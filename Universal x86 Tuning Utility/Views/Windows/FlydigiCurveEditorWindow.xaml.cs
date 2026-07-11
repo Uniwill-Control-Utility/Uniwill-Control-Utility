@@ -7,7 +7,7 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
     /// <summary>
     /// Dialog window for editing a fan curve profile.
     /// </summary>
-    public partial class FlydigiCurveEditorWindow : UiWindow
+    public partial class FlydigiCurveEditorWindow : FluentWindow
     {
         public FlydigiFanCurveProfile? EditedProfile { get; private set; }
 

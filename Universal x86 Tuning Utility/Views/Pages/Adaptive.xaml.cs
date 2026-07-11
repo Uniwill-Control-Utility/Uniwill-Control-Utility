@@ -42,16 +42,18 @@ using System.ComponentModel;
 
 namespace Universal_x86_Tuning_Utility.Views.Pages
 {
-    /// <summary>
-    /// Interaction logic for Automations.xaml
-    /// </summary>
     public partial class Adaptive : Page
     {
         System.Windows.Threading.DispatcherTimer adaptiveMode = new System.Windows.Threading.DispatcherTimer();
         System.Windows.Threading.DispatcherTimer sensors = new System.Windows.Threading.DispatcherTimer();
         private static int coreCount = 0;
-        public Adaptive()
+        private readonly GpuInventoryService gpuInventory;
+        private int radeonGpuCount;
+        private int nvidiaGpuCount;
+
+        public Adaptive(GpuInventoryService gpuInventory)
         {
+            this.gpuInventory = gpuInventory;
             InitializeComponent();
 
             _ = Tablet.TabletDevices;
@@ -82,13 +84,17 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         {
             try
             {
-                if (GetRadeonGPUCount() <= 0)
+                GpuInventorySnapshot inventory = await gpuInventory.GetSnapshotAsync();
+                radeonGpuCount = inventory.RadeonCount;
+                nvidiaGpuCount = inventory.NvidiaCount;
+
+                if (radeonGpuCount <= 0)
                 {
                     sdTBOiGPU.Visibility = Visibility.Collapsed;
                     sdADLX.Visibility = Visibility.Collapsed;
                 }
 
-                if (GetNVIDIAGPUCount() < 1) sdNVIDIA.Visibility = Visibility.Collapsed;
+                if (nvidiaGpuCount < 1) sdNVIDIA.Visibility = Visibility.Collapsed;
 
                 if (Family.TYPE == Family.ProcessorType.Amd_Desktop_Cpu || Family.FAM == Family.RyzenFamily.DragonRange) nudPowerLimit.Value = 86;
                 else nudPowerLimit.Value = 28;
@@ -280,7 +286,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 if (start)
                 {
                     start = false;
-                    siStartIcon.Symbol = Wpf.Ui.Common.SymbolRegular.Play20;
+                    siStartIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Play20;
                     tbxStartText.Text = "Start Adaptive Mode";
                     GetSensor.CloseSensor();
                     Settings.Default.isAdaptiveModeRunning = false;
@@ -290,7 +296,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 else
                 {
                     start = true;
-                    siStartIcon.Symbol = Wpf.Ui.Common.SymbolRegular.Stop20;
+                    siStartIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Stop20;
                     tbxStartText.Text = "Stop Adaptive Mode";
                     await Task.Run(() => GetSensor.OpenSensor());
                     Settings.Default.isAdaptiveModeRunning = true;
@@ -508,19 +514,22 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         else CPUTemp = (int)GetSensor.GetCPUInfo(SensorType.Temperature, "Core");
                         CPULoad = (int)GetSensor.GetCPUInfo(SensorType.Load, "Total");
 
-                        int i = 1;
-                        do
+                        int clockTotal = 0;
+                        int clockSamples = 0;
+                        for (int core = 1; core <= coreCount; core++)
                         {
-                            if (i <= i) CPUClock = CPUClock + (int)GetSensor.GetCPUInfo(SensorType.Clock, $"Core #{i}");
-                            i++;
+                            int clock = (int)GetSensor.GetCPUInfo(SensorType.Clock, $"Core #{core}");
+                            if (clock <= 0)
+                                continue;
+                            clockTotal += clock;
+                            clockSamples++;
                         }
-                        while (i <= coreCount);
 
-                        CPUClock = (int)(CPUClock / i);
+                        CPUClock = clockSamples > 0 ? clockTotal / clockSamples : 0;
 
                         //CPUPower = (int)GetSensor.getCPUInfo(SensorType.Power, "Package");
 
-                        if (GetRadeonGPUCount() <= 0)
+                        if (radeonGpuCount > 0)
                         {
                             GPULoad = ADLXBackend.GetGPUMetrics(0, 7);
                             GPUClock = ADLXBackend.GetGPUMetrics(0, 0);
@@ -530,7 +539,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         isGameRunning();
                     });
 
-                    if (GetNVIDIAGPUCount() < 1) sdNVIDIA.Visibility = Visibility.Collapsed;
+                    if (nvidiaGpuCount < 1) sdNVIDIA.Visibility = Visibility.Collapsed;
 
                     minCPUClock = Convert.ToInt32(nudMinCpuClk.Value);
                     if (CPULoad < (100 / coreCount) + 5) newMinCPUClock = minCPUClock + 500;
@@ -563,39 +572,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
         }
 
-        public static int GetRadeonGPUCount()
-        {
-            int count = 0;
-            using (ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT * FROM Win32_VideoController"))
-            {
-                foreach (ManagementObject obj in searcher.Get())
-                {
-                    string name = obj["Name"] as string;
-                    if (name != null && name.Contains("Radeon"))
-                    {
-                        count++;
-                    }
-                }
-            }
-            return count;
-        }
-
-        public static int GetNVIDIAGPUCount()
-        {
-            int count = 0;
-            using (ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT * FROM Win32_VideoController"))
-            {
-                foreach (ManagementObject obj in searcher.Get())
-                {
-                    string name = obj["Name"] as string;
-                    if (name != null && name.Contains("NVIDIA"))
-                    {
-                        count++;
-                    }
-                }
-            }
-            return count;
-        }
         string lastCPU = "";
         string lastCO = "";
         string lastiGPU = "";
@@ -683,30 +659,30 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                                 _waterCoolerService = App.GetService<WaterCoolerService>();
 
                             if (_waterCoolerService != null && _waterCoolerService.IsConnected)
-                        {
-                            PumpVoltage curPump = GetPumpVoltageFromIndex(cbxWcPumpVoltage.SelectedIndex);
-                            FanSpeed curFan = GetFanSpeedFromIndex(cbxWcFanSpeed.SelectedIndex);
-                            RgbState curRgbMode = GetRgbModeFromIndex(cbxWcRgbMode.SelectedIndex);
-                            RgbColor curRgbColor = GetRgbColorFromIndex(cbxWcRgbColor.SelectedIndex);
-
-                            if (curPump != lastWcPump)
                             {
-                                await _waterCoolerService.WritePumpModeAsync(curPump);
-                                lastWcPump = curPump;
-                            }
+                                PumpVoltage curPump = GetPumpVoltageFromIndex(cbxWcPumpVoltage.SelectedIndex);
+                                FanSpeed curFan = GetFanSpeedFromIndex(cbxWcFanSpeed.SelectedIndex);
+                                RgbState curRgbMode = GetRgbModeFromIndex(cbxWcRgbMode.SelectedIndex);
+                                RgbColor curRgbColor = GetRgbColorFromIndex(cbxWcRgbColor.SelectedIndex);
 
-                            if (curFan != lastWcFan)
-                            {
-                                await _waterCoolerService.WriteFanModeAsync(curFan);
-                                lastWcFan = curFan;
-                            }
+                                if (curPump != lastWcPump)
+                                {
+                                    await _waterCoolerService.WritePumpModeAsync(curPump);
+                                    lastWcPump = curPump;
+                                }
 
-                            if (curRgbMode != lastWcRgbMode || curRgbColor != lastWcRgbColor)
-                            {
-                                await _waterCoolerService.WriteRgbModeAsync(curRgbMode, curRgbColor);
-                                lastWcRgbMode = curRgbMode;
-                                lastWcRgbColor = curRgbColor;
-                            }
+                                if (curFan != lastWcFan)
+                                {
+                                    await _waterCoolerService.WriteFanModeAsync(curFan);
+                                    lastWcFan = curFan;
+                                }
+
+                                if (curRgbMode != lastWcRgbMode || curRgbColor != lastWcRgbColor)
+                                {
+                                    await _waterCoolerService.WriteRgbModeAsync(curRgbMode, curRgbColor);
+                                    lastWcRgbMode = curRgbMode;
+                                    lastWcRgbColor = curRgbColor;
+                                }
                             }
                         }
 
@@ -717,33 +693,33 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                                 _bs2ProService = App.GetService<FlydigiCoolerService>();
 
                             if (_bs2ProService != null && _bs2ProService.IsConnected)
-                        {
-                            string bs2Mode = GetBs2ProFanModeFromIndex(cbxBs2ProFanMode.SelectedIndex);
+                            {
+                                string bs2Mode = GetBs2ProFanModeFromIndex(cbxBs2ProFanMode.SelectedIndex);
 
-                            if (bs2Mode == "Off")
-                            {
-                                await _bs2ProService.WriteRealtimeRpmAsync(0);
-                            }
-                            else if (bs2Mode == "Gear")
-                            {
-                                byte gear = (byte)(cbxBs2ProGear.SelectedIndex + 1);
-                                if (gear != lastBs2ProGear)
+                                if (bs2Mode == "Off")
                                 {
-                                    await _bs2ProService.WriteGearAsync(gear);
-                                    lastBs2ProGear = gear;
+                                    await _bs2ProService.WriteRealtimeRpmAsync(0);
                                 }
-                            }
-                            else if (bs2Mode == "Rpm")
-                            {
-                                ushort rpm = (ushort)Math.Clamp((int)nudBs2ProRpm.Value, 1300, 4000);
-                                if (rpm != lastBs2ProRpm)
+                                else if (bs2Mode == "Gear")
                                 {
-                                    await _bs2ProService.WriteRealtimeRpmAsync(rpm);
-                                    lastBs2ProRpm = rpm;
+                                    byte gear = (byte)(cbxBs2ProGear.SelectedIndex + 1);
+                                    if (gear != lastBs2ProGear)
+                                    {
+                                        await _bs2ProService.WriteGearAsync(gear);
+                                        lastBs2ProGear = gear;
+                                    }
                                 }
-                            }
-                            // "Curve" mode is handled by FlydigiSmartControl on the FlydigiCooler page,
-                            // not by the adaptive tick loop. Auto-control toggle is saved for future use.
+                                else if (bs2Mode == "Rpm")
+                                {
+                                    ushort rpm = (ushort)Math.Clamp((int)nudBs2ProRpm.Value, 1300, 4000);
+                                    if (rpm != lastBs2ProRpm)
+                                    {
+                                        await _bs2ProService.WriteRealtimeRpmAsync(rpm);
+                                        lastBs2ProRpm = rpm;
+                                    }
+                                }
+                                // "Curve" mode is handled by FlydigiSmartControl on the FlydigiCooler page,
+                                // not by the adaptive tick loop. Auto-control toggle is saved for future use.
                             }
                         }
 
@@ -794,7 +770,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
-            Garbage.Garbage_Collect();
         }
 
 

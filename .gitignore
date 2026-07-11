@@ -361,6 +361,10 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+FodyWeavers.xsd
 
-JetBrains IDE
+# JetBrains IDE
 /**/.idea/*
+
+# Qwen Code
+.qwen/

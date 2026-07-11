@@ -6,8 +6,8 @@ using System.Linq;
 using System.Management;
 using System.Runtime.Intrinsics.X86;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
+using Microsoft.Win32;
 using Universal_x86_Tuning_Utility.Scripts.AMD_Backend;
 using Universal_x86_Tuning_Utility.Scripts.Intel_Backend;
 
@@ -177,7 +177,8 @@ namespace Universal_x86_Tuning_Utility.Scripts
             // Unknown AMD mobile fallback
             return 55;
         }
-        public static async void setCpuFamily()
+
+        public static void setCpuFamily()
         {
             try
             {
@@ -261,7 +262,7 @@ namespace Universal_x86_Tuning_Utility.Scripts
                 }
                 catch { /* WMI not available for GPU detection */ }
             }
-            catch (ManagementException e)
+            catch (Exception e)
             {
                 Debug.WriteLine("Error: " + e.Message);
             }
@@ -269,7 +270,6 @@ namespace Universal_x86_Tuning_Utility.Scripts
             if (CPUName.Contains("Intel"))
             {
                 TYPE = ProcessorType.Intel;
-                Intel_Management.determineCPU();
             }
             else
             {

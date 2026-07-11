@@ -1,4 +1,4 @@
-<ui:UiWindow x:Class="Universal_x86_Tuning_Utility.Views.Windows.FlydigiCurveEditorWindow"
+<ui:FluentWindow x:Class="Universal_x86_Tuning_Utility.Views.Windows.FlydigiCurveEditorWindow"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
@@ -48,4 +48,4 @@
             </StackPanel>
         </Grid>
     </Grid>
-</ui:UiWindow>
+</ui:FluentWindow>
