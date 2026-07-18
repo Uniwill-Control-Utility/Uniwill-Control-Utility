@@ -7,13 +7,22 @@
     mc:Ignorable="d"
     d:DesignHeight="450" d:DesignWidth="800"
     Loaded="FlydigiCooler_Loaded"
-    Unloaded="Page_Unloaded">
+    Unloaded="Page_Unloaded"
+    ScrollViewer.CanContentScroll="False">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="24">
+    <Grid>
+        <!-- Content -->
+        <ScrollViewer x:Name="PageScrollViewer"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      CanContentScroll="False"
+                      PanningMode="VerticalOnly"
+                      IsDeferredScrollingEnabled="False">
+            <StackPanel Margin="24">
 
             <!-- Header -->
-            <TextBlock Text="Flydigi Cooler Control"
+            <TextBlock x:Name="tbPageTitle"
+                Text="Flydigi Cooler Control"
                 FontSize="20" FontWeight="SemiBold"
                 Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                 Margin="0,0,0,16"/>
@@ -30,7 +39,8 @@
                         <!-- Column 1: Device image + live metrics -->
                         <StackPanel Grid.Column="0"
                                     HorizontalAlignment="Center"
-                                    VerticalAlignment="Center">
+                                    VerticalAlignment="Center"
+                                    Margin="24,0,0,0">
                             <Image x:Name="imgDevice"
                                    Width="320"
                                    Height="140"
@@ -62,7 +72,8 @@
                         <!-- Column 2: Status + action -->
                         <StackPanel Grid.Column="1"
                                     HorizontalAlignment="Center"
-                                    VerticalAlignment="Center">
+                                    VerticalAlignment="Center" 
+                                    Margin="12,0,0,0">
 
                             <!-- Connected state -->
                             <StackPanel x:Name="spConnectedState" Visibility="Collapsed">
@@ -113,17 +124,6 @@
 
             <!-- Controls (hidden until connected) -->
             <StackPanel Name="spControls" Visibility="Collapsed">
-
-                <!-- Adaptive Mode Override Warning -->
-                <ui:CardControl x:Name="cardAdaptiveWarning" Margin="0,0,0,12" Visibility="Collapsed">
-                    <ui:CardControl.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <ui:SymbolIcon Symbol="Warning24" Margin="0,0,8,0" Foreground="Red"/>
-                            <TextBlock Text="Adaptive Mode Override" Foreground="Red"/>
-                        </StackPanel>
-                    </ui:CardControl.Header>
-                    <TextBlock Text="Adaptive Mode is currently controlling the Flydigi cooler. Fan controls on this page are disabled while Adaptive Mode is active." TextWrapping="Wrap"/>
-                </ui:CardControl>
 
                 <!-- Fan Control Section -->
                 <ui:CardControl Margin="0,0,0,12">
@@ -221,50 +221,65 @@
                         <StackPanel Name="spRgbSliders" Visibility="Collapsed">
                             <!-- Red -->
                             <StackPanel Margin="0,0,0,4">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="R:" Width="20" VerticalAlignment="Center"/>
-                                    <ui:NumberBox Name="nudRgbR" Width="60" Minimum="0" Maximum="255"
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="150"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="R:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <ui:NumberBox Name="nudRgbR" Grid.Column="1" Minimum="0" Maximum="255"
                                         Value="{Binding ElementName=sliderRgbR, Path=Value}"
-                                        SmallChange="1" MaxDecimalPlaces="0"
-                                        Margin="4,0,8,0"/>
-                                    <Slider Name="sliderRgbR" Minimum="0" Maximum="255"
+                                        SmallChange="1" MaxDecimalPlaces="0"/>
+                                    <Slider Name="sliderRgbR" Grid.Column="2" Minimum="0" Maximum="255"
                                         Value="{Binding ElementName=nudRgbR, Path=Value}"
                                         TickFrequency="1" IsSnapToTickEnabled="True"
                                         VerticalAlignment="Center"
-                                        ValueChanged="RgbSlider_ValueChanged"/>
-                                </StackPanel>
+                                        ValueChanged="RgbSlider_ValueChanged"
+                                        Margin="12,0,0,0"/>
+                                </Grid>
                             </StackPanel>
 
                             <!-- Green -->
                             <StackPanel Margin="0,0,0,4">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="G:" Width="20" VerticalAlignment="Center"/>
-                                    <ui:NumberBox Name="nudRgbG" Width="60" Minimum="0" Maximum="255"
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="150"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="G:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <ui:NumberBox Name="nudRgbG" Grid.Column="1" Minimum="0" Maximum="255"
                                         Value="{Binding ElementName=sliderRgbG, Path=Value}"
-                                        SmallChange="1" MaxDecimalPlaces="0"
-                                        Margin="4,0,8,0"/>
-                                    <Slider Name="sliderRgbG" Minimum="0" Maximum="255"
+                                        SmallChange="1" MaxDecimalPlaces="0"/>
+                                    <Slider Name="sliderRgbG" Grid.Column="2" Minimum="0" Maximum="255"
                                         Value="{Binding ElementName=nudRgbG, Path=Value}"
                                         TickFrequency="1" IsSnapToTickEnabled="True"
                                         VerticalAlignment="Center"
-                                        ValueChanged="RgbSlider_ValueChanged"/>
-                                </StackPanel>
+                                        ValueChanged="RgbSlider_ValueChanged"
+                                        Margin="12,0,0,0"/>
+                                </Grid>
                             </StackPanel>
 
                             <!-- Blue -->
                             <StackPanel Margin="0,0,0,4">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="B:" Width="20" VerticalAlignment="Center"/>
-                                    <ui:NumberBox Name="nudRgbB" Width="60" Minimum="0" Maximum="255"
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="150"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="B:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <ui:NumberBox Name="nudRgbB" Grid.Column="1" Minimum="0" Maximum="255"
                                         Value="{Binding ElementName=sliderRgbB, Path=Value}"
-                                        SmallChange="1" MaxDecimalPlaces="0"
-                                        Margin="4,0,8,0"/>
-                                    <Slider Name="sliderRgbB" Minimum="0" Maximum="255"
+                                        SmallChange="1" MaxDecimalPlaces="0"/>
+                                    <Slider Name="sliderRgbB" Grid.Column="2" Minimum="0" Maximum="255"
                                         Value="{Binding ElementName=nudRgbB, Path=Value}"
                                         TickFrequency="1" IsSnapToTickEnabled="True"
                                         VerticalAlignment="Center"
-                                        ValueChanged="RgbSlider_ValueChanged"/>
-                                </StackPanel>
+                                        ValueChanged="RgbSlider_ValueChanged"
+                                        Margin="12,0,0,0"/>
+                                </Grid>
                             </StackPanel>
                         </StackPanel>
 
@@ -363,16 +378,23 @@
                                 Checked="tsAvoidance_Checked" Unchecked="tsAvoidance_Unchecked"/>
                             <TextBlock Text="Speed Avoidance Zone" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                            <TextBlock Text="Range:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <ui:NumberBox Name="nudAvoidanceStart" Width="80" Minimum="1300" Maximum="4000"
-                                SmallChange="100" MaxDecimalPlaces="0"
-                                Margin="0,0,4,0"
-                                ValueChanged="nudAvoidance_ValueChanged"/>
-                            <TextBlock Text="-" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                            <ui:NumberBox Name="nudAvoidanceEnd" Width="80" Minimum="1300" Maximum="4000"
-                                SmallChange="100" MaxDecimalPlaces="0"
-                                ValueChanged="nudAvoidance_ValueChanged"/>
+                        <StackPanel Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="150"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Range:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <ui:NumberBox Name="nudAvoidanceStart" Grid.Column="1" Minimum="1300" Maximum="4000"
+                                    SmallChange="100" MaxDecimalPlaces="0"
+                                    ValueChanged="nudAvoidance_ValueChanged"/>
+                                <TextBlock Grid.Column="2" Text="-" VerticalAlignment="Center" Margin="8,0,8,0"/>
+                                <ui:NumberBox Name="nudAvoidanceEnd" Grid.Column="3" Minimum="1300" Maximum="4000"
+                                    SmallChange="100" MaxDecimalPlaces="0"
+                                    ValueChanged="nudAvoidance_ValueChanged"/>
+                            </Grid>
                         </StackPanel>
 
                         <!-- Temperature Source -->
@@ -406,5 +428,12 @@
 
             </StackPanel>
         </StackPanel>
-    </ScrollViewer>
+        </ScrollViewer>
+
+        <!-- Dark overlay for Adaptive Mode override (covers ScrollViewer to block input) -->
+        <Grid x:Name="overlayAdaptiveWarning" Visibility="Collapsed" Background="Black" Opacity="0.4"/>
+
+        <!-- Page-scoped snackbar presenter for Adaptive Mode override warning -->
+        <ui:SnackbarPresenter x:Name="SnackbarPresenter"/>
+    </Grid>
 </Page>

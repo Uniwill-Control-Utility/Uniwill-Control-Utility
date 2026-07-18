@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Universal_x86_Tuning_Utility.Properties;
+using Universal_x86_Tuning_Utility.Scripts;
 using Universal_x86_Tuning_Utility.Views.Controls;
 using Universal_x86_Tuning_Utility.Models;
 using Universal_x86_Tuning_Utility.Services;
@@ -22,6 +23,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private bool _isInitialized;
         private FlydigiCoolerService? _coolerService;
         private MultiColorPickerControl? mcRotationColors;
+        private Wpf.Ui.Controls.Snackbar? _adaptiveSnackbar;
+        private bool _adaptiveSnackbarShown;
+        /// <summary>True while the override was previously active (regardless of whether the snackbar was visually shown).</summary>
+        private bool _wasPreviouslyOverridden;
 
         private FlydigiSmartControl? _smartControl;
         private FlydigiTemperatureProvider? _tempProvider;
@@ -32,40 +37,34 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private System.Threading.Timer? _rpmApplyTimer;
         private System.Threading.Timer? _rgbApplyTimer;
 
+        /// <summary>True once initial settings (RGB, RPM) have been applied to the device after first connect.</summary>
+        private bool _hasAppliedInitialSettings;
+
         /// <summary>The currently selected fan curve profile for auto control.</summary>
         private FlydigiFanCurveProfile? _activeProfile;
 
         public FlydigiCooler()
         {
             InitializeComponent();
+            InitializePage();
         }
 
         /* ------------------------------------------------------------------ */
         /*  Lifecycle                                                          */
         /* ------------------------------------------------------------------ */
 
-        private void FlydigiCooler_Loaded(object sender, RoutedEventArgs e)
+        private void InitializePage()
         {
             if (_isInitialized) return;
             _isInitialized = true;
-            Loaded -= FlydigiCooler_Loaded;
 
             try
             {
                 _coolerService = App.GetService<FlydigiCoolerService>();
                 if (_coolerService == null)
                 {
-                    MessageBox.Show(
-                        "Flydigi cooler service is not available.\nPlease restart the application.",
-                        "Service Error",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
                     return;
                 }
-
-                _coolerService.ConnectionStateChanged += OnConnectionStateChanged;
-                _coolerService.StatusChanged += OnStatusChanged;
-                _coolerService.FanDataReceived += OnFanDataReceived;
 
                 // Create multi-color picker programmatically (XAML codegen doesn't generate the field)
                 mcRotationColors = new MultiColorPickerControl();
@@ -74,31 +73,47 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                 LoadSettingsToUI();
 
-                // Apply saved RGB settings on connect if already connected
-                if (_coolerService.IsConnected)
-                    ApplyRgbAsync();
-
-                // Reflect current connection state
-                if (_coolerService.IsConnected)
-                {
-                    UpdateConnectionUI(true);
-                }
-                else
-                {
-                    SetControlsEnabled(false);
-                }
-
-                // Start polling for Adaptive Mode state (checks every 2 seconds)
-                StartAdaptiveCheck();
+                // Update page title with detected cooler model name
+                tbPageTitle.Text = $"Flydigi {FlydigiHardwareDetector.GetDetectedModelName()} Control";
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Failed to initialize Flydigi cooler page: {ex.Message}",
-                    "Initialization Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                // Log but don't block page load
+                System.Diagnostics.Debug.WriteLine($"FlydigiCooler init error: {ex.Message}");
             }
+        }
+
+        private void FlydigiCooler_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (_coolerService == null) return;
+
+            _coolerService.ConnectionStateChanged += OnConnectionStateChanged;
+            _coolerService.StatusChanged += OnStatusChanged;
+            _coolerService.FanDataReceived += OnFanDataReceived;
+
+            // Check Adaptive Mode override state first — it gates whether we apply settings
+            CheckAdaptiveModeState();
+
+            // Apply saved RGB settings only on first connect, not on every page navigation
+            if (_coolerService.IsConnected && !_hasAppliedInitialSettings)
+            {
+                ApplyRgbAsync();
+                _hasAppliedInitialSettings = true;
+            }
+
+            // Reflect current connection state
+            if (_coolerService.IsConnected)
+            {
+                UpdateConnectionUI(true);
+                StartTemperaturePolling();
+            }
+            else
+            {
+                SetControlsEnabled(false);
+            }
+
+            // Start polling for Adaptive Mode state (checks every 2 seconds)
+            StartAdaptiveCheck();
         }
 
         private void Page_Unloaded(object? sender, RoutedEventArgs e)
@@ -112,8 +127,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             StopTemperaturePolling();
             StopAutoControl();
-            _tempProvider?.Dispose();
-            _tempProvider = null;
 
             _rpmApplyTimer?.Dispose();
             _rpmApplyTimer = null;
@@ -121,6 +134,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _rgbApplyTimer = null;
             _adaptiveCheckTimer?.Dispose();
             _adaptiveCheckTimer = null;
+
+            // Reset snackbar/override state so it can show again on next page visit
+            _adaptiveSnackbarShown = false;
+            _wasPreviouslyOverridden = false;
+            _adaptiveSnackbar = null;
         }
 
         /* ------------------------------------------------------------------ */
@@ -199,6 +217,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             if (_coolerService == null || !_coolerService.IsConnected) return;
 
+            // Guard: don't apply settings when Adaptive Mode is overriding
+            if (Settings.Default.isAdaptiveModeRunning && Settings.Default.AdaptiveBs2ProEnabled)
+                return;
+
             var rpm = (ushort)nudRpm.Value;
 
             try
@@ -245,6 +267,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         {
             if (_coolerService == null || !_coolerService.IsConnected) return;
 
+            // Guard: don't apply settings when Adaptive Mode is overriding
+            if (Settings.Default.isAdaptiveModeRunning && Settings.Default.AdaptiveBs2ProEnabled)
+                return;
+
             try
             {
                 await _coolerService.WriteGearAsync(gear);
@@ -259,6 +285,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private async void cbxGearSubLevel_SelectionChanged(object sender, EventArgs e)
         {
             if (_coolerService == null || !_coolerService.IsConnected) return;
+
+            // Guard: don't apply settings when Adaptive Mode is overriding
+            if (Settings.Default.isAdaptiveModeRunning && Settings.Default.AdaptiveBs2ProEnabled)
+                return;
 
             var subLevel = cbxGearSubLevel.SelectedIndex; // 0=Low, 1=Medium, 2=High
 
@@ -377,22 +407,78 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             bool adaptiveRunning = Settings.Default.isAdaptiveModeRunning;
             bool bs2ProEnabled = Settings.Default.AdaptiveBs2ProEnabled;
             bool shouldOverride = adaptiveRunning && bs2ProEnabled;
-            bool wasOverriding = cardAdaptiveWarning.Visibility == Visibility.Visible;
 
-            if (shouldOverride && !wasOverriding)
+            overlayAdaptiveWarning.Visibility = shouldOverride ? Visibility.Visible : Visibility.Collapsed;
+
+            if (shouldOverride)
             {
-                // Adaptive Mode just started with BS2 Pro enabled — disable controls
-                cardAdaptiveWarning.Visibility = Visibility.Visible;
                 SetControlsEnabled(false);
                 StopAutoControl();
+
+                // Show snackbar on transition from "no override" to "override"
+                if (!_adaptiveSnackbarShown)
+                {
+                    _adaptiveSnackbarShown = true;
+                    ShowAdaptiveSnackbar();
+                }
+                _wasPreviouslyOverridden = true;
             }
-            else if (!shouldOverride && wasOverriding)
+            else if (_coolerService?.IsConnected == true)
             {
-                // Adaptive Mode stopped or BS2 Pro disabled — re-enable controls
-                cardAdaptiveWarning.Visibility = Visibility.Collapsed;
-                if (_coolerService?.IsConnected == true)
-                    SetControlsEnabled(true);
+                // Hide snackbar on transition from "override" to "no override"
+                if (_adaptiveSnackbarShown)
+                {
+                    _adaptiveSnackbarShown = false;
+                    HideAdaptiveSnackbar();
+                }
+
+                // Re-apply the Flydigi page's saved settings now that control is returned.
+                // This ensures the device reflects the page's settings, not whatever
+                // Adaptive Mode last commanded. Only on transition, not every tick.
+                if (_wasPreviouslyOverridden)
+                {
+                    _wasPreviouslyOverridden = false;
+                    ApplyRgbAsync();
+                    if (cbxFanMode.SelectedIndex == 0)
+                    {
+                        ApplyRpmAsync();
+                    }
+                }
+
+                SetControlsEnabled(true);
+
+                // Restart auto control if we're in Auto mode and it was stopped by the override
+                if (cbxFanMode.SelectedIndex == 2 && _smartControl == null && _activeProfile != null)
+                {
+                    StartAutoControl();
+                }
             }
+        }
+
+        /// <summary>
+        /// Creates and shows the Adaptive Mode override snackbar.
+        /// </summary>
+        private void ShowAdaptiveSnackbar()
+        {
+            _adaptiveSnackbar = new Wpf.Ui.Controls.Snackbar(SnackbarPresenter)
+            {
+                Title = "Adaptive Mode Override",
+                Content = "Adaptive Mode is currently controlling the Flydigi cooler. Controls on this page are currently disabled.",
+                Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+                Icon = new Wpf.Ui.Controls.SymbolIcon(Wpf.Ui.Controls.SymbolRegular.Warning24),
+                IsCloseButtonEnabled = false,
+                Timeout = TimeSpan.FromHours(1), // effectively infinite — dismissed on page Unloaded
+            };
+            _adaptiveSnackbar.Show(true);
+        }
+
+        /// <summary>
+        /// Hides the Adaptive Mode override snackbar.
+        /// </summary>
+        private void HideAdaptiveSnackbar()
+        {
+            SnackbarPresenter.HideCurrent();
+            _adaptiveSnackbar = null;
         }
 
         /* ------------------------------------------------------------------ */
@@ -550,6 +636,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _rgbApplyTimer = null;
 
             if (_coolerService == null || !_coolerService.IsConnected) return;
+
+            // Guard: don't apply settings when Adaptive Mode is overriding
+            if (Settings.Default.isAdaptiveModeRunning && Settings.Default.AdaptiveBs2ProEnabled)
+                return;
 
             var modeIndex = cbxRgbMode.SelectedIndex;
             var mode = GetRgbModeName(modeIndex);
@@ -853,6 +943,12 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             Application.Current.Dispatcher.Invoke(() =>
             {
                 UpdateConnectionUI(connected);
+                // Apply initial settings on first connect (from the Connect button, not page navigation)
+                if (connected && !_hasAppliedInitialSettings)
+                {
+                    ApplyRgbAsync();
+                    _hasAppliedInitialSettings = true;
+                }
             });
         }
 
@@ -999,6 +1095,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 btnScan.IsEnabled = false;
                 SetControlsEnabled(true);
 
+                // Check if Adaptive Mode is overriding — this may re-disable controls
+                CheckAdaptiveModeState();
+
                 if (_coolerService?.ConnectedDeviceInfo != null)
                     UpdateDeviceImage(_coolerService.ConnectedDeviceInfo.ProductId);
 
@@ -1010,9 +1109,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                 // Show control panels when connected
                 spControls.Visibility = Visibility.Visible;
-
-                // Apply saved RGB settings on connect
-                ApplyRgbAsync();
             }
             else
             {
@@ -1035,6 +1131,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 // Stop auto control when disconnected
                 StopAutoControl();
                 StopTemperaturePolling();
+
+                // Reset so settings re-apply on next connect
+                _hasAppliedInitialSettings = false;
             }
         }
 
@@ -1132,7 +1231,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             nudRgbR.IsEnabled = enabled;
             nudRgbG.IsEnabled = enabled;
             nudRgbB.IsEnabled = enabled;
+            sliderRgbR.IsEnabled = enabled;
+            sliderRgbG.IsEnabled = enabled;
+            sliderRgbB.IsEnabled = enabled;
             nudRgbBrightness.IsEnabled = enabled;
+            sliderRgbBrightness.IsEnabled = enabled;
             cbxRgbSpeed.IsEnabled = enabled;
             if (mcRotationColors is not null) mcRotationColors.IsEnabled = enabled;
             tsAutoConnect.IsEnabled = enabled;

@@ -3,72 +3,114 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     Title="Watercooler Control"
-    Unloaded="Page_Unloaded">
+    Unloaded="Page_Unloaded"
+    ScrollViewer.CanContentScroll="False">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="24">
+    <Grid>
+        <!-- Content -->
+        <ScrollViewer x:Name="PageScrollViewer"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      CanContentScroll="False"
+                      PanningMode="VerticalOnly"
+                      IsDeferredScrollingEnabled="False">
+            <StackPanel Margin="24">
 
             <!-- Header -->
-            <TextBlock Text="LCT Watercooler Control"
+            <TextBlock x:Name="tbPageTitle"
+                Text="LCT Watercooler Control"
                 FontSize="20" FontWeight="SemiBold"
                 Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                 Margin="0,0,0,16"/>
 
-        <!-- Device Discovery Section -->
-        <ui:CardControl x:Name="cardDiscovery" Margin="0,0,0,12">
-            <ui:CardControl.Header>
-                <StackPanel Orientation="Horizontal">
-                    <ui:SymbolIcon Symbol="Bluetooth24" Margin="0,0,8,0"/>
-                    <TextBlock Text="Device Discovery"/>
-                </StackPanel>
-            </ui:CardControl.Header>
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <ComboBox x:Name="cbxDevices" Grid.Column="1" Margin="8,0" MinWidth="200" SelectionChanged="cbxDevices_SelectionChanged">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
-                                <TextBlock Text=" (" Margin="6,0,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                                <TextBlock Text="{Binding Address}" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                                <TextBlock Text=")" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                                <TextBlock Text="  RSSI: " Margin="12,0,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
-                                <TextBlock Text="{Binding Rssi}" Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
+            <!-- Device Status Card -->
+            <ui:CardControl Margin="0,0,0,12">
+                <ui:CardControl.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Column 1: Device image -->
+                        <StackPanel Grid.Column="0"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                            <Image x:Name="imgDevice"
+                                   Width="320"
+                                   Height="140"
+                                   Stretch="Uniform"
+                                   Source="pack://application:,,,/Assets/HydroUI/mk1.png"
+                                   Margin="0,0,0,12"/>
+                        </StackPanel>
+
+                        <!-- Column 2: Status + action -->
+                        <StackPanel Grid.Column="1"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+
+                            <!-- Connected state -->
+                            <StackPanel x:Name="spConnectedState" Visibility="Collapsed">
+                                <ui:SymbolIcon Symbol="CheckmarkCircle48"
+                                               Foreground="Green"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,0,0,8"/>
+                                <TextBlock Text="Connected"
+                                           FontWeight="SemiBold"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,16"/>
+                                <Button x:Name="btnDisconnect"
+                                        Content="Disconnect"
+                                        Width="140"
+                                        Click="btnDisconnect_Click"/>
                             </StackPanel>
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
-                <Button x:Name="btnScan" Grid.Column="2" Content="Scan for Devices" Width="160" Click="btnScan_Click"/>
-            </Grid>
-        </ui:CardControl>
 
-        <!-- Connection Status -->
-        <ui:CardControl Margin="0,0,0,12">
-            <ui:CardControl.Header>
-                <StackPanel Orientation="Horizontal">
-                    <ui:SymbolIcon Symbol="Status24" Margin="0,0,8,0"/>
-                    <TextBlock Text="Connection Status"/>
-                </StackPanel>
-            </ui:CardControl.Header>
-            <StackPanel Orientation="Horizontal">
-                <ui:SymbolIcon x:Name="iconConnected" Symbol="Checkmark24" Visibility="Collapsed">
-                    <ui:SymbolIcon.Foreground>
-                        <SolidColorBrush Color="#00CC00"/>
-                    </ui:SymbolIcon.Foreground>
-                </ui:SymbolIcon>
-                <ui:SymbolIcon x:Name="iconDisconnected" Symbol="EqualCircle24" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Visibility="Visible"/>
-                <TextBlock x:Name="txtConnectionStatus" Text="Not connected" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                <Button x:Name="btnConnect" Content="Connect" Width="100" Margin="12,0,0,0" Click="btnConnect_Click" IsEnabled="False"/>
-                <Button x:Name="btnDisconnect" Content="Disconnect" Width="100" Margin="8,0,0,0" Click="btnDisconnect_Click" IsEnabled="False"/>
-            </StackPanel>
-        </ui:CardControl>
+                            <!-- Disconnected state -->
+                            <StackPanel x:Name="spDisconnectedState">
+                                <ui:SymbolIcon Symbol="DismissCircle48"
+                                               Foreground="Red"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,0,0,8"/>
+                                <TextBlock Text="Disconnected"
+                                           FontWeight="SemiBold"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,16"/>
 
-        <!-- Controls (hidden until connected) -->
-        <StackPanel x:Name="spControls" Visibility="Collapsed">
+                                <!-- Device discovery row -->
+                                <Grid HorizontalAlignment="Center" Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="cbxDevices" Grid.Column="0" Margin="0,0,8,0" MinWidth="200" SelectionChanged="cbxDevices_SelectionChanged">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                                    <TextBlock Text=" (" Margin="6,0,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                                    <TextBlock Text="{Binding Address}" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                                    <TextBlock Text=")" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                                    <TextBlock Text="  RSSI: " Margin="12,0,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
+                                                    <TextBlock Text="{Binding Rssi}" Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Button x:Name="btnScan" Grid.Column="1" Content="Scan" Width="80" Click="btnScan_Click"/>
+                                </Grid>
+
+                                <Button x:Name="btnConnect"
+                                        Content="Connect"
+                                        Width="140"
+                                        Click="btnConnect_Click"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </ui:CardControl.Header>
+            </ui:CardControl>
+
+            <!-- Controls (hidden until connected) -->
+            <StackPanel x:Name="spControls" Visibility="Collapsed">
 
             <!-- Pump Control -->
             <ui:CardControl Margin="0,0,0,12">
@@ -161,5 +203,19 @@
         </StackPanel>
 
     </StackPanel>
-    </ScrollViewer>
+        </ScrollViewer>
+
+        <!-- Dark overlay to block input when Adaptive Mode override is active -->
+        <Grid x:Name="overlayAdaptiveWarning"
+              Visibility="Collapsed"
+              Background="Black"
+              Opacity="0.4"
+              IsHitTestVisible="True" />
+
+        <!-- SnackbarPresenter for Adaptive Mode override warning -->
+        <ui:SnackbarPresenter x:Name="SnackbarPresenter"
+                              Margin="12"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Bottom" />
+    </Grid>
 </Page>

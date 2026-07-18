@@ -80,6 +80,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private static AdaptivePresetManager adaptivePresetManager = new AdaptivePresetManager(Settings.Default.Path + "adaptivePresets.json");
         private static WaterCoolerService? _waterCoolerService;
         private static FlydigiCoolerService? _bs2ProService;
+        private static FlydigiSmartControl? _bs2ProSmartControl;
+        private static FlydigiTemperatureProvider? _bs2ProTempProvider;
         private async void setUp()
         {
             try
@@ -96,8 +98,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                 if (nvidiaGpuCount < 1) sdNVIDIA.Visibility = Visibility.Collapsed;
 
-                if (Family.TYPE == Family.ProcessorType.Amd_Desktop_Cpu || Family.FAM == Family.RyzenFamily.DragonRange) nudPowerLimit.Value = 86;
-                else nudPowerLimit.Value = 28;
+                bool watercoolerActive = (_waterCoolerService?.IsConnected == true
+                    || _bs2ProService?.IsConnected == true);
+                nudPowerLimit.Value = Family.GetRecommendedPowerLimit(watercoolerActive);
                 nudMaxGfxClk.Value = 1900;
                 nudMinGfxClk.Value = 400;
                 nudTemp.Value = 95;
@@ -184,6 +187,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             Bs2ProGear = 1,
                             Bs2ProRpm = 2000,
                             Bs2ProCurveProfileId = string.Empty,
+                            Bs2ProRgbMode = "Static",
+                            Bs2ProRgbR = 0,
+                            Bs2ProRgbG = 0,
+                            Bs2ProRgbB = 255,
+                            Bs2ProBrightness = 100,
                             isAutoSwitch = (bool)tsAutoSwitch.IsChecked
                         };
                         adaptivePresetManager.SavePreset(item.gameName, preset);
@@ -310,6 +318,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     tbxStartText.Text = LocalizationService.Get("Start Adaptive Mode");
                     GetSensor.CloseSensor();
                     Settings.Default.isAdaptiveModeRunning = false;
+                    Settings.Default.isStartAdpative = false;
                     Settings.Default.Save();
 
                 }
@@ -320,6 +329,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     tbxStartText.Text = LocalizationService.Get("Stop Adaptive Mode");
                     await Task.Run(() => GetSensor.OpenSensor());
                     Settings.Default.isAdaptiveModeRunning = true;
+                    Settings.Default.isStartAdpative = true;
                     Settings.Default.Save();
                 }
             }
@@ -429,12 +439,21 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                     // Watercooler
                     cbxWcEnabled.IsChecked = myPreset.WcEnabled;
+                    Settings.Default.AdaptiveWcEnabled = myPreset.WcEnabled;
+                    Settings.Default.Save();
                     if (Enum.TryParse<PumpVoltage>(myPreset.WcPumpVoltage, true, out var pv))
                         cbxWcPumpVoltage.SelectedIndex = GetPumpVoltageIndex(pv);
                     if (Enum.TryParse<FanSpeed>(myPreset.WcFanSpeed, true, out var fs))
                         cbxWcFanSpeed.SelectedIndex = GetFanSpeedIndex(fs);
                     if (Enum.TryParse<RgbState>(myPreset.WcRgbMode, true, out var rm))
+                    {
                         cbxWcRgbMode.SelectedIndex = GetRgbModeIndex(rm);
+                        spWcRgbColor.Visibility = rm switch
+                        {
+                            RgbState.Static or RgbState.Breathe => Visibility.Visible,
+                            _ => Visibility.Collapsed
+                        };
+                    }
                     if (Enum.TryParse<RgbColor>(myPreset.WcRgbColor, true, out var rc))
                         cbxWcRgbColor.SelectedIndex = GetRgbColorIndex(rc);
 
@@ -447,6 +466,26 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     cbxBs2ProGear.SelectedIndex = Math.Clamp(myPreset.Bs2ProGear - 1, 0, 3);
                     nudBs2ProRpm.Value = Math.Clamp((int)myPreset.Bs2ProRpm, 1300, 4000);
                     cbxBs2ProCurve.SelectedIndex = GetBs2ProCurveIndex(myPreset.Bs2ProCurveProfileId);
+
+                    // BS2 Pro RGB
+                    cbxBs2ProRgbMode.SelectedIndex = GetBs2ProRgbModeIndex(myPreset.Bs2ProRgbMode);
+                    UpdateBs2ProRgbUI();
+                    nudBs2ProRgbR.Value = myPreset.Bs2ProRgbR;
+                    nudBs2ProRgbG.Value = myPreset.Bs2ProRgbG;
+                    nudBs2ProRgbB.Value = myPreset.Bs2ProRgbB;
+                    nudBs2ProBrightness.Value = myPreset.Bs2ProBrightness;
+
+                    // Reset tracking variables so the next sensors_Tick applies all settings
+                    lastBs2ProGear = 0;
+                    lastBs2ProRpm = 0;
+                    lastBs2ProRgbMode = "";
+                    lastBs2ProRgbR = 0;
+                    lastBs2ProRgbG = 0;
+                    lastBs2ProRgbB = 0;
+                    lastBs2ProBrightness = 0;
+
+                    // Stop any existing smart control (curve mode) so it restarts with the new profile
+                    StopBs2ProSmartControl();
                 }
             }
             catch (Exception ex)
@@ -511,6 +550,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     Bs2ProGear = cbxBs2ProGear.SelectedIndex + 1,
                     Bs2ProRpm = (ushort)Math.Clamp((int)nudBs2ProRpm.Value, 1300, 4000),
                     Bs2ProCurveProfileId = GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex),
+                    Bs2ProRgbMode = GetBs2ProRgbModeFromIndex(cbxBs2ProRgbMode.SelectedIndex),
+                    Bs2ProRgbR = (byte)nudBs2ProRgbR.Value,
+                    Bs2ProRgbG = (byte)nudBs2ProRgbG.Value,
+                    Bs2ProRgbB = (byte)nudBs2ProRgbB.Value,
+                    Bs2ProBrightness = (byte)nudBs2ProBrightness.Value,
                     isAutoSwitch = (bool)tsAutoSwitch.IsChecked
                 };
                 adaptivePresetManager.SavePreset(presetName, preset);
@@ -544,7 +588,27 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void btnSave_Click(object sender, RoutedEventArgs e)
         {
-            savePreset(cbxPowerPreset.SelectedItem.ToString());
+            string presetName = cbxPowerPreset.SelectedItem.ToString();
+            savePreset(presetName);
+
+            // Sync active settings so other pages can detect the change immediately
+            Settings.Default.AdaptiveBs2ProEnabled = (bool)cbxBs2ProEnabled.IsChecked;
+            Settings.Default.AdaptiveWcEnabled = (bool)cbxWcEnabled.IsChecked;
+            Settings.Default.Save();
+        }
+
+        private void cbxBs2ProEnabled_Toggled(object sender, RoutedEventArgs e)
+        {
+            // Sync immediately so other pages (e.g. FlydigiCooler) detect the change live
+            Settings.Default.AdaptiveBs2ProEnabled = (bool)cbxBs2ProEnabled.IsChecked;
+            Settings.Default.Save();
+        }
+
+        private void cbxWcEnabled_Toggled(object sender, RoutedEventArgs e)
+        {
+            // Sync immediately so other pages (e.g. Watercooler) detect the change live
+            Settings.Default.AdaptiveWcEnabled = (bool)cbxWcEnabled.IsChecked;
+            Settings.Default.Save();
         }
 
         private static int newMinCPUClock = 1440;
@@ -627,6 +691,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         RgbColor lastWcRgbColor = RgbColor.Red;
         byte lastBs2ProGear = 0;
         ushort lastBs2ProRpm = 0;
+        string lastBs2ProRgbMode = "";
+        byte lastBs2ProRgbR = 0;
+        byte lastBs2ProRgbG = 0;
+        byte lastBs2ProRgbB = 0;
+        byte lastBs2ProBrightness = 0;
         string lastWindowsProcessorPower = "";
         private async void update()
         {
@@ -772,8 +841,73 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                                         lastBs2ProRpm = rpm;
                                     }
                                 }
-                                // "Curve" mode is handled by FlydigiSmartControl on the FlydigiCooler page,
-                                // not by the adaptive tick loop. Auto-control toggle is saved for future use.
+                                else if (bs2Mode == "Curve")
+                                {
+                                    // Handle Curve mode via FlydigiSmartControl
+                                    string curveProfileId = GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex);
+                                    FlydigiFanCurveProfile curveProfile = curveProfileId switch
+                                    {
+                                        "Silent" => FlydigiFanCurveProfile.CreateSilent(),
+                                        "Performance" => FlydigiFanCurveProfile.CreatePerformance(),
+                                        "Custom" => LoadCustomCurveProfile(),
+                                        _ => FlydigiFanCurveProfile.CreateBalanced()
+                                    };
+
+                                    if (_bs2ProSmartControl == null)
+                                    {
+                                        _bs2ProTempProvider = new FlydigiTemperatureProvider();
+                                        _bs2ProSmartControl = new FlydigiSmartControl(_bs2ProService, _bs2ProTempProvider);
+                                        _bs2ProSmartControl.ActiveProfile = curveProfile;
+                                        _bs2ProSmartControl.Start();
+                                    }
+                                    else
+                                    {
+                                        // Update profile if it changed
+                                        _bs2ProSmartControl.ActiveProfile = curveProfile;
+                                    }
+                                }
+                                else
+                                {
+                                    // Fan mode changed away from Curve — stop smart control
+                                    StopBs2ProSmartControl();
+                                }
+
+                                // Apply RGB settings
+                                string bs2RgbMode = GetBs2ProRgbModeFromIndex(cbxBs2ProRgbMode.SelectedIndex);
+                                byte bs2R = (byte)nudBs2ProRgbR.Value;
+                                byte bs2G = (byte)nudBs2ProRgbG.Value;
+                                byte bs2B = (byte)nudBs2ProRgbB.Value;
+                                byte bs2Brightness = (byte)nudBs2ProBrightness.Value;
+
+                                if (bs2RgbMode != lastBs2ProRgbMode || bs2R != lastBs2ProRgbR ||
+                                    bs2G != lastBs2ProRgbG || bs2B != lastBs2ProRgbB ||
+                                    bs2Brightness != lastBs2ProBrightness)
+                                {
+                                    try
+                                    {
+                                        switch (bs2RgbMode)
+                                        {
+                                            case "Off":
+                                                await _bs2ProService.WriteRgbOffAsync();
+                                                break;
+                                            case "Static":
+                                                await _bs2ProService.WriteRgbStaticAsync(bs2R, bs2G, bs2B, bs2Brightness);
+                                                break;
+                                            case "Breathing":
+                                                await _bs2ProService.WriteRgbBreathingAsync(bs2R, bs2G, bs2B, bs2Brightness);
+                                                break;
+                                        }
+                                        lastBs2ProRgbMode = bs2RgbMode;
+                                        lastBs2ProRgbR = bs2R;
+                                        lastBs2ProRgbG = bs2G;
+                                        lastBs2ProRgbB = bs2B;
+                                        lastBs2ProBrightness = bs2Brightness;
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        DiagnosticLogger.LogError(ex, "Failed to apply BS2 Pro RGB");
+                                    }
+                                }
                             }
                         }
 
@@ -1128,6 +1262,18 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             };
         }
 
+        private void cbxWcRgbMode_SelectionChanged(object sender, RoutedEventArgs e)
+        {
+            if (spWcRgbColor == null) return;
+
+            var mode = GetRgbModeFromIndex(cbxWcRgbMode.SelectedIndex);
+            spWcRgbColor.Visibility = mode switch
+            {
+                RgbState.Static or RgbState.Breathe => Visibility.Visible,
+                _ => Visibility.Collapsed
+            };
+        }
+
         #endregion
 
         #region BS2 Pro Helpers
@@ -1177,6 +1323,40 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 "Custom" => 3,
                 _ => 0
             };
+        }
+
+        /// <summary>Stops and disposes the BS2 Pro smart control (curve mode) if active.</summary>
+        private static void StopBs2ProSmartControl()
+        {
+            if (_bs2ProSmartControl != null)
+            {
+                try { _bs2ProSmartControl.Stop(); } catch { /* ignore */ }
+                try { _bs2ProSmartControl.Dispose(); } catch { /* ignore */ }
+                _bs2ProSmartControl = null;
+            }
+            if (_bs2ProTempProvider != null)
+            {
+                try { _bs2ProTempProvider.Dispose(); } catch { /* ignore */ }
+                _bs2ProTempProvider = null;
+            }
+        }
+
+        /// <summary>Loads the custom curve profile from Bs2Pro settings, falling back to Balanced.</summary>
+        private static FlydigiFanCurveProfile LoadCustomCurveProfile()
+        {
+            try
+            {
+                var bs2Settings = _bs2ProService?.GetSettings();
+                if (bs2Settings != null && !string.IsNullOrEmpty(bs2Settings.CustomCurveJson))
+                {
+                    return FlydigiFanCurveProfile.FromJSON(bs2Settings.CustomCurveJson);
+                }
+            }
+            catch
+            {
+                // Corrupted custom curve JSON — fall back to Balanced
+            }
+            return FlydigiFanCurveProfile.CreateBalanced();
         }
 
         private void cbxBs2ProFanMode_SelectionChanged(object sender, EventArgs e)
@@ -1249,6 +1429,44 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 // because it reads from the same settings file.
             }
             catch { /* Flydigi page may not be loaded */ }
+        }
+
+        // RGB helpers
+
+        private static string GetBs2ProRgbModeFromIndex(int index)
+        {
+            return (index + 1) switch
+            {
+                1 => "Off",
+                2 => "Static",
+                3 => "Breathing",
+                _ => "Static"
+            };
+        }
+
+        private static int GetBs2ProRgbModeIndex(string mode)
+        {
+            return mode switch
+            {
+                "Off" => 0,
+                "Static" => 1,
+                "Breathing" => 2,
+                _ => 1
+            };
+        }
+
+        private void cbxBs2ProRgbMode_SelectionChanged(object sender, EventArgs e)
+        {
+            UpdateBs2ProRgbUI();
+        }
+
+        private void UpdateBs2ProRgbUI()
+        {
+            if (spBs2ProRgb == null)
+                return;
+
+            var mode = cbxBs2ProRgbMode.SelectedIndex;
+            spBs2ProRgb.Visibility = mode == 0 ? Visibility.Collapsed : Visibility.Visible;
         }
 
         #endregion

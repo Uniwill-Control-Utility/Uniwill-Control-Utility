@@ -734,6 +734,18 @@ namespace Universal_x86_Tuning_Utility.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool AdaptiveWcEnabled {
+            get {
+                return ((bool)(this["AdaptiveWcEnabled"]));
+            }
+            set {
+                this["AdaptiveWcEnabled"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool isTrack {
             get {
                 return ((bool)(this["isTrack"]));

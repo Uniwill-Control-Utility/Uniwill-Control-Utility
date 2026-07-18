@@ -73,6 +73,13 @@ namespace Universal_x86_Tuning_Utility.Services
         public ushort Bs2ProRpm { get; set; } = 2000;      // 1300-4000 manual RPM
         public string Bs2ProCurveProfileId { get; set; } = string.Empty; // GUID of active curve profile
 
+        // BS2 Pro RGB per-game settings
+        public string Bs2ProRgbMode { get; set; } = "Static"; // "Off", "SmartTemp", "Static", "Flowing", "Breathing"
+        public byte Bs2ProRgbR { get; set; } = 0;
+        public byte Bs2ProRgbG { get; set; } = 0;
+        public byte Bs2ProRgbB { get; set; } = 255;
+        public byte Bs2ProBrightness { get; set; } = 100;
+
         [DefaultValue(true)]
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]
         public bool isAutoSwitch { get; set; }
