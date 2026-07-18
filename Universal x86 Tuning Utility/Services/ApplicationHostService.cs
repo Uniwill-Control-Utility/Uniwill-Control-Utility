@@ -36,7 +36,6 @@ namespace Universal_x86_Tuning_Utility.Services
             {
                 _navigationWindow = (_serviceProvider.GetService(typeof(INavigationWindow)) as INavigationWindow)!;
                 _navigationWindow!.ShowWindow();
-
                 _navigationWindow.Navigate(typeof(Views.Pages.DashboardPage));
             }
 

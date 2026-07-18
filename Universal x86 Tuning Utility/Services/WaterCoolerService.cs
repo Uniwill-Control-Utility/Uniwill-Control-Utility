@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Management;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
@@ -47,6 +48,12 @@ namespace Universal_x86_Tuning_Utility.Services
         /// True when both TX (command) and RX (notification) characteristics are ready.
         /// </summary>
         public bool IsFullyConnected => _device != null && _txCharacteristic != null && _rxCharacteristic != null;
+
+        /// <summary>
+        /// Human-readable name of the connected cooler (e.g. "XMG Oasis Mk2 (LCT22002)").
+        /// Empty string when disconnected or unknown.
+        /// </summary>
+        public string ConnectedDeviceName { get; private set; } = string.Empty;
 
         public WaterCoolerService()
         {
@@ -147,7 +154,8 @@ namespace Universal_x86_Tuning_Utility.Services
                         {
                             Address = e.BluetoothAddress.ToString(),
                             Name = name,
-                            Rssi = e.RawSignalStrengthInDBm
+                            Rssi = e.RawSignalStrengthInDBm,
+                            Model = DetectModelFromBleName(name)
                         });
                     }
                 }
@@ -161,6 +169,91 @@ namespace Universal_x86_Tuning_Utility.Services
             // Deduplicate by address
             return devices.DistinctBy(d => d.Address).ToList();
         }
+
+        #region Device Identification
+
+        /// <summary>
+        /// Detects the LCT hardware model from a BLE advertising name.
+        /// Returns "LCT22002", "LCT21001", or null if unknown.
+        /// </summary>
+        private static string? DetectModelFromBleName(string bleName)
+        {
+            if (string.IsNullOrEmpty(bleName))
+                return null;
+
+            string upper = bleName.ToUpperInvariant();
+
+            if (upper.Contains("22002"))
+                return LctDeviceModel.LCT22002;
+
+            if (upper.Contains("21001"))
+                return LctDeviceModel.LCT21001;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Resolves a human-readable cooler brand name from the laptop chassis WMI data.
+        /// Returns "XMG Oasis", "TUXEDO Aquaris", "PC Specialist", "Eluktronics", or "LCT Watercooler".
+        /// </summary>
+        private static string DetectChassisBrand()
+        {
+            try
+            {
+                using var searcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_ComputerSystem");
+
+                foreach (ManagementObject obj in searcher.Get())
+                {
+                    var manufacturer = obj["Manufacturer"]?.ToString() ?? "";
+                    var model = obj["Model"]?.ToString() ?? "";
+                    var productName = obj["Name"]?.ToString() ?? "";
+
+                    var combined = (manufacturer + " " + model + " " + productName).ToLowerInvariant();
+
+                    if (combined.Contains("xmg") || combined.Contains("schenker"))
+                        return "XMG Oasis";
+
+                    if (combined.Contains("tuxedo") || combined.Contains("aquaris"))
+                        return "TUXEDO Aquaris";
+
+                    if (combined.Contains("specialist"))
+                        return "PC Specialist";
+
+                    if (combined.Contains("eluktronics"))
+                        return "Eluktronics";
+                }
+            }
+            catch
+            {
+                // WMI not available
+            }
+
+            return "LCT Watercooler";
+        }
+
+        /// <summary>
+        /// Builds a human-readable device name from the BLE name and chassis brand.
+        /// Examples: "XMG Oasis Mk2", "TUXEDO Aquaris Mk1", "LCT Watercooler"
+        /// </summary>
+        private string ResolveDeviceName(string bleName)
+        {
+            string? model = DetectModelFromBleName(bleName);
+            string brand = DetectChassisBrand();
+
+            if (model == LctDeviceModel.LCT22002)
+                return $"{brand} Mk2";
+
+            if (model == LctDeviceModel.LCT21001)
+                return $"{brand} Mk1";
+
+            // Unknown model — show brand with raw BLE name
+            if (!string.IsNullOrEmpty(bleName) && bleName != brand)
+                return $"{brand} ({bleName})";
+
+            return brand;
+        }
+
+        #endregion
 
         /// <summary>
         /// Connects to a BLE device and prepares the TX characteristic.
@@ -239,6 +332,10 @@ namespace Universal_x86_Tuning_Utility.Services
 
                     if (_txCharacteristic != null)
                     {
+                        // Resolve and store the human-readable device name
+                        string bleName = _device.Name ?? string.Empty;
+                        ConnectedDeviceName = ResolveDeviceName(bleName);
+
                         // Store last connected device for auto-connect
                         _settings.LastDeviceAddress = deviceAddress;
                         SaveSettings();
@@ -385,6 +482,7 @@ namespace Universal_x86_Tuning_Utility.Services
             // Clear all characteristic references
             _rxCharacteristic = null;
             _txCharacteristic = null;
+            ConnectedDeviceName = string.Empty;
 
             ConnectionStateChanged?.Invoke(this, WatercoolerConnectionState.Disconnected);
         }

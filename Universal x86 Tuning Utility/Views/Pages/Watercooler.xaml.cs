@@ -6,7 +6,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using Universal_x86_Tuning_Utility.Models;
-using Universal_x86_Tuning_Utility.Properties;
 using Universal_x86_Tuning_Utility.Services;
 
 namespace Universal_x86_Tuning_Utility.Views.Pages
@@ -18,13 +17,13 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
     public partial class Watercooler : Page
     {
         private WaterCoolerService? _waterCoolerService;
+        private DeviceApplier? _deviceApplier;
         private string? _selectedDeviceAddress;
         private bool _isInitialized;
         private Wpf.Ui.Controls.Snackbar? _adaptiveSnackbar;
-        private bool _adaptiveSnackbarShown;
-        /// <summary>True while the override was previously active (regardless of whether the snackbar was visually shown).</summary>
-        private bool _wasPreviouslyOverridden;
-        private System.Threading.Timer? _adaptiveCheckTimer;
+
+        /// <summary>True while OnWatercoolerPresetApplied is updating UI controls. Suppresses selection-changed side effects.</summary>
+        private bool _isSyncingFromPreset;
 
         public Watercooler()
         {
@@ -51,6 +50,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     return;
                 }
 
+                // Get DeviceApplier for centralized device commands and override management
+                _deviceApplier = App.GetService<DeviceApplier>();
+
                 LoadSettings();
             }
             catch (Exception ex)
@@ -70,17 +72,28 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _waterCoolerService.ConnectionStateChanged += OnConnectionStateChanged;
             _waterCoolerService.StatusChanged += OnStatusChanged;
 
-            // Check Adaptive Mode override state first — it gates whether controls are enabled
-            CheckAdaptiveModeState();
+            // Subscribe to DeviceApplier events for override state and preset applications
+            if (_deviceApplier != null)
+            {
+                _deviceApplier.WatercoolerOverrideChanged += OnWatercoolerOverrideChanged;
+                _deviceApplier.WatercoolerPresetApplied += OnWatercoolerPresetApplied;
+            }
+
+            // Apply current override state (may already be overridden from startup or Adaptive page)
+            bool isOverridden = _deviceApplier?.IsWatercoolerOverridden == true;
+            ApplyOverrideState(isOverridden);
+
+            // If override is active, sync UI from the last-applied preset.
+            if (isOverridden && _deviceApplier?.LastAppliedWatercoolerPreset is { } preset)
+            {
+                SyncUiFromPreset(preset);
+            }
 
             // Reflect current connection state if already connected
             if (_waterCoolerService.IsConnected)
             {
                 OnConnectionStateChanged(null, WaterCoolerService.WatercoolerConnectionState.Connected);
             }
-
-            // Start polling for Adaptive Mode state (checks every 2 seconds)
-            StartAdaptiveCheck();
         }
 
         private void LoadSettings()
@@ -273,7 +286,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 await Task.Delay(500);
 
                 // Restore saved settings to device (skip if Adaptive Mode is overriding)
-                if (!IsAdaptiveOverrideActive())
+                if (_deviceApplier?.IsWatercoolerOverridden != true)
                 {
                     // WriteWithResponse ensures reliable delivery — no artificial delays needed.
                     try
@@ -315,8 +328,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private async void cbxPumpVoltage_SelectionChanged(object sender, EventArgs e)
         {
+            if (_isSyncingFromPreset) return;
             if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
-            if (IsAdaptiveOverrideActive()) return;
 
             var voltage = GetSelectedPumpVoltage();
             await _waterCoolerService.WritePumpModeAsync(voltage);
@@ -325,8 +338,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private async void cbxFanSpeed_SelectionChanged(object sender, EventArgs e)
         {
+            if (_isSyncingFromPreset) return;
             if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
-            if (IsAdaptiveOverrideActive()) return;
 
             var speed = GetSelectedFanSpeed();
             await _waterCoolerService.WriteFanModeAsync(speed);
@@ -335,8 +348,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private async void cbxRgbMode_SelectionChanged(object sender, EventArgs e)
         {
+            if (_isSyncingFromPreset) return;
             if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
-            if (IsAdaptiveOverrideActive()) return;
 
             var mode = GetSelectedRgbMode();
             var color = GetSelectedRgbColor();
@@ -346,8 +359,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private async void cbxRgbColor_SelectionChanged(object sender, EventArgs e)
         {
+            if (_isSyncingFromPreset) return;
             if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
-            if (IsAdaptiveOverrideActive()) return;
 
             var mode = GetSelectedRgbMode();
             var color = GetSelectedRgbColor();
@@ -451,106 +464,109 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 _waterCoolerService.StatusChanged -= OnStatusChanged;
             }
 
-            _adaptiveCheckTimer?.Dispose();
-            _adaptiveCheckTimer = null;
+            // Unsubscribe from DeviceApplier events
+            if (_deviceApplier != null)
+            {
+                _deviceApplier.WatercoolerOverrideChanged -= OnWatercoolerOverrideChanged;
+                _deviceApplier.WatercoolerPresetApplied -= OnWatercoolerPresetApplied;
+            }
 
-            // Reset snackbar/override state so it can show again on next page visit
-            _adaptiveSnackbarShown = false;
-            _wasPreviouslyOverridden = false;
+            // Reset snackbar state so it can show again on next page visit
             _adaptiveSnackbar = null;
         }
 
         #endregion
 
         /* ------------------------------------------------------------------ */
-        /*  Adaptive Mode Override Detection                                   */
+        /*  Adaptive Mode Override (Event-Driven)                              */
         /* ------------------------------------------------------------------ */
 
-        private void StartAdaptiveCheck()
+        /// <summary>
+        /// Event handler for <see cref="DeviceApplier.WatercoolerOverrideChanged"/>.
+        /// </summary>
+        private void OnWatercoolerOverrideChanged(object? sender, bool isOverridden)
         {
-            _adaptiveCheckTimer = new System.Threading.Timer(
-                _ =>
-                {
-                    var dispatcher = Application.Current?.Dispatcher;
-                    if (dispatcher == null || dispatcher.HasShutdownStarted)
-                        return;
-                    try
-                    {
-                        dispatcher.Invoke(CheckAdaptiveModeState);
-                    }
-                    catch (System.Threading.Tasks.TaskCanceledException)
-                    {
-                        // Dispatcher is shutting down, ignore
-                    }
-                },
-                null, TimeSpan.Zero, TimeSpan.FromSeconds(2));
+            ApplyOverrideState(isOverridden);
         }
 
-        private void CheckAdaptiveModeState()
+        /// <summary>
+        /// Applies the override state: shows/hides snackbar, enables/disables controls,
+        /// and syncs UI when override is lifted.
+        /// </summary>
+        private void ApplyOverrideState(bool isOverridden)
         {
-            bool adaptiveRunning = Settings.Default.isAdaptiveModeRunning;
-            bool wcEnabled = Settings.Default.AdaptiveWcEnabled;
-            bool shouldOverride = adaptiveRunning && wcEnabled;
+            overlayAdaptiveWarning.Visibility = isOverridden ? Visibility.Visible : Visibility.Collapsed;
 
-            overlayAdaptiveWarning.Visibility = shouldOverride ? Visibility.Visible : Visibility.Collapsed;
-
-            if (shouldOverride)
+            if (isOverridden)
             {
                 SetControlsEnabled(false);
-
-                // Show snackbar on transition from "no override" to "override"
-                if (!_adaptiveSnackbarShown)
-                {
-                    _adaptiveSnackbarShown = true;
-                    ShowAdaptiveSnackbar();
-                }
-                _wasPreviouslyOverridden = true;
+                ShowAdaptiveSnackbar();
             }
-            else
+            else if (_waterCoolerService?.IsConnected == true)
             {
-                // Only enable controls if connected
-                if (_waterCoolerService?.IsConnected == true)
-                {
-                    SetControlsEnabled(true);
-                }
+                // DeviceApplier already re-applied settings to the device in DisableWatercoolerOverrideAsync.
+                // We just need to sync the UI to reflect the restored settings.
+                SyncUiFromSettings();
+                SetControlsEnabled(true);
+            }
+        }
 
-                // Hide snackbar on transition from "override" to "no override"
-                if (_adaptiveSnackbarShown)
-                {
-                    _adaptiveSnackbarShown = false;
-                    HideAdaptiveSnackbar();
-                }
+        /// <summary>
+        /// Re-applies the Watercooler page's saved settings to the device after override is lifted.
+        /// </summary>
+        private void ReapplyUserSettingsToDevice()
+        {
+            if (_waterCoolerService == null || !_waterCoolerService.IsConnected)
+                return;
 
-                // Re-apply the Watercooler page's saved settings now that control is returned.
-                // Only on transition, not every tick.
-                if (_wasPreviouslyOverridden)
-                {
-                    _wasPreviouslyOverridden = false;
-                    if (_waterCoolerService?.IsConnected == true)
-                    {
-                        try
-                        {
-                            var pumpVoltage = GetSelectedPumpVoltage();
-                            if (pumpVoltage != PumpVoltage.Off)
-                                _ = _waterCoolerService.WritePumpModeAsync(pumpVoltage);
+            try
+            {
+                var settings = _waterCoolerService.GetSettings();
+                var pumpVoltage = settings.GetPumpVoltage();
+                var fanSpeed = settings.GetFanSpeed();
+                var rgbMode = settings.GetRgbMode();
+                var rgbColor = settings.GetRgbColor();
 
-                            var fanSpeed = GetSelectedFanSpeed();
-                            if (fanSpeed != FanSpeed.Off)
-                                _ = _waterCoolerService.WriteFanModeAsync(fanSpeed);
+                if (pumpVoltage != PumpVoltage.Off)
+                    _ = _waterCoolerService.WritePumpModeAsync(pumpVoltage);
 
-                            var rgbMode = GetSelectedRgbMode();
-                            var rgbColor = GetSelectedRgbColor();
-                            if (rgbMode != RgbState.Off)
-                                _ = _waterCoolerService.WriteRgbModeAsync(rgbMode, rgbColor);
-                        }
-                        catch { /* non-critical on override-lift */ }
-                    }
-                }
+                if (fanSpeed != FanSpeed.Off)
+                    _ = _waterCoolerService.WriteFanModeAsync(fanSpeed);
+
+                if (rgbMode != RgbState.Off)
+                    _ = _waterCoolerService.WriteRgbModeAsync(rgbMode, rgbColor);
+            }
+            catch { /* non-critical on override-lift */ }
+        }
+
+        /// <summary>
+        /// Syncs UI controls from the service's restored settings after override is lifted.
+        /// </summary>
+        private void SyncUiFromSettings()
+        {
+            if (_waterCoolerService == null) return;
+            var settings = _waterCoolerService.GetSettings();
+
+            _isSyncingFromPreset = true;
+            try
+            {
+                cbxPumpVoltage.SelectedIndex = GetPumpVoltageIndex(settings.GetPumpVoltage());
+                cbxFanSpeed.SelectedIndex = GetFanSpeedIndex(settings.GetFanSpeed());
+                cbxRgbMode.SelectedIndex = GetRgbModeIndex(settings.GetRgbMode());
+                cbxRgbColor.SelectedIndex = GetRgbColorIndex(settings.GetRgbColor());
+            }
+            finally
+            {
+                _isSyncingFromPreset = false;
             }
         }
 
         private void ShowAdaptiveSnackbar()
         {
+            // Hide existing snackbar before showing a new one
+            if (_adaptiveSnackbar != null)
+                SnackbarPresenter.HideCurrent();
+
             _adaptiveSnackbar = new Wpf.Ui.Controls.Snackbar(SnackbarPresenter)
             {
                 Title = "Adaptive Mode Override",
@@ -569,13 +585,32 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _adaptiveSnackbar = null;
         }
 
-        /* ------------------------------------------------------------------ */
-        /*  Override Guards                                                    */
-        /* ------------------------------------------------------------------ */
-
-        private bool IsAdaptiveOverrideActive()
+        /// <summary>
+        /// Event handler for <see cref="DeviceApplier.WatercoolerPresetApplied"/>.
+        /// Syncs the Watercooler page's UI controls to reflect the profile's values.
+        /// </summary>
+        private void OnWatercoolerPresetApplied(object? sender, WatercoolerPresetAppliedEventArgs e)
         {
-            return Settings.Default.isAdaptiveModeRunning && Settings.Default.AdaptiveWcEnabled;
+            _isSyncingFromPreset = true;
+            try
+            {
+                SyncUiFromPreset(e);
+            }
+            finally
+            {
+                _isSyncingFromPreset = false;
+            }
+        }
+
+        /// <summary>
+        /// Syncs UI controls from a preset (used by both the event handler and Page_Loaded).
+        /// </summary>
+        private void SyncUiFromPreset(WatercoolerPresetAppliedEventArgs e)
+        {
+            cbxPumpVoltage.SelectedIndex = GetPumpVoltageIndex(e.PumpVoltage);
+            cbxFanSpeed.SelectedIndex = GetFanSpeedIndex(e.FanSpeed);
+            cbxRgbMode.SelectedIndex = GetRgbModeIndex(e.RgbMode);
+            cbxRgbColor.SelectedIndex = GetRgbColorIndex(e.RgbColor);
         }
     }
 }

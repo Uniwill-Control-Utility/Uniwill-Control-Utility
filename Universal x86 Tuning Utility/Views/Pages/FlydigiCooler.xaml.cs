@@ -5,7 +5,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using Universal_x86_Tuning_Utility.Properties;
 using Universal_x86_Tuning_Utility.Scripts;
 using Universal_x86_Tuning_Utility.Views.Controls;
 using Universal_x86_Tuning_Utility.Models;
@@ -22,16 +21,13 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
     {
         private bool _isInitialized;
         private FlydigiCoolerService? _coolerService;
+        private DeviceApplier? _deviceApplier;
         private MultiColorPickerControl? mcRotationColors;
         private Wpf.Ui.Controls.Snackbar? _adaptiveSnackbar;
-        private bool _adaptiveSnackbarShown;
-        /// <summary>True while the override was previously active (regardless of whether the snackbar was visually shown).</summary>
-        private bool _wasPreviouslyOverridden;
 
         private FlydigiSmartControl? _smartControl;
         private FlydigiTemperatureProvider? _tempProvider;
         private System.Threading.Timer? _tempTimer;
-        private System.Threading.Timer? _adaptiveCheckTimer;
 
         // Debounce timers for auto-apply
         private System.Threading.Timer? _rpmApplyTimer;
@@ -42,6 +38,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         /// <summary>The currently selected fan curve profile for auto control.</summary>
         private FlydigiFanCurveProfile? _activeProfile;
+
+        /// <summary>True while OnFlydigiPresetApplied is updating UI controls. Suppresses selection-changed side effects.</summary>
+        private bool _isSyncingFromPreset;
 
         public FlydigiCooler()
         {
@@ -71,6 +70,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 mcRotationColors.ColorsChanged += OnRotationColorsChanged;
                 mcRotationColorsHost.Children.Add(mcRotationColors);
 
+                // Get DeviceApplier for centralized device commands and override management
+                _deviceApplier = App.GetService<DeviceApplier>();
+
                 LoadSettingsToUI();
 
                 // Update page title with detected cooler model name
@@ -91,11 +93,28 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _coolerService.StatusChanged += OnStatusChanged;
             _coolerService.FanDataReceived += OnFanDataReceived;
 
-            // Check Adaptive Mode override state first — it gates whether we apply settings
-            CheckAdaptiveModeState();
+            // Subscribe to DeviceApplier events for override state and preset applications
+            if (_deviceApplier != null)
+            {
+                _deviceApplier.FlydigiOverrideChanged += OnFlydigiOverrideChanged;
+                _deviceApplier.FlydigiPresetApplied += OnFlydigiPresetApplied;
+            }
+
+            // Apply current override state (may already be overridden from startup or Adaptive page)
+            bool isOverridden = _deviceApplier?.IsFlydigiOverridden == true;
+            ApplyOverrideState(isOverridden);
+
+            // If override is active, sync UI from the last-applied preset so the user sees
+            // the profile's values even if they navigate to this page after the override fires.
+            if (isOverridden && _deviceApplier?.LastAppliedFlydigiPreset is { } preset)
+            {
+                SyncUiFromPreset(preset);
+            }
 
             // Apply saved RGB settings only on first connect, not on every page navigation
-            if (_coolerService.IsConnected && !_hasAppliedInitialSettings)
+            // Skip if Adaptive Mode is overriding (the profile owns the device)
+            if (_coolerService.IsConnected && !_hasAppliedInitialSettings &&
+                _deviceApplier?.IsFlydigiOverridden != true)
             {
                 ApplyRgbAsync();
                 _hasAppliedInitialSettings = true;
@@ -111,9 +130,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             {
                 SetControlsEnabled(false);
             }
-
-            // Start polling for Adaptive Mode state (checks every 2 seconds)
-            StartAdaptiveCheck();
         }
 
         private void Page_Unloaded(object? sender, RoutedEventArgs e)
@@ -125,6 +141,13 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 _coolerService.FanDataReceived -= OnFanDataReceived;
             }
 
+            // Unsubscribe from DeviceApplier events
+            if (_deviceApplier != null)
+            {
+                _deviceApplier.FlydigiOverrideChanged -= OnFlydigiOverrideChanged;
+                _deviceApplier.FlydigiPresetApplied -= OnFlydigiPresetApplied;
+            }
+
             StopTemperaturePolling();
             StopAutoControl();
 
@@ -132,12 +155,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _rpmApplyTimer = null;
             _rgbApplyTimer?.Dispose();
             _rgbApplyTimer = null;
-            _adaptiveCheckTimer?.Dispose();
-            _adaptiveCheckTimer = null;
 
-            // Reset snackbar/override state so it can show again on next page visit
-            _adaptiveSnackbarShown = false;
-            _wasPreviouslyOverridden = false;
+            // Reset snackbar state so it can show again on next page visit
             _adaptiveSnackbar = null;
         }
 
@@ -147,6 +166,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void cbxFanMode_SelectionChanged(object sender, EventArgs e)
         {
+            // Suppress side effects when UI is being synced from a preset event
+            if (_isSyncingFromPreset)
+                return;
+
             UpdateFanModeUI();
 
             // Persist fan mode to settings
@@ -192,12 +215,20 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void sliderRpm_ValueChanged(object? sender, RoutedPropertyChangedEventArgs<double> e)
         {
+            // Suppress side effects when UI is being synced from a preset event
+            if (_isSyncingFromPreset)
+                return;
+
             // Debounce: wait 300ms after user stops dragging the slider
             ResetDebounceTimer(ref _rpmApplyTimer, 300, ApplyRpmAsync);
         }
 
         private void nudRpm_ValueChanged(object? sender, RoutedEventArgs e)
         {
+            // Suppress side effects when UI is being synced from a preset event
+            if (_isSyncingFromPreset)
+                return;
+
             // Immediate apply when user types a value and commits
             _rpmApplyTimer?.Dispose();
             _rpmApplyTimer = null;
@@ -216,10 +247,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _rpmApplyTimer = null;
 
             if (_coolerService == null || !_coolerService.IsConnected) return;
-
-            // Guard: don't apply settings when Adaptive Mode is overriding
-            if (Settings.Default.isAdaptiveModeRunning && Settings.Default.AdaptiveBs2ProEnabled)
-                return;
 
             var rpm = (ushort)nudRpm.Value;
 
@@ -267,10 +294,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         {
             if (_coolerService == null || !_coolerService.IsConnected) return;
 
-            // Guard: don't apply settings when Adaptive Mode is overriding
-            if (Settings.Default.isAdaptiveModeRunning && Settings.Default.AdaptiveBs2ProEnabled)
-                return;
-
             try
             {
                 await _coolerService.WriteGearAsync(gear);
@@ -284,11 +307,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private async void cbxGearSubLevel_SelectionChanged(object sender, EventArgs e)
         {
+            if (_isSyncingFromPreset) return;
             if (_coolerService == null || !_coolerService.IsConnected) return;
-
-            // Guard: don't apply settings when Adaptive Mode is overriding
-            if (Settings.Default.isAdaptiveModeRunning && Settings.Default.AdaptiveBs2ProEnabled)
-                return;
 
             var subLevel = cbxGearSubLevel.SelectedIndex; // 0=Low, 1=Medium, 2=High
 
@@ -379,71 +399,37 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         }
 
         /* ------------------------------------------------------------------ */
-        /*  Adaptive Mode Override Detection                                   */
+        /*  Adaptive Mode Override (Event-Driven)                              */
         /* ------------------------------------------------------------------ */
 
-        private void StartAdaptiveCheck()
+        /// <summary>
+        /// Event handler for <see cref="DeviceApplier.FlydigiOverrideChanged"/>.
+        /// Applies or lifts the override UI state (snackbar, control enablement, auto control).
+        /// </summary>
+        private void OnFlydigiOverrideChanged(object? sender, bool isOverridden)
         {
-            _adaptiveCheckTimer = new System.Threading.Timer(
-                _ =>
-                {
-                    var dispatcher = Application.Current?.Dispatcher;
-                    if (dispatcher == null || dispatcher.HasShutdownStarted)
-                        return;
-                    try
-                    {
-                        dispatcher.Invoke(CheckAdaptiveModeState);
-                    }
-                    catch (System.Threading.Tasks.TaskCanceledException)
-                    {
-                        // Dispatcher is shutting down, ignore
-                    }
-                },
-                null, TimeSpan.Zero, TimeSpan.FromSeconds(2));
+            ApplyOverrideState(isOverridden);
         }
 
-        private void CheckAdaptiveModeState()
+        /// <summary>
+        /// Applies the override state: shows/hides snackbar, enables/disables controls,
+        /// stops/starts auto control, and re-applies user settings when override is lifted.
+        /// </summary>
+        private void ApplyOverrideState(bool isOverridden)
         {
-            bool adaptiveRunning = Settings.Default.isAdaptiveModeRunning;
-            bool bs2ProEnabled = Settings.Default.AdaptiveBs2ProEnabled;
-            bool shouldOverride = adaptiveRunning && bs2ProEnabled;
+            overlayAdaptiveWarning.Visibility = isOverridden ? Visibility.Visible : Visibility.Collapsed;
 
-            overlayAdaptiveWarning.Visibility = shouldOverride ? Visibility.Visible : Visibility.Collapsed;
-
-            if (shouldOverride)
+            if (isOverridden)
             {
                 SetControlsEnabled(false);
                 StopAutoControl();
-
-                // Show snackbar on transition from "no override" to "override"
-                if (!_adaptiveSnackbarShown)
-                {
-                    _adaptiveSnackbarShown = true;
-                    ShowAdaptiveSnackbar();
-                }
-                _wasPreviouslyOverridden = true;
+                ShowAdaptiveSnackbar();
             }
             else if (_coolerService?.IsConnected == true)
             {
-                // Hide snackbar on transition from "override" to "no override"
-                if (_adaptiveSnackbarShown)
-                {
-                    _adaptiveSnackbarShown = false;
-                    HideAdaptiveSnackbar();
-                }
-
-                // Re-apply the Flydigi page's saved settings now that control is returned.
-                // This ensures the device reflects the page's settings, not whatever
-                // Adaptive Mode last commanded. Only on transition, not every tick.
-                if (_wasPreviouslyOverridden)
-                {
-                    _wasPreviouslyOverridden = false;
-                    ApplyRgbAsync();
-                    if (cbxFanMode.SelectedIndex == 0)
-                    {
-                        ApplyRpmAsync();
-                    }
-                }
+                // DeviceApplier already re-applied settings to the device in DisableFlydigiOverrideAsync.
+                // We just need to sync the UI to reflect the restored settings.
+                SyncUiFromSettings();
 
                 SetControlsEnabled(true);
 
@@ -456,10 +442,158 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         }
 
         /// <summary>
+        /// Syncs UI controls from the service's restored settings after override is lifted.
+        /// Uses _isSyncingFromPreset guard to prevent selection-changed callbacks.
+        /// </summary>
+        private void SyncUiFromSettings()
+        {
+            if (_coolerService == null) return;
+            var settings = _coolerService.GetSettings();
+
+            _isSyncingFromPreset = true;
+            try
+            {
+                cbxFanMode.SelectedIndex = Math.Clamp(settings.FanMode, 0, 2);
+                nudRpm.Value = settings.ManualRpm;
+                cbxGearSubLevel.SelectedIndex = Math.Clamp(settings.ManualGear - 1, 0, 3);
+
+                cbxRgbMode.SelectedIndex = GetRgbModeIndex(settings.RgbMode);
+                UpdateRgbColorVisibility();
+                nudRgbR.Value = settings.R;
+                nudRgbG.Value = settings.G;
+                nudRgbB.Value = settings.B;
+                nudRgbBrightness.Value = settings.Brightness;
+            }
+            finally
+            {
+                _isSyncingFromPreset = false;
+            }
+        }
+
+        /// <summary>
+        /// Re-applies the Flydigi page's saved settings to the device after override is lifted.
+        /// This ensures the device reflects the page's user settings, not whatever
+        /// Adaptive Mode last commanded.
+        /// </summary>
+        private void ReapplyUserSettingsToDevice()
+        {
+            if (_coolerService == null || !_coolerService.IsConnected)
+                return;
+
+            var settings = _coolerService.GetSettings();
+
+            // Apply RGB from restored settings
+            try
+            {
+                ApplyRgbFromSettings(settings);
+            }
+            catch { /* non-critical on override-lift */ }
+
+            // Apply fan from restored settings
+            try
+            {
+                ApplyFanFromSettings(settings);
+            }
+            catch { /* non-critical on override-lift */ }
+        }
+
+        /// <summary>
+        /// Applies RGB to the device from the given settings object.
+        /// </summary>
+        private async Task ApplyRgbFromSettings(Bs2ProSettings settings)
+        {
+            if (_coolerService == null || !_coolerService.IsConnected)
+                return;
+
+            try
+            {
+                switch (settings.RgbMode)
+                {
+                    case "Off":
+                        await _coolerService.WriteRgbOffAsync();
+                        break;
+                    case "Static":
+                        await _coolerService.WriteRgbStaticAsync(settings.R, settings.G, settings.B, settings.Brightness);
+                        break;
+                    case "Breathing":
+                        await _coolerService.WriteRgbBreathingAsync(settings.R, settings.G, settings.B, settings.Brightness);
+                        break;
+                    case "SmartTemp":
+                        await _coolerService.WriteRgbSmartTempAsync();
+                        break;
+                    case "Flowing":
+                        await _coolerService.WriteRgbFlowingAsync(settings.RgbSpeed, settings.Brightness);
+                        break;
+                    case "Rotation":
+                        if (!string.IsNullOrEmpty(settings.RotationColors))
+                        {
+                            var colors = settings.RotationColors.Split(',')
+                                .Select(h =>
+                                {
+                                    var hex = h.Trim().Replace("#", "");
+                                    if (hex.Length == 6)
+                                        return Color.FromRgb(
+                                            byte.Parse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber),
+                                            byte.Parse(hex.Substring(2, 2), System.Globalization.NumberStyles.HexNumber),
+                                            byte.Parse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber));
+                                    return (Color?)null;
+                                })
+                                .Where(c => c.HasValue)
+                                .Select(c => c.Value)
+                                .ToList();
+                            if (colors.Count > 0)
+                                await _coolerService.WriteRgbRotationMultiAsync(colors, settings.RotationSpeed, settings.RotationBrightness);
+                        }
+                        else
+                            await _coolerService.WriteRgbRotationAsync(settings.R, settings.G, settings.B, settings.RotationSpeed, settings.RotationBrightness);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"FlydigiCooler: Failed to re-apply RGB on override-lift: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Applies fan to the device from the given settings object.
+        /// </summary>
+        private async Task ApplyFanFromSettings(Bs2ProSettings settings)
+        {
+            if (_coolerService == null || !_coolerService.IsConnected)
+                return;
+
+            try
+            {
+                switch (settings.FanMode)
+                {
+                    case 0: // Manual RPM
+                        if (settings.ManualRpm > 0)
+                            await _coolerService.WriteRealtimeRpmAsync(settings.ManualRpm);
+                        break;
+                    case 1: // Gear
+                        if (settings.ManualGear > 0)
+                            await _coolerService.WriteGearAsync((byte)settings.ManualGear);
+                        break;
+                    case 2: // Curve — handled by FlydigiSmartControl (restart in ApplyOverrideState)
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"FlydigiCooler: Failed to re-apply fan on override-lift: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Creates and shows the Adaptive Mode override snackbar.
         /// </summary>
         private void ShowAdaptiveSnackbar()
         {
+            // Hide existing snackbar before showing a new one
+            if (_adaptiveSnackbar != null)
+                SnackbarPresenter.HideCurrent();
+
             _adaptiveSnackbar = new Wpf.Ui.Controls.Snackbar(SnackbarPresenter)
             {
                 Title = "Adaptive Mode Override",
@@ -480,6 +614,52 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             SnackbarPresenter.HideCurrent();
             _adaptiveSnackbar = null;
         }
+
+        /// <summary>
+        /// Event handler for <see cref="DeviceApplier.FlydigiPresetApplied"/>.
+        /// Syncs the Flydigi page's UI controls to reflect the profile's values.
+        /// Uses _isSyncingFromPreset flag to suppress selection-changed side effects.
+        /// </summary>
+        private void OnFlydigiPresetApplied(object? sender, FlydigiPresetAppliedEventArgs e)
+        {
+            _isSyncingFromPreset = true;
+            try
+            {
+                SyncUiFromPreset(e);
+            }
+            finally
+            {
+                _isSyncingFromPreset = false;
+            }
+        }
+
+        /// <summary>
+        /// Syncs UI controls from a preset (used by both the event handler and Page_Loaded).
+        /// </summary>
+        private void SyncUiFromPreset(FlydigiPresetAppliedEventArgs e)
+        {
+            cbxFanMode.SelectedIndex = GetFanModeIndex(e.FanMode);
+            if (e.Gear.HasValue)
+                cbxGearSubLevel.SelectedIndex = Math.Clamp(e.Gear.Value - 1, 0, 3);
+            if (e.Rpm.HasValue)
+                nudRpm.Value = e.Rpm.Value;
+
+            cbxRgbMode.SelectedIndex = GetRgbModeIndex(e.RgbMode);
+            UpdateRgbColorVisibility();
+            nudRgbR.Value = e.R;
+            nudRgbG.Value = e.G;
+            nudRgbB.Value = e.B;
+            nudRgbBrightness.Value = e.Brightness;
+        }
+
+        private static int GetFanModeIndex(string mode) => mode switch
+        {
+            "Off" => -1,       // No "Off" in the Flydigi page combo box
+            "Gear" => 1,        // Gear Presets
+            "Rpm" => 0,         // Manual
+            "Curve" => 2,       // Auto (Curve)
+            _ => -1
+        };
 
         /* ------------------------------------------------------------------ */
         /*  Curve Profile Management                                           */
@@ -599,6 +779,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void cbxRgbMode_SelectionChanged(object sender, EventArgs e)
         {
+            // Suppress side effects when UI is being synced from a preset event
+            if (_isSyncingFromPreset)
+                return;
+
             UpdateRgbColorVisibility();
 
             // Apply immediately for all modes when connected and initialized
@@ -612,6 +796,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void RgbSlider_ValueChanged(object? sender, RoutedPropertyChangedEventArgs<double> e)
         {
+            // Suppress side effects when UI is being synced from a preset event
+            if (_isSyncingFromPreset)
+                return;
+
             // Debounce: wait 500ms after user stops adjusting (RGB upload is expensive)
             ResetDebounceTimer(ref _rgbApplyTimer, 500, ApplyRgbAsync);
         }
@@ -636,10 +824,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _rgbApplyTimer = null;
 
             if (_coolerService == null || !_coolerService.IsConnected) return;
-
-            // Guard: don't apply settings when Adaptive Mode is overriding
-            if (Settings.Default.isAdaptiveModeRunning && Settings.Default.AdaptiveBs2ProEnabled)
-                return;
 
             var modeIndex = cbxRgbMode.SelectedIndex;
             var mode = GetRgbModeName(modeIndex);
@@ -1096,7 +1280,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 SetControlsEnabled(true);
 
                 // Check if Adaptive Mode is overriding — this may re-disable controls
-                CheckAdaptiveModeState();
+                ApplyOverrideState(_deviceApplier?.IsFlydigiOverridden == true);
 
                 if (_coolerService?.ConnectedDeviceInfo != null)
                     UpdateDeviceImage(_coolerService.ConnectedDeviceInfo.ProductId);

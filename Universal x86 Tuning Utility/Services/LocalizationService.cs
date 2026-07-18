@@ -248,7 +248,16 @@ namespace Universal_x86_Tuning_Utility.Services
                 return;
             }
 
-            var property = element.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public);
+            PropertyInfo? property;
+            try
+            {
+                property = element.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public);
+            }
+            catch (AmbiguousMatchException)
+            {
+                // Types like SnackbarPresenter shadow ContentPresenter.Content — skip them
+                return;
+            }
             if (property == null || (property.PropertyType != typeof(string) && property.PropertyType != typeof(object)) || !property.CanRead || !property.CanWrite || property.GetIndexParameters().Length != 0)
             {
                 return;

@@ -40,7 +40,7 @@
                                    Width="320"
                                    Height="140"
                                    Stretch="Uniform"
-                                   Source="pack://application:,,,/Assets/HydroUI/mk1.png"
+                                   Source="pack://application:,,,/Assets/HydroUI/mk2.png"
                                    Margin="0,0,0,12"/>
                         </StackPanel>
 

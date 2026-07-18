@@ -78,7 +78,12 @@ namespace Universal_x86_Tuning_Utility
         private async void OnStartup(object sender, StartupEventArgs e)
         {
             Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory;
+
             LocalizationService.Initialize(Settings.Default.Language);
+
+            // Ensure logs directory exists before configuring the logger
+            if (!Directory.Exists(LOGS_FOLDER))
+                Directory.CreateDirectory(LOGS_FOLDER);
 
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.ControlledBy(Scripts.Misc.DiagnosticLogger.LevelSwitch)
@@ -89,7 +94,14 @@ namespace Universal_x86_Tuning_Utility
                 )
                 .CreateLogger();
 
+            Log.Information("Logger initialized");
+
             Scripts.Misc.DiagnosticLogger.ApplySettingsLevel();
+
+            // Catch unhandled exceptions from all threads (not just the UI thread)
+            AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
+
+            Log.Information("About to check VC Redist");
 
             if (!IsVcRedistInstalled("x64") && !IsVcRedistInstalled("x86"))
             {
@@ -219,6 +231,9 @@ namespace Universal_x86_Tuning_Utility
                         services.AddScoped<Views.Pages.FlydigiCooler>();
                         services.AddSingleton<FlydigiCoolerService>();
 
+                        // Centralized device applier (singleton)
+                        services.AddSingleton<DeviceApplier>();
+
                         // Configuration
                         services.Configure<AppConfig>(context.Configuration.GetSection(nameof(AppConfig)));
                     }).Build();
@@ -326,6 +341,24 @@ namespace Universal_x86_Tuning_Utility
                     _logger?.LogError(ex, "Failed to auto-connect Flydigi cooler");
                 }
 
+                // Restore Adaptive Mode override state from previous session
+                try
+                {
+                    var deviceApplier = _host.Services.GetService<DeviceApplier>();
+                    if (deviceApplier != null)
+                    {
+                        if (Settings.Default.AdaptiveBs2ProEnabled)
+                            deviceApplier.EnableFlydigiOverride();
+
+                        if (Settings.Default.AdaptiveWcEnabled)
+                            deviceApplier.EnableWatercoolerOverride();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Failed to restore Adaptive Mode override state");
+                }
+
                 _ = RunPostStartupTasksAsync();
             }
             catch (Exception ex)
@@ -342,7 +375,9 @@ namespace Universal_x86_Tuning_Utility
                 var isInternetAvailable = await Task.Run(IsInternetAvailable);
 
                 if (isInternetAvailable && Settings.Default.UpdateCheck)
+                {
                     CheckForUpdate();
+                }
 
                 if (isInternetAvailable && PawnIoDetectionService.ShouldOpenInstaller())
                     new InstallpawnIo().Show();
@@ -484,19 +519,29 @@ namespace Universal_x86_Tuning_Utility
 
         /// <summary>
         /// Occurs when the application is closing.
+        /// Cleanup runs on a background thread to avoid blocking the UI thread
+        /// (which would deadlock if hosted services try to dispatch back to the UI).
         /// </summary>
-        private async void OnExit(object sender, ExitEventArgs e)
+        private void OnExit(object sender, ExitEventArgs e)
         {
-            if (Family.TYPE != Family.ProcessorType.Intel) SMUCommands.RyzenAccess.Deinitialize();
-            else Intel_Management.Deinitialize();
+            if (Family.TYPE != Family.ProcessorType.Intel)
+                SMUCommands.RyzenAccess.Deinitialize();
+            else
+                Intel_Management.Deinitialize();
 
-            await _host.StopAsync();
-
-            _host.Dispose();
+            // Stop the host on a background thread to avoid deadlock with Dispatcher.Invoke
+            // calls from hosted services' StopAsync. The host's cancellation token ensures
+            // background work stops. We don't block-wait because that would deadlock if
+            // a service tries to dispatch to the UI thread.
+            _ = Task.Run(() =>
+            {
+                _host.StopAsync(CancellationToken.None).Wait();
+                _host.Dispose();
+            });
 
             if (Games.CustomGameIconsDirectoryPath != null) //will be refactored in the future
             {
-                Directory.Delete(Games.CustomGameIconsDirectoryPath, true);
+                try { Directory.Delete(Games.CustomGameIconsDirectoryPath, true); } catch { /* ignore */ }
             }
         }
 
@@ -515,6 +560,34 @@ namespace Universal_x86_Tuning_Utility
                 MessageBoxImage.Error);
 
             e.Handled = true;
+        }
+
+        /// <summary>
+        /// Catches unhandled exceptions from all threads (including background threads).
+        /// </summary>
+        private void OnAppDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            Log.Logger.Fatal(e.ExceptionObject as Exception ?? new Exception(e.ExceptionObject?.ToString()), "Unhandled exception on non-UI thread");
+
+            if (e.IsTerminating)
+            {
+                // Try to show a message box, but this may not work if the UI thread is dead
+                try
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show(
+                            $"A critical error occurred:\n\n{e.ExceptionObject}\n\nThe application will now close.",
+                            "Critical Error",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                    });
+                }
+                catch
+                {
+                    // UI thread is dead, can't show dialog
+                }
+            }
         }
 
         static void UnblockFilesInDirectory(string directoryPath)

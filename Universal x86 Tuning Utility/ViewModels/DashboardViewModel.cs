@@ -3,10 +3,8 @@ using CommunityToolkit.Mvvm.Input;
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using System.Windows.Threading;
 using Wpf.Ui;
 using Wpf.Ui.Abstractions.Controls;
-using Settings = Universal_x86_Tuning_Utility.Properties.Settings;
 
 namespace Universal_x86_Tuning_Utility.ViewModels
 {
@@ -15,7 +13,6 @@ namespace Universal_x86_Tuning_Utility.ViewModels
         INavigationAware
     {
         private readonly INavigationService _navigationService;
-        private readonly DispatcherTimer _autoAdaptiveTimer;
 
         public DashboardViewModel(
             INavigationService navigationService)
@@ -23,14 +20,6 @@ namespace Universal_x86_Tuning_Utility.ViewModels
             _navigationService = navigationService
                 ?? throw new ArgumentNullException(
                     nameof(navigationService));
-
-            _autoAdaptiveTimer = new DispatcherTimer(
-                DispatcherPriority.Background)
-            {
-                Interval = TimeSpan.FromSeconds(1)
-            };
-
-            _autoAdaptiveTimer.Tick += AutoAdaptiveTimer_Tick;
         }
 
         [RelayCommand]
@@ -56,15 +45,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                     break;
 
                 case "help":
-                    OpenUrl("https://discord.gg/3EkYMZGJwq");
-                    break;
-
-                case "support":
-                    OpenUrl(
-                        "https://www.paypal.com/paypalme/JamesCJ60");
-
-                    OpenUrl(
-                        "https://patreon.com/uxtusoftware");
+                    OpenUrl("https://github.com/JamesCJ60/Universal-x86-Tuning-Utility/wiki");
                     break;
 
                 default:
@@ -80,13 +61,6 @@ namespace Universal_x86_Tuning_Utility.ViewModels
             Debug.WriteLine(
                 $"INFO | {nameof(DashboardViewModel)} navigated to.");
 
-            _autoAdaptiveTimer.Stop();
-
-            if (Settings.Default.isStartAdpative)
-            {
-                _autoAdaptiveTimer.Start();
-            }
-
             return Task.CompletedTask;
         }
 
@@ -95,21 +69,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
             Debug.WriteLine(
                 $"INFO | {nameof(DashboardViewModel)} navigated from.");
 
-            _autoAdaptiveTimer.Stop();
-
             return Task.CompletedTask;
-        }
-
-        private void AutoAdaptiveTimer_Tick(
-            object? sender,
-            EventArgs e)
-        {
-            _autoAdaptiveTimer.Stop();
-
-            if (Settings.Default.isStartAdpative)
-            {
-                NavigateWithinApplication("adaptive");
-            }
         }
 
         private void NavigateWithinApplication(

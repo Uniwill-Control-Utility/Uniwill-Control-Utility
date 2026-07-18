@@ -434,6 +434,9 @@
         <Grid x:Name="overlayAdaptiveWarning" Visibility="Collapsed" Background="Black" Opacity="0.4"/>
 
         <!-- Page-scoped snackbar presenter for Adaptive Mode override warning -->
-        <ui:SnackbarPresenter x:Name="SnackbarPresenter"/>
+        <ui:SnackbarPresenter x:Name="SnackbarPresenter"
+                              Margin="12"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Bottom" />
     </Grid>
 </Page>

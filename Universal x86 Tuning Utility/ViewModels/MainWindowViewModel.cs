@@ -79,7 +79,17 @@ namespace Universal_x86_Tuning_Utility.ViewModels
             // Conditionally insert Flydigi cooler before Info for connected cooling pads
             if (FlydigiHardwareDetector.IsDeviceAvailable())
             {
-                NavigationItems.Add(CreateNavigationItem(FlydigiHardwareDetector.GetDetectedModelName(), "flydigicooler", SymbolRegular.WeatherDuststorm24, typeof(Views.Pages.FlydigiCooler)));
+                var flydigiItem = new NavigationViewItem("Flydigi", SymbolRegular.Empty, typeof(Views.Pages.FlydigiCooler))
+                {
+                    TargetPageTag = "flydigicooler",
+                    Icon = new ImageIcon
+                    {
+                        Source = CreateFlydigiLogoImageSource(),
+                        Width = 21,
+                        Height = 21
+                    }
+                };
+                NavigationItems.Add(flydigiItem);
             }
 
             NavigationItems.Add(CreateNavigationItem("Info", "info", SymbolRegular.Info24, typeof(Views.Pages.SystemInfo)));
@@ -163,13 +173,6 @@ namespace Universal_x86_Tuning_Utility.ViewModels
             {
                 case "download":
                     OpenUrl("https://github.com/JamesCJ60/Universal-x86-Tuning-Utility/releases");
-                    break;
-                case "discord":
-                    OpenUrl("http://www.discord.gg/3EkYMZGJwq");
-                    break;
-                case "support":
-                    OpenUrl("https://www.paypal.com/paypalme/JamesCJ60");
-                    OpenUrl("https://patreon.com/uxtusoftware");
                     break;
             }
         }

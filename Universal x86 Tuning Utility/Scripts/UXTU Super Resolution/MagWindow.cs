@@ -114,9 +114,6 @@ namespace Universal_x86_Tuning_Utility.Scripts.UXTU_Super_Resolution
                 if (!initSuccess)
                 {
                     CloseEvent?.Invoke("Msg_Error_Init");
-                    parent.Dispatcher.Invoke(() => {
-                        parent.Close();
-                    });
                     return;
                 }
 
@@ -181,6 +178,7 @@ namespace Universal_x86_Tuning_Utility.Scripts.UXTU_Super_Resolution
             });
 
             magThread.SetApartmentState(ApartmentState.MTA);
+            magThread.IsBackground = true;
             magThread.Start();
 
             CloseEvent += (string? errorMsgId) => {

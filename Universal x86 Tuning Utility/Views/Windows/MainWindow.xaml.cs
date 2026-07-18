@@ -78,7 +78,6 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
             autoRestore.Start();
 
             SetupNavigationService(pageProvider);
-
             SetupUI();
             ApplyOnStart();
 
@@ -103,50 +102,66 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
             }
 
             tbMain.Title = $"Universal x86 Tuning Utility - {Family.CPUName}";
-            Controller.SetUpMagWindow(this);
+
+            try
+            {
+                Controller.SetUpMagWindow(this);
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "Failed to setup MagWindow");
+            }
+
             miPremadePresets.Visibility = Visibility.Visible;
             Wpf.Ui.Appearance.SystemThemeWatcher.Watch(this, WindowBackdropType.Mica, true);
         }
 
         private async void ApplyOnStart()
         {
-            if (Settings.Default.ApplyOnStart)
-                if (Settings.Default.CommandString != null && Settings.Default.CommandString != "")
-                {
-
-                    await Task.Run(() => GetBatteryStatus());
-
-                    if (statuscode == 2 || statuscode == 6 || statuscode == 7 || statuscode == 8)
+            try
+            {
+                if (Settings.Default.ApplyOnStart)
+                    if (Settings.Default.CommandString != null && Settings.Default.CommandString != "")
                     {
-                        if (Settings.Default.acCommandString != null && Settings.Default.acCommandString != "")
+
+                        await Task.Run(() => GetBatteryStatus());
+
+                        if (statuscode == 2 || statuscode == 6 || statuscode == 7 || statuscode == 8)
                         {
-                            Settings.Default.CommandString = Settings.Default.acCommandString;
-                            Settings.Default.Save();
-                            await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset);
-                            ToastNotification.ShowToastNotification("Charge Preset Applied!", $"Your charge preset settings have been applied!");
+                            if (Settings.Default.acCommandString != null && Settings.Default.acCommandString != "")
+                            {
+                                Settings.Default.CommandString = Settings.Default.acCommandString;
+                                Settings.Default.Save();
+                                await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset);
+                                ToastNotification.ShowToastNotification("Charge Preset Applied!", $"Your charge preset settings have been applied!");
+                            }
+                            else
+                            {
+                                await RyzenAdj_To_UXTU.TranslateAsync(Settings.Default.CommandString);
+                                ToastNotification.ShowToastNotification("Settings Reapplied!", $"Your last applied settings have been reapplied!");
+                            }
                         }
                         else
                         {
-                            await RyzenAdj_To_UXTU.TranslateAsync(Settings.Default.CommandString);
-                            ToastNotification.ShowToastNotification("Settings Reapplied!", $"Your last applied settings have been reapplied!");
+                            if (Settings.Default.dcCommandString != null && Settings.Default.dcCommandString != "")
+                            {
+                                Settings.Default.CommandString = Settings.Default.dcCommandString;
+                                Settings.Default.Save();
+                                await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset);
+                                ToastNotification.ShowToastNotification("Discharge Preset Applied!", $"Your discharge preset settings have been applied!");
+                            }
+                            else
+                            {
+                                await RyzenAdj_To_UXTU.TranslateAsync(Settings.Default.CommandString);
+                                ToastNotification.ShowToastNotification("Settings Reapplied!", $"Your last applied settings have been reapplied!");
+                            }
                         }
                     }
-                    else
-                    {
-                        if (Settings.Default.dcCommandString != null && Settings.Default.dcCommandString != "")
-                        {
-                            Settings.Default.CommandString = Settings.Default.dcCommandString;
-                            Settings.Default.Save();
-                            await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset);
-                            ToastNotification.ShowToastNotification("Discharge Preset Applied!", $"Your discharge preset settings have been applied!");
-                        }
-                        else
-                        {
-                            await RyzenAdj_To_UXTU.TranslateAsync(Settings.Default.CommandString);
-                            ToastNotification.ShowToastNotification("Settings Reapplied!", $"Your last applied settings have been reapplied!");
-                        }
-                    }
-                }
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "Failed to apply settings on start");
+            }
         }
 
 
@@ -673,7 +688,10 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
         {
             Dispatcher.BeginInvoke(
                 DispatcherPriority.ApplicationIdle,
-                new Action(() => Controller.SetUpMagWindow(this)));
+                new Action(() =>
+                {
+                    Controller.SetUpMagWindow(this);
+                }));
 
             if (Settings.Default.StartMini == true)
             {
@@ -698,10 +716,21 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
             // sensor polling timer and auto-starts Adaptive Mode if isStartAdpative is set).
             // Without this, the page is lazily created on first navigation, meaning the
             // timer never starts and Adaptive Mode doesn't activate on app launch.
+            // Set isAdaptiveModeRunning synchronously so other pages (Flydigi) can detect
+            // the override state before ToggleAdaptiveMode() completes its async work.
             if (Settings.Default.isStartAdpative)
             {
+                Settings.Default.isAdaptiveModeRunning = true;
+                Settings.Default.Save();
                 var adaptivePage = App.GetService<Views.Pages.Adaptive>();
             }
+
+            // Eagerly instantiate Hydro UI and Flydigi cooler pages to avoid a 1-2 second
+            // delay on first navigation. These pages do heavy work in Loaded (service
+            // resolution, event subscriptions, settings loading) which is noticeable
+            // when the page is created lazily on first visit.
+            _ = App.GetService<Views.Pages.Watercooler>();
+            _ = App.GetService<Views.Pages.FlydigiCooler>();
 
             Task.Run(Garbage.Garbage_Collect);
         }

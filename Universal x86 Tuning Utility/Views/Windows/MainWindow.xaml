@@ -9,9 +9,9 @@
     x:Name="mainWindow"
     Title="{Binding ViewModel.ApplicationTitle, Mode=OneWay}"
     Width="1080"
-    Height="640"
+    Height="730"
     MinWidth="980"
-    MinHeight="420"
+    MinHeight="680"
     d:DataContext="{d:DesignInstance local:MainWindow, IsDesignTimeCreatable=True}"
     d:Background="{DynamicResource ApplicationBackgroundBrush}"
     Foreground="{DynamicResource TextFillColorPrimaryBrush}"
@@ -59,7 +59,7 @@
                 <ui:ImageIcon Source="pack://application:,,,/Assets/applicationIcon-256.png" />
             </ui:TitleBar.Icon>
             <ui:TitleBar.Header>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="48,0,0,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,0,0">
                     <TextBlock x:Name="ModelNameText" FontSize="11" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" Margin="0,0,8,0" Text="UXTU"/>
                     <Border x:Name="CpuChip" Style="{StaticResource ChipStyle}" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -73,7 +73,7 @@
                             <TextBlock x:Name="CpuChipText" FontSize="11" FontWeight="SemiBold" Foreground="#E0E0E0" Text="Detecting CPU..." Margin="0,0,-28,0"/>
                         </StackPanel>
                     </Border>
-                    <Border x:Name="GpuChip" Style="{StaticResource ChipStyle}" VerticalAlignment="Center" Margin="8,0,0,0" Visibility="Collapsed">
+                    <Border x:Name="GpuChip" Style="{StaticResource ChipStyle}" VerticalAlignment="Center" Margin="4,0,0,0" Visibility="Collapsed">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="&#xE7F4;" FontSize="12" FontWeight="Bold" Foreground="#D0D0D0" VerticalAlignment="Center" Margin="0,0,6,0">
                                 <TextBlock.Style>
@@ -109,18 +109,7 @@
                             </ToolTip>
                         </ui:SymbolIcon.ToolTip>
                     </ui:SymbolIcon>
-                    <ui:Button Margin="0,0,6,0"
-                               Padding="10,4"
-                               Appearance="Transparent"
-                               Command="{Binding ViewModel.NavigateCommand}"
-                               CommandParameter="support"
-                               Content="Buy us a beer! ♥" />
-                    <ui:Button Padding="10,4"
-                               Appearance="Transparent"
-                               Command="{Binding ViewModel.NavigateCommand}"
-                               CommandParameter="discord"
-                               Content="Join our Discord!" Margin="0,0,8,0"/>
-                </StackPanel>
+                 </StackPanel>
             </ui:TitleBar.TrailingContent>
         </ui:TitleBar>
 

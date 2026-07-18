@@ -89,6 +89,8 @@
     <None Remove="Assets\Flydigi\bs2-pro.png" />
     <None Remove="Assets\Flydigi\bs3.png" />
     <None Remove="Assets\Flydigi\bs3-pro.png" />
+    <None Remove="Assets\HydroUI\mk1.png" />
+    <None Remove="Assets\HydroUI\mk2.png" />
     <None Remove="Assets\Flydigi\logo.svg" />
     <None Remove="Assets\Laptops\Framework\framework-laptop-13.png" />
     <None Remove="Assets\Laptops\Framework\framework-laptop-16.png" />
@@ -159,6 +161,8 @@
     <Resource Include="Assets\Flydigi\bs2-pro.png" />
     <Resource Include="Assets\Flydigi\bs3.png" />
     <Resource Include="Assets\Flydigi\bs3-pro.png" />
+    <Resource Include="Assets\HydroUI\mk1.png" />
+    <Resource Include="Assets\HydroUI\mk2.png" />
     <Resource Include="Assets\Flydigi\logo.svg" />
     <Resource Include="Assets\config-DT-AM4.png" />
     <Resource Include="Assets\config-DT-AM5.png" />
