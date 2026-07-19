@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -21,11 +23,16 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
     {
         private bool _isInitialized;
         private FlydigiCoolerService? _coolerService;
+        private Bs1Service? _bs1Service;
         private DeviceApplier? _deviceApplier;
         private MultiColorPickerControl? mcRotationColors;
         private Wpf.Ui.Controls.Snackbar? _adaptiveSnackbar;
 
+        /// <summary>True when a BS1 (BLE-only) device is connected. False for BS2+ HID devices.</summary>
+        private bool _isBs1Device;
+
         private FlydigiSmartControl? _smartControl;
+        private Bs1SmartControl? _bs1SmartControl;
         private FlydigiTemperatureProvider? _tempProvider;
         private System.Threading.Timer? _tempTimer;
 
@@ -35,6 +42,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         /// <summary>True once initial settings (RGB, RPM) have been applied to the device after first connect.</summary>
         private bool _hasAppliedInitialSettings;
+
+        /// <summary>True once UpdateConnectionUI(true) has run for the current connection session. Prevents redundant BLE writes on page navigation.</summary>
+        private bool _hasAppliedConnectionUI;
 
         /// <summary>The currently selected fan curve profile for auto control.</summary>
         private FlydigiFanCurveProfile? _activeProfile;
@@ -60,10 +70,17 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             try
             {
                 _coolerService = App.GetService<FlydigiCoolerService>();
-                if (_coolerService == null)
+                _bs1Service = App.GetService<Bs1Service>();
+
+                if (_coolerService == null && _bs1Service == null)
                 {
                     return;
                 }
+
+                // Determine active device type from which service is actually connected
+                bool initBs1Connected = _bs1Service?.IsConnected == true;
+                bool initHidConnected = _coolerService?.IsConnected == true;
+                _isBs1Device = initBs1Connected && !initHidConnected;
 
                 // Create multi-color picker programmatically (XAML codegen doesn't generate the field)
                 mcRotationColors = new MultiColorPickerControl();
@@ -76,7 +93,36 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 LoadSettingsToUI();
 
                 // Update page title with detected cooler model name
-                tbPageTitle.Text = $"Flydigi {FlydigiHardwareDetector.GetDetectedModelName()} Control";
+                UpdatePageTitle();
+
+                // Update device image based on device type
+                if (_isBs1Device)
+                {
+                    imgDevice.Source = new BitmapImage(new Uri("pack://application:,,,/Assets/Flydigi/bs1.png"));
+                }
+
+                // Apply BS1-specific UI restrictions (no RGB, no device settings, no sub-gear)
+                ApplyDeviceTypeUI();
+
+                // Subscribe to service events early so the page responds to connection
+                // events even before it's navigated to (e.g., auto-connect at startup).
+                SubscribeToServiceEvents();
+
+                // Subscribe to DeviceApplier events for override state and preset applications
+                if (_deviceApplier != null)
+                {
+                    _deviceApplier.FlydigiOverrideChanged += OnFlydigiOverrideChanged;
+                    _deviceApplier.FlydigiPresetApplied += OnFlydigiPresetApplied;
+                }
+
+                // Reflect any already-connected state (auto-connect may have fired before page load)
+                bool bs1Connected = _bs1Service?.IsConnected == true;
+                bool hidConnected = _coolerService?.IsConnected == true;
+                if (bs1Connected || hidConnected)
+                {
+                    _isBs1Device = bs1Connected;
+                    UpdateConnectionUI(true, bs1Connected);
+                }
             }
             catch (Exception ex)
             {
@@ -85,24 +131,39 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
         }
 
-        private void FlydigiCooler_Loaded(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Subscribes to connection/status/fan events on the active service.
+        /// Called once from InitializePage() — not on every page navigation.
+        /// </summary>
+        private void SubscribeToServiceEvents()
         {
-            if (_coolerService == null) return;
-
-            _coolerService.ConnectionStateChanged += OnConnectionStateChanged;
-            _coolerService.StatusChanged += OnStatusChanged;
-            _coolerService.FanDataReceived += OnFanDataReceived;
-
-            // Subscribe to DeviceApplier events for override state and preset applications
-            if (_deviceApplier != null)
+            if (_bs1Service != null)
             {
-                _deviceApplier.FlydigiOverrideChanged += OnFlydigiOverrideChanged;
-                _deviceApplier.FlydigiPresetApplied += OnFlydigiPresetApplied;
+                _bs1Service.ConnectionStateChanged += OnConnectionStateChanged;
+                _bs1Service.StatusChanged += OnStatusChanged;
+                _bs1Service.FanDataReceived += OnFanDataReceived;
             }
 
+            if (_coolerService != null)
+            {
+                _coolerService.ConnectionStateChanged += OnConnectionStateChanged;
+                _coolerService.StatusChanged += OnStatusChanged;
+                _coolerService.FanDataReceived += OnFanDataReceived;
+            }
+        }
+
+        private void FlydigiCooler_Loaded(object sender, RoutedEventArgs e)
+        {
+            // Lightweight: only reflect current state on navigation.
+            // Heavy event subscription is done once in InitializePage().
+
             // Apply current override state (may already be overridden from startup or Adaptive page)
+            // Only if the override state actually changed since last check.
             bool isOverridden = _deviceApplier?.IsFlydigiOverridden == true;
-            ApplyOverrideState(isOverridden);
+            if (isOverridden != (_adaptiveSnackbar != null || overlayAdaptiveWarning.Visibility == Visibility.Visible))
+            {
+                ApplyOverrideState(isOverridden);
+            }
 
             // If override is active, sync UI from the last-applied preset so the user sees
             // the profile's values even if they navigate to this page after the override fires.
@@ -113,33 +174,51 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             // Apply saved RGB settings only on first connect, not on every page navigation
             // Skip if Adaptive Mode is overriding (the profile owns the device)
-            if (_coolerService.IsConnected && !_hasAppliedInitialSettings &&
+            bool bs1Connected = _bs1Service?.IsConnected == true;
+            bool hidConnected = _coolerService?.IsConnected == true;
+            bool isConnected = bs1Connected || hidConnected;
+
+            if (isConnected && !_hasAppliedInitialSettings &&
                 _deviceApplier?.IsFlydigiOverridden != true)
             {
                 ApplyRgbAsync();
                 _hasAppliedInitialSettings = true;
             }
 
-            // Reflect current connection state
-            if (_coolerService.IsConnected)
+            // Reflect current connection state if already connected.
+            // Skip the heavy UpdateConnectionUI() if we already ran it for this
+            // connection session — it triggers BLE writes that cause visible lag.
+            if (isConnected)
             {
-                UpdateConnectionUI(true);
-                StartTemperaturePolling();
+                _isBs1Device = bs1Connected;
+
+                // Only run the full connection UI update on the first navigation
+                // after connect (e.g., auto-connect before page was visited).
+                if (!_hasAppliedConnectionUI)
+                {
+                    UpdateConnectionUI(true, bs1Connected);
+                }
+
+                // Keep temperature polling alive — restart only if timer was disposed
+                if (_tempTimer == null)
+                {
+                    StartTemperaturePolling();
+                }
             }
             else
             {
                 SetControlsEnabled(false);
+
+                 // Auto-scan once when entering the page with no active connection
+                RunAutoScanAsync();
             }
         }
 
         private void Page_Unloaded(object? sender, RoutedEventArgs e)
         {
-            if (_coolerService != null)
-            {
-                _coolerService.ConnectionStateChanged -= OnConnectionStateChanged;
-                _coolerService.StatusChanged -= OnStatusChanged;
-                _coolerService.FanDataReceived -= OnFanDataReceived;
-            }
+            // Note: service events are subscribed once in InitializePage() so they remain
+            // active even when the page is not visible (e.g., auto-connect at startup).
+            // We don't unsubscribe because the page lifetime matches the app lifetime.
 
             // Unsubscribe from DeviceApplier events
             if (_deviceApplier != null)
@@ -148,16 +227,74 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 _deviceApplier.FlydigiPresetApplied -= OnFlydigiPresetApplied;
             }
 
-            StopTemperaturePolling();
-            StopAutoControl();
+            // Keep auto-control and temperature polling alive across page navigation.
+            // The page lifetime matches the app lifetime — stopping/restarting these
+            // on every navigation causes visible lag and unnecessary BLE traffic.
 
-            _rpmApplyTimer?.Dispose();
-            _rpmApplyTimer = null;
-            _rgbApplyTimer?.Dispose();
-            _rgbApplyTimer = null;
-
+            // Keep debounce timers alive (they're lightweight and self-managing)
             // Reset snackbar state so it can show again on next page visit
             _adaptiveSnackbar = null;
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Device Type UI Adjustments                                         */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>
+        /// Applies UI visibility changes based on whether the connected device is a BS1 (BLE-only)
+        /// or BS2+ (HID). BS1 has no RGB, no device settings, no sub-gear levels, and a lower
+        /// max RPM (3000 vs 4000).
+        /// </summary>
+        private void ApplyDeviceTypeUI()
+        {
+            if (_isBs1Device)
+            {
+                // Hide RGB section — BS1 has no RGB
+                cardRgb.Visibility = Visibility.Collapsed;
+
+                // Hide Device Settings section — BS1 has no device settings
+                cardDeviceSettings.Visibility = Visibility.Collapsed;
+
+                // Hide sub-gear selector — BS1 has no sub-levels
+                spGearSubLevel.Visibility = Visibility.Collapsed;
+
+                // Adjust RPM range to BS1 max (3000)
+                sliderRpm.Maximum = 3000;
+                nudRpm.Maximum = 3000;
+                nudAvoidanceStart.Maximum = 3000;
+                nudAvoidanceEnd.Maximum = 3000;
+
+                // Update RPM label
+                foreach (var child in spManual.Children)
+                {
+                    if (child is TextBlock tb && tb.Text?.Contains("4000") == true)
+                        tb.Text = "RPM (1300 - 3000)";
+                }
+
+                // Clamp any existing manual RPM that's out of range
+                if (nudRpm.Value > 3000)
+                    nudRpm.Value = 3000;
+            }
+            else
+            {
+                // Restore HID device UI (BS2/BS2 Pro/BS3/BS3 Pro)
+                cardRgb.Visibility = Visibility.Visible;
+                cardDeviceSettings.Visibility = Visibility.Visible;
+                spGearSubLevel.Visibility = Visibility.Visible;
+
+                // Restore RPM range to HID max (4000)
+                sliderRpm.Maximum = 4000;
+                nudRpm.Maximum = 4000;
+                nudAvoidanceStart.Maximum = 4000;
+                nudAvoidanceEnd.Maximum = 4000;
+
+                // Restore RPM label
+                foreach (var child in spManual.Children)
+                {
+                    if (child is TextBlock tb && tb.Text?.Contains("3000") == true)
+                        tb.Text = "RPM (1300 - 4000)";
+                }
+            }
         }
 
         /* ------------------------------------------------------------------ */
@@ -186,7 +323,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             var selectedIndex = cbxFanMode.SelectedIndex;
             var enteringAuto = selectedIndex == 2;
             var enteringManual = selectedIndex == 0;
-            var wasAuto = _smartControl != null;
+            var wasAuto = _smartControl != null || _bs1SmartControl != null;
 
             spManual.Visibility = enteringManual ? Visibility.Visible : Visibility.Collapsed;
             spGear.Visibility = selectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
@@ -194,7 +331,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             if (enteringAuto && !wasAuto)
             {
-                StartAutoControl();
+                if (_isBs1Device)
+                    StartAutoControlBs1();
+                else
+                    StartAutoControl();
             }
             else if (!enteringAuto && wasAuto)
             {
@@ -246,18 +386,26 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _rpmApplyTimer?.Dispose();
             _rpmApplyTimer = null;
 
-            if (_coolerService == null || !_coolerService.IsConnected) return;
-
-            var rpm = (ushort)nudRpm.Value;
+            var rpm = nudRpm.Value.HasValue ? (ushort)nudRpm.Value.Value : (ushort)0;
 
             try
             {
-                await _coolerService.WriteRealtimeRpmAsync(rpm);
+                if (_isBs1Device && _bs1Service != null && _bs1Service.IsConnected)
+                {
+                    await _bs1Service.WriteRpmAsync(rpm);
 
-                // Persist RPM to settings
-                var settings = _coolerService.GetSettings();
-                settings.ManualRpm = rpm;
-                _coolerService.PersistSettings();
+                    var settings = _bs1Service.GetSettings();
+                    settings.ManualRpm = rpm;
+                    _bs1Service.PersistSettings();
+                }
+                else if (_coolerService != null && _coolerService.IsConnected)
+                {
+                    await _coolerService.WriteRealtimeRpmAsync(rpm);
+
+                    var settings = _coolerService.GetSettings();
+                    settings.ManualRpm = rpm;
+                    _coolerService.PersistSettings();
+                }
             }
             catch (Exception ex)
             {
@@ -292,11 +440,22 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private async Task ApplyGearAsync(byte gear)
         {
-            if (_coolerService == null || !_coolerService.IsConnected) return;
-
             try
             {
-                await _coolerService.WriteGearAsync(gear);
+                if (_isBs1Device && _bs1Service != null && _bs1Service.IsConnected)
+                {
+                    await _bs1Service.WriteGearAsync(gear);
+                    var settings = _bs1Service.GetSettings();
+                    settings.ManualGear = gear;
+                    _bs1Service.PersistSettings();
+                }
+                else if (_coolerService != null && _coolerService.IsConnected)
+                {
+                    await _coolerService.WriteGearAsync(gear);
+                    var settings = _coolerService.GetSettings();
+                    settings.ManualGear = gear;
+                    _coolerService.PersistSettings();
+                }
             }
             catch (Exception ex)
             {
@@ -382,6 +541,33 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
         }
 
+        private void StartAutoControlBs1()
+        {
+            if (_bs1Service == null || !_bs1Service.IsConnected)
+                return;
+
+            if (_activeProfile == null)
+                return;
+
+            try
+            {
+                StopAutoControl();
+
+                _tempProvider ??= new FlydigiTemperatureProvider();
+                _bs1SmartControl = new Bs1SmartControl(_bs1Service, _tempProvider);
+                _bs1SmartControl.ActiveProfile = _activeProfile;
+                _bs1SmartControl.Settings = _bs1Service.GetSettings();
+                _bs1SmartControl.TempSource = _bs1Service.GetSettings().TempSource;
+
+                _bs1SmartControl.Start();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to start auto control: {ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private void StopAutoControl()
         {
             if (_smartControl != null)
@@ -389,6 +575,13 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 try { _smartControl.Stop(); } catch { /* ignore */ }
                 try { _smartControl.Dispose(); } catch { /* ignore */ }
                 _smartControl = null;
+            }
+
+            if (_bs1SmartControl != null)
+            {
+                try { _bs1SmartControl.Stop(); } catch { /* ignore */ }
+                try { _bs1SmartControl.Dispose(); } catch { /* ignore */ }
+                _bs1SmartControl = null;
             }
 
             if (_tempProvider != null)
@@ -425,7 +618,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 StopAutoControl();
                 ShowAdaptiveSnackbar();
             }
-            else if (_coolerService?.IsConnected == true)
+            else if (_coolerService?.IsConnected == true || _bs1Service?.IsConnected == true)
             {
                 // DeviceApplier already re-applied settings to the device in DisableFlydigiOverrideAsync.
                 // We just need to sync the UI to reflect the restored settings.
@@ -434,9 +627,12 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 SetControlsEnabled(true);
 
                 // Restart auto control if we're in Auto mode and it was stopped by the override
-                if (cbxFanMode.SelectedIndex == 2 && _smartControl == null && _activeProfile != null)
+                if (cbxFanMode.SelectedIndex == 2 && _smartControl == null && _bs1SmartControl == null && _activeProfile != null)
                 {
-                    StartAutoControl();
+                    if (_isBs1Device)
+                        StartAutoControlBs1();
+                    else
+                        StartAutoControl();
                 }
             }
         }
@@ -677,17 +873,30 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 _activeProfile = profile;
 
                 // Persist selected profile name (skip during initial population)
-                if (_isInitialized && _coolerService != null)
+                if (_isInitialized)
                 {
-                    var settings = _coolerService.GetSettings();
-                    settings.SelectedCurveProfile = profile.Name;
-                    _coolerService.PersistSettings();
+                    if (_isBs1Device && _bs1Service != null)
+                    {
+                        var settings = _bs1Service.GetSettings();
+                        settings.SelectedCurveProfile = profile.Name;
+                        _bs1Service.PersistSettings();
+                    }
+                    else if (_coolerService != null)
+                    {
+                        var settings = _coolerService.GetSettings();
+                        settings.SelectedCurveProfile = profile.Name;
+                        _coolerService.PersistSettings();
+                    }
                 }
 
                 // Re-apply if auto control is active
                 if (_smartControl != null)
                 {
                     _smartControl.ActiveProfile = _activeProfile;
+                }
+                else if (_bs1SmartControl != null)
+                {
+                    _bs1SmartControl.ActiveProfile = _activeProfile;
                 }
             }
         }
@@ -705,20 +914,26 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             cbxCurveProfile.Items.Add(new ComboBoxItem { Content = performance.Name, Tag = performance });
 
             // Load saved custom curve if it exists
-            if (_coolerService != null)
+            string? customCurveJson = null;
+            if (_isBs1Device && _bs1Service != null)
             {
-                var settings = _coolerService.GetSettings();
-                if (!string.IsNullOrEmpty(settings.CustomCurveJson))
+                customCurveJson = _bs1Service.GetSettings().CustomCurveJson;
+            }
+            else if (_coolerService != null)
+            {
+                customCurveJson = _coolerService.GetSettings().CustomCurveJson;
+            }
+
+            if (!string.IsNullOrEmpty(customCurveJson))
+            {
+                try
                 {
-                    try
-                    {
-                        var custom = FlydigiFanCurveProfile.FromJSON(settings.CustomCurveJson);
-                        cbxCurveProfile.Items.Add(new ComboBoxItem { Content = custom.Name, Tag = custom });
-                    }
-                    catch
-                    {
-                        // Corrupted JSON — ignore and let user recreate
-                    }
+                    var custom = FlydigiFanCurveProfile.FromJSON(customCurveJson);
+                    cbxCurveProfile.Items.Add(new ComboBoxItem { Content = custom.Name, Tag = custom });
+                }
+                catch
+                {
+                    // Corrupted JSON — ignore and let user recreate
                 }
             }
 
@@ -758,7 +973,14 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             cbxCurveProfile.SelectedIndex = cbxCurveProfile.Items.Count - 1;
 
             // Persist custom curve JSON
-            if (_coolerService != null)
+            if (_isBs1Device && _bs1Service != null)
+            {
+                var settings = _bs1Service.GetSettings();
+                settings.CustomCurveJson = _activeProfile.ToJSON();
+                settings.SelectedCurveProfile = "Custom";
+                _bs1Service.PersistSettings();
+            }
+            else if (_coolerService != null)
             {
                 var settings = _coolerService.GetSettings();
                 settings.CustomCurveJson = _activeProfile.ToJSON();
@@ -767,7 +989,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
 
             // Re-apply if auto control is active
-            if (_smartControl != null)
+            if (_bs1SmartControl != null)
+            {
+                _bs1SmartControl.ActiveProfile = _activeProfile;
+            }
+            else if (_smartControl != null)
             {
                 _smartControl.ActiveProfile = _activeProfile;
             }
@@ -950,18 +1176,34 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void tsAutoConnect_Checked(object sender, RoutedEventArgs e)
         {
-            if (_coolerService == null) return;
-            var settings = _coolerService.GetSettings();
-            settings.AutoConnect = true;
-            _coolerService.PersistSettings();
+            if (_isBs1Device && _bs1Service != null)
+            {
+                var settings = _bs1Service.GetSettings();
+                settings.AutoConnect = true;
+                _bs1Service.PersistSettings();
+            }
+            else if (_coolerService != null)
+            {
+                var settings = _coolerService.GetSettings();
+                settings.AutoConnect = true;
+                _coolerService.PersistSettings();
+            }
         }
 
         private void tsAutoConnect_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (_coolerService == null) return;
-            var settings = _coolerService.GetSettings();
-            settings.AutoConnect = false;
-            _coolerService.PersistSettings();
+            if (_isBs1Device && _bs1Service != null)
+            {
+                var settings = _bs1Service.GetSettings();
+                settings.AutoConnect = false;
+                _bs1Service.PersistSettings();
+            }
+            else if (_coolerService != null)
+            {
+                var settings = _coolerService.GetSettings();
+                settings.AutoConnect = false;
+                _coolerService.PersistSettings();
+            }
         }
 
         private async void tsPowerOnStart_Checked(object sender, RoutedEventArgs e)
@@ -1126,7 +1368,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                UpdateConnectionUI(connected);
+                bool isBs1Sender = sender == _bs1Service;
+                UpdateConnectionUI(connected, isBs1Sender);
                 // Apply initial settings on first connect (from the Connect button, not page navigation)
                 if (connected && !_hasAppliedInitialSettings)
                 {
@@ -1145,7 +1388,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                tbCurrentRpm.Text = $"{data.CurrentRpm} RPM";
+                // Only show RPM data when actually connected
+                if (spConnectedState.Visibility == Visibility.Visible)
+                    tbCurrentRpm.Text = $"{data.CurrentRpm} RPM";
             });
         }
 
@@ -1155,6 +1400,64 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void LoadSettingsToUI()
         {
+            // BS1-specific settings load (simplified — no RGB, no device settings, no learning)
+            if (_isBs1Device && _bs1Service != null)
+            {
+                var bs1Settings = _bs1Service.GetSettings();
+
+                // Fan mode
+                cbxFanMode.SelectedIndex = Math.Clamp(bs1Settings.FanMode, 0, 2);
+
+                // Manual RPM (clamped to BS1 range)
+                double bs1Rpm = bs1Settings.ManualRpm > 0
+                    ? Math.Min((int)bs1Settings.ManualRpm, 3000)
+                    : Bs1DefaultGearRpm.Gear0_Quiet;
+                nudRpm.Value = bs1Rpm;
+                sliderRpm.Value = bs1Rpm;
+
+                // Auto-connect
+                tsAutoConnect.IsChecked = bs1Settings.AutoConnect;
+
+                // Advanced settings (avoidance, temp source)
+                tsAvoidance.IsChecked = bs1Settings.AvoidanceEnabled;
+                nudAvoidanceStart.Value = bs1Settings.AvoidanceStartRpm;
+                nudAvoidanceEnd.Value = bs1Settings.AvoidanceEndRpm;
+
+                cbxTempSource.SelectedIndex = bs1Settings.TempSource.ToLowerInvariant() switch
+                {
+                    "cpu" => 1,
+                    "gpu" => 2,
+                    _ => 0
+                };
+
+                // Hide learning for BS1 (not supported)
+                tsLearning.Visibility = Visibility.Collapsed;
+                var learningBiasPanel = tsLearning.Parent as StackPanel;
+                if (learningBiasPanel != null)
+                    learningBiasPanel.Visibility = Visibility.Collapsed;
+
+                // Curve profile
+                var bs1SavedProfile = bs1Settings.SelectedCurveProfile;
+                _isInitialized = false;
+                LoadCurveProfiles();
+                if (!string.IsNullOrEmpty(bs1SavedProfile))
+                {
+                    for (int i = 0; i < cbxCurveProfile.Items.Count; i++)
+                    {
+                        if (cbxCurveProfile.Items[i] is ComboBoxItem ci && ci.Content?.ToString() == bs1SavedProfile)
+                        {
+                            cbxCurveProfile.SelectedIndex = i;
+                            _activeProfile = ci.Tag as FlydigiFanCurveProfile;
+                            break;
+                        }
+                    }
+                }
+                _isInitialized = true;
+
+                return;
+            }
+
+            // BS2+ settings load
             if (_coolerService == null) return;
 
             var settings = _coolerService.GetSettings();
@@ -1270,10 +1573,29 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
           }
 
-        private void UpdateConnectionUI(bool connected)
+        private void UpdateConnectionUI(bool connected, bool isBs1Sender = false)
         {
             if (connected)
             {
+                // Determine device type from the event sender (which service fired this event)
+                _isBs1Device = isBs1Sender;
+
+                // Notify hardware detector FIRST so UpdatePageTitle reads the correct model name
+                string model = _isBs1Device ? "BS1" : FlydigiHardwareDetector.GetDetectedModelName();
+                FlydigiHardwareDetector.SetConnectedDeviceType(
+                    _isBs1Device ? ConnectedDeviceType.BS1 : ConnectedDeviceType.Hid, model);
+
+                // Reload settings from the active device so the page shows correct device-specific
+                // settings (e.g., AutoConnect toggle) when switching between BS1 and HID
+                LoadSettingsToUI();
+
+                // Apply device-type-specific UI (hide/restore RGB, RPM range, etc.)
+                // Called for both BS1 and HID so that UI restores properly when switching devices
+                ApplyDeviceTypeUI();
+
+                // Update page title with connected device name
+                UpdatePageTitle();
+
                 spConnectedState.Visibility = Visibility.Visible;
                 spDisconnectedState.Visibility = Visibility.Collapsed;
                 btnScan.IsEnabled = false;
@@ -1285,6 +1607,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 if (_coolerService?.ConnectedDeviceInfo != null)
                     UpdateDeviceImage(_coolerService.ConnectedDeviceInfo.ProductId);
 
+                // Update device image for BS1 (use bs1.png)
+                if (_isBs1Device)
+                    UpdateDeviceImageBs1();
+
                 // Start standalone temperature polling
                 StartTemperaturePolling();
 
@@ -1293,31 +1619,99 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                 // Show control panels when connected
                 spControls.Visibility = Visibility.Visible;
+
+                // Ensure the fan mode sub-panels (Manual/Gear/Auto) are visible
+                // matching the currently selected mode. This is needed because the
+                // combo box index is restored from settings before connect, but the
+                // sub-panels are hidden inside spControls which was collapsed.
+                UpdateFanModeUI();
+
+                // Apply saved RPM/gear on connect so the device doesn't stay at its
+                // last power-on speed (e.g. 1300) when the user has a different saved value.
+                ApplySavedFanSettingsOnConnect();
+
+                // Mark so subsequent page navigations skip this heavy work
+                _hasAppliedConnectionUI = true;
             }
             else
             {
+                // The sender service disconnected. Check if the other service is still connected.
+                bool bs1StillConnected = _bs1Service?.IsConnected == true;
+                bool hidStillConnected = _coolerService?.IsConnected == true;
+
+                if (isBs1Sender && hidStillConnected)
+                {
+                    // BS1 disconnected but HID is still connected — switch to HID
+                    _isBs1Device = false;
+                    _hasAppliedConnectionUI = false;
+
+                    // Stop BS1 smart control, keep temperature polling
+                    if (_bs1SmartControl != null)
+                    {
+                        try { _bs1SmartControl.Stop(); } catch { /* ignore */ }
+                        try { _bs1SmartControl.Dispose(); } catch { /* ignore */ }
+                        _bs1SmartControl = null;
+                    }
+
+                    string model = FlydigiHardwareDetector.GetDetectedModelName();
+                    FlydigiHardwareDetector.SetConnectedDeviceType(ConnectedDeviceType.Hid, model);
+                    ApplyDeviceTypeUI(); // Restore HID UI (RGB, etc.)
+
+                    // Re-run the connect UI for the HID device
+                    UpdateConnectionUI(true, false);
+                    return;
+                }
+                else if (!isBs1Sender && bs1StillConnected)
+                {
+                    // HID disconnected but BS1 is still connected — switch to BS1
+                    _isBs1Device = true;
+                    _hasAppliedConnectionUI = false;
+
+                    // Stop HID smart control
+                    if (_smartControl != null)
+                    {
+                        try { _smartControl.Stop(); } catch { /* ignore */ }
+                        try { _smartControl.Dispose(); } catch { /* ignore */ }
+                        _smartControl = null;
+                    }
+
+                    FlydigiHardwareDetector.SetConnectedDeviceType(ConnectedDeviceType.BS1, "BS1");
+                    ApplyDeviceTypeUI(); // Apply BS1 restrictions
+
+                    // Re-run the connect UI for BS1
+                    UpdateConnectionUI(true, true);
+                    return;
+                }
+
+                // Neither service is connected — true disconnect
+                _hasAppliedConnectionUI = false;
+
+                FlydigiHardwareDetector.SetConnectedDeviceType(ConnectedDeviceType.None);
+
+                // Stop polling first to prevent timer from overwriting cleared values
+                StopAutoControl();
+                StopTemperaturePolling();
+
                 spConnectedState.Visibility = Visibility.Collapsed;
                 spDisconnectedState.Visibility = Visibility.Visible;
                 tbCurrentRpm.Text = "--";
                 tbTemperature.Text = "--";
                 SetControlsEnabled(false);
 
-                // Reset device image to default
                 UpdateDeviceImage(0);
 
-                // Restore button text (may have been left as "Disconnecting...")
                 btnConnect.Content = "Connect";
                 btnScan.IsEnabled = true;
 
-                // Hide control panels when disconnected
                 spControls.Visibility = Visibility.Collapsed;
 
-                // Stop auto control when disconnected
-                StopAutoControl();
-                StopTemperaturePolling();
-
-                // Reset so settings re-apply on next connect
                 _hasAppliedInitialSettings = false;
+                _isBs1Device = false;
+
+                UpdatePageTitle();
+
+                // Auto-scan once after disconnect so the user can immediately reconnect
+                RunAutoScanAsync();
             }
         }
 
@@ -1338,6 +1732,80 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             imgDevice.Source = new BitmapImage(
                 new Uri($"pack://application:,,,/Assets/Flydigi/{imageFile}", UriKind.Absolute));
+        }
+
+        /// <summary>
+        /// Sets the device image to the BS1-specific asset.
+        /// </summary>
+        private void UpdateDeviceImageBs1()
+        {
+            imgDevice.Source = new BitmapImage(
+                new Uri("pack://application:,,,/Assets/Flydigi/bs1.png", UriKind.Absolute));
+        }
+
+        /// <summary>
+        /// Updates the page title with the detected cooler model name.
+        /// - No device: "Flydigi Cooler Control"
+        /// - BS1: "Flydigi BS1 Cooler Control"
+        /// - BS2+: "Flydigi BS2 PRO Cooler Control"
+        /// </summary>
+        private void UpdatePageTitle()
+        {
+            string modelName = FlydigiHardwareDetector.GetConnectedModelName();
+            if (modelName.StartsWith("Flydigi ", StringComparison.OrdinalIgnoreCase))
+                tbPageTitle.Text = $"{modelName} Control";
+            else
+                tbPageTitle.Text = $"Flydigi {modelName} Cooler Control";
+        }
+
+        /// <summary>
+        /// Applies the saved fan settings (RPM or gear) to the device on connect
+        /// so it doesn't stay at whatever speed it was at when powered on.
+        /// </summary>
+        private async void ApplySavedFanSettingsOnConnect()
+        {
+            try
+            {
+                if (_isBs1Device && _bs1Service != null && _bs1Service.IsConnected)
+                {
+                    var settings = _bs1Service.GetSettings();
+                    switch (settings.FanMode)
+                    {
+                        case 0: // Manual RPM
+                            if (settings.ManualRpm > 0)
+                                await _bs1Service.WriteRpmAsync(settings.ManualRpm);
+                            break;
+                        case 1: // Gear Presets
+                            if (settings.ManualGear > 0)
+                                await _bs1Service.WriteGearAsync((byte)settings.ManualGear);
+                            break;
+                        case 2: // Auto Curve - StartAutoControl will handle this
+                            StartAutoControlBs1();
+                            break;
+                    }
+                }
+                else if (_coolerService != null && _coolerService.IsConnected)
+                {
+                    var settings = _coolerService.GetSettings();
+                    switch (settings.FanMode)
+                    {
+                        case 0: // Manual RPM
+                            if (settings.ManualRpm > 0)
+                                await _coolerService.WriteRealtimeRpmAsync(settings.ManualRpm);
+                            break;
+                        case 1: // Gear Presets
+                            if (settings.ManualGear > 0)
+                                await _coolerService.WriteGearAsync((byte)settings.ManualGear);
+                            break;
+                        case 2: // Auto Curve - already handled by StartAutoControl in temperature polling
+                            break;
+                    }
+                }
+            }
+            catch
+            {
+                // Non-critical: device may not be ready yet
+            }
         }
 
         /* ------------------------------------------------------------------ */
@@ -1367,6 +1835,16 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // Guard against timer firing after page unload / service disposal
             if (_coolerService == null)
                 return;
+
+            // Don't update temperature if disconnected
+            var checkDispatcher = Application.Current?.Dispatcher;
+            if (checkDispatcher != null)
+            {
+                bool isConnected = false;
+                checkDispatcher.Invoke(() => isConnected = (spConnectedState.Visibility == Visibility.Visible));
+                if (!isConnected)
+                    return;
+            }
 
             _tempProvider ??= new FlydigiTemperatureProvider();
 
@@ -1459,32 +1937,48 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private async void btnScan_Click(object sender, RoutedEventArgs e)
         {
-            if (_coolerService == null) return;
-
             btnScan.IsEnabled = false;
             btnScan.Content = "Scanning...";
 
             try
             {
-                var devices = _coolerService.DiscoverDevices();
                 cbxDevices.Items.Clear();
 
-                foreach (var device in devices)
+                // Scan for HID devices (BS2+)
+                if (_coolerService != null)
                 {
-                    cbxDevices.Items.Add(new ComboBoxItem
+                    var hidDevices = _coolerService.DiscoverDevices();
+                    foreach (var device in hidDevices)
                     {
-                        Content = device.ModelName,
-                        Tag = device
-                    });
+                        cbxDevices.Items.Add(new ComboBoxItem
+                        {
+                            Content = device.ModelName,
+                            Tag = device
+                        });
+                    }
                 }
 
-                if (devices.Count > 0)
+                // Scan for BLE devices (BS1)
+                if (_bs1Service != null)
+                {
+                    var bleDevices = await _bs1Service.DiscoverDevicesAsync(5000);
+                    foreach (var device in bleDevices)
+                    {
+                        cbxDevices.Items.Add(new ComboBoxItem
+                        {
+                            Content = $"{device.ModelName} ({device.Name})",
+                            Tag = device
+                        });
+                    }
+                }
+
+                if (cbxDevices.Items.Count > 0)
                 {
                     cbxDevices.SelectedIndex = 0;
                 }
                 else
                 {
-                    MessageBox.Show("No Flydigi devices found.\nMake sure the cooling pad is connected via USB.",
+                    MessageBox.Show("No Flydigi devices found.\nMake sure the cooling pad is connected (USB for BS2+, BLE for BS1).",
                         "No Devices", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
@@ -1498,33 +1992,133 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             btnScan.Content = "Scan";
         }
 
+        /// <summary>
+        /// Runs a background scan for HID and BLE devices, populating the device combobox
+        /// with proper Tag objects so Connect can resolve the correct device.
+        /// </summary>
+        private void RunAutoScanAsync()
+        {
+            _ = Task.Run(async () =>
+            {
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    btnScan.IsEnabled = false;
+                    btnScan.Content = "Scanning...";
+                });
+
+                try
+                {
+                    List<(string Content, object Tag)> discoveredDevices = new();
+
+                    // Scan for HID devices (BS2+)
+                    if (_coolerService != null)
+                    {
+                        var hidDevices = _coolerService.DiscoverDevices();
+                        foreach (var device in hidDevices)
+                        {
+                            discoveredDevices.Add((device.ModelName, (object)device));
+                        }
+                    }
+
+                    // Scan for BLE devices (BS1)
+                    if (_bs1Service != null)
+                    {
+                        var bleDevices = await _bs1Service.DiscoverDevicesAsync(5000);
+                        foreach (var device in bleDevices)
+                        {
+                            discoveredDevices.Add(($"{device.ModelName} ({device.Name})", (object)device));
+                        }
+                    }
+
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        cbxDevices.Items.Clear();
+                        foreach (var dev in discoveredDevices)
+                        {
+                            cbxDevices.Items.Add(new ComboBoxItem
+                            {
+                                Content = dev.Content,
+                                Tag = dev.Tag
+                            });
+                        }
+
+                        if (cbxDevices.Items.Count > 0)
+                            cbxDevices.SelectedIndex = 0;
+
+                        btnScan.IsEnabled = true;
+                        btnScan.Content = "Scan";
+                    });
+                }
+                catch
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        btnScan.IsEnabled = true;
+                        btnScan.Content = "Scan";
+                    });
+                }
+            });
+        }
+
         private async void btnConnect_Click(object sender, RoutedEventArgs e)
         {
-            if (_coolerService == null) return;
-
-            // Get selected device path
-            string? devicePath = null;
-            if (cbxDevices.SelectedItem is ComboBoxItem selectedItem && selectedItem.Tag is FlydigiCoolerDeviceInfo info)
-            {
-                devicePath = info.DevicePath;
-            }
-            else if (!string.IsNullOrEmpty(_coolerService.GetSettings().LastDevicePath))
-            {
-                devicePath = _coolerService.GetSettings().LastDevicePath;
-            }
-
-            if (string.IsNullOrEmpty(devicePath))
-            {
-                MessageBox.Show("Please scan for devices first, then select a device to connect.",
-                    "No Device Selected", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
+            if (_coolerService == null && _bs1Service == null) return;
 
             btnConnect.Content = "Connecting...";
+            btnConnect.IsEnabled = false;
 
             try
             {
-                var connected = await _coolerService.ConnectAsync(devicePath);
+                bool connected = false;
+                bool isHidTarget = false; // Track which device type the user selected
+
+                // Determine device type from selected item
+                if (cbxDevices.SelectedItem is ComboBoxItem selectedItem)
+                {
+                    if (selectedItem.Tag is FlydigiCoolerDeviceInfo hidInfo)
+                    {
+                        // HID device (BS2+)
+                        isHidTarget = true;
+                        if (_coolerService != null)
+                            connected = await _coolerService.ConnectAsync(hidInfo.DevicePath);
+                    }
+                    else if (selectedItem.Tag is Bs1DeviceInfo bleInfo)
+                    {
+                        // BLE device (BS1)
+                        if (_bs1Service != null)
+                        {
+                            connected = await _bs1Service.ConnectAsync(bleInfo.Address);
+                            if (connected)
+                            {
+                                _isBs1Device = true;
+                                ApplyDeviceTypeUI();
+                            }
+                        }
+                    }
+                }
+
+                // Fallback: try last known device of the SAME type the user selected.
+                // Do not cross-fallback (HID failure should not fall back to BLE, and vice versa).
+                if (!connected && isHidTarget && _coolerService != null &&
+                    !string.IsNullOrEmpty(_coolerService.GetSettings().LastDevicePath))
+                {
+                    connected = await _coolerService.ConnectAsync(_coolerService.GetSettings().LastDevicePath);
+                }
+
+                if (!connected && !isHidTarget && _bs1Service != null)
+                {
+                    var bs1Settings = _bs1Service.GetSettings();
+                    if (!string.IsNullOrEmpty(bs1Settings.LastDeviceAddress))
+                    {
+                        connected = await _bs1Service.ConnectAsync(bs1Settings.LastDeviceAddress);
+                        if (connected)
+                        {
+                            _isBs1Device = true;
+                            ApplyDeviceTypeUI();
+                        }
+                    }
+                }
+
                 if (!connected)
                 {
                     MessageBox.Show("Failed to connect to the device.",
@@ -1536,17 +2130,23 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 MessageBox.Show($"Connection error: {ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
+            finally
+            {
+                btnConnect.Content = "Connect";
+                btnConnect.IsEnabled = true;
+            }
         }
 
         private async void btnDisconnect_Click(object sender, RoutedEventArgs e)
         {
-            if (_coolerService == null) return;
-
             btnDisconnect.Content = "Disconnecting...";
 
             try
             {
-                _coolerService.DisconnectAsync();
+                if (_isBs1Device && _bs1Service != null)
+                    await _bs1Service.DisconnectAsync();
+                else if (_coolerService != null)
+                    _coolerService.DisconnectAsync();
             }
             catch (Exception ex)
             {

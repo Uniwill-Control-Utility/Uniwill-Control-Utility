@@ -74,13 +74,57 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (!Settings.Default.isASUS) sdAsusPower.Visibility = Visibility.Collapsed;
 
             sdHydroUI.Visibility = WaterCoolerHardwareDetector.IsSupportedHardware() ? Visibility.Visible : Visibility.Collapsed;
-            sdBs2Pro.Visibility = FlydigiHardwareDetector.IsDeviceAvailable() ? Visibility.Visible : Visibility.Collapsed;
-            tbBs2ProTitle.Text = FlydigiHardwareDetector.GetDetectedModelName();
+            UpdateFlydigiCardVisibility();
         }
+
+        /// <summary>
+        /// Updates the Flydigi card visibility and controls based on the currently connected device.
+        /// BS1: shows fan controls only (no RGB, no Curve, max 3000 RPM).
+        /// BS2+: shows all controls including RGB.
+        /// No device: hides the card entirely.
+        /// </summary>
+        private void UpdateFlydigiCardVisibility()
+        {
+            var deviceType = FlydigiHardwareDetector.ConnectedDeviceType;
+
+            if (deviceType == ConnectedDeviceType.None)
+            {
+                sdBs2Pro.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            sdBs2Pro.Visibility = Visibility.Visible;
+
+            bool isBs1 = deviceType == ConnectedDeviceType.BS1;
+            tbBs2ProTitle.Text = "Flydigi Cooler";
+
+            // BS1 has no RGB — hide the RGB mode selector and RGB color panels
+            if (spBs2ProRgbMode != null)
+                spBs2ProRgbMode.Visibility = isBs1 ? Visibility.Collapsed : Visibility.Visible;
+            if (spBs2ProRgb != null)
+                spBs2ProRgb.Visibility = isBs1 ? Visibility.Collapsed : Visibility.Visible;
+
+            if (isBs1)
+            {
+                // BS1 supports Curve (Auto) via app-localized Bs1SmartControl — keep all 3 fan modes.
+                // BS1 max RPM is 3000
+                nudBs2ProRpm.Maximum = 3000;
+                sdBs2ProRpm.Maximum = 3000;
+                if (nudBs2ProRpm.Value > 3000)
+                    nudBs2ProRpm.Value = 3000;
+            }
+            else
+            {
+                nudBs2ProRpm.Maximum = 4000;
+                sdBs2ProRpm.Maximum = 4000;
+            }
+        }
+
         private static AdaptivePresetManager adaptivePresetManager = new AdaptivePresetManager(Settings.Default.Path + "adaptivePresets.json");
         private static DeviceApplier? _deviceApplier;
         private static FlydigiSmartControl? _bs2ProSmartControl;
         private static FlydigiTemperatureProvider? _bs2ProTempProvider;
+        private static Bs1SmartControl? _bs1SmartControl;
         private async void setUp()
         {
             try
@@ -519,6 +563,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                     // Stop any existing smart control (curve mode) so it restarts with the new profile
                     StopBs2ProSmartControl();
+                    StopBs1SmartControl();
                 }
             }
             catch (Exception ex)
@@ -869,29 +914,65 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                             if (bs2Mode == "Curve")
                             {
-                                // Handle Curve mode via FlydigiSmartControl (stateful, can't route through DeviceApplier)
-                                var flydigiService = App.GetService<FlydigiCoolerService>();
-                                if (flydigiService?.IsConnected == true)
-                                {
-                                    string curveProfileId = GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex);
-                                    FlydigiFanCurveProfile curveProfile = curveProfileId switch
-                                    {
-                                        "Silent" => FlydigiFanCurveProfile.CreateSilent(),
-                                        "Performance" => FlydigiFanCurveProfile.CreatePerformance(),
-                                        "Custom" => LoadCustomCurveProfile(flydigiService),
-                                        _ => FlydigiFanCurveProfile.CreateBalanced()
-                                    };
+                                // Handle Curve mode via smart control (stateful, can't route through DeviceApplier)
+                                bool isBs1Curve = FlydigiHardwareDetector.ConnectedDeviceType == ConnectedDeviceType.BS1;
 
-                                    if (_bs2ProSmartControl == null)
+                                if (isBs1Curve)
+                                {
+                                    // BS1 Curve mode via app-localized Bs1SmartControl
+                                    var bs1Service = App.GetService<Bs1Service>();
+                                    if (bs1Service?.IsConnected == true)
                                     {
-                                        _bs2ProTempProvider = new FlydigiTemperatureProvider();
-                                        _bs2ProSmartControl = new FlydigiSmartControl(flydigiService, _bs2ProTempProvider);
-                                        _bs2ProSmartControl.ActiveProfile = curveProfile;
-                                        _bs2ProSmartControl.Start();
+                                        string curveProfileId = GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex);
+                                        FlydigiFanCurveProfile curveProfile = curveProfileId switch
+                                        {
+                                            "Silent" => FlydigiFanCurveProfile.CreateSilent(),
+                                            "Performance" => FlydigiFanCurveProfile.CreatePerformance(),
+                                            "Custom" => LoadBs1CustomCurveProfile(bs1Service),
+                                            _ => FlydigiFanCurveProfile.CreateBalanced()
+                                        };
+
+                                        if (_bs1SmartControl == null)
+                                        {
+                                            var tempProvider = new FlydigiTemperatureProvider();
+                                            _bs1SmartControl = new Bs1SmartControl(bs1Service, tempProvider);
+                                            _bs1SmartControl.ActiveProfile = curveProfile;
+                                            _bs1SmartControl.Settings = bs1Service.GetSettings();
+                                            _bs1SmartControl.TempSource = bs1Service.GetSettings().TempSource;
+                                            _bs1SmartControl.Start();
+                                        }
+                                        else
+                                        {
+                                            _bs1SmartControl.ActiveProfile = curveProfile;
+                                        }
                                     }
-                                    else
+                                }
+                                else
+                                {
+                                    // BS2+ Curve mode via FlydigiSmartControl
+                                    var flydigiService = App.GetService<FlydigiCoolerService>();
+                                    if (flydigiService?.IsConnected == true)
                                     {
-                                        _bs2ProSmartControl.ActiveProfile = curveProfile;
+                                        string curveProfileId = GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex);
+                                        FlydigiFanCurveProfile curveProfile = curveProfileId switch
+                                        {
+                                            "Silent" => FlydigiFanCurveProfile.CreateSilent(),
+                                            "Performance" => FlydigiFanCurveProfile.CreatePerformance(),
+                                            "Custom" => LoadCustomCurveProfile(flydigiService),
+                                            _ => FlydigiFanCurveProfile.CreateBalanced()
+                                        };
+
+                                        if (_bs2ProSmartControl == null)
+                                        {
+                                            _bs2ProTempProvider = new FlydigiTemperatureProvider();
+                                            _bs2ProSmartControl = new FlydigiSmartControl(flydigiService, _bs2ProTempProvider);
+                                            _bs2ProSmartControl.ActiveProfile = curveProfile;
+                                            _bs2ProSmartControl.Start();
+                                        }
+                                        else
+                                        {
+                                            _bs2ProSmartControl.ActiveProfile = curveProfile;
+                                        }
                                     }
                                 }
                             }
@@ -900,13 +981,15 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                                 // For non-curve modes, stop smart control if active
                                 if (_bs2ProSmartControl != null)
                                     StopBs2ProSmartControl();
+                                if (_bs1SmartControl != null)
+                                    StopBs1SmartControl();
 
                                 byte? gear = null;
                                 ushort? rpm = null;
                                 if (bs2Mode == "Gear")
                                     gear = (byte)(cbxBs2ProGear.SelectedIndex + 1);
                                 else if (bs2Mode == "Rpm")
-                                    rpm = (ushort)Math.Clamp((int)nudBs2ProRpm.Value, 1300, 4000);
+                                    rpm = (ushort)Math.Clamp((int)nudBs2ProRpm.Value, 1300, (FlydigiHardwareDetector.ConnectedDeviceType == ConnectedDeviceType.BS1 ? 3000 : 4000));
 
                                 // Use DeviceApplier for fan + RGB (diff-based to avoid redundant writes)
                                 // Only compare gear/rpm when they're relevant for the current mode.
@@ -1012,6 +1095,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 // Don't reset tracking on navigation — just load the preset UI values
                 loadPreset(presetName, resetTracking: false);
             }
+
+            // Recheck Flydigi card visibility on navigation (device may have connected/disconnected)
+            UpdateFlydigiCardVisibility();
         }
 
 
@@ -1350,9 +1436,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         {
             return (index + 1) switch
             {
-                1 => "Off",
-                2 => "Gear",
-                3 => "Rpm",
+                1 => "Gear",
+                2 => "Rpm",
                 _ => "Curve"
             };
         }
@@ -1361,10 +1446,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         {
             return mode switch
             {
-                "Off" => 0,
-                "Gear" => 1,
-                "Rpm" => 2,
-                "Curve" => 3,
+                "Gear" => 0,
+                "Rpm" => 1,
+                "Curve" => 2,
                 _ => 0
             };
         }
@@ -1409,6 +1493,34 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
         }
 
+        private static void StopBs1SmartControl()
+        {
+            if (_bs1SmartControl != null)
+            {
+                try { _bs1SmartControl.Stop(); } catch { /* ignore */ }
+                try { _bs1SmartControl.Dispose(); } catch { /* ignore */ }
+                _bs1SmartControl = null;
+            }
+        }
+
+        /// <summary>Loads the custom curve profile from Bs1 settings, falling back to Balanced.</summary>
+        private static FlydigiFanCurveProfile LoadBs1CustomCurveProfile(Bs1Service bs1Service)
+        {
+            try
+            {
+                var bs1Settings = bs1Service.GetSettings();
+                if (!string.IsNullOrEmpty(bs1Settings.CustomCurveJson))
+                {
+                    return FlydigiFanCurveProfile.FromJSON(bs1Settings.CustomCurveJson);
+                }
+            }
+            catch
+            {
+                // Corrupted custom curve JSON — fall back to Balanced
+            }
+            return FlydigiFanCurveProfile.CreateBalanced();
+        }
+
         /// <summary>Loads the custom curve profile from Bs2Pro settings, falling back to Balanced.</summary>
         private static FlydigiFanCurveProfile LoadCustomCurveProfile(FlydigiCoolerService flydigiService)
         {
@@ -1439,9 +1551,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 return;
 
             var mode = cbxBs2ProFanMode.SelectedIndex;
-            spBs2ProGear.Visibility = mode == 1 ? Visibility.Visible : Visibility.Collapsed;
-            spBs2ProRpm.Visibility = mode == 2 ? Visibility.Visible : Visibility.Collapsed;
-            spBs2ProCurve.Visibility = mode == 3 ? Visibility.Visible : Visibility.Collapsed;
+            spBs2ProGear.Visibility = mode == 0 ? Visibility.Visible : Visibility.Collapsed;
+            spBs2ProRpm.Visibility = mode == 1 ? Visibility.Visible : Visibility.Collapsed;
+            spBs2ProCurve.Visibility = mode == 2 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void btnBs2ProEditCurve_Click(object sender, RoutedEventArgs e)
