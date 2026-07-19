@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -76,21 +77,8 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                 NavigationItems.Add(CreateNavigationItem("Hydro UI", "watercooler", SymbolRegular.Water24, typeof(Views.Pages.Watercooler)));
             }
 
-            // Conditionally insert Flydigi cooler before Info for connected cooling pads
-            if (FlydigiHardwareDetector.IsDeviceAvailable())
-            {
-                var flydigiItem = new NavigationViewItem("Flydigi", SymbolRegular.Empty, typeof(Views.Pages.FlydigiCooler))
-                {
-                    TargetPageTag = "flydigicooler",
-                    Icon = new ImageIcon
-                    {
-                        Source = CreateFlydigiLogoImageSource(),
-                        Width = 21,
-                        Height = 21
-                    }
-                };
-                NavigationItems.Add(flydigiItem);
-            }
+            // Flydigi cooler page is always visible
+            NavigationItems.Add(CreateFlydigiNavItem());
 
             NavigationItems.Add(CreateNavigationItem("Info", "info", SymbolRegular.Info24, typeof(Views.Pages.SystemInfo)));
 
@@ -175,6 +163,23 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                     OpenUrl("https://github.com/JamesCJ60/Universal-x86-Tuning-Utility/releases");
                     break;
             }
+        }
+
+        /// <summary>
+        /// Creates the Flydigi navigation item with the logo icon.
+        /// </summary>
+        private static NavigationViewItem CreateFlydigiNavItem()
+        {
+            return new NavigationViewItem("Flydigi", SymbolRegular.Empty, typeof(Views.Pages.FlydigiCooler))
+            {
+                TargetPageTag = "flydigicooler",
+                Icon = new ImageIcon
+                {
+                    Source = CreateFlydigiLogoImageSource(),
+                    Width = 21,
+                    Height = 21
+                }
+            };
         }
 
         /// <summary>

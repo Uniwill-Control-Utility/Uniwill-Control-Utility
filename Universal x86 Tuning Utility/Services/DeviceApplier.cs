@@ -16,6 +16,7 @@ namespace Universal_x86_Tuning_Utility.Services
     public class DeviceApplier
     {
         private readonly FlydigiCoolerService _flydigiService;
+        private readonly Bs1Service? _bs1Service;
         private readonly WaterCoolerService _waterCoolerService;
 
         /// <summary>Whether Adaptive Mode is currently overriding Flydigi device control.</summary>
@@ -66,9 +67,10 @@ namespace Universal_x86_Tuning_Utility.Services
         /// </summary>
         private WaterCoolerSettings? _savedWatercoolerSettings;
 
-        public DeviceApplier(FlydigiCoolerService flydigiService, WaterCoolerService waterCoolerService)
+        public DeviceApplier(FlydigiCoolerService flydigiService, Bs1Service? bs1Service, WaterCoolerService waterCoolerService)
         {
             _flydigiService = flydigiService;
+            _bs1Service = bs1Service;
             _waterCoolerService = waterCoolerService;
         }
 
@@ -197,40 +199,72 @@ namespace Universal_x86_Tuning_Utility.Services
         /* ------------------------------------------------------------------ */
 
         /// <summary>
-        /// Applies fan mode + RPM/gear to the Flydigi device.
+        /// Applies fan mode + RPM/gear to the Flydigi device (BS2+ or BS1).
         /// "Curve" mode is handled by FlydigiSmartControl — this method is a no-op for Curve.
         /// </summary>
         public async Task ApplyFlydigiFanAsync(string fanMode, byte? gear = null, ushort? rpm = null)
         {
-            if (!_flydigiService.IsConnected)
-                return;
+            // Try BS2+ first, then BS1
+            bool applied = false;
 
-            try
+            if (_flydigiService.IsConnected)
             {
-                switch (fanMode)
+                applied = true;
+                try
                 {
-                    case "Off":
-                        await _flydigiService.WriteRealtimeRpmAsync(0);
-                        break;
-
-                    case "Gear":
-                        if (gear.HasValue && gear.Value > 0)
-                            await _flydigiService.WriteGearAsync(gear.Value);
-                        break;
-
-                    case "Rpm":
-                        if (rpm.HasValue && rpm.Value > 0)
-                            await _flydigiService.WriteRealtimeRpmAsync(rpm.Value);
-                        break;
-
-                    // "Curve" is handled by FlydigiSmartControl, not this applier.
-                    break;
+                    switch (fanMode)
+                    {
+                        case "Off":
+                            await _flydigiService.WriteRealtimeRpmAsync(0);
+                            break;
+                        case "Gear":
+                            if (gear.HasValue && gear.Value > 0)
+                                await _flydigiService.WriteGearAsync(gear.Value);
+                            break;
+                        case "Rpm":
+                            if (rpm.HasValue && rpm.Value > 0)
+                                await _flydigiService.WriteRealtimeRpmAsync(rpm.Value);
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to apply Flydigi fan settings (BS2+)");
                 }
             }
-            catch (Exception ex)
+
+            // Also apply to BS1 if connected
+            if (_bs1Service?.IsConnected == true)
             {
-                DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to apply Flydigi fan settings");
+                applied = true;
+                try
+                {
+                    ushort? clampedRpm = rpm.HasValue ? (ushort?)Math.Clamp(rpm.Value, Bs1DefaultGearRpm.MinRpm, Bs1DefaultGearRpm.MaxRpm) : null;
+
+                    switch (fanMode)
+                    {
+                        case "Off":
+                            await _bs1Service.WriteFanOffAsync();
+                            break;
+                        case "Gear":
+                            if (gear.HasValue && gear.Value > 0)
+                                await _bs1Service.WriteGearAsync(gear.Value);
+                            break;
+                        case "Rpm":
+                            if (clampedRpm.HasValue && clampedRpm.Value > 0)
+                                await _bs1Service.WriteRpmAsync(clampedRpm.Value);
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to apply Flydigi fan settings (BS1)");
+                }
             }
+
+            // Neither connected — no-op
+            if (!applied)
+                return;
         }
 
         /// <summary>

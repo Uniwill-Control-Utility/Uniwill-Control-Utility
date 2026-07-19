@@ -174,7 +174,7 @@
                                 <Button Name="btnGearStrong" Content="Strong" Margin="0,0,6,6" Width="90" Click="btnGearStrong_Click"/>
                                 <Button Name="btnGearOverclock" Content="Overclock" Margin="0,0,6,6" Width="90" Click="btnGearOverclock_Click"/>
                             </WrapPanel>
-                            <StackPanel Orientation="Horizontal">
+                            <StackPanel x:Name="spGearSubLevel" Orientation="Horizontal">
                                 <TextBlock Text="Sub-level:" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                 <ComboBox Name="cbxGearSubLevel" MinWidth="120">
                                     <ComboBoxItem Content="Low"/>
@@ -195,8 +195,8 @@
                     </StackPanel>
                 </ui:CardControl>
 
-                <!-- RGB Control Section -->
-                <ui:CardControl Margin="0,0,0,12">
+                <!-- RGB Control Section (hidden for BS1 which has no RGB) -->
+                <ui:CardControl x:Name="cardRgb" Margin="0,0,0,12">
                     <ui:CardControl.Header>
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Symbol="Color24" Margin="0,0,8,0"/>
@@ -321,8 +321,25 @@
                     </StackPanel>
                 </ui:CardControl>
 
-                <!-- Device Settings Section -->
+                <!-- Auto-Connect (visible for all device types including BS1) -->
                 <ui:CardControl Margin="0,0,0,12">
+                    <ui:CardControl.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="ArrowReset20" Margin="0,0,8,0"/>
+                            <TextBlock Text="Connection"/>
+                        </StackPanel>
+                    </ui:CardControl.Header>
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <ui:ToggleSwitch Name="tsAutoConnect" Margin="0,0,9,0"
+                                Checked="tsAutoConnect_Checked" Unchecked="tsAutoConnect_Unchecked"/>
+                            <TextBlock Text="Auto-connect on startup" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ui:CardControl>
+
+                <!-- Device Settings Section (hidden for BS1 which has no device settings) -->
+                <ui:CardControl x:Name="cardDeviceSettings" Margin="0,0,0,12">
                     <ui:CardControl.Header>
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Symbol="Settings20" Margin="0,0,8,0"/>
@@ -330,13 +347,6 @@
                         </StackPanel>
                     </ui:CardControl.Header>
                     <StackPanel>
-                        <!-- Auto-Connect -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                            <ui:ToggleSwitch Name="tsAutoConnect" Margin="0,0,9,0"
-                                Checked="tsAutoConnect_Checked" Unchecked="tsAutoConnect_Unchecked"/>
-                            <TextBlock Text="Auto-connect on startup" VerticalAlignment="Center"/>
-                        </StackPanel>
-
                         <!-- Power-On Start -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                             <ui:ToggleSwitch Name="tsPowerOnStart" Margin="0,0,9,0"

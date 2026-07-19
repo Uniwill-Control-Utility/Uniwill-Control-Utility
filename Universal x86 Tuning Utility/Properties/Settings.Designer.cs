@@ -826,5 +826,6 @@ namespace Universal_x86_Tuning_Utility.Properties {
                 this["Language"] = value;
             }
         }
-    }
+
+     }
 }

@@ -851,7 +851,6 @@ Icon="{ui:SymbolIcon Power20}" Margin="0,8,15,0">
                                     <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select the fan control mode for this game." VerticalAlignment="Bottom" />
                                 </StackPanel>
                                 <ComboBox Name="cbxBs2ProFanMode" MinWidth="160" Margin="0,4,0,0" Height="37" SelectedIndex="0" SelectionChanged="cbxBs2ProFanMode_SelectionChanged">
-                                    <ComboBoxItem>Off</ComboBoxItem>
                                     <ComboBoxItem>Gear Preset</ComboBoxItem>
                                     <ComboBoxItem>Manual RPM</ComboBoxItem>
                                     <ComboBoxItem>Curve (Auto)</ComboBoxItem>
@@ -898,7 +897,7 @@ Icon="{ui:SymbolIcon Power20}" Margin="0,8,15,0">
                             </StackPanel>
 
                             <!-- RGB Control -->
-                            <StackPanel Margin="0,8,0,0">
+                            <StackPanel Name="spBs2ProRgbMode" Margin="0,8,0,0">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">RGB Mode</TextBlock>
                                     <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select the RGB lighting mode for this game." VerticalAlignment="Bottom" />

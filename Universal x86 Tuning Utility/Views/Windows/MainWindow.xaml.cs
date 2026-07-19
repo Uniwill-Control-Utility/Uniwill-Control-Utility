@@ -51,6 +51,7 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
 
         public static bool isMini { get; private set; }
         public static NavigationView _mainWindowNav;
+        public static MainWindow? Instance { get; private set; }
         private static INavigationService _navigationService;
         private bool _isTrayPresetApplying;
         public static bool IsPageSelected(Type pageType) =>
@@ -82,6 +83,8 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
             ApplyOnStart();
 
             SystemEvents.PowerModeChanged += HandlePowerModeChange;
+
+            Instance = this;
         }
 
         private void SetupNavigationService(INavigationViewPageProvider pageProvider)

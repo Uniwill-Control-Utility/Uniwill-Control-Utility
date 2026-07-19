@@ -68,6 +68,7 @@ namespace Universal_x86_Tuning_Utility.Services
         private string _lastScheduledProfile;
         private HidDevice? _device;
         private CancellationTokenSource? _readCts;
+        private Task? _readTask;
         private readonly object _writeLock = new();
         private DateTime _lastWriteTime = DateTime.MinValue;
 
@@ -474,7 +475,7 @@ namespace Universal_x86_Tuning_Utility.Services
             _readCts = new CancellationTokenSource();
             var token = _readCts.Token;
 
-            Task.Run(() =>
+            _readTask = Task.Run(() =>
             {
                 while (!token.IsCancellationRequested && _device != null && _device.IsOpen)
                 {
@@ -509,8 +510,14 @@ namespace Universal_x86_Tuning_Utility.Services
             }
             catch { /* ignore cancellation errors */ }
 
+            // Wait for the read loop to exit before closing the device handle.
+            // The read uses a 200ms timeout, so this should complete quickly.
+            // We allow up to 2 seconds to avoid hanging indefinitely.
+            _readTask?.Wait(2000);
+
             _readCts?.Dispose();
             _readCts = null;
+            _readTask = null;
         }
 
         private void OnInputReport(byte[] data)

@@ -142,7 +142,7 @@ namespace Universal_x86_Tuning_Utility
                     Log.Logger.Error(ex, "Failed to setup product and display refresh rates");
                 }
 
-                _host = Host
+           _host = Host
                     .CreateDefaultBuilder()
                     .ConfigureAppConfiguration(c =>
                     {
@@ -230,6 +230,9 @@ namespace Universal_x86_Tuning_Utility
                         // Flydigi BS2 Pro cooling pad page and service
                         services.AddScoped<Views.Pages.FlydigiCooler>();
                         services.AddSingleton<FlydigiCoolerService>();
+
+                        // Flydigi BS1 (BLE-only) cooling pad service
+                        services.AddSingleton<Bs1Service>();
 
                         // Centralized device applier (singleton)
                         services.AddSingleton<DeviceApplier>();
@@ -339,6 +342,18 @@ namespace Universal_x86_Tuning_Utility
                 catch (Exception ex)
                 {
                     _logger?.LogError(ex, "Failed to auto-connect Flydigi cooler");
+                }
+
+                // Auto-connect Flydigi BS1 (BLE) cooling pad on startup if enabled
+                try
+                {
+                    var bs1Service = _host.Services.GetService<Bs1Service>();
+                    if (bs1Service != null)
+                        await bs1Service.TryAutoConnectAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Failed to auto-connect Flydigi BS1");
                 }
 
                 // Restore Adaptive Mode override state from previous session

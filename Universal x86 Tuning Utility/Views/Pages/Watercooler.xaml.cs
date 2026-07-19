@@ -440,7 +440,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         /// </summary>
         private void UpdateDeviceImage()
         {
-            string imageFile = "mk1.png"; // Default fallback
+            string imageFile = "mk2.png"; // Default fallback
 
             if (_waterCoolerService?.ConnectedDeviceName != null)
             {
