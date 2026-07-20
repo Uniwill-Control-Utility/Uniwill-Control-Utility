@@ -71,6 +71,13 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             cbAutoSwitch.IsChecked = Settings.Default.autoSwitch;
 
+            // Initialize override checkboxes from persisted settings so they reflect
+            // the state from the previous session. This must happen before setUp()
+            // calls ToggleAdaptiveMode(), otherwise the checkboxes stay at their
+            // XAML default (false) and get captured by loadPreset as "wasEnabled=false".
+            cbxBs2ProEnabled.IsChecked = Settings.Default.AdaptiveBs2ProEnabled;
+            cbxWcEnabled.IsChecked = Settings.Default.AdaptiveWcEnabled;
+
             if (!Settings.Default.isASUS) sdAsusPower.Visibility = Visibility.Collapsed;
 
             sdHydroUI.Visibility = WaterCoolerHardwareDetector.IsSupportedHardware() ? Visibility.Visible : Visibility.Collapsed;
@@ -370,6 +377,18 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     Settings.Default.isStartAdpative = false;
                     Settings.Default.Save();
 
+                    // Stop smart control when Adaptive Mode stops
+                    StopBs2ProSmartControl();
+                    StopBs1SmartControl();
+
+                    // Lift DeviceApplier overrides when Adaptive Mode stops so that
+                    // the Flydigi/Watercooler pages regain control and hide their overlays.
+                    if (_deviceApplier != null)
+                    {
+                        _ = _deviceApplier.DisableFlydigiOverrideAsync();
+                        _ = _deviceApplier.DisableWatercoolerOverrideAsync();
+                    }
+
                 }
                 else
                 {
@@ -380,6 +399,17 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     Settings.Default.isAdaptiveModeRunning = true;
                     Settings.Default.isStartAdpative = true;
                     Settings.Default.Save();
+
+                    // Sync DeviceApplier override state to the current checkbox values
+                    // when Adaptive Mode starts. This ensures the override state matches
+                    // what the user has configured in the active profile.
+                    if (_deviceApplier != null)
+                    {
+                        if ((bool)cbxBs2ProEnabled.IsChecked && !_deviceApplier.IsFlydigiOverridden)
+                            _deviceApplier.EnableFlydigiOverride();
+                        if ((bool)cbxWcEnabled.IsChecked && !_deviceApplier.IsWatercoolerOverridden)
+                            _deviceApplier.EnableWatercoolerOverride();
+                    }
                 }
             }
             catch (Exception ex)
@@ -453,11 +483,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                 if (myPreset != null)
                 {
-                    // Preserve user's explicit override checkbox state so that setting
-                    // IsChecked below doesn't fire Toggled and unexpectedly enable/disable
-                    // the DeviceApplier override.
-                    bool wasBs2ProEnabled = (bool)cbxBs2ProEnabled.IsChecked;
-                    bool wasWcEnabled = (bool)cbxWcEnabled.IsChecked;
+                    // Capture current DeviceApplier override state so we can reconcile
+                    // it with the preset's per-profile values below without firing Toggled.
+                    bool prevBs2ProEnabled = (bool)cbxBs2ProEnabled.IsChecked;
+                    bool prevWcEnabled = (bool)cbxWcEnabled.IsChecked;
                     tsAutoSwitch.IsChecked = myPreset.isAutoSwitch;
 
                     nudTemp.Value = myPreset.Temp;
@@ -536,9 +565,23 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     nudBs2ProRgbB.Value = myPreset.Bs2ProRgbB;
                     nudBs2ProBrightness.Value = myPreset.Bs2ProBrightness;
 
-                    // Restore user's override checkbox state (don't let preset override it)
-                    cbxWcEnabled.IsChecked = wasWcEnabled;
-                    cbxBs2ProEnabled.IsChecked = wasBs2ProEnabled;
+                    // Apply the preset's per-profile override flags only when resetTracking
+                    // is true (profile switch). When resetTracking is false (Page_Loaded,
+                    // game detection without profile change), preserve the user's current
+                    // checkbox edits so they aren't overwritten by the saved preset.
+                    if (resetTracking)
+                    {
+                        if (cbxBs2ProEnabled.IsChecked != myPreset.Bs2ProEnabled)
+                            cbxBs2ProEnabled.IsChecked = myPreset.Bs2ProEnabled;
+                        if (cbxWcEnabled.IsChecked != myPreset.WcEnabled)
+                            cbxWcEnabled.IsChecked = myPreset.WcEnabled;
+
+                        // Sync global settings to the active preset's override state so that
+                        // App.xaml.cs startup restoration reads the correct values.
+                        Settings.Default.AdaptiveBs2ProEnabled = myPreset.Bs2ProEnabled;
+                        Settings.Default.AdaptiveWcEnabled = myPreset.WcEnabled;
+                        Settings.Default.Save();
+                    }
 
                     if (resetTracking)
                     {
@@ -1254,14 +1297,12 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     cbxPowerPreset.SelectedItem = item;
                     _isUpdatingPresetSelection = false;
 
-                    // Only load preset UI values when no device override is active.
-                    // When Flydigi/Watercooler override is enabled, the profile owns
-                    // the device settings and game detection should not overwrite the
-                    // UI controls (which would cause update() to re-send commands).
-                    if ((bool)cbxBs2ProEnabled.IsChecked || (bool)cbxWcEnabled.IsChecked)
-                        return;
-
-                    loadPreset(presetName, resetTracking: false);
+                    // Load the new preset's UI values. The device override flags being
+                    // active does not prevent profile switching — the new profile may
+                    // have different override settings (ON vs OFF) that need to apply.
+                    // Use resetTracking: true so the next update() tick applies the
+                    // new preset's settings to the device and CPU/GPU controls.
+                    loadPreset(presetName, resetTracking: true);
                     return;
                 }
             }
@@ -1271,10 +1312,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             cbxPowerPreset.SelectedIndex = 0;
             _isUpdatingPresetSelection = false;
 
-            if ((bool)cbxBs2ProEnabled.IsChecked || (bool)cbxWcEnabled.IsChecked)
-                return;
-
-            loadPreset(DefaultProfileName, resetTracking: false);
+             // Use resetTracking: true so the next update() tick applies the Default preset.
+            loadPreset(DefaultProfileName, resetTracking: true);
         }
 
         private void cb_Checked(object sender, RoutedEventArgs e)

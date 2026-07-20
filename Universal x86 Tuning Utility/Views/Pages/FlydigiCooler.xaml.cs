@@ -159,8 +159,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             // Apply current override state (may already be overridden from startup or Adaptive page)
             // Only if the override state actually changed since last check.
+            // Use the DeviceApplier flag as the source of truth — the overlay/snackbar may
+            // be stale after Unloaded cleared _adaptiveSnackbar but left the overlay visible.
             bool isOverridden = _deviceApplier?.IsFlydigiOverridden == true;
-            if (isOverridden != (_adaptiveSnackbar != null || overlayAdaptiveWarning.Visibility == Visibility.Visible))
+            bool isUiOverridden = _adaptiveSnackbar != null;
+            if (isOverridden != isUiOverridden)
             {
                 ApplyOverrideState(isOverridden);
             }
@@ -220,12 +223,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // active even when the page is not visible (e.g., auto-connect at startup).
             // We don't unsubscribe because the page lifetime matches the app lifetime.
 
-            // Unsubscribe from DeviceApplier events
-            if (_deviceApplier != null)
-            {
-                _deviceApplier.FlydigiOverrideChanged -= OnFlydigiOverrideChanged;
-                _deviceApplier.FlydigiPresetApplied -= OnFlydigiPresetApplied;
-            }
+            // DeviceApplier events also stay subscribed — the page lifetime matches the
+            // app lifetime. Unsubscribing here caused a permanent disconnect: the constructor
+            // subscribes once, the first navigation away unsubscribes, and Loaded never
+            // re-subscribes. After that, the page never receives override state changes.
 
             // Keep auto-control and temperature polling alive across page navigation.
             // The page lifetime matches the app lifetime — stopping/restarting these
@@ -618,13 +619,18 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 StopAutoControl();
                 ShowAdaptiveSnackbar();
             }
-            else if (_coolerService?.IsConnected == true || _bs1Service?.IsConnected == true)
+            else
             {
-                // DeviceApplier already re-applied settings to the device in DisableFlydigiOverrideAsync.
-                // We just need to sync the UI to reflect the restored settings.
-                SyncUiFromSettings();
+                // Override lifted — hide snackbar and overlay regardless of connection state.
+                HideAdaptiveSnackbar();
 
-                SetControlsEnabled(true);
+                if (_coolerService?.IsConnected == true || _bs1Service?.IsConnected == true)
+                {
+                    // DeviceApplier already re-applied settings to the device in DisableFlydigiOverrideAsync.
+                    // We just need to sync the UI to reflect the restored settings.
+                    SyncUiFromSettings();
+
+                    SetControlsEnabled(true);
 
                 // Restart auto control if we're in Auto mode and it was stopped by the override
                 if (cbxFanMode.SelectedIndex == 2 && _smartControl == null && _bs1SmartControl == null && _activeProfile != null)
@@ -633,6 +639,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         StartAutoControlBs1();
                     else
                         StartAutoControl();
+                }
                 }
             }
         }
@@ -783,6 +790,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         /// <summary>
         /// Creates and shows the Adaptive Mode override snackbar.
+        /// Defers showing until the SnackbarPresenter is in the visual tree to avoid
+        /// the snackbar being created before the page is navigated to.
         /// </summary>
         private void ShowAdaptiveSnackbar()
         {
@@ -799,7 +808,14 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 IsCloseButtonEnabled = false,
                 Timeout = TimeSpan.FromHours(1), // effectively infinite — dismissed on page Unloaded
             };
-            _adaptiveSnackbar.Show(true);
+
+            // Defer showing until the presenter is in the visual tree.
+            // The page may be eagerly instantiated before navigation, in which case
+            // the SnackbarPresenter isn't loaded yet and Show() would silently fail.
+            if (SnackbarPresenter.IsLoaded)
+                _adaptiveSnackbar.Show(true);
+            else
+                SnackbarPresenter.Loaded += (s, e) => _adaptiveSnackbar?.Show(true);
         }
 
         /// <summary>
@@ -1602,7 +1618,15 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 SetControlsEnabled(true);
 
                 // Check if Adaptive Mode is overriding — this may re-disable controls
-                ApplyOverrideState(_deviceApplier?.IsFlydigiOverridden == true);
+                bool isOverriddenOnConnect = _deviceApplier?.IsFlydigiOverridden == true;
+                ApplyOverrideState(isOverriddenOnConnect);
+
+                // If override is active, sync UI from the last-applied preset so the user sees
+                // the profile's values, not the Flydigi page's saved settings from LoadSettingsToUI.
+                if (isOverriddenOnConnect && _deviceApplier?.LastAppliedFlydigiPreset is { } preset)
+                {
+                    SyncUiFromPreset(preset);
+                }
 
                 if (_coolerService?.ConnectedDeviceInfo != null)
                     UpdateDeviceImage(_coolerService.ConnectedDeviceInfo.ProductId);
@@ -1628,7 +1652,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                 // Apply saved RPM/gear on connect so the device doesn't stay at its
                 // last power-on speed (e.g. 1300) when the user has a different saved value.
-                ApplySavedFanSettingsOnConnect();
+                // Skip if Adaptive Mode is overriding — the profile owns the device.
+                if (_deviceApplier?.IsFlydigiOverridden != true)
+                    ApplySavedFanSettingsOnConnect();
 
                 // Mark so subsequent page navigations skip this heavy work
                 _hasAppliedConnectionUI = true;

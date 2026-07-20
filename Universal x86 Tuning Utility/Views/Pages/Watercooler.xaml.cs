@@ -53,6 +53,14 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 // Get DeviceApplier for centralized device commands and override management
                 _deviceApplier = App.GetService<DeviceApplier>();
 
+                // Subscribe to DeviceApplier events early so the page responds to override
+                // state changes even before it's navigated to (e.g., auto-start at startup).
+                if (_deviceApplier != null)
+                {
+                    _deviceApplier.WatercoolerOverrideChanged += OnWatercoolerOverrideChanged;
+                    _deviceApplier.WatercoolerPresetApplied += OnWatercoolerPresetApplied;
+                }
+
                 LoadSettings();
             }
             catch (Exception ex)
@@ -72,14 +80,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _waterCoolerService.ConnectionStateChanged += OnConnectionStateChanged;
             _waterCoolerService.StatusChanged += OnStatusChanged;
 
-            // Subscribe to DeviceApplier events for override state and preset applications
-            if (_deviceApplier != null)
-            {
-                _deviceApplier.WatercoolerOverrideChanged += OnWatercoolerOverrideChanged;
-                _deviceApplier.WatercoolerPresetApplied += OnWatercoolerPresetApplied;
-            }
-
-            // Apply current override state (may already be overridden from startup or Adaptive page)
+            // Apply current override state (may already be overridden from startup or Adaptive page).
+            // DeviceApplier event subscription is done in InitializePage() so we receive events
+            // even before this page is navigated to.
             bool isOverridden = _deviceApplier?.IsWatercoolerOverridden == true;
             ApplyOverrideState(isOverridden);
 
@@ -458,18 +461,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void Page_Unloaded(object sender, RoutedEventArgs e)
         {
-            if (_waterCoolerService != null)
-            {
-                _waterCoolerService.ConnectionStateChanged -= OnConnectionStateChanged;
-                _waterCoolerService.StatusChanged -= OnStatusChanged;
-            }
-
-            // Unsubscribe from DeviceApplier events
-            if (_deviceApplier != null)
-            {
-                _deviceApplier.WatercoolerOverrideChanged -= OnWatercoolerOverrideChanged;
-                _deviceApplier.WatercoolerPresetApplied -= OnWatercoolerPresetApplied;
-            }
+            // Service events stay subscribed — the page lifetime matches the app lifetime.
+            // DeviceApplier events also stay subscribed. Unsubscribing caused a permanent
+            // disconnect: the constructor subscribes once, the first navigation away
+            // unsubscribes, and Loaded never re-subscribes.
 
             // Reset snackbar state so it can show again on next page visit
             _adaptiveSnackbar = null;
@@ -502,12 +497,18 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 SetControlsEnabled(false);
                 ShowAdaptiveSnackbar();
             }
-            else if (_waterCoolerService?.IsConnected == true)
+            else
             {
-                // DeviceApplier already re-applied settings to the device in DisableWatercoolerOverrideAsync.
-                // We just need to sync the UI to reflect the restored settings.
-                SyncUiFromSettings();
-                SetControlsEnabled(true);
+                // Override lifted — hide snackbar and overlay regardless of connection state.
+                HideAdaptiveSnackbar();
+
+                if (_waterCoolerService?.IsConnected == true)
+                {
+                    // DeviceApplier already re-applied settings to the device in DisableWatercoolerOverrideAsync.
+                    // We just need to sync the UI to reflect the restored settings.
+                    SyncUiFromSettings();
+                    SetControlsEnabled(true);
+                }
             }
         }
 
@@ -576,7 +577,14 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 IsCloseButtonEnabled = false,
                 Timeout = TimeSpan.FromHours(1), // effectively infinite — dismissed on page Unloaded
             };
-            _adaptiveSnackbar.Show(true);
+
+            // Defer showing until the presenter is in the visual tree.
+            // The page may be eagerly instantiated before navigation, in which case
+            // the SnackbarPresenter isn't loaded yet and Show() would silently fail.
+            if (SnackbarPresenter.IsLoaded)
+                _adaptiveSnackbar.Show(true);
+            else
+                SnackbarPresenter.Loaded += (s, e) => _adaptiveSnackbar?.Show(true);
         }
 
         private void HideAdaptiveSnackbar()
