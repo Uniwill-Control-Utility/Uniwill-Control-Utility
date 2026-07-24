@@ -200,16 +200,31 @@ namespace Universal_x86_Tuning_Utility.Scripts
                 ManagementObjectSearcher mos = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_Processor");
                 foreach (ManagementObject mo in mos.Get())
                 {
-                   CPUName = mo["Name"].ToString();
+                   CPUName = mo["Name"]?.ToString()?.Trim() ?? "";
                 }
 
                 // Detect laptop/system model from Win32_ComputerSystem
                 try
                 {
-                    ManagementObjectSearcher modelSearcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT Model FROM Win32_ComputerSystem");
+                    ManagementObjectSearcher modelSearcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT Model, Manufacturer FROM Win32_ComputerSystem");
                     foreach (ManagementObject mo in modelSearcher.Get())
                     {
-                        LaptopModel = mo["Model"]?.ToString()?.Trim() ?? "";
+                        string model = mo["Model"]?.ToString()?.Trim() ?? "";
+                        string manufacturer = mo["Manufacturer"]?.ToString()?.Trim() ?? "";
+
+                        // If the model doesn't already contain the manufacturer name,
+                        // prepend it (e.g., "PCSpecialist Recoil III 16" instead of just "Recoil III 16")
+                        if (!string.IsNullOrEmpty(manufacturer) &&
+                            !string.IsNullOrEmpty(model) &&
+                            !model.StartsWith(manufacturer, StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Skip common manufacturers that are already part of the model string
+                            LaptopModel = $"{manufacturer} {model}";
+                        }
+                        else
+                        {
+                            LaptopModel = model;
+                        }
                     }
                 }
                 catch { /* WMI not available for model detection */ }

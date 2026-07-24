@@ -1,0 +1,51 @@
+<UserControl x:Class="Universal_x86_Tuning_Utility.Views.Controls.HydroUiControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             FlowDirection="LeftToRight">
+
+    <ui:Card Padding="18">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="100" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Grid.ColumnSpan="5"
+                       Margin="0,0,0,8"
+                       FontSize="18"
+                       FontWeight="Medium"
+                       Text="Hydro UI" />
+
+            <Label Grid.Row="1" Grid.Column="0"
+                   VerticalContentAlignment="Center"
+                   Content="Pump"
+                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Label x:Name="_pumpLabel"
+                   Grid.Row="1" Grid.Column="2"
+                   Grid.ColumnSpan="2"
+                   VerticalContentAlignment="Center"
+                   Content="--"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+            <Label Grid.Row="2" Grid.Column="0"
+                   VerticalContentAlignment="Center"
+                   Content="Fan"
+                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Label x:Name="_fanLabel"
+                   Grid.Row="2" Grid.Column="2"
+                   Grid.ColumnSpan="2"
+                   VerticalContentAlignment="Center"
+                   Content="--"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        </Grid>
+    </ui:Card>
+</UserControl>

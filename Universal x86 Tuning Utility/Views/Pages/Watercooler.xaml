@@ -32,16 +32,37 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- Column 1: Device image -->
+                        <!-- Column 1: Device image with glow -->
                         <StackPanel Grid.Column="0"
                                     HorizontalAlignment="Center"
-                                    VerticalAlignment="Center">
-                            <Image x:Name="imgDevice"
-                                   Width="320"
-                                   Height="140"
-                                   Stretch="Uniform"
-                                   Source="pack://application:,,,/Assets/HydroUI/mk2.png"
-                                   Margin="0,0,0,12"/>
+                                    VerticalAlignment="Center"
+                                    Margin="16">
+                            <Grid Margin="0,0,0,12">
+                                <!-- Colored glow layer behind -->
+                                <Rectangle x:Name="rectGlowOverlay"
+                                           Width="165"
+                                           Height="140"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Fill="#007ACC"
+                                           Opacity="0"
+                                           RenderOptions.EdgeMode="Unspecified"
+                                           Margin="0,12,0,12">
+                                    <Rectangle.Effect>
+                                        <BlurEffect Radius="60"/>
+                                    </Rectangle.Effect>
+                                    <Rectangle.OpacityMask>
+                                        <ImageBrush ImageSource="pack://application:,,,/Assets/HydroUI/mk2.png"
+                                                    Stretch="Fill" />
+                                    </Rectangle.OpacityMask>
+                                </Rectangle>
+                                <!-- Sharp original image on top -->
+                                <Image x:Name="imgDevice"
+                                       Width="320"
+                                       Height="140"
+                                       Stretch="Uniform"
+                                       Source="pack://application:,,,/Assets/HydroUI/mk2.png" />
+                            </Grid>
                         </StackPanel>
 
                         <!-- Column 2: Status + action -->
@@ -120,7 +141,7 @@
                         <TextBlock Text="Pump Voltage"/>
                     </StackPanel>
                 </ui:CardControl.Header>
-                <StackPanel>
+                <StackPanel HorizontalAlignment="Right">
                     <ComboBox x:Name="cbxPumpVoltage" MinWidth="160" SelectionChanged="cbxPumpVoltage_SelectionChanged">
                         <ComboBoxItem Content="Off"/>
                         <ComboBoxItem Content="7V"/>
@@ -140,7 +161,7 @@
                         <TextBlock Text="Fan Speed"/>
                     </StackPanel>
                 </ui:CardControl.Header>
-                <StackPanel>
+                <StackPanel HorizontalAlignment="Right">
                     <ComboBox x:Name="cbxFanSpeed" MinWidth="160" SelectionChanged="cbxFanSpeed_SelectionChanged">
                         <ComboBoxItem Content="Off"/>
                         <ComboBoxItem Content="25%"/>
@@ -163,7 +184,7 @@
                         <TextBlock Text="RGB Lighting"/>
                     </StackPanel>
                 </ui:CardControl.Header>
-                <StackPanel>
+                <StackPanel HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                         <TextBlock Text="Mode:" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <ComboBox x:Name="cbxRgbMode" MinWidth="160" SelectionChanged="cbxRgbMode_SelectionChanged">
@@ -194,7 +215,7 @@
                         <TextBlock Text="Settings"/>
                     </StackPanel>
                 </ui:CardControl.Header>
-                <StackPanel Orientation="Horizontal">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <ui:ToggleSwitch x:Name="tsAutoConnect" Margin="0,0,9,0" Checked="tsAutoConnect_Checked" Unchecked="tsAutoConnect_Unchecked"/>
                     <TextBlock Text="Auto-connect on startup" VerticalAlignment="Center"/>
                 </StackPanel>

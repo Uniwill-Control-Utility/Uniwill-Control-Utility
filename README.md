@@ -75,10 +75,27 @@ _New to the Universal x86 Tuning Utility?_ _No worries!_ _This quickstart guide 
 * Make gradual changes instead of drastic ones to maintain stability and longevity.
 * Be cautious of the recommended maximum temperature and TDP for your hardware.
 
-## Projects Used:
-- [G-Helper (GitHub)](https://github.com/seerge/g-helper)  
-- [WPF UI (GitHub)](https://github.com/lepoco/wpfui)
-- [reverse_engineering (GitHub)](https://github.com/zllovesuki/reverse_engineering)  
-- [Laptops (GitHub)](https://github.com/ahahahahahMtnf/Laptops/tree/main/Asus/WMI)  
-- [ADLX SDK Wrapper (GitHub)](https://github.com/JamesCJ60/ADLX-SDK-Wrapper)
-- [Magpie (GitHub)](https://github.com/Blinue/Magpie)
+## Credits
+
+UXTU builds on the work of many open-source projects and reverse-engineering efforts. We thank the authors of the following projects for their contributions:
+
+### Core & Inspiration
+- [G-Helper (GitHub)](https://github.com/seerge/g-helper) — Lightweight laptop tuning utility that inspired UXTU's design philosophy
+- [WPF UI (GitHub)](https://github.com/lepoco/wpfui) — Modern Fluent Design UI library used for the UXTU interface
+- [Magpie (GitHub)](https://github.com/Blinue/Magpie) — Translation management library used for localization
+
+### Reverse Engineering References
+- [reverse_engineering (GitHub)](https://github.com/zllovesuki/reverse_engineering) — DSDT and WMI reverse engineering references
+- [Laptops (GitHub)](https://github.com/ahahahahahMtnf/Laptops/tree/main/Asus/WMI) — ASUS WMI method documentation
+- [ADLX SDK Wrapper (GitHub)](https://github.com/JamesCJ60/ADLX-SDK-Wrapper) — AMD ADLX SDK wrapper for GPU controls
+
+### Device Protocol References
+- [THRM (GitHub)](https://github.com/TIANLI0/THRM) by TIANLI0 — Primary reference for the Flydigi `5A A5` cooler protocol. Provided the most complete documentation of the frame format, RGB upload sequence, and gear RPM table.
+- [watercooler-manager (GitHub)](https://github.com/tomups/watercooler-manager) by tomups — Primary reference for the LCT watercooler BLE protocol. The Python implementation confirmed the Nordic UART UUIDs, frame format, and command byte values.
+- [UCC (GitHub)](https://github.com/nanomatters/ucc) by nanomatters — Secondary reference for the LCT watercooler protocol. The C++/Qt implementation provided additional insight into the BLE connection lifecycle, error recovery, and state management.
+- [LenovoLegionToolkit (GitHub)](https://github.com/LenovoLegionToolkit/LenovoLegionToolkit) — Reference for the color picker UI pattern and fan curve editor approach.
+
+### Earlier Projects by the UXTU Team
+- [Ryzen Controller (GitLab)](https://gitlab.com/ryzen-controller-team/ryzen-controller) — Desktop Ryzen tuning utility
+- [Renoir Mobile Tuning (GitHub)](https://github.com/sbski/Renoir-Mobile-Tuning) — Early mobile Ryzen tuning experiment
+- [Power Control Panel (GitHub)](https://github.com/project-sbc/Power-Control-Panel-v2) — Power limit control utility

@@ -16,6 +16,28 @@ namespace Universal_x86_Tuning_Utility.Services
         Battery = 8
     }
 
+    /// <summary>
+    /// Lightweight snapshot of connected device state (Hydro UI, Flydigi) for the dashboard.
+    /// </summary>
+    public sealed record DeviceMetricsSnapshot
+    {
+        /// <summary>Whether a Hydro UI (LCT) watercooler is connected.</summary>
+        public bool HydroUiConnected { get; init; }
+        /// <summary>Current pump voltage (7, 8, 11, or 0 for off).</summary>
+        public int HydroUiPumpVoltage { get; init; }
+        /// <summary>Current fan speed percentage (0-100, or 0 for off).</summary>
+        public int HydroUiFanSpeed { get; init; }
+        /// <summary>Current fan RPM from device status (0 if unknown).</summary>
+        public int HydroUiFanRpm { get; init; }
+
+        /// <summary>Whether a Flydigi cooler is connected.</summary>
+        public bool FlydigiConnected { get; init; }
+        /// <summary>Current fan RPM from device (0 if unknown).</summary>
+        public int FlydigiFanRpm { get; init; }
+        /// <summary>Current RGB mode name (e.g. "Off", "Static", "SmartTemp").</summary>
+        public string FlydigiRgbMode { get; init; } = string.Empty;
+    }
+
     public sealed record HardwareMetricsSnapshot
     {
         public int CpuTemperature { get; init; }
@@ -23,13 +45,15 @@ namespace Universal_x86_Tuning_Utility.Services
         public int CpuPowerWatts { get; init; }
         public int CpuClockMhz { get; init; }
         public int GpuTemperature { get; init; }
-        public int GpuUsage { get; init; }
+        public double GpuUsage { get; init; }
         public int GpuPowerWatts { get; init; }
         public int GpuClockMhz { get; init; }
         public double GpuMemoryUsedGb { get; init; }
         public double GpuMemoryTotalGb { get; init; }
         public double SystemMemoryUsedGb { get; init; }
         public double SystemMemoryTotalGb { get; init; }
+        public double SystemMemoryCommittedGb { get; init; }
+        public double SystemMemoryPagefileTotalGb { get; init; }
         public bool HasBattery { get; init; }
         public int BatteryPercent { get; init; }
         public bool IsBatteryCharging { get; init; }
@@ -78,15 +102,13 @@ namespace Universal_x86_Tuning_Utility.Services
                 UpdateHardware();
 
                 IHardware? cpu = FindHardware(HardwareType.Cpu);
-                IHardware? memory = FindHardware(HardwareType.Memory);
                 IHardware? gpu = FindPreferredGpu();
                 IHardware? battery = FindHardware(HardwareType.Battery);
                 GetSystemPowerStatus(out SystemPowerStatus powerStatus);
 
-                double memoryUsed = ReadValue(memory, SensorType.Data, "Memory Used");
-                double memoryAvailable = ReadValue(memory, SensorType.Data, "Memory Available");
                 double gpuMemoryUsedMb = ReadFirstValue(gpu, SensorType.SmallData, "GPU Memory Used", "D3D Dedicated Memory Used");
                 double gpuMemoryTotalMb = ReadFirstValue(gpu, SensorType.SmallData, "GPU Memory Total", "D3D Dedicated Memory Total");
+                var (memoryUsed, memoryTotal, memoryCommitted, pagefileTotal) = ReadPhysicalMemory();
 
                 return new HardwareMetricsSnapshot
                 {
@@ -101,7 +123,9 @@ namespace Universal_x86_Tuning_Utility.Services
                     GpuMemoryUsedGb = gpuMemoryUsedMb / 1024d,
                     GpuMemoryTotalGb = gpuMemoryTotalMb / 1024d,
                     SystemMemoryUsedGb = memoryUsed,
-                    SystemMemoryTotalGb = memoryUsed + memoryAvailable,
+                    SystemMemoryTotalGb = memoryTotal,
+                    SystemMemoryCommittedGb = memoryCommitted,
+                    SystemMemoryPagefileTotalGb = pagefileTotal,
                     HasBattery = powerStatus.BatteryFlag != 128 && powerStatus.BatteryLifePercent <= 100,
                     BatteryPercent = powerStatus.BatteryLifePercent <= 100 ? powerStatus.BatteryLifePercent : 0,
                     IsBatteryCharging = (powerStatus.BatteryFlag & 8) != 0,
@@ -155,7 +179,10 @@ namespace Universal_x86_Tuning_Utility.Services
                 IsCpuEnabled = requested.HasFlag(HardwareMonitoringCategory.Cpu),
                 IsMemoryEnabled = requested.HasFlag(HardwareMonitoringCategory.Memory),
                 IsGpuEnabled = requested.HasFlag(HardwareMonitoringCategory.Gpu),
-                IsBatteryEnabled = requested.HasFlag(HardwareMonitoringCategory.Battery)
+                IsBatteryEnabled = requested.HasFlag(HardwareMonitoringCategory.Battery),
+                IsMotherboardEnabled = true,
+                IsStorageEnabled = true,
+                IsControllerEnabled = true
             };
             _computer.Open();
         }
@@ -280,6 +307,9 @@ namespace Universal_x86_Tuning_Utility.Services
         [DllImport("kernel32.dll")]
         private static extern bool GetSystemPowerStatus(out SystemPowerStatus status);
 
+        [DllImport("kernel32.dll")]
+        private static extern void GlobalMemoryStatusEx(ref MemoryStatusEx buffer);
+
         [StructLayout(LayoutKind.Sequential)]
         private struct SystemPowerStatus
         {
@@ -289,6 +319,33 @@ namespace Universal_x86_Tuning_Utility.Services
             public byte SystemStatusFlag;
             public int BatteryLifeTime;
             public int BatteryFullLifeTime;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MemoryStatusEx
+        {
+            public uint Length;
+            public uint MemoryLoad;
+            public ulong TotalPhysical;
+            public ulong AvailablePhysical;
+            public ulong TotalPageFile;
+            public ulong AvailablePageFile;
+            public ulong TotalVirtual;
+            public ulong AvailableVirtual;
+            public ulong AvailableExtendedVirtual;
+        }
+
+        private static (double usedGb, double totalGb, double committedGb, double pagefileTotalGb) ReadPhysicalMemory()
+        {
+            const double gib = 1024d * 1024 * 1024;
+            var mem = new MemoryStatusEx { Length = (uint)Marshal.SizeOf<MemoryStatusEx>() };
+            GlobalMemoryStatusEx(ref mem);
+
+            double total = mem.TotalPhysical / gib;
+            double available = mem.AvailablePhysical / gib;
+            double committed = (mem.TotalPageFile - mem.AvailablePageFile) / gib;
+            double pagefileTotal = mem.TotalPageFile / gib;
+            return (total - available, total, committed, pagefileTotal);
         }
     }
 }

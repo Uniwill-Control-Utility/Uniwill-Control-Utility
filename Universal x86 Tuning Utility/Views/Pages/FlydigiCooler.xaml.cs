@@ -52,6 +52,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         /// <summary>True while OnFlydigiPresetApplied is updating UI controls. Suppresses selection-changed side effects.</summary>
         private bool _isSyncingFromPreset;
 
+        /// <summary>Discrete animation timer for the glow breathing effect.</summary>
+        private System.Threading.Timer? _glowPulseTimer;
+        private bool _glowPulseDirection = true;
+        private volatile bool _glowActive;
+
         public FlydigiCooler()
         {
             InitializeComponent();
@@ -98,7 +103,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 // Update device image based on device type
                 if (_isBs1Device)
                 {
-                    imgDevice.Source = new BitmapImage(new Uri("pack://application:,,,/Assets/Flydigi/bs1.png"));
+                    var bs1Source = new BitmapImage(new Uri("pack://application:,,,/Assets/Flydigi/bs1.png"));
+                    imgDevice.Source = bs1Source;
+                    UpdateGlowOpacityMask("bs1.png");
                 }
 
                 // Apply BS1-specific UI restrictions (no RGB, no device settings, no sub-gear)
@@ -199,7 +206,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 // after connect (e.g., auto-connect before page was visited).
                 if (!_hasAppliedConnectionUI)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[FlydigiCooler_Loaded] Calling UpdateConnectionUI, bs1Connected={bs1Connected}, current cbxFanMode.SelectedIndex={cbxFanMode.SelectedIndex}");
                     UpdateConnectionUI(true, bs1Connected);
+                    System.Diagnostics.Debug.WriteLine($"[FlydigiCooler_Loaded] After UpdateConnectionUI, cbxFanMode.SelectedIndex={cbxFanMode.SelectedIndex}");
                 }
 
                 // Keep temperature polling alive — restart only if timer was disposed
@@ -235,6 +244,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // Keep debounce timers alive (they're lightweight and self-managing)
             // Reset snackbar state so it can show again on next page visit
             _adaptiveSnackbar = null;
+
+            // Stop glow animation timer to avoid running in unloaded state
+            StopGlowPulse();
         }
 
         /* ------------------------------------------------------------------ */
@@ -311,7 +323,14 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             UpdateFanModeUI();
 
             // Persist fan mode to settings
-            if (_coolerService != null)
+            if (_isBs1Device && _bs1Service != null)
+            {
+                var settings = _bs1Service.GetSettings();
+                settings.FanMode = cbxFanMode.SelectedIndex;
+                System.Diagnostics.Debug.WriteLine($"[BS1 SelectionChanged] Saving FanMode={cbxFanMode.SelectedIndex}");
+                _bs1Service.PersistSettings();
+            }
+            else if (_coolerService != null)
             {
                 var settings = _coolerService.GetSettings();
                 settings.FanMode = cbxFanMode.SelectedIndex;
@@ -631,6 +650,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     SyncUiFromSettings();
 
                     SetControlsEnabled(true);
+
+                    // Restart glow if it was stopped
+                    StartGlowPulse();
+                    ApplyAccentGlow();
 
                 // Restart auto control if we're in Auto mode and it was stopped by the override
                 if (cbxFanMode.SelectedIndex == 2 && _smartControl == null && _bs1SmartControl == null && _activeProfile != null)
@@ -1411,6 +1434,121 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         }
 
         /* ------------------------------------------------------------------ */
+        /*  Device Glow                                                        */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>Starts the subtle breathing glow animation when a device connects.</summary>
+        private void StartGlowPulse()
+        {
+            _glowPulseTimer?.Dispose();
+            _glowActive = true;
+            _glowPulseDirection = true;
+            rectGlowOverlay.Opacity = 0.2;
+            _glowPulseTimer = new System.Threading.Timer(_ =>
+            {
+                if (!_glowActive)
+                    return;
+                try
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        if (!_glowActive)
+                            return;
+                        var current = rectGlowOverlay.Opacity;
+                        if (_glowPulseDirection)
+                        {
+                            if (current < 0.5)
+                                rectGlowOverlay.Opacity = current + 0.008;
+                            else
+                                _glowPulseDirection = false;
+                        }
+                        else
+                        {
+                            if (current > 0.2)
+                                rectGlowOverlay.Opacity = current - 0.008;
+                            else
+                                _glowPulseDirection = true;
+                        }
+                    });
+                }
+                catch
+                {
+                    // Dispatcher shut down or element detached — stop the timer
+                    _glowActive = false;
+                }
+            }, null, 80, 80);
+        }
+
+        /// <summary>Stops the glow pulse and hides the glow when disconnected.</summary>
+        private void StopGlowPulse()
+        {
+            _glowActive = false;
+            var timer = _glowPulseTimer;
+            _glowPulseTimer = null;
+            timer?.Dispose();
+            try
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    rectGlowOverlay.Opacity = 0;
+                });
+            }
+            catch
+            {
+                // Dispatcher shut down — ignore
+            }
+        }
+
+        /// <summary>Applies the Windows accent color as a decorative glow behind the cooler image.</summary>
+        private void ApplyAccentGlow()
+        {
+            try
+            {
+                var accentColor = GetWindowsAccentColor();
+                rectGlowOverlay.Fill = new SolidColorBrush(accentColor);
+            }
+            catch { /* element detached or color unavailable */ }
+        }
+
+        /// <summary>Reads the Windows 10/11 accent color from the registry.</summary>
+        private static Color GetWindowsAccentColor()
+        {
+            try
+            {
+                using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\DWM");
+                if (key?.GetValue("AccentColor") is long accentLong)
+                {
+                    // Registry stores as 0x00BBGGRR (little-endian BGR)
+                    var b = (byte)((accentLong >> 16) & 0xFF);
+                    var g = (byte)((accentLong >> 8) & 0xFF);
+                    var r = (byte)(accentLong & 0xFF);
+                    return Color.FromRgb(r, g, b);
+                }
+            }
+            catch { /* fall through to default */ }
+
+            // Fallback: WPF-UI default blue
+            return Color.FromRgb(0, 0x7A, 0xCC);
+        }
+
+        /// <summary>Updates the glow overlay's OpacityMask to match the device image.</summary>
+        private void UpdateGlowOpacityMask(string imageFile)
+        {
+            try
+            {
+                var maskBrush = new ImageBrush
+                {
+                    ImageSource = new BitmapImage(new Uri($"pack://application:,,,/Assets/Flydigi/{imageFile}", UriKind.Absolute)),
+                    Stretch = Stretch.Uniform,
+                    AlignmentX = AlignmentX.Center,
+                    AlignmentY = AlignmentY.Center,
+                };
+                rectGlowOverlay.OpacityMask = maskBrush;
+            }
+            catch { /* element detached */ }
+        }
+
+        /* ------------------------------------------------------------------ */
         /*  Helpers                                                            */
         /* ------------------------------------------------------------------ */
 
@@ -1420,9 +1558,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (_isBs1Device && _bs1Service != null)
             {
                 var bs1Settings = _bs1Service.GetSettings();
-
-                // Fan mode
-                cbxFanMode.SelectedIndex = Math.Clamp(bs1Settings.FanMode, 0, 2);
 
                 // Manual RPM (clamped to BS1 range)
                 double bs1Rpm = bs1Settings.ManualRpm > 0
@@ -1452,7 +1587,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 if (learningBiasPanel != null)
                     learningBiasPanel.Visibility = Visibility.Collapsed;
 
-                // Curve profile
+                // Curve profile — restore BEFORE fan mode so _activeProfile is ready
+                // when the fan mode combo box fires SelectionChanged and tries to start
+                // auto control (BS1 Auto is app-side, unlike BS2+ which does it on-device).
                 var bs1SavedProfile = bs1Settings.SelectedCurveProfile;
                 _isInitialized = false;
                 LoadCurveProfiles();
@@ -1469,6 +1606,12 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     }
                 }
                 _isInitialized = true;
+
+                // Fan mode — must come AFTER curve profile so that _activeProfile is
+                // populated when SelectionChanged → StartAutoControlBs1() runs.
+                int bs1FanMode = Math.Clamp(bs1Settings.FanMode, 0, 2);
+                System.Diagnostics.Debug.WriteLine($"[BS1 LoadSettingsToUI] FanMode from settings={bs1Settings.FanMode}, clamped={bs1FanMode}, _activeProfile={(_activeProfile?.Name ?? "null")}");
+                cbxFanMode.SelectedIndex = bs1FanMode;
 
                 return;
             }
@@ -1638,6 +1781,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 // Start standalone temperature polling
                 StartTemperaturePolling();
 
+                // Start glow effect
+                StartGlowPulse();
+                ApplyAccentGlow();
+
                 // Restore button text (may have been left as "Connecting..." from the click handler)
                 btnDisconnect.Content = "Disconnect";
 
@@ -1718,6 +1865,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 StopAutoControl();
                 StopTemperaturePolling();
 
+                // Stop glow effect
+                StopGlowPulse();
+
                 spConnectedState.Visibility = Visibility.Collapsed;
                 spDisconnectedState.Visibility = Visibility.Visible;
                 tbCurrentRpm.Text = "--";
@@ -1756,8 +1906,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 _ => "bs2-pro.png" // Default fallback
             };
 
-            imgDevice.Source = new BitmapImage(
+            var source = new BitmapImage(
                 new Uri($"pack://application:,,,/Assets/Flydigi/{imageFile}", UriKind.Absolute));
+            imgDevice.Source = source;
+            UpdateGlowOpacityMask(imageFile);
         }
 
         /// <summary>
@@ -1765,8 +1917,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         /// </summary>
         private void UpdateDeviceImageBs1()
         {
-            imgDevice.Source = new BitmapImage(
+            var source = new BitmapImage(
                 new Uri("pack://application:,,,/Assets/Flydigi/bs1.png", UriKind.Absolute));
+            imgDevice.Source = source;
+            UpdateGlowOpacityMask("bs1.png");
         }
 
         /// <summary>
@@ -1795,6 +1949,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 if (_isBs1Device && _bs1Service != null && _bs1Service.IsConnected)
                 {
                     var settings = _bs1Service.GetSettings();
+                    System.Diagnostics.Debug.WriteLine($"[BS1 ApplySavedFanSettingsOnConnect] FanMode={settings.FanMode}, _activeProfile={(_activeProfile?.Name ?? "null")}");
                     switch (settings.FanMode)
                     {
                         case 0: // Manual RPM

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Universal_x86_Tuning_Utility.Models;
 using Universal_x86_Tuning_Utility.Services;
@@ -21,6 +22,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private string? _selectedDeviceAddress;
         private bool _isInitialized;
         private Wpf.Ui.Controls.Snackbar? _adaptiveSnackbar;
+
+        // Glow pulse timer fields
+        private System.Threading.Timer? _glowPulseTimer;
+        private bool _glowPulseDirection;
+        private volatile bool _glowActive;
 
         /// <summary>True while OnWatercoolerPresetApplied is updating UI controls. Suppresses selection-changed side effects.</summary>
         private bool _isSyncingFromPreset;
@@ -402,6 +408,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         // Update device image based on detected model
                         UpdateDeviceImage();
 
+                        // Start glow effect on connect
+                        StartGlowPulse();
+                        ApplyAccentGlow();
+
                         // Update page title with detected device name
                         if (_waterCoolerService?.ConnectedDeviceName != null
                             && !string.IsNullOrEmpty(_waterCoolerService.ConnectedDeviceName))
@@ -417,6 +427,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         btnConnect.IsEnabled = _selectedDeviceAddress != null;
                         SetControlsEnabled(false);
                         spControls.Visibility = Visibility.Collapsed;
+
+                        // Stop glow effect on disconnect
+                        StopGlowPulse();
 
                         // Reset device image to default (Mk1)
                         UpdateDeviceImage();
@@ -465,6 +478,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // DeviceApplier events also stay subscribed. Unsubscribing caused a permanent
             // disconnect: the constructor subscribes once, the first navigation away
             // unsubscribes, and Loaded never re-subscribes.
+
+            // Stop glow pulse timer to prevent leaks
+            StopGlowPulse();
 
             // Reset snackbar state so it can show again on next page visit
             _adaptiveSnackbar = null;
@@ -619,6 +635,104 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             cbxFanSpeed.SelectedIndex = GetFanSpeedIndex(e.FanSpeed);
             cbxRgbMode.SelectedIndex = GetRgbModeIndex(e.RgbMode);
             cbxRgbColor.SelectedIndex = GetRgbColorIndex(e.RgbColor);
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Device Glow                                                        */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>Starts the subtle breathing glow animation when a device connects.</summary>
+        private void StartGlowPulse()
+        {
+            _glowPulseTimer?.Dispose();
+            _glowActive = true;
+            _glowPulseDirection = true;
+            rectGlowOverlay.Opacity = 0.2;
+            _glowPulseTimer = new System.Threading.Timer(_ =>
+            {
+                if (!_glowActive)
+                    return;
+                try
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        if (!_glowActive)
+                            return;
+                        var current = rectGlowOverlay.Opacity;
+                        if (_glowPulseDirection)
+                        {
+                            if (current < 0.5)
+                                rectGlowOverlay.Opacity = current + 0.008;
+                            else
+                                _glowPulseDirection = false;
+                        }
+                        else
+                        {
+                            if (current > 0.2)
+                                rectGlowOverlay.Opacity = current - 0.008;
+                            else
+                                _glowPulseDirection = true;
+                        }
+                    });
+                }
+                catch
+                {
+                    // Dispatcher shut down or element detached — stop the timer
+                    _glowActive = false;
+                }
+            }, null, 80, 80);
+        }
+
+        /// <summary>Stops the glow pulse and hides the glow when disconnected.</summary>
+        private void StopGlowPulse()
+        {
+            _glowActive = false;
+            var timer = _glowPulseTimer;
+            _glowPulseTimer = null;
+            timer?.Dispose();
+            try
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    rectGlowOverlay.Opacity = 0;
+                });
+            }
+            catch
+            {
+                // Dispatcher shut down — ignore
+            }
+        }
+
+        /// <summary>Applies the Windows accent color as a decorative glow behind the cooler image.</summary>
+        private void ApplyAccentGlow()
+        {
+            try
+            {
+                var accentColor = GetWindowsAccentColor();
+                rectGlowOverlay.Fill = new SolidColorBrush(accentColor);
+            }
+            catch { /* element detached or color unavailable */ }
+        }
+
+        /// <summary>Reads the Windows 10/11 accent color from the registry.</summary>
+        private static Color GetWindowsAccentColor()
+        {
+            try
+            {
+                using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\DWM");
+                if (key?.GetValue("AccentColor") is long accentLong)
+                {
+                    // Registry stores as 0x00BBGGRR (little-endian BGR)
+                    var b = (byte)((accentLong >> 16) & 0xFF);
+                    var g = (byte)((accentLong >> 8) & 0xFF);
+                    var r = (byte)(accentLong & 0xFF);
+                    return Color.FromRgb(r, g, b);
+                }
+            }
+            catch { /* fall through to default */ }
+
+            // Fallback: WPF-UI default blue
+            return Color.FromRgb(0, 0x7A, 0xCC);
         }
     }
 }

@@ -1,0 +1,54 @@
+<UserControl x:Class="Universal_x86_Tuning_Utility.Views.Controls.BatteryControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             FlowDirection="LeftToRight">
+
+    <ui:Card Padding="18">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="70" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Grid.ColumnSpan="5"
+                       Margin="0,0,0,8"
+                       FontSize="18"
+                       FontWeight="Medium"
+                       Text="Battery" />
+
+            <Label Grid.Row="1" Grid.Column="0"
+                   VerticalContentAlignment="Center"
+                   Content="Charge"
+                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+            <ProgressBar x:Name="_batteryBar"
+                         Grid.Row="1" Grid.Column="2"
+                         Minimum="0" Maximum="100" Value="0" />
+            <Label x:Name="_batteryPercentLabel"
+                   Grid.Row="1" Grid.Column="4"
+                   HorizontalContentAlignment="Right"
+                   VerticalContentAlignment="Center"
+                   Content="--"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+            <Label Grid.Row="2" Grid.Column="0"
+                   VerticalContentAlignment="Center"
+                   Content="Power"
+                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Label x:Name="_batteryStatusLabel"
+                   Grid.Row="2" Grid.Column="2"
+                   Grid.ColumnSpan="2"
+                   VerticalContentAlignment="Center"
+                   Content="--"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        </Grid>
+    </ui:Card>
+</UserControl>

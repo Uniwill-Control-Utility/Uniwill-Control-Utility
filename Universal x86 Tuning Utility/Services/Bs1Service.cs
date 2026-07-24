@@ -124,6 +124,7 @@ namespace Universal_x86_Tuning_Utility.Services
                 {
                     var json = File.ReadAllText(filePath);
                     _settings = JsonConvert.DeserializeObject<Bs1Settings>(json) ?? new Bs1Settings();
+                    Log($"[BS1] Settings loaded: FanMode={_settings.FanMode}, Profile={_settings.SelectedCurveProfile}");
                 }
             }
             catch
@@ -140,6 +141,7 @@ namespace Universal_x86_Tuning_Utility.Services
                 var filePath = Path.Combine(SettingsFolder, "bs1_settings.json");
                 var json = JsonConvert.SerializeObject(_settings, Newtonsoft.Json.Formatting.Indented);
                 File.WriteAllText(filePath, json);
+                Log($"[BS1] Settings saved: FanMode={_settings.FanMode}, Profile={_settings.SelectedCurveProfile}");
             }
             catch { /* non-critical */ }
         }

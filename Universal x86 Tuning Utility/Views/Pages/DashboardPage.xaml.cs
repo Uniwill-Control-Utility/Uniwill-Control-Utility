@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Windows.Controls;
+using Universal_x86_Tuning_Utility.Services;
 using Universal_x86_Tuning_Utility.ViewModels;
 using Wpf.Ui.Abstractions.Controls;
 
@@ -19,6 +20,21 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             DataContext = this;
 
             InitializeComponent();
+
+            ViewModel.MetricsUpdated += OnMetricsUpdated;
+            ViewModel.DeviceMetricsUpdated += OnDeviceMetricsUpdated;
+        }
+
+        private void OnMetricsUpdated(object? sender, HardwareMetricsSnapshot snapshot)
+        {
+            _cpu.UpdateMetrics(snapshot);
+            _gpu.UpdateMetrics(snapshot);
+            _system.UpdateMetrics(snapshot);
+        }
+
+        private void OnDeviceMetricsUpdated(object? sender, DeviceMetricsSnapshot snapshot)
+        {
+            _devices.UpdateMetrics(snapshot);
         }
     }
 }

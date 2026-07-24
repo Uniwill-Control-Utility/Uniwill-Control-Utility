@@ -54,6 +54,7 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
         public static MainWindow? Instance { get; private set; }
         private static INavigationService _navigationService;
         private bool _isTrayPresetApplying;
+        private System.Windows.Controls.MenuItem _miCustomPresets;
         public static bool IsPageSelected(Type pageType) =>
             _mainWindowNav?.SelectedItem is INavigationViewItem item && item.TargetPageType == pageType;
 
@@ -85,6 +86,34 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
             SystemEvents.PowerModeChanged += HandlePowerModeChange;
 
             Instance = this;
+
+            // Ensure tray icon is visible
+            niTray.Visibility = Visibility.Visible;
+
+            // Reference the XAML-generated custom presets menu item
+            _miCustomPresets = miCustomPresets;
+        }
+
+        /// <summary>Restores the window when the tray icon is left-clicked.</summary>
+        private void NotifyIcon_LeftClick(Wpf.Ui.Tray.Controls.NotifyIcon sender, RoutedEventArgs e)
+        {
+            if (this.Visibility != Visibility.Visible || this.WindowState == WindowState.Minimized)
+            {
+                this.Show();
+                this.WindowState = WindowState.Normal;
+                this.Activate();
+            }
+        }
+
+        private void TrayMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            PopulateTrayCustomPresets();
+        }
+
+        private async void TrayPremadePresets_SubmenuOpened(object sender, RoutedEventArgs e)
+        {
+            await Task.Run(PremadePresets.SetPremadePresets);
+            this.Dispatcher.Invoke(() => RefreshTrayPremadePresetChecks());
         }
 
         private void SetupNavigationService(INavigationViewPageProvider pageProvider)
@@ -115,8 +144,7 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
                 Log.Logger.Error(ex, "Failed to setup MagWindow");
             }
 
-            miPremadePresets.Visibility = Visibility.Visible;
-            Wpf.Ui.Appearance.SystemThemeWatcher.Watch(this, WindowBackdropType.Mica, true);
+             Wpf.Ui.Appearance.SystemThemeWatcher.Watch(this, WindowBackdropType.Mica, true);
         }
 
         private async void ApplyOnStart()
@@ -288,8 +316,6 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
         {
             try
             {
-                if (niTray.Visibility == Visibility.Hidden && this.Visibility == Visibility.Hidden) niTray.Visibility = Visibility.Visible;
-
                 if ((bool)Settings.Default.AutoReapply == true && (bool)Settings.Default.isAdaptiveModeRunning == false)
                 {
                     string commands = (string)Settings.Default.CommandString;
@@ -483,29 +509,16 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
 
         }
 
-        private void NotifyIcon_LeftClick(Wpf.Ui.Tray.Controls.NotifyIcon sender, RoutedEventArgs e)
+        private async void TrayPremadePreset_Click(object? sender, RoutedEventArgs e)
         {
-            if (this.WindowState != WindowState.Minimized)
+            if (_isTrayPresetApplying || sender is not System.Windows.Controls.MenuItem menuItem)
             {
-                this.WindowState = WindowState.Minimized;
-            }
-            else
-            {
-                this.WindowState = WindowState.Normal;
-                this.Activate();
+                return;
             }
 
-        }
+            string? presetId = menuItem.Tag?.ToString();
 
-        private async void TrayPremadePresets_SubmenuOpened(object sender, RoutedEventArgs e)
-        {
-            await Task.Run(PremadePresets.SetPremadePresets);
-            RefreshTrayPremadePresetChecks();
-        }
-
-        private async void TrayPremadePreset_Click(object sender, RoutedEventArgs e)
-        {
-            if (_isTrayPresetApplying || sender is not System.Windows.Controls.MenuItem { Tag: string presetId })
+            if (string.IsNullOrEmpty(presetId))
             {
                 return;
             }
@@ -546,9 +559,9 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
             }
         }
 
-        private void TrayMenu_Opened(object sender, RoutedEventArgs e)
+        private void PopulateTrayCustomPresets()
         {
-            miCustomPresets.Items.Clear();
+            _miCustomPresets.Items.Clear();
             try
             {
                 var manager = CreateCustomPresetManager();
@@ -559,7 +572,7 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
 
                 if (names.Length == 0)
                 {
-                    miCustomPresets.Items.Add(new System.Windows.Controls.MenuItem
+                    _miCustomPresets.Items.Add(new System.Windows.Controls.MenuItem
                     {
                         Header = LocalizationService.Get("No custom presets found"),
                         IsEnabled = false
@@ -574,14 +587,14 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
                         Header = name,
                         Tag = name
                     };
-                    item.Click += TrayCustomPreset_Click;
-                    miCustomPresets.Items.Add(item);
+                    item.Click += (s, ev) => TrayCustomPreset_ClickAsync(name);
+                    _miCustomPresets.Items.Add(item);
                 }
             }
             catch (Exception ex)
             {
                 DiagnosticLogger.LogError(ex, "Failed to populate custom presets in the tray menu");
-                miCustomPresets.Items.Add(new System.Windows.Controls.MenuItem
+                _miCustomPresets.Items.Add(new System.Windows.Controls.MenuItem
                 {
                     Header = LocalizationService.Get("No custom presets found"),
                     IsEnabled = false
@@ -589,9 +602,9 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
             }
         }
 
-        private async void TrayCustomPreset_Click(object sender, RoutedEventArgs e)
+        private async void TrayCustomPreset_ClickAsync(string presetName)
         {
-            if (_isTrayPresetApplying || sender is not System.Windows.Controls.MenuItem { Tag: string presetName })
+            if (_isTrayPresetApplying)
             {
                 return;
             }
@@ -664,7 +677,7 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
             miTrayExtremePreset.IsChecked = !string.IsNullOrWhiteSpace(PremadePresets.ExtremePreset) && string.Equals(command, PremadePresets.ExtremePreset, StringComparison.Ordinal);
         }
 
-        private void miClose_Click(object sender, RoutedEventArgs e)
+        private void miClose_Click(object? sender, RoutedEventArgs e)
         {
             Settings.Default.isAdaptiveModeRunning = false;
             Settings.Default.Save();

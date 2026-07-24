@@ -58,7 +58,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
         [ObservableProperty] private double _pointOnePercentFrameTimeMs;
         [ObservableProperty] private string _graphicsApi = "N/A";
         [ObservableProperty] private int _gpuTemperature;
-        [ObservableProperty] private int _gpuUsage;
+        [ObservableProperty] private double _gpuUsage;
         [ObservableProperty] private int _gpuPowerWatts;
         [ObservableProperty] private int _gpuClockMhz;
         [ObservableProperty] private double _gpuMemoryUsedGb;

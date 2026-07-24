@@ -7,9 +7,10 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
 using Universal_x86_Tuning_Utility.Scripts;
 using Universal_x86_Tuning_Utility.Services;
 using Wpf.Ui;
@@ -71,21 +72,19 @@ namespace Universal_x86_Tuning_Utility.ViewModels
             NavigationItems.Add(CreateNavigationItem("Overlay", "overlay", SymbolRegular.DesktopPulse24, typeof(Views.Pages.OverlaySettingsPage)));
             NavigationItems.Add(CreateNavigationItem("Auto", "auto", SymbolRegular.Transmission24, typeof(Views.Pages.Automations)));
 
-            // Conditionally insert Hydro UI before Info for supported watercooler hardware
+            NavigationFooter = new ObservableCollection<object>();
+
+            // Hydro UI in footer for supported watercooler hardware
             if (WaterCoolerHardwareDetector.IsSupportedHardware())
             {
-                NavigationItems.Add(CreateNavigationItem("Hydro UI", "watercooler", SymbolRegular.Water24, typeof(Views.Pages.Watercooler)));
+                NavigationFooter.Add(CreateNavigationItem("Hydro UI", "watercooler", SymbolRegular.Water24, typeof(Views.Pages.Watercooler)));
             }
 
-            // Flydigi cooler page is always visible
-            NavigationItems.Add(CreateFlydigiNavItem());
+            // Flydigi cooler in footer
+            NavigationFooter.Add(CreateFlydigiNavItem());
 
-            NavigationItems.Add(CreateNavigationItem("Info", "info", SymbolRegular.Info24, typeof(Views.Pages.SystemInfo)));
-
-            NavigationFooter = new ObservableCollection<object>
-            {
-                CreateNavigationItem("Settings", "settings", SymbolRegular.Settings24, typeof(Views.Pages.SettingsPage))
-            };
+            // Settings at the bottom of footer
+            NavigationFooter.Add(CreateNavigationItem("Settings", "settings", SymbolRegular.Settings24, typeof(Views.Pages.SettingsPage)));
 
             TrayMenuItems = new ObservableCollection<MenuItem>
             {
@@ -109,7 +108,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                     "games" => SymbolRegular.Games24,
                     "overlay" => SymbolRegular.DesktopPulse24,
                     "auto" => SymbolRegular.Transmission24,
-                    "info" => SymbolRegular.Info24,
+                    "watercooler" => SymbolRegular.Water24,
                     "settings" => SymbolRegular.Settings24,
                     _ => SymbolRegular.Empty
                 };
@@ -167,54 +166,54 @@ namespace Universal_x86_Tuning_Utility.ViewModels
 
         /// <summary>
         /// Creates the Flydigi navigation item with the logo icon.
+        /// Uses a FlydigiIconElement (a Path-based IconElement) whose Fill binds to the
+        /// parent NavigationViewItem's Foreground, so it follows theme changes automatically.
         /// </summary>
         private static NavigationViewItem CreateFlydigiNavItem()
         {
             return new NavigationViewItem("Flydigi", SymbolRegular.Empty, typeof(Views.Pages.FlydigiCooler))
             {
                 TargetPageTag = "flydigicooler",
-                Icon = new ImageIcon
-                {
-                    Source = CreateFlydigiLogoImageSource(),
-                    Width = 21,
-                    Height = 21
-                }
+                Icon = new FlydigiIconElement()
             };
         }
 
         /// <summary>
-        /// Creates a Flydigi logo bitmap from the SVG path data converted to a WPF DrawingImage,
-        /// then rendered to a BitmapSource for use in the NavigationItem.Image property.
+        /// A Path-based IconElement for the Flydigi logo. The Fill binds to the inherited
+        /// Foreground from the parent NavigationViewItem, so it follows theme changes.
         /// </summary>
-        private static BitmapSource CreateFlydigiLogoImageSource()
+        private sealed class FlydigiIconElement : IconElement
         {
-            var drawing = new DrawingGroup
+            private readonly Path _path;
+
+            public FlydigiIconElement()
             {
-                Children =
+                var geometry = Geometry.Parse(
+                    "M19.015,7.83 L0,0 L15.659,23.488 L16.777,21.251 L10.066,10.066 L15.659,11.185 " +
+                    "L20.287,18.706 L16.777,25.726 L22.369,40.267 L27.962,25.726 L25.609,21.02 " +
+                    "L23.645,24.163 L24.607,25.726 L22.369,40.267 L20.132,25.726 L29.079,11.185 " +
+                    "L34.673,10.066 L27.962,21.251 L29.08,23.488 L45,0 L25.985,7.829 " +
+                    "L22.63,14.54 L19.274,7.83 Z");
+
+                _path = new Path
                 {
-                    new GeometryDrawing(
-                        Brushes.White,
-                        new Pen(Brushes.White, 1),
-                        Geometry.Parse(
-                            "M19.015,7.83 L0,0 L15.659,23.488 L16.777,21.251 L10.066,10.066 L15.659,11.185 " +
-                            "L20.287,18.706 L16.777,25.726 L22.369,40.267 L27.962,25.726 L25.609,21.02 " +
-                            "L23.645,24.163 L24.607,25.726 L22.369,40.267 L20.132,25.726 L29.079,11.185 " +
-                            "L34.673,10.066 L27.962,21.251 L29.08,23.488 L45,0 L25.985,7.829 " +
-                            "L22.63,14.54 L19.274,7.83 Z"))
-                }
-            };
+                    Data = geometry,
+                    Stretch = Stretch.Uniform,
+                    Width = 24,
+                    Height = 24,
+                    SnapsToDevicePixels = true
+                };
+            }
 
-            var drawingImage = new DrawingImage(drawing);
-            drawingImage.Freeze();
-
-            // Render to a 32x32 bitmap to match the SVG viewBox (45x41) at nav icon size
-            var bitmap = new RenderTargetBitmap(32, 32, 96, 96, PixelFormats.Pbgra32);
-            var visual = new System.Windows.Controls.Image { Source = drawingImage, Width = 32, Height = 32 };
-            visual.Arrange(new Rect(0, 0, 32, 32));
-            bitmap.Render(visual);
-            bitmap.Freeze();
-
-            return bitmap;
+            protected override UIElement InitializeChildren()
+            {
+                _path.SetBinding(Path.FillProperty, new Binding("Foreground")
+                {
+                    RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(NavigationViewItem), 1),
+                    Mode = BindingMode.OneWay
+                });
+                return _path;
+            }
         }
 
         private static void OpenUrl(string url) =>

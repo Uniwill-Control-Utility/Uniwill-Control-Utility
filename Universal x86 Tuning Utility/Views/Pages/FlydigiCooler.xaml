@@ -40,13 +40,34 @@
                         <StackPanel Grid.Column="0"
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
-                                    Margin="24,0,0,0">
-                            <Image x:Name="imgDevice"
-                                   Width="320"
-                                   Height="140"
-                                   Stretch="Uniform"
-                                   Source="pack://application:,,,/Assets/Flydigi/bs2-pro.png"
-                                   Margin="0,0,0,12"/>
+                                    Margin="64,0,0,0">
+                            <!-- Device image with glow effect -->
+                            <Grid x:Name="glowDeviceGrid" Margin="0,24,0,24">
+                                <!-- Colored glow layer behind (blurred, slightly larger than device image) -->
+                                <Rectangle x:Name="rectGlowOverlay"
+                                           Width="330"
+                                           Height="140"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Fill="#007ACC"
+                                           Opacity="0"
+                                           RenderOptions.EdgeMode="Unspecified"
+                                           Margin="0,12,0,12">
+                                    <Rectangle.Effect>
+                                        <BlurEffect Radius="60"/>
+                                    </Rectangle.Effect>
+                                    <Rectangle.OpacityMask>
+                                        <ImageBrush ImageSource="pack://application:,,,/Assets/Flydigi/bs2-pro.png"
+                                                    Stretch="Fill" />
+                                    </Rectangle.OpacityMask>
+                                </Rectangle>
+                                <!-- Sharp original image on top -->
+                                <Image x:Name="imgDevice"
+                                       Width="320"
+                                       Height="140"
+                                       Stretch="Uniform"
+                                       Source="pack://application:,,,/Assets/Flydigi/bs2-pro.png" />
+                            </Grid>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -133,7 +154,7 @@
                             <TextBlock Text="Fan Control"/>
                         </StackPanel>
                     </ui:CardControl.Header>
-                    <StackPanel>
+                    <StackPanel HorizontalAlignment="Right">
                         <!-- Fan Mode Selector -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                             <TextBlock Text="Mode:" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -145,7 +166,7 @@
                         </StackPanel>
 
                         <!-- Manual Mode -->
-                        <StackPanel Name="spManual">
+                        <StackPanel Name="spManual" HorizontalAlignment="Right">
                             <TextBlock Text="RPM (1300 - 4000)" FontWeight="SemiBold" Margin="0,0,0,4"/>
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -203,7 +224,7 @@
                             <TextBlock Text="RGB Control"/>
                         </StackPanel>
                     </ui:CardControl.Header>
-                    <StackPanel>
+                    <StackPanel HorizontalAlignment="Right">
                         <!-- RGB Mode -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                             <TextBlock Text="Mode:" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -329,7 +350,7 @@
                             <TextBlock Text="Connection"/>
                         </StackPanel>
                     </ui:CardControl.Header>
-                    <StackPanel>
+                    <StackPanel HorizontalAlignment="Right">
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                             <ui:ToggleSwitch Name="tsAutoConnect" Margin="0,0,9,0"
                                 Checked="tsAutoConnect_Checked" Unchecked="tsAutoConnect_Unchecked"/>
@@ -346,7 +367,7 @@
                             <TextBlock Text="Device Settings"/>
                         </StackPanel>
                     </ui:CardControl.Header>
-                    <StackPanel>
+                    <StackPanel HorizontalAlignment="Right">
                         <!-- Power-On Start -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                             <ui:ToggleSwitch Name="tsPowerOnStart" Margin="0,0,9,0"
@@ -381,7 +402,7 @@
                             <TextBlock Text="Advanced"/>
                         </StackPanel>
                     </ui:CardControl.Header>
-                    <StackPanel>
+                    <StackPanel HorizontalAlignment="Right">
                         <!-- Speed Avoidance Zone -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                             <ui:ToggleSwitch Name="tsAvoidance" Margin="0,0,9,0"

@@ -1,0 +1,123 @@
+<UserControl x:Class="Universal_x86_Tuning_Utility.Views.Controls.DevicesControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             FlowDirection="LeftToRight">
+
+    <ui:Card Padding="18">
+        <StackPanel>
+            <!-- Hydro UI section -->
+            <TextBlock x:Name="_hydroTitle"
+                       Margin="0,0,0,8"
+                       FontSize="18"
+                       FontWeight="Medium"
+                       Text="Hydro UI" />
+
+            <Grid x:Name="_hydroMetrics">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="70" />
+                </Grid.ColumnDefinitions>
+
+                <Label Grid.Column="0"
+                       VerticalContentAlignment="Center"
+                       Content="Pump"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                <ProgressBar x:Name="_pumpBar"
+                             Grid.Column="2"
+                             Minimum="0" Maximum="11" Value="0" />
+                <Label x:Name="_pumpLabel"
+                       Grid.Column="4"
+                       HorizontalContentAlignment="Right"
+                       VerticalContentAlignment="Center"
+                       Content="--"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </Grid>
+
+            <Grid x:Name="_hydroFanRow" Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="70" />
+                </Grid.ColumnDefinitions>
+
+                <Label Grid.Column="0"
+                       VerticalContentAlignment="Center"
+                       Content="Fan"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                <ProgressBar x:Name="_fanBar"
+                             Grid.Column="2"
+                             Minimum="0" Maximum="100" Value="0" />
+                <Label x:Name="_fanLabel"
+                       Grid.Column="4"
+                       HorizontalContentAlignment="Right"
+                       VerticalContentAlignment="Center"
+                       Content="--"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </Grid>
+
+            <!-- Flydigi section (hidden when disconnected) -->
+            <Border x:Name="_flydigiSection"
+                    Visibility="Collapsed">
+                <StackPanel>
+                    <Border Height="1"
+                            Background="{DynamicResource CardStrokeColorDefaultBrush}"
+                            Opacity="0.4"
+                            Margin="0,12,0,12" />
+
+                    <TextBlock Margin="0,0,0,8"
+                               FontSize="18"
+                               FontWeight="Medium"
+                               Text="Flydigi Cooler" />
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="80" />
+                        </Grid.ColumnDefinitions>
+
+                        <Label Grid.Column="0"
+                               VerticalContentAlignment="Center"
+                               Content="Fan"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <ProgressBar x:Name="_flydigiFanBar"
+                                     Grid.Column="2"
+                                     Minimum="1300" Maximum="4000" Value="1300" />
+                        <Label x:Name="_flydigiFanLabel"
+                               Grid.Column="4"
+                               HorizontalContentAlignment="Right"
+                               VerticalContentAlignment="Center"
+                               Content="--"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </Grid>
+
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Label Grid.Column="0"
+                               VerticalContentAlignment="Center"
+                               Content="RGB"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <Label x:Name="_flydigiRgbLabel"
+                               Grid.Column="2"
+                               VerticalContentAlignment="Center"
+                               Content="--"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ui:Card>
+</UserControl>
