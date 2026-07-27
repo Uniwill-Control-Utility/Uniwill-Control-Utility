@@ -25,6 +25,9 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
 
             _gpuClockBar.Value = snapshot.GpuClockMhz;
             _gpuClockLabel.Content = snapshot.GpuClockMhz > 0 ? $"{snapshot.GpuClockMhz}MHz" : "--";
+
+            _gpuFanBar.Value = snapshot.GpuFanSpeed;
+            _gpuFanLabel.Content = snapshot.GpuFanSpeed > 0 ? $"{snapshot.GpuFanSpeed}%" : "--";
         }
     }
 }

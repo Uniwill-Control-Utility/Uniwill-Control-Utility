@@ -17,6 +17,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Grid.ColumnSpan="3"
@@ -80,6 +81,21 @@
                          Minimum="0" Maximum="6000" Value="0" />
             <Label x:Name="_cpuClockLabel"
                    Grid.Row="4" Grid.Column="2"
+                   HorizontalContentAlignment="Right"
+                   VerticalContentAlignment="Center"
+                   Content="--"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+            <Label Grid.Row="5" Grid.Column="0"
+                   VerticalContentAlignment="Center"
+                   Content="Fan Speed"
+                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+            <ProgressBar x:Name="_cpuFanBar"
+                         Grid.Row="5" Grid.Column="1"
+                         Margin="16,0,16,0"
+                         Minimum="0" Maximum="100" Value="0" />
+            <Label x:Name="_cpuFanLabel"
+                   Grid.Row="5" Grid.Column="2"
                    HorizontalContentAlignment="Right"
                    VerticalContentAlignment="Center"
                    Content="--"

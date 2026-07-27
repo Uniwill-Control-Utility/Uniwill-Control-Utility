@@ -44,10 +44,12 @@ namespace Universal_x86_Tuning_Utility.Services
         public int CpuUsage { get; init; }
         public int CpuPowerWatts { get; init; }
         public int CpuClockMhz { get; init; }
+        public int CpuFanSpeed { get; init; }
         public int GpuTemperature { get; init; }
         public double GpuUsage { get; init; }
         public int GpuPowerWatts { get; init; }
         public int GpuClockMhz { get; init; }
+        public int GpuFanSpeed { get; init; }
         public double GpuMemoryUsedGb { get; init; }
         public double GpuMemoryTotalGb { get; init; }
         public double SystemMemoryUsedGb { get; init; }

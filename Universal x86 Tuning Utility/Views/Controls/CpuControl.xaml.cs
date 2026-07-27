@@ -23,6 +23,9 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
 
             _cpuClockBar.Value = snapshot.CpuClockMhz;
             _cpuClockLabel.Content = snapshot.CpuClockMhz > 0 ? $"{snapshot.CpuClockMhz}MHz" : "--";
+
+            _cpuFanBar.Value = snapshot.CpuFanSpeed;
+            _cpuFanLabel.Content = snapshot.CpuFanSpeed > 0 ? $"{snapshot.CpuFanSpeed}%" : "--";
         }
     }
 }
