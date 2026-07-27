@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -20,26 +21,50 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private readonly UniwillECService? _uniwillEc;
         private readonly FlydigiCoolerService _flydigiService;
         private readonly Bs1Service _bs1Service;
+        private readonly DeviceApplier _deviceApplier;
         private bool _loadingSettings;
         private DispatcherTimer? _statusTimer;
         private IDisposable? _monitoringLease;
+        private System.Timers.Timer? _applyDebounceTimer;
+        private Wpf.Ui.Controls.Snackbar? _adaptiveSnackbar;
 
         public FanControl(
             IHardwareMonitoringService hardwareMonitoring,
+            DeviceApplier deviceApplier,
             UniwillECService? uniwillEc = null,
             FlydigiCoolerService? flydigiService = null,
             Bs1Service? bs1Service = null)
         {
             _hardwareMonitoring = hardwareMonitoring;
+            _deviceApplier = deviceApplier;
             _uniwillEc = uniwillEc;
             _flydigiService = flydigiService;
             _bs1Service = bs1Service;
             InitializeComponent();
 
-            // Subscribe to curve changes for banner updates
-            FanCurveEditor.CurveChanged += (s, e) => UpdateBanner();
-            CpuFanCurveEditor.CurveChanged += (s, e) => UpdateBanner();
-            GpuFanCurveEditor.CurveChanged += (s, e) => UpdateBanner();
+            // Subscribe to DeviceApplier override events
+            _deviceApplier.EcFanOverrideChanged += OnEcFanOverrideChanged;
+            _deviceApplier.EcFanPresetApplied += OnEcFanPresetApplied;
+
+            // Subscribe to curve changes for banner updates and auto-apply debounce
+            FanCurveEditor.CurveChanged += (s, e) =>
+            {
+                UpdateBanner();
+                SaveCurrentSettings();
+                ScheduleAutoApply();
+            };
+            CpuFanCurveEditor.CurveChanged += (s, e) =>
+            {
+                UpdateBanner();
+                SaveCurrentSettings();
+                ScheduleAutoApply();
+            };
+            GpuFanCurveEditor.CurveChanged += (s, e) =>
+            {
+                UpdateBanner();
+                SaveCurrentSettings();
+                ScheduleAutoApply();
+            };
 
             // Update banner when Flydigi connection state changes (affects cooler name)
             _flydigiService.ConnectionStateChanged += (s, e) => UpdateBanner();
@@ -91,6 +116,178 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         {
             StatusText.Text = message;
         }
+
+        /// <summary>
+        /// Schedules an auto-apply of the current fan curve after 5 seconds of inactivity.
+        /// Each call resets the timer — the curve only applies after the user stops interacting.
+        /// </summary>
+        private void ScheduleAutoApply()
+        {
+            if (_loadingSettings) return;
+
+            if (_applyDebounceTimer == null)
+            {
+                _applyDebounceTimer = new System.Timers.Timer(5000) { AutoReset = false };
+                _applyDebounceTimer.Elapsed += (s, e) =>
+                {
+                    Dispatcher.Invoke(() => ApplyCurveInBackground());
+                };
+            }
+
+            _applyDebounceTimer.Stop();
+            _applyDebounceTimer.Start();
+        }
+
+        #region Adaptive Mode Override
+
+        private void OnEcFanOverrideChanged(object? sender, bool isOverridden)
+        {
+            ApplyOverrideState(isOverridden);
+        }
+
+        private void OnEcFanPresetApplied(object? sender, EcFanPresetAppliedEventArgs e)
+        {
+            // Update UI controls to reflect the preset being applied
+            _loadingSettings = true;
+            try
+            {
+                if (e.UnifiedMode)
+                {
+                    tsUnifiedCurve.IsChecked = true;
+                    UnifiedCard.IsExpanded = true;
+                    SplitCurvePanel.Visibility = Visibility.Collapsed;
+
+                    if (e.CustomDuties != null && e.CustomDuties.Length == 11)
+                    {
+                        cbPreset.SelectedIndex = 5; // Custom
+                        var curve = new EcFanCurve { Name = e.PresetName };
+                        curve.Duties.Clear();
+                        foreach (var d in e.CustomDuties)
+                            curve.Duties.Add(Math.Clamp(d, 0, 100));
+                        FanCurveEditor.SetCurve(curve);
+                        FanCurveEditor.IsReadOnly = true;
+                    }
+                    else
+                    {
+                        // Map preset name to index
+                        cbPreset.SelectedIndex = e.PresetName switch
+                        {
+                            "Silent" => 0,
+                            "Performance" => 2,
+                            "Full Speed" => 3,
+                            "Off" => 4,
+                            _ => 1 // Balanced
+                        };
+                        FanCurveEditor.SetCurve(GetPresetCurve(e.PresetName));
+                        FanCurveEditor.IsReadOnly = true;
+                    }
+
+                    if (e.CpuTemps != null)
+                        FanCurveEditor.Temperatures = e.CpuTemps;
+                }
+                else
+                {
+                    tsUnifiedCurve.IsChecked = false;
+                    UnifiedCard.IsExpanded = false;
+                    SplitCurvePanel.Visibility = Visibility.Visible;
+
+                    // CPU
+                    if (e.CpuPresetDuties != null && e.CpuPresetDuties.Length == 11)
+                    {
+                        cbCpuPreset.SelectedIndex = 5; // Custom
+                        var cpuCurve = new EcFanCurve { Name = "Custom" };
+                        cpuCurve.Duties.Clear();
+                        foreach (var d in e.CpuPresetDuties)
+                            cpuCurve.Duties.Add(Math.Clamp(d, 0, 100));
+                        CpuFanCurveEditor.SetCurve(cpuCurve);
+                        CpuFanCurveEditor.IsReadOnly = true;
+                    }
+
+                    // GPU
+                    if (e.GpuPresetDuties != null && e.GpuPresetDuties.Length == 11)
+                    {
+                        cbGpuPreset.SelectedIndex = 5; // Custom
+                        var gpuCurve = new EcFanCurve { Name = "Custom" };
+                        gpuCurve.Duties.Clear();
+                        foreach (var d in e.GpuPresetDuties)
+                            gpuCurve.Duties.Add(Math.Clamp(d, 0, 100));
+                        GpuFanCurveEditor.SetCurve(gpuCurve);
+                        GpuFanCurveEditor.IsReadOnly = true;
+                    }
+
+                    if (e.CpuTemps != null)
+                        CpuFanCurveEditor.Temperatures = e.CpuTemps;
+                    if (e.GpuTemps != null)
+                        GpuFanCurveEditor.Temperatures = e.GpuTemps;
+                }
+
+                UpdateBanner();
+            }
+            finally
+            {
+                _loadingSettings = false;
+            }
+        }
+
+        private void ApplyOverrideState(bool isOverridden)
+        {
+            if (isOverridden)
+            {
+                overlayAdaptiveWarning.Visibility = Visibility.Visible;
+                SetControlsEnabled(false);
+                ShowAdaptiveSnackbar();
+            }
+            else
+            {
+                overlayAdaptiveWarning.Visibility = Visibility.Collapsed;
+                SetControlsEnabled(true);
+                HideAdaptiveSnackbar();
+            }
+        }
+
+        private void ShowAdaptiveSnackbar()
+        {
+            if (_adaptiveSnackbar != null)
+                SnackbarPresenter.HideCurrent();
+
+            _adaptiveSnackbar = new Wpf.Ui.Controls.Snackbar(SnackbarPresenter)
+            {
+                Title = "Adaptive Mode Override",
+                Content = "Adaptive Mode is currently controlling the EC fan curves. Controls on this page are currently disabled.",
+                Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+                Icon = new Wpf.Ui.Controls.SymbolIcon(Wpf.Ui.Controls.SymbolRegular.Warning24),
+                IsCloseButtonEnabled = false,
+                Timeout = TimeSpan.FromHours(1),
+            };
+
+            if (SnackbarPresenter.IsLoaded)
+                _adaptiveSnackbar.Show(true);
+            else
+                SnackbarPresenter.Loaded += (s, e) => _adaptiveSnackbar?.Show(true);
+        }
+
+        private void HideAdaptiveSnackbar()
+        {
+            SnackbarPresenter.HideCurrent();
+            _adaptiveSnackbar = null;
+        }
+
+        private void SetControlsEnabled(bool enabled)
+        {
+            foreach (var child in UniwillAvailable.Children)
+            {
+                if (child is FrameworkElement fe)
+                {
+                    fe.IsEnabled = enabled;
+                }
+            }
+
+            // Also disable/enable the bottom bar buttons
+            btnResetFanState.IsEnabled = enabled;
+            btnRestore.IsEnabled = enabled;
+        }
+
+        #endregion
 
         private void ReadFanRpm()
         {
@@ -557,7 +754,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             string? name = item.Content?.ToString();
             HandlePresetSelection(FanCurveEditor, name);
             if (!_loadingSettings)
+            {
                 SaveCurrentSettings();
+                ScheduleAutoApply();
+            }
             UpdateBanner();
         }
 
@@ -567,7 +767,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             string? name = item.Content?.ToString();
             HandlePresetSelection(CpuFanCurveEditor, name);
             if (!_loadingSettings)
+            {
                 SaveCurrentSettings();
+                ScheduleAutoApply();
+            }
             UpdateBanner();
         }
 
@@ -577,7 +780,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             string? name = item.Content?.ToString();
             HandlePresetSelection(GpuFanCurveEditor, name);
             if (!_loadingSettings)
+            {
                 SaveCurrentSettings();
+                ScheduleAutoApply();
+            }
             UpdateBanner();
         }
 
@@ -663,8 +869,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             settings.UnifiedMode = true;
             FanControlSettingsService.Save(settings);
 
-            // Apply curve in the background without blocking the UI
-            ApplyCurveInBackground();
+            // Auto-apply curve after debounce
+            ScheduleAutoApply();
             UpdateBanner();
         }
 
@@ -694,8 +900,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             settings.UnifiedMode = false;
             FanControlSettingsService.Save(settings);
 
-            // Apply curves in the background without blocking the UI
-            ApplyCurveInBackground();
+            // Auto-apply curves after debounce
+            ScheduleAutoApply();
             UpdateBanner();
         }
 
@@ -786,24 +992,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     System.Diagnostics.Debug.WriteLine($"Failed to apply fan curve: {ex.Message}");
                 }
             });
-        }
-
-        private void btnApplyCurve_Click(object sender, RoutedEventArgs e)
-        {
-            if (_uniwillEc is null) return;
-
-            // Show immediate feedback, then apply in background
-            if (tsUnifiedCurve.IsChecked == true)
-            {
-                var name = (cbPreset.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Custom";
-                SetStatusText(LocalizationService.Format("Applying unified curve: {0}", name));
-            }
-            else
-            {
-                SetStatusText(LocalizationService.Get("Applying fan curves..."));
-            }
-
-            ApplyCurveInBackground();
         }
 
         private void btnRestore_Click(object sender, RoutedEventArgs e)
@@ -1055,6 +1243,13 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _statusTimer?.Start();
             UpdateBanner();
 
+            // Re-apply override state on every navigation back to this page.
+            // The DeviceApplier event only fires when the state *changes*, so if we
+            // navigated away while override was active (Unloaded hid the snackbar),
+            // we need to restore the overlay + snackbar on return.
+            bool isOverridden = _deviceApplier.IsEcFanOverridden;
+            ApplyOverrideState(isOverridden);
+
             // Acquire hardware monitoring lease on a background thread to avoid
             // blocking the UI while LibreHardwareMonitor probes hardware.
             if (_monitoringLease is null)
@@ -1071,6 +1266,14 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private void Page_Unloaded(object? sender, EventArgs e)
         {
             _statusTimer?.Stop();
+
+            // Clean up debounce timer
+            _applyDebounceTimer?.Stop();
+            _applyDebounceTimer?.Dispose();
+            _applyDebounceTimer = null;
+
+            // Hide adaptive snackbar
+            HideAdaptiveSnackbar();
 
             // Restore auto fan control and release lease on a background thread
             // to avoid blocking the UI during navigation.

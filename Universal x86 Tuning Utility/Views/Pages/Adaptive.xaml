@@ -969,6 +969,94 @@ Icon="{ui:SymbolIcon Power20}" Margin="0,8,15,0">
                         </StackPanel>
                     </ui:CardExpander>
 
+                    <!-- EC Fan Control - only visible on supported hardware -->
+                    <ui:CardExpander Name="sdEcFan"
+                        Visibility="Collapsed"
+                        IsEnabled="True"
+                        IsExpanded="False"
+                        Icon="Gauge20" Margin="0,8,15,0">
+                        <ui:CardExpander.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock
+                                        FontSize="14"
+                                        FontWeight="Medium"
+                                        Text="EC Fan Control" />
+                                    <TextBlock
+                                        FontSize="12"
+                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                        Text="Per-game fan curve control for the EC fan controller."/>
+                                </StackPanel>
+                                <ui:ToggleSwitch Name="cbxEcFanEnabled" Grid.Column="1" VerticalAlignment="Center"
+                                    Margin="0,0,9,0"
+                                    ToolTip="Enable EC fan controls for this game"
+                                    Checked="cbxEcFanEnabled_Toggled"
+                                    Unchecked="cbxEcFanEnabled_Toggled" />
+                            </Grid>
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <!-- Fan Curve Mode selector -->
+                            <StackPanel Margin="0,-8,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Fan Curve Mode</TextBlock>
+                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select Unified (single curve) or Split (separate CPU/GPU curves)." VerticalAlignment="Bottom" />
+                                </StackPanel>
+                                <ComboBox Name="cbxEcFanMode" MinWidth="160" Margin="0,4,0,0" Height="37" SelectedIndex="0" SelectionChanged="cbxEcFanMode_SelectionChanged">
+                                    <ComboBoxItem>Unified</ComboBoxItem>
+                                    <ComboBoxItem>Split (CPU + GPU)</ComboBoxItem>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <!-- Unified preset selector -->
+                            <StackPanel Name="spEcFanUnified" Margin="0,8,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Fan Curve Profile</TextBlock>
+                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select a fan curve profile for this game." VerticalAlignment="Bottom" />
+                                </StackPanel>
+                                <ComboBox Name="cbxEcFanPreset" MinWidth="160" Margin="0,4,0,0" Height="37" SelectedIndex="1">
+                                    <ComboBoxItem>Silent</ComboBoxItem>
+                                    <ComboBoxItem>Balanced</ComboBoxItem>
+                                    <ComboBoxItem>Performance</ComboBoxItem>
+                                    <ComboBoxItem>Full Speed</ComboBoxItem>
+                                    <ComboBoxItem>Off</ComboBoxItem>
+                                    <ComboBoxItem>Custom</ComboBoxItem>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <!-- Split CPU/GPU preset selectors -->
+                            <StackPanel Name="spEcFanSplit" Margin="0,8,0,0" Visibility="Collapsed">
+                                <StackPanel Margin="0,0,0,8">
+                                    <TextBlock FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4">CPU Fan Curve</TextBlock>
+                                    <ComboBox Name="cbxEcFanCpuPreset" MinWidth="160" Height="37" SelectedIndex="1">
+                                        <ComboBoxItem>Silent</ComboBoxItem>
+                                        <ComboBoxItem>Balanced</ComboBoxItem>
+                                        <ComboBoxItem>Performance</ComboBoxItem>
+                                        <ComboBoxItem>Full Speed</ComboBoxItem>
+                                        <ComboBoxItem>Off</ComboBoxItem>
+                                        <ComboBoxItem>Custom</ComboBoxItem>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,4">GPU Fan Curve</TextBlock>
+                                    <ComboBox Name="cbxEcFanGpuPreset" MinWidth="160" Height="37" SelectedIndex="1">
+                                        <ComboBoxItem>Silent</ComboBoxItem>
+                                        <ComboBoxItem>Balanced</ComboBoxItem>
+                                        <ComboBoxItem>Performance</ComboBoxItem>
+                                        <ComboBoxItem>Full Speed</ComboBoxItem>
+                                        <ComboBoxItem>Off</ComboBoxItem>
+                                        <ComboBoxItem>Custom</ComboBoxItem>
+                                    </ComboBox>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}">Notes: Custom curves are saved per-game and applied automatically when this profile is active.</TextBlock>
+                        </StackPanel>
+                    </ui:CardExpander>
+
                     <ui:CardExpander Name="sdRTSS" Visibility="Collapsed"
 IsEnabled="True"
 IsExpanded="False"

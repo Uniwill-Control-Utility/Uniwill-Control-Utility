@@ -9,15 +9,16 @@ using Universal_x86_Tuning_Utility.Scripts.Misc;
 namespace Universal_x86_Tuning_Utility.Services
 {
     /// <summary>
-    /// Centralized service for applying device settings to Flydigi cooler and LCT watercooler.
-    /// This is the single point of truth for what gets sent to the hardware.
-    /// Both the Flydigi/Watercooler pages and Adaptive Mode route through this service.
+    /// Centralized service for applying device settings to Flydigi cooler, LCT watercooler,
+    /// and Uniwill EC fan curves. This is the single point of truth for what gets sent
+    /// to the hardware. Both the device pages and Adaptive Mode route through this service.
     /// </summary>
     public class DeviceApplier
     {
         private readonly FlydigiCoolerService _flydigiService;
         private readonly Bs1Service? _bs1Service;
         private readonly WaterCoolerService _waterCoolerService;
+        private readonly UniwillECService? _uniwillEc;
 
         /// <summary>Whether Adaptive Mode is currently overriding Flydigi device control.</summary>
         public bool IsFlydigiOverridden { get; private set; }
@@ -25,11 +26,17 @@ namespace Universal_x86_Tuning_Utility.Services
         /// <summary>Whether Adaptive Mode is currently overriding Watercooler device control.</summary>
         public bool IsWatercoolerOverridden { get; private set; }
 
+        /// <summary>Whether Adaptive Mode is currently overriding EC Fan Control.</summary>
+        public bool IsEcFanOverridden { get; private set; }
+
         /// <summary>The last Flydigi preset applied from Adaptive Mode (null when nothing has been applied yet).</summary>
         public FlydigiPresetAppliedEventArgs? LastAppliedFlydigiPreset { get; private set; }
 
         /// <summary>The last Watercooler preset applied from Adaptive Mode (null when nothing has been applied yet).</summary>
         public WatercoolerPresetAppliedEventArgs? LastAppliedWatercoolerPreset { get; private set; }
+
+        /// <summary>The last EC Fan curve applied from Adaptive Mode (null when nothing has been applied yet).</summary>
+        public EcFanPresetAppliedEventArgs? LastAppliedEcFanPreset { get; private set; }
 
         /// <summary>
         /// Raised when the Flydigi override state changes.
@@ -56,6 +63,18 @@ namespace Universal_x86_Tuning_Utility.Services
         public event EventHandler<WatercoolerPresetAppliedEventArgs>? WatercoolerPresetApplied;
 
         /// <summary>
+        /// Raised when the EC Fan override state changes.
+        /// Args: (isOverridden)
+        /// </summary>
+        public event EventHandler<bool>? EcFanOverrideChanged;
+
+        /// <summary>
+        /// Raised when profile-specific EC Fan settings have been applied and the Fan Control
+        /// page should update its UI controls to reflect the profile's values.
+        /// </summary>
+        public event EventHandler<EcFanPresetAppliedEventArgs>? EcFanPresetApplied;
+
+        /// <summary>
         /// Saved user Flydigi settings, captured when override is enabled.
         /// Restored when override is lifted.
         /// </summary>
@@ -67,11 +86,18 @@ namespace Universal_x86_Tuning_Utility.Services
         /// </summary>
         private WaterCoolerSettings? _savedWatercoolerSettings;
 
-        public DeviceApplier(FlydigiCoolerService flydigiService, Bs1Service? bs1Service, WaterCoolerService waterCoolerService)
+        /// <summary>
+        /// Saved user EC Fan settings, captured when override is enabled.
+        /// Restored when override is lifted.
+        /// </summary>
+        private FanControlSettings? _savedEcFanSettings;
+
+        public DeviceApplier(FlydigiCoolerService flydigiService, Bs1Service? bs1Service, WaterCoolerService waterCoolerService, UniwillECService? uniwillEc = null)
         {
             _flydigiService = flydigiService;
             _bs1Service = bs1Service;
             _waterCoolerService = waterCoolerService;
+            _uniwillEc = uniwillEc;
         }
 
         /* ------------------------------------------------------------------ */
@@ -193,6 +219,142 @@ namespace Universal_x86_Tuning_Utility.Services
 
             WatercoolerOverrideChanged?.Invoke(this, false);
         }
+
+        /// <summary>
+        /// Enables Adaptive Mode override for EC Fan Control.
+        /// Captures the current user settings so they can be restored later.
+        /// </summary>
+        public void EnableEcFanOverride()
+        {
+            if (IsEcFanOverridden)
+                return;
+
+            // Capture current user Fan Control settings before overriding
+            _savedEcFanSettings = FanControlSettingsService.Load();
+            IsEcFanOverridden = true;
+            EcFanOverrideChanged?.Invoke(this, true);
+        }
+
+        /// <summary>
+        /// Disables Adaptive Mode override for EC Fan Control.
+        /// Restores the previously saved user settings and re-applies them to the EC.
+        /// </summary>
+        public void DisableEcFanOverride()
+        {
+            if (!IsEcFanOverridden)
+                return;
+
+            IsEcFanOverridden = false;
+
+            FanControlSettings? saved = _savedEcFanSettings;
+            if (saved != null)
+            {
+                FanControlSettingsService.Save(saved);
+                _savedEcFanSettings = null;
+
+                // Re-apply restored settings to the EC immediately.
+                if (_uniwillEc is not null)
+                {
+                    try
+                    {
+                        var cpuCurve = saved.CpuPreset == "Custom" && saved.CpuDuties?.Length == 11
+                            ? BuildCurveFromSettings(saved.CpuPreset, saved.CpuDuties)
+                            : GetPresetCurve(saved.CpuPreset);
+
+                        var gpuCurve = saved.GpuPreset == "Custom" && saved.GpuDuties?.Length == 11
+                            ? BuildCurveFromSettings(saved.GpuPreset, saved.GpuDuties)
+                            : GetPresetCurve(saved.GpuPreset);
+
+                        var cpuTemps = saved.CpuTempThresholds ?? EcFanCurve.CpuTemperatures;
+                        var gpuTemps = saved.GpuTempThresholds ?? EcFanCurve.GpuTemperatures;
+
+                        _uniwillEc.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to re-apply user EC Fan settings on override-lift");
+                    }
+                }
+            }
+
+            EcFanOverrideChanged?.Invoke(this, false);
+        }
+
+        /// <summary>
+        /// Applies an EC Fan curve from Adaptive Mode.
+        /// Fires EcFanPresetApplied so the Fan Control page can sync its UI.
+        /// </summary>
+        public void ApplyEcFanFromPreset(
+            bool unifiedMode,
+            string presetName,
+            int[]? customDuties,
+            int[]? cpuPresetDuties,
+            int[]? gpuPresetDuties,
+            int[]? cpuTemps = null,
+            int[]? gpuTemps = null)
+        {
+            if (_uniwillEc is null)
+                return;
+
+            try
+            {
+                EcFanCurve cpuCurve;
+                EcFanCurve gpuCurve;
+                int[] finalCpuTemps = cpuTemps ?? EcFanCurve.CpuTemperatures;
+                int[] finalGpuTemps = gpuTemps ?? EcFanCurve.GpuTemperatures;
+
+                if (unifiedMode)
+                {
+                    cpuCurve = customDuties?.Length == 11
+                        ? BuildCurveFromSettings(presetName, customDuties)
+                        : GetPresetCurve(presetName);
+                    gpuCurve = cpuCurve;
+                    finalGpuTemps = cpuTemps ?? finalGpuTemps;
+                }
+                else
+                {
+                    // For split mode we need separate preset names — but the profile
+                    // only stores a single preset name. We use the same preset for both
+                    // unless custom duties are provided per-source.
+                    cpuCurve = cpuPresetDuties?.Length == 11
+                        ? BuildCurveFromSettings(presetName, cpuPresetDuties)
+                        : GetPresetCurve(presetName);
+                    gpuCurve = gpuPresetDuties?.Length == 11
+                        ? BuildCurveFromSettings(presetName, gpuPresetDuties)
+                        : GetPresetCurve(presetName);
+                }
+
+                _uniwillEc.ApplyFanCurve(cpuCurve, gpuCurve, finalCpuTemps, finalGpuTemps);
+
+                var args = new EcFanPresetAppliedEventArgs(
+                    unifiedMode, presetName, customDuties, cpuPresetDuties, gpuPresetDuties, cpuTemps, gpuTemps);
+                LastAppliedEcFanPreset = args;
+                EcFanPresetApplied?.Invoke(this, args);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to apply EC Fan curve from preset");
+            }
+        }
+
+        private static EcFanCurve BuildCurveFromSettings(string presetName, int[] duties)
+        {
+            var curve = new EcFanCurve { Name = presetName };
+            curve.Duties.Clear();
+            foreach (var d in duties)
+                curve.Duties.Add(Math.Clamp(d, 0, 100));
+            return curve;
+        }
+
+        private static EcFanCurve GetPresetCurve(string? name) => name switch
+        {
+            "Silent" => EcFanCurve.CreateSilent(),
+            "Balanced" => EcFanCurve.CreateBalanced(),
+            "Performance" => EcFanCurve.CreatePerformance(),
+            "Full Speed" => EcFanCurve.CreateFullSpeed(),
+            "Off" => EcFanCurve.CreateOff(),
+            _ => EcFanCurve.CreateBalanced()
+        };
 
         /* ------------------------------------------------------------------ */
         /*  Flydigi Device Commands                                            */
@@ -540,6 +702,35 @@ namespace Universal_x86_Tuning_Utility.Services
             FanSpeed = fanSpeed;
             RgbMode = rgbMode;
             RgbColor = rgbColor;
+        }
+    }
+
+    /// <summary>
+    /// Raised when profile-specific EC Fan settings have been applied to the device.
+    /// The Fan Control page should sync its UI controls to reflect these values.
+    /// </summary>
+    public class EcFanPresetAppliedEventArgs : EventArgs
+    {
+        public bool UnifiedMode { get; }
+        public string PresetName { get; }
+        public int[]? CustomDuties { get; }
+        public int[]? CpuPresetDuties { get; }
+        public int[]? GpuPresetDuties { get; }
+        public int[]? CpuTemps { get; }
+        public int[]? GpuTemps { get; }
+
+        public EcFanPresetAppliedEventArgs(
+            bool unifiedMode, string presetName,
+            int[]? customDuties, int[]? cpuPresetDuties, int[]? gpuPresetDuties,
+            int[]? cpuTemps, int[]? gpuTemps)
+        {
+            UnifiedMode = unifiedMode;
+            PresetName = presetName;
+            CustomDuties = customDuties;
+            CpuPresetDuties = cpuPresetDuties;
+            GpuPresetDuties = gpuPresetDuties;
+            CpuTemps = cpuTemps;
+            GpuTemps = gpuTemps;
         }
     }
 }

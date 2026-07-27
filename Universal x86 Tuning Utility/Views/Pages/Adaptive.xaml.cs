@@ -82,6 +82,26 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             sdHydroUI.Visibility = WaterCoolerHardwareDetector.IsSupportedHardware() ? Visibility.Visible : Visibility.Collapsed;
             UpdateFlydigiCardVisibility();
+
+            // Show/hide EC Fan card based on Uniwill EC availability.
+            // Run the hardware probe on a background thread to avoid blocking
+            // the initial page render — EC register reads can take seconds.
+            _ = Task.Run(() =>
+            {
+                bool uniwillAvailable = false;
+                var uniwillEc = App.GetService<UniwillECService>();
+                if (uniwillEc is not null)
+                {
+                    try { uniwillAvailable = uniwillEc.Initialize(); }
+                    catch { /* not available */ }
+                }
+
+                Dispatcher.Invoke(() =>
+                {
+                    if (uniwillAvailable)
+                        sdEcFan.Visibility = Visibility.Visible;
+                });
+            });
         }
 
         /// <summary>
@@ -244,6 +264,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             Bs2ProRgbG = 0,
                             Bs2ProRgbB = 255,
                             Bs2ProBrightness = 100,
+                            EcFanEnabled = true,
+                            EcFanUnifiedMode = false,
+                            EcFanPreset = "Balanced",
+                            EcFanCpuPreset = "Balanced",
+                            EcFanGpuPreset = "Balanced",
                             isAutoSwitch = (bool)tsAutoSwitch.IsChecked
                         };
                         adaptivePresetManager.SavePreset(item.gameName, preset);
@@ -387,6 +412,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     {
                         _ = _deviceApplier.DisableFlydigiOverrideAsync();
                         _ = _deviceApplier.DisableWatercoolerOverrideAsync();
+                        _deviceApplier.DisableEcFanOverride();
                     }
 
                 }
@@ -409,6 +435,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             _deviceApplier.EnableFlydigiOverride();
                         if ((bool)cbxWcEnabled.IsChecked && !_deviceApplier.IsWatercoolerOverridden)
                             _deviceApplier.EnableWatercoolerOverride();
+                        if ((bool)cbxEcFanEnabled.IsChecked && !_deviceApplier.IsEcFanOverridden)
+                            _deviceApplier.EnableEcFanOverride();
                     }
                 }
             }
@@ -565,6 +593,17 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     nudBs2ProRgbB.Value = myPreset.Bs2ProRgbB;
                     nudBs2ProBrightness.Value = myPreset.Bs2ProBrightness;
 
+                    // EC Fan
+                    if (sdEcFan.Visibility == Visibility.Visible)
+                    {
+                        cbxEcFanEnabled.IsChecked = myPreset.EcFanEnabled;
+                        cbxEcFanMode.SelectedIndex = myPreset.EcFanUnifiedMode ? 0 : 1;
+                        cbxEcFanPreset.SelectedIndex = GetEcFanPresetIndex(myPreset.EcFanPreset);
+                        cbxEcFanCpuPreset.SelectedIndex = GetEcFanPresetIndex(myPreset.EcFanCpuPreset);
+                        cbxEcFanGpuPreset.SelectedIndex = GetEcFanPresetIndex(myPreset.EcFanGpuPreset);
+                        UpdateEcFanModeUI();
+                    }
+
                     // Apply the preset's per-profile override flags only when resetTracking
                     // is true (profile switch). When resetTracking is false (Page_Loaded,
                     // game detection without profile change), preserve the user's current
@@ -599,6 +638,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         lastWcFan = FanSpeed.Off;
                         lastWcRgbMode = RgbState.Off;
                         lastWcRgbColor = RgbColor.Red;
+
+                        lastEcFanUnifiedMode = false;
+                        lastEcFanPreset = "";
+                        lastEcFanCpuPreset = "";
+                        lastEcFanGpuPreset = "";
                     }
                     // When resetTracking is false (Page_Loaded, game detection), leave
                     // tracking vars unchanged so update() won't re-send device commands
@@ -676,6 +720,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     Bs2ProRgbG = (byte)nudBs2ProRgbG.Value,
                     Bs2ProRgbB = (byte)nudBs2ProRgbB.Value,
                     Bs2ProBrightness = (byte)nudBs2ProBrightness.Value,
+                    EcFanEnabled = sdEcFan.Visibility == Visibility.Visible ? (bool)cbxEcFanEnabled.IsChecked : false,
+                    EcFanUnifiedMode = sdEcFan.Visibility == Visibility.Visible ? cbxEcFanMode.SelectedIndex == 0 : false,
+                    EcFanPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanPreset.SelectedIndex) : "Balanced",
+                    EcFanCpuPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanCpuPreset.SelectedIndex) : "Balanced",
+                    EcFanGpuPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanGpuPreset.SelectedIndex) : "Balanced",
                     isAutoSwitch = (bool)tsAutoSwitch.IsChecked
                 };
                 adaptivePresetManager.SavePreset(presetName, preset);
@@ -754,6 +803,39 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
             else
                 _ = _deviceApplier!.DisableWatercoolerOverrideAsync();
+        }
+
+        private void cbxEcFanEnabled_Toggled(object sender, RoutedEventArgs e)
+        {
+            bool enabled = (bool)cbxEcFanEnabled.IsChecked;
+
+            if (enabled)
+            {
+                _deviceApplier?.EnableEcFanOverride();
+                // Reset tracking so the next update() tick force-applies
+                lastEcFanPreset = "";
+                lastEcFanCpuPreset = "";
+                lastEcFanGpuPreset = "";
+            }
+            else
+            {
+                _deviceApplier?.DisableEcFanOverride();
+            }
+        }
+
+        private void cbxEcFanMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateEcFanModeUI();
+        }
+
+        private void UpdateEcFanModeUI()
+        {
+            if (cbxEcFanMode == null || spEcFanUnified == null || spEcFanSplit == null)
+                return;
+
+            bool unified = cbxEcFanMode.SelectedIndex == 0;
+            spEcFanUnified.Visibility = unified ? Visibility.Visible : Visibility.Collapsed;
+            spEcFanSplit.Visibility = unified ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private static int newMinCPUClock = 1440;
@@ -842,6 +924,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         byte lastBs2ProRgbG = 0;
         byte lastBs2ProRgbB = 0;
         byte lastBs2ProBrightness = 0;
+        // EC Fan diff-tracking
+        private bool lastEcFanUnifiedMode = false;
+        private string lastEcFanPreset = "";
+        private string lastEcFanCpuPreset = "";
+        private string lastEcFanGpuPreset = "";
         string lastWindowsProcessorPower = "";
         private SemaphoreSlim _updateSemaphore = new(1, 1);
         private async void update()
@@ -1067,6 +1154,49 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             }
                         }
 
+                        // Apply EC Fan settings if enabled
+                        if ((bool)cbxEcFanEnabled.IsChecked && _deviceApplier != null)
+                        {
+                            bool unified = cbxEcFanMode.SelectedIndex == 0;
+                            string unifiedPreset = GetEcFanPresetFromIndex(cbxEcFanPreset.SelectedIndex);
+                            string cpuPreset = GetEcFanPresetFromIndex(cbxEcFanCpuPreset.SelectedIndex);
+                            string gpuPreset = GetEcFanPresetFromIndex(cbxEcFanGpuPreset.SelectedIndex);
+
+                            bool changed = unified != lastEcFanUnifiedMode ||
+                                (unified && unifiedPreset != lastEcFanPreset) ||
+                                (!unified && (cpuPreset != lastEcFanCpuPreset || gpuPreset != lastEcFanGpuPreset));
+
+                            if (changed)
+                            {
+                                if (unified)
+                                {
+                                    var cpuCurve = GetEcFanPresetCurve(unifiedPreset);
+                                    var cpuTemps = Universal_x86_Tuning_Utility.Models.EcFanCurve.CpuTemperatures;
+
+                                    _deviceApplier.ApplyEcFanFromPreset(true, unifiedPreset,
+                                        cpuCurve.Duties.ToArray(), null, null,
+                                        cpuTemps, cpuTemps);
+
+                                    lastEcFanPreset = unifiedPreset;
+                                }
+                                else
+                                {
+                                    var cpuCurve = GetEcFanPresetCurve(cpuPreset);
+                                    var gpuCurve = GetEcFanPresetCurve(gpuPreset);
+                                    var cpuTemps = Universal_x86_Tuning_Utility.Models.EcFanCurve.CpuTemperatures;
+                                    var gpuTemps = Universal_x86_Tuning_Utility.Models.EcFanCurve.GpuTemperatures;
+
+                                    _deviceApplier.ApplyEcFanFromPreset(false, cpuPreset,
+                                        null, cpuCurve.Duties.ToArray(), gpuCurve.Duties.ToArray(),
+                                        cpuTemps, gpuTemps);
+
+                                    lastEcFanCpuPreset = cpuPreset;
+                                    lastEcFanGpuPreset = gpuPreset;
+                                }
+                                lastEcFanUnifiedMode = unified;
+                            }
+                        }
+
                         if (commandString != null && commandString != "") await RyzenAdj_To_UXTU.TranslateAsync(commandString, appliedName: "Adaptive Mode", localizeAppliedName: true);
                     }
 
@@ -1132,15 +1262,20 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
-            adaptivePresetManager = new AdaptivePresetManager(Settings.Default.Path + "adaptivePresets.json");
-            if (cbxPowerPreset.SelectedItem is string presetName)
-            {
-                // Don't reset tracking on navigation — just load the preset UI values
-                loadPreset(presetName, resetTracking: false);
-            }
-
             // Recheck Flydigi card visibility on navigation (device may have connected/disconnected)
             UpdateFlydigiCardVisibility();
+
+            // Defer preset loading to after the first frame renders so the page
+            // appears immediately and control updates happen in a second pass.
+            if (cbxPowerPreset.SelectedItem is string presetName)
+            {
+                Dispatcher.InvokeAsync(() =>
+                {
+                    adaptivePresetManager = new AdaptivePresetManager(Settings.Default.Path + "adaptivePresets.json");
+                    // Don't reset tracking on navigation — just load the preset UI values
+                    loadPreset(presetName, resetTracking: false);
+                }, DispatcherPriority.Loaded);
+            }
         }
 
 
@@ -1692,6 +1827,40 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // Show RGB color controls only for Static (2) and Breathing (3)
             spBs2ProRgb.Visibility = mode is 2 or 3 ? Visibility.Visible : Visibility.Collapsed;
         }
+
+        #endregion
+
+        #region EC Fan Helpers
+
+        private static int GetEcFanPresetIndex(string? presetName) => presetName switch
+        {
+            "Silent" => 0,
+            "Performance" => 2,
+            "Full Speed" => 3,
+            "Off" => 4,
+            "Custom" => 5,
+            _ => 1 // Balanced
+        };
+
+        private static string GetEcFanPresetFromIndex(int index) => index switch
+        {
+            0 => "Silent",
+            2 => "Performance",
+            3 => "Full Speed",
+            4 => "Off",
+            5 => "Custom",
+            _ => "Balanced"
+        };
+
+        private static Universal_x86_Tuning_Utility.Models.EcFanCurve GetEcFanPresetCurve(string? name) => name switch
+        {
+            "Silent" => Universal_x86_Tuning_Utility.Models.EcFanCurve.CreateSilent(),
+            "Balanced" => Universal_x86_Tuning_Utility.Models.EcFanCurve.CreateBalanced(),
+            "Performance" => Universal_x86_Tuning_Utility.Models.EcFanCurve.CreatePerformance(),
+            "Full Speed" => Universal_x86_Tuning_Utility.Models.EcFanCurve.CreateFullSpeed(),
+            "Off" => Universal_x86_Tuning_Utility.Models.EcFanCurve.CreateOff(),
+            _ => Universal_x86_Tuning_Utility.Models.EcFanCurve.CreateBalanced()
+        };
 
         #endregion
     }

@@ -80,6 +80,16 @@ namespace Universal_x86_Tuning_Utility.Services
         public byte Bs2ProRgbB { get; set; } = 255;
         public byte Bs2ProBrightness { get; set; } = 100;
 
+        // EC Fan Control per-game settings
+        public bool EcFanEnabled { get; set; } = false;
+        public bool EcFanUnifiedMode { get; set; } = false;
+        public string EcFanPreset { get; set; } = "Balanced";
+        public int[]? EcFanCustomDuties { get; set; }
+        public string EcFanCpuPreset { get; set; } = "Balanced";
+        public int[]? EcFanCpuCustomDuties { get; set; }
+        public string EcFanGpuPreset { get; set; } = "Balanced";
+        public int[]? EcFanGpuCustomDuties { get; set; }
+
         [DefaultValue(true)]
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]
         public bool isAutoSwitch { get; set; }

@@ -19,11 +19,13 @@
       UseLayoutRounding="True"
       ScrollViewer.CanContentScroll="False">
 
-    <Grid Margin="18,10,18,18">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+    <Grid>
+        <!-- Content Grid with margins -->
+        <Grid Margin="18,10,18,18">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
         <!-- Scrollable content -->
         <ScrollViewer Grid.Row="0"
@@ -445,7 +447,7 @@
         </ScrollViewer>
 
         <!-- Bottom bar: status (left) + buttons (right) -->
-        <Grid Grid.Row="1" Margin="0,14,0,-2">
+        <Grid x:Name="bottomBar" Grid.Row="1" Margin="0,14,0,-2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -487,7 +489,7 @@
             </ui:Button>
             <ui:Button x:Name="btnRestore"
                        MinWidth="138"
-                       Margin="0,0,8,0"
+                       Margin="0,0,0,0"
                        Click="btnRestore_Click"
                        ToolTip="Undo all custom fan curves and let the system manage fan speeds automatically.">
                 <StackPanel Orientation="Horizontal">
@@ -495,17 +497,19 @@
                     <TextBlock Text="Restore Auto" />
                 </StackPanel>
             </ui:Button>
-            <ui:Button x:Name="btnApplyCurve"
-                       MinWidth="150"
-                       Margin="0,0,0,0"
-                       Appearance="Primary"
-                       Click="btnApplyCurve_Click">
-                <StackPanel Orientation="Horizontal">
-                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8FB;" Margin="0,0,12,0" />
-                    <TextBlock Text="Apply Curve" />
-                </StackPanel>
-            </ui:Button>
             </WrapPanel>
         </Grid>
+
+        </Grid>
+        <!-- End Content Grid -->
+
+        <!-- Dark overlay for Adaptive Mode override (full-page, outside margins) -->
+        <Border x:Name="overlayAdaptiveWarning" Visibility="Collapsed" Background="Black" Opacity="0.4" CornerRadius="4"/>
+
+        <!-- Page-scoped snackbar presenter -->
+        <ui:SnackbarPresenter x:Name="SnackbarPresenter"
+                              Margin="12"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Bottom" />
     </Grid>
 </Page>

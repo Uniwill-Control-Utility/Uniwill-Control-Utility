@@ -462,7 +462,7 @@
         </ScrollViewer>
 
         <!-- Dark overlay for Adaptive Mode override (covers ScrollViewer to block input) -->
-        <Grid x:Name="overlayAdaptiveWarning" Visibility="Collapsed" Background="Black" Opacity="0.4"/>
+        <Border x:Name="overlayAdaptiveWarning" Visibility="Collapsed" Background="Black" Opacity="0.4" CornerRadius="4"/>
 
         <!-- Page-scoped snackbar presenter for Adaptive Mode override warning -->
         <ui:SnackbarPresenter x:Name="SnackbarPresenter"
