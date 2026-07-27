@@ -18,6 +18,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
     {
         private readonly INavigationService _navigationService;
         private readonly IHardwareMonitoringService _hardwareMonitoring;
+        private readonly UniwillECService? _uniwillEc;
         private readonly WaterCoolerService _waterCoolerService;
         private readonly FlydigiCoolerService _flydigiService;
         private readonly Bs1Service _bs1Service;
@@ -27,6 +28,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
         public DashboardViewModel(
             INavigationService navigationService,
             IHardwareMonitoringService hardwareMonitoring,
+            UniwillECService? uniwillEc,
             WaterCoolerService waterCoolerService,
             FlydigiCoolerService flydigiService,
             Bs1Service bs1Service)
@@ -35,6 +37,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                 ?? throw new ArgumentNullException(nameof(navigationService));
             _hardwareMonitoring = hardwareMonitoring
                 ?? throw new ArgumentNullException(nameof(hardwareMonitoring));
+            _uniwillEc = uniwillEc;
             _waterCoolerService = waterCoolerService;
             _flydigiService = flydigiService;
             _bs1Service = bs1Service;
@@ -52,6 +55,23 @@ namespace Universal_x86_Tuning_Utility.ViewModels
             try
             {
                 HardwareMetricsSnapshot snapshot = _hardwareMonitoring.ReadSnapshot();
+
+                // Enrich with EC fan speed data if available
+                if (_uniwillEc is not null)
+                {
+                    try
+                    {
+                        int cpuPwm = _uniwillEc.GetFanPwm(0);
+                        int gpuPwm = _uniwillEc.GetFanPwm(1);
+                        snapshot = snapshot with
+                        {
+                            CpuFanSpeed = (int)Math.Round(cpuPwm * 100.0 / 200.0),
+                            GpuFanSpeed = (int)Math.Round(gpuPwm * 100.0 / 200.0)
+                        };
+                    }
+                    catch { /* EC read failed, fan speed stays 0 */ }
+                }
+
                 MetricsUpdated?.Invoke(this, snapshot);
             }
             catch
@@ -183,10 +203,19 @@ namespace Universal_x86_Tuning_Utility.ViewModels
             Debug.WriteLine(
                 $"INFO | {nameof(DashboardViewModel)} navigated to.");
 
-            // Acquire hardware monitoring lease on a background thread to avoid
-            // blocking the UI while LibreHardwareMonitor probes hardware on first use.
+            // Initialize EC and acquire hardware monitoring lease on a background
+            // thread to avoid blocking the UI while probes run.
             _ = System.Threading.Tasks.Task.Run(() =>
             {
+                if (_uniwillEc is not null)
+                {
+                    try
+                    {
+                        _uniwillEc.Initialize();
+                    }
+                    catch { /* EC not available on this hardware */ }
+                }
+
                 _lease = _hardwareMonitoring.Acquire(
                     HardwareMonitoringCategory.Cpu |
                     HardwareMonitoringCategory.Gpu |
@@ -210,8 +239,16 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                 $"INFO | {nameof(DashboardViewModel)} navigated from.");
 
             _refreshTimer.IsEnabled = false;
-            _lease?.Dispose();
+
+            // Dispose lease on a background thread to avoid _computer.Close()
+            // blocking the UI during navigation.
+            var lease = _lease;
             _lease = null;
+
+            if (lease is not null)
+            {
+                _ = System.Threading.Tasks.Task.Run(() => lease.Dispose());
+            }
 
             return Task.CompletedTask;
         }
