@@ -45,9 +45,11 @@ namespace Universal_x86_Tuning_Utility.ViewModels
         private string _lastAppliedSettingsToolTip = string.Empty;
 
         private ICommand? _navigateCommand;
+        private readonly UniwillECService? _uniwillEc;
 
-        public MainWindowViewModel(INavigationService navigationService)
+        public MainWindowViewModel(INavigationService navigationService, UniwillECService? uniwillEc = null)
         {
+            _uniwillEc = uniwillEc;
             InitializeViewModel();
             LocalizationService.CultureChanged += OnCultureChanged;
             LastAppliedSettingsService.Changed += OnLastAppliedSettingsChanged;
@@ -83,6 +85,12 @@ namespace Universal_x86_Tuning_Utility.ViewModels
             // Flydigi cooler in footer
             NavigationFooter.Add(CreateFlydigiNavItem());
 
+            // Fan Control in footer for Uniwill EC hardware (XMG / TUXEDO)
+            if (_uniwillEc is not null && _uniwillEc.Initialize())
+            {
+                NavigationFooter.Add(CreateNavigationItem("Fan Control", "fancontrol", SymbolRegular.Gauge24, typeof(Views.Pages.FanControl)));
+            }
+
             // Settings at the bottom of footer
             NavigationFooter.Add(CreateNavigationItem("Settings", "settings", SymbolRegular.Settings24, typeof(Views.Pages.SettingsPage)));
 
@@ -109,6 +117,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                     "overlay" => SymbolRegular.DesktopPulse24,
                     "auto" => SymbolRegular.Transmission24,
                     "watercooler" => SymbolRegular.Water24,
+                    "fancontrol" => SymbolRegular.Gauge24,
                     "settings" => SymbolRegular.Settings24,
                     _ => SymbolRegular.Empty
                 };

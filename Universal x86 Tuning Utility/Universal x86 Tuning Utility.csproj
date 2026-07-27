@@ -198,6 +198,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="ACPIDriverDll.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="ADLX_3DSettings.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

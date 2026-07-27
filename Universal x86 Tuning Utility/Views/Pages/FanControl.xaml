@@ -13,16 +13,18 @@
       d:DesignWidth="800"
       Title="Fan Control"
       Loaded="Page_Loaded"
+      Unloaded="Page_Unloaded"
       SnapsToDevicePixels="True"
       UseLayoutRounding="True">
 
     <StackPanel Margin="18,10,18,18">
-        <TextBlock FontSize="26" FontWeight="Medium" Text="Fan Control Test" />
+        <TextBlock FontSize="26" FontWeight="Medium" Text="Fan Control" />
         <TextBlock Margin="0,4,0,12"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                   Text="Validate the loaded fan configuration and test direct fan-control commands."
+                   Text="Manage fan speeds and temperature curves for your device."
                    TextWrapping="Wrap" />
 
+        <!-- Config info card -->
         <ui:CardControl Icon="{ui:SymbolIcon Grid20}">
             <ui:CardControl.Header>
                 <Grid>
@@ -50,82 +52,102 @@
             </ui:CardControl.Header>
         </ui:CardControl>
 
-        <ui:CardControl Margin="0,8,0,0" Icon="{ui:SymbolIcon Gauge20}">
+        <!-- Status card -->
+        <ui:CardControl Margin="0,8,0,0" Icon="{ui:SymbolIcon Info20}">
             <ui:CardControl.Header>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock VerticalAlignment="Center" FontWeight="DemiBold" Text="Fan curve test" />
+                <StackPanel>
+                    <TextBlock FontWeight="DemiBold" Text="Status" />
                     <TextBlock x:Name="tbFanSpeed"
-                               Grid.Column="1"
-                               Margin="12,0,0,0"
-                               VerticalAlignment="Center"
+                               Margin="0,4,0,0"
+                               FontSize="14"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                TextWrapping="Wrap" />
-                </Grid>
+                </StackPanel>
             </ui:CardControl.Header>
         </ui:CardControl>
 
-        <ui:CardControl Margin="0,8,0,0" Icon="{ui:SymbolIcon Gauge20}">
-            <ui:CardControl.Header>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Margin="0,0,18,0">
-                        <TextBlock FontWeight="DemiBold" Text="Manual fan speed" />
-                        <TextBlock Margin="0,2,0,0"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                   Text="Set the requested fan speed as a percentage."
-                                   TextWrapping="Wrap" />
+        <!-- Uniwill-specific controls -->
+        <StackPanel x:Name="UniwillAvailable">
+            <!-- Manual fan speed -->
+            <ui:CardControl Margin="0,8,0,0" Icon="{ui:SymbolIcon Gauge20}">
+                <ui:CardControl.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,18,0">
+                            <TextBlock FontWeight="DemiBold" Text="Manual fan speed" />
+                            <TextBlock Margin="0,2,0,0"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       Text="Set the requested fan speed as a percentage."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ui:NumberBox x:Name="nudFanSpeed"
+                                      Grid.Column="1"
+                                      Width="160"
+                                      Minimum="0"
+                                      Maximum="100"
+                                      Value="50"
+                                      SmallChange="1"
+                                      MaxDecimalPlaces="0" />
+                    </Grid>
+                </ui:CardControl.Header>
+            </ui:CardControl>
+
+            <!-- Action buttons -->
+            <WrapPanel Margin="0,14,0,0" HorizontalAlignment="Right">
+                <ui:Button x:Name="btnRestore"
+                           MinWidth="138"
+                           Margin="0,0,8,8"
+                           Click="btnRestore_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="ArrowReset20" Margin="0,0,7,0" />
+                        <TextBlock Text="Restore Auto" />
                     </StackPanel>
-                    <ui:NumberBox x:Name="nudFanSpeed"
-                                  Grid.Column="1"
-                                  Width="160"
-                                  Minimum="0"
-                                  Maximum="100"
-                                  Value="50"
-                                  SmallChange="1"
-                                  MaxDecimalPlaces="0" />
-                </Grid>
+                </ui:Button>
+                <ui:Button x:Name="btnReload"
+                           MinWidth="138"
+                           Margin="0,0,8,8"
+                           Click="btnReload_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="ArrowSync20" Margin="0,0,7,0" />
+                        <TextBlock Text="Refresh" />
+                    </StackPanel>
+                </ui:Button>
+                <ui:Button x:Name="btnFanCurve"
+                           MinWidth="138"
+                           Margin="0,0,8,8"
+                           Click="btnFanCurve_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Pulse20" Margin="0,0,7,0" />
+                        <TextBlock Text="Test Fan Curve" />
+                    </StackPanel>
+                </ui:Button>
+                <ui:Button x:Name="btnFanSpeed"
+                           MinWidth="150"
+                           Margin="0,0,0,8"
+                           Appearance="Primary"
+                           Click="btnFanSpeed_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Gauge20" Margin="0,0,7,0" />
+                        <TextBlock Text="Set Fan Speed" />
+                    </StackPanel>
+                </ui:Button>
+            </WrapPanel>
+        </StackPanel>
+
+        <!-- Fallback when Uniwill EC is not available -->
+        <ui:CardControl x:Name="UniwillUnavailable"
+                        Margin="0,8,0,0"
+                        Icon="{ui:SymbolIcon Info20}"
+                        Visibility="Collapsed">
+            <ui:CardControl.Header>
+                <TextBlock Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           Text="Uniwill EC hardware not detected on this device. Fan controls are unavailable."
+                           TextWrapping="Wrap" />
             </ui:CardControl.Header>
         </ui:CardControl>
-
-        <WrapPanel Margin="0,14,0,0" HorizontalAlignment="Right">
-            <ui:Button x:Name="btnReload" MinWidth="138" Margin="0,0,8,8" Click="btnReload_Click">
-                <StackPanel Orientation="Horizontal">
-                    <ui:SymbolIcon Symbol="ArrowSync20" Margin="0,0,7,0" />
-                    <TextBlock Text="Reload Config" />
-                </StackPanel>
-            </ui:Button>
-            <ui:Button x:Name="btnFanCurve" MinWidth="138" Margin="0,0,8,8" Click="btnFanCurve_Click">
-                <StackPanel Orientation="Horizontal">
-                    <ui:SymbolIcon Symbol="Pulse20" Margin="0,0,7,0" />
-                    <TextBlock Text="Test Fan Curve" />
-                </StackPanel>
-            </ui:Button>
-            <ui:Button x:Name="btnFanSpeed" MinWidth="150" Margin="0,0,8,8" Appearance="Primary" Click="btnFanSpeed_Click">
-                <StackPanel Orientation="Horizontal">
-                    <ui:SymbolIcon Symbol="Gauge20" Margin="0,0,7,0" />
-                    <TextBlock Text="Update Fan Speed" />
-                </StackPanel>
-            </ui:Button>
-            <ui:Button x:Name="btnEn" MinWidth="152" Margin="0,0,8,8" Appearance="Success" Click="btnEn_Click">
-                <StackPanel Orientation="Horizontal">
-                    <ui:SymbolIcon Symbol="Play20" Margin="0,0,7,0" />
-                    <TextBlock Text="Enable Fan Control" />
-                </StackPanel>
-            </ui:Button>
-            <ui:Button x:Name="btnDis" MinWidth="152" Margin="0,0,0,8" Appearance="Danger" Click="btnDis_Click">
-                <StackPanel Orientation="Horizontal">
-                    <ui:SymbolIcon Symbol="Delete20" Margin="0,0,7,0" />
-                    <TextBlock Text="Disable Fan Control" />
-                </StackPanel>
-            </ui:Button>
-        </WrapPanel>
     </StackPanel>
 </Page>
