@@ -4,6 +4,7 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:local="clr-namespace:Universal_x86_Tuning_Utility.Views.Pages"
+      xmlns:controls="clr-namespace:Universal_x86_Tuning_Utility.Views.Controls"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       d:DataContext="{d:DesignInstance local:FanControl, IsDesignTimeCreatable=False}"
       d:Background="{DynamicResource ApplicationBackgroundBrush}"
@@ -15,139 +16,496 @@
       Loaded="Page_Loaded"
       Unloaded="Page_Unloaded"
       SnapsToDevicePixels="True"
-      UseLayoutRounding="True">
+      UseLayoutRounding="True"
+      ScrollViewer.CanContentScroll="False">
 
-    <StackPanel Margin="18,10,18,18">
-        <TextBlock FontSize="26" FontWeight="Medium" Text="Fan Control" />
-        <TextBlock Margin="0,4,0,12"
-                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                   Text="Manage fan speeds and temperature curves for your device."
-                   TextWrapping="Wrap" />
+    <Grid Margin="18,10,18,18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-        <!-- Config info card -->
-        <ui:CardControl Icon="{ui:SymbolIcon Grid20}">
-            <ui:CardControl.Header>
-                <Grid>
+        <!-- Scrollable content -->
+        <ScrollViewer Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      CanContentScroll="False"
+                      PanningMode="VerticalOnly"
+                      IsDeferredScrollingEnabled="False"
+                      Margin="0,0,-18,0">
+            <ScrollViewer.Style>
+                <Style TargetType="{x:Type ScrollViewer}"
+                       BasedOn="{StaticResource {x:Type ScrollViewer}}">
+                    <Setter Property="Padding" Value="0" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ComputedVerticalScrollBarVisibility, RelativeSource={RelativeSource Self}}"
+                                     Value="Visible">
+                            <Setter Property="Padding" Value="0,0,12,0" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ScrollViewer.Style>
+            <StackPanel>
+                <TextBlock FontSize="26" FontWeight="Medium" Text="Fan Control" />
+                <TextBlock Margin="0,4,0,12"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           Text="Manage fan speeds and temperature curves for your device."
+                           TextWrapping="Wrap" />
+
+                <!-- CPU & GPU status cards side by side -->
+                <Grid Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock VerticalAlignment="Center" FontWeight="DemiBold" Text="Fan configuration" />
-                    <TextBlock x:Name="tbConfigName"
-                               Grid.Column="1"
-                               Margin="12,0"
-                               VerticalAlignment="Center"
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                               TextWrapping="Wrap" />
-                    <ui:Button x:Name="btnCopy"
-                               Grid.Column="2"
-                               MinWidth="84"
-                               Click="btnCopy_Click">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Copy" />
-                        </StackPanel>
-                    </ui:Button>
+
+                    <controls:CpuControl x:Name="CpuControl" Grid.Column="0" />
+                    <controls:GpuControl x:Name="GpuControl" Grid.Column="2" />
                 </Grid>
-            </ui:CardControl.Header>
-        </ui:CardControl>
 
-        <!-- Status card -->
-        <ui:CardControl Margin="0,8,0,0" Icon="{ui:SymbolIcon Info20}">
-            <ui:CardControl.Header>
-                <StackPanel>
-                    <TextBlock FontWeight="DemiBold" Text="Status" />
-                    <TextBlock x:Name="tbFanSpeed"
-                               Margin="0,4,0,0"
-                               FontSize="14"
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                               TextWrapping="Wrap" />
-                </StackPanel>
-            </ui:CardControl.Header>
-        </ui:CardControl>
+               <!-- Uniwill-specific controls -->
+                <StackPanel x:Name="UniwillAvailable">
+                    <!-- Info banner -->
+                    <Border x:Name="InfoBanner"
+                            Margin="0,8,0,0"
+                            Padding="14,12"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}"
+                            CornerRadius="4">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ui:FontIcon x:Name="InfoBannerIcon"
+                                         FontFamily="Segoe Fluent Icons"
+                                         Glyph="&#xE946;"
+                                         FontSize="16"
+                                         Margin="0,0,10,0"
+                                         VerticalAlignment="Center" />
+                            <TextBlock x:Name="InfoBannerText"
+                                       Grid.Column="1"
+                                       Text="Default fan curve profiles cannot be edited, switch to Custom in order to make a personalized curve."
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
 
-        <!-- Uniwill-specific controls -->
-        <StackPanel x:Name="UniwillAvailable">
-            <!-- Manual fan speed -->
-            <ui:CardControl Margin="0,8,0,0" Icon="{ui:SymbolIcon Gauge20}">
-                <ui:CardControl.Header>
+                    <!-- Unified curve toggle with expander -->
+                    <ui:CardExpander x:Name="UnifiedCard"
+                                     Margin="0,8,0,0"
+                                     IsExpanded="False"
+                                     Expanded="UnifiedCard_Expanded"
+                                     Collapsed="UnifiedCard_Collapsed"
+                                     Loaded="UnifiedCard_Loaded">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEA3C;" FontSize="20" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock FontWeight="DemiBold" Text="Unified Fan Curve" />
+                                    <TextBlock FontSize="12"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                               Text="When enabled, a single curve controls both CPU and GPU fans."
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="tsUnifiedCurve"
+                                                 Grid.Column="1"
+                                                 Margin="0,0,9,0"
+                                                 IsChecked="False"
+                                                 Checked="tsUnifiedCurve_Checked"
+                                                 Unchecked="tsUnifiedCurve_Unchecked" />
+                            </Grid>
+                        </ui:CardExpander.Header>
+
+                        <!-- Unified curve editor (expander content) -->
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock FontSize="12"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Drag the sliders to set fan speed at each temperature."
+                                           TextWrapping="Wrap"
+                                           VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <TextBlock Margin="0,0,6,0"
+                                               FontSize="12"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                               Text="Profile:"
+                                               VerticalAlignment="Center" />
+                                    <ComboBox x:Name="cbPreset"
+                                              Width="140"
+                                              Padding="8,4"
+                                              FontSize="12"
+                                              SelectionChanged="cbPreset_SelectionChanged">
+                                        <ComboBoxItem Content="Silent" />
+                                        <ComboBoxItem Content="Balanced" />
+                                        <ComboBoxItem Content="Performance" />
+                                        <ComboBoxItem Content="Full Speed" />
+                                        <ComboBoxItem Content="Off" />
+                                        <ComboBoxItem Content="Custom" />
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+                            <controls:EcFanCurveEditor x:Name="FanCurveEditor" Margin="0,8,0,0" />
+
+                            <!-- Unified temperature thresholds editor -->
+                            <ui:CardExpander Margin="0,8,0,0"
+                                             Header="Thermal Thresholds"
+                                             IsExpanded="False">
+                                <ui:CardExpander.Icon>
+                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C3;" FontSize="16" />
+                                </ui:CardExpander.Icon>
+                                <StackPanel>
+                                    <TextBlock FontSize="11"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Set the temperature (°C) at which each fan speed zone activates. Index 0 is the OFF threshold."
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,0,8" />
+                                    <UniformGrid x:Name="ugUnifiedTemps"
+                                                 Columns="11" Rows="1"
+                                                 Margin="0,0,0,4">
+                                        <!-- Row of zone labels -->
+                                    </UniformGrid>
+                                    <UniformGrid x:Name="ugUnifiedTempInputs"
+                                                 Columns="11" Rows="1" />
+                                            <ui:Button Margin="0,8,0,0"
+                                                       HorizontalAlignment="Left"
+                                                       Appearance="Transparent"
+                                                       Click="btnResetUnifiedTemps_Click">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" Margin="0,0,4,0" />
+                                                    <TextBlock Text="Reset to Default" />
+                                                </StackPanel>
+                                            </ui:Button>
+                                </StackPanel>
+                            </ui:CardExpander>
+                        </StackPanel>
+                    </ui:CardExpander>
+
+                    <!-- CPU & GPU Fan curve editors side by side (visible when unified is OFF) -->
+                    <StackPanel x:Name="SplitCurvePanel" Margin="0,8,0,0">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Margin="0,0,18,0">
-                            <TextBlock FontWeight="DemiBold" Text="Manual fan speed" />
-                            <TextBlock Margin="0,2,0,0"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                       Text="Set the requested fan speed as a percentage."
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                        <ui:NumberBox x:Name="nudFanSpeed"
-                                      Grid.Column="1"
-                                      Width="160"
-                                      Minimum="0"
-                                      Maximum="100"
-                                      Value="50"
-                                      SmallChange="1"
-                                      MaxDecimalPlaces="0" />
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- CPU card -->
+                        <ui:CardControl Grid.Row="0" Grid.Column="0">
+                            <ui:CardControl.Header>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid Grid.Row="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:FontIcon Grid.Column="0"
+                                                     FontFamily="Segoe Fluent Icons"
+                                                     Glyph="&#xEEA1;"
+                                                     FontSize="20"
+                                                     Margin="0,0,12,0"
+                                                     VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock FontWeight="DemiBold" Text="CPU Fan Curve" />
+                                            <TextBlock FontSize="12"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Drag the sliders to set fan speed at each temperature."
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ComboBox x:Name="cbCpuPreset"
+                                                  Grid.Column="2"
+                                                  Width="120"
+                                                  Padding="8,4"
+                                                  FontSize="12"
+                                                  SelectionChanged="cbCpuPreset_SelectionChanged"
+                                                  HorizontalAlignment="Right">
+                                            <ComboBoxItem Content="Silent" />
+                                            <ComboBoxItem Content="Balanced" />
+                                            <ComboBoxItem Content="Performance" />
+                                            <ComboBoxItem Content="Full Speed" />
+                                            <ComboBoxItem Content="Off" />
+                                            <ComboBoxItem Content="Custom" />
+                                        </ComboBox>
+                                    </Grid>
+                                    <Separator Grid.Row="1"
+                                               Margin="0,8,0,8"
+                                               Background="{DynamicResource ControlFillColorDefaultBrush}" />
+                                    <controls:EcFanCurveEditor x:Name="CpuFanCurveEditor"
+                                                               Grid.Row="2" />
+                                </Grid>
+                            </ui:CardControl.Header>
+                        </ui:CardControl>
+
+                        <!-- GPU card -->
+                        <ui:CardControl Grid.Row="0" Grid.Column="2">
+                            <ui:CardControl.Header>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid Grid.Row="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:FontIcon Grid.Column="0"
+                                                     FontFamily="Segoe Fluent Icons"
+                                                     Glyph="&#xE964;"
+                                                     FontSize="20"
+                                                     Margin="0,0,12,0"
+                                                     VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock FontWeight="DemiBold" Text="GPU Fan Curve" />
+                                            <TextBlock FontSize="12"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Applies when GPU crosses temperature thresholds."
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ComboBox x:Name="cbGpuPreset"
+                                                  Grid.Column="2"
+                                                  Width="120"
+                                                  Padding="8,4"
+                                                  FontSize="12"
+                                                  SelectionChanged="cbGpuPreset_SelectionChanged"
+                                                  HorizontalAlignment="Right">
+                                            <ComboBoxItem Content="Silent" />
+                                            <ComboBoxItem Content="Balanced" />
+                                            <ComboBoxItem Content="Performance" />
+                                            <ComboBoxItem Content="Full Speed" />
+                                            <ComboBoxItem Content="Off" />
+                                            <ComboBoxItem Content="Custom" />
+                                        </ComboBox>
+                                    </Grid>
+                                    <Separator Grid.Row="1"
+                                               Margin="0,8,0,8"
+                                               Background="{DynamicResource ControlFillColorDefaultBrush}" />
+                                    <controls:EcFanCurveEditor x:Name="GpuFanCurveEditor"
+                                                               Grid.Row="2" />
+                                </Grid>
+                            </ui:CardControl.Header>
+                        </ui:CardControl>
+
+                            <!-- Merged temperature thresholds editor for both CPU and GPU -->
+                            <ui:CardExpander Grid.Row="1"
+                                         Grid.ColumnSpan="3"
+                                         Margin="0,8,0,0"
+                                         Header="Thermal Thresholds"
+                                         IsExpanded="False">
+                            <ui:CardExpander.Icon>
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C3;" FontSize="16" />
+                            </ui:CardExpander.Icon>
+                            <StackPanel>
+                                <TextBlock FontSize="11"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Set the temperature (°C) at which each fan speed zone activates."
+                                           TextWrapping="Wrap"
+                                           Margin="0,0,0,8" />
+
+                                <!-- Side by side: CPU left, GPU right -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- CPU -->
+                                    <Border Grid.Column="0"
+                                            BorderBrush="{DynamicResource ControlFillColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="4"
+                                            Padding="12,8">
+                                        <StackPanel>
+                                            <TextBlock FontWeight="SemiBold"
+                                                       FontSize="12"
+                                                       Text="CPU"
+                                                       HorizontalAlignment="Center"
+                                                       Margin="0,0,0,8" />
+                                            <UniformGrid x:Name="ugCpuTemps"
+                                                         Columns="11" Rows="1"
+                                                         Margin="0,0,0,2" />
+                                            <UniformGrid x:Name="ugCpuTempInputs"
+                                                         Columns="11" Rows="1"
+                                                         Margin="0,0,0,8" />
+                                            <ui:Button HorizontalAlignment="Right"
+                                                       Appearance="Transparent"
+                                                       Click="btnResetCpuTemps_Click">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" Margin="0,0,4,0" />
+                                                    <TextBlock Text="Reset to Default" />
+                                                </StackPanel>
+                                            </ui:Button>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- GPU -->
+                                    <Border Grid.Column="2"
+                                            BorderBrush="{DynamicResource ControlFillColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="4"
+                                            Padding="12,8">
+                                        <StackPanel>
+                                            <TextBlock FontWeight="SemiBold"
+                                                       FontSize="12"
+                                                       Text="GPU"
+                                                       HorizontalAlignment="Center"
+                                                       Margin="0,0,0,8" />
+                                            <UniformGrid x:Name="ugGpuTemps"
+                                                         Columns="11" Rows="1"
+                                                         Margin="0,0,0,2" />
+                                            <UniformGrid x:Name="ugGpuTempInputs"
+                                                         Columns="11" Rows="1"
+                                                         Margin="0,0,0,8" />
+                                            <ui:Button HorizontalAlignment="Right"
+                                                       Appearance="Transparent"
+                                                       Click="btnResetGpuTemps_Click">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" Margin="0,0,4,0" />
+                                                    <TextBlock Text="Reset to Default" />
+                                                </StackPanel>
+                                            </ui:Button>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </ui:CardExpander>
                     </Grid>
-                </ui:CardControl.Header>
-            </ui:CardControl>
+                    </StackPanel>
 
-            <!-- Action buttons -->
-            <WrapPanel Margin="0,14,0,0" HorizontalAlignment="Right">
-                <ui:Button x:Name="btnRestore"
-                           MinWidth="138"
-                           Margin="0,0,8,8"
-                           Click="btnRestore_Click">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="ArrowReset20" Margin="0,0,7,0" />
-                        <TextBlock Text="Restore Auto" />
-                    </StackPanel>
-                </ui:Button>
-                <ui:Button x:Name="btnReload"
-                           MinWidth="138"
-                           Margin="0,0,8,8"
-                           Click="btnReload_Click">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="ArrowSync20" Margin="0,0,7,0" />
-                        <TextBlock Text="Refresh" />
-                    </StackPanel>
-                </ui:Button>
-                <ui:Button x:Name="btnFanCurve"
-                           MinWidth="138"
-                           Margin="0,0,8,8"
-                           Click="btnFanCurve_Click">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Pulse20" Margin="0,0,7,0" />
-                        <TextBlock Text="Test Fan Curve" />
-                    </StackPanel>
-                </ui:Button>
-                <ui:Button x:Name="btnFanSpeed"
-                           MinWidth="150"
-                           Margin="0,0,0,8"
-                           Appearance="Primary"
-                           Click="btnFanSpeed_Click">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Gauge20" Margin="0,0,7,0" />
-                        <TextBlock Text="Set Fan Speed" />
-                    </StackPanel>
-                </ui:Button>
+                    <!-- Fan Turbo toggle -->
+                    <ui:CardControl Margin="0,8,0,0"
+                                    Background="#200000">
+                        <ui:CardControl.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xECAD;" FontSize="20" />
+                        </ui:CardControl.Icon>
+                        <ui:CardControl.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock FontWeight="DemiBold" Text="Fan Turbo" />
+                                    <TextBlock FontSize="12"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                               Text="Force fans to maximum speed. Toggle off to restore previous settings."
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="tsTurbo"
+                                                 Grid.Column="1"
+                                                 Margin="0,0,9,0"
+                                                 Checked="tsTurbo_Checked"
+                                                 Unchecked="tsTurbo_Unchecked" />
+                            </Grid>
+                        </ui:CardControl.Header>
+                    </ui:CardControl>
+                </StackPanel>
+
+                <!-- Fallback when Uniwill EC is not available -->
+                <ui:CardControl x:Name="UniwillUnavailable"
+                                Margin="0,8,0,0"
+                                Visibility="Collapsed">
+                    <ui:CardControl.Icon>
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BA;" FontSize="20" />
+                    </ui:CardControl.Icon>
+                    <ui:CardControl.Header>
+                        <TextBlock Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Uniwill EC hardware not detected on this device. Fan controls are unavailable."
+                                   TextWrapping="Wrap" />
+                    </ui:CardControl.Header>
+                </ui:CardControl>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Bottom bar: status (left) + buttons (right) -->
+        <Grid Grid.Row="1" Margin="0,14,0,-2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Status indicator (left) -->
+            <Border Grid.Column="0"
+                    Padding="12,8"
+                    BorderThickness="1"
+                    BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}"
+                    CornerRadius="4"
+                    VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal">
+                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;"
+                                 Margin="0,0,12,0"
+                                 VerticalAlignment="Center" />
+                    <TextBlock x:Name="StatusText"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               Text="Ready" />
+                </StackPanel>
+            </Border>
+
+            <!-- Action buttons (right) -->
+            <WrapPanel Grid.Column="1"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Center">
+                <ui:Button x:Name="btnResetFanState"
+                       MinWidth="150"
+                       Margin="0,0,8,0"
+                       Appearance="Danger"
+                       Click="btnResetFanState_Click"
+                       ToolTip="Force fans to 100% and reset the EC fan controller. Use if fans are stuck or behaving erratically.">
+                <StackPanel Orientation="Horizontal">
+                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" Margin="0,0,12,0" />
+                    <TextBlock Text="Reset Fan State" />
+                </StackPanel>
+            </ui:Button>
+            <ui:Button x:Name="btnRestore"
+                       MinWidth="138"
+                       Margin="0,0,8,0"
+                       Click="btnRestore_Click"
+                       ToolTip="Undo all custom fan curves and let the system manage fan speeds automatically.">
+                <StackPanel Orientation="Horizontal">
+                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE777;" Margin="0,0,12,0" />
+                    <TextBlock Text="Restore Auto" />
+                </StackPanel>
+            </ui:Button>
+            <ui:Button x:Name="btnApplyCurve"
+                       MinWidth="150"
+                       Margin="0,0,0,0"
+                       Appearance="Primary"
+                       Click="btnApplyCurve_Click">
+                <StackPanel Orientation="Horizontal">
+                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8FB;" Margin="0,0,12,0" />
+                    <TextBlock Text="Apply Curve" />
+                </StackPanel>
+            </ui:Button>
             </WrapPanel>
-        </StackPanel>
-
-        <!-- Fallback when Uniwill EC is not available -->
-        <ui:CardControl x:Name="UniwillUnavailable"
-                        Margin="0,8,0,0"
-                        Icon="{ui:SymbolIcon Info20}"
-                        Visibility="Collapsed">
-            <ui:CardControl.Header>
-                <TextBlock Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           Text="Uniwill EC hardware not detected on this device. Fan controls are unavailable."
-                           TextWrapping="Wrap" />
-            </ui:CardControl.Header>
-        </ui:CardControl>
-    </StackPanel>
+        </Grid>
+    </Grid>
 </Page>
