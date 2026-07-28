@@ -69,7 +69,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 return;
             }
 
-            ModifierKeys modifiers = Keyboard.Modifiers;
+            ModifierKeys modifiers = System.Windows.Input.Keyboard.Modifiers;
             var value = new StringBuilder();
 
             if (modifiers.HasFlag(ModifierKeys.Control))

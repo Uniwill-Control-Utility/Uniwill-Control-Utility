@@ -43,5 +43,21 @@
   "Imported {0} custom presets and {1} adaptive mode presets.": "Imported {0} custom presets and {1} adaptive mode presets.",
   "Preset import failed": "Preset import failed",
   "The selected file is not a valid UXTU preset backup.": "The selected file is not a valid UXTU preset backup.",
-  "The presets could not be imported.\n\n{0}": "The presets could not be imported.\n\n{0}"
+  "The presets could not be imported.\n\n{0}": "The presets could not be imported.\n\n{0}",
+  "Keyboard": "Keyboard",
+  "Customize your keyboard backlight color, brightness, and effects.": "Customize your keyboard backlight color, brightness, and effects.",
+  "Keyboard Backlight": "Keyboard Backlight",
+  "Turn the keyboard backlight on or off.": "Turn the keyboard backlight on or off.",
+  "Effect": "Effect",
+  "Choose a lighting effect for your keyboard.": "Choose a lighting effect for your keyboard.",
+  "Static Color": "Static Color",
+  "Logo": "Logo",
+  "Rainbow": "Rainbow",
+  "Color": "Color",
+  "Select a custom color for your keyboard backlight.": "Select a custom color for your keyboard backlight.",
+  "Brightness": "Brightness",
+  "Adjust the keyboard backlight brightness level.": "Adjust the keyboard backlight brightness level.",
+  "Your keyboard has white backlight only. Color and effect options are not available, but you can still adjust the brightness.": "Your keyboard has white backlight only. Color and effect options are not available, but you can still adjust the brightness.",
+  "Keyboard control is not available on this device. This feature requires Uniwill EC hardware (XMG / TUXEDO laptops).": "Keyboard control is not available on this device. This feature requires Uniwill EC hardware (XMG / TUXEDO laptops).",
+  "Applied": "Applied"
 }

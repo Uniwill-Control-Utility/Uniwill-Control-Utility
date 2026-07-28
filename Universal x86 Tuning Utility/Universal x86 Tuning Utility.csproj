@@ -9,7 +9,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>favicon.ico</ApplicationIcon>
     <Platforms>AnyCPU;x64</Platforms>
-    <PackageIcon>favicon.ico</PackageIcon>
+    <PackageIcon>applicationIcon-256.png</PackageIcon>
     <Title>$(AssemblyName)</Title>
     <Authors>JamesCJ60</Authors>
     <UseWindowsForms>True</UseWindowsForms>
@@ -77,7 +77,6 @@
     <None Remove="AMDFamily17.bin" />
     <None Remove="AMDReset.bin" />
     <None Remove="Assets\applicationIcon-1024.png" />
-    <None Remove="Assets\applicationIcon-256.png" />
     <None Remove="Assets\BuiltInScaleModels.json" />
     <None Remove="Assets\config-DT-AM4.png" />
     <None Remove="Assets\config-DT-AM5.png" />
@@ -212,6 +211,10 @@
     </None>
     <None Update="ADLX_PerformanceMetrics.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\applicationIcon-256.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
     </None>
     <None Update="Assets\GameImages\default.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

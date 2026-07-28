@@ -1009,7 +1009,7 @@ namespace Universal_x86_Tuning_Utility.Services
             trigger ^= TRIGGER_RGB_APPLY_COLOR; // toggle bit 5
             WriteECRegister(REG_TRIGGER, trigger);
 
-            DebugLog($"UniwillEC: Set keyboard color to R={red} G={green} B={blue}");
+            DebugLog($"[KBD] UniwillEC: Set keyboard color to R={red} G={green} B={blue}");
         }
 
         /// <summary>
@@ -1026,16 +1026,89 @@ namespace Universal_x86_Tuning_Utility.Services
 
             WriteECRegister(REG_KBD_STATUS, kbdStatus);
 
-            DebugLog($"UniwillEC: Set keyboard brightness to {brightness}");
+            DebugLog($"[KBD] UniwillEC: Set keyboard brightness to {brightness}");
         }
 
         /// <summary>
-        /// Returns true if the keyboard supports RGB (not white-only).
+        /// Returns true if the keyboard supports RGB (not white-only) based on SUPPORT_2 register.
         /// </summary>
         public bool IsRgbKeyboard()
         {
             byte support2 = ReadECRegister(REG_SUPPORT_2);
-            return (support2 & RGB_KEYBOARD) != 0;
+            bool isRgb = (support2 & RGB_KEYBOARD) != 0;
+            DebugLog($"[KBD] UniwillEC: IsRgbKeyboard check — SUPPORT_2(0x{REG_SUPPORT_2:X4}) = 0x{support2:X2}, RGB bit = {isRgb}");
+            return isRgb;
+        }
+
+        /// <summary>
+        /// Returns true if the keyboard is white-only based on KBD_STATUS register.
+        /// </summary>
+        public bool IsWhiteOnlyKeyboard()
+        {
+            byte kbdStatus = ReadECRegister(REG_KBD_STATUS);
+            DebugLog($"[KBD] UniwillEC: IsWhiteOnlyKeyboard check — KBD_STATUS(0x{REG_KBD_STATUS:X4}) = 0x{kbdStatus:X2}, WHITE_ONLY bit = {(kbdStatus & KBD_WHITE_ONLY) != 0}");
+            return (kbdStatus & KBD_WHITE_ONLY) != 0;
+        }
+
+        /// <summary>
+        /// Enables China mode on BIOS_OEM_2 (0x0782). This is required for RGB keyboard
+        /// control on non-China hardware. Without this, the EC may reject RGB writes.
+        /// </summary>
+        public void SetChinaMode()
+        {
+            byte biosOem2 = ReadECRegister(REG_BIOS_OEM_2);
+            biosOem2 |= ENABLE_CHINA_MODE; // set bit 6
+            WriteECRegister(REG_BIOS_OEM_2, biosOem2);
+            DebugLog($"[KBD] UniwillEC: Set China mode — BIOS_OEM_2(0x{REG_BIOS_OEM_2:X4}) = 0x{biosOem2:X2}");
+        }
+
+        /// <summary>
+        /// Triggers the Logo lighting effect on the keyboard.
+        /// This toggles bit 6 of the TRIGGER register.
+        /// </summary>
+        public void TriggerLogoEffect()
+        {
+            byte trigger = ReadECRegister(REG_TRIGGER);
+            trigger ^= TRIGGER_RGB_LOGO_EFFECT; // toggle bit 6
+            WriteECRegister(REG_TRIGGER, trigger);
+            DebugLog("[KBD] UniwillEC: Triggered Logo keyboard effect");
+        }
+
+        /// <summary>
+        /// Triggers the Rainbow lighting effect on the keyboard.
+        /// This toggles bit 7 of the TRIGGER register.
+        /// </summary>
+        public void TriggerRainbowEffect()
+        {
+            byte trigger = ReadECRegister(REG_TRIGGER);
+            trigger ^= TRIGGER_RGB_RAINBOW_EFFECT; // toggle bit 7
+            WriteECRegister(REG_TRIGGER, trigger);
+            DebugLog("[KBD] UniwillEC: Triggered Rainbow keyboard effect");
+        }
+
+        /// <summary>
+        /// Turns off the keyboard backlight by setting the KBD_POWER_OFF bit.
+        /// </summary>
+        public void TurnOffKeyboard()
+        {
+            byte kbdStatus = ReadECRegister(REG_KBD_STATUS);
+            kbdStatus |= KBD_POWER_OFF; // set bit 1
+            kbdStatus |= KBD_APPLY;     // set bit 4 to tell EC to apply the change
+            WriteECRegister(REG_KBD_STATUS, kbdStatus);
+            DebugLog($"[KBD] UniwillEC: Keyboard backlight turned off (KBD_STATUS = 0x{kbdStatus:X2})");
+        }
+
+        /// <summary>
+        /// Turns on the keyboard backlight by clearing the KBD_POWER_OFF bit.
+        /// </summary>
+        public void TurnOnKeyboard()
+        {
+            byte kbdStatus = ReadECRegister(REG_KBD_STATUS);
+            DebugLog($"[KBD] UniwillEC: TurnOnKeyboard — current KBD_STATUS = 0x{kbdStatus:X2}");
+            kbdStatus &= unchecked((byte)~KBD_POWER_OFF); // clear bit 1
+            kbdStatus |= KBD_APPLY;     // set bit 4 to tell EC to apply the change
+            WriteECRegister(REG_KBD_STATUS, kbdStatus);
+            DebugLog($"[KBD] UniwillEC: Keyboard backlight turned on (writing KBD_STATUS = 0x{kbdStatus:X2})");
         }
 
         /// <summary>

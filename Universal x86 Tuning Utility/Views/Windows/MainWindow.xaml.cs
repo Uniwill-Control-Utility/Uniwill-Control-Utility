@@ -188,11 +188,117 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
                             }
                         }
                     }
+
+                // Apply keyboard RGB settings on startup (runs on background thread)
+                Task.Run(ApplyKeyboardOnStart);
             }
             catch (Exception ex)
             {
                 Log.Logger.Error(ex, "Failed to apply settings on start");
             }
+        }
+
+        /// <summary>Applies persisted keyboard RGB settings at app startup.</summary>
+        private void ApplyKeyboardOnStart()
+        {
+            try
+            {
+                var hidService = new KeyboardHidService();
+                if (!hidService.Open())
+                {
+                    hidService.Dispose();
+                    return;
+                }
+
+                var settings = KeyboardSettingsService.Load();
+
+                if (settings.PowerOn)
+                {
+                    int brightnessPercent = (settings.Brightness * 100) / 7;
+                    hidService.TurnOn(settings.ColorR, settings.ColorG, settings.ColorB, brightnessPercent);
+
+                    // Send multi-color palette for effects that need it
+                    if (Universal_x86_Tuning_Utility.Views.Pages.Keyboard.IsMultiColor7Effect(settings.EffectMode))
+                    {
+                        var colors = ParseKeyboardColorString(settings.MultiColors, 7);
+                        if (colors.Count > 0)
+                        {
+                            // Marquee displays colors in reverse order on the HID controller
+                            if (settings.EffectMode == Universal_x86_Tuning_Utility.Models.KeyboardEffect.Marquee)
+                                colors = colors.AsEnumerable().Reverse().ToList();
+                            hidService.SetMultiColor(colors);
+                        }
+                    }
+                    else if (Universal_x86_Tuning_Utility.Views.Pages.Keyboard.IsMultiColor4Effect(settings.EffectMode))
+                    {
+                        var colors = ParseKeyboardColorString(settings.MultiColors, 4);
+                        if (colors.Count > 0)
+                            hidService.SetMultiColor(colors);
+                    }
+                    else if (Universal_x86_Tuning_Utility.Views.Pages.Keyboard.IsMultiColor4Plus1Effect(settings.EffectMode))
+                    {
+                        var colors = ParseKeyboardColorString(settings.MultiColors, 4);
+                        if (colors.Count > 0)
+                            hidService.SetMultiColor(colors);
+                    }
+
+                    // Convert saved HID speed byte to what SetEffect expects
+                    byte speed = (byte)Math.Clamp((int)settings.Speed, 0, 11);
+                    hidService.SetEffect(settings.EffectMode, speed);
+                }
+                else
+                {
+                    hidService.TurnOff();
+                }
+
+                hidService.Dispose();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[KBD] Startup apply failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>Parses a comma-separated hex color string, padded to the requested count.</summary>
+        private static List<System.Windows.Media.Color> ParseKeyboardColorString(string data, int count)
+        {
+            var defaults = new[]
+            {
+                System.Windows.Media.Color.FromRgb(255, 0, 0),
+                System.Windows.Media.Color.FromRgb(255, 123, 0),
+                System.Windows.Media.Color.FromRgb(255, 183, 0),
+                System.Windows.Media.Color.FromRgb(0, 255, 0),
+                System.Windows.Media.Color.FromRgb(0, 255, 255),
+                System.Windows.Media.Color.FromRgb(0, 0, 255),
+                System.Windows.Media.Color.FromRgb(139, 0, 255),
+            };
+
+            var result = new List<System.Windows.Media.Color>();
+            if (!string.IsNullOrEmpty(data))
+            {
+                foreach (var part in data.Split(',', System.StringSplitOptions.RemoveEmptyEntries))
+                {
+                    try
+                    {
+                        var hex = part.Trim();
+                        if (hex.StartsWith("#")) hex = hex.Substring(1);
+                        if (hex.Length == 6)
+                        {
+                            var r = byte.Parse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber);
+                            var g = byte.Parse(hex.Substring(2, 2), System.Globalization.NumberStyles.HexNumber);
+                            var b = byte.Parse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber);
+                            result.Add(System.Windows.Media.Color.FromRgb(r, g, b));
+                        }
+                    }
+                    catch { /* skip invalid */ }
+                }
+            }
+
+            // Pad with defaults
+            while (result.Count < count)
+                result.Add(defaults[result.Count % defaults.Length]);
+
+            return result.Take(count).ToList();
         }
 
 
