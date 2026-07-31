@@ -23,6 +23,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private KeyboardHidService? _hidService;
         private KeyboardSettings? _settings;
         private bool _isFirstLoad = true;
+        private bool _initialHidApplied;
 
         // Debounce timer for effects mode HID writes
         private readonly DispatcherTimer _applyDebounce = new()
@@ -77,11 +78,16 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             ApplySettings(settings);
 
                             // Apply saved mode to HID on background thread to avoid UI lag.
+                            // Re-reads ModeToggle.IsChecked at execution time (via Dispatcher.Invoke)
+                            // so that if the user toggles before this task runs, we respect the
+                            // current UI state instead of overwriting with a stale captured value.
                             _ = Task.Run(() =>
                             {
                                 try
                                 {
-                                    if (settings.PerKeyMode)
+                                    bool isPerKey = Application.Current.Dispatcher.Invoke(
+                                        () => ModeToggle.IsChecked == true);
+                                    if (isPerKey)
                                     {
                                         ApplyPerKeyColorsToHid();
                                     }
@@ -89,6 +95,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                                     {
                                         ApplySettingsToHid();
                                     }
+                                    _initialHidApplied = true;
                                 }
                                 catch (Exception ex)
                                 {
@@ -127,42 +134,65 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             UpdateEffectUi();
             _isFirstLoad = false;
 
-            // If HID is already open, apply the saved mode on background thread.
-            // This handles the case where HID callback fired before Page_Loaded
-            // and the toggle event was suppressed by _isFirstLoad.
-            if (_hidService?.IsAvailable == true)
+            // If HID is not available yet (slow startup), try to open it now.
+            if (_hidService == null || !_hidService.IsAvailable)
             {
-                var isPerKey = ModeToggle.IsChecked == true;
-                _ = Task.Run(() =>
+                try
                 {
-                    try
+                    var service = new KeyboardHidService();
+                    if (service.Open())
                     {
-                        if (isPerKey)
-                        {
-                            ApplyPerKeyColorsToHid();
-                        }
-                        else
-                        {
-                            ApplySettingsToHid();
-                        }
+                        _hidService = service;
+                        RgbAvailable.Visibility = Visibility.Visible;
+                        RgbUnavailable.Visibility = Visibility.Collapsed;
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        Debug.WriteLine($"[RGB] Page_Loaded apply failed: {ex.Message}");
+                        service.Dispose();
+                        return;
                     }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[RGB] Page_Loaded HID open failed: {ex.Message}");
+                    return;
+                }
+            }
 
+            // Apply the current mode to HID on background thread.
+            var isPerKey = ModeToggle.IsChecked == true;
+            _ = Task.Run(() =>
+            {
+                try
+                {
                     if (isPerKey)
                     {
-                        Application.Current.Dispatcher.Invoke(() => LoadPerKeyColors());
+                        ApplyPerKeyColorsToHid();
                     }
-                });
-            }
+                    else
+                    {
+                        ApplySettingsToHid();
+                    }
+                    _initialHidApplied = true;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[RGB] Page_Loaded apply failed: {ex.Message}");
+                }
+
+                if (isPerKey)
+                {
+                    Application.Current.Dispatcher.Invoke(() => LoadPerKeyColors());
+                }
+            });
         }
 
         private void Page_Unloaded(object sender, RoutedEventArgs e)
         {
             _visualizer.KeysSelected -= OnKeysSelected;
-            _hidService?.Dispose();
+            // Keep HID handle open across navigation — disposing it causes
+            // the handle to be lost on return navigation, breaking all RGB control.
+            _initialHidApplied = false;
         }
 
         #region Device Segment
@@ -178,7 +208,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         #region Mode Toggle
 
-        private void ModeToggle_Checked(object sender, RoutedEventArgs e)
+       private void ModeToggle_Checked(object sender, RoutedEventArgs e)
         {
             bool isPerKey = ModeToggle.IsChecked == true;
             EffectsContent.Visibility = isPerKey ? Visibility.Collapsed : Visibility.Visible;
@@ -187,6 +217,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (_isFirstLoad)
                 return;
 
+            Debug.WriteLine($"[RGB] Mode toggle: isPerKey={isPerKey}");
             // Auto-apply the active mode when switching
             if (isPerKey)
             {
@@ -196,6 +227,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             else
             {
                 ApplySettingsToHid();
+                Debug.WriteLine("[RGB] Mode toggle off: effects applied");
             }
 
             SaveSettings();
@@ -445,6 +477,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                 if (powerOn)
                 {
+                    // Exit per-key/User mode before sending effects commands.
+                    // The ITE controller ignores standard effect commands while in UserMode.
+                    _hidService.ExitPerKeyMode();
+
                     var color = ColorPicker.SelectedColor;
                     _hidService.TurnOn(color.R, color.G, color.B, brightnessPercent);
 
@@ -829,6 +865,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     // and should not be overwritten by effects commands.
                     if (ModeToggle.IsChecked != true)
                     {
+                        Debug.WriteLine("[RGB] Debounce firing: ApplySettingsToHid");
                         ApplySettingsToHid();
                     }
                 }

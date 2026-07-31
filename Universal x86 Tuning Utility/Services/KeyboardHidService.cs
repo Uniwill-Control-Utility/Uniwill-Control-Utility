@@ -819,6 +819,25 @@ namespace Universal_x86_Tuning_Utility.Services
         }
 
         /// <summary>
+        /// Exits per-key/User mode by sending the full keyboard off sequence.
+        /// The ITE controller ignores standard effect commands while in UserMode.
+        /// A full off sequence (CMD_KEYBOARD_OFF + CMD_ZONE_RESET + zone off) is
+        /// required to clear UserMode state before effects commands take effect.
+        /// </summary>
+        public void ExitPerKeyMode()
+        {
+            EnsureAvailable();
+
+            lock (_lock)
+            {
+                SendReport(new byte[] { 0x00, CMD_KEYBOARD_OFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });
+                SendReport(new byte[] { 0x00, CMD_ZONE_RESET, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 });
+                SendReport(new byte[] { 0x00, CMD_ZONE_ON_OFF, (byte)ZoneKeyboard, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 });
+                DebugLog("[KBD-HID] Exited per-key/User mode");
+            }
+        }
+
+        /// <summary>
         /// Updates brightness for per-key/User mode. Re-sends the UserMode command
         /// with the new brightness. The caller should then re-send per-key colors.
         /// Linux driver format: 08 02 33 00 [brightness 0-50] 00 00 00

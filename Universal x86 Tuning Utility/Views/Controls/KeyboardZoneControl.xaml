@@ -53,11 +53,5 @@
                 </Setter>
             </Style>
         </ToggleButton.Style>
-        <ToggleButton.ToolTip>
-            <StackPanel>
-                <TextBlock FontWeight="SemiBold" Text="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=Label}" />
-                <TextBlock FontSize="10" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=ZoneIndexDisplay}" />
-            </StackPanel>
-        </ToggleButton.ToolTip>
     </ToggleButton>
 </UserControl>
