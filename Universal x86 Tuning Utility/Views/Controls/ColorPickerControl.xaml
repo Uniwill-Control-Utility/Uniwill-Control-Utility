@@ -72,9 +72,9 @@
         </Button>
 
         <Popup x:Name="_popup"
-               Width="250"
+               Width="320"
                AllowsTransparency="True"
-               HorizontalOffset="-106"
+               HorizontalOffset="-120"
                Placement="Bottom"
                StaysOpen="False"
                VerticalOffset="4">
@@ -85,8 +85,8 @@
                     CornerRadius="8">
                 <StackPanel>
                     <cp:SquarePicker x:Name="_colorPicker"
-                                     Width="200"
-                                     Height="200"
+                                     Width="240"
+                                     Height="240"
                                      Margin="16"
                                      HorizontalAlignment="Center"
                                      ColorChanged="ColorPicker_ColorChanged"

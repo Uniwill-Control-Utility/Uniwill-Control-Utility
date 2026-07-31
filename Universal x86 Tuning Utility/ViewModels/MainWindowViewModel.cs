@@ -85,12 +85,11 @@ namespace Universal_x86_Tuning_Utility.ViewModels
             // Flydigi cooler in footer
             NavigationFooter.Add(CreateFlydigiNavItem());
 
-            // Fan Control & Keyboard in footer for Uniwill EC hardware (XMG / TUXEDO)
+            // Fan Control & RGB in footer for Uniwill EC hardware (XMG / TUXEDO)
             if (_uniwillEc is not null && _uniwillEc.Initialize())
             {
                 NavigationFooter.Add(CreateNavigationItem("Fan Control", "fancontrol", SymbolRegular.Gauge24, typeof(Views.Pages.FanControl)));
-                NavigationFooter.Add(CreateNavigationItem("Keyboard", "keyboard", SymbolRegular.Keyboard24, typeof(Views.Pages.Keyboard)));
-                NavigationFooter.Add(CreateNavigationItem("Per-Key", "perkey", SymbolRegular.Color24, typeof(Views.Pages.KeyboardPerKeyPage)));
+                NavigationFooter.Add(CreateNavigationItem("RGB", "rgb", SymbolRegular.Color24, typeof(Views.Pages.RGB)));
             }
 
             // Settings at the bottom of footer
@@ -120,8 +119,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                     "auto" => SymbolRegular.Transmission24,
                     "watercooler" => SymbolRegular.Water24,
                     "fancontrol" => SymbolRegular.Gauge24,
-                    "keyboard" => SymbolRegular.Keyboard24,
-                    "perkey" => SymbolRegular.Color24,
+                    "rgb" => SymbolRegular.Color24,
                     "settings" => SymbolRegular.Settings24,
                     _ => SymbolRegular.Empty
                 };

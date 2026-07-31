@@ -81,13 +81,13 @@ namespace Universal_x86_Tuning_Utility.Models
         /// <summary>
         /// Per-key colors for all 126 zones. Stored as "R,G,B" per zone, pipe-separated.
         /// e.g., "0,255,255|255,0,0|0,0,255|..." (126 entries)
-        /// Null or empty means all white (default).
+        /// Null or empty means all black (default).
         /// </summary>
         public string? PerKeyColors { get; set; }
 
         /// <summary>
         /// Deserializes PerKeyColors string into a dictionary of zone index to RGB tuple.
-        /// Returns all-white defaults if the string is null or empty.
+        /// Returns all-black defaults if the string is null or empty.
         /// </summary>
         public Dictionary<int, (byte R, byte G, byte B)> GetPerKeyColors()
         {
@@ -95,7 +95,7 @@ namespace Universal_x86_Tuning_Utility.Models
             if (string.IsNullOrWhiteSpace(PerKeyColors))
             {
                 for (int i = 0; i < 126; i++)
-                    result[i] = (255, 255, 255);
+                    result[i] = (0, 0, 0);
                 return result;
             }
 
@@ -112,12 +112,12 @@ namespace Universal_x86_Tuning_Utility.Models
                     }
                     else
                     {
-                        result[i] = (255, 255, 255);
+                        result[i] = (0, 0, 0);
                     }
                 }
                 else
                 {
-                    result[i] = (255, 255, 255);
+                    result[i] = (0, 0, 0);
                 }
             }
             return result;
@@ -131,7 +131,7 @@ namespace Universal_x86_Tuning_Utility.Models
             var entries = new List<string>();
             for (int i = 0; i < 126; i++)
             {
-                (byte R, byte G, byte B) c = colors.TryGetValue(i, out var val) ? val : ((byte)255, (byte)255, (byte)255);
+                (byte R, byte G, byte B) c = colors.TryGetValue(i, out var val) ? val : ((byte)0, (byte)0, (byte)0);
                 entries.Add($"{c.R},{c.G},{c.B}");
             }
             PerKeyColors = string.Join("|", entries);
