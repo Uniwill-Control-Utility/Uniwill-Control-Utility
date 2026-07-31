@@ -90,6 +90,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
             {
                 NavigationFooter.Add(CreateNavigationItem("Fan Control", "fancontrol", SymbolRegular.Gauge24, typeof(Views.Pages.FanControl)));
                 NavigationFooter.Add(CreateNavigationItem("Keyboard", "keyboard", SymbolRegular.Keyboard24, typeof(Views.Pages.Keyboard)));
+                NavigationFooter.Add(CreateNavigationItem("Per-Key", "perkey", SymbolRegular.Color24, typeof(Views.Pages.KeyboardPerKeyPage)));
             }
 
             // Settings at the bottom of footer
@@ -120,6 +121,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                     "watercooler" => SymbolRegular.Water24,
                     "fancontrol" => SymbolRegular.Gauge24,
                     "keyboard" => SymbolRegular.Keyboard24,
+                    "perkey" => SymbolRegular.Color24,
                     "settings" => SymbolRegular.Settings24,
                     _ => SymbolRegular.Empty
                 };

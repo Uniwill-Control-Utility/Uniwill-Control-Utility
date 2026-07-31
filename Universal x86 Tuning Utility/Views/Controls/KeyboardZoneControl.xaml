@@ -1,0 +1,63 @@
+<UserControl x:Class="Universal_x86_Tuning_Utility.Views.Controls.KeyboardZoneControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+    <ToggleButton x:Name="_button"
+                  Background="Transparent"
+                  BorderThickness="0"
+                  Padding="0"
+                  Click="_button_Click"
+                  SnapsToDevicePixels="True"
+                  UseLayoutRounding="True">
+        <ToggleButton.Style>
+            <Style TargetType="ToggleButton">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <Border x:Name="border"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="Transparent"
+                                    BorderThickness="0"
+                                    CornerRadius="3"
+                                    SnapsToDevicePixels="True">
+                                <Grid>
+                                    <!-- Color overlay background -->
+                                    <Border x:Name="colorBg"
+                                            CornerRadius="3"
+                                            Opacity="0.55"
+                                            Background="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=ZoneBrush}" />
+                                    <!-- Key label -->
+                                    <TextBlock HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontSize="8"
+                                               FontWeight="SemiBold"
+                                               Foreground="White"
+                                               Text="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=Label}"
+                                               TextOptions.TextFormattingMode="Display" />
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <!-- Selected state -->
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="border" Property="BorderBrush" Value="#0078D4" />
+                                    <Setter TargetName="border" Property="BorderThickness" Value="2" />
+                                </Trigger>
+                                <!-- Hover state -->
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="BorderBrush" Value="#80FFFFFF" />
+                                    <Setter TargetName="border" Property="BorderThickness" Value="1" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ToggleButton.Style>
+        <ToggleButton.ToolTip>
+            <StackPanel>
+                <TextBlock FontWeight="SemiBold" Text="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=Label}" />
+                <TextBlock FontSize="10" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=ZoneIndexDisplay}" />
+            </StackPanel>
+        </ToggleButton.ToolTip>
+    </ToggleButton>
+</UserControl>

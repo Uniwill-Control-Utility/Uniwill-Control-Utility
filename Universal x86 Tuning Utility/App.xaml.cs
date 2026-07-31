@@ -214,6 +214,7 @@ namespace Universal_x86_Tuning_Utility
                         services.AddScoped<Views.Pages.Automations>();
                         services.AddScoped<Views.Pages.FanControl>();
                         services.AddScoped<Views.Pages.Keyboard>();
+                        services.AddScoped<Views.Pages.KeyboardPerKeyPage>();
                         services.AddScoped<Views.Pages.SystemInfo>();
                         services.AddScoped<ViewModels.GamesViewModel>();
                         services.AddScoped<Views.Pages.Games>();

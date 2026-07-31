@@ -1,0 +1,182 @@
+<Page x:Class="Universal_x86_Tuning_Utility.Views.Pages.KeyboardPerKeyPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:Universal_x86_Tuning_Utility.Views.Pages"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:controls="clr-namespace:Universal_x86_Tuning_Utility.Views.Controls"
+      mc:Ignorable="d"
+      d:DesignHeight="620" d:DesignWidth="800"
+      Title="Keyboard Per-Key"
+      Loaded="Page_Loaded"
+      Unloaded="Page_Unloaded"
+      SnapsToDevicePixels="True"
+      UseLayoutRounding="True"
+      ScrollViewer.CanContentScroll="False">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      CanContentScroll="False"
+                      PanningMode="VerticalOnly"
+                      IsDeferredScrollingEnabled="False"
+                      Margin="0,0,-18,0">
+            <ScrollViewer.Style>
+                <Style TargetType="{x:Type ScrollViewer}"
+                       BasedOn="{StaticResource {x:Type ScrollViewer}}">
+                    <Setter Property="Padding" Value="0" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ComputedVerticalScrollBarVisibility, RelativeSource={RelativeSource Self}}"
+                                     Value="Visible">
+                            <Setter Property="Padding" Value="0,0,8,0" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ScrollViewer.Style>
+
+            <StackPanel Margin="18,10,36,18">
+                <TextBlock FontSize="26" FontWeight="Medium" Text="Keyboard Per-Key" />
+                <TextBlock Margin="0,4,0,12"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           Text="Click keys to select them, then pick a color. Hold Ctrl to select multiple keys."
+                           TextWrapping="Wrap" />
+
+                <!-- Per-key content when HID is available -->
+                <StackPanel x:Name="PerKeyAvailable">
+                    <!-- Toolbar -->
+                    <ui:CardControl Margin="0,0,0,8">
+                        <ui:CardControl.Header>
+                            <StackPanel>
+                                <TextBlock FontWeight="DemiBold" Text="Controls" />
+                                <TextBlock FontSize="12"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           Text="Select keys on the keyboard below and apply colors." />
+                            </StackPanel>
+                        </ui:CardControl.Header>
+                    </ui:CardControl>
+
+                    <!-- Keyboard visualizer -->
+                    <Border Margin="0,0,0,8"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}"
+                            CornerRadius="6"
+                            Padding="4">
+                        <controls:KeyboardVisualizerControl x:Name="_visualizer" />
+                    </Border>
+
+                    <!-- Action row -->
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <ui:Button x:Name="_selectAllBtn"
+                                       Appearance="Transparent"
+                                       Content="Select All"
+                                       Click="SelectAll_Click"
+                                       Margin="0,0,8,0" />
+                            <ui:Button x:Name="_clearSelectBtn"
+                                       Appearance="Transparent"
+                                       Content="Clear Selection"
+                                       Click="ClearSelection_Click"
+                                       Margin="0,0,8,0" />
+                            <ui:Button x:Name="_fillAllBtn"
+                                       Appearance="Transparent"
+                                       Content="Fill All"
+                                       Click="FillAll_Click" />
+                        </StackPanel>
+
+                        <controls:ColorPickerControl x:Name="_colorPicker"
+                                                     Grid.Column="1"
+                                                     Margin="0,0,12,0"
+                                                     SelectedColor="White" />
+
+                        <ui:Button x:Name="_applyBtn"
+                                   Grid.Column="2"
+                                   Appearance="Primary"
+                                   Content="Apply"
+                                   Click="Apply_Click" />
+                    </Grid>
+
+                    <!-- Status -->
+                    <TextBlock x:Name="_statusText"
+                               FontSize="11"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="Select keys to edit their color."
+                               Margin="0,0,0,8" />
+
+                    <!-- Debug panel -->
+                    <Expander x:Name="_debugExpander"
+                              Margin="0,8,0,0"
+                              Header="Debug"
+                              IsExpanded="False">
+                        <StackPanel>
+                            <ui:Button Content="Test Pattern (row colors)"
+                                       Click="_debugTestPattern_Click"
+                                       Appearance="Transparent"
+                                       Margin="0,0,0,8"
+                                       HorizontalAlignment="Left" />
+
+                            <TextBox x:Name="_debugLog"
+                                     Height="120"
+                                     Margin="0,0,0,8"
+                                     FontFamily="Consolas"
+                                     FontSize="10"
+                                     IsReadOnly="True"
+                                     TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     VerticalScrollBarVisibility="Auto" />
+
+                            <StackPanel Orientation="Horizontal">
+                                <ui:Button Content="Clear Log"
+                                           Click="_debugClearLog_Click"
+                                           Appearance="Transparent"
+                                           Margin="0,0,8,0" />
+                                <ui:Button Content="Copy Log"
+                                           Click="_debugCopyLog_Click"
+                                           Appearance="Transparent" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Expander>
+                </StackPanel>
+
+                <!-- Unavailable state -->
+                <StackPanel x:Name="PerKeyUnavailable" Visibility="Collapsed">
+                    <Border Margin="0,8,0,0"
+                            Padding="14,12"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}"
+                            CornerRadius="4">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ui:FontIcon Grid.Column="0"
+                                         FontFamily="Segoe Fluent Icons"
+                                         Glyph="&#xE7A7;"
+                                         FontSize="16"
+                                         Margin="0,0,10,0"
+                                         VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1"
+                                       Text="Per-key RGB control is not available on this device. This feature requires an ITE HID lighting controller (vid_048d)."
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

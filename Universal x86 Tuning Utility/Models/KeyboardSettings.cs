@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
 namespace Universal_x86_Tuning_Utility.Models
 {
     /// <summary>
@@ -67,6 +71,71 @@ namespace Universal_x86_Tuning_Utility.Models
         /// Idle timer duration in minutes. Range 5-60. Default 10 (matches XMG CC).
         /// </summary>
         public int IdleTimerMinutes { get; set; } = 10;
+
+        /// <summary>
+        /// Per-key color override mode. When true, the keyboard uses per-key colors
+        /// instead of effects. Mutually exclusive with effect modes.
+        /// </summary>
+        public bool PerKeyMode { get; set; } = false;
+
+        /// <summary>
+        /// Per-key colors for all 126 zones. Stored as "R,G,B" per zone, pipe-separated.
+        /// e.g., "0,255,255|255,0,0|0,0,255|..." (126 entries)
+        /// Null or empty means all white (default).
+        /// </summary>
+        public string? PerKeyColors { get; set; }
+
+        /// <summary>
+        /// Deserializes PerKeyColors string into a dictionary of zone index to RGB tuple.
+        /// Returns all-white defaults if the string is null or empty.
+        /// </summary>
+        public Dictionary<int, (byte R, byte G, byte B)> GetPerKeyColors()
+        {
+            var result = new Dictionary<int, (byte, byte, byte)>();
+            if (string.IsNullOrWhiteSpace(PerKeyColors))
+            {
+                for (int i = 0; i < 126; i++)
+                    result[i] = (255, 255, 255);
+                return result;
+            }
+
+            var entries = PerKeyColors.Split('|');
+            for (int i = 0; i < 126; i++)
+            {
+                if (i < entries.Length)
+                {
+                    var parts = entries[i].Split(',');
+                    if (parts.Length >= 3 && byte.TryParse(parts[0], out var r)
+                        && byte.TryParse(parts[1], out var g) && byte.TryParse(parts[2], out var b))
+                    {
+                        result[i] = (r, g, b);
+                    }
+                    else
+                    {
+                        result[i] = (255, 255, 255);
+                    }
+                }
+                else
+                {
+                    result[i] = (255, 255, 255);
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Serializes a dictionary of zone colors to the PerKeyColors string format.
+        /// </summary>
+        public void SetPerKeyColors(Dictionary<int, (byte R, byte G, byte B)> colors)
+        {
+            var entries = new List<string>();
+            for (int i = 0; i < 126; i++)
+            {
+                (byte R, byte G, byte B) c = colors.TryGetValue(i, out var val) ? val : ((byte)255, (byte)255, (byte)255);
+                entries.Add($"{c.R},{c.G},{c.B}");
+            }
+            PerKeyColors = string.Join("|", entries);
+        }
     }
 
     /// <summary>
