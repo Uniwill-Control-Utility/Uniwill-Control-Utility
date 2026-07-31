@@ -214,37 +214,55 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
 
                 if (settings.PowerOn)
                 {
-                    int brightnessPercent = (settings.Brightness * 100) / 7;
-                    hidService.TurnOn(settings.ColorR, settings.ColorG, settings.ColorB, brightnessPercent);
-
-                    // Send multi-color palette for effects that need it
-                    if (Universal_x86_Tuning_Utility.Views.Pages.Keyboard.IsMultiColor7Effect(settings.EffectMode))
+                    if (settings.PerKeyMode)
                     {
-                        var colors = ParseKeyboardColorString(settings.MultiColors, 7);
-                        if (colors.Count > 0)
+                        // Per-key mode: apply saved per-key colors
+                        int brightnessPercent = (settings.Brightness * 100) / 7;
+                        hidService.TurnOn(settings.ColorR, settings.ColorG, settings.ColorB, brightnessPercent);
+                        hidService.SetEffect(Universal_x86_Tuning_Utility.Models.KeyboardEffect.Static);
+
+                        var colors = settings.GetPerKeyColors();
+                        hidService.SendAllPerKeyColorsFromDict(colors);
+
+                        System.Diagnostics.Debug.WriteLine("[KBD] Startup apply: per-key mode");
+                    }
+                    else
+                    {
+                        // Effects mode: apply saved effect settings
+                        int brightnessPercent = (settings.Brightness * 100) / 7;
+                        hidService.TurnOn(settings.ColorR, settings.ColorG, settings.ColorB, brightnessPercent);
+
+                        // Send multi-color palette for effects that need it
+                        if (Universal_x86_Tuning_Utility.Views.Pages.Keyboard.IsMultiColor7Effect(settings.EffectMode))
                         {
-                            // Marquee displays colors in reverse order on the HID controller
-                            if (settings.EffectMode == Universal_x86_Tuning_Utility.Models.KeyboardEffect.Marquee)
-                                colors = colors.AsEnumerable().Reverse().ToList();
-                            hidService.SetMultiColor(colors);
+                            var colors = ParseKeyboardColorString(settings.MultiColors, 7);
+                            if (colors.Count > 0)
+                            {
+                                // Marquee displays colors in reverse order on the HID controller
+                                if (settings.EffectMode == Universal_x86_Tuning_Utility.Models.KeyboardEffect.Marquee)
+                                    colors = colors.AsEnumerable().Reverse().ToList();
+                                hidService.SetMultiColor(colors);
+                            }
                         }
-                    }
-                    else if (Universal_x86_Tuning_Utility.Views.Pages.Keyboard.IsMultiColor4Effect(settings.EffectMode))
-                    {
-                        var colors = ParseKeyboardColorString(settings.MultiColors, 4);
-                        if (colors.Count > 0)
-                            hidService.SetMultiColor(colors);
-                    }
-                    else if (Universal_x86_Tuning_Utility.Views.Pages.Keyboard.IsMultiColor4Plus1Effect(settings.EffectMode))
-                    {
-                        var colors = ParseKeyboardColorString(settings.MultiColors, 4);
-                        if (colors.Count > 0)
-                            hidService.SetMultiColor(colors);
-                    }
+                        else if (Universal_x86_Tuning_Utility.Views.Pages.Keyboard.IsMultiColor4Effect(settings.EffectMode))
+                        {
+                            var colors = ParseKeyboardColorString(settings.MultiColors, 4);
+                            if (colors.Count > 0)
+                                hidService.SetMultiColor(colors);
+                        }
+                        else if (Universal_x86_Tuning_Utility.Views.Pages.Keyboard.IsMultiColor4Plus1Effect(settings.EffectMode))
+                        {
+                            var colors = ParseKeyboardColorString(settings.MultiColors, 4);
+                            if (colors.Count > 0)
+                                hidService.SetMultiColor(colors);
+                        }
 
-                    // Convert saved HID speed byte to what SetEffect expects
-                    byte speed = (byte)Math.Clamp((int)settings.Speed, 0, 11);
-                    hidService.SetEffect(settings.EffectMode, speed);
+                        // Convert saved HID speed byte to what SetEffect expects
+                        byte speed = (byte)Math.Clamp((int)settings.Speed, 0, 11);
+                        hidService.SetEffect(settings.EffectMode, speed);
+
+                        System.Diagnostics.Debug.WriteLine($"[KBD] Startup apply: effect {settings.EffectMode}");
+                    }
                 }
                 else
                 {

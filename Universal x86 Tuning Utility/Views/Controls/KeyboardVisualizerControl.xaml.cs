@@ -16,6 +16,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
     public partial class KeyboardVisualizerControl : UserControl
     {
         private readonly Dictionary<int, KeyboardZoneControl> _zoneControls = new();
+        private bool _isBuilt;
 
         /// <summary>
         /// Raised when keys are selected (single or multi-select).
@@ -25,7 +26,15 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
         public KeyboardVisualizerControl()
         {
             InitializeComponent();
+        }
+
+        /// <summary>Lazy-loads the keyboard layout on first access to avoid navigation lag.</summary>
+        private void EnsureBuilt()
+        {
+            if (_isBuilt)
+                return;
             BuildKeyboard();
+            _isBuilt = true;
         }
 
         private void BuildKeyboard()
@@ -81,6 +90,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
         /// </summary>
         public IList<int> GetSelectedZoneIndices()
         {
+            EnsureBuilt();
             var selected = new List<int>();
             foreach (var kvp in _zoneControls)
             {
@@ -96,6 +106,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
         /// </summary>
         public void ClearSelection()
         {
+            EnsureBuilt();
             foreach (var c in _zoneControls.Values)
                 c.IsSelected = false;
         }
@@ -105,6 +116,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
         /// </summary>
         public void SetZoneColor(int zoneIndex, Color color)
         {
+            EnsureBuilt();
             if (_zoneControls.TryGetValue(zoneIndex, out var control))
             {
                 control.ZoneBrush = new SolidColorBrush(color);
@@ -116,6 +128,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
         /// </summary>
         public void SetZoneColors(Dictionary<int, Color> colors)
         {
+            EnsureBuilt();
             foreach (var kvp in colors)
             {
                 if (_zoneControls.TryGetValue(kvp.Key, out var control))
@@ -130,6 +143,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
         /// </summary>
         public Color? GetZoneColor(int zoneIndex)
         {
+            EnsureBuilt();
             if (_zoneControls.TryGetValue(zoneIndex, out var control))
                 return control.ZoneColor;
             return null;
@@ -140,6 +154,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
         /// </summary>
         public Dictionary<int, Color> GetAllColors()
         {
+            EnsureBuilt();
             var colors = new Dictionary<int, Color>();
             foreach (var kvp in _zoneControls)
             {
@@ -154,6 +169,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
         /// </summary>
         public void SelectAll()
         {
+            EnsureBuilt();
             foreach (var c in _zoneControls.Values)
                 c.IsSelected = true;
         }

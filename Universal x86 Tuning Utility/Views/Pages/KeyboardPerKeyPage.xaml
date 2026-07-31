@@ -63,13 +63,8 @@
                     </ui:CardControl>
 
                     <!-- Keyboard visualizer -->
-                    <Border Margin="0,0,0,8"
-                            BorderThickness="1"
-                            BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}"
-                            CornerRadius="6"
-                            Padding="4">
-                        <controls:KeyboardVisualizerControl x:Name="_visualizer" />
-                    </Border>
+                    <controls:KeyboardVisualizerControl x:Name="_visualizer" />
+                    
 
                     <!-- Action row -->
                     <Grid Margin="0,0,0,8">

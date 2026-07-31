@@ -5,9 +5,11 @@
              SnapsToDevicePixels="True"
              UseLayoutRounding="True">
     <Border Background="#181818"
-            CornerRadius="6"
-            Padding="10">
-        <Viewbox Stretch="Uniform" StretchDirection="Both">
+            CornerRadius="4"
+            Padding="12,0,0,10">
+        <Viewbox Stretch="Uniform"
+                 StretchDirection="Both"
+                 HorizontalAlignment="Center">
             <Canvas x:Name="_keyboardCanvas"
                     Width="735"
                     Height="280"

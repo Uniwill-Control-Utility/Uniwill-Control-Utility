@@ -210,6 +210,43 @@
                             </ui:CardControl.Header>
                         </ui:CardControl>
 
+                        <!-- Brightness (common to both modes) -->
+                        <ui:CardControl Margin="0,0,0,8">
+                            <ui:CardControl.Header>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock FontWeight="DemiBold" Text="Brightness" />
+                                        <TextBlock FontSize="12"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                   Text="Adjust the backlight brightness level." />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center">
+                                        <TextBlock x:Name="BrightnessValueText"
+                                                   Width="30"
+                                                   HorizontalAlignment="Right"
+                                                   Margin="0,0,12,0"
+                                                   Text="5" />
+                                        <Slider x:Name="BrightnessSlider"
+                                                Width="140"
+                                                Minimum="1"
+                                                Maximum="7"
+                                                Value="5"
+                                                IsSnapToTickEnabled="True"
+                                                TickFrequency="1"
+                                                IsMoveToPointEnabled="False"
+                                                ValueChanged="BrightnessSlider_ValueChanged" />
+                                    </StackPanel>
+                                </Grid>
+                            </ui:CardControl.Header>
+                        </ui:CardControl>
+
                         <!-- ===== EFFECTS MODE CONTENT ===== -->
                         <StackPanel x:Name="EffectsContent">
                             <!-- Keyboard power toggle -->
@@ -342,42 +379,6 @@
                                                                      VerticalAlignment="Center"
                                                                      SelectedColor="White"
                                                                      ColorChangedDelayed="GamingModeFullRestColor_ColorChangedDelayed" />
-                                    </Grid>
-
-                                    <Separator Margin="0,12,0,12"
-                                               Background="{DynamicResource ControlFillColorDefaultBrush}" />
-
-                                    <!-- Brightness -->
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0">
-                                            <TextBlock FontWeight="DemiBold" Text="Brightness" />
-                                            <TextBlock FontSize="12"
-                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                                       Text="Adjust the backlight brightness level." />
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1"
-                                                    Orientation="Horizontal"
-                                                    HorizontalAlignment="Right"
-                                                    VerticalAlignment="Center">
-                                            <TextBlock x:Name="BrightnessValueText"
-                                                       Width="30"
-                                                       HorizontalAlignment="Right"
-                                                       Margin="0,0,12,0"
-                                                       Text="5" />
-                                            <Slider x:Name="BrightnessSlider"
-                                                    Width="140"
-                                                    Minimum="1"
-                                                    Maximum="7"
-                                                    Value="5"
-                                                    IsSnapToTickEnabled="True"
-                                                    TickFrequency="1"
-                                                    IsMoveToPointEnabled="False"
-                                                    ValueChanged="BrightnessSlider_ValueChanged" />
-                                        </StackPanel>
                                     </Grid>
 
                                     <Separator Margin="0,12,0,12"

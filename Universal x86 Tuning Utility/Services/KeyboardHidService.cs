@@ -819,6 +819,29 @@ namespace Universal_x86_Tuning_Utility.Services
         }
 
         /// <summary>
+        /// Updates brightness for per-key/User mode. Re-sends the UserMode command
+        /// with the new brightness. The caller should then re-send per-key colors.
+        /// Linux driver format: 08 02 33 00 [brightness 0-50] 00 00 00
+        /// </summary>
+        public void SetPerKeyBrightness(int brightness)
+        {
+            EnsureAvailable();
+            brightness = Math.Clamp(brightness, 0, 100);
+            _brightness = brightness;
+
+            lock (_lock)
+            {
+                byte scaledBrightness = (byte)Math.Min(_brightness, 0x32);
+                SendControlReport(0x08, new byte[]
+                {
+                    0x08, 0x02, ITE_PARAM_MODE_USER, 0x00,
+                    scaledBrightness, 0x00, 0x00, 0x00
+                });
+                DebugLog($"[KBD-HID] Per-key brightness set to {brightness}");
+            }
+        }
+
+        /// <summary>
         /// Enters per-key/User mode on the ITE controller.
         /// Linux driver format: 08 02 33 00 [brightness 0-50] 00 00 00
         /// </summary>

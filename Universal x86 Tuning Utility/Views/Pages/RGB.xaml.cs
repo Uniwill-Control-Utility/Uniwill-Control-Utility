@@ -76,17 +76,31 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             var settings = KeyboardSettingsService.Load();
                             ApplySettings(settings);
 
-                            // Apply saved mode to HID now that the device is open.
-                            // Load visualizer colors if per-key mode is saved.
-                            if (settings.PerKeyMode)
+                            // Apply saved mode to HID on background thread to avoid UI lag.
+                            _ = Task.Run(() =>
                             {
-                                LoadPerKeyColors();
-                                ApplyPerKeyColorsToHid();
-                            }
-                            else
-                            {
-                                ApplySettingsToHid();
-                            }
+                                try
+                                {
+                                    if (settings.PerKeyMode)
+                                    {
+                                        ApplyPerKeyColorsToHid();
+                                    }
+                                    else
+                                    {
+                                        ApplySettingsToHid();
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"[RGB] Startup apply failed: {ex.Message}");
+                                }
+
+                                // Load visualizer colors on UI thread after HID apply
+                                if (settings.PerKeyMode)
+                                {
+                                    Application.Current.Dispatcher.Invoke(() => LoadPerKeyColors());
+                                }
+                            });
                         }
                         else
                         {
@@ -113,20 +127,35 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             UpdateEffectUi();
             _isFirstLoad = false;
 
-            // If HID is already open, apply the saved mode.
+            // If HID is already open, apply the saved mode on background thread.
             // This handles the case where HID callback fired before Page_Loaded
             // and the toggle event was suppressed by _isFirstLoad.
             if (_hidService?.IsAvailable == true)
             {
-                if (ModeToggle.IsChecked == true)
+                var isPerKey = ModeToggle.IsChecked == true;
+                _ = Task.Run(() =>
                 {
-                    LoadPerKeyColors();
-                    ApplyPerKeyColorsToHid();
-                }
-                else
-                {
-                    ApplySettingsToHid();
-                }
+                    try
+                    {
+                        if (isPerKey)
+                        {
+                            ApplyPerKeyColorsToHid();
+                        }
+                        else
+                        {
+                            ApplySettingsToHid();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[RGB] Page_Loaded apply failed: {ex.Message}");
+                    }
+
+                    if (isPerKey)
+                    {
+                        Application.Current.Dispatcher.Invoke(() => LoadPerKeyColors());
+                    }
+                });
             }
         }
 
@@ -179,6 +208,14 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             try
             {
+                // Sync brightness from slider to HID service first.
+                // The service's internal _brightness defaults to 50 and is only
+                // updated when the user moves the slider. On startup/navigation
+                // we must sync it so SendAllPerKeyColorsFromDict uses the right value.
+                int brightnessLevel = (int)BrightnessSlider.Value;
+                int brightnessPercent = (brightnessLevel * 100) / 7;
+                _hidService.SetPerKeyBrightness(brightnessPercent);
+
                 var colors = _settings.GetPerKeyColors();
                 _hidService.SetEffect(KeyboardEffect.Static);
                 _hidService.SendAllPerKeyColorsFromDict(colors);
@@ -303,7 +340,23 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (_isFirstLoad) return;
             if (tsKeyboardPower.IsChecked == false)
                 _keyboardWasIdleOff = false;
-            _pendingApply = true;
+
+            if (ModeToggle.IsChecked == true)
+            {
+                // Per-key mode: turn on/off without switching to effects
+                if (_hidService?.IsAvailable == true)
+                {
+                    if (tsKeyboardPower.IsChecked == true)
+                        ApplyPerKeyColorsToHid();
+                    else
+                        _hidService.TurnOff();
+                }
+                SaveSettings();
+            }
+            else
+            {
+                _pendingApply = true;
+            }
         }
 
         private void ColorPicker_ColorChangedDelayed(object sender, EventArgs e)
@@ -327,7 +380,44 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         {
             if (_isFirstLoad) return;
             BrightnessValueText.Text = ((int)BrightnessSlider.Value).ToString();
-            _pendingApply = true;
+
+            if (ModeToggle.IsChecked == true)
+            {
+                // Per-key mode: update brightness without switching to effects
+                ApplyPerKeyBrightness();
+                SaveSettings();
+            }
+            else
+            {
+                // Effects mode: debounce-apply
+                _pendingApply = true;
+            }
+        }
+
+        private void ApplyPerKeyBrightness()
+        {
+            if (_hidService == null || !_hidService.IsAvailable)
+                return;
+
+            try
+            {
+                int brightnessLevel = (int)BrightnessSlider.Value;
+                int brightnessPercent = (brightnessLevel * 100) / 7;
+                _hidService.SetPerKeyBrightness(brightnessPercent);
+
+                // Re-send per-key colors so the brightness takes effect
+                if (_settings != null)
+                {
+                    var colors = _settings.GetPerKeyColors();
+                    _hidService.SendAllPerKeyColorsFromDict(colors);
+                }
+
+                Debug.WriteLine($"[RGB] Per-key brightness set to {brightnessPercent}%");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[RGB] Per-key brightness error: {ex.Message}");
+            }
         }
 
         private void SpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -609,13 +699,17 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private void TsIdleTimer_Toggled(object sender, RoutedEventArgs e)
         {
             if (_isFirstLoad) return;
-            _pendingApply = true;
+            if (ModeToggle.IsChecked != true)
+                _pendingApply = true;
+            SaveSettings();
         }
 
         private void CmbIdleTimer_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_isFirstLoad) return;
-            _pendingApply = true;
+            if (ModeToggle.IsChecked != true)
+                _pendingApply = true;
+            SaveSettings();
         }
 
         #endregion
@@ -666,6 +760,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void SaveSettings()
         {
+            // Preserve existing per-key colors if in per-key mode
+            var savedPerKeyColors = _settings?.PerKeyColors;
+
             var settings = new KeyboardSettings
             {
                 PowerOn = tsKeyboardPower.IsChecked == true,
@@ -682,6 +779,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     ? s_idleTimerOptions[cmbIdleTimer.SelectedIndex].Seconds / 60
                     : 10,
                 PerKeyMode = ModeToggle.IsChecked == true,
+                PerKeyColors = savedPerKeyColors,
             };
             KeyboardSettingsService.Save(settings);
         }
@@ -725,7 +823,14 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 if (_pendingApply)
                 {
                     _pendingApply = false;
-                    ApplySettingsToHid();
+
+                    // Only apply effects-mode settings when NOT in per-key mode.
+                    // Per-key mode has its own direct apply paths (brightness, power, etc.)
+                    // and should not be overwritten by effects commands.
+                    if (ModeToggle.IsChecked != true)
+                    {
+                        ApplySettingsToHid();
+                    }
                 }
             };
         }
