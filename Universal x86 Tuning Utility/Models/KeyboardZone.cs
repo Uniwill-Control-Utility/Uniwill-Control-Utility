@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Media;
 
@@ -48,11 +50,244 @@ namespace Universal_x86_Tuning_Utility.Models
         /// </summary>
         public Color Color { get; set; } = Colors.White;
 
+        /* ------------------------------------------------------------------ */
+        /*  Zone definitions (positions only — labels applied per-locale)     */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>Returns zones with US QWERTY labels (default).</summary>
+        public static KeyboardZone[] GetAllZones() => GetAllZones(KeyboardLayoutType.UsQwerty);
+
+        /// <summary>Returns zones with labels for the specified keyboard layout.</summary>
+        public static KeyboardZone[] GetAllZones(KeyboardLayoutType layout)
+        {
+            var usZones = BuildBaseZones();
+            var overrides = GetLabelOverrides(layout);
+
+            if (overrides.Count == 0)
+                return usZones;
+
+            // Clone zones and apply overrides
+            var result = new KeyboardZone[usZones.Length];
+            for (int i = 0; i < usZones.Length; i++)
+            {
+                var z = usZones[i];
+                if (overrides.TryGetValue(z.Index, out string? label))
+                {
+                    result[i] = z with { Label = label };
+                }
+                else
+                {
+                    result[i] = z;
+                }
+            }
+            return result;
+        }
+
         /// <summary>
-        /// Returns the full set of keyboard zones with Canvas positions.
-        /// Canvas size: 735 x 280.
+        /// Returns zone-index → label overrides for the given layout.
+        /// Only keys that differ from US QWERTY are included.
+        /// Labels show the primary (unshifted) character, capitalized.
         /// </summary>
-        public static KeyboardZone[] GetAllZones()
+        private static Dictionary<int, string> GetLabelOverrides(KeyboardLayoutType layout)
+        {
+            return layout switch
+            {
+                KeyboardLayoutType.DeQwertz or
+                KeyboardLayoutType.HuQwertz => DeQwertzOverrides(),
+
+                KeyboardLayoutType.CzQwertz => CzQwertzOverrides(),
+                KeyboardLayoutType.SkQwertz => SkQwertzOverrides(),
+
+                KeyboardLayoutType.HrQwertz => HrQwertzOverrides(),
+
+                KeyboardLayoutType.ChDeQwertz or
+                KeyboardLayoutType.ChFrQwertz => SwissQwertzOverrides(),
+
+                KeyboardLayoutType.FrAzerty or
+                KeyboardLayoutType.BeAzerty => FrAzertyOverrides(),
+
+                KeyboardLayoutType.ItQwerty => ItQwertyOverrides(),
+                KeyboardLayoutType.EsQwerty => EsQwertyOverrides(),
+
+                KeyboardLayoutType.SeQwerty or
+                KeyboardLayoutType.NoQwerty or
+                KeyboardLayoutType.DkQwerty or
+                KeyboardLayoutType.FiQwerty => SeQwertyOverrides(),
+
+                KeyboardLayoutType.DvorakUs => DvorakUsOverrides(),
+                KeyboardLayoutType.DvorakDe => DvorakDeOverrides(),
+
+                KeyboardLayoutType.TrQwerty => TrQwertyOverrides(),
+
+                // UK and US_Intl are identical to US base for our label purposes
+                KeyboardLayoutType.UkQwerty or
+                KeyboardLayoutType.UsIntl => EmptyDict,
+
+                _ => EmptyDict,
+            };
+        }
+
+        private static readonly Dictionary<int, string> EmptyDict = new();
+
+        /* ---- Zone index map (for reference) ----
+         * Row 1 (num):  84=`  85=1  86=2  87=3  88=4  89=5  90=6  91=7  92=8  93=9  94=0  95=-  96==
+         * Row 2 (qpo):  65=Q  66=W  67=E  68=R  69=T  70=Y  71=U  72=I  73=O  74=P  75=[  76=]
+         * Row 3 (asl):  44=A  45=S  46=D  47=F  48=G  49=H  50=J  51=K  52=L  53=;  54='  55=\
+         * Row 4 (zmc):  23=\  24=Z  25=X  26=C  27=V  28=B  29=N  30=M  31=,  32=.  33=/
+         * ---------------------------------------------------------------
+         */
+
+        /* ---- German QWERTZ (DE, HU) ---- */
+        private static Dictionary<int, string> DeQwertzOverrides()
+        {
+            return new Dictionary<int, string>
+            {
+                { 84, "^" },   { 95, "ß" },   { 96, "´" },
+                { 70, "Z" },   { 24, "Y" },   { 75, "Ü" },   { 76, "+" },
+                { 53, "Ö" },   { 54, "Ä" },   { 55, "#" },
+                { 23, "<" },
+            };
+        }
+
+        /* ---- Czech QWERTZ ---- */
+        private static Dictionary<int, string> CzQwertzOverrides()
+        {
+            return new Dictionary<int, string>
+            {
+                { 84, "°" },   { 95, "%" },   { 96, "ˇ" },
+                { 70, "Z" },   { 24, "Y" },   { 75, "/" },   { 76, "(" },
+                { 53, "ů" },   { 54, "§" },   { 55, "¨" },
+            };
+        }
+
+        /* ---- Slovak QWERTZ ---- */
+        private static Dictionary<int, string> SkQwertzOverrides()
+        {
+            return new Dictionary<int, string>
+            {
+                { 84, "°" },   { 95, "%" },   { 96, "ˇ" },
+                { 70, "Z" },   { 24, "Y" },   { 75, "/" },   { 76, "(" },
+                { 53, "ô" },   { 54, "§" },   { 55, "ň" },
+            };
+        }
+
+        /* ---- Croatian/Slovenian QWERTZ ---- */
+        private static Dictionary<int, string> HrQwertzOverrides()
+        {
+            return new Dictionary<int, string>
+            {
+                { 84, "¸" },   { 95, "'" },   { 96, "+" },
+                { 70, "Z" },   { 24, "Y" },   { 75, "Š" },   { 76, "Đ" },
+                { 53, "Č" },   { 54, "Ć" },   { 55, "Ž" },
+                { 23, "<" },
+            };
+        }
+
+        /* ---- Swiss QWERTZ ---- */
+        private static Dictionary<int, string> SwissQwertzOverrides()
+        {
+            return new Dictionary<int, string>
+            {
+                { 84, "§" },   { 95, "'" },   { 96, "^" },
+                { 70, "Z" },   { 24, "Y" },   { 75, "è" },   { 76, "¨" },
+                { 53, "é" },   { 54, "à" },   { 55, "$" },
+                { 23, "<" },
+            };
+        }
+
+        /* ---- French AZERTY ---- */
+        private static Dictionary<int, string> FrAzertyOverrides()
+        {
+            return new Dictionary<int, string>
+            {
+                { 84, "²" },   { 85, "&" },   { 86, "é" },   { 87, "\"" },
+                { 88, "'" },   { 89, "(" },   { 90, "-" },   { 91, "è" },
+                { 92, "_" },   { 93, "ç" },   { 94, "à" },   { 95, ")" },
+                { 65, "A" },   { 66, "Z" },   { 75, "^" },   { 76, "$" },
+                { 44, "Q" },   { 53, "M" },   { 54, "ù" },   { 55, "*" },
+                { 23, "<" },   { 24, "W" },   { 31, "," },   { 32, ";" },   { 33, "!" },
+            };
+        }
+
+        /* ---- Italian QWERTY ---- */
+        private static Dictionary<int, string> ItQwertyOverrides()
+        {
+            return new Dictionary<int, string>
+            {
+                { 84, "\\" },  { 95, "'" },   { 96, "ì" },
+                { 75, "è" },   { 76, "+" },
+                { 53, "ò" },   { 54, "à" },   { 55, "ù" },
+                { 23, "<" },
+            };
+        }
+
+        /* ---- Spanish QWERTY ---- */
+        private static Dictionary<int, string> EsQwertyOverrides()
+        {
+            return new Dictionary<int, string>
+            {
+                { 84, "º" },   { 95, "'" },   { 96, "¡" },
+                { 75, "`" },   { 76, "+" },
+                { 53, "Ñ" },   { 54, "´" },   { 55, "ç" },
+                { 23, "<" },
+            };
+        }
+
+        /* ---- Swedish/Finnish/Norwegian/Danish QWERTY ---- */
+        private static Dictionary<int, string> SeQwertyOverrides()
+        {
+            return new Dictionary<int, string>
+            {
+                { 84, "§" },   { 95, "+" },   { 96, "´" },
+                { 75, "Å" },   { 76, "¨" },
+                { 53, "Ö" },   { 54, "Ä" },   { 55, "'" },
+                { 23, "<" },
+            };
+        }
+
+        /* ---- Dvorak US overrides ---- */
+        private static Dictionary<int, string> DvorakUsOverrides()
+        {
+            return new Dictionary<int, string>
+            {
+                { 85, "\"" },  { 86, "\"" },  { 87, "<" },   { 88, ">" },
+                { 89, "(" },   { 90, ")" },   { 91, "{" },   { 92, "}" },
+                { 93, "[" },   { 94, "]" },   { 95, "\\" },  { 96, "|" },
+                { 65, "'" },   { 66, "," },   { 67, "." },   { 68, "P" },
+                { 69, "Y" },   { 70, "F" },   { 71, "G" },   { 72, "C" },
+                { 73, "R" },   { 74, "L" },   { 75, "/" },   { 76, "=" },
+                { 44, "A" },   { 45, "O" },   { 46, "E" },   { 47, "U" },
+                { 48, "I" },   { 49, "D" },   { 50, "H" },   { 51, "T" },
+                { 52, "N" },   { 53, "S" },   { 54, "-" },
+                { 23, "+" },   { 24, "J" },   { 25, "K" },   { 26, "X" },
+                { 27, "B" },   { 28, "M" },   { 29, "W" },   { 30, "Q" },
+                { 31, ">" },   { 32, "<" },   { 33, "?" },
+            };
+        }
+
+        /* ---- Dvorak German overrides ---- */
+        private static Dictionary<int, string> DvorakDeOverrides()
+        {
+            var overrides = DvorakUsOverrides();
+            overrides[53] = "Ö";
+            overrides[54] = "Ä";
+            overrides[55] = "ß";
+            overrides[23] = "Ü";
+            return overrides;
+        }
+
+        /* ---- Turkish QWERTY ---- */
+        private static Dictionary<int, string> TrQwertyOverrides()
+        {
+            return new Dictionary<int, string>
+            {
+                { 53, "ş" },   { 54, "i" },   { 55, "ğ" },
+                { 31, "ö" },   { 32, "ç" },
+            };
+        }
+
+        /* ---- Base zone positions (US QWERTY labels) ---- */
+        private static KeyboardZone[] BuildBaseZones()
         {
             // Right alignment axis for Del / Bksp / Enter / RShift
             const int RIGHT_EDGE = 578;
@@ -98,7 +333,7 @@ namespace Universal_x86_Tuning_Utility.Models
                 new() { Index = 95, Label = "-",    X = 410,  Y = 46 },
                 new() { Index = 96, Label = "=",    X = 448,  Y = 46 },
                 // Backspace: ends at RIGHT_EDGE (571)
-                new() { Index = 98, Label = "⌫",    X = 487,  Y = 46, Width = 84 },
+                new() { Index = 98, Label = "\u232B",    X = 487,  Y = 46, Width = 84 },
 
                 // Numpad row 1
                 new() { Index = 36, Label = "Num",  X = 576,  Y = 46 },
@@ -121,7 +356,7 @@ namespace Universal_x86_Tuning_Utility.Models
                 new() { Index = 75, Label = "[",    X = 430,  Y = 84 },
                 new() { Index = 76, Label = "]",    X = 468,  Y = 84 },
                 // Enter top half: ~1.8 keys (66px), ends at RIGHT_EDGE (571), spans 2 rows
-                new() { Index = 77, Label = "↵",    X = 511,  Y = 84, Width = 60, Height = 74 },
+                new() { Index = 77, Label = "\u21B5",    X = 511,  Y = 84, Width = 60, Height = 74 },
 
                 // Numpad row 2
                 new() { Index = 40, Label = "7",    X = 576,  Y = 84 },
@@ -153,7 +388,7 @@ namespace Universal_x86_Tuning_Utility.Models
 
                 // ===== Row 4: LShift + \ ZXCV + RShift + Numpad (Y=160) =====
                 // LShift: 1.3x normal (46px) so X aligns with LAlt
-                new() { Index = 22, Label = "⇧",    X = 0,    Y = 160, Width = 46 },
+                new() { Index = 22, Label = "\u21E7",    X = 0,    Y = 160, Width = 46 },
                 new() { Index = 23, Label = "\\",   X = 48,   Y = 160 },
                 new() { Index = 24, Label = "Z",    X = 86,   Y = 160 },
                 new() { Index = 25, Label = "X",    X = 124,  Y = 160 },
@@ -166,36 +401,36 @@ namespace Universal_x86_Tuning_Utility.Models
                 new() { Index = 32, Label = ".",    X = 390,  Y = 160 },
                 new() { Index = 33, Label = "/",    X = 428,  Y = 160 },
                 // RShift: ends at RIGHT_EDGE (571), wider to absorb LShift shrink
-                new() { Index = 35, Label = "⇧",    X = 466,  Y = 160, Width = 104 },
+                new() { Index = 35, Label = "\u21E7",    X = 466,  Y = 160, Width = 104 },
 
                 // Numpad row 4
                 new() { Index = 60, Label = "1",    X = 576,  Y = 160 },
                 new() { Index = 61, Label = "2",    X = 614,  Y = 160 },
                 new() { Index = 62, Label = "3",    X = 652,  Y = 160 },
-                new() { Index = 97, Label = "↵",    X = 690,  Y = 160, Height = 74 },
+                new() { Index = 97, Label = "\u21B5",    X = 690,  Y = 160, Height = 74 },
 
                 // ===== Row 5: Modifiers + Space + Arrows + Numpad (Y=198) =====
                 new() { Index = 0,  Label = "Ctrl", X = 0,    Y = 198, Width = 46 },
                 new() { Index = 2,  Label = "Fn",   X = 48,   Y = 198, Width = 36 },
-                new() { Index = 3,  Label = "⊞",    X = 86,   Y = 198 },
+                new() { Index = 3,  Label = "\u229E",    X = 86,   Y = 198 },
                 new() { Index = 4,  Label = "Alt",  X = 124,  Y = 198, Width = 36 },
-                // Space: ends where M ends (M at X=314, W=36 → right edge 350)
+                // Space: ends where M ends (M at X=314, W=36 -> right edge 350)
                 new() { Index = 7,  Label = "Space",X = 162,  Y = 198, Width = 188 },
                 new() { Index = 10, Label = "Alt",  X = 352,  Y = 198, Width = 36 },
                 // Right Ctrl: ends at 449 so arrows start right after
                 new() { Index = 12, Label = "Ctrl", X = 390,  Y = 198, Width = 59 },
                 // Arrow Up: aligned with Arrow Down (X=493)
-                new() { Index = 14, Label = "↑",    X = 492,  Y = 204, Width = 38 },
+                new() { Index = 14, Label = "\u2191",    X = 492,  Y = 204, Width = 38 },
 
                 // Numpad row 5
                 new() { Index = 99, Label = "0",    X = 576,  Y = 198, Width = 74 },
                 new() { Index = 100, Label = ".",   X = 652,  Y = 198 },
 
                 // ===== Row 6: Arrow cluster (Y=236) =====
-                // ← starts after RCtrl (ends 449), → ends at RIGHT_EDGE (571)
-                new() { Index = 13, Label = "←",    X = 452,  Y = 242, Width = 38 },
-                new() { Index = 18, Label = "↓",    X = 492,  Y = 242, Width = 38 },
-                new() { Index = 15, Label = "→",    X = 532,  Y = 242, Width = 38 },
+                // <- starts after RCtrl (ends 449), -> ends at RIGHT_EDGE (571)
+                new() { Index = 13, Label = "\u2190",    X = 452,  Y = 242, Width = 38 },
+                new() { Index = 18, Label = "\u2193",    X = 492,  Y = 242, Width = 38 },
+                new() { Index = 15, Label = "\u2192",    X = 532,  Y = 242, Width = 38 },
             };
         }
     }

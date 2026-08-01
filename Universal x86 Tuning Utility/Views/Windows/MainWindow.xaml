@@ -193,7 +193,9 @@
                          FocusOnLeftClick="False"
                          Icon="pack://application:,,,/Assets/applicationIcon-256.png"
                          MenuOnRightClick="True"
-                         TooltipText="Universal x86 Tuning Utility">
+                         TooltipText="Universal x86 Tuning Utility"
+                         Width="48"
+                         Height="48">
             <tray:NotifyIcon.Menu>
                 <ContextMenu Opened="TrayMenu_Opened">
                     <MenuItem x:Name="miPremadePresets"

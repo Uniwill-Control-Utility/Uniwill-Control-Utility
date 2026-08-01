@@ -72,7 +72,7 @@
         </Button>
 
         <Popup x:Name="_popup"
-               Width="320"
+               Width="340"
                AllowsTransparency="True"
                HorizontalOffset="-120"
                Placement="Bottom"
@@ -102,7 +102,7 @@
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="140"/>
                         </Grid.ColumnDefinitions>
 
                         <Label Grid.Row="0" Grid.Column="0"

@@ -12,11 +12,13 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
     /// Full keyboard visualizer with 126 per-key zones on a Canvas.
     /// Canvas-based layout (like LenovoLegionToolkit) with Viewbox for scaling.
     /// Supports click-to-select, Ctrl+multi-select, and color updates.
+    /// Automatically detects the current Windows input keyboard layout for labels.
     /// </summary>
     public partial class KeyboardVisualizerControl : UserControl
     {
         private readonly Dictionary<int, KeyboardZoneControl> _zoneControls = new();
         private bool _isBuilt;
+        private KeyboardLayoutType _layout;
 
         /// <summary>
         /// Raised when keys are selected (single or multi-select).
@@ -26,6 +28,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
         public KeyboardVisualizerControl()
         {
             InitializeComponent();
+            _layout = KeyboardLayoutDetector.Detect();
         }
 
         /// <summary>Lazy-loads the keyboard layout on first access to avoid navigation lag.</summary>
@@ -39,7 +42,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
 
         private void BuildKeyboard()
         {
-            var zones = KeyboardZone.GetAllZones();
+            var zones = KeyboardZone.GetAllZones(_layout);
 
             foreach (var zone in zones)
             {
@@ -60,6 +63,32 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
 
                 _keyboardCanvas.Children.Add(control);
                 _zoneControls[zone.Index] = control;
+            }
+        }
+
+        /// <summary>
+        /// Rebuilds the keyboard visualizer with the current detected input layout.
+        /// Call this when the user switches Windows input language.
+        /// </summary>
+        public void RefreshLayout()
+        {
+            var newLayout = KeyboardLayoutDetector.Detect();
+            if (newLayout == _layout)
+                return;
+
+            _layout = newLayout;
+            RebuildLabels();
+        }
+
+        private void RebuildLabels()
+        {
+            var zones = KeyboardZone.GetAllZones(_layout);
+            foreach (var zone in zones)
+            {
+                if (_zoneControls.TryGetValue(zone.Index, out var control))
+                {
+                    control.Label = zone.Label;
+                }
             }
         }
 
