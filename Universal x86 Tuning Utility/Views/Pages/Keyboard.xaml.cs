@@ -396,7 +396,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         {
             if (cmbEffect.SelectedItem is not KeyboardEffect effect)
             {
-                ColorSeparator.Visibility = Visibility.Collapsed;
                 ColorRow.Visibility = Visibility.Collapsed;
                 MultiColorRow.Visibility = Visibility.Collapsed;
                 GamingModeFullRestRow.Visibility = Visibility.Collapsed;
@@ -410,7 +409,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // Rainbow has fixed colors — no color controls, no speed, no direction.
             if (effect == KeyboardEffect.Rainbow)
             {
-                ColorSeparator.Visibility = Visibility.Collapsed;
                 ColorRow.Visibility = Visibility.Collapsed;
                 MultiColorRow.Visibility = Visibility.Collapsed;
                 GamingModeFullRestRow.Visibility = Visibility.Collapsed;
@@ -467,7 +465,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             bool anyControlVisible = ColorRow.Visibility == Visibility.Visible
                 || MultiColorRow.Visibility == Visibility.Visible
                 || SpeedRow.Visibility == Visibility.Visible;
-            ColorSeparator.Visibility = anyControlVisible ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void DirectionButton_Click(object sender, RoutedEventArgs e)
