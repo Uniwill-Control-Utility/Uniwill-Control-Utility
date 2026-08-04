@@ -29,6 +29,9 @@ namespace Universal_x86_Tuning_Utility.Services
         /// <summary>Whether Adaptive Mode is currently overriding EC Fan Control.</summary>
         public bool IsEcFanOverridden { get; private set; }
 
+        /// <summary>Whether Adaptive Mode is currently overriding Keyboard RGB.</summary>
+        public bool IsKeyboardOverridden { get; private set; }
+
         /// <summary>The last Flydigi preset applied from Adaptive Mode (null when nothing has been applied yet).</summary>
         public FlydigiPresetAppliedEventArgs? LastAppliedFlydigiPreset { get; private set; }
 
@@ -37,6 +40,9 @@ namespace Universal_x86_Tuning_Utility.Services
 
         /// <summary>The last EC Fan curve applied from Adaptive Mode (null when nothing has been applied yet).</summary>
         public EcFanPresetAppliedEventArgs? LastAppliedEcFanPreset { get; private set; }
+
+        /// <summary>The last Keyboard preset applied from Adaptive Mode (null when nothing has been applied yet).</summary>
+        public KeyboardPresetAppliedEventArgs? LastAppliedKeyboardPreset { get; private set; }
 
         /// <summary>
         /// Raised when the Flydigi override state changes.
@@ -75,6 +81,18 @@ namespace Universal_x86_Tuning_Utility.Services
         public event EventHandler<EcFanPresetAppliedEventArgs>? EcFanPresetApplied;
 
         /// <summary>
+        /// Raised when the Keyboard RGB override state changes.
+        /// Args: (isOverridden)
+        /// </summary>
+        public event EventHandler<bool>? KeyboardOverrideChanged;
+
+        /// <summary>
+        /// Raised when profile-specific Keyboard RGB settings have been applied and the Keyboard
+        /// page should update its UI controls to reflect the profile's values.
+        /// </summary>
+        public event EventHandler<KeyboardPresetAppliedEventArgs>? KeyboardPresetApplied;
+
+        /// <summary>
         /// Saved user Flydigi settings, captured when override is enabled.
         /// Restored when override is lifted.
         /// </summary>
@@ -86,11 +104,17 @@ namespace Universal_x86_Tuning_Utility.Services
         /// </summary>
         private WaterCoolerSettings? _savedWatercoolerSettings;
 
-        /// <summary>
+       /// <summary>
         /// Saved user EC Fan settings, captured when override is enabled.
         /// Restored when override is lifted.
         /// </summary>
         private FanControlSettings? _savedEcFanSettings;
+
+        /// <summary>
+        /// Saved user Keyboard settings, captured when override is enabled.
+        /// Restored when override is lifted.
+        /// </summary>
+        private KeyboardSettings? _savedKeyboardSettings;
 
         public DeviceApplier(FlydigiCoolerService flydigiService, Bs1Service? bs1Service, WaterCoolerService waterCoolerService, UniwillECService? uniwillEc = null)
         {
@@ -346,7 +370,7 @@ namespace Universal_x86_Tuning_Utility.Services
             return curve;
         }
 
-        private static EcFanCurve GetPresetCurve(string? name) => name switch
+         private static EcFanCurve GetPresetCurve(string? name) => name switch
         {
             "Silent" => EcFanCurve.CreateSilent(),
             "Balanced" => EcFanCurve.CreateBalanced(),
@@ -354,6 +378,308 @@ namespace Universal_x86_Tuning_Utility.Services
             "Full Speed" => EcFanCurve.CreateFullSpeed(),
             "Off" => EcFanCurve.CreateOff(),
             _ => EcFanCurve.CreateBalanced()
+        };
+
+        /* ------------------------------------------------------------------ */
+        /*  Keyboard Override Management                                       */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>
+        /// Enables Adaptive Mode override for Keyboard RGB.
+        /// Captures the current user settings so they can be restored later.
+        /// </summary>
+        public void EnableKeyboardOverride()
+        {
+            if (IsKeyboardOverridden)
+                return;
+
+            // Capture current user keyboard settings before overriding
+            _savedKeyboardSettings = KeyboardSettingsService.Load();
+            IsKeyboardOverridden = true;
+            KeyboardOverrideChanged?.Invoke(this, true);
+        }
+
+        /// <summary>
+        /// Disables Adaptive Mode override for Keyboard RGB.
+        /// Restores the previously saved user settings, persists them to disk,
+        /// and applies them to the HID device immediately.
+        /// </summary>
+        public void DisableKeyboardOverride()
+        {
+            if (!IsKeyboardOverridden)
+                return;
+
+            IsKeyboardOverridden = false;
+
+            KeyboardSettings? saved = _savedKeyboardSettings;
+            if (saved != null)
+            {
+                KeyboardSettingsService.Save(saved);
+                _savedKeyboardSettings = null;
+            }
+
+            // Clear the cached preset so the Keyboard page doesn't re-apply it
+            // when navigating after override is lifted.
+            LastAppliedKeyboardPreset = null;
+
+            KeyboardOverrideChanged?.Invoke(this, false);
+
+            // Apply restored settings to the HID device immediately so the hardware
+            // doesn't stay on the Adaptive Mode preset while the user is still on
+            // the Adaptive page.
+            if (saved != null)
+            {
+                var s = saved;
+                _ = Task.Run(() =>
+                {
+                    ApplyKeyboardHid(s.PerKeyMode, s.Brightness, s.EffectMode, s.Speed,
+                        s.Direction, s.ColorR, s.ColorG, s.ColorB, s.MultiColors, s.PerKeyColors,
+                        0, 0, 0);
+                });
+            }
+        }
+
+        /// <summary>
+        /// Applies keyboard RGB settings from Adaptive Mode.
+        /// Fires KeyboardPresetApplied so the Keyboard page can sync its UI.
+        /// </summary>
+        public void ApplyKeyboardFromPreset(
+            bool perKeyMode,
+            int brightness,
+            bool idleTimerEnabled,
+            int idleTimerMinutes,
+            string effectMode,
+            byte effectSpeed,
+            string direction,
+            byte colorR,
+            byte colorG,
+            byte colorB,
+            string multiColors,
+            string? perKeyColors,
+            byte restColorR,
+            byte restColorG,
+            byte restColorB)
+        {
+            try
+            {
+                // Persist the preset settings so the Keyboard page can pick them up.
+                // Load existing settings first to preserve per-key colors when switching
+                // to Effects mode — we don't want to wipe saved per-key data.
+                var settings = KeyboardSettingsService.Load();
+                settings.PowerOn = true;
+                settings.PerKeyMode = perKeyMode;
+                settings.Brightness = brightness;
+                settings.IdleTimerEnabled = idleTimerEnabled;
+                settings.IdleTimerMinutes = idleTimerMinutes;
+                settings.EffectMode = ParseKeyboardEffect(effectMode);
+                settings.Speed = effectSpeed;
+                settings.Direction = ParseKeyboardDirection(direction);
+                settings.ColorR = colorR;
+                settings.ColorG = colorG;
+                settings.ColorB = colorB;
+                settings.MultiColors = multiColors;
+                // Only update per-key colors when actually in per-key mode with data.
+                // This preserves previously saved per-key colors when the user switches
+                // to Effects mode, so they're available if the user switches back.
+                if (perKeyMode && !string.IsNullOrEmpty(perKeyColors))
+                    settings.PerKeyColors = perKeyColors;
+                KeyboardSettingsService.Save(settings);
+
+                var args = new KeyboardPresetAppliedEventArgs(
+                    perKeyMode, brightness, idleTimerEnabled, idleTimerMinutes,
+                    effectMode, effectSpeed, settings.Direction,
+                    colorR, colorG, colorB, multiColors, perKeyColors,
+                    restColorR, restColorG, restColorB);
+                LastAppliedKeyboardPreset = args;
+                KeyboardPresetApplied?.Invoke(this, args);
+
+                // Send HID commands directly so the keyboard updates immediately even when
+                // the Keyboard page is not visible. The Keyboard page's debounce timer will
+                // also fire if it's visible, but that's harmless (idempotent HID writes).
+                // The ITE firmware needs ~500ms to settle after power-on before accepting
+                // direction bytes. Without this delay, direction defaults to Left→Right.
+                if (settings.Direction != KeyboardDirection.LeftRight)
+                    System.Threading.Thread.Sleep(500);
+                ApplyKeyboardHid(perKeyMode, brightness, settings.EffectMode, effectSpeed,
+                    settings.Direction, colorR, colorG, colorB, multiColors, perKeyColors,
+                    restColorR, restColorG, restColorB);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to apply Keyboard preset from profile");
+            }
+        }
+
+        // Effects that need 7 multi-color slots
+        private static readonly HashSet<KeyboardEffect> s_multiColor7Effects = new()
+        {
+            KeyboardEffect.Breathing, KeyboardEffect.Wave, KeyboardEffect.Reactive,
+            KeyboardEffect.Ripple, KeyboardEffect.Marquee, KeyboardEffect.Raindrop,
+            KeyboardEffect.Aurora, KeyboardEffect.TouchAurora,
+            KeyboardEffect.TouchSpark, KeyboardEffect.Spark, KeyboardEffect.Music,
+        };
+
+        // Effects that need 4 multi-color slots
+        private static readonly HashSet<KeyboardEffect> s_multiColor4Effects = new()
+        {
+            KeyboardEffect.GamingMode,
+        };
+
+        // Effects that need 4+1 multi-color slots
+        private static readonly HashSet<KeyboardEffect> s_multiColor4Plus1Effects = new()
+        {
+            KeyboardEffect.GamingModeFull,
+        };
+
+        /// <summary>
+        /// Sends keyboard HID commands directly to the device.
+        /// </summary>
+        private void ApplyKeyboardHid(bool perKeyMode, int brightness, KeyboardEffect effect,
+            byte effectSpeed, KeyboardDirection direction, byte r, byte g, byte b,
+            string multiColors, string? perKeyColors,
+            byte restColorR, byte restColorG, byte restColorB)
+        {
+            var hid = new KeyboardHidService();
+            try
+            {
+                if (!hid.Open())
+                    return;
+
+                int brightnessPercent = (brightness * 100) / 7;
+
+                if (perKeyMode && !string.IsNullOrEmpty(perKeyColors))
+                {
+                    // Per-key mode: SendAllPerKeyColorsFromDict handles entering
+                    // UserMode and sending all rows. Set brightness first.
+                    hid.SetPerKeyBrightness(brightnessPercent);
+                    var tempSettings = new KeyboardSettings { PerKeyColors = perKeyColors };
+                    var colors = tempSettings.GetPerKeyColors();
+                    if (colors.Count > 0)
+                    {
+                        hid.SendAllPerKeyColorsFromDict(colors);
+                    }
+                }
+                else
+                {
+                    // Effects mode: exit per-key mode, set color, then apply effect.
+                    // The effect must be sent BEFORE the multi-color palette so the
+                    // ITE controller knows how to interpret the upcoming color data.
+                    hid.ExitPerKeyMode();
+                    hid.TurnOn(r, g, b, brightnessPercent);
+
+                    hid.SetEffect(effect, effectSpeed, direction);
+
+                    // Multi-color effects need additional color reports after effect is set.
+                    if (!string.IsNullOrEmpty(multiColors))
+                    {
+                        var multiColorList = ParseMultiColorString(multiColors);
+                        if (multiColorList.Count > 0)
+                        {
+                            if (s_multiColor7Effects.Contains(effect))
+                            {
+                                hid.SetMultiColor(multiColorList);
+                            }
+                            else if (s_multiColor4Effects.Contains(effect))
+                            {
+                                hid.SetMultiColor(multiColorList.Take(4).ToList());
+                            }
+                            else if (s_multiColor4Plus1Effects.Contains(effect))
+                            {
+                                var allColors = multiColorList.Take(4).ToList();
+                                allColors.Add(Color.FromRgb(restColorR, restColorG, restColorB));
+                                hid.SetMultiColor(allColors);
+                            }
+                        }
+                        else
+                        {
+                            ApplyFallbackMultiColor(hid, effect, r, g, b);
+                        }
+                    }
+                    else
+                    {
+                        ApplyFallbackMultiColor(hid, effect, r, g, b);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to send keyboard HID commands");
+            }
+            finally
+            {
+                hid.Dispose();
+            }
+        }
+
+        private static List<Color> ParseMultiColorString(string data)
+        {
+            var result = new List<Color>();
+            foreach (var part in data.Split(',', System.StringSplitOptions.RemoveEmptyEntries))
+            {
+                try
+                {
+                    var hex = part.Trim();
+                    if (hex.StartsWith("#"))
+                        hex = hex.Substring(1);
+                    if (hex.Length == 6)
+                    {
+                        var r = byte.Parse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber);
+                        var g = byte.Parse(hex.Substring(2, 2), System.Globalization.NumberStyles.HexNumber);
+                        var b = byte.Parse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber);
+                        result.Add(Color.FromRgb(r, g, b));
+                    }
+                }
+                catch { }
+            }
+            return result;
+        }
+
+        private static void ApplyFallbackMultiColor(KeyboardHidService hid, KeyboardEffect effect, byte r, byte g, byte b)
+        {
+            if (s_multiColor7Effects.Contains(effect))
+            {
+                hid.SetMultiColor(new[] { Color.FromRgb(r, g, b) });
+            }
+            else if (s_multiColor4Effects.Contains(effect))
+            {
+                hid.SetMultiColor(new[] { Color.FromRgb(r, g, b) });
+            }
+            else if (s_multiColor4Plus1Effects.Contains(effect))
+            {
+                hid.SetMultiColor(new[] { Color.FromRgb(r, g, b) });
+            }
+        }
+
+        private static KeyboardEffect ParseKeyboardEffect(string name) => name switch
+        {
+            "Static" => KeyboardEffect.Static,
+            "Breathing" => KeyboardEffect.Breathing,
+            "Wave" => KeyboardEffect.Wave,
+            "Reactive" => KeyboardEffect.Reactive,
+            "Rainbow" => KeyboardEffect.Rainbow,
+            "Ripple" => KeyboardEffect.Ripple,
+            "TouchRipple" => KeyboardEffect.TouchRipple,
+            "Marquee" => KeyboardEffect.Marquee,
+            "Raindrop" => KeyboardEffect.Raindrop,
+            "Aurora" => KeyboardEffect.Aurora,
+            "TouchAurora" => KeyboardEffect.TouchAurora,
+            "TouchSpark" => KeyboardEffect.TouchSpark,
+            "Spark" => KeyboardEffect.Spark,
+            "GamingMode" => KeyboardEffect.GamingMode,
+            "GamingModeFull" => KeyboardEffect.GamingModeFull,
+            "Music" => KeyboardEffect.Music,
+            _ => KeyboardEffect.Static,
+        };
+
+        private static KeyboardDirection ParseKeyboardDirection(string name) => name switch
+        {
+            "LeftRight" => KeyboardDirection.LeftRight,
+            "RightLeft" => KeyboardDirection.RightLeft,
+            "DownUp" => KeyboardDirection.DownUp,
+            "UpDown" => KeyboardDirection.UpDown,
+            "DiagonalBottomRightToTopLeft" => KeyboardDirection.DiagonalBottomRightToTopLeft,
+            "DiagonalBottomLeftToTopRight" => KeyboardDirection.DiagonalBottomLeftToTopRight,
+            _ => KeyboardDirection.LeftRight,
         };
 
         /* ------------------------------------------------------------------ */
@@ -702,6 +1028,53 @@ namespace Universal_x86_Tuning_Utility.Services
             FanSpeed = fanSpeed;
             RgbMode = rgbMode;
             RgbColor = rgbColor;
+        }
+    }
+
+    /// <summary>
+    /// Raised when profile-specific Keyboard RGB settings have been applied.
+    /// The Keyboard page should sync its UI controls to reflect these values.
+    /// </summary>
+    public class KeyboardPresetAppliedEventArgs : EventArgs
+    {
+        public bool PerKeyMode { get; }
+        public int Brightness { get; }
+        public bool IdleTimerEnabled { get; }
+        public int IdleTimerMinutes { get; }
+        public string EffectMode { get; }
+        public byte EffectSpeed { get; }
+        public KeyboardDirection Direction { get; }
+        public byte ColorR { get; }
+        public byte ColorG { get; }
+        public byte ColorB { get; }
+        public byte RestColorR { get; }
+        public byte RestColorG { get; }
+        public byte RestColorB { get; }
+        public string MultiColors { get; }
+        public string? PerKeyColors { get; }
+
+        public KeyboardPresetAppliedEventArgs(
+            bool perKeyMode, int brightness, bool idleTimerEnabled, int idleTimerMinutes,
+            string effectMode, byte effectSpeed, KeyboardDirection direction,
+            byte colorR, byte colorG, byte colorB,
+            string multiColors, string? perKeyColors,
+            byte restColorR, byte restColorG, byte restColorB)
+        {
+            PerKeyMode = perKeyMode;
+            Brightness = brightness;
+            IdleTimerEnabled = idleTimerEnabled;
+            IdleTimerMinutes = idleTimerMinutes;
+            EffectMode = effectMode;
+            EffectSpeed = effectSpeed;
+            Direction = direction;
+            ColorR = colorR;
+            ColorG = colorG;
+            ColorB = colorB;
+            RestColorR = restColorR;
+            RestColorG = restColorG;
+            RestColorB = restColorB;
+            MultiColors = multiColors;
+            PerKeyColors = perKeyColors;
         }
     }
 

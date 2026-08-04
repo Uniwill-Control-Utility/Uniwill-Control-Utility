@@ -1,0 +1,114 @@
+<ui:FluentWindow x:Class="Universal_x86_Tuning_Utility.Views.Windows.KeyboardPerKeyDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:Universal_x86_Tuning_Utility.Views.Controls"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="Per-Key RGB"
+        Width="820"
+        Height="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica"
+        WindowCornerPreference="Round">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Title bar (drag handle) -->
+        <ui:TitleBar Grid.Row="0"
+                     Title="Per-Key RGB"
+                     ShowMinimize="False"
+                     ShowMaximize="False"
+                     ShowClose="True" />
+
+        <!-- Content -->
+        <Grid Grid.Row="1" Margin="16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="16" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Title -->
+            <TextBlock Grid.Row="0"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       Text="Per-Key RGB Colors"
+                       Margin="0,0,0,8" />
+
+            <!-- Visualizer -->
+            <controls:KeyboardVisualizerControl x:Name="_visualizer"
+                                                 Grid.Row="1" />
+
+            <!-- Action row -->
+            <Grid Grid.Row="2" Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <ui:Button Appearance="Transparent"
+                               Content="Select All"
+                               Click="SelectAll_Click"
+                               Margin="0,0,8,0" />
+                    <ui:Button Appearance="Transparent"
+                               Content="Clear Selection"
+                               Click="ClearSelection_Click"
+                               Margin="0,0,8,0" />
+                    <ui:Button x:Name="_fillAllBtn"
+                               Appearance="Transparent"
+                               Content="Fill All"
+                               Click="FillAll_Click" />
+                </StackPanel>
+
+                <controls:ColorPickerControl x:Name="_colorPicker"
+                                             Grid.Column="1"
+                                             Margin="0,0,12,0"
+                                             SelectedColor="Black" />
+
+                <ui:Button x:Name="_applyBtn"
+                           Grid.Column="2"
+                           Appearance="Primary"
+                           Content="Apply"
+                           Click="Apply_Click" />
+            </Grid>
+
+            <!-- Spacing row -->
+
+            <!-- OK/Cancel -->
+            <Grid Grid.Row="4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           x:Name="_statusText"
+                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                           VerticalAlignment="Center"
+                           Text="Select keys and choose a color, then Apply." />
+
+                <ui:Button Grid.Column="1"
+                           Appearance="Primary"
+                           Content="OK"
+                           Click="Ok_Click"
+                           MinWidth="80"
+                           Margin="0,0,8,0" />
+
+                <ui:Button Grid.Column="2"
+                           Content="Cancel"
+                           Click="Cancel_Click"
+                           MinWidth="80" />
+            </Grid>
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

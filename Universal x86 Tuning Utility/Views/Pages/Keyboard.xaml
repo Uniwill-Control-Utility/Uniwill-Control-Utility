@@ -17,11 +17,24 @@
 
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <ScrollViewer Grid.Row="0"
+        <StackPanel Orientation="Vertical" Grid.Row="0" Margin="24,12,24,8">
+            <TextBlock FontSize="26"
+               FontWeight="Medium"
+               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+               Text="Keyboard" />
+                        <TextBlock Margin="0,4,0,12"
+               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+               Text="Customize your keyboard backlight and lighting effects."
+               TextWrapping="Wrap" />
+        </StackPanel>
+        
+
+        <ScrollViewer Grid.Row="1"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       CanContentScroll="False"
@@ -41,16 +54,8 @@
                 </Style>
             </ScrollViewer.Style>
 
-            <StackPanel Margin="18,10,36,18">
-                <TextBlock FontSize="26"
-                           FontWeight="Medium"
-                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                           Text="Keyboard" />
-                <TextBlock Margin="0,4,0,12"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           Text="Customize your keyboard backlight."
-                           TextWrapping="Wrap" />
-
+            <StackPanel Margin="18,0,36,18">
+               
                 <!-- Unavailable state -->
                 <StackPanel x:Name="KeyboardUnavailable" Visibility="Collapsed">
                     <Border Margin="0,8,0,0"
@@ -68,6 +73,7 @@
                                          Glyph="&#xE7A7;"
                                          FontSize="16"
                                          Margin="0,0,10,0"
+                                         Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                          VerticalAlignment="Center" />
                             <TextBlock Grid.Column="1"
                                        Text="Keyboard control is not available on this device. This feature requires an ITE HID lighting controller (vid_048d)."
@@ -85,18 +91,27 @@
                         <ui:CardControl Margin="0,0,0,8">
                             <ui:CardControl.Header>
                                 <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <ui:FontIcon Grid.Column="0"
+                                     FontFamily="Segoe Fluent Icons"
+                                     Glyph="&#xE8D3;"
+                                     FontSize="20"
+                                     Margin="4,0,20,0"
+                                     VerticalAlignment="Center" />
+                                    
+                                <StackPanel Grid.Column="1">
                                         <TextBlock FontWeight="DemiBold" Text="Per-key RGB control" />
                                         <TextBlock FontSize="12"
                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                                    Text="Enable per-key color control instead of animation effects." />
                                     </StackPanel>
                                     <ui:ToggleSwitch x:Name="ModeToggle"
-                                                     Grid.Column="1"
+                                                     Grid.Column="2"
                                                      Margin="0,0,9,0"
                                                      Checked="ModeToggle_Checked"
                                                      Unchecked="ModeToggle_Checked" />
@@ -105,22 +120,28 @@
                         </ui:CardControl>
 
                         <!-- Idle Timer (common to both modes) -->
-                        <ui:CardExpander x:Name="IdleTimerCard"
+                    <ui:CardExpander x:Name="IdleTimerCard"
                                         Margin="0,0,0,8"
                                         IsExpanded="False"
                                         Loaded="IdleTimerCard_Loaded"
                                         Expanded="IdleTimerCard_Expanded"
                                         Collapsed="IdleTimerCard_Collapsed">
-                            <ui:CardExpander.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xED41;" FontSize="20" />
-                            </ui:CardExpander.Icon>
-                            <ui:CardExpander.Header>
+                        <ui:CardExpander.Header>
                                 <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <ui:FontIcon Grid.Column="0"
+                                     FontFamily="Segoe Fluent Icons"
+                                     Glyph="&#xE916;"
+                                     FontSize="20"
+                                     Margin="4,0,20,0"
+                                     VerticalAlignment="Center" />
+                                    
+                                <StackPanel Grid.Column="1">
                                         <TextBlock FontWeight="DemiBold" Text="Idle Timer" />
                                         <TextBlock FontSize="12"
                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
@@ -128,7 +149,7 @@
                                                    TextWrapping="Wrap" />
                                     </StackPanel>
                                     <ui:ToggleSwitch x:Name="tsIdleTimer"
-                                                    Grid.Column="1"
+                                                    Grid.Column="2"
                                                     Margin="0,0,9,0"
                                                     Checked="TsIdleTimer_Toggled"
                                                     Unchecked="TsIdleTimer_Toggled" />
@@ -141,7 +162,7 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
+                                    <StackPanel Grid.Column="0" Margin="12,0,0,0">
                                         <TextBlock FontWeight="DemiBold" Text="Timeout" />
                                         <TextBlock FontSize="12"
                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
@@ -162,24 +183,33 @@
                         <ui:CardControl Margin="0,0,0,8">
                             <ui:CardControl.Header>
                                 <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <ui:FontIcon Grid.Column="0"
+                                     FontFamily="Segoe Fluent Icons"
+                                     Glyph="&#xE706;"
+                                     FontSize="20"
+                                     Margin="4,0,20,0"
+                                     VerticalAlignment="Center" />
+
+                                <StackPanel Grid.Column="1">
                                         <TextBlock FontWeight="DemiBold" Text="Brightness" />
                                         <TextBlock FontSize="12"
                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                                    Text="Adjust the backlight brightness level." />
                                     </StackPanel>
-                                    <StackPanel Grid.Column="1"
+                                    <StackPanel Grid.Column="2"
                                                 Orientation="Horizontal"
                                                 HorizontalAlignment="Right"
                                                 VerticalAlignment="Center">
                                         <TextBlock x:Name="BrightnessValueText"
                                                    Width="30"
-                                                   HorizontalAlignment="Right"
-                                                   Margin="0,0,12,0"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
                                                    Text="5" />
                                         <Slider x:Name="BrightnessSlider"
                                                 Width="140"
@@ -188,6 +218,7 @@
                                                 Value="5"
                                                 IsSnapToTickEnabled="True"
                                                 TickFrequency="1"
+                                                TickPlacement="Both"
                                                 IsMoveToPointEnabled="False"
                                                 ValueChanged="BrightnessSlider_ValueChanged" />
                                     </StackPanel>
@@ -198,7 +229,7 @@
                         <!-- ===== EFFECTS MODE CONTENT ===== -->
                         <StackPanel x:Name="EffectsContent">
                             <!-- Keyboard power toggle -->
-                            <ui:CardControl Margin="0,8,0,0">
+                            <ui:CardControl >
                                 <ui:CardControl.Header>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -209,9 +240,9 @@
 
                                         <ui:FontIcon Grid.Column="0"
                                                      FontFamily="Segoe Fluent Icons"
-                                                     Glyph="&#xE786;"
+                                                     Glyph="&#xED39;"
                                                      FontSize="20"
-                                                     Margin="0,0,12,0"
+                                                     Margin="4,0,20,0"
                                                      VerticalAlignment="Center" />
 
                                         <StackPanel Grid.Column="1">
@@ -233,12 +264,34 @@
 
                             <!-- Effect card with all controls -->
                             <ui:CardExpander Margin="0,8,0,0"
-                                            Header="Effect"
-                                            IsExpanded="True">
-                                <ui:CardExpander.Icon>
-                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE775;" FontSize="20" />
-                                </ui:CardExpander.Icon>
-                                <StackPanel>
+                                            IsExpanded="True"
+                                            >
+                                <ui:CardExpander.Header>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <ui:FontIcon Grid.Column="0"
+                                             FontFamily="Segoe Fluent Icons"
+                                             Glyph="&#xE794;"
+                                             FontSize="20"
+                                             Margin="4,0,20,0"
+                                             VerticalAlignment="Center" />
+
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock FontWeight="DemiBold" Text="Effects" />
+                                        <TextBlock FontSize="12"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                           Text="Choose between various keyboard lighting effects."
+                                           TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                        </ui:CardExpander.Header>
+                                        <StackPanel>
                                     <!-- Effect type -->
                                     <Grid Margin="0,4,0,0">
                                         <Grid.ColumnDefinitions>
@@ -259,7 +312,7 @@
                                                   SelectionChanged="CmbEffect_SelectionChanged" />
                                     </Grid>
 
-                                    <Separator Margin="0,12,0,12"
+                                    <Separator x:Name="ColorSeparator" Margin="0,12,0,12"
                                                Background="{DynamicResource ControlFillColorDefaultBrush}" />
 
                                     <!-- Color (visible for single-color effects) -->
@@ -329,7 +382,7 @@
                                                                      ColorChangedDelayed="GamingModeFullRestColor_ColorChangedDelayed" />
                                     </Grid>
 
-                                    <Separator Margin="0,12,0,12"
+                                    <Separator x:Name="SpeedSeparator" Margin="0,12,0,12"
                                                Background="{DynamicResource ControlFillColorDefaultBrush}" />
 
                                     <!-- Speed (visible for animated effects) -->
@@ -351,8 +404,8 @@
                                                     VerticalAlignment="Center">
                                             <TextBlock x:Name="SpeedValueText"
                                                        Width="30"
-                                                       HorizontalAlignment="Right"
-                                                       Margin="0,0,12,0"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
                                                        Text="5" />
                                             <Slider x:Name="SpeedSlider"
                                                     Width="140"
@@ -361,8 +414,54 @@
                                                     Value="5"
                                                     IsSnapToTickEnabled="True"
                                                     TickFrequency="1"
+                                                    TickPlacement="Both"
                                                     IsMoveToPointEnabled="False"
                                                     ValueChanged="SpeedSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Direction (visible for animated effects) -->
+                                    <Separator x:Name="DirectionSeparator" Margin="0,12,0,12"
+                                               Visibility="Collapsed"
+                                               Background="{DynamicResource ControlFillColorDefaultBrush}" />
+                                    <Grid x:Name="DirectionRow"
+                                          Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock FontWeight="DemiBold" Text="Direction" />
+                                            <TextBlock FontSize="12"
+                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                       Text="Control the animation direction (verified on Wave)." />
+                                        </StackPanel>
+                                        <!-- Single row of direction toggle buttons -->
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <ui:Button x:Name="btnDirLeftRight" Width="40" Height="36" Margin="0,0,4,0"
+                                                       Appearance="Transparent" Click="DirectionButton_Click" Tag="LeftRight">
+                                                <TextBlock Text="→" FontSize="18" HorizontalAlignment="Center"/>
+                                            </ui:Button>
+                                            <ui:Button x:Name="btnDirRightLeft" Width="40" Height="36" Margin="0,0,4,0"
+                                                       Appearance="Transparent" Click="DirectionButton_Click" Tag="RightLeft">
+                                                <TextBlock Text="←" FontSize="18" HorizontalAlignment="Center"/>
+                                            </ui:Button>
+                                            <ui:Button x:Name="btnDirDownUp" Width="40" Height="36" Margin="0,0,4,0"
+                                                       Appearance="Transparent" Click="DirectionButton_Click" Tag="DownUp">
+                                                <TextBlock Text="↑" FontSize="18" HorizontalAlignment="Center"/>
+                                            </ui:Button>
+                                            <ui:Button x:Name="btnDirUpDown" Width="40" Height="36" Margin="0,0,4,0"
+                                                       Appearance="Transparent" Click="DirectionButton_Click" Tag="UpDown">
+                                                <TextBlock Text="↓" FontSize="18" HorizontalAlignment="Center"/>
+                                            </ui:Button>
+                                            <ui:Button x:Name="btnDiagBRTL" Width="40" Height="36" Margin="0,0,4,0"
+                                                       Appearance="Transparent" Click="DirectionButton_Click" Tag="DiagonalBottomRightToTopLeft">
+                                                <TextBlock Text="↖" FontSize="18" HorizontalAlignment="Center"/>
+                                            </ui:Button>
+                                            <ui:Button x:Name="btnDiagBLTR" Width="40" Height="36" Margin="0,0,0,0"
+                                                       Appearance="Transparent" Click="DirectionButton_Click" Tag="DiagonalBottomLeftToTopRight">
+                                                <TextBlock Text="↗" FontSize="18" HorizontalAlignment="Center"/>
+                                            </ui:Button>
                                         </StackPanel>
                                     </Grid>
                                 </StackPanel>
@@ -422,5 +521,14 @@
                 </StackPanel>
             </StackPanel>
         </ScrollViewer>
+
+        <!-- Dark overlay for Adaptive Mode override (covers ScrollViewer to block input) -->
+        <Border x:Name="overlayAdaptiveWarning" Visibility="Collapsed" Background="Black" Opacity="0.4" CornerRadius="4"/>
+
+        <!-- Page-scoped snackbar presenter for Adaptive Mode override warning -->
+        <ui:SnackbarPresenter x:Name="SnackbarPresenter"
+                              Margin="12"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Bottom" />
     </Grid>
 </Page>

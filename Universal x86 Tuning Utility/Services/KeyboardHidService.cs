@@ -242,7 +242,7 @@ namespace Universal_x86_Tuning_Utility.Services
         [DllImport("setupapi.dll", SetLastError = true)]
         private static extern bool SetupDiEnumDeviceInterfaces(nint deviceInfoSet, nint deviceInfoData, ref Guid interfaceClassGuid, uint memberIndex, ref SpDeviceInterfaceData deviceInterfaceData);
 
-        [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [DllImport("setupapi.dll", CharSet = CharSet.Ansi, SetLastError = true)]
         private static extern bool SetupDiGetDeviceInterfaceDetail(nint deviceInfoSet, ref SpDeviceInterfaceData deviceInterfaceData, nint detailData, uint detailDataSize, out uint requiredSize, nint deviceInfoData);
 
         [DllImport("setupapi.dll", SetLastError = true)]
@@ -457,7 +457,7 @@ namespace Universal_x86_Tuning_Utility.Services
 
                         if (SetupDiGetDeviceInterfaceDetail(deviceInfoSet, ref ifaceData, buffer, requiredSize, out _, nint.Zero))
                         {
-                            string? path = Marshal.PtrToStringUni(buffer + 4);
+                            string? path = Marshal.PtrToStringAnsi(buffer + 4);
                             if (!string.IsNullOrEmpty(path) && path.Contains(ITE_VID_STRING, StringComparison.OrdinalIgnoreCase))
                             {
                                 list.Add(path);
@@ -514,7 +514,11 @@ namespace Universal_x86_Tuning_Utility.Services
 
         /// <summary>
         /// Turns on the keyboard backlight with the specified color and brightness.
-        /// Report format: 00 08 02 [effect] [speed] [brightness] 08 00 00
+        /// Sends zone enable, RGB color, and CMD_MODE_BRIGHTNESS initialization reports.
+        /// The CMD_MODE_BRIGHTNESS reports are required to initialize the controller's
+        /// effect engine — without them, certain effects (0x0F, 0x10) produce black output.
+        /// The effect byte here is Static (0x01) as a placeholder; callers should follow
+        /// with SetEffect() to apply the actual desired effect.
         /// </summary>
         public void TurnOn(byte r, byte g, byte b, int brightness)
         {
@@ -529,10 +533,10 @@ namespace Universal_x86_Tuning_Utility.Services
                 // Report 2: Set RGB color
                 SendReport(new byte[] { 0x00, CMD_SET_COLOR, (byte)ZoneKeyboard, 0x01, r, g, b, 0x00, 0x00 });
 
-                // Report 3: Set brightness (effect=Static 0x01, speed=0x05 medium)
+                // Report 3: Initialize effect engine (no zone mask)
                 SendReport(new byte[] { 0x00, CMD_MODE_BRIGHTNESS, 0x00, 0x01, 0x05, (byte)brightness, 0x00, 0x00, 0x00 });
 
-                // Update Report 3 with zone mask
+                // Report 4: Initialize effect engine (with zone mask)
                 SendReport(new byte[] { 0x00, CMD_MODE_BRIGHTNESS, ZoneMaskKeyboard, 0x01, 0x05, (byte)brightness, 0x08, 0x00, 0x00 });
 
                 _color = (r, g, b);
@@ -643,6 +647,8 @@ namespace Universal_x86_Tuning_Utility.Services
                 int error = Marshal.GetLastWin32Error();
                 DebugLog($"[KBD-HID] HidD_SetFeature failed (error {error}): {string.Join(", ", report.Select(b => $"0x{b:X2}"))}");
             }
+
+            DebugLog($"[KBD-HID] Sent: {string.Join(" ", report.Select(b => $"0x{b:X2}"))}");
         }
 
         /// <summary>
@@ -721,12 +727,14 @@ namespace Universal_x86_Tuning_Utility.Services
 
         /// <summary>
         /// Sets the keyboard lighting effect mode.
-        /// Sends a CMD_MODE_BRIGHTNESS (0x08) report with the effect in byte[3] and speed in byte[4].
-        /// Format: 00 08 02 [effect] [speed] [brightness] 08 00 00
+        /// Sends a CMD_MODE_BRIGHTNESS (0x08) report with the effect in byte[3], speed in byte[4],
+        /// and direction in byte[7].
+        /// Format: 00 08 02 [effect] [speed] [brightness] 08 [direction] 00
         /// Speed (byte[4]): 0x00 = fastest, 0x0B = frozen (effect active but no movement).
         /// Higher value = slower animation.
+        /// Direction (byte[7]): 0x00=Left→Right, 0x02=Right→Left, 0x03=Down→Up, etc.
         /// </summary>
-        public void SetEffect(KeyboardEffect effect, byte speed = 5)
+        public void SetEffect(KeyboardEffect effect, byte speed = 5, KeyboardDirection direction = KeyboardDirection.LeftRight)
         {
             EnsureAvailable();
 
@@ -734,6 +742,27 @@ namespace Universal_x86_Tuning_Utility.Services
             {
                 // Clamp speed to 0-0x0B range
                 byte clampedSpeed = (byte)Math.Clamp((int)speed, 0, 0x0B);
+                byte directionByte = (byte)direction;
+
+                // For variant effects (TouchAurora, TouchSpark), the ITE
+                // controller requires the base effect to be sent first, then the variant.
+                // A delay is needed between primer and variant for the firmware to process.
+                if (s_baseEffectForVariant.TryGetValue(effect, out var baseEffect))
+                {
+                    byte[] primer = new byte[]
+                    {
+                        0x00, CMD_MODE_BRIGHTNESS, ZoneMaskKeyboard,
+                        (byte)baseEffect, clampedSpeed, (byte)_brightness,
+                        0x08, directionByte, 0x00
+                    };
+                    SendReport(primer);
+                    DebugLog($"[KBD-HID] Effect primer {baseEffect} (0x{(byte)baseEffect:X2}) for {effect}");
+
+                    // The ITE controller needs time to process the primer before
+                    // accepting the variant byte. Without this delay, the primer
+                    // is overwritten and the variant falls back to Static or black.
+                    System.Threading.Thread.Sleep(50);
+                }
 
                 byte[] report = new byte[]
                 {
@@ -744,14 +773,54 @@ namespace Universal_x86_Tuning_Utility.Services
                     clampedSpeed,            // Speed: 0=fastest, 0x0B=frozen
                     (byte)_brightness,       // Current brightness
                     0x08,                    // Unknown constant
-                    0x00,                    // Reserved
+                    directionByte,           // Direction: byte[7]
                     0x00                     // Reserved
                 };
 
                 SendReport(report);
-                DebugLog($"[KBD-HID] Effect set to {effect} (0x{(byte)effect:X2}) speed={clampedSpeed}");
+                DebugLog($"[KBD-HID] Effect set to {effect} (0x{(byte)effect:X2}) speed={clampedSpeed} direction={direction}");
             }
         }
+
+        /// <summary>
+        /// Sends a direction override report that mimics the TurnOn() initialization
+        /// format. This is needed because the firmware locks in byte[7] (direction)
+        /// from the first CMD_MODE_BRIGHTNESS report with zone mask during initialization.
+        /// Calling this immediately after TurnOn() but before SetEffect() ensures the
+        /// firmware accepts the direction byte.
+        /// </summary>
+        public void SetDirection(KeyboardDirection direction)
+        {
+            EnsureAvailable();
+
+            lock (_lock)
+            {
+                byte directionByte = (byte)direction;
+                // Same format as TurnOn() report 4 but with the actual direction.
+                byte[] report = new byte[]
+                {
+                    0x00, CMD_MODE_BRIGHTNESS, ZoneMaskKeyboard,
+                    0x01,          // Static (safe init effect)
+                    0x05,          // default speed
+                    (byte)_brightness,
+                    0x08, directionByte, 0x00
+                };
+                SendReport(report);
+                DebugLog($"[KBD-HID] Direction override set to {direction} (0x{directionByte:X2})");
+            }
+        }
+
+        /// <summary>
+        /// Maps variant effects to their base effect that must be sent first.
+        /// The ITE controller firmware requires the base effect to be armed before
+        /// accepting the variant byte.
+        /// </summary>
+        private static readonly Dictionary<KeyboardEffect, KeyboardEffect> s_baseEffectForVariant = new()
+        {
+            { KeyboardEffect.TouchRipple, KeyboardEffect.Ripple },        // 0x07 needs 0x06
+            { KeyboardEffect.TouchAurora, KeyboardEffect.Aurora },        // 0x0F needs 0x0E
+            { KeyboardEffect.TouchSpark, KeyboardEffect.Spark },          // 0x10 needs 0x11
+        };
 
         /// <summary>
         /// Sends up to 7 colors to the HID controller using CMD_SET_COLOR (0x14).

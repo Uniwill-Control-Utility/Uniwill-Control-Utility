@@ -90,6 +90,24 @@ namespace Universal_x86_Tuning_Utility.Services
         public string EcFanGpuPreset { get; set; } = "Balanced";
         public int[]? EcFanGpuCustomDuties { get; set; }
 
+        // Keyboard RGB per-game settings
+        public bool KbEnabled { get; set; } = false;
+        public bool KbPerKeyMode { get; set; } = false;
+        public int KbBrightness { get; set; } = 5;
+        public bool KbIdleTimerEnabled { get; set; } = false;
+        public int KbIdleTimerMinutes { get; set; } = 10;
+        public string KbEffectMode { get; set; } = "Static";
+        public byte KbEffectSpeed { get; set; } = 5;
+        public string KbDirection { get; set; } = "LeftRight";
+        public byte KbColorR { get; set; } = 0;
+        public byte KbColorG { get; set; } = 255;
+        public byte KbColorB { get; set; } = 255;
+        public byte KbRestColorR { get; set; } = 255;
+        public byte KbRestColorG { get; set; } = 255;
+        public byte KbRestColorB { get; set; } = 255;
+        public string KbMultiColors { get; set; } = "";
+        public string? KbPerKeyColors { get; set; }
+
         [DefaultValue(true)]
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]
         public bool isAutoSwitch { get; set; }

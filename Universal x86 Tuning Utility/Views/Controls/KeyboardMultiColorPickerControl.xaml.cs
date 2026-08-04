@@ -57,12 +57,6 @@ public partial class KeyboardMultiColorPickerControl : UserControl
     /// <summary>Load colors into the control with a fixed swatch count (4 or 7).</summary>
     public void SetColors(IEnumerable<Color> colors, int count)
     {
-        SetColors(colors, count, false);
-    }
-
-    /// <summary>Load colors into the control. When suppressEvents is true, no ColorsChanged fires.</summary>
-    public void SetColors(IEnumerable<Color> colors, int count, bool suppressEvents)
-    {
         count = Math.Clamp(count, 1, MaxColors);
         var list = colors.ToList();
 
@@ -77,22 +71,21 @@ public partial class KeyboardMultiColorPickerControl : UserControl
         ColorChipsPanel.Children.Clear();
 
         foreach (var c in list)
-            AddColorInternal(c, suppressEvents);
+            AddColorInternal(c);
     }
 
     /* ------------------------------------------------------------------ */
     /*  Internal                                                           */
     /* ------------------------------------------------------------------ */
 
-    private ColorPickerControl AddColorInternal(Color color, bool suppressEvents)
+    private ColorPickerControl AddColorInternal(Color color)
     {
         var picker = new ColorPickerControl
         {
             SelectedColor = color,
             Margin = new Thickness(0, 0, 4, 0)
         };
-        if (!suppressEvents)
-            picker.ColorChangedDelayed += (s, e) => ColorsChanged?.Invoke(this, EventArgs.Empty);
+        picker.ColorChangedDelayed += (s, e) => ColorsChanged?.Invoke(this, EventArgs.Empty);
         ColorChipsPanel.Children.Add(picker);
         return picker;
     }

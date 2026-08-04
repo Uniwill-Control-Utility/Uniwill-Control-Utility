@@ -399,6 +399,9 @@ namespace Universal_x86_Tuning_Utility
 
                         if (Settings.Default.AdaptiveWcEnabled)
                             deviceApplier.EnableWatercoolerOverride();
+
+                        if (Settings.Default.AdaptiveKeyboardEnabled)
+                            deviceApplier.EnableKeyboardOverride();
                     }
                 }
                 catch (Exception ex)

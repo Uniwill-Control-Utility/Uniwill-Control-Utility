@@ -4,6 +4,7 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:local="clr-namespace:Universal_x86_Tuning_Utility.Views.Pages"
+      xmlns:controls="clr-namespace:Universal_x86_Tuning_Utility.Views.Controls"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       d:DataContext="{d:DesignInstance local:Adaptive, IsDesignTimeCreatable=False}"
       d:Background="{DynamicResource ApplicationBackgroundBrush}"
@@ -85,19 +86,17 @@
                           ScrollChanged="mainScroll_ScrollChanged">
                 <ScrollViewer.Style>
                     <Style TargetType="{x:Type ScrollViewer}"
-BasedOn="{StaticResource {x:Type ScrollViewer}}">
+                        BasedOn="{StaticResource {x:Type ScrollViewer}}">
 
                         <Setter Property="Padding"
-     Value="0" />
-
+                             Value="0" />
                         <Style.Triggers>
                             <DataTrigger
-     Binding="{Binding ComputedVerticalScrollBarVisibility,
-                       RelativeSource={RelativeSource Self}}"
-     Value="Visible">
-
+                                Binding="{Binding ComputedVerticalScrollBarVisibility,
+                                                RelativeSource={RelativeSource Self}}"
+                                Value="Visible">
                                 <Setter Property="Padding"
-             Value="0,0,12,0" />
+                                     Value="0,0,12,0" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -132,9 +131,9 @@ BasedOn="{StaticResource {x:Type ScrollViewer}}">
                         </ui:CardControl.Header>
                     </ui:CardControl>
                 <ui:CardExpander Name="sdBasic"
-            IsEnabled="True"
-            IsExpanded="False"
-            Icon="{ui:SymbolIcon Book20}" VerticalAlignment="Top" Margin="0,8,15,0">
+                    IsEnabled="True"
+                    IsExpanded="False"
+                    Icon="{ui:SymbolIcon Book20}" VerticalAlignment="Top" Margin="0,8,15,0">
                     <ui:CardExpander.Header>
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -208,9 +207,9 @@ BasedOn="{StaticResource {x:Type ScrollViewer}}">
                 </ui:CardExpander>
 
                 <ui:CardExpander Name="sdTBOiGPU"
-            IsEnabled="True"
-            IsExpanded="False"
-            Icon="{ui:SymbolIcon Pulse20}" VerticalAlignment="Top" Margin="0,8,15,0">
+                    IsEnabled="True"
+                    IsExpanded="False"
+                    Icon="{ui:SymbolIcon Pulse20}" VerticalAlignment="Top" Margin="0,8,15,0">
                     <ui:CardExpander.Header>
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -290,9 +289,9 @@ BasedOn="{StaticResource {x:Type ScrollViewer}}">
                         </StackPanel>
                 </ui:CardExpander>
                     <ui:CardExpander Name="sdUXTUSR"
-IsEnabled="True"
-IsExpanded="False"
-Icon="{ui:SymbolIcon Image24}" Margin="0,8,15,0">
+                        IsEnabled="True"
+                        IsExpanded="False"
+                        Icon="{ui:SymbolIcon Image24}" Margin="0,8,15,0">
                         <ui:CardExpander.Header>
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -301,13 +300,13 @@ Icon="{ui:SymbolIcon Image24}" Margin="0,8,15,0">
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                     <TextBlock
-                FontSize="14"
-                FontWeight="Medium"
-                Text="UXTU Super Resolution" />
+                                        FontSize="14"
+                                        FontWeight="Medium"
+                                        Text="UXTU Super Resolution" />
                                     <TextBlock
-                FontSize="12"
-                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                Text="Powered by a customised version of Magpie. Use Alt+F to toggle."/>
+                                        FontSize="12"
+                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                        Text="Powered by a customised version of Magpie. Use Alt+F to toggle."/>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Grid.Column="1">
                                     <ui:ToggleSwitch Name="tsUXTUSR" Margin="0,0,9,0"/>
@@ -368,8 +367,8 @@ Icon="{ui:SymbolIcon Image24}" Margin="0,8,15,0">
                                         <ColumnDefinition Width="208" />
                                     </Grid.ColumnDefinitions>
                                     <ComboBox
-Grid.Column="1"
-VerticalAlignment="Center" SelectedIndex="0" MinWidth="138" Name="cbxResScale" Height="37">
+                                        Grid.Column="1"
+                                        VerticalAlignment="Center" SelectedIndex="0" MinWidth="138" Name="cbxResScale" Height="37">
                                         <ComboBoxItem>Application Controlled</ComboBoxItem>
                                         <ComboBoxItem>Ultra Quality (77%)</ComboBoxItem>
                                         <ComboBoxItem>Quality (67%)</ComboBoxItem>
@@ -382,9 +381,9 @@ VerticalAlignment="Center" SelectedIndex="0" MinWidth="138" Name="cbxResScale" H
                         </StackPanel>
                     </ui:CardExpander>
                     <ui:CardExpander Name="sdADLX"
-            IsEnabled="True"
-            IsExpanded="False"
-            Icon="{ui:SymbolIcon Image24}" Margin="0,8,15,0">
+                        IsEnabled="True"
+                        IsExpanded="False"
+                        Icon="{ui:SymbolIcon Image24}" Margin="0,8,15,0">
                         <ui:CardExpander.Header>
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -489,9 +488,9 @@ VerticalAlignment="Center" SelectedIndex="0" MinWidth="138" Name="cbxResScale" H
                         </StackPanel>
                     </ui:CardExpander>
                     <ui:CardExpander Name="sdNVIDIA"
-IsEnabled="True"
-IsExpanded="False"
-Icon="{ui:SymbolIcon Pulse20}" Margin="0,8,15,0">
+                        IsEnabled="True"
+                        IsExpanded="False"
+                        Icon="{ui:SymbolIcon Pulse20}" Margin="0,8,15,0">
                         <ui:CardExpander.Header>
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -500,13 +499,13 @@ Icon="{ui:SymbolIcon Pulse20}" Margin="0,8,15,0">
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                     <TextBlock
-                FontSize="14"
-                FontWeight="Medium"
-                Text="NVIDIA GPU Tuning" />
+                                        FontSize="14"
+                                        FontWeight="Medium"
+                                        Text="NVIDIA GPU Tuning" />
                                     <TextBlock
-                FontSize="12"
-                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                Text="Provides the ability to set tune your NVIDIA GPU."/>
+                                        FontSize="12"
+                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                        Text="Provides the ability to set tune your NVIDIA GPU."/>
                                 </StackPanel>
 
                                 <StackPanel Orientation="Horizontal" Grid.Column="1">
@@ -563,9 +562,9 @@ Icon="{ui:SymbolIcon Pulse20}" Margin="0,8,15,0">
                             </StackPanel>
 
                             <TextBlock
-                FontSize="12"
-                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                Text="Warning: We are not liable for any damages to hardware or resulting instabilities caused by adjustment of frequencies and voltages." TextWrapping="WrapWithOverflow" Margin="0,8,0,0"/>
+                                FontSize="12"
+                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                Text="Warning: We are not liable for any damages to hardware or resulting instabilities caused by adjustment of frequencies and voltages." TextWrapping="WrapWithOverflow" Margin="0,8,0,0"/>
                         </StackPanel>
                     </ui:CardExpander>
                     <ui:CardExpander Name="sdWindowsProcessorPower"
@@ -699,8 +698,8 @@ Icon="{ui:SymbolIcon Pulse20}" Margin="0,8,15,0">
                         </StackPanel>
                     </ui:CardExpander>
                     <ui:CardControl Name="sdAsusPower"
-IsEnabled="True"
-Icon="{ui:SymbolIcon Power20}" Margin="0,8,15,0">
+                        IsEnabled="True"
+                        Icon="{ui:SymbolIcon Power20}" Margin="0,8,15,0">
                         <ui:CardControl.Header>
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -709,17 +708,17 @@ Icon="{ui:SymbolIcon Power20}" Margin="0,8,15,0">
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                     <TextBlock
-                FontSize="14"
-                FontWeight="Medium"
-                Text="ASUS Power Profile" />
+                                        FontSize="14"
+                                        FontWeight="Medium"
+                                        Text="ASUS Power Profile" />
                                     <TextBlock
-                FontSize="12"
-                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                Text="Provides the ability to set an ASUS power profile. This will override Armoury Crate!"/>
+                                        FontSize="12"
+                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                        Text="Provides the ability to set an ASUS power profile. This will override Armoury Crate!"/>
                                 </StackPanel>
                                 <ComboBox
-            Grid.Column="1"
-            VerticalAlignment="Center" SelectedIndex="0" MinWidth="164" Name="cbxAsusPower" Height="37">
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center" SelectedIndex="0" MinWidth="164" Name="cbxAsusPower" Height="37">
                                     <ComboBoxItem>AC Controlled</ComboBoxItem>
                                     <ComboBoxItem>Silent</ComboBoxItem>
                                     <ComboBoxItem>Performance</ComboBoxItem>
@@ -1057,10 +1056,14 @@ Icon="{ui:SymbolIcon Power20}" Margin="0,8,15,0">
                         </StackPanel>
                     </ui:CardExpander>
 
-                    <ui:CardExpander Name="sdRTSS" Visibility="Collapsed"
-IsEnabled="True"
-IsExpanded="False"
-Icon="{ui:SymbolIcon Pulse20}" Margin="0,8,15,0">
+                    <!-- Keyboard RGB - per-game keyboard backlight control -->
+                    <ui:CardExpander Name="sdKeyboard"
+                        IsEnabled="True"
+                        IsExpanded="False"
+                        Margin="0,8,15,0">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE92E;" FontSize="20" />
+                        </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -1069,13 +1072,246 @@ Icon="{ui:SymbolIcon Pulse20}" Margin="0,8,15,0">
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                     <TextBlock
-                FontSize="14"
-                FontWeight="Medium"
-                Text="Static RTSS Frame Rate" />
+                                        FontSize="14"
+                                        FontWeight="Medium"
+                                        Text="Keyboard RGB" />
                                     <TextBlock
-                FontSize="12"
-                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                Text="Provides the ability to set a custom RTSS frame limit."/>
+                                        FontSize="12"
+                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                        Text="Per-game keyboard backlight control for ITE HID keyboards."/>
+                                </StackPanel>
+                                <ui:ToggleSwitch Name="cbxKbEnabled" Grid.Column="1" VerticalAlignment="Center"
+                                    Margin="0,0,9,0"
+                                    ToolTip="Enable keyboard RGB controls for this game"
+                                    Checked="cbxKbEnabled_Toggled"
+                                    Unchecked="cbxKbEnabled_Toggled" />
+                            </Grid>
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <!-- Mode: Effects / Per-Key -->
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Mode</TextBlock>
+                                    <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="Choose between animation effects or per-key color control." />
+                                </StackPanel>
+                                <ComboBox Name="cbxKbMode" Grid.Column="1" MinWidth="160" HorizontalAlignment="Right" VerticalAlignment="Center" Height="37" SelectedIndex="0" SelectionChanged="cbxKbMode_SelectionChanged">
+                                    <ComboBoxItem>Effects</ComboBoxItem>
+                                    <ComboBoxItem>Per-Key RGB</ComboBoxItem>
+                                </ComboBox>
+                            </Grid>
+
+                            <!-- Effect controls (visible in Effects mode) -->
+                            <StackPanel Name="spKbEffectControls" Visibility="Collapsed">
+                                <!-- Divider before Effect -->
+                                <Separator Name="sepKbEffect" Margin="0,12,0,12"
+                                           Background="{DynamicResource ControlFillColorDefaultBrush}" />
+
+                                <!-- Effect Type -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Effect</TextBlock>
+                                        <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="Choose an animation effect." />
+                                    </StackPanel>
+                                    <ComboBox Name="cbxKbEffect" Grid.Column="1" MinWidth="180" HorizontalAlignment="Right" VerticalAlignment="Center" Height="37" SelectedIndex="0" SelectionChanged="cbxKbEffect_SelectionChanged">
+                                        <ComboBoxItem>Static</ComboBoxItem>
+                                        <ComboBoxItem>Breathing</ComboBoxItem>
+                                        <ComboBoxItem>Wave</ComboBoxItem>
+                                        <ComboBoxItem>Reactive</ComboBoxItem>
+                                        <ComboBoxItem>Rainbow</ComboBoxItem>
+                                        <ComboBoxItem>Ripple</ComboBoxItem>
+                                        <ComboBoxItem>Touch Ripple</ComboBoxItem>
+                                        <ComboBoxItem>Marquee</ComboBoxItem>
+                                        <ComboBoxItem>Raindrop</ComboBoxItem>
+                                        <ComboBoxItem>Aurora</ComboBoxItem>
+                                        <ComboBoxItem>Touch Aurora</ComboBoxItem>
+                                        <ComboBoxItem>Touch Spark</ComboBoxItem>
+                                        <ComboBoxItem>Spark</ComboBoxItem>
+                                        <ComboBoxItem>Gaming Mode</ComboBoxItem>
+                                        <ComboBoxItem>Gaming Mode Full</ComboBoxItem>
+                                        <ComboBoxItem>Music</ComboBoxItem>
+                                    </ComboBox>
+                                </Grid>
+
+                                <!-- Divider before Color -->
+                                <Separator Name="sepKbColor" Margin="0,12,0,12"
+                                           Background="{DynamicResource ControlFillColorDefaultBrush}" />
+
+                                <!-- Color (visible for single-color effects) -->
+                                <Grid Name="spKbColor" Visibility="Visible">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Color</TextBlock>
+                                        <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="Single color for static and single-color effects." />
+                                    </StackPanel>
+                                    <controls:ColorPickerControl x:Name="KbColorPicker" Grid.Column="1"
+                                                                     HorizontalAlignment="Right"
+                                                                     VerticalAlignment="Center"
+                                                                     SelectedColor="Aqua"
+                                                                     ColorChangedDelayed="KbColorPicker_ColorChangedDelayed" />
+                                </Grid>
+
+                                <!-- Multi-color picker (visible for multi-color effects) — shares sepKbColor -->
+                                <Grid Name="spKbMultiColor" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Name="tbKbMultiColorTitle">Effect Colors</TextBlock>
+                                        <TextBlock x:Name="tbKbMultiColorSubtitle" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="7 colors required for this effect." />
+                                    </StackPanel>
+                                    <controls:KeyboardMultiColorPickerControl x:Name="KbMultiColorPicker" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" ColorsChanged="KbMultiColorPicker_ColorsChanged"/>
+                                </Grid>
+
+                                <!-- Rest color for GamingModeFull — shares sepKbColor -->
+                                <Grid Name="spKbGamingRest" Visibility="Collapsed" Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Rest of Keyboard</TextBlock>
+                                        <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="Color for non-WASD/arrow keys." />
+                                    </StackPanel>
+                                    <controls:ColorPickerControl x:Name="KbRestColorPicker" Grid.Column="1"
+                                                                     HorizontalAlignment="Right"
+                                                                     VerticalAlignment="Center"
+                                                                     SelectedColor="White"
+                                                                     ColorChangedDelayed="KbRestColorPicker_ColorChangedDelayed" />
+                                </Grid>
+
+                                <!-- Divider before Direction -->
+                                <Separator Name="sepKbDirection" Margin="0,12,0,12"
+                                           Background="{DynamicResource ControlFillColorDefaultBrush}"
+                                           Visibility="Collapsed" />
+
+                                <!-- Direction (Wave only) -->
+                                <Grid Name="grKbDirection" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Direction</TextBlock>
+                                        <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="Animation direction for Wave effect." />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                <ui:Button x:Name="btnKbDirLeftRight" Width="40" Height="36" Margin="0,0,4,0"
+                                                           Appearance="Transparent" Click="KbDirectionButton_Click" Tag="LeftRight">
+                                                    <TextBlock Text="→" FontSize="18" HorizontalAlignment="Center"/>
+                                                </ui:Button>
+                                                <ui:Button x:Name="btnKbDirRightLeft" Width="40" Height="36" Margin="0,0,4,0"
+                                                           Appearance="Transparent" Click="KbDirectionButton_Click" Tag="RightLeft">
+                                                    <TextBlock Text="←" FontSize="18" HorizontalAlignment="Center"/>
+                                                </ui:Button>
+                                                <ui:Button x:Name="btnKbDirDownUp" Width="40" Height="36" Margin="0,0,4,0"
+                                                           Appearance="Transparent" Click="KbDirectionButton_Click" Tag="DownUp">
+                                                    <TextBlock Text="↑" FontSize="18" HorizontalAlignment="Center"/>
+                                                </ui:Button>
+                                                <ui:Button x:Name="btnKbDirUpDown" Width="40" Height="36" Margin="0,0,4,0"
+                                                           Appearance="Transparent" Click="KbDirectionButton_Click" Tag="UpDown">
+                                                    <TextBlock Text="↓" FontSize="18" HorizontalAlignment="Center"/>
+                                                </ui:Button>
+                                                <ui:Button x:Name="btnKbDiagBRTL" Width="40" Height="36" Margin="0,0,4,0"
+                                                           Appearance="Transparent" Click="KbDirectionButton_Click" Tag="DiagonalBottomRightToTopLeft">
+                                                    <TextBlock Text="↖" FontSize="18" HorizontalAlignment="Center"/>
+                                                </ui:Button>
+                                                <ui:Button x:Name="btnKbDiagBLTR" Width="40" Height="36" Margin="0,0,0,0"
+                                                           Appearance="Transparent" Click="KbDirectionButton_Click" Tag="DiagonalBottomLeftToTopRight">
+                                                    <TextBlock Text="↗" FontSize="18" HorizontalAlignment="Center"/>
+                                                </ui:Button>
+                                            </StackPanel>
+                                </Grid>
+
+                                <!-- Divider before Brightness -->
+                                <Separator Name="sepKbBrightness" Margin="0,12,0,12"
+                                           Background="{DynamicResource ControlFillColorDefaultBrush}" />
+
+                                <!-- Brightness -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Brightness</TextBlock>
+                                        <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="Backlight brightness level 1-7." />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock Name="tbKbBrightnessValue" Width="30" HorizontalAlignment="Right" Margin="0,0,12,0" Text="5" />
+                                        <Slider Name="sdKbBrightness" Width="140" Maximum="7" Minimum="1" TickFrequency="1" TickPlacement="Both" IsSnapToTickEnabled="True" Value="5" IsMoveToPointEnabled="False" ValueChanged="sdKbBrightness_ValueChanged"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Divider before Speed -->
+                                <Separator Name="sepKbSpeed" Margin="0,12,0,12"
+                                           Background="{DynamicResource ControlFillColorDefaultBrush}"
+                                           Visibility="Collapsed" />
+
+                                <!-- Speed (hidden for Static, Rainbow, GamingMode, GamingModeFull) -->
+                                <Grid Name="spKbSpeed" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Speed</TextBlock>
+                                        <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="Animation speed (1=fastest, 10=slowest)." />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock Name="tbKbSpeedValue" Width="30" HorizontalAlignment="Right" Margin="0,0,12,0" Text="5" />
+                                        <Slider Name="sdKbSpeed" Width="140" Maximum="10" Minimum="1" TickFrequency="1" TickPlacement="Both" IsSnapToTickEnabled="True" Value="5" IsMoveToPointEnabled="False" ValueChanged="sdKbSpeed_ValueChanged"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- Per-Key controls (visible in Per-Key mode) -->
+                            <StackPanel Name="spKbPerKeyNote" Visibility="Collapsed" Margin="0,8,0,0">
+                                <Border Padding="12" Background="{DynamicResource ControlFillColorDefaultBrush}" CornerRadius="4">
+                                    <StackPanel>
+                                        <TextBlock Text="Per-Key RGB Mode" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4" />
+                                        <TextBlock Text="Configure individual key colors for this profile." Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                                        <ui:Button Name="btnKbEditPerKey"
+                                                   Appearance="Primary"
+                                                   Content="Edit Per-Key Colors"
+                                                   HorizontalAlignment="Left"
+                                                   Click="btnKbEditPerKey_Click" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+                    </ui:CardExpander>
+
+                    <ui:CardExpander Name="sdRTSS" Visibility="Collapsed"
+                        IsEnabled="True"
+                        IsExpanded="False"
+                        Icon="{ui:SymbolIcon Pulse20}" Margin="0,8,15,0">
+                        <ui:CardExpander.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock
+                                        FontSize="14"
+                                        FontWeight="Medium"
+                                        Text="Static RTSS Frame Rate" />
+                                    <TextBlock
+                                        FontSize="12"
+                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                        Text="Provides the ability to set a custom RTSS frame limit."/>
                                 </StackPanel>
 
                                 <StackPanel Orientation="Horizontal" Grid.Column="1">

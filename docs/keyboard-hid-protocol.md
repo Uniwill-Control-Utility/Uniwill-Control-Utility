@@ -112,9 +112,9 @@ SendReport(new byte[] { 0x00, 0x1A, 0x00, 0x01, 0x04, 0x00, 0x00, 0x00, 0x01 });
 SendReport(new byte[] { 0x00, 0x14, 0x00, 0x01, R, G, B, 0x00, 0x00 });
 //             reportID  CMD    zone  ?    R    G  B   pad  pad
 
-// Step 3: Set effect mode + brightness
-SendReport(new byte[] { 0x00, 0x08, 0x02, effect, speed, brightness, 0x08, 0x00, 0x00 });
-//             reportID  CMD    mask   eff   spd   bri    ?      pad  pad
+// Step 3: Set effect mode + brightness + direction
+SendReport(new byte[] { 0x00, 0x08, 0x02, effect, speed, brightness, 0x08, direction, 0x00 });
+//             reportID  CMD    mask   eff   spd   bri    ?      dir    pad
 ```
 
 Where `SendReport` calls `HidD_SetFeature(handle, report, 9)`.
@@ -139,9 +139,77 @@ Where `SendReport` calls `HidD_SetFeature(handle, report, 9)`.
 
 Range `0x00` (fastest) to `0x0B` (frozen — effect active but no movement). Higher = slower.
 
+#### Slider-to-HID Speed Conversion
+
+UI slider values (1–10, where 1=fastest, 10=slowest) must be **inverted** before sending to
+the HID controller:
+
+```
+HID_speed = 10 - slider_value    // slider 1→9 (slow in HID), slider 10→0 (fast in HID)
+```
+
+This inversion is implemented as `SliderToHidSpeed()` in `Keyboard.xaml.cs`. The Adaptive Mode
+page must apply the same conversion when reading from its speed slider before passing the value
+to `ApplyKeyboardFromPreset()`.
+
+**Pitfall** (discovered 2026-08-03): If the slider value is sent directly without inversion,
+the speed appears to not work at all or behaves in reverse, because the HID controller
+interprets slider value 1 as HID speed 1 (very slow) instead of the intended fast speed.
+
 ### Brightness (byte[5] of CMD_MODE_BRIGHTNESS)
 
 Range `0x00` to `0x64` (0–100 decimal). For per-key mode, the range is `0x00` to `0x32` (0–50).
+
+### Direction (byte[7] of CMD_MODE_BRIGHTNESS)
+
+Controls the animation direction for effects that support it. **Verified on Wave (0x03) only** —
+other animated effects (Ripple, Breathing, Marquee, etc.) have not yet been tested to confirm
+they respect this byte.
+
+Values `0x00` and `0x01` both produce the default Left→Right direction. Values `0x07` and above
+wrap back to Left→Right.
+
+| Value | Direction (Wave) | Notes |
+|-------|-------------------|-------|
+| `0x00` | Left → Right | Default |
+| `0x01` | Left → Right | Same as `0x00` |
+| `0x02` | Right → Left | |
+| `0x03` | Down → Up | |
+| `0x04` | Up → Down | |
+| `0x05` | Diagonal: bottom-right → top-left | |
+| `0x06` | Diagonal: bottom-left → top-right | Not used by GCUService |
+| `0x07`+ | Left → Right | Wraps back to default |
+
+**Discovered**: 2026-08-03 via systematic HID report experimentation (HidCapture direction tool).
+The GCUService direction enum (LeftRight=0, RightLeft=1, DownUp=2, UpDown=3, OnKeyPressed=4, Sync=5)
+does **not** map to the actual hardware directions — the enum names are misleading. The correct
+mapping (verified on Wave) is `0x02` = Right→Left, `0x03` = Down→Up, `0x04` = Up→Down, `0x05` = diagonal BR→TL.
+
+#### Wave Direction Primer+Delay Requirement (discovered 2026-08-03)
+
+The ITE firmware requires a **two-step primer+delay sequence** for the direction byte to take
+effect on Wave. Simply sending `CMD_MODE_BRIGHTNESS` with the desired direction in byte[7] is
+not enough — the firmware must first see Wave "armed" with a default direction before it accepts
+direction changes.
+
+**Required sequence for Wave with non-default direction:**
+```
+1. CMD_MODE_BRIGHTNESS: effect=Wave(0x03), direction=LeftRight(0x00)   // primer
+2. Sleep(100ms)
+3. CMD_MODE_BRIGHTNESS: effect=Wave(0x03), direction=<desired>          // apply
+```
+
+Without this sequence, the firmware applies the Wave effect but ignores the direction byte,
+defaulting to Left→Right. This is especially noticeable on app startup where `TurnOn()`
+initializes the effect engine with Static+LeftRight, and the first `SetEffect(Wave, direction)`
+is ignored for the direction byte.
+
+**Root cause hypothesis**: The firmware caches the direction from the first
+`CMD_MODE_BRIGHTNESS` report it receives after initialization (which comes from `TurnOn()`
+with `byte[7]=0x00`). Subsequent reports update the effect byte but not the direction byte
+until Wave has been "armed" by a primer report.
+
+**TODO**: Verify direction byte behavior on Ripple, Breathing, Marquee, Raindrop, Aurora, Spark.
 
 ### Turning Off
 
@@ -297,7 +365,35 @@ Or turn the keyboard off entirely using the global off sequence.
 
 ## Common Pitfalls
 
-### 1. Using IOCTL_HID_SET_OUTPUT_REPORT for Color Data
+### 1. HID Apply Lifecycle — `Page_Loaded` Is the Single Source of Truth
+
+The Keyboard page is `Scoped` in DI and reused across navigations. The constructor opens the
+HID handle once. **Do NOT call `ApplySettingsToHid()` from the constructor** — let `Page_Loaded`
+be the single source of truth for HID applies.
+
+**Why**: The constructor runs when the page is first instantiated (which may be before the user
+navigates to it). `Page_Loaded` fires on every navigate-in. If the constructor also applies,
+you get:
+- Race with Adaptive Mode's HID applies (both use the same HID device)
+- Double-apply on first navigation (constructor + `Page_Loaded`)
+- No re-apply on subsequent navigations (constructor only runs once for Scoped pages)
+
+**Fix**: Constructor opens HID and syncs UI from settings only. `Page_Loaded` applies to HID
+on a background `Task.Run()` with a 200ms initial delay (firmware settle time).
+
+**Discovered**: 2026-08-03. The `_startupApplyDone` flag approach was insufficient because it
+prevented ALL future `Page_Loaded` applies, not just the duplicate.
+
+### 2. Firmware Settle Time After HID Open
+
+After opening the HID device, the ITE firmware needs ~200ms to settle before accepting
+direction bytes in CMD_MODE_BRIGHTNESS reports. Without this delay, the direction byte is
+silently ignored and defaults to Left→Right.
+
+**Fix**: Add `Thread.Sleep(200)` in the background `Task.Run()` before calling
+`ApplySettingsToHid()` or `ApplyPerKeyColorsToHid()`.
+
+### 3. Using IOCTL_HID_SET_OUTPUT_REPORT for Color Data
 
 `IOCTL_HID_SET_OUTPUT_REPORT` goes through the Windows HID class driver, which translates the buffer through the HID report descriptor. The firmware receives **corrupted data**. Use `WriteFile` instead.
 

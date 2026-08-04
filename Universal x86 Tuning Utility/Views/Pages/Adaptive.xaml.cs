@@ -77,6 +77,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // XAML default (false) and get captured by loadPreset as "wasEnabled=false".
             cbxBs2ProEnabled.IsChecked = Settings.Default.AdaptiveBs2ProEnabled;
             cbxWcEnabled.IsChecked = Settings.Default.AdaptiveWcEnabled;
+            cbxKbEnabled.IsChecked = Settings.Default.AdaptiveKeyboardEnabled;
 
             if (!Settings.Default.isASUS) sdAsusPower.Visibility = Visibility.Collapsed;
 
@@ -413,6 +414,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         _ = _deviceApplier.DisableFlydigiOverrideAsync();
                         _ = _deviceApplier.DisableWatercoolerOverrideAsync();
                         _deviceApplier.DisableEcFanOverride();
+                        _deviceApplier.DisableKeyboardOverride();
                     }
 
                 }
@@ -437,6 +439,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             _deviceApplier.EnableWatercoolerOverride();
                         if ((bool)cbxEcFanEnabled.IsChecked && !_deviceApplier.IsEcFanOverridden)
                             _deviceApplier.EnableEcFanOverride();
+                        if ((bool)cbxKbEnabled.IsChecked && !_deviceApplier.IsKeyboardOverridden)
+                            _deviceApplier.EnableKeyboardOverride();
                     }
                 }
             }
@@ -604,6 +608,42 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         UpdateEcFanModeUI();
                     }
 
+                    // Keyboard RGB
+                    cbxKbMode.SelectedIndex = myPreset.KbPerKeyMode ? 1 : 0;
+                    UpdateKbModeUI();
+                    int brightness = Math.Clamp(myPreset.KbBrightness, 1, 7);
+                    sdKbBrightness.Value = brightness;
+                    tbKbBrightnessValue.Text = brightness.ToString();
+                    cbxKbEffect.SelectedIndex = GetKbEffectIndex(myPreset.KbEffectMode);
+                    KbColorPicker.SelectedColor = Color.FromRgb(myPreset.KbColorR, myPreset.KbColorG, myPreset.KbColorB);
+                    KbRestColorPicker.SelectedColor = Color.FromRgb(myPreset.KbRestColorR, myPreset.KbRestColorG, myPreset.KbRestColorB);
+                    int speed = Math.Clamp((int)myPreset.KbEffectSpeed, 1, 10);
+                    sdKbSpeed.Value = speed;
+                    tbKbSpeedValue.Text = speed.ToString();
+                    _kbDirection = myPreset.KbDirection;
+                    UpdateKbDirectionButtons();
+
+                    // Restore multi-colors if saved
+                    if (!string.IsNullOrEmpty(myPreset.KbMultiColors))
+                    {
+                        var colors = ParseColorString(myPreset.KbMultiColors);
+                        if (colors.Count > 0)
+                        {
+                            int count = myPreset.KbEffectMode == "GamingModeFull" || myPreset.KbEffectMode == "GamingMode" ? 4 : 7;
+                            KbMultiColorPicker.SetColors(colors, count);
+                        }
+                    }
+
+                    // Push the preset's per-key colors to the global keyboard settings
+                    // so that update() picks them up when in per-key mode. Always do this
+                    // regardless of current mode — the user may switch back to per-key later.
+                    if (!string.IsNullOrEmpty(myPreset.KbPerKeyColors))
+                    {
+                        var kbSettings = KeyboardSettingsService.Load();
+                        kbSettings.PerKeyColors = myPreset.KbPerKeyColors;
+                        KeyboardSettingsService.Save(kbSettings);
+                    }
+
                     // Apply the preset's per-profile override flags only when resetTracking
                     // is true (profile switch). When resetTracking is false (Page_Loaded,
                     // game detection without profile change), preserve the user's current
@@ -614,11 +654,14 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             cbxBs2ProEnabled.IsChecked = myPreset.Bs2ProEnabled;
                         if (cbxWcEnabled.IsChecked != myPreset.WcEnabled)
                             cbxWcEnabled.IsChecked = myPreset.WcEnabled;
+                        if (cbxKbEnabled.IsChecked != myPreset.KbEnabled)
+                            cbxKbEnabled.IsChecked = myPreset.KbEnabled;
 
                         // Sync global settings to the active preset's override state so that
                         // App.xaml.cs startup restoration reads the correct values.
                         Settings.Default.AdaptiveBs2ProEnabled = myPreset.Bs2ProEnabled;
                         Settings.Default.AdaptiveWcEnabled = myPreset.WcEnabled;
+                        Settings.Default.AdaptiveKeyboardEnabled = myPreset.KbEnabled;
                         Settings.Default.Save();
                     }
 
@@ -643,6 +686,19 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         lastEcFanPreset = "";
                         lastEcFanCpuPreset = "";
                         lastEcFanGpuPreset = "";
+
+                        lastKbPerKeyMode = false;
+                        lastKbBrightness = 0;
+                        lastKbEffectMode = "";
+                        lastKbEffectSpeed = 0;
+                        lastKbColorR = 0;
+                        lastKbColorG = 0;
+                        lastKbColorB = 0;
+                        lastKbRestColorR = 0;
+                        lastKbRestColorG = 0;
+                        lastKbRestColorB = 0;
+                        lastKbMultiColors = "";
+                        lastKbDirection = "";
                     }
                     // When resetTracking is false (Page_Loaded, game detection), leave
                     // tracking vars unchanged so update() won't re-send device commands
@@ -725,6 +781,22 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     EcFanPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanPreset.SelectedIndex) : "Balanced",
                     EcFanCpuPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanCpuPreset.SelectedIndex) : "Balanced",
                     EcFanGpuPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanGpuPreset.SelectedIndex) : "Balanced",
+                    KbEnabled = (bool)cbxKbEnabled.IsChecked,
+                    KbPerKeyMode = cbxKbMode.SelectedIndex == 1,
+                    KbBrightness = (int)sdKbBrightness.Value,
+                    KbIdleTimerEnabled = false,
+                    KbIdleTimerMinutes = 0,
+                    KbEffectMode = GetKbEffectFromIndex(cbxKbEffect.SelectedIndex),
+                    KbEffectSpeed = (byte)Math.Clamp((int)sdKbSpeed.Value, 1, 10),
+                    KbColorR = KbColorPicker.SelectedColor.R,
+                    KbColorG = KbColorPicker.SelectedColor.G,
+                    KbColorB = KbColorPicker.SelectedColor.B,
+                    KbRestColorR = KbRestColorPicker.SelectedColor.R,
+                    KbRestColorG = KbRestColorPicker.SelectedColor.G,
+                    KbRestColorB = KbRestColorPicker.SelectedColor.B,
+                    KbMultiColors = SerializeColors(KbMultiColorPicker.Colors),
+                    KbPerKeyColors = KeyboardSettingsService.Load().PerKeyColors,
+                    KbDirection = _kbDirection,
                     isAutoSwitch = (bool)tsAutoSwitch.IsChecked
                 };
                 adaptivePresetManager.SavePreset(presetName, preset);
@@ -929,6 +1001,20 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private string lastEcFanPreset = "";
         private string lastEcFanCpuPreset = "";
         private string lastEcFanGpuPreset = "";
+        // Keyboard RGB diff-tracking
+        private bool lastKbPerKeyMode = false;
+        private int lastKbBrightness = 0;
+        private string lastKbEffectMode = "";
+        private byte lastKbEffectSpeed = 0;
+        private byte lastKbColorR = 0;
+        private byte lastKbColorG = 0;
+        private byte lastKbColorB = 0;
+        private byte lastKbRestColorR = 0;
+        private byte lastKbRestColorG = 0;
+        private byte lastKbRestColorB = 0;
+        private string lastKbMultiColors = "";
+        private string _kbDirection = "LeftRight";
+        private string lastKbDirection = "";
         string lastWindowsProcessorPower = "";
         private SemaphoreSlim _updateSemaphore = new(1, 1);
         private async void update()
@@ -1194,6 +1280,62 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                                     lastEcFanGpuPreset = gpuPreset;
                                 }
                                 lastEcFanUnifiedMode = unified;
+                            }
+                        }
+
+                        // Apply Keyboard RGB settings if enabled
+                        if ((bool)cbxKbEnabled.IsChecked && _deviceApplier != null)
+                        {
+                            bool perKeyMode = cbxKbMode.SelectedIndex == 1;
+                            int brightness = (int)sdKbBrightness.Value;
+                            string effectMode = GetKbEffectFromIndex(cbxKbEffect.SelectedIndex);
+                            byte effectSpeed = (byte)(10 - Math.Clamp((int)sdKbSpeed.Value, 1, 10));
+                            byte colorR = KbColorPicker.SelectedColor.R;
+                            byte colorG = KbColorPicker.SelectedColor.G;
+                            byte colorB = KbColorPicker.SelectedColor.B;
+                            byte restColorR = KbRestColorPicker.SelectedColor.R;
+                            byte restColorG = KbRestColorPicker.SelectedColor.G;
+                            byte restColorB = KbRestColorPicker.SelectedColor.B;
+                            string multiColors = SerializeColors(KbMultiColorPicker.Colors);
+
+                            bool changed = perKeyMode != lastKbPerKeyMode ||
+                                brightness != lastKbBrightness ||
+                                effectMode != lastKbEffectMode ||
+                                effectSpeed != lastKbEffectSpeed ||
+                                _kbDirection != lastKbDirection ||
+                                colorR != lastKbColorR ||
+                                colorG != lastKbColorG ||
+                                colorB != lastKbColorB ||
+                                restColorR != lastKbRestColorR ||
+                                restColorG != lastKbRestColorG ||
+                                restColorB != lastKbRestColorB ||
+                                multiColors != lastKbMultiColors;
+
+                            if (changed)
+                            {
+                                // In per-key mode, pass the current per-key colors from settings
+                                string? perKeyColorsStr = perKeyMode
+                                    ? KeyboardSettingsService.Load().PerKeyColors
+                                    : null;
+
+                                _deviceApplier.ApplyKeyboardFromPreset(
+                                    perKeyMode, brightness, false, 0,
+                                    effectMode, effectSpeed, _kbDirection,
+                                    colorR, colorG, colorB,
+                                    multiColors, perKeyColorsStr, restColorR, restColorG, restColorB);
+
+                                lastKbPerKeyMode = perKeyMode;
+                                lastKbBrightness = brightness;
+                                lastKbEffectMode = effectMode;
+                                lastKbEffectSpeed = effectSpeed;
+                                lastKbDirection = _kbDirection;
+                                lastKbColorR = colorR;
+                                lastKbColorG = colorG;
+                                lastKbColorB = colorB;
+                                lastKbRestColorR = restColorR;
+                                lastKbRestColorG = restColorG;
+                                lastKbRestColorB = restColorB;
+                                lastKbMultiColors = multiColors;
                             }
                         }
 
@@ -1861,6 +2003,373 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             "Off" => Universal_x86_Tuning_Utility.Models.EcFanCurve.CreateOff(),
             _ => Universal_x86_Tuning_Utility.Models.EcFanCurve.CreateBalanced()
         };
+
+        #endregion
+
+        #region Keyboard RGB helpers
+
+        private void cbxKbEnabled_Toggled(object sender, RoutedEventArgs e)
+        {
+            bool enabled = (bool)cbxKbEnabled.IsChecked;
+            Settings.Default.AdaptiveKeyboardEnabled = enabled;
+            Settings.Default.Save();
+
+            if (enabled)
+            {
+                _deviceApplier?.EnableKeyboardOverride();
+                // Reset tracking so the next update() tick force-applies
+                lastKbPerKeyMode = false;
+                lastKbBrightness = 0;
+                lastKbEffectMode = "";
+            }
+            else
+            {
+                _deviceApplier?.DisableKeyboardOverride();
+            }
+        }
+
+        private void cbxKbMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateKbModeUI();
+        }
+
+        private void cbxKbEffect_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateKbEffectUi();
+        }
+
+        private void KbDirectionButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Wpf.Ui.Controls.Button btn && btn.Tag is string tag)
+                _kbDirection = tag;
+            UpdateKbDirectionButtons();
+        }
+
+        private void UpdateKbDirectionButtons()
+        {
+            void SetActive(Wpf.Ui.Controls.Button btn, string tag)
+            {
+                btn.Appearance = _kbDirection == tag ? Wpf.Ui.Controls.ControlAppearance.Primary : Wpf.Ui.Controls.ControlAppearance.Transparent;
+            }
+            SetActive(btnKbDirLeftRight, "LeftRight");
+            SetActive(btnKbDirRightLeft, "RightLeft");
+            SetActive(btnKbDirDownUp, "DownUp");
+            SetActive(btnKbDirUpDown, "UpDown");
+            SetActive(btnKbDiagBRTL, "DiagonalBottomRightToTopLeft");
+            SetActive(btnKbDiagBLTR, "DiagonalBottomLeftToTopRight");
+        }
+
+        private void UpdateKbModeUI()
+        {
+            if (spKbEffectControls == null || spKbPerKeyNote == null)
+                return;
+
+            bool perKey = cbxKbMode.SelectedIndex == 1;
+            bool showEffects = !perKey;
+            spKbEffectControls.Visibility = showEffects ? Visibility.Visible : Visibility.Collapsed;
+            spKbPerKeyNote.Visibility = perKey ? Visibility.Visible : Visibility.Collapsed;
+
+            if (!perKey)
+                UpdateKbEffectUi();
+        }
+
+        /// <summary>
+        /// Shows/hides Color, Multi-Color, Rest color, and Speed controls based on the
+        /// selected effect — mirroring the Keyboard page's UpdateEffectUi().
+        /// </summary>
+        private void UpdateKbEffectUi()
+        {
+            // Guard against calls before XAML fields are loaded (e.g. constructor, Page_Loaded).
+            if (spKbColor == null || spKbMultiColor == null || spKbGamingRest == null || spKbSpeed == null)
+                return;
+
+            if (cbxKbEffect.SelectedItem is not ComboBoxItem item)
+            {
+                sepKbColor.Visibility = Visibility.Collapsed;
+                spKbColor.Visibility = Visibility.Collapsed;
+                spKbMultiColor.Visibility = Visibility.Collapsed;
+                spKbGamingRest.Visibility = Visibility.Collapsed;
+                sepKbSpeed.Visibility = Visibility.Collapsed;
+                spKbSpeed.Visibility = Visibility.Collapsed;
+                sepKbDirection.Visibility = Visibility.Collapsed;
+                grKbDirection.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            string effect = GetKbEffectFromIndex(cbxKbEffect.SelectedIndex);
+
+            // Rainbow has fixed colors — no color controls, no speed.
+            if (ParseKbEffect(effect) == KeyboardEffect.Rainbow)
+            {
+                sepKbColor.Visibility = Visibility.Collapsed;
+                spKbColor.Visibility = Visibility.Collapsed;
+                spKbMultiColor.Visibility = Visibility.Collapsed;
+                spKbGamingRest.Visibility = Visibility.Collapsed;
+                sepKbSpeed.Visibility = Visibility.Collapsed;
+                spKbSpeed.Visibility = Visibility.Collapsed;
+                sepKbDirection.Visibility = Visibility.Collapsed;
+                grKbDirection.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            if (Views.Pages.Keyboard.IsMultiColor7Effect(ParseKbEffect(effect)))
+            {
+                spKbColor.Visibility = Visibility.Collapsed;
+                spKbMultiColor.Visibility = Visibility.Visible;
+                spKbGamingRest.Visibility = Visibility.Collapsed;
+                tbKbMultiColorTitle.Text = "Effect Colors";
+                tbKbMultiColorSubtitle.Text = "7 colors required for this effect. Click a swatch to edit.";
+                KbMultiColorPicker.SetColors(KbMultiColorPicker.Colors, 7);
+            }
+            else if (Views.Pages.Keyboard.IsMultiColor4Effect(ParseKbEffect(effect)))
+            {
+                spKbColor.Visibility = Visibility.Collapsed;
+                spKbMultiColor.Visibility = Visibility.Visible;
+                spKbGamingRest.Visibility = Visibility.Collapsed;
+                tbKbMultiColorTitle.Text = "WASD & Arrow Keys";
+                tbKbMultiColorSubtitle.Text = "4 colors for gaming keys. Click a swatch to edit.";
+                KbMultiColorPicker.SetColors(KbMultiColorPicker.Colors, 4);
+            }
+            else if (Views.Pages.Keyboard.IsMultiColor4Plus1Effect(ParseKbEffect(effect)))
+            {
+                spKbColor.Visibility = Visibility.Collapsed;
+                spKbMultiColor.Visibility = Visibility.Visible;
+                spKbGamingRest.Visibility = Visibility.Visible;
+                tbKbMultiColorTitle.Text = "WASD & Arrow Keys";
+                tbKbMultiColorSubtitle.Text = "4 colors for gaming keys. Click a swatch to edit.";
+                KbMultiColorPicker.SetColors(KbMultiColorPicker.Colors, 4);
+            }
+            else
+            {
+                // Single-color effects (Static, Rainbow, etc.)
+                spKbColor.Visibility = Visibility.Visible;
+                spKbMultiColor.Visibility = Visibility.Collapsed;
+                spKbGamingRest.Visibility = Visibility.Collapsed;
+            }
+
+            // Speed: animated effects only (not Static, Rainbow, GamingMode, GamingModeFull)
+            bool showSpeed = ParseKbEffect(effect) is KeyboardEffect effectEnum
+                && effectEnum != KeyboardEffect.Static
+                && effectEnum != KeyboardEffect.Rainbow
+                && effectEnum != KeyboardEffect.GamingMode
+                && effectEnum != KeyboardEffect.GamingModeFull;
+            sepKbSpeed.Visibility = showSpeed ? Visibility.Visible : Visibility.Collapsed;
+            spKbSpeed.Visibility = showSpeed ? Visibility.Visible : Visibility.Collapsed;
+            // Direction: Wave effect only (other effects use different byte flags to be probed later)
+            bool showDirection = effectEnum == KeyboardEffect.Wave;
+            sepKbDirection.Visibility = showDirection ? Visibility.Visible : Visibility.Collapsed;
+            grKbDirection.Visibility = showDirection ? Visibility.Visible : Visibility.Collapsed;
+
+            // sepKbColor: show if any color control (Color, MultiColor, GamingRest) is visible.
+            bool anyColorVisible = spKbColor.Visibility == Visibility.Visible
+                || spKbMultiColor.Visibility == Visibility.Visible
+                || spKbGamingRest.Visibility == Visibility.Visible;
+            sepKbColor.Visibility = anyColorVisible ? Visibility.Visible : Visibility.Collapsed;
+
+            UpdateKbDirectionButtons();
+        }
+
+        private void KbMultiColorPicker_ColorsChanged(object sender, EventArgs e)
+        {
+            // Multi-color colors changed — will be picked up by update() loop's diff tracking
+        }
+
+        private void KbColorPicker_ColorChangedDelayed(object sender, EventArgs e)
+        {
+            // Color changed — will be picked up by update() loop's diff tracking
+        }
+
+        private void KbRestColorPicker_ColorChangedDelayed(object sender, EventArgs e)
+        {
+            // Rest color changed — will be picked up by update() loop's diff tracking
+        }
+
+        /// <summary>
+        /// Parses an effect name string to KeyboardEffect enum, matching the Adaptive page's index mapping.
+        /// </summary>
+        private static KeyboardEffect ParseKbEffect(string name) => name switch
+        {
+            "Static" => KeyboardEffect.Static,
+            "Breathing" => KeyboardEffect.Breathing,
+            "Wave" => KeyboardEffect.Wave,
+            "Reactive" => KeyboardEffect.Reactive,
+            "Rainbow" => KeyboardEffect.Rainbow,
+            "Ripple" => KeyboardEffect.Ripple,
+            "TouchRipple" => KeyboardEffect.TouchRipple,
+            "Marquee" => KeyboardEffect.Marquee,
+            "Raindrop" => KeyboardEffect.Raindrop,
+            "Aurora" => KeyboardEffect.Aurora,
+            "TouchAurora" => KeyboardEffect.TouchAurora,
+            "TouchSpark" => KeyboardEffect.TouchSpark,
+            "Spark" => KeyboardEffect.Spark,
+            "GamingMode" => KeyboardEffect.GamingMode,
+            "GamingModeFull" => KeyboardEffect.GamingModeFull,
+            "Music" => KeyboardEffect.Music,
+            _ => KeyboardEffect.Static,
+        };
+
+        private void sdKbBrightness_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            tbKbBrightnessValue.Text = ((int)sdKbBrightness.Value).ToString();
+            // Force the next update() tick to detect the change.
+            lastKbBrightness = int.MinValue;
+        }
+
+        private void sdKbSpeed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            tbKbSpeedValue.Text = ((int)sdKbSpeed.Value).ToString();
+            // Force the next update() tick to detect the change.
+            lastKbEffectSpeed = byte.MaxValue;
+        }
+
+        private static int GetKbIdleTimerIndex(int minutes) => minutes switch
+        {
+            <= 5 => 0,
+            <= 10 => 1,
+            <= 15 => 2,
+            <= 30 => 3,
+            <= 60 => 4,
+            <= 120 => 5,
+            _ => 6
+        };
+
+        private static int GetKbIdleTimerMinutes(int index) => index switch
+        {
+            0 => 5,
+            1 => 10,
+            2 => 15,
+            3 => 30,
+            4 => 60,
+            5 => 120,
+            _ => 180
+        };
+
+        private static int GetKbEffectIndex(string effectMode) => effectMode switch
+        {
+            "Static" => 0,
+            "Breathing" => 1,
+            "Wave" => 2,
+            "Reactive" => 3,
+            "Rainbow" => 4,
+            "Ripple" => 5,
+            "TouchRipple" => 6,
+            "Marquee" => 7,
+            "Raindrop" => 8,
+            "Aurora" => 9,
+            "TouchAurora" => 10,
+            "TouchSpark" => 11,
+            "Spark" => 12,
+            "GamingMode" => 13,
+            "GamingModeFull" => 14,
+            "Music" => 15,
+            _ => 0
+        };
+
+        private static string GetKbEffectFromIndex(int index) => index switch
+        {
+            0 => "Static",
+            1 => "Breathing",
+            2 => "Wave",
+            3 => "Reactive",
+            4 => "Rainbow",
+            5 => "Ripple",
+            6 => "TouchRipple",
+            7 => "Marquee",
+            8 => "Raindrop",
+            9 => "Aurora",
+            10 => "TouchAurora",
+            11 => "TouchSpark",
+            12 => "Spark",
+            13 => "GamingMode",
+            14 => "GamingModeFull",
+            15 => "Music",
+            _ => "Static"
+        };
+
+        private void btnKbEditPerKey_Click(object sender, RoutedEventArgs e)
+        {
+            // Load current settings from KeyboardSettingsService (the source of truth)
+            var settings = KeyboardSettingsService.Load();
+
+            var dialog = new Views.Windows.KeyboardPerKeyDialog(settings);
+            if (dialog.ShowDialog() == true && dialog.Applied && dialog.ResultColors != null)
+            {
+                // Save the updated settings
+                KeyboardSettingsService.Save(settings);
+
+                // Apply to device if override is active
+                if (_deviceApplier != null && _deviceApplier.IsKeyboardOverridden)
+                {
+                    // Re-apply the current preset with the new per-key colors
+                    bool perKeyMode = cbxKbMode.SelectedIndex == 1;
+                    int brightness = (int)sdKbBrightness.Value;
+                    string effectMode = GetKbEffectFromIndex(cbxKbEffect.SelectedIndex);
+                    byte effectSpeed = (byte)(10 - Math.Clamp((int)sdKbSpeed.Value, 1, 10));
+                    byte colorR = KbColorPicker.SelectedColor.R;
+                    byte colorG = KbColorPicker.SelectedColor.G;
+                    byte colorB = KbColorPicker.SelectedColor.B;
+
+                    // Serialize per-key colors to string
+                    var sb = new System.Text.StringBuilder();
+                    var colors = dialog.ResultColors;
+                    for (int i = 0; i < 126; i++)
+                    {
+                        if (i > 0) sb.Append('|');
+                        (byte R, byte G, byte B) c = colors.TryGetValue(i, out var val) ? val : ((byte)0, (byte)0, (byte)0);
+                        sb.Append($"{c.R},{c.G},{c.B}");
+                    }
+                    string perKeyColorsStr = sb.ToString();
+
+                    _deviceApplier.ApplyKeyboardFromPreset(
+                        perKeyMode, brightness, false, 0,
+                        effectMode, effectSpeed, _kbDirection,
+                        colorR, colorG, colorB, "", perKeyColorsStr,
+                        KbRestColorPicker.SelectedColor.R, KbRestColorPicker.SelectedColor.G, KbRestColorPicker.SelectedColor.B);
+
+                    // Update tracking
+                    lastKbPerKeyMode = perKeyMode;
+                    lastKbBrightness = brightness;
+                    lastKbEffectMode = effectMode;
+                    lastKbEffectSpeed = effectSpeed;
+                    lastKbDirection = _kbDirection;
+                    lastKbColorR = colorR;
+                    lastKbColorG = colorG;
+                    lastKbColorB = colorB;
+                }
+            }
+        }
+
+        #endregion
+
+        #region Color serialization helpers
+
+        private static string SerializeColors(System.Collections.Generic.List<Color> colors)
+        {
+            return string.Join(",", colors.Select(c => $"#{c.R:X2}{c.G:X2}{c.B:X2}"));
+        }
+
+        private static System.Collections.Generic.List<Color> ParseColorString(string data)
+        {
+            var result = new System.Collections.Generic.List<Color>();
+            foreach (var part in data.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                try
+                {
+                    var hex = part.Trim();
+                    if (hex.StartsWith("#"))
+                        hex = hex.Substring(1);
+                    if (hex.Length == 6)
+                    {
+                        var r = byte.Parse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber);
+                        var g = byte.Parse(hex.Substring(2, 2), System.Globalization.NumberStyles.HexNumber);
+                        var b = byte.Parse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber);
+                        result.Add(Color.FromRgb(r, g, b));
+                    }
+                }
+                catch { }
+            }
+            return result;
+        }
 
         #endregion
     }

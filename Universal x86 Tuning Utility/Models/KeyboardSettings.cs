@@ -49,10 +49,10 @@ namespace Universal_x86_Tuning_Utility.Models
         public byte Speed { get; set; } = 5;
 
         /// <summary>
-        /// Animation direction for effects that support it (Wave, Music).
-        /// 0 = off/left, 1 = right. Default 1.
+        /// Animation direction for effects that support it (verified on Wave; other effects TBD).
+        /// Stored as byte[7] in CMD_MODE_BRIGHTNESS HID reports.
         /// </summary>
-        public byte Direction { get; set; } = 1;
+        public KeyboardDirection Direction { get; set; } = KeyboardDirection.LeftRight;
 
         /// <summary>
         /// Multi-color palette for effects that support it (Breathing, Wave, Ripple, Music).
@@ -172,9 +172,6 @@ namespace Universal_x86_Tuning_Utility.Models
         /// <summary>Backlight off, random keys breathe in multiple colors (XCC: "Raindrop").</summary>
         Raindrop = 0x0A,
 
-        /// <summary>Faster variant of Raindrop with different key transitions.</summary>
-        RaindropFast = 0x0B,
-
         /// <summary>Rows light up from random positions, spreading across (XCC: "Aurora").</summary>
         Aurora = 0x0E,
 
@@ -195,5 +192,31 @@ namespace Universal_x86_Tuning_Utility.Models
 
         /// <summary>Music-reactive effect (XCC: "Music").</summary>
         Music = 0x33,
+    }
+
+    /// <summary>
+    /// Animation direction for effects that support directional control.
+    /// Maps to byte[7] in CMD_MODE_BRIGHTNESS HID reports.
+    /// Verified on Wave (0x03); behavior on other effects is yet to be confirmed.
+    /// </summary>
+    public enum KeyboardDirection : byte
+    {
+        /// <summary>Left → Right (default).</summary>
+        LeftRight = 0x00,
+
+        /// <summary>Right → Left.</summary>
+        RightLeft = 0x02,
+
+        /// <summary>Down → Up.</summary>
+        DownUp = 0x03,
+
+        /// <summary>Up → Down.</summary>
+        UpDown = 0x04,
+
+        /// <summary>Diagonal: bottom-right → top-left.</summary>
+        DiagonalBottomRightToTopLeft = 0x05,
+
+        /// <summary>Diagonal: bottom-left → top-right.</summary>
+        DiagonalBottomLeftToTopRight = 0x06,
     }
 }

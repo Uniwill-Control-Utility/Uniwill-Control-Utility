@@ -746,6 +746,18 @@ namespace Universal_x86_Tuning_Utility.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool AdaptiveKeyboardEnabled {
+            get {
+                return ((bool)(this["AdaptiveKeyboardEnabled"]));
+            }
+            set {
+                this["AdaptiveKeyboardEnabled"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool isTrack {
             get {
                 return ((bool)(this["isTrack"]));
