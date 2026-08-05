@@ -46,6 +46,13 @@ namespace Universal_x86_Tuning_Utility.Models
         public double Height { get; init; } = 36;
 
         /// <summary>
+        /// Indicates that this key should render as an ISO inverted-L shape
+        /// (narrower bottom half). Used for the Enter key on ISO layouts.
+        /// The bottom-left corner is clipped by approximately half a key width.
+        /// </summary>
+        public bool IsInvertedLShape { get; init; } = false;
+
+        /// <summary>
         /// Current color for this zone. Default is white.
         /// </summary>
         public Color Color { get; set; } = Colors.White;
@@ -355,8 +362,9 @@ namespace Universal_x86_Tuning_Utility.Models
                 new() { Index = 74, Label = "P",    X = 392,  Y = 84 },
                 new() { Index = 75, Label = "[",    X = 430,  Y = 84 },
                 new() { Index = 76, Label = "]",    X = 468,  Y = 84 },
-                // Enter top half: ~1.8 keys (66px), ends at RIGHT_EDGE (571), spans 2 rows
-                new() { Index = 77, Label = "\u21B5",    X = 511,  Y = 84, Width = 60, Height = 74 },
+                // Enter: ISO inverted-L shape, ~1.8 keys wide, ends at RIGHT_EDGE (571), spans 2 rows.
+                // Top half starts at 506 (2px gap from ] at 504), bottom half indents to 514 (2px gap from \ at 512).
+                new() { Index = 77, Label = "\u21B5",    X = 506,  Y = 84, Width = 65, Height = 74, IsInvertedLShape = true },
 
                 // Numpad row 2
                 new() { Index = 40, Label = "7",    X = 576,  Y = 84 },
@@ -377,9 +385,9 @@ namespace Universal_x86_Tuning_Utility.Models
                 new() { Index = 51, Label = "K",    X = 328,  Y = 122 },
                 new() { Index = 52, Label = "L",    X = 366,  Y = 122 },
                 new() { Index = 53, Label = ";",    X = 404,  Y = 122 },
-                // ' and \ keys: 30px each, fit between ; and Enter with 2px gaps
+                // ' and \ keys: fit between ; and Enter with 2px gaps
                 new() { Index = 54, Label = "'",    X = 442,  Y = 122, Width = 32 },
-                new() { Index = 55, Label = "\\",   X = 476,  Y = 122, Width = 32 },
+                new() { Index = 55, Label = "\\",   X = 476,  Y = 122, Width = 36 },
 
                 // Numpad row 3
                 new() { Index = 57, Label = "4",    X = 576,  Y = 122 },
@@ -401,7 +409,7 @@ namespace Universal_x86_Tuning_Utility.Models
                 new() { Index = 32, Label = ".",    X = 390,  Y = 160 },
                 new() { Index = 33, Label = "/",    X = 428,  Y = 160 },
                 // RShift: ends at RIGHT_EDGE (571), wider to absorb LShift shrink
-                new() { Index = 35, Label = "\u21E7",    X = 466,  Y = 160, Width = 104 },
+                new() { Index = 35, Label = "\u21E7",    X = 466,  Y = 160, Width = 105 },
 
                 // Numpad row 4
                 new() { Index = 60, Label = "1",    X = 576,  Y = 160 },
@@ -420,7 +428,7 @@ namespace Universal_x86_Tuning_Utility.Models
                 // Right Ctrl: ends at 449 so arrows start right after
                 new() { Index = 12, Label = "Ctrl", X = 390,  Y = 198, Width = 59 },
                 // Arrow Up: aligned with Arrow Down (X=493)
-                new() { Index = 14, Label = "\u2191",    X = 492,  Y = 204, Width = 38 },
+                new() { Index = 14, Label = "\u2191",    X = 493,  Y = 204, Width = 38 },
 
                 // Numpad row 5
                 new() { Index = 99, Label = "0",    X = 576,  Y = 198, Width = 74 },
@@ -428,9 +436,9 @@ namespace Universal_x86_Tuning_Utility.Models
 
                 // ===== Row 6: Arrow cluster (Y=236) =====
                 // <- starts after RCtrl (ends 449), -> ends at RIGHT_EDGE (571)
-                new() { Index = 13, Label = "\u2190",    X = 452,  Y = 242, Width = 38 },
-                new() { Index = 18, Label = "\u2193",    X = 492,  Y = 242, Width = 38 },
-                new() { Index = 15, Label = "\u2192",    X = 532,  Y = 242, Width = 38 },
+                new() { Index = 13, Label = "\u2190",    X = 453,  Y = 242, Width = 38 },
+                new() { Index = 18, Label = "\u2193",    X = 493,  Y = 242, Width = 38 },
+                new() { Index = 15, Label = "\u2192",    X = 533,  Y = 242, Width = 38 },
             };
         }
     }

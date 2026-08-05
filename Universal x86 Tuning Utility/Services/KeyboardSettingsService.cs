@@ -39,10 +39,11 @@ namespace Universal_x86_Tuning_Utility.Services
                 Directory.CreateDirectory(SettingsFolder);
                 var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
                 File.WriteAllText(SettingsFile, json);
+                System.Diagnostics.Debug.WriteLine($"[KBD-SETTINGS] Saved to {SettingsFile} (PerKeyMode={settings.PerKeyMode})");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to save keyboard settings: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[KBD-SETTINGS] Failed to save keyboard settings: {ex.Message}");
             }
         }
     }

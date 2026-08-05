@@ -87,6 +87,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             PopulateEffects();
 
                             var settings = KeyboardSettingsService.Load();
+                            Debug.WriteLine($"[KBD] Loaded settings: PerKeyMode={settings.PerKeyMode}, PerKeyColors={(string.IsNullOrEmpty(settings.PerKeyColors) ? "null" : settings.PerKeyColors.Length + " chars")}");
                             ApplySettings(settings);
 
                             // HID apply is deferred to Page_Loaded which is the single source
@@ -196,7 +197,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             bool isOverrideActive = deviceApplier?.IsKeyboardOverridden == true;
             if (!isOverrideActive)
             {
-                var isPerKey = ModeToggle.IsChecked == true;
+                // Read mode from _settings instead of ModeToggle.IsChecked to avoid
+                // a race: the constructor's async HID open may not have called
+                // ApplySettings() yet, leaving ModeToggle on its XAML default (false).
+                bool isPerKey = _settings?.PerKeyMode == true;
                 _ = Task.Run(() =>
                 {
                     try
@@ -205,6 +209,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         // Without this delay, the direction byte is ignored on startup.
                         Thread.Sleep(200);
 
+                        Debug.WriteLine($"[KBD] Page_Loaded apply: isPerKey={isPerKey}");
                         if (isPerKey)
                         {
                             ApplyPerKeyColorsToHid();
@@ -332,14 +337,17 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                             var color = (System.Windows.Media.Color)Application.Current.Dispatcher.Invoke(
                                 () => ColorPicker.SelectedColor);
-                            _hidService.TurnOn(color.R, color.G, color.B, brightnessPercent);
 
                             KeyboardEffect effect = (KeyboardEffect)Application.Current.Dispatcher.Invoke(
                                 () => cmbEffect.SelectedItem is KeyboardEffect e ? e : KeyboardEffect.Static);
 
                             byte speed = SliderToHidSpeed(5);
 
-                            _hidService.SetEffect(effect, speed, _currentDirection);
+                            // Combine power-on and effect into one sequence to avoid
+                            // a visible flash of intermediate Static color.
+                            _hidService.TurnOnWithEffect(
+                                color.R, color.G, color.B, brightnessPercent,
+                                effect, speed, _currentDirection);
 
                             // Multi-color palette (if needed for this effect)
                             if (s_multiColor7Effects.Contains(effect))
@@ -409,7 +417,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 _hidService.SetPerKeyBrightness(brightnessPercent);
 
                 var colors = _settings.GetPerKeyColors();
-                _hidService.SetEffect(KeyboardEffect.Static);
+                // Enter UserMode directly without a Static primer to avoid
+                // a visible flash of a single color before per-key data arrives.
                 _hidService.SendAllPerKeyColorsFromDict(colors);
                 Debug.WriteLine("[KBD] Applied saved per-key colors to HID");
             }
@@ -749,21 +758,18 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                 if (powerOn)
                 {
-                    // Exit per-key/User mode before sending effects commands.
-                    // The ITE controller ignores standard effect commands while in UserMode.
-                    _hidService.ExitPerKeyMode();
-
                     var color = ColorPicker.SelectedColor;
-                    _hidService.TurnOn(color.R, color.G, color.B, brightnessPercent);
-
                     KeyboardEffect effect = cmbEffect.SelectedItem is KeyboardEffect e ? e
                         : KeyboardSettingsService.Load().EffectMode;
 
-                    // Send effect BEFORE multi-color palette. The ITE controller
-                    // firmware requires the effect to be set first so it knows how
-                    // to interpret the upcoming color palette.
-                    _hidService.SetEffect(effect, speed, _currentDirection);
+                    // Use fast apply to minimize visible flash. TurnOnWithEffect
+                    // combines power-on and effect into one sequence so the
+                    // firmware never shows an intermediate static color.
+                    _hidService.TurnOnWithEffect(
+                        color.R, color.G, color.B, brightnessPercent,
+                        effect, speed, _currentDirection);
 
+                    // Multi-color palette (after effect is set).
                     if (s_multiColor7Effects.Contains(effect))
                     {
                         var colors = effect == KeyboardEffect.Marquee
@@ -850,22 +856,28 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             try
             {
-                _hidService.SetEffect(KeyboardEffect.Static);
-
+                // Update visualizer first (UI thread).
                 for (int i = 0; i < KeyboardHidService.MaxPerKeyZones; i++)
                 {
-                    _hidService.SetPerKeyColor(i, color.R, color.G, color.B);
                     _visualizer.SetZoneColor(i, color);
                 }
 
                 if (_settings == null)
                     _settings = new KeyboardSettings();
 
+                // Build color dict for HID send.
                 var colors = new Dictionary<int, (byte, byte, byte)>();
                 for (int i = 0; i < 126; i++)
                     colors[i] = (color.R, color.G, color.B);
+
+                // Save to disk first so the color data persists even if the HID
+                // send fails (e.g., controller disconnects mid-transfer).
                 _settings.SetPerKeyColors(colors);
+                _settings.PerKeyMode = true;
                 KeyboardSettingsService.Save(_settings);
+
+                // Send all per-key colors in one batch (enters UserMode internally).
+                _hidService.SendAllPerKeyColorsFromDict(colors);
 
                 _visualizer.ClearSelection();
                 _statusText.Text = $"All keys set to {color}.";
@@ -914,9 +926,18 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             try
             {
-                _hidService.SendAllPerKeyColorsFromDict(allColors);
+                // Save to disk first so the color data persists even if the HID
+                // send fails (e.g., controller disconnects mid-transfer).
                 _settings.SetPerKeyColors(allColors);
+                // Ensure PerKeyMode is in sync with the current toggle state.
+                // _settings.PerKeyMode may be stale if the user just toggled to
+                // per-key mode (ModeToggle_Checked saves a fresh KeyboardSettings
+                // but doesn't update the _settings field instance).
+                _settings.PerKeyMode = true;
                 KeyboardSettingsService.Save(_settings);
+                Debug.WriteLine($"[KBD-PERKEY] Saved: PerKeyMode={_settings.PerKeyMode}, PerKeyColors length={_settings.PerKeyColors?.Length ?? 0}");
+
+                _hidService.SendAllPerKeyColorsFromDict(allColors);
 
                 Debug.WriteLine($"[KBD-PERKEY] Applied {color} to zones: {string.Join(", ", selected)}");
                 _statusText.Text = $"Applied {color} to {selected.Count} key{(selected.Count > 1 ? "s" : "")}.";
@@ -1122,6 +1143,35 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             // Set mode toggle based on saved per-key mode
             ModeToggle.IsChecked = settings.PerKeyMode;
+
+            // Restore per-key color picker color
+            if (!string.IsNullOrEmpty(settings.PerKeyPickerColor))
+            {
+                var parts = settings.PerKeyPickerColor.Split(',');
+                if (parts.Length == 3 && byte.TryParse(parts[0], out var pr)
+                    && byte.TryParse(parts[1], out var pg) && byte.TryParse(parts[2], out var pb))
+                {
+                    _colorPicker.SelectedColor = Color.FromRgb(pr, pg, pb);
+                }
+            }
+
+            // Sync content visibility to match the saved mode. ModeToggle_Checked
+            // won't fire for programmatic IsChecked changes, so we must set the
+            // visibility here otherwise the visualizer stays in a collapsed panel.
+            EffectsContent.Visibility = settings.PerKeyMode ? Visibility.Collapsed : Visibility.Visible;
+            PerKeyContent.Visibility = settings.PerKeyMode ? Visibility.Visible : Visibility.Collapsed;
+
+            // Load per-key colors into the visualizer now. This ensures the UI
+            // reflects saved data even if Page_Loaded fires before this method
+            // (race between constructor's async HID open and Page_Loaded).
+            // Page_Loaded will also call LoadPerKeyColors() but that's harmless.
+            if (settings.PerKeyMode)
+            {
+                LoadPerKeyColors();
+            }
+
+            // Sync picker brush so hover/selection overlays use the right color.
+            _visualizer.SetPickerBrush(new SolidColorBrush(_colorPicker.SelectedColor));
         }
 
         private void SaveSettings()
@@ -1130,8 +1180,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (cmbEffect.SelectedItem is not KeyboardEffect)
                 return;
 
-            // Preserve existing per-key colors if in per-key mode
+            // Preserve existing per-key colors from the live _settings instance.
+            // Apply_Click updates _settings.PerKeyColors in-place, so this always
+            // reads the latest per-key color data.
             var savedPerKeyColors = _settings?.PerKeyColors;
+            var pickerColor = _colorPicker.SelectedColor;
 
             var settings = new KeyboardSettings
             {
@@ -1150,8 +1203,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     : 10,
                 PerKeyMode = ModeToggle.IsChecked == true,
                 PerKeyColors = savedPerKeyColors,
+                PerKeyPickerColor = $"{pickerColor.R},{pickerColor.G},{pickerColor.B}",
             };
             KeyboardSettingsService.Save(settings);
+            Debug.WriteLine($"[KBD] SaveSettings: PerKeyMode={settings.PerKeyMode}, PerKeyColors={(string.IsNullOrEmpty(savedPerKeyColors) ? "null" : "saved")}");
         }
 
         private static string SerializeColors(List<Color> colors)
@@ -1425,6 +1480,13 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _fillAllBtn.IsEnabled = enabled;
             _colorPicker.IsEnabled = enabled;
             _applyBtn.IsEnabled = enabled;
+        }
+
+        private void _colorPicker_ColorChangedDelayed(object sender, EventArgs e)
+        {
+            // Push the current picker color to all visualizer zones so hover and
+            // selection overlays use the right color.
+            _visualizer.SetPickerBrush(new SolidColorBrush(_colorPicker.SelectedColor));
         }
 
         #endregion

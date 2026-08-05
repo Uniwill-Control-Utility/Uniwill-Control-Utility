@@ -498,7 +498,8 @@
                             <controls:ColorPickerControl x:Name="_colorPicker"
                                                          Grid.Column="1"
                                                          Margin="0,0,12,0"
-                                                         SelectedColor="Black" />
+                                                         SelectedColor="White"
+                                                         ColorChangedDelayed="_colorPicker_ColorChangedDelayed" />
 
                             <ui:Button x:Name="_applyBtn"
                                        Grid.Column="2"

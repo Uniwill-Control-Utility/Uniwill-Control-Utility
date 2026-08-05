@@ -561,13 +561,10 @@ namespace Universal_x86_Tuning_Utility.Services
                 }
                 else
                 {
-                    // Effects mode: exit per-key mode, set color, then apply effect.
-                    // The effect must be sent BEFORE the multi-color palette so the
-                    // ITE controller knows how to interpret the upcoming color data.
-                    hid.ExitPerKeyMode();
-                    hid.TurnOn(r, g, b, brightnessPercent);
-
-                    hid.SetEffect(effect, effectSpeed, direction);
+                    // Effects mode: use TurnOnWithEffect to combine power-on and
+                    // effect into one sequence, avoiding a visible flash of
+                    // intermediate Static color.
+                    hid.TurnOnWithEffect(r, g, b, brightnessPercent, effect, effectSpeed, direction);
 
                     // Multi-color effects need additional color reports after effect is set.
                     if (!string.IsNullOrEmpty(multiColors))

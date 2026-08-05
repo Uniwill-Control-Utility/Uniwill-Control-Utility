@@ -79,6 +79,12 @@ namespace Universal_x86_Tuning_Utility.Models
         public bool PerKeyMode { get; set; } = false;
 
         /// <summary>
+        /// The currently selected color in the per-key color picker.
+        /// Stored as "R,G,B". Default is white (255,255,255).
+        /// </summary>
+        public string PerKeyPickerColor { get; set; } = "255,255,255";
+
+        /// <summary>
         /// Per-key colors for all 126 zones. Stored as "R,G,B" per zone, pipe-separated.
         /// e.g., "0,255,255|255,0,0|0,0,255|..." (126 entries)
         /// Null or empty means all black (default).

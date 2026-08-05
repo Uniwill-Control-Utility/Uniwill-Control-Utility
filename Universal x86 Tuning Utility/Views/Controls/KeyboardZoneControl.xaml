@@ -14,38 +14,39 @@
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="ToggleButton">
-                            <Border x:Name="border"
-                                    Background="{TemplateBinding Background}"
-                                    BorderBrush="Transparent"
-                                    BorderThickness="0"
-                                    CornerRadius="3"
-                                    SnapsToDevicePixels="True">
-                                <Grid>
-                                    <!-- Color overlay background -->
-                                    <Border x:Name="colorBg"
-                                            CornerRadius="3"
-                                            Opacity="0.55"
-                                            Background="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=ZoneBrush}" />
-                                    <!-- Key label -->
-                                    <TextBlock HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               FontSize="8"
-                                               FontWeight="SemiBold"
-                                               Foreground="White"
-                                               Text="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=Label}"
-                                               TextOptions.TextFormattingMode="Display" />
-                                </Grid>
-                            </Border>
+                            <Grid>
+                                <!-- Default state: semi-transparent zone color fill -->
+                                <Border x:Name="colorBg"
+                                        CornerRadius="3"
+                                        Opacity="0.55"
+                                        Background="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=ZoneBrush}" />
+                                <!-- Hover overlay: 25% opaque picker color -->
+                                <Border x:Name="hoverBg"
+                                        CornerRadius="3"
+                                        Opacity="0"
+                                        Background="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=PickerBrush}" />
+                                <!-- Selection overlay: 75% opaque picker color -->
+                                <Border x:Name="selectOverlay"
+                                        CornerRadius="3"
+                                        Opacity="0"
+                                        Background="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=PickerBrush}" />
+                                <!-- Key label -->
+                                <TextBlock HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="8"
+                                           FontWeight="SemiBold"
+                                           Foreground="White"
+                                           Text="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=Label}"
+                                           TextOptions.TextFormattingMode="Display" />
+                            </Grid>
                             <ControlTemplate.Triggers>
-                                <!-- Selected state -->
+                                <!-- Selected state: 25% opaque picker color fill -->
                                 <Trigger Property="IsChecked" Value="True">
-                                    <Setter TargetName="border" Property="BorderBrush" Value="#0078D4" />
-                                    <Setter TargetName="border" Property="BorderThickness" Value="2" />
+                                    <Setter TargetName="selectOverlay" Property="Opacity" Value="0.25" />
                                 </Trigger>
-                                <!-- Hover state -->
+                                <!-- Hover state: 75% opaque picker color fill -->
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="border" Property="BorderBrush" Value="#80FFFFFF" />
-                                    <Setter TargetName="border" Property="BorderThickness" Value="1" />
+                                    <Setter TargetName="hoverBg" Property="Opacity" Value="0.75" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>

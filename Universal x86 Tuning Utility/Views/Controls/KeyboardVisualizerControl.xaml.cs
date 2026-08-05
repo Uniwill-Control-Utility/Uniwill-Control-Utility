@@ -51,9 +51,10 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
                     ZoneIndex = zone.Index,
                     Label = zone.Label,
                     ZoneBrush = new SolidColorBrush(zone.Color),
+                    IsInvertedLShape = zone.IsInvertedLShape,
+                    IsTabStop = false,
                     Width = zone.Width,
                     Height = zone.Height,
-                    IsTabStop = false,
                 };
 
                 control.Click += OnZoneClick;
@@ -201,6 +202,17 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
             EnsureBuilt();
             foreach (var c in _zoneControls.Values)
                 c.IsSelected = true;
+        }
+
+        /// <summary>
+        /// Updates the picker brush on all zones so hover and selection overlays
+        /// use the current color from the per-key color picker.
+        /// </summary>
+        public void SetPickerBrush(System.Windows.Media.Brush brush)
+        {
+            EnsureBuilt();
+            foreach (var c in _zoneControls.Values)
+                c.PickerBrush = brush;
         }
     }
 }

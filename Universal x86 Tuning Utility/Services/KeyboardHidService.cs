@@ -548,6 +548,40 @@ namespace Universal_x86_Tuning_Utility.Services
         }
 
         /// <summary>
+        /// Powers on the keyboard and sets the target effect in a single sequence.
+        /// Sends black color + effect config BEFORE enabling the zone, so the firmware
+        /// doesn't flash a cached static color when the zone turns on.
+        /// </summary>
+        public void TurnOnWithEffect(byte r, byte g, byte b, int brightness,
+            KeyboardEffect effect, byte speed = 5, KeyboardDirection direction = KeyboardDirection.LeftRight)
+        {
+            EnsureAvailable();
+            brightness = Math.Clamp(brightness, 0, 100);
+
+            lock (_lock)
+            {
+                byte clampedSpeed = (byte)Math.Clamp((int)speed, 0, 0x0B);
+                byte directionByte = (byte)direction;
+
+                // Report 1: Set black color to avoid flashing cached cyan when zone enables
+                SendReport(new byte[] { 0x00, CMD_SET_COLOR, (byte)ZoneKeyboard, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00 });
+
+                // Reports 2-3: Configure effect engine BEFORE enabling the zone.
+                SendReport(new byte[] { 0x00, CMD_MODE_BRIGHTNESS, 0x00, (byte)effect, clampedSpeed, (byte)brightness, 0x00, 0x00, 0x00 });
+                SendReport(new byte[] { 0x00, CMD_MODE_BRIGHTNESS, ZoneMaskKeyboard, (byte)effect, clampedSpeed, (byte)brightness, 0x08, directionByte, 0x00 });
+
+                // Report 4: Zone enable — firmware renders the pre-configured effect
+                SendReport(new byte[] { 0x00, CMD_ZONE_ON_OFF, (byte)ZoneKeyboard, 0x01, 0x04, 0x00, 0x00, 0x00, 0x01 });
+
+                _color = (r, g, b);
+                _brightness = brightness;
+                IsOn = true;
+
+                DebugLog($"[KBD-HID] Keyboard ON with effect {effect} (0x{(byte)effect:X2}) — brightness={brightness}");
+            }
+        }
+
+        /// <summary>
         /// Turns off the keyboard backlight.
         /// </summary>
         public void TurnOff()
