@@ -166,44 +166,11 @@
                                           HorizontalAlignment="Right"
                                           VerticalAlignment="Center"
                                           SelectedIndex="9"
-                                          SelectionChanged="CmbIdleTimer_SelectionChanged" />
+                                          SelectionChanged="CmbIdleTimer_SelectionChanged"
+                                          MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown" />
                             </Grid>
                         </StackPanel>
                     </ui:CardExpander>
-
-                    <!-- Brightness (common to both modes) -->
-                    <ui:CardControl Margin="0,0,0,12" >
-                        <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE706;" FontSize="20" Margin="4,0,6,0" />
-                        </ui:CardControl.Icon>
-                        <ui:CardControl.Header>
-                            <StackPanel>
-                                <ui:TextBlock FontTypography="Body" Text="Brightness" />
-                                <ui:TextBlock Margin="0,2,0,0"
-                                               FontTypography="Caption"
-                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Adjust the backlight brightness level." />
-                            </StackPanel>
-                        </ui:CardControl.Header>
-                        <StackPanel Orientation="Horizontal"
-                                    VerticalAlignment="Center">
-                            <TextBlock x:Name="BrightnessValueText"
-                                       Width="30"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       Text="5" />
-                            <Slider x:Name="BrightnessSlider"
-                                    Width="140"
-                                    Minimum="1"
-                                    Maximum="7"
-                                    Value="5"
-                                    IsSnapToTickEnabled="True"
-                                    TickFrequency="1"
-                                    TickPlacement="Both"
-                                    IsMoveToPointEnabled="False"
-                                    ValueChanged="BrightnessSlider_ValueChanged" />
-                        </StackPanel>
-                    </ui:CardControl>
 
                     <!-- ===== EFFECTS MODE CONTENT ===== -->
                     <StackPanel x:Name="EffectsContent">
@@ -231,9 +198,9 @@
                         </ui:CardControl>
 
                         <!-- Effect card with all controls -->
-                        <ui:CardExpander Margin="0,0,0,0"
-                                         IsExpanded="True"
-                                         >
+                        <ui:CardExpander x:Name="EffectsCardExpander"
+                                         Margin="0,0,0,0"
+                                         IsExpanded="True">
                             <ui:CardExpander.Icon>
                                 <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
                             </ui:CardExpander.Icon>
@@ -257,10 +224,51 @@
                                               Margin="2,0,12,0"
                                               HorizontalAlignment="Right"
                                               VerticalAlignment="Center"
-                                              SelectionChanged="CmbEffect_SelectionChanged" />
+                                              SelectionChanged="CmbEffect_SelectionChanged"
+                                              MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown" />
                                 </Grid>
                             </ui:CardExpander.Header>
                             <StackPanel>
+
+                                <!-- Brightness (always visible at top) -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Brightness" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Adjust the backlight brightness level." />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center">
+                                        <TextBlock x:Name="BrightnessValueText"
+                                                   Width="30"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Text="5" />
+                                        <Slider x:Name="BrightnessSlider"
+                                                Width="140"
+                                                Minimum="1"
+                                                Maximum="7"
+                                                Value="5"
+                                                IsSnapToTickEnabled="True"
+                                                TickFrequency="1"
+                                                TickPlacement="Both"
+                                                IsMoveToPointEnabled="False"
+                                                ValueChanged="BrightnessSlider_ValueChanged" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Divider between Brightness and effect controls (hidden for Rainbow) -->
+                                <Border x:Name="BrightnessSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
 
                                 <!-- Color (visible for single-color effects) -->
                                 <Grid x:Name="ColorRow"
@@ -424,6 +432,40 @@
 
                     <!-- ===== PER-KEY MODE CONTENT ===== -->
                     <StackPanel x:Name="PerKeyContent" Visibility="Collapsed">
+                        <!-- Brightness (per-key mode) -->
+                        <ui:CardControl Margin="0,0,0,12">
+                            <ui:CardControl.Icon>
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE706;" FontSize="20" Margin="4,0,6,0" />
+                            </ui:CardControl.Icon>
+                            <ui:CardControl.Header>
+                                <StackPanel>
+                                    <ui:TextBlock FontTypography="Body" Text="Brightness" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Adjust the backlight brightness level." />
+                                </StackPanel>
+                            </ui:CardControl.Header>
+                            <StackPanel Orientation="Horizontal"
+                                        VerticalAlignment="Center">
+                                <TextBlock x:Name="BrightnessValueTextPerKey"
+                                           Width="30"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Text="5" />
+                                <Slider x:Name="BrightnessSliderPerKey"
+                                        Width="140"
+                                        Minimum="1"
+                                        Maximum="7"
+                                        Value="5"
+                                        IsSnapToTickEnabled="True"
+                                        TickFrequency="1"
+                                        TickPlacement="Both"
+                                        IsMoveToPointEnabled="False"
+                                        ValueChanged="BrightnessSliderPerKey_ValueChanged" />
+                            </StackPanel>
+                        </ui:CardControl>
+
                         <!-- Keyboard visualizer -->
                         <controls:KeyboardVisualizerControl x:Name="_visualizer"
                                                             Margin="0,0,0,12" />
@@ -476,11 +518,13 @@
             </StackPanel>
         </ScrollViewer>
 
-        <!-- Dark overlay for Adaptive Mode override (covers ScrollViewer to block input) -->
-        <Border x:Name="overlayAdaptiveWarning" Visibility="Collapsed" Background="Black" Opacity="0.4" CornerRadius="4"/>
+        <!-- Dark overlay for Adaptive Mode override (covers entire page) -->
+        <Border x:Name="overlayAdaptiveWarning" Grid.Row="0" Grid.RowSpan="3" Panel.ZIndex="0" Visibility="Collapsed" Background="Black" Opacity="0.4" CornerRadius="4"/>
 
-        <!-- Page-scoped snackbar presenter for Adaptive Mode override warning -->
+        <!-- Page-scoped snackbar presenter for Adaptive Mode override warning (above overlay) -->
         <ui:SnackbarPresenter x:Name="SnackbarPresenter"
+                              Grid.Row="0" Grid.RowSpan="3"
+                              Panel.ZIndex="1"
                               Margin="12"
                               HorizontalAlignment="Right"
                               VerticalAlignment="Bottom" />

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Universal_x86_Tuning_Utility.Models;
@@ -57,6 +58,12 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             InitializeDebounce();
             InitializeIdleTimer();
 
+            // Subscribe to override state changes so the UI updates when Adaptive
+            // Mode activates (which may happen after Page_Loaded at startup).
+            var deviceApplier = App.GetService<DeviceApplier>();
+            if (deviceApplier != null)
+                deviceApplier.KeyboardOverrideChanged += OnKeyboardOverrideChanged;
+ 
             // Show unavailable state initially; HID opens in background
             KeyboardAvailable.Visibility = Visibility.Collapsed;
             KeyboardUnavailable.Visibility = Visibility.Visible;
@@ -118,15 +125,14 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             var deviceApplier = App.GetService<DeviceApplier>();
             if (deviceApplier != null)
             {
-                // Reconcile override state with current DeviceApplier state.
-                // The page may be eagerly instantiated before navigation, in which case
-                // the UI state may be stale after Unloaded cleared _adaptiveSnackbar.
-                bool isUiOverridden = _adaptiveSnackbar != null;
                 bool isOverridden = deviceApplier.IsKeyboardOverridden;
-                if (isUiOverridden != isOverridden)
-                {
-                    ApplyOverrideState(isOverridden);
-                }
+
+                // Always force override state on Page_Loaded. The override event may
+                // have fired in the constructor (before the presenter was in the
+                // visual tree), leaving a stale snackbar that never appeared.
+                // Similarly, _adaptiveSnackbar may be null after Page_Unloaded
+                // cleared it, even though override is still active.
+                ApplyOverrideState(isOverridden);
 
                 // If override is still active and a preset was applied while the page
                 // was not visible, sync UI to match the preset. Skip this when override
@@ -230,6 +236,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // Clean up Adaptive Mode snackbar so it can re-show on next navigation
             HideAdaptiveSnackbar();
             _adaptiveSnackbar = null;
+
+            // Unsubscribe from override events to prevent memory leaks.
+            var deviceApplier = App.GetService<DeviceApplier>();
+            if (deviceApplier != null)
+                deviceApplier.KeyboardOverrideChanged -= OnKeyboardOverrideChanged;
         }
 
         #region Idle Timer Chevron Hide
@@ -292,8 +303,91 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
             else
             {
-                ApplySettingsToHid();
-                Debug.WriteLine("[KBD] Mode toggle off: effects applied");
+                // Switching from Per-Key to Effects: the firmware retains cached
+                // per-key color data in UserMode. A full off-then-on cycle is needed
+                // to clear the cache and reinitialize the effect engine properly.
+                // Must run off the UI thread to avoid freezing during delays.
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        if (_hidService == null || !_hidService.IsAvailable) return;
+
+                        Thread.Sleep(100);
+
+                        // Full power cycle: turn off completely, wait, then turn on.
+                        // This ensures per-key color cache is cleared and the effect
+                        // engine is reinitialized (similar to cold startup).
+                        _hidService.TurnOff();
+                        Thread.Sleep(100);
+
+                        bool powerOn = (bool)Application.Current.Dispatcher.Invoke(
+                            () => tsKeyboardPower.IsChecked);
+
+                        if (powerOn)
+                        {
+                            int brightnessLevel = (int)Application.Current.Dispatcher.Invoke(
+                                () => BrightnessSlider.Value);
+                            int brightnessPercent = (brightnessLevel * 100) / 7;
+
+                            var color = (System.Windows.Media.Color)Application.Current.Dispatcher.Invoke(
+                                () => ColorPicker.SelectedColor);
+                            _hidService.TurnOn(color.R, color.G, color.B, brightnessPercent);
+
+                            KeyboardEffect effect = (KeyboardEffect)Application.Current.Dispatcher.Invoke(
+                                () => cmbEffect.SelectedItem is KeyboardEffect e ? e : KeyboardEffect.Static);
+
+                            byte speed = SliderToHidSpeed(5);
+
+                            _hidService.SetEffect(effect, speed, _currentDirection);
+
+                            // Multi-color palette (if needed for this effect)
+                            if (s_multiColor7Effects.Contains(effect))
+                            {
+                                var colors = effect == KeyboardEffect.Marquee
+                                    ? Application.Current.Dispatcher.Invoke(
+                                        () => MultiColorPicker.Colors.AsEnumerable().Reverse().ToList())
+                                    : Application.Current.Dispatcher.Invoke(
+                                        () => MultiColorPicker.Colors.ToList());
+                                _hidService.SetMultiColor(colors);
+                            }
+                            else if (s_multiColor4Effects.Contains(effect))
+                            {
+                                var colors = Application.Current.Dispatcher.Invoke(
+                                    () => MultiColorPicker.Colors.ToList());
+                                _hidService.SetMultiColor(colors.Take(4));
+                            }
+                            else if (s_multiColor4Plus1Effects.Contains(effect))
+                            {
+                                var colors = Application.Current.Dispatcher.Invoke(() =>
+                                {
+                                    var list = MultiColorPicker.Colors.ToList();
+                                    var rest = GamingModeFullRestColor.SelectedColor;
+                                    list.AddRange(new[] { rest });
+                                    return list;
+                                });
+                                _hidService.SetMultiColor(colors);
+                            }
+                            else
+                            {
+                                // Rainbow and other non-multi-color effects still need the
+                                // firmware color palette reset after per-key mode. Sending the
+                                // default palette clears corrupted per-key color data that
+                                // would otherwise break the effect's internal gradient.
+                                var colors = Application.Current.Dispatcher.Invoke(
+                                    () => MultiColorPicker.Colors.ToList());
+                                _hidService.SetMultiColor(colors);
+                            }
+                        }
+
+                        Application.Current.Dispatcher.Invoke(() => SaveSettings());
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[KBD] Mode toggle off primer error: {ex.Message}");
+                    }
+                });
+                Debug.WriteLine("[KBD] Mode toggle off: full power cycle + apply queued");
             }
 
             SaveSettings();
@@ -392,10 +486,21 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
         }
 
+        /// <summary>
+        /// Prevents the CardExpander's ToggleButton from intercepting clicks on ComboBoxes
+        /// nested inside its header. Uses the bubbling MouseLeftButtonDown so the ComboBox
+        /// processes the click first, then we block it from reaching the ToggleButton above.
+        /// </summary>
+        private void ComboBoxInCardExpander_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+        }
+
         private void UpdateEffectUi()
         {
             if (cmbEffect.SelectedItem is not KeyboardEffect effect)
             {
+                BrightnessSeparator.Visibility = Visibility.Collapsed;
                 ColorRow.Visibility = Visibility.Collapsed;
                 MultiColorRow.Visibility = Visibility.Collapsed;
                 GamingModeFullRestRow.Visibility = Visibility.Collapsed;
@@ -407,8 +512,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
 
             // Rainbow has fixed colors — no color controls, no speed, no direction.
+            // Brightness is still available inside the CardExpander but no divider below it.
             if (effect == KeyboardEffect.Rainbow)
             {
+                BrightnessSeparator.Visibility = Visibility.Collapsed;
                 ColorRow.Visibility = Visibility.Collapsed;
                 MultiColorRow.Visibility = Visibility.Collapsed;
                 GamingModeFullRestRow.Visibility = Visibility.Collapsed;
@@ -418,6 +525,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 DirectionRow.Visibility = Visibility.Collapsed;
                 return;
             }
+
+            // Non-Rainbow effects have controls below Brightness — show the divider.
+            BrightnessSeparator.Visibility = Visibility.Visible;
 
             if (s_multiColor7Effects.Contains(effect))
             {
@@ -575,6 +685,15 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
         }
 
+        private void BrightnessSliderPerKey_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isFirstLoad) return;
+            BrightnessValueTextPerKey.Text = ((int)BrightnessSliderPerKey.Value).ToString();
+
+            ApplyPerKeyBrightness();
+            SaveSettings();
+        }
+
         private void ApplyPerKeyBrightness()
         {
             if (_hidService == null || !_hidService.IsAvailable)
@@ -582,7 +701,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             try
             {
-                int brightnessLevel = (int)BrightnessSlider.Value;
+                int brightnessLevel = (int)BrightnessSliderPerKey.Value;
                 int brightnessPercent = (brightnessLevel * 100) / 7;
                 _hidService.SetPerKeyBrightness(brightnessPercent);
 
@@ -963,6 +1082,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             tsKeyboardPower.IsChecked = settings.PowerOn;
             BrightnessSlider.Value = Math.Clamp(settings.Brightness, 1, 7);
             BrightnessValueText.Text = Math.Clamp(settings.Brightness, 1, 7).ToString();
+            BrightnessSliderPerKey.Value = Math.Clamp(settings.Brightness, 1, 7);
+            BrightnessValueTextPerKey.Text = Math.Clamp(settings.Brightness, 1, 7).ToString();
 
             int hidSpeed = Math.Clamp((int)settings.Speed, 1, 10);
             SpeedSlider.Value = 10 - hidSpeed;
@@ -1173,6 +1294,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // Brightness
             BrightnessSlider.Value = Math.Clamp(e.Brightness, 1, 7);
             BrightnessValueText.Text = e.Brightness.ToString();
+            BrightnessSliderPerKey.Value = Math.Clamp(e.Brightness, 1, 7);
+            BrightnessValueTextPerKey.Text = e.Brightness.ToString();
 
             // Idle timer
             tsIdleTimer.IsChecked = e.IdleTimerEnabled;
@@ -1289,6 +1412,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             IdleTimerCard.IsEnabled = enabled;
             cmbIdleTimer.IsEnabled = enabled;
             BrightnessSlider.IsEnabled = enabled;
+            BrightnessSliderPerKey.IsEnabled = enabled;
             tsKeyboardPower.IsEnabled = enabled;
             cmbEffect.IsEnabled = enabled;
             ColorPicker.IsEnabled = enabled;

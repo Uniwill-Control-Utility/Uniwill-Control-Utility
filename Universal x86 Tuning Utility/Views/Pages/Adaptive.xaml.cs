@@ -1420,6 +1420,44 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
         }
 
+        private void Page_Unloaded(object sender, RoutedEventArgs e)
+        {
+            // Save current UI values back to the active preset so that
+            // unsaved changes (e.g., speed, brightness, color) persist
+            // across navigation. Without this, Page_Loaded reloads the
+            // preset from disk and overwrites in-flight edits.
+            if (cbxPowerPreset.SelectedItem is string presetName && adaptivePresetManager != null)
+            {
+                try
+                {
+                    var existing = adaptivePresetManager.GetPreset(presetName);
+                    if (existing != null)
+                    {
+                        // Patch only the keyboard RGB fields that can be edited
+                        // without clicking Save Preset.
+                        existing.KbEffectSpeed = (byte)Math.Clamp((int)sdKbSpeed.Value, 1, 10);
+                        existing.KbBrightness = (int)sdKbBrightness.Value;
+                        existing.KbEffectMode = GetKbEffectFromIndex(cbxKbEffect.SelectedIndex);
+                        existing.KbColorR = KbColorPicker.SelectedColor.R;
+                        existing.KbColorG = KbColorPicker.SelectedColor.G;
+                        existing.KbColorB = KbColorPicker.SelectedColor.B;
+                        existing.KbRestColorR = KbRestColorPicker.SelectedColor.R;
+                        existing.KbRestColorG = KbRestColorPicker.SelectedColor.G;
+                        existing.KbRestColorB = KbRestColorPicker.SelectedColor.B;
+                        existing.KbMultiColors = SerializeColors(KbMultiColorPicker.Colors);
+                        existing.KbPerKeyMode = cbxKbMode.SelectedIndex == 1;
+                        existing.KbDirection = _kbDirection;
+
+                        adaptivePresetManager.SavePreset(presetName, existing);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Adaptive] Page_Unloaded save failed: {ex.Message}");
+                }
+            }
+        }
+
 
         string runningGameName = DefaultProfileName;
         string lastConfirmedGame = DefaultProfileName;
