@@ -9,8 +9,7 @@
             Padding="12,0,0,10">
         <Viewbox Stretch="Uniform"
                  StretchDirection="Both"
-                 HorizontalAlignment="Center"
-                 RenderOptions.BitmapScalingMode="HighQuality">
+                 HorizontalAlignment="Center">
             <Canvas x:Name="_keyboardCanvas"
                     Width="736"
                     Height="280"
