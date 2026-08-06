@@ -27,6 +27,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private bool _isFirstLoad = true;
         private KeyboardDirection _currentDirection = KeyboardDirection.LeftRight;
 
+        // Static flag to prevent re-applying HID settings on every page navigation.
+        // The MainWindow's ApplyKeyboardOnStart handles the initial startup apply.
+        // This only applies on the very first Page_Loaded after that.
+        private static bool s_hasAppliedOnce;
+
         // Adaptive Mode override
         private Wpf.Ui.Controls.Snackbar? _adaptiveSnackbar;
         private bool _isSyncingFromPreset;
@@ -194,9 +199,13 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // Apply the current mode to HID on background thread.
             // Skip when Adaptive Mode override is active — the Adaptive Mode update()
             // loop is the authority and will re-apply the preset if we overwrite it.
+            // Also skip on re-navigation: the MainWindow's ApplyKeyboardOnStart already
+            // applied settings at app launch, and the user hasn't changed anything.
             bool isOverrideActive = deviceApplier?.IsKeyboardOverridden == true;
-            if (!isOverrideActive)
+            if (!isOverrideActive && !s_hasAppliedOnce)
             {
+                s_hasAppliedOnce = true;
+
                 // Read mode from _settings instead of ModeToggle.IsChecked to avoid
                 // a race: the constructor's async HID open may not have called
                 // ApplySettings() yet, leaving ModeToggle on its XAML default (false).
@@ -226,9 +235,23 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                     if (isPerKey)
                     {
-                        Application.Current.Dispatcher.Invoke(() => LoadPerKeyColors());
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            LoadPerKeyColors();
+                            Debug.WriteLine("[KBD] Page_Loaded: per-key colors reloaded after HID apply");
+                        });
                     }
                 });
+            }
+
+            // Always sync visualizer to saved per-key colors on navigation.
+            // The constructor's ApplySettings() may have loaded colors before the
+            // visualizer was in the visual tree, or the page may have been
+            // round-tripped (navigated away and back) and the lazy-built
+            // visualizer needs a refresh. This is harmless when not in per-key mode.
+            if (_settings?.PerKeyMode == true)
+            {
+                LoadPerKeyColors();
             }
         }
 
@@ -819,7 +842,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private void LoadPerKeyColors()
         {
             if (_settings == null)
+            {
+                Debug.WriteLine("[KBD] LoadPerKeyColors: _settings is null");
                 return;
+            }
 
             var colors = _settings.GetPerKeyColors();
             var mediaColors = new Dictionary<int, Color>();
@@ -828,6 +854,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             {
                 mediaColors[kvp.Key] = Color.FromRgb(kvp.Value.R, kvp.Value.G, kvp.Value.B);
             }
+
+            // Count non-black zones for diagnostics
+            int nonBlack = colors.Count(kvp => kvp.Value.R != 0 || kvp.Value.G != 0 || kvp.Value.B != 0);
+            Debug.WriteLine($"[KBD] LoadPerKeyColors: {mediaColors.Count} zones, {nonBlack} non-black");
 
             _visualizer.SetZoneColors(mediaColors);
         }
@@ -941,6 +971,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                 Debug.WriteLine($"[KBD-PERKEY] Applied {color} to zones: {string.Join(", ", selected)}");
                 _statusText.Text = $"Applied {color} to {selected.Count} key{(selected.Count > 1 ? "s" : "")}.";
+
+                // Deselect all keys after applying so the visualizer is clean.
+                _visualizer.ClearSelection();
             }
             catch (ObjectDisposedException)
             {

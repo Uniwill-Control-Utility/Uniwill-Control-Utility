@@ -15,17 +15,22 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="ToggleButton">
                             <Grid>
+                                <!-- Black underlay: ensures hover/selection overlays
+                                     show the picker color cleanly without mixing with
+                                     the existing zone color underneath -->
+                                <Border CornerRadius="3"
+                                        Background="Black" />
                                 <!-- Default state: semi-transparent zone color fill -->
                                 <Border x:Name="colorBg"
                                         CornerRadius="3"
                                         Opacity="0.55"
                                         Background="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=ZoneBrush}" />
-                                <!-- Hover overlay: 25% opaque picker color -->
+                                <!-- Hover overlay: picker color -->
                                 <Border x:Name="hoverBg"
                                         CornerRadius="3"
                                         Opacity="0"
                                         Background="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=PickerBrush}" />
-                                <!-- Selection overlay: 75% opaque picker color -->
+                                <!-- Selection overlay: picker color -->
                                 <Border x:Name="selectOverlay"
                                         CornerRadius="3"
                                         Opacity="0"
@@ -33,18 +38,20 @@
                                 <!-- Key label -->
                                 <TextBlock HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
-                                           FontSize="8"
+                                           FontSize="14"
                                            FontWeight="SemiBold"
                                            Foreground="White"
                                            Text="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=Label}"
-                                           TextOptions.TextFormattingMode="Display" />
+                                           TextOptions.TextFormattingMode="Display"
+                                           TextOptions.TextRenderingMode="Aliased"
+                                           RenderOptions.EdgeMode="Aliased" />
                             </Grid>
                             <ControlTemplate.Triggers>
-                                <!-- Selected state: 25% opaque picker color fill -->
+                                <!-- Selected state: picker color overlay -->
                                 <Trigger Property="IsChecked" Value="True">
                                     <Setter TargetName="selectOverlay" Property="Opacity" Value="0.25" />
                                 </Trigger>
-                                <!-- Hover state: 75% opaque picker color fill -->
+                                <!-- Hover state: picker color overlay -->
                                 <Trigger Property="IsMouseOver" Value="True">
                                     <Setter TargetName="hoverBg" Property="Opacity" Value="0.75" />
                                 </Trigger>

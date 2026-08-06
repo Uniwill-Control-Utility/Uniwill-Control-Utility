@@ -229,21 +229,20 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
                     }
                     else
                     {
-                        // Effects mode: apply saved effect settings.
-                        // Set effect BEFORE multi-color palette so the controller
-                        // knows how to interpret the upcoming color data.
+                        // Effects mode: apply saved effect settings using TurnOnWithEffect
+                        // to combine power-on and effect into one sequence, avoiding a
+                        // visible flash of intermediate Static color.
                         // The ITE firmware needs ~500ms to settle after the HID handle
                         // is opened before it accepts direction bytes. Without this delay
                         // the direction silently falls back to Left→Right.
                         int brightnessPercent = (settings.Brightness * 100) / 7;
-                        hidService.TurnOn(settings.ColorR, settings.ColorG, settings.ColorB, brightnessPercent);
-
                         byte speed = (byte)Math.Clamp((int)settings.Speed, 0, 11);
                         if (settings.Direction != KeyboardDirection.LeftRight)
                         {
                             System.Threading.Thread.Sleep(500);
                         }
-                        hidService.SetEffect(settings.EffectMode, speed, settings.Direction);
+                        hidService.TurnOnWithEffect(settings.ColorR, settings.ColorG, settings.ColorB,
+                            brightnessPercent, settings.EffectMode, speed, settings.Direction);
 
                         // Send multi-color palette for effects that need it
                         if (Universal_x86_Tuning_Utility.Views.Pages.Keyboard.IsMultiColor7Effect(settings.EffectMode))

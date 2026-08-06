@@ -53,26 +53,31 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
 
         private void ApplyClip()
         {
-            if (IsInvertedLShape && _button is not null)
-            {
-                double w = _button.ActualWidth;
-                double h = _button.ActualHeight;
+            if (!IsInvertedLShape || _button is null)
+                return;
 
-                // If the control hasn't been measured yet, defer to Loaded.
-                if (w > 0 && h > 0)
+            double w = _button.ActualWidth;
+            double h = _button.ActualHeight;
+
+            // If the control hasn't been measured yet, defer to SizeChanged.
+            // Loaded may not fire again after a navigation round-trip, but
+            // SizeChanged will fire when dimensions become valid.
+            if (w <= 0 || h <= 0)
+            {
+                SizeChangedEventHandler handler = null;
+                handler = (s, e) =>
                 {
-                    ApplyClipGeometry(w, h);
-                }
-                else
-                {
-                    RoutedEventHandler handler = null;
-                    handler = (s, e) =>
+                    if (_button.ActualWidth > 0 && _button.ActualHeight > 0)
                     {
-                        _button.Loaded -= handler;
+                        _button.SizeChanged -= handler;
                         ApplyClipGeometry(_button.ActualWidth, _button.ActualHeight);
-                    };
-                    _button.Loaded += handler;
-                }
+                    }
+                };
+                _button.SizeChanged += handler;
+            }
+            else
+            {
+                ApplyClipGeometry(w, h);
             }
         }
 

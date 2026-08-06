@@ -115,16 +115,13 @@
 
         <ui:NavigationView x:Name="RootNavigation"
                    Grid.Row="1"
-                   Margin="0,0,0,2"
-                   FontSize="11"
-                   PaneDisplayMode="LeftFluent"
+                   FontSize="10"
+                   Margin="1,2"
                    IsPaneOpen="False"
-                   IsPaneToggleVisible="False"
                    IsBackButtonVisible="Collapsed"
-                   AlwaysShowHeader="False"
+                   PaneDisplayMode="LeftFluent"
                    HeaderVisibility="Collapsed"
                    HorizontalContentAlignment="Center"
-                   VerticalContentAlignment="Center"
                    MenuItemsSource="{Binding ViewModel.NavigationItems}"
                    FooterMenuItemsSource="{Binding ViewModel.NavigationFooter}">
 
@@ -134,56 +131,8 @@
                        FontSize="11"
                        HorizontalAlignment="Center"
                        VerticalAlignment="Center">
-
-                        <!--<TextBlock.Style>
-                            <Style TargetType="{x:Type TextBlock}">
-                                <Setter Property="Margin"
-                                Value="0" />
-
-                                <Style.Triggers>
-                                    <DataTrigger
-                                Binding="{Binding IsActive,
-                                      RelativeSource={RelativeSource AncestorType={x:Type ui:NavigationViewItem}}}"
-                                Value="False">
-                                        <Setter Property="Margin"
-                                        Value="0,4,0,0" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>-->
                     </TextBlock>
                 </DataTemplate>
-                <!--<Style TargetType="{x:Type ui:NavigationViewItem}"
-               BasedOn="{StaticResource NavigationViewItemDefaultStyle}">
-
-                    <Setter Property="FontSize"
-                    Value="10" />
-
-                    <Setter Property="ContentTemplate"
-                    Value="{StaticResource NavigationLabelTemplate}" />
-                </Style>
-
-                <Style TargetType="{x:Type ui:SymbolIcon}">
-                    <Setter Property="FontSize"
-                    Value="21" />
-
-                    <Setter Property="Margin"
-                    Value="0" />
-
-                    <Setter Property="VerticalAlignment"
-                    Value="Center" />
-
-                    <Style.Triggers>
-                        <DataTrigger
-                    Binding="{Binding IsActive,
-                              RelativeSource={RelativeSource AncestorType={x:Type ui:NavigationViewItem}}}"
-                    Value="False">
-
-                            <Setter Property="Margin"
-                            Value="0,4,0,-4" />
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>-->
 
             </ui:NavigationView.Resources>
         </ui:NavigationView>

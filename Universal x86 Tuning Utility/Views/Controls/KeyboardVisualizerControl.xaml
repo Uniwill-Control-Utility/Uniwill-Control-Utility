@@ -9,12 +9,12 @@
             Padding="12,0,0,10">
         <Viewbox Stretch="Uniform"
                  StretchDirection="Both"
-                 HorizontalAlignment="Center">
+                 HorizontalAlignment="Center"
+                 RenderOptions.BitmapScalingMode="HighQuality">
             <Canvas x:Name="_keyboardCanvas"
-                    Width="735"
+                    Width="736"
                     Height="280"
-                    Background="Transparent"
-                    SnapsToDevicePixels="True">
+                    Background="Transparent">
                 <!-- Keys are added programmatically in code-behind -->
             </Canvas>
         </Viewbox>

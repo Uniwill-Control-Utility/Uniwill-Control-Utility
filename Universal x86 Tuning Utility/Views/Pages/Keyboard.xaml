@@ -15,194 +15,110 @@
       UseLayoutRounding="True"
       ScrollViewer.CanContentScroll="False">
 
+    <!-- Root Grid spans full window space -->
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
 
-        <!-- Page title — symmetric 24px horizontal margins matching content area -->
-        <StackPanel Orientation="Vertical" Grid.Row="0" Margin="24,12,24,8">
-            <TextBlock FontSize="26"
-                       FontWeight="Medium"
-                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                       Text="Keyboard" />
-            <TextBlock Margin="0,8,0,12"
-                       FontSize="12"
-                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                       Text="Customize your keyboard backlight and lighting effects."
-                       TextWrapping="Wrap" />
-        </StackPanel>
-
-
-        <ScrollViewer Grid.Row="1"
-                      VerticalScrollBarVisibility="Auto"
+        <!-- 1. Full-width, full-height ScrollViewer ensures the scrollbar is glued 
+             to the absolute right edge and spans the entire page window vertically. -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       CanContentScroll="False"
                       PanningMode="VerticalOnly"
                       IsDeferredScrollingEnabled="False">
             <ScrollViewer.Style>
-                <Style TargetType="{x:Type ScrollViewer}"
-                       BasedOn="{StaticResource {x:Type ScrollViewer}}">
+                <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource {x:Type ScrollViewer}}">
                     <Setter Property="Padding" Value="0" />
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding ComputedVerticalScrollBarVisibility, RelativeSource={RelativeSource Self}}"
-                                     Value="Visible">
-                            <Setter Property="Padding" Value="0,0,8,0" />
-                        </DataTrigger>
-                    </Style.Triggers>
                 </Style>
             </ScrollViewer.Style>
 
-            <!-- Symmetric 24px horizontal margins aligned with page title -->
-            <StackPanel Margin="24,0,24,18">
+            <!-- 2. Centered max-width layout container INSIDE the scroll viewer. 
+                 This aligns both the header and content to the exact same vertical axis. -->
+            <Grid MaxWidth="1080" HorizontalAlignment="Stretch">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-                <!-- Unavailable state -->
-                <StackPanel x:Name="KeyboardUnavailable" Visibility="Collapsed">
-                    <Border Margin="0,8,0,0"
-                            Padding="14,12"
-                            BorderThickness="1"
-                            BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}"
-                            CornerRadius="4">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <ui:FontIcon Grid.Column="0"
-                                         FontFamily="Segoe Fluent Icons"
-                                         Glyph="&#xE7A7;"
-                                         FontSize="16"
-                                         Margin="0,0,10,0"
-                                         Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                                         VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Text="Keyboard control is not available on this device. This feature requires an ITE HID lighting controller (vid_048d)."
-                                       TextWrapping="Wrap"
-                                       VerticalAlignment="Center" />
-                        </Grid>
-                    </Border>
+                <!-- Row 0: Page title block (Inner elements carry the 24px side margin) -->
+                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,12,0,8">
+                    <TextBlock FontSize="26"
+                               FontWeight="Medium"
+                               Margin="24,0,24,0"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               Text="Keyboard" />
+                    <TextBlock Margin="24,8,24,12"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="Customize your keyboard backlight and lighting effects."
+                               TextWrapping="Wrap" />
                 </StackPanel>
 
-                <!-- Available content -->
-                <StackPanel x:Name="KeyboardAvailable" Visibility="Visible">
+                <!-- Row 1: Content cards (Inner stack panel carries identical 24px side margin) -->
+                <StackPanel Grid.Row="1" Margin="24,0,24,18">
 
-                    <!-- Mode toggle: Effects / Per-Key -->
-                    <ui:CardControl Margin="0,0,0,12">
-                        <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8D3;" FontSize="20" Margin="4,0,6,0" />
-                        </ui:CardControl.Icon>
-                        <ui:CardControl.Header>
-                            <StackPanel>
-                                <ui:TextBlock FontTypography="Body" Text="Per-key RGB control" />
-                                <ui:TextBlock Margin="0,2,0,0"
-                                               FontTypography="Caption"
-                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Enable per-key color control instead of animation effects." />
-                            </StackPanel>
-                        </ui:CardControl.Header>
-                        <ui:ToggleSwitch x:Name="ModeToggle"
-                                         LabelPosition="Left"
-                                         OnContent="On"
-                                         OffContent="Off"
-                                         Checked="ModeToggle_Checked"
-                                         Unchecked="ModeToggle_Checked" />
-                    </ui:CardControl>
-
-                    <!-- Idle Timer (common to both modes) -->
-                    <ui:CardExpander x:Name="IdleTimerCard"
-                                     Margin="0,0,0,12"
-                                     IsExpanded="False"
-                                     Loaded="IdleTimerCard_Loaded"
-                                     Expanded="IdleTimerCard_Expanded"
-                                     Collapsed="IdleTimerCard_Collapsed">
-                        <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE916;" FontSize="20" Margin="4,0,6,0" />
-                        </ui:CardExpander.Icon>
-                        <ui:CardExpander.Header>
+                    <!-- Unavailable state -->
+                    <StackPanel x:Name="KeyboardUnavailable" Visibility="Collapsed">
+                        <Border Margin="0,8,0,0"
+        Padding="14,12"
+        BorderThickness="1"
+        BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}"
+        CornerRadius="4">
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Idle Timer" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Automatically turn off the keyboard backlight after a period of inactivity."
-                                                   TextWrapping="Wrap" />
-                                </StackPanel>
-                                <ui:ToggleSwitch x:Name="tsIdleTimer"
-                                                 Grid.Column="1"
-                                                 Margin="4,0,0,0"
-                                                 LabelPosition="Left"
-                                                 OnContent="On"
-                                                 OffContent="Off"
-                                                 Checked="TsIdleTimer_Toggled"
-                                                 Unchecked="TsIdleTimer_Toggled" />
-                            </Grid>
-                        </ui:CardExpander.Header>
-
-                        <StackPanel>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Timeout" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Time of inactivity before the keyboard turns off." />
-                                </StackPanel>
-                                <ComboBox x:Name="cmbIdleTimer"
-                                          Grid.Column="1"
-                                          Width="130"
-                                          HorizontalAlignment="Right"
-                                          VerticalAlignment="Center"
-                                          SelectedIndex="9"
-                                          SelectionChanged="CmbIdleTimer_SelectionChanged"
-                                          MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown" />
+                                <ui:FontIcon Grid.Column="0"
+                     FontFamily="Segoe Fluent Icons"
+                     Glyph="&#xE7A7;"
+                     FontSize="16"
+                     Margin="0,0,10,0"
+                     Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                     VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                   FontSize="12"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   Text="Keyboard control is not available on this device. This feature requires an ITE HID lighting controller (vid_048d)."
+                   TextWrapping="Wrap"
+                   VerticalAlignment="Center" />
                             </Grid>
-                        </StackPanel>
-                    </ui:CardExpander>
+                        </Border>
+                    </StackPanel>
 
-                    <!-- ===== EFFECTS MODE CONTENT ===== -->
-                    <StackPanel x:Name="EffectsContent">
-                        <!-- Keyboard power toggle -->
+                    <!-- Available content -->
+                    <StackPanel x:Name="KeyboardAvailable" Visibility="Visible">
+
+                        <!-- Mode toggle: Effects / Per-Key -->
                         <ui:CardControl Margin="0,0,0,12">
                             <ui:CardControl.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xED39;" FontSize="20" Margin="4,0,6,0" />
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8D3;" FontSize="20" Margin="4,0,6,0" />
                             </ui:CardControl.Icon>
                             <ui:CardControl.Header>
                                 <StackPanel>
-                                    <ui:TextBlock FontTypography="Body" Text="Keyboard Backlight" />
+                                    <ui:TextBlock FontTypography="Body" Text="Per-key RGB control" />
                                     <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Turn the keyboard backlight on or off." />
+                           FontTypography="Caption"
+                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                           Text="Enable per-key color control instead of animation effects." />
                                 </StackPanel>
                             </ui:CardControl.Header>
-                            <ui:ToggleSwitch x:Name="tsKeyboardPower"
-                                             LabelPosition="Left"
-                                             OnContent="On"
-                                             OffContent="Off"
-                                             IsChecked="True"
-                                             Checked="TsKeyboardPower_Toggled"
-                                             Unchecked="TsKeyboardPower_Toggled" />
+                            <ui:ToggleSwitch x:Name="ModeToggle"
+                     LabelPosition="Left"
+                     OnContent="On"
+                     OffContent="Off"
+                     Checked="ModeToggle_Checked"
+                     Unchecked="ModeToggle_Checked" />
                         </ui:CardControl>
 
-                        <!-- Effect card with all controls -->
-                        <ui:CardExpander x:Name="EffectsCardExpander"
-                                         Margin="0,0,0,0"
-                                         IsExpanded="True">
+                        <!-- Idle Timer (common to both modes) -->
+                        <ui:CardExpander x:Name="IdleTimerCard"
+                 Margin="0,0,0,12"
+                 IsExpanded="False"
+                 Loaded="IdleTimerCard_Loaded"
+                 Expanded="IdleTimerCard_Expanded"
+                 Collapsed="IdleTimerCard_Collapsed">
                             <ui:CardExpander.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE916;" FontSize="20" Margin="4,0,6,0" />
                             </ui:CardExpander.Icon>
                             <ui:CardExpander.Header>
                                 <Grid>
@@ -211,321 +127,404 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body" Text="Effects" />
+                                        <ui:TextBlock FontTypography="Body" Text="Idle Timer" />
                                         <ui:TextBlock Margin="0,2,0,0"
-                                                       FontTypography="Caption"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Choose between various keyboard lighting effects."
-                                                       TextWrapping="Wrap" />
+                               FontTypography="Caption"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                               Text="Automatically turn off the keyboard backlight after a period of inactivity."
+                               TextWrapping="Wrap" />
                                     </StackPanel>
-                                    <ComboBox x:Name="cmbEffect"
-                                              Grid.Column="1"
-                                              Width="180"
-                                              Margin="2,0,12,0"
-                                              HorizontalAlignment="Right"
-                                              VerticalAlignment="Center"
-                                              SelectionChanged="CmbEffect_SelectionChanged"
-                                              MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown" />
+                                    <ui:ToggleSwitch x:Name="tsIdleTimer"
+                             Grid.Column="1"
+                             Margin="4,0,0,0"
+                             LabelPosition="Left"
+                             OnContent="On"
+                             OffContent="Off"
+                             Checked="TsIdleTimer_Toggled"
+                             Unchecked="TsIdleTimer_Toggled" />
                                 </Grid>
                             </ui:CardExpander.Header>
-                            <StackPanel>
 
-                                <!-- Brightness (always visible at top) -->
+                            <StackPanel>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body" Text="Brightness" />
+                                        <ui:TextBlock FontTypography="Body" Text="Timeout" />
                                         <ui:TextBlock Margin="0,2,0,0"
-                                                       FontTypography="Caption"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Adjust the backlight brightness level." />
+                               FontTypography="Caption"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                               Text="Time of inactivity before the keyboard turns off." />
                                     </StackPanel>
-                                    <StackPanel Grid.Column="1"
-                                                Orientation="Horizontal"
-                                                HorizontalAlignment="Right"
-                                                VerticalAlignment="Center">
-                                        <TextBlock x:Name="BrightnessValueText"
-                                                   Width="30"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"
-                                                   Text="5" />
-                                        <Slider x:Name="BrightnessSlider"
-                                                Width="140"
-                                                Minimum="1"
-                                                Maximum="7"
-                                                Value="5"
-                                                IsSnapToTickEnabled="True"
-                                                TickFrequency="1"
-                                                TickPlacement="Both"
-                                                IsMoveToPointEnabled="False"
-                                                ValueChanged="BrightnessSlider_ValueChanged" />
-                                    </StackPanel>
-                                </Grid>
-
-                                <!-- Divider between Brightness and effect controls (hidden for Rainbow) -->
-                                <Border x:Name="BrightnessSeparator" Height="1" Margin="-58,12,-46,12"
-                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
-                                        Visibility="Collapsed" />
-
-                                <!-- Color (visible for single-color effects) -->
-                                <Grid x:Name="ColorRow"
-                                      Visibility="Visible">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body" Text="Color" />
-                                        <ui:TextBlock Margin="0,2,0,0"
-                                                       FontTypography="Caption"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Single color for Static mode." />
-                                    </StackPanel>
-                                    <controls:ColorPickerControl x:Name="ColorPicker"
-                                                                 Grid.Column="1"
-                                                                 HorizontalAlignment="Right"
-                                                                 VerticalAlignment="Center"
-                                                                 SelectedColor="Aqua"
-                                                                 ColorChangedDelayed="ColorPicker_ColorChangedDelayed" />
-                                </Grid>
-
-                                <!-- Multi-color picker -->
-                                <Grid x:Name="MultiColorRow"
-                                      Visibility="Collapsed">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body"
-                                                       x:Name="MultiColorTitle"
-                                                       Text="Effect Colors" />
-                                        <ui:TextBlock Margin="0,2,0,0"
-                                                       FontTypography="Caption"
-                                                       x:Name="MultiColorSubtitle"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="7 colors required for this effect. Click a swatch to edit." />
-                                    </StackPanel>
-                                    <controls:KeyboardMultiColorPickerControl x:Name="MultiColorPicker"
-                                                                              Grid.Column="1"
-                                                                              HorizontalAlignment="Right"
-                                                                              VerticalAlignment="Center"
-                                                                              ColorsChanged="MultiColorPicker_ColorsChanged" />
-                                </Grid>
-
-                                <!-- Rest color picker for GamingModeFull -->
-                                <Grid x:Name="GamingModeFullRestRow"
-                                      Visibility="Collapsed"
-                                      Margin="0,12,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body"
-                                                       Text="Rest of Keyboard" />
-                                        <ui:TextBlock Margin="0,2,0,0"
-                                                       FontTypography="Caption"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Color for non-WASD/arrow keys." />
-                                    </StackPanel>
-                                    <controls:ColorPickerControl x:Name="GamingModeFullRestColor"
-                                                                 Grid.Column="1"
-                                                                 HorizontalAlignment="Right"
-                                                                 VerticalAlignment="Center"
-                                                                 SelectedColor="White"
-                                                                 ColorChangedDelayed="GamingModeFullRestColor_ColorChangedDelayed" />
-                                </Grid>
-
-                                <!-- Full-width divider matching CardExpander's header/content separator -->
-                                <Border x:Name="SpeedSeparator" Height="1" Margin="-58,12,-46,12"
-                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                                <!-- Speed (visible for animated effects) -->
-                                <Grid x:Name="SpeedRow"
-                                      Visibility="Collapsed">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body" Text="Speed" />
-                                        <ui:TextBlock Margin="0,2,0,0"
-                                                       FontTypography="Caption"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Control the animation speed." />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1"
-                                                Orientation="Horizontal"
-                                                HorizontalAlignment="Right"
-                                                VerticalAlignment="Center">
-                                        <TextBlock x:Name="SpeedValueText"
-                                                   Width="30"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"
-                                                   Text="5" />
-                                        <Slider x:Name="SpeedSlider"
-                                                Width="140"
-                                                Minimum="1"
-                                                Maximum="10"
-                                                Value="5"
-                                                IsSnapToTickEnabled="True"
-                                                TickFrequency="1"
-                                                TickPlacement="Both"
-                                                IsMoveToPointEnabled="False"
-                                                ValueChanged="SpeedSlider_ValueChanged" />
-                                    </StackPanel>
-                                </Grid>
-
-                                <!-- Direction (visible for animated effects) -->
-                                <!-- Full-width divider matching CardExpander's header/content separator -->
-                                <Border x:Name="DirectionSeparator" Height="1" Margin="-58,12,-46,12"
-                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
-                                        Visibility="Collapsed" />
-                                <Grid x:Name="DirectionRow"
-                                      Visibility="Collapsed">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body" Text="Direction" />
-                                        <ui:TextBlock Margin="0,2,0,0"
-                                                       FontTypography="Caption"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Control the animation direction (verified on Wave)." />
-                                    </StackPanel>
-                                    <!-- Single row of direction toggle buttons -->
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,4,0,0">
-                                        <ui:Button x:Name="btnDirLeftRight" Width="40" Height="36" Margin="0,0,4,0"
-                                                   Appearance="Transparent" Click="DirectionButton_Click" Tag="LeftRight">
-                                            <TextBlock Text="&#x2192;" FontSize="18" HorizontalAlignment="Center"/>
-                                        </ui:Button>
-                                        <ui:Button x:Name="btnDirRightLeft" Width="40" Height="36" Margin="0,0,4,0"
-                                                   Appearance="Transparent" Click="DirectionButton_Click" Tag="RightLeft">
-                                            <TextBlock Text="&#x2190;" FontSize="18" HorizontalAlignment="Center"/>
-                                        </ui:Button>
-                                        <ui:Button x:Name="btnDirDownUp" Width="40" Height="36" Margin="0,0,4,0"
-                                                   Appearance="Transparent" Click="DirectionButton_Click" Tag="DownUp">
-                                            <TextBlock Text="&#x2191;" FontSize="18" HorizontalAlignment="Center"/>
-                                        </ui:Button>
-                                        <ui:Button x:Name="btnDirUpDown" Width="40" Height="36" Margin="0,0,4,0"
-                                                   Appearance="Transparent" Click="DirectionButton_Click" Tag="UpDown">
-                                            <TextBlock Text="&#x2193;" FontSize="18" HorizontalAlignment="Center"/>
-                                        </ui:Button>
-                                        <ui:Button x:Name="btnDiagBRTL" Width="40" Height="36" Margin="0,0,4,0"
-                                                   Appearance="Transparent" Click="DirectionButton_Click" Tag="DiagonalBottomRightToTopLeft">
-                                            <TextBlock Text="&#x2196;" FontSize="18" HorizontalAlignment="Center"/>
-                                        </ui:Button>
-                                        <ui:Button x:Name="btnDiagBLTR" Width="40" Height="36" Margin="0,0,0,0"
-                                                   Appearance="Transparent" Click="DirectionButton_Click" Tag="DiagonalBottomLeftToTopRight">
-                                            <TextBlock Text="&#x2197;" FontSize="18" HorizontalAlignment="Center"/>
-                                        </ui:Button>
-                                    </StackPanel>
+                                    <ComboBox x:Name="cmbIdleTimer"
+                      Grid.Column="1"
+                      Width="130"
+                      HorizontalAlignment="Right"
+                      VerticalAlignment="Center"
+                      SelectedIndex="9"
+                      SelectionChanged="CmbIdleTimer_SelectionChanged"
+                      MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown" />
                                 </Grid>
                             </StackPanel>
                         </ui:CardExpander>
-                    </StackPanel>
 
-                    <!-- ===== PER-KEY MODE CONTENT ===== -->
-                    <StackPanel x:Name="PerKeyContent" Visibility="Collapsed">
-                        <!-- Brightness (per-key mode) -->
-                        <ui:CardControl Margin="0,0,0,12">
-                            <ui:CardControl.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE706;" FontSize="20" Margin="4,0,6,0" />
-                            </ui:CardControl.Icon>
-                            <ui:CardControl.Header>
+                        <!-- ===== EFFECTS MODE CONTENT ===== -->
+                        <StackPanel x:Name="EffectsContent">
+                            <!-- Keyboard power toggle -->
+                            <ui:CardControl Margin="0,0,0,12">
+                                <ui:CardControl.Icon>
+                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xED39;" FontSize="20" Margin="4,0,6,0" />
+                                </ui:CardControl.Icon>
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <ui:TextBlock FontTypography="Body" Text="Keyboard Backlight" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                               FontTypography="Caption"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                               Text="Turn the keyboard backlight on or off." />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <ui:ToggleSwitch x:Name="tsKeyboardPower"
+                         LabelPosition="Left"
+                         OnContent="On"
+                         OffContent="Off"
+                         IsChecked="True"
+                         Checked="TsKeyboardPower_Toggled"
+                         Unchecked="TsKeyboardPower_Toggled" />
+                            </ui:CardControl>
+
+                            <!-- Effect card with all controls -->
+                            <ui:CardExpander x:Name="EffectsCardExpander"
+                     Margin="0,0,0,0"
+                     IsExpanded="True">
+                                <ui:CardExpander.Icon>
+                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
+                                </ui:CardExpander.Icon>
+                                <ui:CardExpander.Header>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body" Text="Effects" />
+                                            <ui:TextBlock Margin="0,2,0,0"
+                                   FontTypography="Caption"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="Choose between various keyboard lighting effects."
+                                   TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ComboBox x:Name="cmbEffect"
+                          Grid.Column="1"
+                          Width="180"
+                          Margin="2,0,12,0"
+                          HorizontalAlignment="Right"
+                          VerticalAlignment="Center"
+                          SelectionChanged="CmbEffect_SelectionChanged"
+                          MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown" />
+                                    </Grid>
+                                </ui:CardExpander.Header>
                                 <StackPanel>
-                                    <ui:TextBlock FontTypography="Body" Text="Brightness" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Adjust the backlight brightness level." />
+
+                                    <!-- Brightness (always visible at top) -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body" Text="Brightness" />
+                                            <ui:TextBlock Margin="0,2,0,0"
+                                   FontTypography="Caption"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="Adjust the backlight brightness level." />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                                            <TextBlock x:Name="BrightnessValueText"
+                               Width="30"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Text="5" />
+                                            <Slider x:Name="BrightnessSlider"
+                            Width="140"
+                            Minimum="1"
+                            Maximum="7"
+                            Value="5"
+                            IsSnapToTickEnabled="True"
+                            TickFrequency="1"
+                            TickPlacement="Both"
+                            IsMoveToPointEnabled="False"
+                            ValueChanged="BrightnessSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Divider between Brightness and effect controls (hidden for Rainbow) -->
+                                    <Border x:Name="BrightnessSeparator" Height="1" Margin="-58,12,-46,12"
+                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                    Visibility="Collapsed" />
+
+                                    <!-- Color (visible for single-color effects) -->
+                                    <Grid x:Name="ColorRow"
+                  Visibility="Visible">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body" Text="Color" />
+                                            <ui:TextBlock Margin="0,2,0,0"
+                                   FontTypography="Caption"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="Single color for Static mode." />
+                                        </StackPanel>
+                                        <controls:ColorPickerControl x:Name="ColorPicker"
+                                             Grid.Column="1"
+                                             HorizontalAlignment="Right"
+                                             VerticalAlignment="Center"
+                                             SelectedColor="Aqua"
+                                             ColorChangedDelayed="ColorPicker_ColorChangedDelayed" />
+                                    </Grid>
+
+                                    <!-- Multi-color picker -->
+                                    <Grid x:Name="MultiColorRow"
+                  Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body"
+                                   x:Name="MultiColorTitle"
+                                   Text="Effect Colors" />
+                                            <ui:TextBlock Margin="0,2,0,0"
+                                   FontTypography="Caption"
+                                   x:Name="MultiColorSubtitle"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="7 colors required for this effect. Click a swatch to edit." />
+                                        </StackPanel>
+                                        <controls:KeyboardMultiColorPickerControl x:Name="MultiColorPicker"
+                                                          Grid.Column="1"
+                                                          HorizontalAlignment="Right"
+                                                          VerticalAlignment="Center"
+                                                          ColorsChanged="MultiColorPicker_ColorsChanged" />
+                                    </Grid>
+
+                                    <!-- Rest color picker for GamingModeFull -->
+                                    <Grid x:Name="GamingModeFullRestRow"
+                  Visibility="Collapsed"
+                  Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body"
+                                   Text="Rest of Keyboard" />
+                                            <ui:TextBlock Margin="0,2,0,0"
+                                   FontTypography="Caption"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="Color for non-WASD/arrow keys." />
+                                        </StackPanel>
+                                        <controls:ColorPickerControl x:Name="GamingModeFullRestColor"
+                                             Grid.Column="1"
+                                             HorizontalAlignment="Right"
+                                             VerticalAlignment="Center"
+                                             SelectedColor="White"
+                                             ColorChangedDelayed="GamingModeFullRestColor_ColorChangedDelayed" />
+                                    </Grid>
+
+                                    <!-- Full-width divider matching CardExpander's header/content separator -->
+                                    <Border x:Name="SpeedSeparator" Height="1" Margin="-58,12,-46,12"
+                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                                    <!-- Speed (visible for animated effects) -->
+                                    <Grid x:Name="SpeedRow"
+                  Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body" Text="Speed" />
+                                            <ui:TextBlock Margin="0,2,0,0"
+                                   FontTypography="Caption"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="Control the animation speed." />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                                            <TextBlock x:Name="SpeedValueText"
+                               Width="30"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Text="5" />
+                                            <Slider x:Name="SpeedSlider"
+                            Width="140"
+                            Minimum="1"
+                            Maximum="10"
+                            Value="5"
+                            IsSnapToTickEnabled="True"
+                            TickFrequency="1"
+                            TickPlacement="Both"
+                            IsMoveToPointEnabled="False"
+                            ValueChanged="SpeedSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Direction (visible for animated effects) -->
+                                    <!-- Full-width divider matching CardExpander's header/content separator -->
+                                    <Border x:Name="DirectionSeparator" Height="1" Margin="-58,12,-46,12"
+                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                    Visibility="Collapsed" />
+                                    <Grid x:Name="DirectionRow"
+                  Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body" Text="Direction" />
+                                            <ui:TextBlock Margin="0,2,0,0"
+                                   FontTypography="Caption"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="Control the animation direction (verified on Wave)." />
+                                        </StackPanel>
+                                        <!-- Single row of direction toggle buttons -->
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,4,0,0">
+                                            <ui:Button x:Name="btnDirLeftRight" Width="40" Height="36" Margin="0,0,4,0"
+                               Appearance="Transparent" Click="DirectionButton_Click" Tag="LeftRight">
+                                                <TextBlock Text="&#x2192;" FontSize="18" HorizontalAlignment="Center"/>
+                                            </ui:Button>
+                                            <ui:Button x:Name="btnDirRightLeft" Width="40" Height="36" Margin="0,0,4,0"
+                               Appearance="Transparent" Click="DirectionButton_Click" Tag="RightLeft">
+                                                <TextBlock Text="&#x2190;" FontSize="18" HorizontalAlignment="Center"/>
+                                            </ui:Button>
+                                            <ui:Button x:Name="btnDirDownUp" Width="40" Height="36" Margin="0,0,4,0"
+                               Appearance="Transparent" Click="DirectionButton_Click" Tag="DownUp">
+                                                <TextBlock Text="&#x2191;" FontSize="18" HorizontalAlignment="Center"/>
+                                            </ui:Button>
+                                            <ui:Button x:Name="btnDirUpDown" Width="40" Height="36" Margin="0,0,4,0"
+                               Appearance="Transparent" Click="DirectionButton_Click" Tag="UpDown">
+                                                <TextBlock Text="&#x2193;" FontSize="18" HorizontalAlignment="Center"/>
+                                            </ui:Button>
+                                            <ui:Button x:Name="btnDiagBRTL" Width="40" Height="36" Margin="0,0,4,0"
+                               Appearance="Transparent" Click="DirectionButton_Click" Tag="DiagonalBottomRightToTopLeft">
+                                                <TextBlock Text="&#x2196;" FontSize="18" HorizontalAlignment="Center"/>
+                                            </ui:Button>
+                                            <ui:Button x:Name="btnDiagBLTR" Width="40" Height="36" Margin="0,0,0,0"
+                               Appearance="Transparent" Click="DirectionButton_Click" Tag="DiagonalBottomLeftToTopRight">
+                                                <TextBlock Text="&#x2197;" FontSize="18" HorizontalAlignment="Center"/>
+                                            </ui:Button>
+                                        </StackPanel>
+                                    </Grid>
                                 </StackPanel>
-                            </ui:CardControl.Header>
-                            <StackPanel Orientation="Horizontal"
-                                        VerticalAlignment="Center">
-                                <TextBlock x:Name="BrightnessValueTextPerKey"
-                                           Width="30"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           Text="5" />
-                                <Slider x:Name="BrightnessSliderPerKey"
-                                        Width="140"
-                                        Minimum="1"
-                                        Maximum="7"
-                                        Value="5"
-                                        IsSnapToTickEnabled="True"
-                                        TickFrequency="1"
-                                        TickPlacement="Both"
-                                        IsMoveToPointEnabled="False"
-                                        ValueChanged="BrightnessSliderPerKey_ValueChanged" />
-                            </StackPanel>
-                        </ui:CardControl>
+                            </ui:CardExpander>
+                        </StackPanel>
 
-                        <!-- Keyboard visualizer -->
-                        <controls:KeyboardVisualizerControl x:Name="_visualizer"
-                                                            Margin="0,0,0,12" />
+                        <!-- ===== PER-KEY MODE CONTENT ===== -->
+                        <StackPanel x:Name="PerKeyContent" Visibility="Collapsed">
+                            <!-- Brightness (per-key mode) -->
+                            <ui:CardControl Margin="0,0,0,12">
+                                <ui:CardControl.Icon>
+                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE706;" FontSize="20" Margin="4,0,6,0" />
+                                </ui:CardControl.Icon>
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <ui:TextBlock FontTypography="Body" Text="Brightness" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                               FontTypography="Caption"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                               Text="Adjust the backlight brightness level." />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal"
+                    VerticalAlignment="Center">
+                                    <TextBlock x:Name="BrightnessValueTextPerKey"
+                       Width="30"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Text="5" />
+                                    <Slider x:Name="BrightnessSliderPerKey"
+                    Width="140"
+                    Minimum="1"
+                    Maximum="7"
+                    Value="5"
+                    IsSnapToTickEnabled="True"
+                    TickFrequency="1"
+                    TickPlacement="Both"
+                    IsMoveToPointEnabled="False"
+                    ValueChanged="BrightnessSliderPerKey_ValueChanged" />
+                                </StackPanel>
+                            </ui:CardControl>
 
-                        <!-- Action row -->
-                        <Grid Margin="0,0,0,12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
+                            <!-- Keyboard visualizer -->
+                            <controls:KeyboardVisualizerControl x:Name="_visualizer"
+                                        Margin="0,0,0,12" />
 
-                            <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                <ui:Button x:Name="_selectAllBtn"
-                                           Appearance="Transparent"
-                                           Content="Select All"
-                                           Click="SelectAll_Click"
-                                           Margin="0,0,8,0" />
-                                <ui:Button x:Name="_clearSelectBtn"
-                                           Appearance="Transparent"
-                                           Content="Clear Selection"
-                                           Click="ClearSelection_Click"
-                                           Margin="0,0,8,0" />
-                                <ui:Button x:Name="_fillAllBtn"
-                                           Appearance="Transparent"
-                                           Content="Fill All"
-                                           Click="FillAll_Click" />
-                            </StackPanel>
+                            <!-- Action row -->
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
 
-                            <controls:ColorPickerControl x:Name="_colorPicker"
-                                                         Grid.Column="1"
-                                                         Margin="0,0,12,0"
-                                                         SelectedColor="White"
-                                                         ColorChangedDelayed="_colorPicker_ColorChangedDelayed" />
+                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                    <ui:Button x:Name="_selectAllBtn"
+                       Appearance="Transparent"
+                       Content="Select All"
+                       Click="SelectAll_Click"
+                       Margin="0,0,8,0" />
+                                    <ui:Button x:Name="_clearSelectBtn"
+                       Appearance="Transparent"
+                       Content="Clear Selection"
+                       Click="ClearSelection_Click"
+                       Margin="0,0,8,0" />
+                                    <ui:Button x:Name="_fillAllBtn"
+                       Appearance="Transparent"
+                       Content="Fill All"
+                       Click="FillAll_Click" />
+                                </StackPanel>
 
-                            <ui:Button x:Name="_applyBtn"
-                                       Grid.Column="2"
-                                       Appearance="Primary"
-                                       Content="Apply"
-                                       Click="Apply_Click" />
-                        </Grid>
+                                <controls:ColorPickerControl x:Name="_colorPicker"
+                                     Grid.Column="1"
+                                     Margin="0,0,12,0"
+                                     SelectedColor="White"
+                                     ColorChangedDelayed="_colorPicker_ColorChangedDelayed" />
 
-                        <!-- Status -->
-                        <TextBlock x:Name="_statusText"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                   Text="Select keys to edit their color."
-                                   Margin="0,0,0,8" />
+                                <ui:Button x:Name="_applyBtn"
+                   Grid.Column="2"
+                   Appearance="Primary"
+                   Content="Apply"
+                   Click="Apply_Click" />
+                            </Grid>
+
+                            <!-- Status -->
+                            <TextBlock x:Name="_statusText"
+               FontSize="12"
+               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+               Text="Select keys to edit their color."
+               Margin="0,0,0,8" />
+                        </StackPanel>
                     </StackPanel>
+
                 </StackPanel>
-            </StackPanel>
+            </Grid>
         </ScrollViewer>
 
-        <!-- Dark overlay for Adaptive Mode override (covers entire page) -->
-        <Border x:Name="overlayAdaptiveWarning" Grid.Row="0" Grid.RowSpan="3" Panel.ZIndex="0" Visibility="Collapsed" Background="Black" Opacity="0.4" CornerRadius="4"/>
+        <!-- 3. Overlays/Dialogs sit outside the ScrollViewer to freeze the entire UI if needed -->
+        <Border x:Name="overlayAdaptiveWarning" Panel.ZIndex="10" Visibility="Collapsed" Background="Black" Opacity="0.4"/>
 
-        <!-- Page-scoped snackbar presenter for Adaptive Mode override warning (above overlay) -->
+        <!-- Page-scoped snackbar presenter (above overlay) -->
         <ui:SnackbarPresenter x:Name="SnackbarPresenter"
-                              Grid.Row="0" Grid.RowSpan="3"
-                              Panel.ZIndex="1"
+                              Panel.ZIndex="11"
                               Margin="12"
                               HorizontalAlignment="Right"
                               VerticalAlignment="Bottom" />
