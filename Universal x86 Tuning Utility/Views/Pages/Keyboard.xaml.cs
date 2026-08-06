@@ -25,6 +25,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private KeyboardHidService? _hidService;
         private KeyboardSettings? _settings;
         private bool _isFirstLoad = true;
+        private bool _isInitialized; // true after ApplySettings has synced UI from disk
         private KeyboardDirection _currentDirection = KeyboardDirection.LeftRight;
 
         // Static flag to prevent re-applying HID settings on every page navigation.
@@ -445,12 +446,13 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             try
             {
-                // Sync brightness from slider to HID service first.
-                // The service's internal _brightness defaults to 50 and is only
-                // updated when the user moves the slider. On startup/navigation
-                // we must sync it so SendAllPerKeyColorsFromDict uses the right value.
-                int brightnessLevel = (int)BrightnessSlider.Value;
-                int brightnessPercent = (brightnessLevel * 100) / 7;
+                // Read brightness from the UI control on the UI thread.
+                // This method is called from a background Task.Run in Page_Loaded.
+                int brightnessPercent = Application.Current.Dispatcher.Invoke(() =>
+                {
+                    int brightnessLevel = (int)BrightnessSlider.Value;
+                    return (brightnessLevel * 100) / 7;
+                });
                 _hidService.SetPerKeyBrightness(brightnessPercent);
 
                 var colors = _settings.GetPerKeyColors();
@@ -523,7 +525,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void CmbEffect_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isFirstLoad) return;
+            // Skip during initial setup: _isInitialized guards against PopulateEffects
+            // triggering a selection change before ApplySettings has synced UI from disk.
+            if (_isFirstLoad || !_isInitialized) return;
             UpdateEffectUi();
             if (!_isSyncingFromPreset)
             {
@@ -1222,6 +1226,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             // Sync picker brush so hover/selection overlays use the right color.
             _visualizer.SetPickerBrush(new SolidColorBrush(_colorPicker.SelectedColor));
+
+            // Mark as initialized so that SelectionChanged handlers triggered by
+            // PopulateEffects (which runs before this) don't fire after we're done.
+            _isInitialized = true;
         }
 
         private void SaveSettings()

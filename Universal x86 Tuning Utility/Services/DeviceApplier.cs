@@ -387,14 +387,28 @@ namespace Universal_x86_Tuning_Utility.Services
         /// <summary>
         /// Enables Adaptive Mode override for Keyboard RGB.
         /// Captures the current user settings so they can be restored later.
+        /// Persists the saved settings to a separate file so they survive app restarts.
         /// </summary>
         public void EnableKeyboardOverride()
         {
             if (IsKeyboardOverridden)
                 return;
 
-            // Capture current user keyboard settings before overriding
-            _savedKeyboardSettings = KeyboardSettingsService.Load();
+            // If a saved override file exists from a previous session (e.g., the user
+            // restarted the app while override was active), use it as the saved settings.
+            // Otherwise, capture the current settings from the main settings file.
+            var existingSaved = KeyboardSettingsService.LoadForOverride();
+            if (existingSaved != null)
+            {
+                _savedKeyboardSettings = existingSaved;
+            }
+            else
+            {
+                _savedKeyboardSettings = KeyboardSettingsService.Load();
+                // Persist the captured settings so they survive a restart.
+                KeyboardSettingsService.SaveForOverride(_savedKeyboardSettings);
+            }
+
             IsKeyboardOverridden = true;
             KeyboardOverrideChanged?.Invoke(this, true);
         }
@@ -417,6 +431,9 @@ namespace Universal_x86_Tuning_Utility.Services
                 KeyboardSettingsService.Save(saved);
                 _savedKeyboardSettings = null;
             }
+
+            // Delete the override backup file so it doesn't persist after override is lifted.
+            KeyboardSettingsService.DeleteSavedSettings();
 
             // Clear the cached preset so the Keyboard page doesn't re-apply it
             // when navigating after override is lifted.

@@ -635,9 +635,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     }
 
                     // Push the preset's per-key colors to the global keyboard settings
-                    // so that update() picks them up when in per-key mode. Always do this
-                    // regardless of current mode — the user may switch back to per-key later.
-                    if (!string.IsNullOrEmpty(myPreset.KbPerKeyColors))
+                    // so that update() picks them up when in per-key mode. Only do this
+                    // when keyboard override is active — don't overwrite the user's
+                    // own per-key colors with stale preset data.
+                    if (!string.IsNullOrEmpty(myPreset.KbPerKeyColors) && _deviceApplier?.IsKeyboardOverridden == true)
                     {
                         var kbSettings = KeyboardSettingsService.Load();
                         kbSettings.PerKeyColors = myPreset.KbPerKeyColors;
