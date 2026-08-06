@@ -254,13 +254,18 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
 
             // Always sync visualizer to saved per-key colors on navigation.
-            // The constructor's ApplySettings() may have loaded colors before the
-            // visualizer was in the visual tree, or the page may have been
-            // round-tripped (navigated away and back) and the lazy-built
-            // visualizer needs a refresh. This is harmless when not in per-key mode.
-            if (_settings?.PerKeyMode == true)
+            // _settings may be null if ApplySettings() hasn't run yet (async race),
+            // so fall back to reading from disk.
+            bool visualizerPerKey = _settings?.PerKeyMode == true;
+            if (!visualizerPerKey)
+            {
+                var diskSettings = KeyboardSettingsService.Load();
+                visualizerPerKey = diskSettings.PerKeyMode;
+            }
+            if (visualizerPerKey)
             {
                 LoadPerKeyColors();
+                Debug.WriteLine("[KBD] Page_Loaded: per-key colors synced to visualizer");
             }
         }
 
@@ -850,13 +855,16 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void LoadPerKeyColors()
         {
-            if (_settings == null)
+            // Use _settings if available, otherwise read from disk. This handles
+            // the race where Page_Loaded fires before ApplySettings() populates _settings.
+            KeyboardSettings? settings = _settings;
+            if (settings == null)
             {
-                Debug.WriteLine("[KBD] LoadPerKeyColors: _settings is null");
-                return;
+                settings = KeyboardSettingsService.Load();
+                Debug.WriteLine("[KBD] LoadPerKeyColors: _settings was null, loaded from disk");
             }
 
-            var colors = _settings.GetPerKeyColors();
+            var colors = settings.GetPerKeyColors();
             var mediaColors = new Dictionary<int, Color>();
 
             foreach (var kvp in colors)
