@@ -38,13 +38,12 @@
                                 <!-- Key label -->
                                 <TextBlock HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
-                                           FontSize="9"
+                                           FontSize="8"
                                            FontWeight="SemiBold"
                                            Foreground="White"
                                            Text="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=Label}"
                                            TextOptions.TextFormattingMode="Display"
-                                           TextOptions.TextRenderingMode="ClearType"
-                                           RenderOptions.EdgeMode="Unspecified" />
+                                           TextOptions.TextRenderingMode="ClearType" />
                             </Grid>
                             <ControlTemplate.Triggers>
                                 <!-- Selected state: picker color overlay -->

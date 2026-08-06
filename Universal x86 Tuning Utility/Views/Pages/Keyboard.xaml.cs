@@ -206,10 +206,19 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             {
                 s_hasAppliedOnce = true;
 
-                // Read mode from _settings instead of ModeToggle.IsChecked to avoid
-                // a race: the constructor's async HID open may not have called
-                // ApplySettings() yet, leaving ModeToggle on its XAML default (false).
+                // Determine the saved mode. _settings may be null if the constructor's
+                // async HID open hasn't called ApplySettings() yet, so fall back to
+                // reading from disk directly. This prevents a race where Page_Loaded
+                // fires before ApplySettings, leading to isPerKey=false, which would
+                // call ApplySettingsToHid() -> SaveSettings() with PerKeyMode=false,
+                // overwriting the user's saved per-key mode on disk.
                 bool isPerKey = _settings?.PerKeyMode == true;
+                if (!isPerKey)
+                {
+                    var diskSettings = KeyboardSettingsService.Load();
+                    isPerKey = diskSettings.PerKeyMode;
+                }
+
                 _ = Task.Run(() =>
                 {
                     try
