@@ -8,54 +8,159 @@
       xmlns:controls="clr-namespace:Universal_x86_Tuning_Utility.Views.Controls"
       Title="Dashboard"
       d:DataContext="{d:DesignInstance local:DashboardPage, IsDesignTimeCreatable=False}"
-      d:DesignHeight="600"
+      d:DesignHeight="800"
       d:DesignWidth="1000"
       d:Background="{DynamicResource ApplicationBackgroundBrush}"
       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
       SnapsToDevicePixels="True"
       UseLayoutRounding="True"
+      ScrollViewer.CanContentScroll="False"
       mc:Ignorable="d">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="16,0,16,12">
+    <!-- Root Grid spans full window space -->
+    <Grid>
 
-            <!-- Hardware metrics: 2x2 grid -->
-            <Grid Margin="0,12,0,0">
+        <!-- 1. Full-width, full-height ScrollViewer ensures the scrollbar is glued
+             to the absolute right edge and spans the entire page window vertically. -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      CanContentScroll="False"
+                      PanningMode="VerticalOnly"
+                      IsDeferredScrollingEnabled="False">
+            <ScrollViewer.Style>
+                <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource {x:Type ScrollViewer}}">
+                    <Setter Property="Padding" Value="0" />
+                </Style>
+            </ScrollViewer.Style>
+
+            <!-- 2. Centered max-width layout container INSIDE the scroll viewer.
+                 This aligns both the header and content to the exact same vertical axis. -->
+            <Grid MaxWidth="1080" HorizontalAlignment="Stretch">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
 
-                <controls:CpuControl x:Name="_cpu"
-                                     Grid.Row="0" Grid.Column="0"
-                                     Margin="0,0,4,4" />
-                <controls:GpuControl x:Name="_gpu"
-                                     Grid.Row="0" Grid.Column="1"
-                                     Margin="4,0,0,4" />
-                <controls:SystemControl x:Name="_system"
-                                        Grid.Row="1" Grid.Column="0"
-                                        Margin="0,4,4,0" />
-                <controls:DevicesControl x:Name="_devices"
-                                         Grid.Row="1" Grid.Column="1"
-                                         Margin="4,4,0,0" />
+                <!-- Row 0: Page title block (Inner elements carry the 24px side margin) -->
+                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,12,0,8">
+                    <TextBlock FontSize="26"
+                               FontWeight="Medium"
+                               Margin="24,0,24,0"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               Text="Dashboard" />
+                    <TextBlock Margin="24,8,24,12"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="Monitor your system's performance and hardware status in real time."
+                               TextWrapping="Wrap" />
+                </StackPanel>
+
+                <!-- Row 1: Content cards (Inner stack panel carries identical 24px side margin) -->
+                <StackPanel Grid.Row="1" Margin="24,0,24,18">
+
+                    <!-- Device Info row - no card wrapper, just laptop image and name -->
+                    <StackPanel x:Name="LaptopInfoContent"
+                                HorizontalAlignment="Center"
+                                Margin="0,12,0,24"
+                                Orientation="Horizontal">
+                        <Image x:Name="LaptopImage"
+                               Width="220"
+                               Height="137"
+                               Stretch="Uniform"
+                               StretchDirection="DownOnly"
+                               VerticalAlignment="Center"
+                               Margin="-24,0,24,0" />
+                        <StackPanel Orientation="Vertical" VerticalAlignment="Center">
+                            <TextBlock x:Name="LaptopNameText"
+                               VerticalAlignment="Center"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               Text="DESKTOP SYSTEM"
+                               Margin="0,0,0,12"/>
+                            <TextBlock x:Name="LaptopCPUNameText"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               FontWeight="Regular"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="AMD Ryzen 9 9955HX3D" 
+                               Margin="0,0,0,2"/>
+                            <TextBlock x:Name="LaptopGPUNameText"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               FontWeight="Regular"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="NVIDIA GeForce RTX 5090 Laptop"
+                               Margin="0,0,0,2"/>
+                            <TextBlock x:Name="LaptopDisplaySpecText"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               FontWeight="Regular"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="2560x1600 @ 300 Hz | MiniLED"
+                               Margin="0,0,0,2"/>
+                            <TextBlock x:Name="LaptopRamText"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               FontWeight="Regular"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="32 GB DDR5 @ 5600 Mt/s"
+                               Margin="0,0,0,2"/>
+                            <TextBlock x:Name="LaptopStorageText"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               FontWeight="Regular"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="2 TB M.2 NvME" />                 
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Hardware metrics: CPU & GPU -->
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <controls:CpuControl x:Name="_cpu"
+                                             Grid.Column="0"
+                                             Margin="0,0,4,0" />
+                        <controls:GpuControl x:Name="_gpu"
+                                             Grid.Column="1"
+                                             Margin="4,0,0,0" />
+                    </Grid>
+
+                    <!-- Memory & Battery row -->
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <controls:MemoryControl x:Name="_memory"
+                                                Grid.Column="0"
+                                                Margin="0,0,4,0" />
+                        <controls:BatteryControl x:Name="_battery"
+                                                 Grid.Column="1"
+                                                 Margin="4,0,0,0" />
+                    </Grid>
+
+                    <!-- Device status row: Hydro UI & Flydigi Cooler -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <controls:HydroUiControl x:Name="_hydroUi"
+                                                 Grid.Column="0"
+                                                 Margin="0,0,4,0" />
+                        <controls:FlydigiControl x:Name="_flydigi"
+                                                 Grid.Column="1"
+                                                 Margin="4,0,0,0" />
+                    </Grid>
+                </StackPanel>
             </Grid>
-
-            <!-- Quick Actions -->
-            <TextBlock Margin="0,20,0,0"
-                       FontSize="18"
-                       FontWeight="Medium"
-                       Text="Quick Actions" />
-
-            <controls:QuickActionsControl x:Name="_quickActions"
-                                          Margin="0,8,0,0" />
-
-            <!-- Spacer at bottom -->
-            <Rectangle Height="12" />
-        </StackPanel>
-    </ScrollViewer>
+        </ScrollViewer>
+    </Grid>
 </Page>

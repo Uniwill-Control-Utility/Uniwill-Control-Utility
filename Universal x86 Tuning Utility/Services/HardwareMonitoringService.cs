@@ -34,8 +34,12 @@ namespace Universal_x86_Tuning_Utility.Services
         public bool FlydigiConnected { get; init; }
         /// <summary>Current fan RPM from device (0 if unknown).</summary>
         public int FlydigiFanRpm { get; init; }
+        /// <summary>True if the connected device is a BS1 (BLE), false for BS2/BS2 Pro/BS3/BS3 Pro (HID).</summary>
+        public bool FlydigiIsBs1 { get; init; }
         /// <summary>Current RGB mode name (e.g. "Off", "Static", "SmartTemp").</summary>
         public string FlydigiRgbMode { get; init; } = string.Empty;
+        /// <summary>Human-readable model name (e.g. "BS1", "BS2 PRO", "BS3").</summary>
+        public string FlydigiModelName { get; init; } = string.Empty;
     }
 
     public sealed record HardwareMetricsSnapshot

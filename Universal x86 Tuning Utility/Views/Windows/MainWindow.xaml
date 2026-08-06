@@ -9,9 +9,9 @@
       x:Name="mainWindow"
     Title="{Binding ViewModel.ApplicationTitle, Mode=OneWay}"
     Width="1080"
-    Height="730"
+    Height="780"
     MinWidth="1000"
-    MinHeight="680"
+    MinHeight="780"
     d:DataContext="{d:DesignInstance local:MainWindow, IsDesignTimeCreatable=True}"
     d:Background="{DynamicResource ApplicationBackgroundBrush}"
     Foreground="{DynamicResource TextFillColorPrimaryBrush}"
@@ -28,19 +28,6 @@
 
     <ui:FluentWindow.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
-        <Style x:Key="ChipStyle" TargetType="Border">
-            <Setter Property="Padding" Value="8,4"/>
-            <Setter Property="CornerRadius" Value="4"/>
-            <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="HorizontalAlignment" Value="Left"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
     </ui:FluentWindow.Resources>
 
     <Grid>
@@ -59,33 +46,13 @@
                 <ui:ImageIcon Source="pack://application:,,,/Assets/applicationIcon-256.png" />
             </ui:TitleBar.Icon>
             <ui:TitleBar.Header>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,0,0">
-                    <TextBlock x:Name="ModelNameText" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" Text="UXTU"/>
-                    <Border x:Name="CpuChip" Style="{StaticResource ChipStyle}" VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE950;" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,6,0">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="FontFamily" Value="Segoe Fluent Icons"/>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                            <TextBlock x:Name="CpuChipText" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Text="Detecting CPU..."/>
-                        </StackPanel>
-                    </Border>
-                    <Border x:Name="GpuChip" Style="{StaticResource ChipStyle}" VerticalAlignment="Center" Margin="4,0,0,0" Visibility="Collapsed">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="&#xE7F4;" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,6,0">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="FontFamily" Value="Segoe Fluent Icons"/>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                            <TextBlock x:Name="GpuChipText" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Text="Detecting GPU..."/>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
+                <TextBlock x:Name="ModelNameText"
+                           FontSize="11"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                           VerticalAlignment="Center"
+                           Margin="4,0,0,0"
+                           Text="Universal x86 Tuning Utility" />
             </ui:TitleBar.Header>
             <ui:TitleBar.TrailingContent>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">

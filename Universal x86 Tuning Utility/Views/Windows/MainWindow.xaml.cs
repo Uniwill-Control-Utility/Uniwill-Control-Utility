@@ -125,16 +125,9 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
 
         private void SetupUI()
         {
-            ModelNameText.Text = !string.IsNullOrEmpty(Family.LaptopModel) ? Family.LaptopModel : "UXTU";
-            CpuChipText.Text = Family.CPUName;
+            ModelNameText.Text = "Universal x86 Tuning Utility";
 
-            if (!string.IsNullOrEmpty(Family.GPUName))
-            {
-                GpuChipText.Text = Family.GPUName;
-                GpuChip.Visibility = Visibility.Visible;
-            }
-
-            tbMain.Title = $"Universal x86 Tuning Utility - {Family.CPUName}";
+            tbMain.Title = "Universal x86 Tuning Utility";
 
             try
             {

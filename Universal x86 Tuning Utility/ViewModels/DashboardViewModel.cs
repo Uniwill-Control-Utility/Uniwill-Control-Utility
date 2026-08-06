@@ -122,6 +122,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
             bool flydigiConnected = _flydigiService.IsConnected;
             int flydigiFanRpm = 0;
             string flydigiRgbMode = string.Empty;
+            string flydigiModelName = string.Empty;
 
             if (flydigiConnected)
             {
@@ -134,14 +135,21 @@ namespace Universal_x86_Tuning_Utility.ViewModels
 
                     var bsSettings = _flydigiService.GetSettings();
                     flydigiRgbMode = bsSettings.RgbMode ?? string.Empty;
+
+                    flydigiModelName = _flydigiService.ConnectedDeviceInfo?.ModelName ?? string.Empty;
                 }
                 catch { /* non-critical */ }
             }
+
+            // Track whether we're on BS1 (BLE) or BS2+ (HID) for RPM range
+            bool flydigiIsBs1 = false;
 
             // If no BS2+ device is connected, check for BS1 (BLE)
             if (!flydigiConnected && _bs1Service.IsConnected)
             {
                 flydigiConnected = true;
+                flydigiIsBs1 = true;
+                flydigiModelName = "BS1";
                 try
                 {
                     var bs1Settings = _bs1Service.GetSettings();
@@ -160,7 +168,9 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                 HydroUiFanRpm = hydroFanRpm,
                 FlydigiConnected = flydigiConnected,
                 FlydigiFanRpm = flydigiFanRpm,
-                FlydigiRgbMode = flydigiRgbMode
+                FlydigiIsBs1 = flydigiIsBs1,
+                FlydigiRgbMode = flydigiRgbMode,
+                FlydigiModelName = flydigiModelName
             };
         }
 

@@ -19,7 +19,8 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0" Grid.ColumnSpan="5"
+            <TextBlock x:Name="_titleText"
+                       Grid.Row="0" Grid.ColumnSpan="5"
                        Margin="0,0,0,8"
                        FontSize="18"
                        FontWeight="Medium"
@@ -29,9 +30,13 @@
                    VerticalContentAlignment="Center"
                    Content="Fan"
                    Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+            <ProgressBar x:Name="_fanBar"
+                         Grid.Row="1" Grid.Column="2"
+                         Margin="0,0,16,0"
+                         Minimum="1300" Maximum="4000" Value="1300" />
             <Label x:Name="_fanLabel"
-                   Grid.Row="1" Grid.Column="2"
-                   Grid.ColumnSpan="2"
+                   Grid.Row="1" Grid.Column="4"
+                   HorizontalContentAlignment="Right"
                    VerticalContentAlignment="Center"
                    Content="--"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
@@ -42,7 +47,7 @@
                    Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
             <Label x:Name="_rgbLabel"
                    Grid.Row="2" Grid.Column="2"
-                   Grid.ColumnSpan="2"
+                   Grid.ColumnSpan="3"
                    VerticalContentAlignment="Center"
                    Content="--"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
