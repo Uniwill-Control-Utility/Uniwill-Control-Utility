@@ -31,166 +31,228 @@
         </Style>
     </Page.Resources>
 
-    <StackPanel Margin="18,10,18,18">
-        <TextBlock FontSize="26"
-                   FontWeight="Medium"
-                   Text="Automations" />
-        <TextBlock Margin="0,4,0,12"
-                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                   Text="Apply presets automatically when power or system state changes."
-                   TextWrapping="Wrap" />
+    <!-- Root Grid spans full window space -->
+    <Grid>
 
-        <ui:CardControl Icon="{ui:SymbolIcon BatteryCharge20}">
-            <ui:CardControl.Header>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
-                        <TextBlock FontSize="14" FontWeight="Medium" Text="Preset on Battery Charge" />
-                        <TextBlock FontSize="12"
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                   Text="Apply a preset whenever the battery begins charging."
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <ComboBox x:Name="cbxCharge"
-                                  MinWidth="150"
-                                  Height="37"
-                                  SelectedIndex="0"
-                                  SelectionChanged="cbxCharge_SelectionChanged">
-                            <ComboBoxItem>None</ComboBoxItem>
-                        </ComboBox>
-                        <ui:Button x:Name="btnChargeLoad"
-                                   Width="44"
-                                   Height="37"
-                                   Margin="8,0,0,0"
-                                   ToolTip="Refresh the preset list"
-                                   Click="btnChargeLoad_Click">
-                            <ui:SymbolIcon Symbol="ArrowSync20" FontSize="20" />
-                        </ui:Button>
-                    </StackPanel>
-                </Grid>
-            </ui:CardControl.Header>
-        </ui:CardControl>
+        <!-- Full-width, full-height ScrollViewer -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      CanContentScroll="False"
+                      PanningMode="VerticalOnly"
+                      IsDeferredScrollingEnabled="False">
+            <ScrollViewer.Style>
+                <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource {x:Type ScrollViewer}}">
+                    <Setter Property="Padding" Value="0" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ComputedVerticalScrollBarVisibility, RelativeSource={RelativeSource Self}}"
+                                     Value="Visible">
+                            <Setter Property="Padding" Value="0,0,8,0" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ScrollViewer.Style>
 
-        <ui:CardControl Margin="0,8,0,0" Icon="{ui:SymbolIcon Battery720}">
-            <ui:CardControl.Header>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
-                        <TextBlock FontSize="14" FontWeight="Medium" Text="Preset on Battery Discharge" />
-                        <TextBlock FontSize="12"
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                   Text="Apply a preset whenever the system begins running from battery power."
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <ComboBox x:Name="cbxDischarge"
-                                  MinWidth="150"
-                                  Height="37"
-                                  SelectedIndex="0"
-                                  SelectionChanged="cbxDischarge_SelectionChanged">
-                            <ComboBoxItem>None</ComboBoxItem>
-                        </ComboBox>
-                        <ui:Button x:Name="btnDischargeLoad"
-                                   Width="44"
-                                   Height="37"
-                                   Margin="8,0,0,0"
-                                   ToolTip="Refresh the preset list"
-                                   Click="btnDischargeLoad_Click">
-                            <ui:SymbolIcon Symbol="ArrowSync20" FontSize="20" />
-                        </ui:Button>
-                    </StackPanel>
-                </Grid>
-            </ui:CardControl.Header>
-        </ui:CardControl>
+            <!-- Centered max-width layout container -->
+            <Grid MaxWidth="1080" HorizontalAlignment="Stretch">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-        <ui:CardControl Margin="0,8,0,0" Icon="{ui:SymbolIcon Sleep20}">
-            <ui:CardControl.Header>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
-                        <TextBlock FontSize="14" FontWeight="Medium" Text="Preset on System Resume" />
-                        <TextBlock FontSize="12"
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                   Text="Apply a preset after the system resumes from sleep or hibernation."
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <ComboBox x:Name="cbxResume"
-                                  MinWidth="150"
-                                  Height="37"
-                                  SelectedIndex="0"
-                                  SelectionChanged="cbxResume_SelectionChanged">
-                            <ComboBoxItem>None</ComboBoxItem>
-                        </ComboBox>
-                        <ui:Button x:Name="btnResumeLoad"
-                                   Width="44"
-                                   Height="37"
-                                   Margin="8,0,0,0"
-                                   ToolTip="Refresh the preset list"
-                                   Click="btnResume_Click">
-                            <ui:SymbolIcon Symbol="ArrowSync20" FontSize="20" />
-                        </ui:Button>
-                    </StackPanel>
-                </Grid>
-            </ui:CardControl.Header>
-        </ui:CardControl>
+                <!-- Row 0: Page title block -->
+                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,12,0,8">
+                    <TextBlock FontSize="26"
+                               FontWeight="Medium"
+                               Margin="24,0,24,0"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               Text="Automations" />
+                    <TextBlock Margin="24,8,24,12"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="Apply presets automatically when power or system state changes."
+                               TextWrapping="Wrap" />
+                </StackPanel>
 
-        <ui:CardControl x:Name="ccAutoOcCpuUv"
-                        Margin="0,8,0,0"
-                        Icon="{ui:SymbolIcon TopSpeed20}">
-            <ui:CardControl.Header>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
-                        <TextBlock FontSize="14" FontWeight="Medium" Text="AutoOC: Adaptive CPU Undervolt" />
-                        <TextBlock FontSize="12"
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                   Text="Dynamically optimises CPU voltage with built-in stability protection. Initial tuning may temporarily cause instability or crashes."
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
-                    <CheckBox x:Name="cbCPUUV"
-                              Grid.Column="1"
-                              VerticalAlignment="Center"
-                              Click="CheckBox_Click" />
-                </Grid>
-            </ui:CardControl.Header>
-        </ui:CardControl>
+                <!-- Row 1: Content cards -->
+                <StackPanel Grid.Row="1" Margin="24,0,24,18">
 
-        <ui:CardControl x:Name="ccAutoOcIgpuUv"
-                        Margin="0,8,0,0"
-                        Icon="{ui:SymbolIcon TopSpeed20}">
-            <ui:CardControl.Header>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
-                        <TextBlock FontSize="14" FontWeight="Medium" Text="AutoOC: Adaptive iGPU Undervolt" />
-                        <TextBlock FontSize="12"
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                   Text="Dynamically optimises iGPU voltage with built-in stability protection. Initial tuning may temporarily cause instability or crashes."
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
-                    <CheckBox x:Name="cbiGPUUV"
-                              Grid.Column="1"
-                              VerticalAlignment="Center"
-                              Click="CheckBox_Click" />
-                </Grid>
-            </ui:CardControl.Header>
-        </ui:CardControl>
-    </StackPanel>
+                <!-- Preset on Battery Charge -->
+                <ui:CardControl Margin="0,0,0,12">
+                    <ui:CardControl.Icon>
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE897;" FontSize="20" Margin="4,0,6,0" />
+                    </ui:CardControl.Icon>
+                    <ui:CardControl.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="Preset on Battery Charge" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Apply a preset whenever the battery begins charging."
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <ComboBox x:Name="cbxCharge"
+                                          MinWidth="150"
+                                          Height="37"
+                                          SelectedIndex="0"
+                                          SelectionChanged="cbxCharge_SelectionChanged">
+                                    <ComboBoxItem>None</ComboBoxItem>
+                                </ComboBox>
+                                <ui:Button x:Name="btnChargeLoad"
+                                           Width="44"
+                                           Height="37"
+                                           Margin="8,0,0,0"
+                                           ToolTip="Refresh the preset list"
+                                           Click="btnChargeLoad_Click">
+                                    <ui:SymbolIcon Symbol="ArrowSync20" FontSize="20" />
+                                </ui:Button>
+                            </StackPanel>
+                        </Grid>
+                    </ui:CardControl.Header>
+                </ui:CardControl>
+
+                <!-- Preset on Battery Discharge -->
+                <ui:CardControl Margin="0,0,0,12">
+                    <ui:CardControl.Icon>
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE97E;" FontSize="20" Margin="4,0,6,0" />
+                    </ui:CardControl.Icon>
+                    <ui:CardControl.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="Preset on Battery Discharge" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Apply a preset whenever the system begins running from battery power."
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <ComboBox x:Name="cbxDischarge"
+                                          MinWidth="150"
+                                          Height="37"
+                                          SelectedIndex="0"
+                                          SelectionChanged="cbxDischarge_SelectionChanged">
+                                    <ComboBoxItem>None</ComboBoxItem>
+                                </ComboBox>
+                                <ui:Button x:Name="btnDischargeLoad"
+                                           Width="44"
+                                           Height="37"
+                                           Margin="8,0,0,0"
+                                           ToolTip="Refresh the preset list"
+                                           Click="btnDischargeLoad_Click">
+                                    <ui:SymbolIcon Symbol="ArrowSync20" FontSize="20" />
+                                </ui:Button>
+                            </StackPanel>
+                        </Grid>
+                    </ui:CardControl.Header>
+                </ui:CardControl>
+
+                <!-- Preset on System Resume -->
+                <ui:CardControl Margin="0,0,0,12">
+                    <ui:CardControl.Icon>
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C5;" FontSize="20" Margin="4,0,6,0" />
+                    </ui:CardControl.Icon>
+                    <ui:CardControl.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="Preset on System Resume" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Apply a preset after the system resumes from sleep or hibernation."
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <ComboBox x:Name="cbxResume"
+                                          MinWidth="150"
+                                          Height="37"
+                                          SelectedIndex="0"
+                                          SelectionChanged="cbxResume_SelectionChanged">
+                                    <ComboBoxItem>None</ComboBoxItem>
+                                </ComboBox>
+                                <ui:Button x:Name="btnResumeLoad"
+                                           Width="44"
+                                           Height="37"
+                                           Margin="8,0,0,0"
+                                           ToolTip="Refresh the preset list"
+                                           Click="btnResume_Click">
+                                    <ui:SymbolIcon Symbol="ArrowSync20" FontSize="20" />
+                                </ui:Button>
+                            </StackPanel>
+                        </Grid>
+                    </ui:CardControl.Header>
+                </ui:CardControl>
+
+                <!-- AutoOC: Adaptive CPU Undervolt -->
+                <ui:CardControl x:Name="ccAutoOcCpuUv"
+                                Margin="0,0,0,12">
+                    <ui:CardControl.Icon>
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BA;" FontSize="20" Margin="4,0,6,0" />
+                    </ui:CardControl.Icon>
+                    <ui:CardControl.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="AutoOC: Adaptive CPU Undervolt" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Dynamically optimises CPU voltage with built-in stability protection. Initial tuning may temporarily cause instability or crashes."
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <CheckBox x:Name="cbCPUUV"
+                                      Grid.Column="1"
+                                      VerticalAlignment="Center"
+                                      Click="CheckBox_Click" />
+                        </Grid>
+                    </ui:CardControl.Header>
+                </ui:CardControl>
+
+                <!-- AutoOC: Adaptive iGPU Undervolt -->
+                <ui:CardControl x:Name="ccAutoOcIgpuUv"
+                                Margin="0,0,0,12">
+                    <ui:CardControl.Icon>
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BA;" FontSize="20" Margin="4,0,6,0" />
+                    </ui:CardControl.Icon>
+                    <ui:CardControl.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="AutoOC: Adaptive iGPU Undervolt" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Dynamically optimises iGPU voltage with built-in stability protection. Initial tuning may temporarily cause instability or crashes."
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <CheckBox x:Name="cbiGPUUV"
+                                      Grid.Column="1"
+                                      VerticalAlignment="Center"
+                                      Click="CheckBox_Click" />
+                        </Grid>
+                    </ui:CardControl.Header>
+                </ui:CardControl>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
 </Page>
