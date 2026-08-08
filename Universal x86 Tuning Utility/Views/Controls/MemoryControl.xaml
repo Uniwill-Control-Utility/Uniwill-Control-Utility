@@ -20,7 +20,7 @@
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Grid.ColumnSpan="5"
-                       Margin="0,0,0,8"
+                       Margin="0,0,0,16"
                        FontSize="18"
                        FontWeight="Medium"
                        Text="Memory" />

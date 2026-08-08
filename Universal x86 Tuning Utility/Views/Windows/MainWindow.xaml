@@ -9,7 +9,7 @@
       x:Name="mainWindow"
     Title="{Binding ViewModel.ApplicationTitle, Mode=OneWay}"
     Width="1080"
-    Height="780"
+    Height="858"
     MinWidth="1000"
     MinHeight="780"
     d:DataContext="{d:DesignInstance local:MainWindow, IsDesignTimeCreatable=True}"
@@ -54,36 +54,13 @@
                            Margin="4,0,0,0"
                            Text="Universal x86 Tuning Utility" />
             </ui:TitleBar.Header>
-            <ui:TitleBar.TrailingContent>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <ui:Button Margin="0,0,6,0"
-                               Padding="10,4"
-                               Appearance="Transparent"
-                               Command="{Binding ViewModel.NavigateCommand}"
-                               CommandParameter="download"
-                               Content="{Binding ViewModel.Downloads}"
-                               Visibility="{Binding ViewModel.IsDownloads, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                    <ui:SymbolIcon Margin="0,0,10,0"
-                                   VerticalAlignment="Center"
-                                   FontSize="18"
-                                   Symbol="Info24"
-                                   Visibility="{Binding ViewModel.HasLastAppliedSettings, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <ui:SymbolIcon.ToolTip>
-                            <ToolTip Placement="Bottom">
-                                <TextBlock MaxWidth="520"
-                                           Text="{Binding ViewModel.LastAppliedSettingsToolTip}"
-                                           TextWrapping="Wrap" />
-                            </ToolTip>
-                        </ui:SymbolIcon.ToolTip>
-                    </ui:SymbolIcon>
-                 </StackPanel>
-            </ui:TitleBar.TrailingContent>
+            
         </ui:TitleBar>
 
         <ui:NavigationView x:Name="RootNavigation"
                    Grid.Row="1"
                    FontSize="10"
-                   Margin="1,2"
+                   Margin="0"
                    IsPaneOpen="False"
                    IsBackButtonVisible="Collapsed"
                    PaneDisplayMode="LeftFluent"

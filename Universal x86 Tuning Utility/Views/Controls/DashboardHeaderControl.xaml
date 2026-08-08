@@ -1,0 +1,111 @@
+<UserControl x:Class="Universal_x86_Tuning_Utility.Views.Controls.DashboardHeaderControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             x:Name="root"
+             Height="300"
+             SnapsToDevicePixels="True"
+             UseLayoutRounding="True"
+             mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <!-- Bottom fade: solid at top, fades to transparent at bottom -->
+        <LinearGradientBrush x:Key="HeaderFadeMask"
+                             StartPoint="0.5,0" EndPoint="0.5,1">
+            <GradientStop Offset="0.3"  Color="#FFFFFFFF" />
+            <GradientStop Offset="0.3" Color="#FFFFFFFF" />
+            <GradientStop Offset="0.85" Color="#00FFFFFF" />
+            <GradientStop Offset="1.0"  Color="#00FFFFFF" />
+        </LinearGradientBrush>
+    </UserControl.Resources>
+
+    <!-- Root grid: clipped in code-behind for top-left rounded corner -->
+    <Grid x:Name="HeaderGrid">
+        <!-- Background layer — provides the rounded corner shape -->
+        <Border x:Name="BackgroundBorder"
+                 />
+
+        <!-- Header image with fade mask — no extra opacity, uniform blend -->
+        <Grid x:Name="ImageGrid"
+              OpacityMask="{StaticResource HeaderFadeMask}">
+            <Image x:Name="HeaderImage"
+                   Source="pack://application:,,,/Assets/Header/HeaderImage.png"
+                   Stretch="Uniform"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Top"
+                   Margin="0,-24,0,0"
+                   RenderOptions.BitmapScalingMode="HighQuality"
+                   />
+        </Grid>
+
+        <!-- Content overlay — inset to match page content margins -->
+        <Grid Margin="36,0,36,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Title text (top-left) -->
+            <StackPanel Grid.Row="0" Margin="0,40,0,0">
+                <TextBlock FontSize="26"
+                           FontWeight="Medium"
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                           Text="Uniwill Control Utility" />
+                <TextBlock Margin="0,8,0,0"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           Text="Unified laptop and ecosystem control."
+                           TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- Laptop info (bottom-center) -->
+            <StackPanel Grid.Row="1"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Bottom"
+                        HorizontalAlignment="Center"
+                        Margin="0,0,0,16">
+                <Image x:Name="LaptopImage"
+                       Width="220"
+                       Height="137"
+                       Stretch="Uniform"
+                       StretchDirection="DownOnly"
+                       VerticalAlignment="Center"
+                       Margin="0,0,12,0" />
+                <StackPanel Orientation="Vertical" VerticalAlignment="Center">
+                    <TextBlock x:Name="LaptopNameText"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               Text="DESKTOP SYSTEM"
+                               Margin="0,0,0,4" />
+                    <TextBlock x:Name="LaptopCPUNameText"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               Text="CPU name"
+                               Margin="0,0,0,2" />
+                    <TextBlock x:Name="LaptopGPUNameText"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               Text="GPU name"
+                               Margin="0,0,0,2" />
+                    <TextBlock x:Name="LaptopDisplaySpecText"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               Text="Display"
+                               Margin="0,0,0,2" />
+                    <TextBlock x:Name="LaptopRamText"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               Text="RAM"
+                               Margin="0,0,0,2" />
+                    <TextBlock x:Name="LaptopStorageText"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               Text="Storage" />
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

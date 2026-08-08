@@ -58,7 +58,8 @@
                                     </Rectangle.Effect>
                                     <Rectangle.OpacityMask>
                                         <ImageBrush ImageSource="pack://application:,,,/Assets/Flydigi/bs2-pro.png"
-                                                    Stretch="Fill" />
+                                                    Stretch="Fill" 
+                                                    RenderOptions.BitmapScalingMode="HighQuality"/>
                                     </Rectangle.OpacityMask>
                                 </Rectangle>
                                 <!-- Sharp original image on top -->
@@ -66,7 +67,8 @@
                                        Width="320"
                                        Height="140"
                                        Stretch="Uniform"
-                                       Source="pack://application:,,,/Assets/Flydigi/bs2-pro.png" />
+                                       Source="pack://application:,,,/Assets/Flydigi/bs2-pro.png"
+                                       RenderOptions.BitmapScalingMode="HighQuality"/>
                             </Grid>
                             <Grid>
                                 <Grid.ColumnDefinitions>

@@ -20,27 +20,30 @@
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Grid.ColumnSpan="5"
-                       Margin="0,0,0,8"
+                       Margin="0,0,0,16"
                        FontSize="18"
                        FontWeight="Medium"
                        Text="Hydro UI" />
 
             <Label Grid.Row="1" Grid.Column="0"
                    VerticalContentAlignment="Center"
-                   Content="Pump"
+                   Content="Fan"
                    Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-            <Label x:Name="_pumpLabel"
-                   Grid.Row="1" Grid.Column="2"
-                   Grid.ColumnSpan="2"
+            <ProgressBar x:Name="_fanBar"
+                         Grid.Row="1" Grid.Column="2"
+                         Minimum="0" Maximum="100" Value="0" />
+            <Label x:Name="_fanLabel"
+                   Grid.Row="1" Grid.Column="4"
+                   HorizontalContentAlignment="Right"
                    VerticalContentAlignment="Center"
                    Content="--"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
             <Label Grid.Row="2" Grid.Column="0"
                    VerticalContentAlignment="Center"
-                   Content="Fan"
+                   Content="Pump"
                    Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-            <Label x:Name="_fanLabel"
+            <Label x:Name="_pumpLabel"
                    Grid.Row="2" Grid.Column="2"
                    Grid.ColumnSpan="2"
                    VerticalContentAlignment="Center"

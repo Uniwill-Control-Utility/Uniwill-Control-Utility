@@ -44,43 +44,32 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 try
                 {
                     var bitmap = new BitmapImage(new Uri(imagePath, UriKind.RelativeOrAbsolute));
-                    LaptopImage.Source = bitmap;
+                    _header.SetLaptopImage(bitmap);
                 }
                 catch
                 {
-                    LaptopImage.Visibility = Visibility.Collapsed;
+                    _header.SetLaptopImageVisibility(Visibility.Collapsed);
                 }
             }
             else
             {
-                LaptopImage.Visibility = Visibility.Collapsed;
+                _header.SetLaptopImageVisibility(Visibility.Collapsed);
             }
 
-            // Set laptop display name (use clean laptop model, no Windows PC name)
-            if (!string.IsNullOrEmpty(model))
-            {
-                LaptopNameText.Text = GetCleanModelName(model).ToUpperInvariant();
-                LaptopInfoContent.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                LaptopNameText.Text = "DESKTOP SYSTEM";
-                LaptopInfoContent.Visibility = Visibility.Visible;
-            }
+            // Set laptop display name
+            string displayName = !string.IsNullOrEmpty(model)
+                ? GetCleanModelName(model).ToUpperInvariant()
+                : "DESKTOP SYSTEM";
 
-            // Set CPU name spec textblock - clean up core count suffix
-            LaptopCPUNameText.Text = CleanCpuName(cpuName);
+            _header.LaptopName = displayName;
+            _header.LaptopCPUName = CleanCpuName(cpuName);
 
-            // Set GPU name spec textblock - filter and clean
             if (!string.IsNullOrEmpty(gpuName))
-            {
-                LaptopGPUNameText.Text = FilterGpuName(gpuName);
-            }
+                _header.LaptopGPUName = FilterGpuName(gpuName);
 
-            // Set display, RAM, and storage spec textblocks
-            LaptopDisplaySpecText.Text = SystemSpecs.GetDisplayString();
-            LaptopRamText.Text = SystemSpecs.GetRamString();
-            LaptopStorageText.Text = SystemSpecs.GetStorageString();
+            _header.LaptopDisplaySpec = SystemSpecs.GetDisplayString();
+            _header.LaptopRam = SystemSpecs.GetRamString();
+            _header.LaptopStorage = SystemSpecs.GetStorageString();
         }
 
         /// <summary>
@@ -123,7 +112,14 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             {
                 int xmgIndex = model.IndexOf("XMG", StringComparison.OrdinalIgnoreCase);
                 if (xmgIndex > 0)
-                    return model.Substring(xmgIndex).Trim();
+                {
+                    string cleaned = model.Substring(xmgIndex).Trim();
+                    // Insert "16" before the variant suffix (e.g., "XMG NEO (A25)" -> "XMG NEO 16 (A25)")
+                    int parenIndex = cleaned.IndexOf('(');
+                    if (parenIndex > 0)
+                        cleaned = cleaned.Insert(parenIndex, "16 ");
+                    return cleaned;
+                }
             }
 
             return model;

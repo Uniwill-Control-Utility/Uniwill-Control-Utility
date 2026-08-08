@@ -28,11 +28,20 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
                 _pumpLabel.Content = pumpText;
 
                 if (snapshot.HydroUiFanRpm > 0)
+                {
+                    _fanBar.Value = 100;
                     _fanLabel.Content = $"{snapshot.HydroUiFanRpm} RPM";
+                }
                 else if (snapshot.HydroUiFanSpeed > 0)
+                {
+                    _fanBar.Value = snapshot.HydroUiFanSpeed;
                     _fanLabel.Content = $"{snapshot.HydroUiFanSpeed}%";
+                }
                 else
+                {
+                    _fanBar.Value = 0;
                     _fanLabel.Content = "Off";
+                }
             }
             else
             {
