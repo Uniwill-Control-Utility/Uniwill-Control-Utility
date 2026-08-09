@@ -121,19 +121,28 @@ Where `SendReport` calls `HidD_SetFeature(handle, report, 9)`.
 
 ### Effect Modes (byte[3] of CMD_MODE_BRIGHTNESS)
 
-| Value | Effect |
-|-------|--------|
-| `0x01` | Static (solid color) |
-| `0x02` | Breathing |
-| `0x03` | Wave |
-| `0x04` | Reactive |
-| `0x05` | Rainbow |
-| `0x06` | Ripple |
-| `0x09` | Marquee |
-| `0x0A` | Raindrop |
-| `0x0E` | Aurora |
-| `0x11` | Spark |
-| `0x33` | **Per-key / User mode** |
+| Value | Effect | Notes |
+|-------|--------|-------|
+| `0x01` | Static (solid color) | |
+| `0x02` | Breathing | Multi-color (7 palette) |
+| `0x03` | Wave | Supports direction (byte[7]) |
+| `0x04` | Random | Non-touch random keys (XCC: "Reactive"). Touch-reactive variant via byte[7]=0x01 |
+| `0x05` | Rainbow | Static rainbow gradient |
+| `0x06` | Ripple | Non-touch ripple. Touch-reactive variant via byte[7]=0x01 |
+| `0x07` | TouchRipple | Ripple triggered by keypress (separate firmware effect) |
+| `0x09` | Marquee | |
+| `0x0A` | Raindrop | Backlight off, random keys breathe (XCC: "Raindrop") |
+| `0x0E` | Aurora | Non-touch Aurora. Touch-reactive variant via byte[7]=0x01 |
+| `0x0F` | TouchAurora | Aurora triggered by keypress (separate firmware effect) |
+| `0x10` | TouchSpark | Spark triggered by keypress (separate firmware effect) |
+| `0x11` | Spark | Non-touch Spark. Touch-reactive variant via byte[7]=0x01 |
+| `0x15` | GamingMode | WASD + arrows lit, rest dark (XCC: "Gaming Mode") |
+| `0x20` | GamingModeFull | GamingMode + static color on rest |
+
+**Dropped effects:**
+- `0x33` (Music / audio-reactive): Requires GCUBridge/GCUService to run for audio capture.
+  This service conflicts with direct EC fan control (GCUBridge overrides fan curves), so this
+  effect is not available in UXTU. Discovered 2026-08-09.
 
 ### Speed (byte[4] of CMD_MODE_BRIGHTNESS)
 
@@ -160,11 +169,15 @@ interprets slider value 1 as HID speed 1 (very slow) instead of the intended fas
 
 Range `0x00` to `0x64` (0–100 decimal). For per-key mode, the range is `0x00` to `0x32` (0–50).
 
-### Direction (byte[7] of CMD_MODE_BRIGHTNESS)
+### Direction / Touch-Reactive (byte[7] of CMD_MODE_BRIGHTNESS)
 
-Controls the animation direction for effects that support it. **Verified on Wave (0x03) only** —
-other animated effects (Ripple, Breathing, Marquee, etc.) have not yet been tested to confirm
-they respect this byte.
+This byte has **dual purpose** depending on the effect:
+
+1. **Animation direction** — For effects like Wave (0x03), byte[7] controls the travel direction.
+2. **Touch-reactive modifier** — For Random (0x04), Ripple (0x06), Aurora (0x0E), and Spark (0x11),
+   byte[7] acts as a variant switch: `0x00` = auto (non-touch), `0x01` = keypress-reactive.
+
+#### Animation Direction (Wave)
 
 Values `0x00` and `0x01` both produce the default Left→Right direction. Values `0x07` and above
 wrap back to Left→Right.
@@ -184,6 +197,23 @@ wrap back to Left→Right.
 The GCUService direction enum (LeftRight=0, RightLeft=1, DownUp=2, UpDown=3, OnKeyPressed=4, Sync=5)
 does **not** map to the actual hardware directions — the enum names are misleading. The correct
 mapping (verified on Wave) is `0x02` = Right→Left, `0x03` = Down→Up, `0x04` = Up→Down, `0x05` = diagonal BR→TL.
+
+#### Touch-Reactive Modifier (Random, Ripple, Aurora, Spark)
+
+For these effects, byte[7] controls whether the effect runs automatically or triggers on keypress:
+
+| Value | Behavior |
+|-------|----------|
+| `0x00` | Auto — effect runs without user interaction |
+| `0x01` | Reactive — effect triggers on keypress |
+
+**Critical**: For Random, Ripple, Aurora, and Spark, the global primer report (byte[2]=0x00)
+interferes with the zone-specific apply. Send **only** the zone-specific report
+(byte[2]=0x02) with byte[7] set to the desired variant. Do NOT send the primer.
+
+**Discovered**: 2026-08-09. The original XMG CC "Reactive" label in the UI actually mapped to
+effect 0x04 with byte[7]=0x00 (non-touch random). The true keypress-reactive variant was
+accidentally discovered by sending a nonzero direction byte to effect 0x04.
 
 #### Wave Direction Primer+Delay Requirement (discovered 2026-08-03)
 
@@ -209,7 +239,8 @@ is ignored for the direction byte.
 with `byte[7]=0x00`). Subsequent reports update the effect byte but not the direction byte
 until Wave has been "armed" by a primer report.
 
-**TODO**: Verify direction byte behavior on Ripple, Breathing, Marquee, Raindrop, Aurora, Spark.
+**Note**: This primer+delay sequence is **NOT** used for Random, Ripple, Aurora, or Spark —
+those effects skip the primer entirely (see Touch-Reactive Modifier section above).
 
 ### Turning Off
 

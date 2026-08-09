@@ -68,6 +68,14 @@ namespace Universal_x86_Tuning_Utility.Models
         public bool IdleTimerEnabled { get; set; } = false;
 
         /// <summary>
+        /// Whether touch-reactive mode is enabled for effects that support it
+        /// (Random, Ripple, Aurora, Spark). When true, the effect triggers on
+        /// keypress instead of running automatically. Stored as byte[7]=0x01
+        /// in CMD_MODE_BRIGHTNESS HID reports.
+        /// </summary>
+        public bool TouchReactive { get; set; } = false;
+
+        /// <summary>
         /// Idle timer duration in minutes. Range 5-60. Default 10 (matches XMG CC).
         /// </summary>
         public int IdleTimerMinutes { get; set; } = 10;
@@ -160,8 +168,8 @@ namespace Universal_x86_Tuning_Utility.Models
         /// <summary>Wave traveling across the keyboard.</summary>
         Wave = 0x03,
 
-        /// <summary>Random keys lighting up spontaneously (XCC: "Reactive").</summary>
-        Reactive = 0x04,
+        /// <summary>Random keys lighting up spontaneously (non-touch, XCC: "Reactive"). Use TouchReactive setting for keypress-reactive variant.</summary>
+        Random = 0x04,
 
         /// <summary>Static rainbow gradient across all keys.</summary>
         Rainbow = 0x05,
@@ -195,9 +203,6 @@ namespace Universal_x86_Tuning_Utility.Models
 
         /// <summary>Gaming mode WASD/arrows + static color on rest.</summary>
         GamingModeFull = 0x20,
-
-        /// <summary>Music-reactive effect (XCC: "Music").</summary>
-        Music = 0x33,
     }
 
     /// <summary>

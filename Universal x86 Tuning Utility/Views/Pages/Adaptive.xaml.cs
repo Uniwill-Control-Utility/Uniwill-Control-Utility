@@ -2231,7 +2231,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             "Static" => KeyboardEffect.Static,
             "Breathing" => KeyboardEffect.Breathing,
             "Wave" => KeyboardEffect.Wave,
-            "Reactive" => KeyboardEffect.Reactive,
+            "Reactive" => KeyboardEffect.Random,
+            "Random" => KeyboardEffect.Random,
             "Rainbow" => KeyboardEffect.Rainbow,
             "Ripple" => KeyboardEffect.Ripple,
             "TouchRipple" => KeyboardEffect.TouchRipple,
@@ -2243,7 +2244,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             "Spark" => KeyboardEffect.Spark,
             "GamingMode" => KeyboardEffect.GamingMode,
             "GamingModeFull" => KeyboardEffect.GamingModeFull,
-            "Music" => KeyboardEffect.Music,
+            "Music" => KeyboardEffect.Static,
             _ => KeyboardEffect.Static,
         };
 
@@ -2289,6 +2290,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             "Breathing" => 1,
             "Wave" => 2,
             "Reactive" => 3,
+            "Random" => 3,
             "Rainbow" => 4,
             "Ripple" => 5,
             "TouchRipple" => 6,

@@ -517,9 +517,10 @@ namespace Universal_x86_Tuning_Utility.Services
                 // direction bytes. Without this delay, direction defaults to Left→Right.
                 if (settings.Direction != KeyboardDirection.LeftRight)
                     System.Threading.Thread.Sleep(500);
+                bool touchReactive = effectMode == "Reactive";
                 ApplyKeyboardHid(perKeyMode, brightness, settings.EffectMode, effectSpeed,
                     settings.Direction, colorR, colorG, colorB, multiColors, perKeyColors,
-                    restColorR, restColorG, restColorB);
+                    restColorR, restColorG, restColorB, touchReactive);
             }
             catch (Exception ex)
             {
@@ -530,10 +531,10 @@ namespace Universal_x86_Tuning_Utility.Services
         // Effects that need 7 multi-color slots
         private static readonly HashSet<KeyboardEffect> s_multiColor7Effects = new()
         {
-            KeyboardEffect.Breathing, KeyboardEffect.Wave, KeyboardEffect.Reactive,
+            KeyboardEffect.Breathing, KeyboardEffect.Wave, KeyboardEffect.Random,
             KeyboardEffect.Ripple, KeyboardEffect.Marquee, KeyboardEffect.Raindrop,
             KeyboardEffect.Aurora, KeyboardEffect.TouchAurora,
-            KeyboardEffect.TouchSpark, KeyboardEffect.Spark, KeyboardEffect.Music,
+            KeyboardEffect.TouchSpark, KeyboardEffect.Spark,
         };
 
         // Effects that need 4 multi-color slots
@@ -554,7 +555,7 @@ namespace Universal_x86_Tuning_Utility.Services
         private void ApplyKeyboardHid(bool perKeyMode, int brightness, KeyboardEffect effect,
             byte effectSpeed, KeyboardDirection direction, byte r, byte g, byte b,
             string multiColors, string? perKeyColors,
-            byte restColorR, byte restColorG, byte restColorB)
+            byte restColorR, byte restColorG, byte restColorB, bool touchReactive = false)
         {
             var hid = new KeyboardHidService();
             try
@@ -581,7 +582,7 @@ namespace Universal_x86_Tuning_Utility.Services
                     // Effects mode: use TurnOnWithEffect to combine power-on and
                     // effect into one sequence, avoiding a visible flash of
                     // intermediate Static color.
-                    hid.TurnOnWithEffect(r, g, b, brightnessPercent, effect, effectSpeed, direction);
+                    hid.TurnOnWithEffect(r, g, b, brightnessPercent, effect, effectSpeed, direction, touchReactive);
 
                     // Multi-color effects need additional color reports after effect is set.
                     if (!string.IsNullOrEmpty(multiColors))
@@ -669,7 +670,8 @@ namespace Universal_x86_Tuning_Utility.Services
             "Static" => KeyboardEffect.Static,
             "Breathing" => KeyboardEffect.Breathing,
             "Wave" => KeyboardEffect.Wave,
-            "Reactive" => KeyboardEffect.Reactive,
+            "Reactive" => KeyboardEffect.Random,
+            "Random" => KeyboardEffect.Random,
             "Rainbow" => KeyboardEffect.Rainbow,
             "Ripple" => KeyboardEffect.Ripple,
             "TouchRipple" => KeyboardEffect.TouchRipple,
@@ -681,7 +683,7 @@ namespace Universal_x86_Tuning_Utility.Services
             "Spark" => KeyboardEffect.Spark,
             "GamingMode" => KeyboardEffect.GamingMode,
             "GamingModeFull" => KeyboardEffect.GamingModeFull,
-            "Music" => KeyboardEffect.Music,
+            "Music" => KeyboardEffect.Static,
             _ => KeyboardEffect.Static,
         };
 

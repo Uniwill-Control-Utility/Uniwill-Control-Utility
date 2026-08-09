@@ -333,6 +333,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             bool isPerKey = ModeToggle.IsChecked == true;
             EffectsContent.Visibility = isPerKey ? Visibility.Collapsed : Visibility.Visible;
             PerKeyContent.Visibility = isPerKey ? Visibility.Visible : Visibility.Collapsed;
+            PerKeyBottomBar.Visibility = isPerKey ? Visibility.Visible : Visibility.Collapsed;
 
             if (_isFirstLoad)
                 return;
@@ -383,9 +384,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                             // Combine power-on and effect into one sequence to avoid
                             // a visible flash of intermediate Static color.
+                            bool touchReactive = (bool)Application.Current.Dispatcher.Invoke(
+                                () => tsTouchReactive.IsChecked);
                             _hidService.TurnOnWithEffect(
                                 color.R, color.G, color.B, brightnessPercent,
-                                effect, speed, _currentDirection);
+                                effect, speed, _currentDirection, touchReactive);
 
                             // Multi-color palette (if needed for this effect)
                             if (s_multiColor7Effects.Contains(effect))
@@ -473,7 +476,12 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void PopulateEffects()
         {
-            cmbEffect.ItemsSource = Enum.GetValues<KeyboardEffect>();
+            // Filter out TouchRipple, TouchAurora, TouchSpark — the touch-reactive
+            // toggle covers those variants for Ripple, Aurora, and Spark respectively.
+            cmbEffect.ItemsSource = Enum.GetValues<KeyboardEffect>()
+                .Where(e => e != KeyboardEffect.TouchRipple
+                         && e != KeyboardEffect.TouchAurora
+                         && e != KeyboardEffect.TouchSpark);
         }
 
         /// <summary>Effects that support a 7-color palette.</summary>
@@ -481,7 +489,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         {
             KeyboardEffect.Breathing,
             KeyboardEffect.Wave,
-            KeyboardEffect.Reactive,
+            KeyboardEffect.Random,
             KeyboardEffect.Ripple,
             KeyboardEffect.TouchRipple,
             KeyboardEffect.Marquee,
@@ -490,7 +498,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             KeyboardEffect.TouchAurora,
             KeyboardEffect.TouchSpark,
             KeyboardEffect.Spark,
-            KeyboardEffect.Music,
         };
 
         internal static readonly HashSet<KeyboardEffect> s_multiColor4Effects = new()
@@ -507,11 +514,20 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         internal static bool IsMultiColor4Effect(KeyboardEffect effect) => s_multiColor4Effects.Contains(effect);
         internal static bool IsMultiColor4Plus1Effect(KeyboardEffect effect) => s_multiColor4Plus1Effects.Contains(effect);
 
+        /// <summary>Effects that support a touch-reactive variant (Random, Ripple, Aurora, Spark).</summary>
+        private static readonly HashSet<KeyboardEffect> s_touchReactiveEffects = new()
+        {
+            KeyboardEffect.Random,
+            KeyboardEffect.Ripple,
+            KeyboardEffect.Aurora,
+            KeyboardEffect.Spark,
+        };
+
         private static readonly HashSet<KeyboardEffect> s_animatedEffects = new()
         {
             KeyboardEffect.Breathing,
             KeyboardEffect.Wave,
-            KeyboardEffect.Reactive,
+            KeyboardEffect.Random,
             KeyboardEffect.Ripple,
             KeyboardEffect.TouchRipple,
             KeyboardEffect.Marquee,
@@ -520,7 +536,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             KeyboardEffect.TouchAurora,
             KeyboardEffect.TouchSpark,
             KeyboardEffect.Spark,
-            KeyboardEffect.Music,
         };
 
         private void CmbEffect_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -617,6 +632,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             bool showSpeed = s_animatedEffects.Contains(effect);
             SpeedSeparator.Visibility = showSpeed ? Visibility.Visible : Visibility.Collapsed;
             SpeedRow.Visibility = showSpeed ? Visibility.Visible : Visibility.Collapsed;
+
+            bool showTouchReactive = s_touchReactiveEffects.Contains(effect);
+            TouchReactiveSeparator.Visibility = showTouchReactive ? Visibility.Visible : Visibility.Collapsed;
+            TouchReactiveRow.Visibility = showTouchReactive ? Visibility.Visible : Visibility.Collapsed;
+
             bool showDirection = effect == KeyboardEffect.Wave;
             DirectionSeparator.Visibility = showDirection ? Visibility.Visible : Visibility.Collapsed;
             DirectionRow.Visibility = showDirection ? Visibility.Visible : Visibility.Collapsed;
@@ -624,9 +644,21 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // Show color separator if any control row below Type is visible.
             bool anyControlVisible = ColorRow.Visibility == Visibility.Visible
                 || MultiColorRow.Visibility == Visibility.Visible
-                || SpeedRow.Visibility == Visibility.Visible;
+                || SpeedRow.Visibility == Visibility.Visible
+                || TouchReactiveRow.Visibility == Visibility.Visible;
         }
 
+        private void TsTouchReactive_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isFirstLoad) return;
+            if (!_isSyncingFromPreset)
+            {
+                SaveSettings();
+                _pendingApply = true;
+            }
+        }
+
+   
         private void DirectionButton_Click(object sender, RoutedEventArgs e)
         {
             if (_isFirstLoad) return;
@@ -797,7 +829,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 int brightnessPercent = (brightnessLevel * 100) / 7;
                 byte speed = SliderToHidSpeed((int)SpeedSlider.Value);
 
-                if (powerOn)
+               if (powerOn)
                 {
                     var color = ColorPicker.SelectedColor;
                     KeyboardEffect effect = cmbEffect.SelectedItem is KeyboardEffect e ? e
@@ -806,9 +838,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     // Use fast apply to minimize visible flash. TurnOnWithEffect
                     // combines power-on and effect into one sequence so the
                     // firmware never shows an intermediate static color.
+                    bool touchReactive = tsTouchReactive.IsChecked == true;
                     _hidService.TurnOnWithEffect(
                         color.R, color.G, color.B, brightnessPercent,
-                        effect, speed, _currentDirection);
+                        effect, speed, _currentDirection, touchReactive);
 
                     // Multi-color palette (after effect is set).
                     if (s_multiColor7Effects.Contains(effect))
@@ -1178,6 +1211,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             tsIdleTimer.IsChecked = settings.IdleTimerEnabled;
             IdleTimerCard.IsExpanded = settings.IdleTimerEnabled;
+            tsTouchReactive.IsChecked = settings.TouchReactive;
             int savedSeconds = settings.IdleTimerMinutes * 60;
             int closestIndex = 0;
             int closestDiff = int.MaxValue;
@@ -1259,6 +1293,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 IdleTimerMinutes = cmbIdleTimer.SelectedIndex >= 0
                     ? s_idleTimerOptions[cmbIdleTimer.SelectedIndex].Seconds / 60
                     : 10,
+                TouchReactive = tsTouchReactive.IsChecked == true,
                 PerKeyMode = ModeToggle.IsChecked == true,
                 PerKeyColors = savedPerKeyColors,
                 PerKeyPickerColor = $"{pickerColor.R},{pickerColor.G},{pickerColor.B}",

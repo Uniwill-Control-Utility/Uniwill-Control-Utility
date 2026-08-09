@@ -556,7 +556,7 @@ namespace Universal_x86_Tuning_Utility.Services
         /// effect engine takes over.
         /// </summary>
         public void TurnOnWithEffect(byte r, byte g, byte b, int brightness,
-            KeyboardEffect effect, byte speed = 5, KeyboardDirection direction = KeyboardDirection.LeftRight)
+            KeyboardEffect effect, byte speed = 5, KeyboardDirection direction = KeyboardDirection.LeftRight, bool touchReactive = false)
         {
             EnsureAvailable();
             brightness = Math.Clamp(brightness, 0, 100);
@@ -585,8 +585,23 @@ namespace Universal_x86_Tuning_Utility.Services
                 SendReport(new byte[] { 0x00, CMD_SET_COLOR, (byte)ZoneKeyboard, 0x01, cr, cg, cb, 0x00, 0x00 });
 
                 // Reports: Configure effect engine BEFORE enabling the zone.
-                SendReport(new byte[] { 0x00, CMD_MODE_BRIGHTNESS, 0x00, (byte)effect, clampedSpeed, (byte)brightness, 0x00, 0x00, 0x00 });
-                SendReport(new byte[] { 0x00, CMD_MODE_BRIGHTNESS, ZoneMaskKeyboard, (byte)effect, clampedSpeed, (byte)brightness, 0x08, directionByte, 0x00 });
+                // For Random (0x04), Ripple (0x06), Aurora (0x0E), and Spark (0x11),
+                // the global primer (byte[2]=0x00) interferes with the zone-specific
+                // apply. The firmware interprets byte[7] as a touch/variant modifier
+                // for these effects: 0x00 = auto (non-touch), 0x01 = keypress-reactive.
+                if (effect == KeyboardEffect.Random
+                    || effect == KeyboardEffect.Ripple
+                    || effect == KeyboardEffect.Aurora
+                    || effect == KeyboardEffect.Spark)
+                {
+                    byte touchByte = touchReactive ? (byte)0x01 : (byte)0x00;
+                    SendReport(new byte[] { 0x00, CMD_MODE_BRIGHTNESS, ZoneMaskKeyboard, (byte)effect, clampedSpeed, (byte)brightness, 0x08, touchByte, 0x00 });
+                }
+                else
+                {
+                    SendReport(new byte[] { 0x00, CMD_MODE_BRIGHTNESS, 0x00, (byte)effect, clampedSpeed, (byte)brightness, 0x00, 0x00, 0x00 });
+                    SendReport(new byte[] { 0x00, CMD_MODE_BRIGHTNESS, ZoneMaskKeyboard, (byte)effect, clampedSpeed, (byte)brightness, 0x08, directionByte, 0x00 });
+                }
 
                 // Final: Zone enable — firmware renders the pre-configured effect
                 SendReport(new byte[] { 0x00, CMD_ZONE_ON_OFF, (byte)ZoneKeyboard, 0x01, 0x04, 0x00, 0x00, 0x00, 0x01 });
