@@ -403,7 +403,7 @@
 
                     <!-- Fan Turbo toggle -->
                     <ui:CardControl Margin="0,8,0,0"
-                                    Background="#200000">
+                                    Background="{DynamicResource SystemFillColorCriticalBackgroundBrush}">
                         <ui:CardControl.Icon>
                             <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xECAD;" FontSize="20" />
                         </ui:CardControl.Icon>

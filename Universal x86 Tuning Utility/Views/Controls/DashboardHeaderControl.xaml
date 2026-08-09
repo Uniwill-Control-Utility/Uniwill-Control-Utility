@@ -5,19 +5,60 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              x:Name="root"
-             Height="300"
+             Height="350"
              SnapsToDevicePixels="True"
              UseLayoutRounding="True"
              mc:Ignorable="d">
 
     <UserControl.Resources>
-        <!-- Bottom fade: solid at top, fades to transparent at bottom -->
-        <LinearGradientBrush x:Key="HeaderFadeMask"
+        <!--
+            HeaderFadeMask group: all fades use white-to-transparent as OpacityMask.
+            The bottom fade is the primary mask; left/top/right edge fades are applied
+            as overlay rectangles with the same white-to-transparent gradients so they
+            compose with the bottom fade to reveal the background color beneath.
+          -->
+         <!-- Bottom: solid, then fades to transparent over bottom 66% with emphasis on upper half -->
+        <LinearGradientBrush x:Key="HeaderFadeBottom"
                              StartPoint="0.5,0" EndPoint="0.5,1">
-            <GradientStop Offset="0.3"  Color="#FFFFFFFF" />
-            <GradientStop Offset="0.3" Color="#FFFFFFFF" />
-            <GradientStop Offset="0.85" Color="#00FFFFFF" />
+            <GradientStop Offset="0.0"  Color="#ACFFFFFF" />
+            <GradientStop Offset="0.34" Color="#FFFFFFFF" />
+            <GradientStop Offset="0.44" Color="#D0FFFFFF" />
+            <GradientStop Offset="0.54" Color="#80FFFFFF" />
+            <GradientStop Offset="0.69" Color="#30FFFFFF" />
             <GradientStop Offset="1.0"  Color="#00FFFFFF" />
+        </LinearGradientBrush>
+
+        <!-- Left edge: transparent at edge, soft dispersal over wider band -->
+        <LinearGradientBrush x:Key="HeaderFadeLeft"
+                             StartPoint="0,0.5" EndPoint="1,0.5">
+            <GradientStop Offset="0.0"   Color="#00FFFFFF" />
+            <GradientStop Offset="0.05"  Color="#80FFFFFF" />
+            <GradientStop Offset="0.10"  Color="#C0FFFFFF" />
+            <GradientStop Offset="0.18"  Color="#E0FFFFFF" />
+            <GradientStop Offset="0.28"  Color="#F0FFFFFF" />
+            <GradientStop Offset="0.40"  Color="#FFFFFFFF" />
+        </LinearGradientBrush>
+
+        <!-- Top edge: mirrors bottom — transparent at top, fades to solid over top 66% -->
+        <LinearGradientBrush x:Key="HeaderFadeTop"
+                             StartPoint="0.5,0" EndPoint="0.5,1">
+            <GradientStop Offset="0.0"   Color="#00FFFFFF" />
+            <GradientStop Offset="0.31"  Color="#30FFFFFF" />
+            <GradientStop Offset="0.46"  Color="#80FFFFFF" />
+            <GradientStop Offset="0.56"  Color="#D0FFFFFF" />
+            <GradientStop Offset="0.66"  Color="#FFFFFFFF" />
+            <GradientStop Offset="1.0"   Color="#FFFFFFFF" />
+        </LinearGradientBrush>
+
+        <!-- Right edge: mirrors left with soft dispersal over wider band -->
+        <LinearGradientBrush x:Key="HeaderFadeRight"
+                             StartPoint="1,0.5" EndPoint="0,0.5">
+            <GradientStop Offset="0.0"   Color="#00FFFFFF" />
+            <GradientStop Offset="0.05"  Color="#80FFFFFF" />
+            <GradientStop Offset="0.10"  Color="#C0FFFFFF" />
+            <GradientStop Offset="0.18"  Color="#E0FFFFFF" />
+            <GradientStop Offset="0.28"  Color="#F0FFFFFF" />
+            <GradientStop Offset="0.40"  Color="#FFFFFFFF" />
         </LinearGradientBrush>
     </UserControl.Resources>
 
@@ -27,21 +68,18 @@
         <Border x:Name="BackgroundBorder"
                  />
 
-        <!-- Header image with fade mask — no extra opacity, uniform blend -->
-        <Grid x:Name="ImageGrid"
-              OpacityMask="{StaticResource HeaderFadeMask}">
+        <!-- Header image with combined fade mask (bottom + left + top + right) — set in code-behind -->
+        <Grid x:Name="ImageGrid">
             <Image x:Name="HeaderImage"
-                   Source="pack://application:,,,/Assets/Header/HeaderImage.png"
-                   Stretch="Uniform"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Top"
-                   Margin="0,-24,0,0"
+                   Stretch="UniformToFill"
+                   HorizontalAlignment="Stretch"
+                   VerticalAlignment="Stretch"
                    RenderOptions.BitmapScalingMode="HighQuality"
                    />
         </Grid>
 
-        <!-- Content overlay — inset to match page content margins -->
-        <Grid Margin="36,0,36,0">
+        <!-- Content overlay — inset to match page content margins (36px provided by parent) -->
+        <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -49,31 +87,41 @@
 
             <!-- Title text (top-left) -->
             <StackPanel Grid.Row="0" Margin="0,40,0,0">
-                <TextBlock FontSize="26"
-                           FontWeight="Medium"
-                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                           Text="Uniwill Control Utility" />
-                <TextBlock Margin="0,8,0,0"
-                           FontSize="12"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           Text="Unified laptop and ecosystem control."
-                           TextWrapping="Wrap" />
+                <TextBlock x:Name="TitleText"
+               FontFamily="Segoe UI Variable Display, Segoe UI"
+               FontSize="28"
+               FontWeight="SemiBold"
+               LineHeight="40"
+               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+               Text="Uniwill Control Utility" />
+                <TextBlock x:Name="SubtitleText"
+               Margin="0,8,0,0"
+               FontFamily="Segoe UI Variable Text, Segoe UI"
+               FontSize="12"
+               FontWeight="Regular"
+               LineHeight="16"
+               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+               Text="Unified laptop and ecosystem control."
+               TextWrapping="Wrap" />
             </StackPanel>
+
 
             <!-- Laptop info (bottom-center) -->
             <StackPanel Grid.Row="1"
                         Orientation="Horizontal"
                         VerticalAlignment="Bottom"
                         HorizontalAlignment="Center"
-                        Margin="0,0,0,16">
+                        Margin="0,24,0,16">
                 <Image x:Name="LaptopImage"
                        Width="220"
                        Height="137"
                        Stretch="Uniform"
                        StretchDirection="DownOnly"
-                       VerticalAlignment="Center"
+                       VerticalAlignment="Bottom"
                        Margin="0,0,12,0" />
-                <StackPanel Orientation="Vertical" VerticalAlignment="Center">
+                <StackPanel x:Name="LaptopInfoPanel"
+                            Orientation="Vertical"
+                            VerticalAlignment="Center">
                     <TextBlock x:Name="LaptopNameText"
                                FontSize="18"
                                FontWeight="Bold"

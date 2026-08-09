@@ -24,6 +24,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Forms;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Universal_x86_Tuning_Utility.Models;
 using Universal_x86_Tuning_Utility.Properties;
@@ -121,6 +122,13 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
         {
             _navigationService.SetNavigationControl(RootNavigation);
             RootNavigation.SetPageProviderService(pageProvider);
+            RootNavigation.SelectionChanged += OnNavigationSelectionChanged;
+        }
+
+        private void OnNavigationSelectionChanged(INavigationView sender, RoutedEventArgs e)
+        {
+            bool isDashboard = IsPageSelected(typeof(Views.Pages.DashboardPage));
+            ModelNameText.Visibility = isDashboard ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private void SetupUI()
@@ -595,7 +603,13 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
 
         public INavigationView GetNavigation() => RootNavigation;
 
-        public bool Navigate(Type pageType) => RootNavigation.Navigate(pageType);
+        public bool Navigate(Type pageType)
+        {
+            bool result = RootNavigation.Navigate(pageType);
+            ModelNameText.Visibility = pageType == typeof(Views.Pages.DashboardPage)
+                ? Visibility.Collapsed : Visibility.Visible;
+            return result;
+        }
 
         public void SetPageService(INavigationViewPageProvider pageProvider) => RootNavigation.SetPageProviderService(pageProvider);
 

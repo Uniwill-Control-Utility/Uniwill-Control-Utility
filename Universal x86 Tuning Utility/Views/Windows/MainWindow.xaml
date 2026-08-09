@@ -9,9 +9,9 @@
       x:Name="mainWindow"
     Title="{Binding ViewModel.ApplicationTitle, Mode=OneWay}"
     Width="1080"
-    Height="858"
+    Height="910"
     MinWidth="1000"
-    MinHeight="780"
+    MinHeight="614"
     d:DataContext="{d:DesignInstance local:MainWindow, IsDesignTimeCreatable=True}"
     d:Background="{DynamicResource ApplicationBackgroundBrush}"
     Foreground="{DynamicResource TextFillColorPrimaryBrush}"
@@ -41,9 +41,9 @@
         <ui:TitleBar
             x:Name="tbMain"
             Grid.Row="0"
-            Title="Universal x86 Tuning Utility">
+            Title="Uniwill Control Utility">
             <ui:TitleBar.Icon>
-                <ui:ImageIcon Source="pack://application:,,,/Assets/applicationIcon-256.png" />
+                <ui:ImageIcon Source="pack://application:,,,/Assets/applicationIcon-256.png" Margin="11,0,0,0"/>
             </ui:TitleBar.Icon>
             <ui:TitleBar.Header>
                 <TextBlock x:Name="ModelNameText"
@@ -52,7 +52,7 @@
                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                            VerticalAlignment="Center"
                            Margin="4,0,0,0"
-                           Text="Universal x86 Tuning Utility" />
+                           Text="Uniwill Control Utility" />
             </ui:TitleBar.Header>
             
         </ui:TitleBar>
