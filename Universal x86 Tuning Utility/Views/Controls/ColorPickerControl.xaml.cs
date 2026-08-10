@@ -79,6 +79,22 @@ public partial class ColorPickerControl : UserControl
     /// <summary>Closes the color picker popup programmatically.</summary>
     public void ClosePopup() => _popup.IsOpen = false;
 
+    /// <summary>Sync popup content with SelectedColor when the popup opens.</summary>
+    private void _popup_Opened(object? sender, EventArgs e)
+    {
+        // The Popup's child visual tree is lazily rendered on first open.
+        // Sync the internal SquarePicker and text fields with the current SelectedColor
+        // so they reflect any programmatic changes made before the popup was opened.
+        var color = SelectedColor;
+        if (_colorPicker is not null)
+            _colorPicker.SelectedColor = color;
+
+        _redNumberBox.Text = color.R.ToString();
+        _greenNumberBox.Text = color.G.ToString();
+        _blueNumberBox.Text = color.B.ToString();
+        _hexTextBox.Text = $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+    }
+
     /// <summary>Sets the popup's placement target externally (for use when the control is invisible).</summary>
     public void SetPopupPlacementTarget(UIElement target)
     {

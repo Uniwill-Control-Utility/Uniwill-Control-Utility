@@ -33,18 +33,6 @@ public partial class MultiColorPickerControl : UserControl
             .ToList();
     }
 
-    public string SelectedSpeed
-    {
-        get
-        {
-            if (cbxSpeed.SelectedItem is ComboBoxItem item)
-                return item.Content?.ToString() ?? "Medium";
-            return "Medium";
-        }
-    }
-
-    public byte Brightness => nudBrightness.Value.HasValue ? (byte)nudBrightness.Value.Value : (byte)100;
-
     public event EventHandler? ColorsChanged;
 
     public MultiColorPickerControl()
@@ -72,19 +60,6 @@ public partial class MultiColorPickerControl : UserControl
             AddColorInternal(c);
 
         UpdateAddRemoveButtons();
-    }
-
-    /// <summary>Set the speed ComboBox by index (0=Fast, 1=Medium, 2=Slow).</summary>
-    public void SetSpeedIndex(int index)
-    {
-        if (index >= 0 && index < cbxSpeed.Items.Count)
-            cbxSpeed.SelectedIndex = index;
-    }
-
-    /// <summary>Set the brightness value (0-100).</summary>
-    public void SetBrightness(byte value)
-    {
-        sliderBrightness.Value = value;
     }
 
     /* ------------------------------------------------------------------ */
@@ -262,20 +237,6 @@ public partial class MultiColorPickerControl : UserControl
             }
         }
         return false;
-    }
-
-    /* ------------------------------------------------------------------ */
-    /*  Speed / Brightness events                                          */
-    /* ------------------------------------------------------------------ */
-
-    private void OnSpeedChanged(object sender, RoutedEventArgs e)
-    {
-        ColorsChanged?.Invoke(this, EventArgs.Empty);
-    }
-
-    private void OnBrightnessChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-    {
-        ColorsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /* ------------------------------------------------------------------ */

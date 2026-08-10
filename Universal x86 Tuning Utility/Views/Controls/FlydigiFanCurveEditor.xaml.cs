@@ -25,6 +25,9 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
         // Fixed temperature points: 0, 10, 20, ..., 100 °C (11 points)
         private static readonly int[] Temperatures = { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
 
+        /// <summary> Fired whenever the user adjusts a slider (curve changes). </summary>
+        public event EventHandler? CurveChanged;
+
         public FlydigiFanCurveEditor()
         {
             InitializeComponent();
@@ -165,6 +168,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
 
             VerifyMonotonicity(currentSlider);
             DrawGraph();
+            CurveChanged?.Invoke(this, EventArgs.Empty);
         }
 
         private static CustomPopupPlacement[] ToolTipCustomPopupPlacementCallback(Size size, Size targetSize, Point _)

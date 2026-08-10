@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Universal_x86_Tuning_Utility.Scripts;
@@ -91,6 +92,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 mcRotationColors = new MultiColorPickerControl();
                 mcRotationColors.ColorsChanged += OnRotationColorsChanged;
                 mcRotationColorsHost.Children.Add(mcRotationColors);
+
+                // Subscribe to embedded curve editor changes for auto-persist
+                FlydigiCurveEditor.CurveChanged += OnFlydigiCurveEditorCurveChanged;
 
                 // Get DeviceApplier for centralized device commands and override management
                 _deviceApplier = App.GetService<DeviceApplier>();
@@ -216,6 +220,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 {
                     StartTemperaturePolling();
                 }
+
+                // Restart glow pulse on every navigation back — Page_Unloaded stops it.
+                StartGlowPulse();
             }
             else
             {
@@ -265,48 +272,45 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 // Hide RGB section — BS1 has no RGB
                 cardRgb.Visibility = Visibility.Collapsed;
 
-                // Hide Device Settings section — BS1 has no device settings
-                cardDeviceSettings.Visibility = Visibility.Collapsed;
+                // Hide device-specific settings rows and dividers — BS1 has no device settings
+                DeviceSettingsDivider.Visibility = Visibility.Collapsed;
+                RowPowerOnStart.Visibility = Visibility.Collapsed;
+                SmartStartStopDivider.Visibility = Visibility.Collapsed;
+                RowSmartStartStop.Visibility = Visibility.Collapsed;
+                GearLightDivider.Visibility = Visibility.Collapsed;
+                RowGearLight.Visibility = Visibility.Collapsed;
 
                 // Hide sub-gear selector — BS1 has no sub-levels
                 spGearSubLevel.Visibility = Visibility.Collapsed;
 
                 // Adjust RPM range to BS1 max (3000)
                 sliderRpm.Maximum = 3000;
-                nudRpm.Maximum = 3000;
                 nudAvoidanceStart.Maximum = 3000;
                 nudAvoidanceEnd.Maximum = 3000;
 
-                // Update RPM label
-                foreach (var child in spManual.Children)
-                {
-                    if (child is TextBlock tb && tb.Text?.Contains("4000") == true)
-                        tb.Text = "RPM (1300 - 3000)";
-                }
-
                 // Clamp any existing manual RPM that's out of range
-                if (nudRpm.Value > 3000)
-                    nudRpm.Value = 3000;
+                if (sliderRpm.Value > 3000)
+                    sliderRpm.Value = 3000;
             }
             else
             {
                 // Restore HID device UI (BS2/BS2 Pro/BS3/BS3 Pro)
                 cardRgb.Visibility = Visibility.Visible;
-                cardDeviceSettings.Visibility = Visibility.Visible;
+
+                // Restore device-specific settings rows and dividers
+                DeviceSettingsDivider.Visibility = Visibility.Visible;
+                RowPowerOnStart.Visibility = Visibility.Visible;
+                SmartStartStopDivider.Visibility = Visibility.Visible;
+                RowSmartStartStop.Visibility = Visibility.Visible;
+                GearLightDivider.Visibility = Visibility.Visible;
+                RowGearLight.Visibility = Visibility.Visible;
+
                 spGearSubLevel.Visibility = Visibility.Visible;
 
                 // Restore RPM range to HID max (4000)
                 sliderRpm.Maximum = 4000;
-                nudRpm.Maximum = 4000;
                 nudAvoidanceStart.Maximum = 4000;
                 nudAvoidanceEnd.Maximum = 4000;
-
-                // Restore RPM label
-                foreach (var child in spManual.Children)
-                {
-                    if (child is TextBlock tb && tb.Text?.Contains("3000") == true)
-                        tb.Text = "RPM (1300 - 4000)";
-                }
             }
         }
 
@@ -343,11 +347,27 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             var selectedIndex = cbxFanMode.SelectedIndex;
             var enteringAuto = selectedIndex == 2;
             var enteringManual = selectedIndex == 0;
+            var enteringGear = selectedIndex == 1;
             var wasAuto = _smartControl != null || _bs1SmartControl != null;
 
             spManual.Visibility = enteringManual ? Visibility.Visible : Visibility.Collapsed;
-            spGear.Visibility = selectedIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
+
+            // Gear Presets row (no divider — mutually exclusive with Manual/Auto)
+            spGear.Visibility = enteringGear ? Visibility.Visible : Visibility.Collapsed;
+
+            // Auto (Curve) row (no divider — mutually exclusive)
             spAuto.Visibility = enteringAuto ? Visibility.Visible : Visibility.Collapsed;
+
+            // Show embedded curve editor only when in Auto mode AND Custom profile is selected
+            var isCustomAuto = enteringAuto && _activeProfile?.Name == "Custom";
+            var editorVisible = isCustomAuto ? Visibility.Visible : Visibility.Collapsed;
+            FanCurveEditorDivider.Visibility = editorVisible;
+            FlydigiCurveEditor.Visibility = editorVisible;
+
+            if (isCustomAuto)
+            {
+                FlydigiCurveEditor.SetCurve(_activeProfile);
+            }
 
             if (enteringAuto && !wasAuto)
             {
@@ -370,6 +390,20 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         }
 
         /* ------------------------------------------------------------------ */
+        /*  CardExpander click handling                                        */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>
+        /// Prevents clicks on ComboBoxes nested inside CardExpander headers from
+        /// also toggling the expander. The ComboBox processes the click first (bubbling),
+        /// and we block it from reaching the ToggleButton above.
+        /// </summary>
+        private void ComboBoxInCardExpander_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+        }
+
+        /* ------------------------------------------------------------------ */
         /*  Manual RPM                                                         */
         /* ------------------------------------------------------------------ */
 
@@ -379,20 +413,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (_isSyncingFromPreset)
                 return;
 
+            // Update the RPM value label
+            RpmValueText.Text = ((int)sliderRpm.Value).ToString();
+
             // Debounce: wait 300ms after user stops dragging the slider
             ResetDebounceTimer(ref _rpmApplyTimer, 300, ApplyRpmAsync);
-        }
-
-        private void nudRpm_ValueChanged(object? sender, RoutedEventArgs e)
-        {
-            // Suppress side effects when UI is being synced from a preset event
-            if (_isSyncingFromPreset)
-                return;
-
-            // Immediate apply when user types a value and commits
-            _rpmApplyTimer?.Dispose();
-            _rpmApplyTimer = null;
-            ApplyRpmAsync();
         }
 
         private static void ResetDebounceTimer(ref System.Threading.Timer? timer, int delayMs, Action callback)
@@ -406,7 +431,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _rpmApplyTimer?.Dispose();
             _rpmApplyTimer = null;
 
-            var rpm = nudRpm.Value.HasValue ? (ushort)nudRpm.Value.Value : (ushort)0;
+            var rpm = (ushort)sliderRpm.Value;
 
             try
             {
@@ -680,7 +705,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             try
             {
                 cbxFanMode.SelectedIndex = Math.Clamp(settings.FanMode, 0, 2);
-                nudRpm.Value = settings.ManualRpm;
+                sliderRpm.Value = settings.ManualRpm;
+                RpmValueText.Text = settings.ManualRpm.ToString();
                 cbxGearSubLevel.SelectedIndex = Math.Clamp(settings.ManualGear - 1, 0, 3);
 
                 cbxRgbMode.SelectedIndex = GetRgbModeIndex(settings.RgbMode);
@@ -688,7 +714,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 nudRgbR.Value = settings.R;
                 nudRgbG.Value = settings.G;
                 nudRgbB.Value = settings.B;
-                nudRgbBrightness.Value = settings.Brightness;
+                RgbColorPicker.SelectedColor = Color.FromRgb(settings.R, settings.G, settings.B);
+                sliderRgbBrightness.Value = settings.Brightness;
+                RgbBrightnessValueText.Text = settings.Brightness.ToString();
             }
             finally
             {
@@ -877,14 +905,19 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (e.Gear.HasValue)
                 cbxGearSubLevel.SelectedIndex = Math.Clamp(e.Gear.Value - 1, 0, 3);
             if (e.Rpm.HasValue)
-                nudRpm.Value = e.Rpm.Value;
+            {
+                sliderRpm.Value = e.Rpm.Value;
+                RpmValueText.Text = e.Rpm.Value.ToString();
+            }
 
             cbxRgbMode.SelectedIndex = GetRgbModeIndex(e.RgbMode);
             UpdateRgbColorVisibility();
             nudRgbR.Value = e.R;
             nudRgbG.Value = e.G;
             nudRgbB.Value = e.B;
-            nudRgbBrightness.Value = e.Brightness;
+            RgbColorPicker.SelectedColor = Color.FromRgb((byte)e.R, (byte)e.G, (byte)e.B);
+            sliderRgbBrightness.Value = e.Brightness;
+            RgbBrightnessValueText.Text = e.Brightness.ToString();
         }
 
         private static int GetFanModeIndex(string mode) => mode switch
@@ -910,6 +943,17 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (cbxCurveProfile.SelectedItem is ComboBoxItem item && item.Tag is FlydigiFanCurveProfile profile)
             {
                 _activeProfile = profile;
+
+                // Show/hide embedded curve editor for Custom profile
+                var isCustom = profile.Name == "Custom";
+                var editorVisible = isCustom ? Visibility.Visible : Visibility.Collapsed;
+                FanCurveEditorDivider.Visibility = editorVisible;
+                FlydigiCurveEditor.Visibility = editorVisible;
+
+                if (isCustom)
+                {
+                    FlydigiCurveEditor.SetCurve(profile);
+                }
 
                 // Persist selected profile name (skip during initial population)
                 if (_isInitialized)
@@ -981,63 +1025,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _activeProfile = balanced;
         }
 
-        private void btnEditCurve_Click(object sender, RoutedEventArgs e)
-        {
-            // Start editing from the currently selected profile (or a fresh balanced default)
-            var seedProfile = _activeProfile ?? FlydigiFanCurveProfile.CreateBalanced();
-
-            var dialog = new Views.Windows.FlydigiCurveEditorWindow(seedProfile);
-            if (dialog.ShowDialog() != true || dialog.EditedProfile == null)
-                return;
-
-            _activeProfile = dialog.EditedProfile;
-
-            // Append or replace the "Custom" entry at the end of the list
-            bool replaced = false;
-            for (int i = 0; i < cbxCurveProfile.Items.Count; i++)
-            {
-                if (cbxCurveProfile.Items[i] is ComboBoxItem existing && existing.Tag is FlydigiFanCurveProfile p && p.Name == "Custom")
-                {
-                    cbxCurveProfile.Items[i] = new ComboBoxItem { Content = _activeProfile.Name, Tag = _activeProfile };
-                    replaced = true;
-                    break;
-                }
-            }
-            if (!replaced)
-            {
-                cbxCurveProfile.Items.Add(new ComboBoxItem { Content = _activeProfile.Name, Tag = _activeProfile });
-            }
-
-            // Select the Custom entry
-            cbxCurveProfile.SelectedIndex = cbxCurveProfile.Items.Count - 1;
-
-            // Persist custom curve JSON
-            if (_isBs1Device && _bs1Service != null)
-            {
-                var settings = _bs1Service.GetSettings();
-                settings.CustomCurveJson = _activeProfile.ToJSON();
-                settings.SelectedCurveProfile = "Custom";
-                _bs1Service.PersistSettings();
-            }
-            else if (_coolerService != null)
-            {
-                var settings = _coolerService.GetSettings();
-                settings.CustomCurveJson = _activeProfile.ToJSON();
-                settings.SelectedCurveProfile = "Custom";
-                _coolerService.PersistSettings();
-            }
-
-            // Re-apply if auto control is active
-            if (_bs1SmartControl != null)
-            {
-                _bs1SmartControl.ActiveProfile = _activeProfile;
-            }
-            else if (_smartControl != null)
-            {
-                _smartControl.ActiveProfile = _activeProfile;
-            }
-        }
-
         /* ------------------------------------------------------------------ */
         /*  RGB Control                                                        */
         /* ------------------------------------------------------------------ */
@@ -1059,28 +1046,90 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
         }
 
-        private void RgbSlider_ValueChanged(object? sender, RoutedPropertyChangedEventArgs<double> e)
+        private void RgbColorPicker_ColorChangedDelayed(object? sender, EventArgs e)
         {
             // Suppress side effects when UI is being synced from a preset event
             if (_isSyncingFromPreset)
                 return;
 
+            // Sync hidden NumberBoxes so ApplyRgbAsync reads the same values
+            var color = RgbColorPicker.SelectedColor;
+            nudRgbR.Value = color.R;
+            nudRgbG.Value = color.G;
+            nudRgbB.Value = color.B;
+
             // Debounce: wait 500ms after user stops adjusting (RGB upload is expensive)
             ResetDebounceTimer(ref _rgbApplyTimer, 500, ApplyRgbAsync);
         }
 
-        private void cbxRgbSpeed_SelectionChanged(object? sender, EventArgs e)
+        private void SliderRgbSpeed_ValueChanged(object? sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            // Immediate apply on speed change
+            // Update label
+            RgbSpeedValueText.Text = GetRgbSpeedNameFromSlider(sliderRgbSpeed.Value);
             _rgbApplyTimer?.Dispose();
             _rgbApplyTimer = null;
             ApplyRgbAsync();
+        }
+
+        private void SliderRgbRotationSpeed_ValueChanged(object? sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            RgbRotationSpeedValueText.Text = GetRgbSpeedNameFromSlider(sliderRgbRotationSpeed.Value);
+            _rgbApplyTimer?.Dispose();
+            _rgbApplyTimer = null;
+            ApplyRgbAsync();
+        }
+
+        private void SliderRgbBrightness_ValueChanged(object? sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            RgbBrightnessValueText.Text = ((int)sliderRgbBrightness.Value).ToString();
+            ResetDebounceTimer(ref _rgbApplyTimer, 300, ApplyRgbAsync);
+        }
+
+        private void SliderRgbRotationBrightness_ValueChanged(object? sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            RgbRotationBrightnessValueText.Text = ((int)sliderRgbRotationBrightness.Value).ToString();
+            ResetDebounceTimer(ref _rgbApplyTimer, 300, ApplyRgbAsync);
         }
 
         private void OnRotationColorsChanged(object? sender, EventArgs e)
         {
             // Debounce rotation color changes (uploads are expensive)
             ResetDebounceTimer(ref _rgbApplyTimer, 500, ApplyRgbAsync);
+        }
+
+        private void OnFlydigiCurveEditorCurveChanged(object? sender, EventArgs e)
+        {
+            // Auto-persist the custom curve whenever the user adjusts a slider.
+            // The profile is already set as _activeProfile, we just need to save the edited points.
+            if (_activeProfile == null) return;
+
+            var editedProfile = FlydigiCurveEditor.GetCurve();
+            // Update _activeProfile in place so the combo box item Tag stays current
+            _activeProfile.Points = editedProfile.Points;
+
+            // Persist custom curve JSON
+            if (_isBs1Device && _bs1Service != null)
+            {
+                var settings = _bs1Service.GetSettings();
+                settings.CustomCurveJson = _activeProfile.ToJSON();
+                _bs1Service.PersistSettings();
+            }
+            else if (_coolerService != null)
+            {
+                var settings = _coolerService.GetSettings();
+                settings.CustomCurveJson = _activeProfile.ToJSON();
+                _coolerService.PersistSettings();
+            }
+
+            // Re-apply if auto control is active
+            if (_bs1SmartControl != null)
+            {
+                _bs1SmartControl.ActiveProfile = _activeProfile;
+            }
+            else if (_smartControl != null)
+            {
+                _smartControl.ActiveProfile = _activeProfile;
+            }
         }
 
         private async void ApplyRgbAsync()
@@ -1094,7 +1143,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             var mode = GetRgbModeName(modeIndex);
 
             // Guard: if NumberBox values are still null, the page hasn't finished loading yet
-            if (nudRgbR.Value == null || nudRgbG.Value == null || nudRgbB.Value == null || nudRgbBrightness.Value == null)
+            if (nudRgbR.Value == null || nudRgbG.Value == null || nudRgbB.Value == null)
                 return;
 
             try
@@ -1114,7 +1163,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             var r = (byte)nudRgbR.Value;
                             var g = (byte)nudRgbG.Value;
                             var b = (byte)nudRgbB.Value;
-                            var brightness = (byte)nudRgbBrightness.Value;
+                            var brightness = (byte)sliderRgbBrightness.Value;
                             await _coolerService.WriteRgbStaticAsync(r, g, b, brightness);
                         }
                         break;
@@ -1122,8 +1171,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     case 3: // Rotation (multi-color)
                         {
                             var colors = mcRotationColors!.Colors;
-                            var speed = mcRotationColors.SelectedSpeed;
-                            var brightness = mcRotationColors.Brightness;
+                            var speed = GetRgbRotationSpeedName();
+                            var brightness = (byte)sliderRgbRotationBrightness.Value;
                             await _coolerService.WriteRgbRotationMultiAsync(colors, speed, brightness);
 
                             // Save rotation-specific settings
@@ -1138,7 +1187,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     case 4: // Flowing
                         {
                             var speed = GetRgbSpeedName();
-                            var brightness = (byte)nudRgbBrightness.Value;
+                            var brightness = (byte)sliderRgbBrightness.Value;
                             await _coolerService.WriteRgbFlowingAsync(speed, brightness);
                         }
                         break;
@@ -1148,7 +1197,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             var r = (byte)nudRgbR.Value;
                             var g = (byte)nudRgbG.Value;
                             var b = (byte)nudRgbB.Value;
-                            var brightness = (byte)nudRgbBrightness.Value;
+                            var brightness = (byte)sliderRgbBrightness.Value;
                             await _coolerService.WriteRgbBreathingAsync(r, g, b, brightness);
                         }
                         break;
@@ -1161,7 +1210,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 settings.G = (byte)nudRgbG.Value;
                 settings.B = (byte)nudRgbB.Value;
                 settings.RgbSpeed = GetRgbSpeedName();
-                settings.Brightness = (byte)nudRgbBrightness.Value;
+                settings.Brightness = (byte)sliderRgbBrightness.Value;
                 _coolerService.PersistSettings();
             }
             catch (Exception ex)
@@ -1175,20 +1224,37 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         {
             var selectedIndex = cbxRgbMode.SelectedIndex;
 
-            // RGB sliders: Static (2), Breathing (5)
-            spRgbSliders.Visibility = selectedIndex is 2 or 5
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            // Off message: Off (0)
+            spRgbOff.Visibility = selectedIndex is 0 ? Visibility.Visible : Visibility.Collapsed;
 
-            // Multi-color picker: Rotation (3)
-            mcRotationColorsHost.Visibility = selectedIndex is 3
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            // Smart-Temp message: Smart-Temp (1)
+            spRgbSmartTemp.Visibility = selectedIndex is 1 ? Visibility.Visible : Visibility.Collapsed;
 
-            // Speed + Brightness: Flowing (4)
-            spRgbSpeedBrightness.Visibility = selectedIndex is 4
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            // Color picker: Static (2), Breathing (5)
+            var staticBreathVisible = selectedIndex is 2 or 5 ? Visibility.Visible : Visibility.Collapsed;
+            spRgbColorPicker.Visibility = staticBreathVisible;
+            RgbStaticBrightnessDivider.Visibility = staticBreathVisible;
+
+            // Multi-color row: Rotation (3) — no divider, stacks with Color
+            var rotationVisible = selectedIndex is 3 ? Visibility.Visible : Visibility.Collapsed;
+            spRgbMultiColor.Visibility = rotationVisible;
+
+            // Rotation Speed row + divider
+            RgbRotationSpeedDivider.Visibility = rotationVisible;
+            spRgbRotationSpeed.Visibility = rotationVisible;
+
+            // Rotation Brightness row + divider
+            RgbRotationBrightnessDivider.Visibility = rotationVisible;
+            spRgbRotationBrightness.Visibility = rotationVisible;
+
+            // Flowing mode (4): Speed row + divider before it (brightness is shared)
+            var flowingVisible = selectedIndex is 4 ? Visibility.Visible : Visibility.Collapsed;
+            RgbFlowingSpeedDivider.Visibility = flowingVisible;
+            spRgbSpeed.Visibility = flowingVisible;
+
+            // Shared brightness: Static (2), Breathing (5), Flowing (4)
+            var brightnessVisible = selectedIndex is 2 or 4 or 5 ? Visibility.Visible : Visibility.Collapsed;
+            spRgbBrightness.Visibility = brightnessVisible;
         }
 
         private static string GetRgbModeName(int index) => index switch
@@ -1204,10 +1270,21 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private string GetRgbSpeedName()
         {
-            if (cbxRgbSpeed.SelectedItem is ComboBoxItem item)
-                return item.Content?.ToString() ?? "Medium";
-            return "Medium";
+            return GetRgbSpeedNameFromSlider(sliderRgbSpeed.Value);
         }
+
+        private string GetRgbRotationSpeedName()
+        {
+            return GetRgbSpeedNameFromSlider(sliderRgbRotationSpeed.Value);
+        }
+
+        /// <summary>Convert slider value (0=Slow, 1=Medium, 2=Fast) to display name.</summary>
+        private static string GetRgbSpeedNameFromSlider(double value) => ((int)value) switch
+        {
+            0 => "Slow",
+            2 => "Fast",
+            _ => "Medium"
+        };
 
         /* ------------------------------------------------------------------ */
         /*  Device Settings                                                    */
@@ -1313,6 +1390,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 settings.AvoidanceEndRpm = (ushort)nudAvoidanceEnd.Value.Value;
             _coolerService.PersistSettings();
 
+            // Show Avoidance Range row + divider
+            AvoidanceRangeDivider.Visibility = Visibility.Visible;
+            AvoidanceRangeRow.Visibility = Visibility.Visible;
+
             // Update smart control settings if active
             if (_smartControl != null)
                 _smartControl.Settings = settings;
@@ -1325,6 +1406,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             var settings = _coolerService.GetSettings();
             settings.AvoidanceEnabled = false;
             _coolerService.PersistSettings();
+
+            // Hide Avoidance Range row + divider
+            AvoidanceRangeDivider.Visibility = Visibility.Collapsed;
+            AvoidanceRangeRow.Visibility = Visibility.Collapsed;
 
             // Update smart control settings if active
             if (_smartControl != null)
@@ -1370,6 +1455,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             var settings = _coolerService.GetSettings();
             settings.LearningEnabled = true;
             _coolerService.PersistSettings();
+
+            // Show Learning Bias row + divider
+            LearningBiasDivider.Visibility = Visibility.Visible;
+            LearningBiasRow.Visibility = Visibility.Visible;
         }
 
         private void tsLearning_Unchecked(object sender, RoutedEventArgs e)
@@ -1378,6 +1467,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             var settings = _coolerService.GetSettings();
             settings.LearningEnabled = false;
             _coolerService.PersistSettings();
+
+            // Hide Learning Bias row + divider
+            LearningBiasDivider.Visibility = Visibility.Collapsed;
+            LearningBiasRow.Visibility = Visibility.Collapsed;
         }
 
         private void cbxLearningBias_SelectionChanged(object sender, EventArgs e)
@@ -1563,8 +1656,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 double bs1Rpm = bs1Settings.ManualRpm > 0
                     ? Math.Min((int)bs1Settings.ManualRpm, 3000)
                     : Bs1DefaultGearRpm.Gear0_Quiet;
-                nudRpm.Value = bs1Rpm;
                 sliderRpm.Value = bs1Rpm;
+                RpmValueText.Text = ((int)bs1Rpm).ToString();
 
                 // Auto-connect
                 tsAutoConnect.IsChecked = bs1Settings.AutoConnect;
@@ -1573,6 +1666,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 tsAvoidance.IsChecked = bs1Settings.AvoidanceEnabled;
                 nudAvoidanceStart.Value = bs1Settings.AvoidanceStartRpm;
                 nudAvoidanceEnd.Value = bs1Settings.AvoidanceEndRpm;
+
+                // Show/hide Avoidance Range based on toggle state
+                var bs1AvoidanceVisible = bs1Settings.AvoidanceEnabled ? Visibility.Visible : Visibility.Collapsed;
+                AvoidanceRangeDivider.Visibility = bs1AvoidanceVisible;
+                AvoidanceRangeRow.Visibility = bs1AvoidanceVisible;
 
                 cbxTempSource.SelectedIndex = bs1Settings.TempSource.ToLowerInvariant() switch
                 {
@@ -1635,11 +1733,14 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             nudRgbR.Value = settings.R;
             nudRgbG.Value = settings.G;
             nudRgbB.Value = settings.B;
+            RgbColorPicker.SelectedColor = Color.FromRgb(settings.R, settings.G, settings.B);
 
             var speedIndex = GetRgbSpeedIndex(settings.RgbSpeed);
-            cbxRgbSpeed.SelectedIndex = speedIndex;
+            sliderRgbSpeed.Value = speedIndex;
+            RgbSpeedValueText.Text = settings.RgbSpeed;
 
-            nudRgbBrightness.Value = settings.Brightness;
+            sliderRgbBrightness.Value = settings.Brightness;
+            RgbBrightnessValueText.Text = settings.Brightness.ToString();
 
             // Load rotation-specific settings
             if (mcRotationColors is not null)
@@ -1667,16 +1768,23 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                 // Load speed
                 var rotSpeedIndex = GetRgbSpeedIndex(settings.RotationSpeed);
-                mcRotationColors.SetSpeedIndex(rotSpeedIndex);
+                sliderRgbRotationSpeed.Value = rotSpeedIndex;
+                RgbRotationSpeedValueText.Text = settings.RotationSpeed;
 
                 // Load brightness
-                mcRotationColors.SetBrightness(settings.RotationBrightness);
+                sliderRgbRotationBrightness.Value = settings.RotationBrightness;
+                RgbRotationBrightnessValueText.Text = settings.RotationBrightness.ToString();
             }
 
             // Advanced settings
             tsAvoidance.IsChecked = settings.AvoidanceEnabled;
             nudAvoidanceStart.Value = settings.AvoidanceStartRpm;
             nudAvoidanceEnd.Value = settings.AvoidanceEndRpm;
+
+            // Show/hide Avoidance Range based on toggle state
+            var avoidanceVisible = settings.AvoidanceEnabled ? Visibility.Visible : Visibility.Collapsed;
+            AvoidanceRangeDivider.Visibility = avoidanceVisible;
+            AvoidanceRangeRow.Visibility = avoidanceVisible;
 
             var tempSourceIndex = settings.TempSource.ToLowerInvariant() switch
             {
@@ -1695,6 +1803,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 _ => 0
             };
             cbxLearningBias.SelectedIndex = biasIndex;
+
+            // Show/hide Learning Bias based on toggle state
+            var learningVisible = settings.LearningEnabled ? Visibility.Visible : Visibility.Collapsed;
+            LearningBiasDivider.Visibility = learningVisible;
+            LearningBiasRow.Visibility = learningVisible;
 
             // Curve profile — restore before fan mode so _activeProfile is ready for auto control
             // Save the selected profile name BEFORE LoadCurveProfiles repopulates the combo box,
@@ -1724,7 +1837,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             // Manual RPM
             if (settings.ManualRpm > 0)
-                nudRpm.Value = settings.ManualRpm;
+            {
+                sliderRpm.Value = settings.ManualRpm;
+                RpmValueText.Text = settings.ManualRpm.ToString();
+            }
 
             // Gear
             if (settings.ManualGear > 0)
@@ -1925,9 +2041,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         /// <summary>
         /// Updates the page title with the detected cooler model name.
-        /// - No device: "Flydigi Cooler Control"
-        /// - BS1: "Flydigi BS1 Cooler Control"
-        /// - BS2+: "Flydigi BS2 PRO Cooler Control"
+        /// - No device: "Flydigi Control"
+        /// - BS1: "Flydigi BS1 Control"
+        /// - BS2+: "Flydigi BS2 PRO Control"
         /// </summary>
         private void UpdatePageTitle()
         {
@@ -1935,7 +2051,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (modelName.StartsWith("Flydigi ", StringComparison.OrdinalIgnoreCase))
                 tbPageTitle.Text = $"{modelName} Control";
             else
-                tbPageTitle.Text = $"Flydigi {modelName} Cooler Control";
+                tbPageTitle.Text = $"Flydigi {modelName} Control";
         }
 
         /// <summary>
@@ -2061,7 +2177,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private void SetControlsEnabled(bool enabled)
         {
             cbxFanMode.IsEnabled = enabled;
-            nudRpm.IsEnabled = enabled;
             sliderRpm.IsEnabled = enabled;
             btnGearQuiet.IsEnabled = enabled;
             btnGearStandard.IsEnabled = enabled;
@@ -2069,18 +2184,13 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             btnGearOverclock.IsEnabled = enabled;
             cbxGearSubLevel.IsEnabled = enabled;
             cbxCurveProfile.IsEnabled = enabled;
-            btnEditCurve.IsEnabled = enabled;
             cbxRgbMode.IsEnabled = enabled;
-            nudRgbR.IsEnabled = enabled;
-            nudRgbG.IsEnabled = enabled;
-            nudRgbB.IsEnabled = enabled;
-            sliderRgbR.IsEnabled = enabled;
-            sliderRgbG.IsEnabled = enabled;
-            sliderRgbB.IsEnabled = enabled;
-            nudRgbBrightness.IsEnabled = enabled;
+            RgbColorPicker.IsEnabled = enabled;
             sliderRgbBrightness.IsEnabled = enabled;
-            cbxRgbSpeed.IsEnabled = enabled;
+            sliderRgbSpeed.IsEnabled = enabled;
             if (mcRotationColors is not null) mcRotationColors.IsEnabled = enabled;
+            sliderRgbRotationSpeed.IsEnabled = enabled;
+            sliderRgbRotationBrightness.IsEnabled = enabled;
             tsAutoConnect.IsEnabled = enabled;
             tsPowerOnStart.IsEnabled = enabled;
             cbxSmartStartStop.IsEnabled = enabled;
@@ -2106,9 +2216,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private static int GetRgbSpeedIndex(string speed) => speed.ToLowerInvariant() switch
         {
-            "fast" => 0,
+            "slow" => 0,
             "medium" => 1,
-            "slow" => 2,
+            "fast" => 2,
             _ => 1
         };
 

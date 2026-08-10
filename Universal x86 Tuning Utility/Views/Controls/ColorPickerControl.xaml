@@ -77,7 +77,8 @@
                HorizontalOffset="-120"
                Placement="Bottom"
                StaysOpen="False"
-               VerticalOffset="4">
+               VerticalOffset="4"
+               Opened="_popup_Opened">
             <Border Background="{DynamicResource ApplicationBackgroundBrush}"
                     BorderBrush="{DynamicResource KeyboardFocusBorderColorBrush}"
                     BorderThickness="0.5"
