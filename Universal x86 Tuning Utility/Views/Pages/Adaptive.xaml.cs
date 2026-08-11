@@ -126,11 +126,14 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             bool isBs1 = deviceType == ConnectedDeviceType.BS1;
             tbBs2ProTitle.Text = "Flydigi Cooler";
 
-            // BS1 has no RGB — hide the RGB mode selector and RGB color panels
+            // BS1 has no RGB — hide the RGB divider and all RGB controls
+            if (Bs2ProRgbDivider != null)
+                Bs2ProRgbDivider.Visibility = isBs1 ? Visibility.Collapsed : Visibility.Visible;
             if (spBs2ProRgbMode != null)
                 spBs2ProRgbMode.Visibility = isBs1 ? Visibility.Collapsed : Visibility.Visible;
-            if (spBs2ProRgb != null)
-                spBs2ProRgb.Visibility = isBs1 ? Visibility.Collapsed : Visibility.Visible;
+
+            // Hide all RGB sub-controls (they are shown/hidden by UpdateBs2ProRgbUI)
+            HideAllBs2ProRgbControls();
 
             if (isBs1)
             {
@@ -146,6 +149,28 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 nudBs2ProRpm.Maximum = 4000;
                 sdBs2ProRpm.Maximum = 4000;
             }
+        }
+
+        /// <summary>Hides all RGB sub-controls (color picker, brightness, speed, dividers, info rows).</summary>
+        private void HideAllBs2ProRgbControls()
+        {
+            // Guard: CardExpander content may not be realized yet (IsExpanded=false).
+            if (spBs2ProRgbOff is not null)
+                spBs2ProRgbOff.Visibility = Visibility.Collapsed;
+            if (spBs2ProRgbSmartTemp is not null)
+                spBs2ProRgbSmartTemp.Visibility = Visibility.Collapsed;
+            if (spBs2ProRgbColorPicker is not null)
+                spBs2ProRgbColorPicker.Visibility = Visibility.Collapsed;
+            if (Bs2ProRgbSubDivider is not null)
+                Bs2ProRgbSubDivider.Visibility = Visibility.Collapsed;
+            if (Bs2ProRgbStaticBrightnessDivider is not null)
+                Bs2ProRgbStaticBrightnessDivider.Visibility = Visibility.Collapsed;
+            if (spBs2ProRgbBrightness is not null)
+                spBs2ProRgbBrightness.Visibility = Visibility.Collapsed;
+            if (Bs2ProRgbFlowingSpeedDivider is not null)
+                Bs2ProRgbFlowingSpeedDivider.Visibility = Visibility.Collapsed;
+            if (spBs2ProRgbSpeed is not null)
+                spBs2ProRgbSpeed.Visibility = Visibility.Collapsed;
         }
 
         private static AdaptivePresetManager adaptivePresetManager = new AdaptivePresetManager(Settings.Default.Path + "adaptivePresets.json");
@@ -582,20 +607,27 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     if (Enum.TryParse<RgbColor>(myPreset.WcRgbColor, true, out var rcLoad))
                         cbxWcRgbColor.SelectedIndex = GetRgbColorIndex(rcLoad);
 
-                    // BS2 Pro
-                    cbxBs2ProFanMode.SelectedIndex = GetBs2ProFanModeIndex(myPreset.Bs2ProFanMode);
-                    UpdateBs2ProModeUI();
-                    cbxBs2ProGear.SelectedIndex = Math.Clamp(myPreset.Bs2ProGear - 1, 0, 3);
-                    nudBs2ProRpm.Value = Math.Clamp((int)myPreset.Bs2ProRpm, 1300, 4000);
-                    cbxBs2ProCurve.SelectedIndex = GetBs2ProCurveIndex(myPreset.Bs2ProCurveProfileId);
+                    // BS2 Pro — guard: CardExpander content is null until expanded
+                    if (cbxBs2ProFanMode is not null)
+                    {
+                        cbxBs2ProFanMode.SelectedIndex = GetBs2ProFanModeIndex(myPreset.Bs2ProFanMode);
+                        UpdateBs2ProModeUI();
+                        cbxBs2ProGear.SelectedIndex = Math.Clamp(myPreset.Bs2ProGear - 1, 0, 3);
+                        nudBs2ProRpm.Value = Math.Clamp((int)myPreset.Bs2ProRpm, 1300, 4000);
+                        cbxBs2ProCurve.SelectedIndex = GetBs2ProCurveIndex(myPreset.Bs2ProCurveProfileId);
 
-                    // BS2 Pro RGB
-                    cbxBs2ProRgbMode.SelectedIndex = GetBs2ProRgbModeIndex(myPreset.Bs2ProRgbMode);
-                    UpdateBs2ProRgbUI();
-                    nudBs2ProRgbR.Value = myPreset.Bs2ProRgbR;
-                    nudBs2ProRgbG.Value = myPreset.Bs2ProRgbG;
-                    nudBs2ProRgbB.Value = myPreset.Bs2ProRgbB;
-                    nudBs2ProBrightness.Value = myPreset.Bs2ProBrightness;
+                        cbxBs2ProRgbMode.SelectedIndex = GetBs2ProRgbModeIndex(myPreset.Bs2ProRgbMode);
+                        UpdateBs2ProRgbUI();
+                        nudBs2ProRgbR.Value = myPreset.Bs2ProRgbR;
+                        nudBs2ProRgbG.Value = myPreset.Bs2ProRgbG;
+                        nudBs2ProRgbB.Value = myPreset.Bs2ProRgbB;
+                        Bs2ProRgbColorPicker.SelectedColor = Color.FromRgb(myPreset.Bs2ProRgbR, myPreset.Bs2ProRgbG, myPreset.Bs2ProRgbB);
+                        sliderBs2ProBrightness.Value = myPreset.Bs2ProBrightness;
+                        Bs2ProRgbBrightnessValueText.Text = myPreset.Bs2ProBrightness.ToString();
+                        int rpm = Math.Clamp((int)myPreset.Bs2ProRpm, 1300, 4000);
+                        Bs2ProRpmValueText.Text = rpm.ToString();
+                        sdBs2ProRpm.Value = rpm;
+                    }
 
                     // EC Fan
                     if (sdEcFan.Visibility == Visibility.Visible)
@@ -776,7 +808,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     Bs2ProRgbR = (byte)nudBs2ProRgbR.Value,
                     Bs2ProRgbG = (byte)nudBs2ProRgbG.Value,
                     Bs2ProRgbB = (byte)nudBs2ProRgbB.Value,
-                    Bs2ProBrightness = (byte)nudBs2ProBrightness.Value,
+                    Bs2ProBrightness = (byte)sliderBs2ProBrightness.Value,
                     EcFanEnabled = sdEcFan.Visibility == Visibility.Visible ? (bool)cbxEcFanEnabled.IsChecked : false,
                     EcFanUnifiedMode = sdEcFan.Visibility == Visibility.Visible ? cbxEcFanMode.SelectedIndex == 0 : false,
                     EcFanPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanPreset.SelectedIndex) : "Balanced",
@@ -843,6 +875,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private void cbxBs2ProEnabled_Toggled(object sender, RoutedEventArgs e)
         {
             bool enabled = (bool)cbxBs2ProEnabled.IsChecked;
+            tbBs2ProEnabledLabel.Text = enabled ? "On" : "Off";
             Settings.Default.AdaptiveBs2ProEnabled = enabled;
             Settings.Default.Save();
 
@@ -997,6 +1030,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         byte lastBs2ProRgbG = 0;
         byte lastBs2ProRgbB = 0;
         byte lastBs2ProBrightness = 0;
+        string lastBs2ProSpeed = "Medium";
         // EC Fan diff-tracking
         private bool lastEcFanUnifiedMode = false;
         private string lastEcFanPreset = "";
@@ -1127,7 +1161,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             byte bs2R = (byte)nudBs2ProRgbR.Value;
                             byte bs2G = (byte)nudBs2ProRgbG.Value;
                             byte bs2B = (byte)nudBs2ProRgbB.Value;
-                            byte bs2Brightness = (byte)nudBs2ProBrightness.Value;
+                            byte bs2Brightness = (byte)sliderBs2ProBrightness.Value;
+                            string bs2Speed = GetRgbSpeedNameFromSlider((int)sliderBs2ProRgbSpeed.Value);
 
                             if (bs2Mode == "Curve")
                             {
@@ -1215,7 +1250,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                                     (bs2Mode == "Rpm" && rpm != lastBs2ProRpm);
                                 bool rgbChanged = bs2RgbMode != lastBs2ProRgbMode ||
                                     bs2R != lastBs2ProRgbR || bs2G != lastBs2ProRgbG ||
-                                    bs2B != lastBs2ProRgbB || bs2Brightness != lastBs2ProBrightness;
+                                    bs2B != lastBs2ProRgbB || bs2Brightness != lastBs2ProBrightness ||
+                                    bs2Speed != lastBs2ProSpeed;
 
                                 if (fanChanged || rgbChanged)
                                 {
@@ -1237,6 +1273,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                                     lastBs2ProRgbG = bs2G;
                                     lastBs2ProRgbB = bs2B;
                                     lastBs2ProBrightness = bs2Brightness;
+                                    lastBs2ProSpeed = bs2Speed;
                                 }
                             }
                         }
@@ -1906,9 +1943,58 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 return;
 
             var mode = cbxBs2ProFanMode.SelectedIndex;
+            Bs2ProFanSubDivider.Visibility = Visibility.Visible;
             spBs2ProGear.Visibility = mode == 0 ? Visibility.Visible : Visibility.Collapsed;
             spBs2ProRpm.Visibility = mode == 1 ? Visibility.Visible : Visibility.Collapsed;
             spBs2ProCurve.Visibility = mode == 2 ? Visibility.Visible : Visibility.Collapsed;
+
+            // Hide curve editor when leaving Curve (Auto) mode — it only makes sense
+            // inside the Curve mode sub-pane. Re-show if already in Curve + Custom.
+            if (mode != 2)
+            {
+                Bs2ProCurveEditorDivider.Visibility = Visibility.Collapsed;
+                Bs2ProCurveEditor.Visibility = Visibility.Collapsed;
+            }
+            else if (Bs2ProCurveEditor is not null && cbxBs2ProCurve?.SelectedIndex == 3)
+            {
+                // Re-entering Curve mode with Custom selected — re-show editor
+                Bs2ProCurveEditorDivider.Visibility = Visibility.Visible;
+                Bs2ProCurveEditor.Visibility = Visibility.Visible;
+                try
+                {
+                    var flydigiService = App.GetService<FlydigiCoolerService>();
+                    Bs2ProCurveEditor.SetCurve(LoadCustomCurveProfile(flydigiService));
+                }
+                catch
+                {
+                    Bs2ProCurveEditor.SetCurve(FlydigiFanCurveProfile.CreateBalanced());
+                }
+            }
+        }
+
+        private void cbxBs2ProCurve_SelectionChanged(object sender, EventArgs e)
+        {
+            // Guard: controls may be null if CardExpander content not realized
+            if (cbxBs2ProCurve is null || Bs2ProCurveEditor is null)
+                return;
+
+            bool isCustom = cbxBs2ProCurve.SelectedIndex == 3;
+            Bs2ProCurveEditorDivider.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
+            Bs2ProCurveEditor.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
+
+            if (isCustom)
+            {
+                // Load custom curve or fall back to Balanced default
+                try
+                {
+                    var flydigiService = App.GetService<FlydigiCoolerService>();
+                    Bs2ProCurveEditor.SetCurve(LoadCustomCurveProfile(flydigiService));
+                }
+                catch
+                {
+                    Bs2ProCurveEditor.SetCurve(FlydigiFanCurveProfile.CreateBalanced());
+                }
+            }
         }
 
         private void btnBs2ProEditCurve_Click(object sender, RoutedEventArgs e)
@@ -2001,13 +2087,101 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void UpdateBs2ProRgbUI()
         {
-            if (spBs2ProRgb == null)
+            // Guard: CardExpander content may not be realized yet (IsExpanded=false).
+            // All content controls are null until the user expands the card.
+            if (spBs2ProRgbOff is null)
                 return;
 
+            // Hide all first, then show what's needed for the selected mode
+            HideAllBs2ProRgbControls();
+
             var mode = cbxBs2ProRgbMode.SelectedIndex;
-            // Show RGB color controls only for Static (2) and Breathing (3)
-            spBs2ProRgb.Visibility = mode is 2 or 3 ? Visibility.Visible : Visibility.Collapsed;
+
+            switch (mode)
+            {
+                case 0: // Off
+                    Bs2ProRgbSubDivider.Visibility = Visibility.Visible;
+                    spBs2ProRgbOff.Visibility = Visibility.Visible;
+                    break;
+                case 1: // Smart-Temp
+                    Bs2ProRgbSubDivider.Visibility = Visibility.Visible;
+                    spBs2ProRgbSmartTemp.Visibility = Visibility.Visible;
+                    break;
+                case 2: // Static
+                    Bs2ProRgbSubDivider.Visibility = Visibility.Visible;
+                    spBs2ProRgbColorPicker.Visibility = Visibility.Visible;
+                    Bs2ProRgbStaticBrightnessDivider.Visibility = Visibility.Visible;
+                    spBs2ProRgbBrightness.Visibility = Visibility.Visible;
+                    break;
+                case 3: // Breathing
+                    Bs2ProRgbSubDivider.Visibility = Visibility.Visible;
+                    spBs2ProRgbColorPicker.Visibility = Visibility.Visible;
+                    Bs2ProRgbStaticBrightnessDivider.Visibility = Visibility.Visible;
+                    spBs2ProRgbBrightness.Visibility = Visibility.Visible;
+                    break;
+                case 4: // Flowing
+                    Bs2ProRgbSubDivider.Visibility = Visibility.Visible;
+                    Bs2ProRgbStaticBrightnessDivider.Visibility = Visibility.Visible;
+                    spBs2ProRgbBrightness.Visibility = Visibility.Visible;
+                    Bs2ProRgbFlowingSpeedDivider.Visibility = Visibility.Visible;
+                    spBs2ProRgbSpeed.Visibility = Visibility.Visible;
+                    break;
+            }
         }
+
+          /* ------------------------------------------------------------------ */
+        /*  Bs2Pro: slider value text sync + color picker                     */
+        /* ------------------------------------------------------------------ */
+
+        private void Bs2ProRpmSlider_ValueChanged(object? sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (Bs2ProRpmValueText is null || nudBs2ProRpm is null)
+                return;
+            Bs2ProRpmValueText.Text = ((int)sdBs2ProRpm.Value).ToString();
+            nudBs2ProRpm.Value = sdBs2ProRpm.Value;
+        }
+
+        private void Bs2ProBrightnessSlider_ValueChanged(object? sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (Bs2ProRgbBrightnessValueText is null)
+                return;
+            Bs2ProRgbBrightnessValueText.Text = ((int)sliderBs2ProBrightness.Value).ToString();
+        }
+
+        private void Bs2ProRgbSpeedSlider_ValueChanged(object? sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (Bs2ProRgbSpeedValueText is null)
+                return;
+            Bs2ProRgbSpeedValueText.Text = GetRgbSpeedNameFromSlider((int)sliderBs2ProRgbSpeed.Value);
+        }
+
+        private void Bs2ProRgbColorPicker_ColorChangedDelayed(object? sender, EventArgs e)
+        {
+            var color = Bs2ProRgbColorPicker.SelectedColor;
+            nudBs2ProRgbR.Value = color.R;
+            nudBs2ProRgbG.Value = color.G;
+            nudBs2ProRgbB.Value = color.B;
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Bs2Pro: speed name mapping (same as Flydigi page)                  */
+        /* ------------------------------------------------------------------ */
+
+        private static string GetRgbSpeedNameFromSlider(int value) => value switch
+        {
+            0 => "Slow",
+            1 => "Medium",
+            2 => "Fast",
+            _ => "Medium"
+        };
+
+        private static int GetRgbSpeedIndex(string? name) => name?.ToLowerInvariant() switch
+        {
+            "slow" => 0,
+            "medium" => 1,
+            "fast" => 2,
+            _ => 1
+        };
 
         #endregion
 

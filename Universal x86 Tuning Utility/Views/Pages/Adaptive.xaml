@@ -815,157 +815,365 @@
                         </StackPanel>
                     </ui:CardExpander>
 
-                    <!-- BS2 Pro (Cooling Pad) - only visible on supported hardware -->
-                    <ui:CardExpander Name="sdBs2Pro"
-                        Visibility="Collapsed"
-                        IsEnabled="True"
-                        IsExpanded="False"
-                        Icon="WeatherSnow20" Margin="0,8,15,0">
+                    <!-- Flydigi Cooler - only visible on supported hardware -->
+                    <ui:CardExpander x:Name="sdBs2Pro"
+                                    Visibility="Collapsed"
+                                    IsEnabled="True"
+                                    IsExpanded="False"
+                                    Margin="0,8,15,0">
+                        <ui:CardExpander.Icon>
+                            <controls:FlydigiIconElement />
+                        </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock Name="tbBs2ProTitle"
-                                        FontSize="14"
-                                        FontWeight="Medium"
-                                        Text="Flydigi Cooler" />
-                                    <TextBlock
-                                        FontSize="12"
-                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                        Text="Per-game fan control for the Flydigi cooling pad."/>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock x:Name="tbBs2ProTitle"
+                                                   FontTypography="Body"
+                                                   Text="Flydigi Cooler" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Per-game fan control for the Flydigi cooling pad."
+                                                   TextWrapping="Wrap" />
                                 </StackPanel>
-                                <ui:ToggleSwitch Name="cbxBs2ProEnabled" Grid.Column="1" VerticalAlignment="Center"
-                                    Margin="0,0,9,0"
-                                    ToolTip="Enable cooling pad controls for this game"
-                                    Checked="cbxBs2ProEnabled_Toggled"
-                                    Unchecked="cbxBs2ProEnabled_Toggled" />
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="tbBs2ProEnabledLabel"
+                                               Margin="0,0,8,0"
+                                               VerticalAlignment="Center"
+                                               FontSize="12"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                               Text="Off" />
+                                    <ui:ToggleSwitch x:Name="cbxBs2ProEnabled"
+                                                     Margin="0,0,9,0"
+                                                     ToolTip="Enable cooling pad controls for this game"
+                                                     Checked="cbxBs2ProEnabled_Toggled"
+                                                     Unchecked="cbxBs2ProEnabled_Toggled" />
+                                </StackPanel>
                             </Grid>
                         </ui:CardExpander.Header>
+
                         <StackPanel>
-                            <StackPanel Margin="0,-8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Fan Mode</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select the fan control mode for this game." VerticalAlignment="Bottom" />
+                            <!-- Row: Fan Mode (ComboBox in content, not header) -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Fan Mode" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select the fan control mode for this game."
+                                                   TextWrapping="Wrap" />
                                 </StackPanel>
-                                <ComboBox Name="cbxBs2ProFanMode" MinWidth="160" Margin="0,4,0,0" Height="37" SelectedIndex="0" SelectionChanged="cbxBs2ProFanMode_SelectionChanged">
-                                    <ComboBoxItem>Gear Preset</ComboBoxItem>
-                                    <ComboBoxItem>Manual RPM</ComboBoxItem>
-                                    <ComboBoxItem>Curve (Auto)</ComboBoxItem>
+                                <ComboBox x:Name="cbxBs2ProFanMode"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          SelectedIndex="0"
+                                          SelectionChanged="cbxBs2ProFanMode_SelectionChanged">
+                                    <ComboBoxItem Content="Gear Preset"/>
+                                    <ComboBoxItem Content="Manual RPM"/>
+                                    <ComboBoxItem Content="Curve (Auto)"/>
                                 </ComboBox>
-                            </StackPanel>
-                            <StackPanel Name="spBs2ProGear" Margin="0,8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Gear Preset</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select the gear preset (1=Quiet, 4=Overclock)." VerticalAlignment="Bottom" />
-                                </StackPanel>
-                                <ComboBox Name="cbxBs2ProGear" MinWidth="160" Margin="0,4,0,0" Height="37" SelectedIndex="0">
-                                    <ComboBoxItem>1 - Quiet</ComboBoxItem>
-                                    <ComboBoxItem>2 - Standard</ComboBoxItem>
-                                    <ComboBoxItem>3 - Strong</ComboBoxItem>
-                                    <ComboBoxItem>4 - Overclock</ComboBoxItem>
-                                </ComboBox>
-                            </StackPanel>
-                            <StackPanel Name="spBs2ProRpm" Margin="0,8,0,0" Visibility="Collapsed">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Manual RPM</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Set a fixed RPM for this game (1300-4000)." VerticalAlignment="Bottom" />
-                                </StackPanel>
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <ui:NumberBox Name="nudBs2ProRpm" Value="2000" Minimum="1300" Maximum="4000" Grid.Column="0" SmallChange="50" MaxDecimalPlaces="0" />
-                                    <Slider Name="sdBs2ProRpm" Value="{Binding ElementName=nudBs2ProRpm, Path=Value}" Minimum="1300" Maximum="4000" Grid.Column="1" Margin="12,0,0,0" TickFrequency="50" VerticalAlignment="Center" IsSnapToTickEnabled="True" TouchDown="SizeSlider_TouchDown"/>
-                                </Grid>
-                            </StackPanel>
-                            <StackPanel Name="spBs2ProCurve" Margin="0,8,0,0" Visibility="Collapsed">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Curve Profile</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select a fan curve profile for automatic temperature-driven control." VerticalAlignment="Bottom" />
-                                </StackPanel>
-                                <ComboBox Name="cbxBs2ProCurve" MinWidth="160" Margin="0,4,0,0" Height="37" SelectedIndex="0">
-                                    <ComboBoxItem>Silent</ComboBoxItem>
-                                    <ComboBoxItem>Balanced</ComboBoxItem>
-                                    <ComboBoxItem>Performance</ComboBoxItem>
-                                    <ComboBoxItem>Custom</ComboBoxItem>
-                                </ComboBox>
-                                <Button Name="btnBs2ProEditCurve" Content="Edit Curve" Width="120" Margin="0,8,0,0" Click="btnBs2ProEditCurve_Click"/>
-                            </StackPanel>
+                            </Grid>
 
-                            <!-- RGB Control -->
-                            <StackPanel Name="spBs2ProRgbMode" Margin="0,8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">RGB Mode</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select the RGB lighting mode for this game." VerticalAlignment="Bottom" />
-                                </StackPanel>
-                                <ComboBox Name="cbxBs2ProRgbMode" MinWidth="160" Margin="0,4,0,0" Height="37" SelectedIndex="1" SelectionChanged="cbxBs2ProRgbMode_SelectionChanged">
-                                    <ComboBoxItem>Off</ComboBoxItem>
-                                    <ComboBoxItem>SmartTemp</ComboBoxItem>
-                                    <ComboBoxItem>Static</ComboBoxItem>
-                                    <ComboBoxItem>Breathing</ComboBoxItem>
-                                    <ComboBoxItem>Flowing</ComboBoxItem>
-                                </ComboBox>
-                            </StackPanel>
+                            <!-- Divider before fan sub-controls (visible for any mode) -->
+                            <Border x:Name="Bs2ProFanSubDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                            <!-- RGB Color (visible for Static/Breathing) -->
-                            <StackPanel Name="spBs2ProRgb" Margin="0,8,0,0">
-                                <!-- Red -->
-                                <StackPanel Margin="0,0,0,4">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="150"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="R:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <ui:NumberBox Name="nudBs2ProRgbR" Grid.Column="1" Minimum="0" Maximum="255" Value="0" SmallChange="1" MaxDecimalPlaces="0"/>
-                                        <Slider Name="sdBs2ProRgbR" Grid.Column="2" Minimum="0" Maximum="255" Value="{Binding ElementName=nudBs2ProRgbR, Path=Value}" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                                    </Grid>
+                            <!-- Row: Gear Preset (visible for Gear mode) -->
+                            <Grid x:Name="spBs2ProGear" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Gear Preset" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select a preset gear level."
+                                                   TextWrapping="Wrap" />
                                 </StackPanel>
-                                <!-- Green -->
-                                <StackPanel Margin="0,0,0,4">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="150"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="G:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <ui:NumberBox Name="nudBs2ProRgbG" Grid.Column="1" Minimum="0" Maximum="255" Value="0" SmallChange="1" MaxDecimalPlaces="0"/>
-                                        <Slider Name="sdBs2ProRgbG" Grid.Column="2" Minimum="0" Maximum="255" Value="{Binding ElementName=nudBs2ProRgbG, Path=Value}" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                                    </Grid>
+                                <ComboBox x:Name="cbxBs2ProGear"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          SelectedIndex="0">
+                                    <ComboBoxItem Content="1 - Quiet"/>
+                                    <ComboBoxItem Content="2 - Standard"/>
+                                    <ComboBoxItem Content="3 - Strong"/>
+                                    <ComboBoxItem Content="4 - Overclock"/>
+                                </ComboBox>
+                            </Grid>
+
+                            <!-- Row: Manual RPM (visible for Manual mode) -->
+                            <Grid x:Name="spBs2ProRpm" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="RPM" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Set fan speed between 1300 and 4000 RPM."
+                                                   TextWrapping="Wrap" />
                                 </StackPanel>
-                                <!-- Blue -->
-                                <StackPanel Margin="0,0,0,4">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="150"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="B:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <ui:NumberBox Name="nudBs2ProRgbB" Grid.Column="1" Minimum="0" Maximum="255" Value="255" SmallChange="1" MaxDecimalPlaces="0"/>
-                                        <Slider Name="sdBs2ProRgbB" Grid.Column="2" Minimum="0" Maximum="255" Value="{Binding ElementName=nudBs2ProRgbB, Path=Value}" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                                    </Grid>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="Bs2ProRpmValueText"
+                                               Width="50"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="2000" />
+                                    <Slider x:Name="sdBs2ProRpm"
+                                            Width="140"
+                                            Minimum="1300"
+                                            Maximum="4000"
+                                            Value="2000"
+                                            TickFrequency="50"
+                                            IsMoveToPointEnabled="False"
+                                            IsSnapToTickEnabled="True"
+                                            ValueChanged="Bs2ProRpmSlider_ValueChanged" />
                                 </StackPanel>
-                                <!-- Brightness -->
-                                <StackPanel Margin="0,0,0,4">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="150"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Brightness:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <ui:NumberBox Name="nudBs2ProBrightness" Grid.Column="1" Minimum="0" Maximum="100" Value="100" SmallChange="1" MaxDecimalPlaces="0"/>
-                                        <Slider Name="sdBs2ProBrightness" Grid.Column="2" Minimum="0" Maximum="100" Value="{Binding ElementName=nudBs2ProBrightness, Path=Value}" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                                    </Grid>
+                            </Grid>
+
+                            <!-- Hidden NumberBox retained for backward compatibility with preset save/load -->
+                            <ui:NumberBox x:Name="nudBs2ProRpm" Width="0" Height="0" Visibility="Collapsed"
+                                          Minimum="1300" Maximum="4000" SmallChange="50" MaxDecimalPlaces="0" />
+
+                            <!-- Row: Curve Profile (visible for Curve mode) -->
+                            <Grid x:Name="spBs2ProCurve" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Curve Profile" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select a temperature-to-RPM fan curve."
+                                                   TextWrapping="Wrap" />
                                 </StackPanel>
-                            </StackPanel>
+                                <ComboBox x:Name="cbxBs2ProCurve"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          SelectedIndex="0"
+                                          SelectionChanged="cbxBs2ProCurve_SelectionChanged">
+                                    <ComboBoxItem Content="Silent"/>
+                                    <ComboBoxItem Content="Balanced"/>
+                                    <ComboBoxItem Content="Performance"/>
+                                    <ComboBoxItem Content="Custom"/>
+                                </ComboBox>
+                            </Grid>
+
+                            <!-- Divider before embedded curve editor (only visible for Custom) -->
+                            <Border x:Name="Bs2ProCurveEditorDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Embedded Curve Editor — full-width row (visible only for Custom profile) -->
+                            <controls:FlydigiFanCurveEditor x:Name="Bs2ProCurveEditor"
+                                                            Visibility="Collapsed"
+                                                            Margin="0,4,0,4"/>
+
+                            <!-- ==================================================== -->
+                            <!-- RGB Section (hidden for BS1)                         -->
+                            <!-- ==================================================== -->
+
+                            <!-- Divider before RGB Mode -->
+                            <Border x:Name="Bs2ProRgbDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Row: RGB Mode -->
+                            <Grid x:Name="spBs2ProRgbMode" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="RGB Mode" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Configure RGB lighting effects and colors."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ComboBox x:Name="cbxBs2ProRgbMode"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          SelectedIndex="1"
+                                          SelectionChanged="cbxBs2ProRgbMode_SelectionChanged">
+                                    <ComboBoxItem Content="Off"/>
+                                    <ComboBoxItem Content="Smart-Temp"/>
+                                    <ComboBoxItem Content="Static"/>
+                                    <ComboBoxItem Content="Breathing"/>
+                                    <ComboBoxItem Content="Flowing"/>
+                                </ComboBox>
+                            </Grid>
+
+                            <!-- Divider before RGB sub-controls (visible for any mode except Off/Smart-Temp which show messages) -->
+                            <Border x:Name="Bs2ProRgbSubDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Off message (visible for Off) -->
+                            <Grid x:Name="spBs2ProRgbOff" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="RGB disabled" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="No customization available while RGB effects are turned off."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Row: Smart-Temp message (visible for Smart-Temp) -->
+                            <Grid x:Name="spBs2ProRgbSmartTemp" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Smart-Temp mode" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Smart-Temp automatically adjusts colors based on device temperature and has no additional controls."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Row: Color picker (visible for Static/Breathing) -->
+                            <Grid x:Name="spBs2ProRgbColorPicker" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Color" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Pick a color for this effect." />
+                                </StackPanel>
+                                <controls:ColorPickerControl x:Name="Bs2ProRgbColorPicker"
+                                                             Grid.Column="1"
+                                                             HorizontalAlignment="Right"
+                                                             VerticalAlignment="Center"
+                                                             SelectedColor="Aqua"
+                                                             ColorChangedDelayed="Bs2ProRgbColorPicker_ColorChangedDelayed" />
+                            </Grid>
+
+                            <!-- Hidden NumberBoxes retained for backward compatibility with preset save/load -->
+                            <ui:NumberBox x:Name="nudBs2ProRgbR" Width="0" Height="0" Visibility="Collapsed"
+                                          Minimum="0" Maximum="255" SmallChange="1" MaxDecimalPlaces="0" />
+                            <ui:NumberBox x:Name="nudBs2ProRgbG" Width="0" Height="0" Visibility="Collapsed"
+                                          Minimum="0" Maximum="255" SmallChange="1" MaxDecimalPlaces="0" />
+                            <ui:NumberBox x:Name="nudBs2ProRgbB" Width="0" Height="0" Visibility="Collapsed"
+                                          Minimum="0" Maximum="255" SmallChange="1" MaxDecimalPlaces="0" />
+
+                            <!-- Divider before Brightness (Static/Breathing) -->
+                            <Border x:Name="Bs2ProRgbStaticBrightnessDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Row: Brightness (visible for Static/Breathing/Flowing) — shared slider -->
+                            <Grid x:Name="spBs2ProRgbBrightness" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Brightness" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Adjust the brightness level." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="Bs2ProRgbBrightnessValueText"
+                                               Width="30"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="100" />
+                                    <Slider x:Name="sliderBs2ProBrightness"
+                                            Width="140"
+                                            Minimum="0"
+                                            Maximum="100"
+                                            Value="100"
+                                            TickFrequency="1"
+                                            IsMoveToPointEnabled="False"
+                                            ValueChanged="Bs2ProBrightnessSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Divider before Flowing Speed -->
+                            <Border x:Name="Bs2ProRgbFlowingSpeedDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Row: Speed (visible for Flowing) -->
+                            <Grid x:Name="spBs2ProRgbSpeed" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Speed" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Control the flowing animation speed." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="Bs2ProRgbSpeedValueText"
+                                               Width="60"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="Medium" />
+                                    <Slider x:Name="sliderBs2ProRgbSpeed"
+                                            Width="140"
+                                            Minimum="0"
+                                            Maximum="2"
+                                            Value="1"
+                                            IsSnapToTickEnabled="True"
+                                            TickFrequency="1"
+                                            TickPlacement="Both"
+                                            IsMoveToPointEnabled="False"
+                                            ValueChanged="Bs2ProRgbSpeedSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
                     </ui:CardExpander>
 
