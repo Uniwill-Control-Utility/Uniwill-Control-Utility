@@ -20,21 +20,18 @@
       ScrollViewer.CanContentScroll="False">
 
     <Grid>
-        <!-- Content Grid with margins -->
-        <Grid Margin="18,10,18,18">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*" />
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-        <!-- Scrollable content -->
+        <!-- Row 0: Scrollable content -->
         <ScrollViewer Grid.Row="0"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       CanContentScroll="False"
                       PanningMode="VerticalOnly"
-                      IsDeferredScrollingEnabled="False"
-                      Margin="0,0,-18,0">
+                      IsDeferredScrollingEnabled="False">
             <ScrollViewer.Style>
                 <Style TargetType="{x:Type ScrollViewer}"
                        BasedOn="{StaticResource {x:Type ScrollViewer}}">
@@ -42,17 +39,33 @@
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding ComputedVerticalScrollBarVisibility, RelativeSource={RelativeSource Self}}"
                                      Value="Visible">
-                            <Setter Property="Padding" Value="0,0,12,0" />
+                            <Setter Property="Padding" Value="0,0,8,0" />
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
             </ScrollViewer.Style>
-            <StackPanel>
-                <TextBlock FontSize="26" FontWeight="Medium" Text="Fan Control" />
-                <TextBlock Margin="0,4,0,12"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           Text="Manage fan speeds and temperature curves for your device."
-                           TextWrapping="Wrap" />
+            <!-- Centered max-width layout container -->
+            <Grid MaxWidth="1080" HorizontalAlignment="Stretch">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Row 0: Page title (36px side margin for non-Home page) -->
+                <StackPanel Grid.Row="0" Margin="0,24,0,0">
+                    <TextBlock FontSize="26"
+                               FontWeight="Medium"
+                               Margin="36,0,36,0"
+                               Text="Fan Control" />
+                    <TextBlock Margin="36,8,36,12"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="Manage fan speeds and temperature curves for your device."
+                               TextWrapping="Wrap" />
+                </StackPanel>
+
+                <!-- Row 1: Content -->
+                <StackPanel Grid.Row="1" Margin="36,16,36,18">
 
                 <!-- CPU & GPU status cards side by side -->
                 <Grid Margin="0,8,0,0">
@@ -70,7 +83,7 @@
                 <StackPanel x:Name="UniwillAvailable">
                     <!-- Info banner -->
                     <Border x:Name="InfoBanner"
-                            Margin="0,8,0,0"
+                            Margin="-1,8,-1,12"
                             Padding="14,12"
                             BorderThickness="1"
                             BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}"
@@ -97,7 +110,7 @@
 
                     <!-- Unified curve toggle with expander -->
                     <ui:CardExpander x:Name="UnifiedCard"
-                                     Margin="0,8,0,0"
+                                     Margin="0,0,0,12"
                                      IsExpanded="False"
                                      Expanded="UnifiedCard_Expanded"
                                      Collapsed="UnifiedCard_Collapsed"
@@ -112,9 +125,8 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock FontWeight="DemiBold" Text="Unified Fan Curve" />
-                                    <TextBlock FontSize="12"
-                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                    <ui:TextBlock FontTypography="Body" Text="Unified Fan Curve" />
+                                    <ui:TextBlock FontTypography="Caption"
                                                Text="When enabled, a single curve controls both CPU and GPU fans."
                                                TextWrapping="Wrap" />
                                 </StackPanel>
@@ -232,9 +244,8 @@
                                                      Margin="0,0,12,0"
                                                      VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1">
-                                            <TextBlock FontWeight="DemiBold" Text="CPU Fan Curve" />
-                                            <TextBlock FontSize="12"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                            <ui:TextBlock FontTypography="Body" Text="CPU Fan Curve" />
+                                            <ui:TextBlock FontTypography="Caption"
                                                        Text="Drag the sliders to set fan speed at each temperature."
                                                        TextWrapping="Wrap" />
                                         </StackPanel>
@@ -284,9 +295,8 @@
                                                      Margin="0,0,12,0"
                                                      VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1">
-                                            <TextBlock FontWeight="DemiBold" Text="GPU Fan Curve" />
-                                            <TextBlock FontSize="12"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                            <ui:TextBlock FontTypography="Body" Text="GPU Fan Curve" />
+                                            <ui:TextBlock FontTypography="Caption"
                                                        Text="Applies when GPU crosses temperature thresholds."
                                                        TextWrapping="Wrap" />
                                         </StackPanel>
@@ -317,7 +327,7 @@
                             <!-- Merged temperature thresholds editor for both CPU and GPU -->
                             <ui:CardExpander Grid.Row="1"
                                          Grid.ColumnSpan="3"
-                                         Margin="0,8,0,0"
+                                         Margin="0,12,0,0"
                                          Header="Thermal Thresholds"
                                          IsExpanded="False">
                             <ui:CardExpander.Icon>
@@ -402,7 +412,7 @@
                     </StackPanel>
 
                     <!-- Fan Turbo toggle -->
-                    <ui:CardControl Margin="0,8,0,0"
+                    <ui:CardControl Margin="0,0,0,12"
                                     Background="{DynamicResource SystemFillColorCriticalBackgroundBrush}">
                         <ui:CardControl.Icon>
                             <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xECAD;" FontSize="20" />
@@ -414,9 +424,8 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock FontWeight="DemiBold" Text="Fan Turbo" />
-                                    <TextBlock FontSize="12"
-                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                    <ui:TextBlock FontTypography="Body" Text="Fan Turbo" />
+                                    <ui:TextBlock FontTypography="Caption"
                                                Text="Force fans to maximum speed. Toggle off to restore previous settings."
                                                TextWrapping="Wrap" />
                                 </StackPanel>
@@ -432,7 +441,7 @@
 
                 <!-- Fallback when Uniwill EC is not available -->
                 <ui:CardControl x:Name="UniwillUnavailable"
-                                Margin="0,8,0,0"
+                                Margin="0,0,0,12"
                                 Visibility="Collapsed">
                     <ui:CardControl.Icon>
                         <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BA;" FontSize="20" />
@@ -444,10 +453,11 @@
                     </ui:CardControl.Header>
                 </ui:CardControl>
             </StackPanel>
+            </Grid>
         </ScrollViewer>
 
-        <!-- Bottom bar: status (left) + buttons (right) -->
-        <Grid x:Name="bottomBar" Grid.Row="1" Margin="0,14,0,-2">
+        <!-- Row 1: Bottom bar — status (left) + buttons (right) -->
+        <Grid x:Name="bottomBar" Grid.Row="1" MaxWidth="1080" HorizontalAlignment="Stretch" Margin="36,12,36,12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -499,9 +509,6 @@
             </ui:Button>
             </WrapPanel>
         </Grid>
-
-        </Grid>
-        <!-- End Content Grid -->
 
         <!-- Dark overlay for Adaptive Mode override (full-page, outside margins) -->
         <Border x:Name="overlayAdaptiveWarning" Visibility="Collapsed" Background="Black" Opacity="0.4" CornerRadius="4"/>

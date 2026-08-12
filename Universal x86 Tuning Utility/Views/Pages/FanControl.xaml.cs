@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
 using System.Windows;
@@ -27,6 +28,12 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private IDisposable? _monitoringLease;
         private System.Timers.Timer? _applyDebounceTimer;
         private Wpf.Ui.Controls.Snackbar? _adaptiveSnackbar;
+
+        // Concurrency: serialize all EC access to prevent AccessViolationException
+        // from concurrent native I/O on the same handle.
+        private readonly SemaphoreSlim _ecSemaphore = new(1, 1);
+        private readonly CancellationTokenSource _pageCts = new();
+        private bool _isUnloaded;
 
         public FanControl(
             IHardwareMonitoringService hardwareMonitoring,
@@ -294,9 +301,20 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             try
             {
                 if (_uniwillEc is null) return;
-                int rpm = _uniwillEc.GetMainFanRpm();
-                if (rpm > 0)
-                    SetStatusText($"{rpm} RPM");
+
+                // Try to acquire the semaphore with a short timeout to avoid blocking the UI.
+                // Reads are non-critical — skip if an EC operation is in progress.
+                if (!_ecSemaphore.Wait(500)) return;
+                try
+                {
+                    int rpm = _uniwillEc.GetMainFanRpm();
+                    if (rpm > 0)
+                        SetStatusText($"{rpm} RPM");
+                }
+                finally
+                {
+                    _ecSemaphore.Release();
+                }
             }
             catch (Exception ex)
             {
@@ -311,8 +329,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 // Get metrics from hardware monitoring (temp, usage, power, clock)
                 var snapshot = _hardwareMonitoring.ReadSnapshot();
 
-                // Enrich with EC fan speed data if available
-                if (_uniwillEc is not null)
+                // Enrich with EC fan speed data if available.
+                // Try to acquire the semaphore with a short timeout — reads are non-critical.
+                if (_uniwillEc is not null && _ecSemaphore.Wait(500))
                 {
                     try
                     {
@@ -325,6 +344,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         };
                     }
                     catch { /* EC read failed, fan speed stays 0 */ }
+                    finally
+                    {
+                        _ecSemaphore.Release();
+                    }
                 }
 
                 // Update both controls from the single enriched snapshot
@@ -971,26 +994,35 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 gpuTemps = GpuFanCurveEditor.Temperatures;
             }
 
-            _ = Task.Run(() =>
+            _ = Task.Run(async () =>
             {
                 try
                 {
-                    _uniwillEc.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
-                    Dispatcher.Invoke(() =>
-                    {
-                        SaveCurrentSettings();
-                        SetStatusText(LocalizationService.Get("Fan curve applied"));
-                        UpdateBanner();
-                    });
+                    await _ecSemaphore.WaitAsync(_pageCts.Token);
                 }
-                catch (Exception ex)
+                catch (OperationCanceledException)
                 {
-                    Dispatcher.Invoke(() =>
-                    {
-                        SetStatusText($"Error: {ex.Message}");
-                    });
-                    System.Diagnostics.Debug.WriteLine($"Failed to apply fan curve: {ex.Message}");
+                    return; // Page unloaded, skip apply
                 }
+                try
+                {
+                    _uniwillEc!.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                }
+                finally
+                {
+                    _ecSemaphore.Release();
+                }
+
+                // Check cancellation before UI update
+                if (_pageCts.IsCancellationRequested) return;
+
+                Dispatcher.Invoke(() =>
+                {
+                    if (_isUnloaded) return;
+                    SaveCurrentSettings();
+                    SetStatusText(LocalizationService.Get("Fan curve applied"));
+                    UpdateBanner();
+                });
             });
         }
 
@@ -1000,66 +1032,70 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             SetStatusText(LocalizationService.Get("Restoring auto mode..."));
 
-            _ = Task.Run(() =>
+            _ = Task.Run(async () =>
             {
                 try
                 {
-                    _uniwillEc.RestoreAutoFanControl();
-                    Dispatcher.Invoke(() =>
-                    {
-                        ReadFanRpm();
-                        SetStatusText(LocalizationService.Get("Auto mode restored"));
-
-                        // Reset UI to Balanced presets
-                        _loadingSettings = true;
-
-                        // Disable unified mode if active
-                        if (tsUnifiedCurve.IsChecked == true)
-                        {
-                            tsUnifiedCurve.IsChecked = false;
-                            UnifiedCard.IsExpanded = false;
-                            SplitCurvePanel.Visibility = Visibility.Visible;
-                        }
-
-                        // Set all combo boxes to Balanced
-                        cbPreset.SelectedIndex = 1;
-                        cbCpuPreset.SelectedIndex = 1;
-                        cbGpuPreset.SelectedIndex = 1;
-
-                        // Load Balanced curves into editors
-                        CpuFanCurveEditor.SetCurve(EcFanCurve.CreateBalanced());
-                        CpuFanCurveEditor.IsReadOnly = true;
-                        GpuFanCurveEditor.SetCurve(EcFanCurve.CreateBalanced());
-                        GpuFanCurveEditor.IsReadOnly = true;
-                        FanCurveEditor.SetCurve(EcFanCurve.CreateBalanced());
-                        FanCurveEditor.IsReadOnly = true;
-
-                        _loadingSettings = false;
-
-                        // Persist reset state
-                        var settings = FanControlSettingsService.Load();
-                        settings.UnifiedMode = false;
-                        settings.UnifiedPreset = "Balanced";
-                        settings.CpuPreset = "Balanced";
-                        settings.GpuPreset = "Balanced";
-                        settings.UnifiedDuties = null;
-                        settings.CpuDuties = null;
-                        settings.GpuDuties = null;
-                        FanControlSettingsService.Save(settings);
-                    });
+                    await _ecSemaphore.WaitAsync(_pageCts.Token);
                 }
-                catch (Exception ex)
+                catch (OperationCanceledException)
                 {
-                    Dispatcher.Invoke(() =>
-                    {
-                        SetStatusText($"Error: {ex.Message}");
-                        System.Windows.MessageBox.Show(
-                            $"Failed to restore auto mode: {ex.Message}",
-                            "Error",
-                            System.Windows.MessageBoxButton.OK,
-                            System.Windows.MessageBoxImage.Error);
-                    });
+                    return;
                 }
+                try
+                {
+                    _uniwillEc!.RestoreAutoFanControl();
+                }
+                finally
+                {
+                    _ecSemaphore.Release();
+                }
+
+                if (_pageCts.IsCancellationRequested) return;
+
+                Dispatcher.Invoke(() =>
+                {
+                    if (_isUnloaded) return;
+                    ReadFanRpm();
+                    SetStatusText(LocalizationService.Get("Auto mode restored"));
+
+                    // Reset UI to Balanced presets
+                    _loadingSettings = true;
+
+                    // Disable unified mode if active
+                    if (tsUnifiedCurve.IsChecked == true)
+                    {
+                        tsUnifiedCurve.IsChecked = false;
+                        UnifiedCard.IsExpanded = false;
+                        SplitCurvePanel.Visibility = Visibility.Visible;
+                    }
+
+                    // Set all combo boxes to Balanced
+                    cbPreset.SelectedIndex = 1;
+                    cbCpuPreset.SelectedIndex = 1;
+                    cbGpuPreset.SelectedIndex = 1;
+
+                    // Load Balanced curves into editors
+                    CpuFanCurveEditor.SetCurve(EcFanCurve.CreateBalanced());
+                    CpuFanCurveEditor.IsReadOnly = true;
+                    GpuFanCurveEditor.SetCurve(EcFanCurve.CreateBalanced());
+                    GpuFanCurveEditor.IsReadOnly = true;
+                    FanCurveEditor.SetCurve(EcFanCurve.CreateBalanced());
+                    FanCurveEditor.IsReadOnly = true;
+
+                    _loadingSettings = false;
+
+                    // Persist reset state
+                    var settings = FanControlSettingsService.Load();
+                    settings.UnifiedMode = false;
+                    settings.UnifiedPreset = "Balanced";
+                    settings.CpuPreset = "Balanced";
+                    settings.GpuPreset = "Balanced";
+                    settings.UnifiedDuties = null;
+                    settings.CpuDuties = null;
+                    settings.GpuDuties = null;
+                    FanControlSettingsService.Save(settings);
+                });
             });
         }
 
@@ -1074,31 +1110,33 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             SetStatusText(LocalizationService.Get("Enabling turbo mode..."));
             SetTurboSwitchColor(true);
 
-            _ = Task.Run(() =>
+            _ = Task.Run(async () =>
             {
                 try
                 {
-                    _uniwillEc.ToggleTurboAsync().GetAwaiter().GetResult();
-                    Dispatcher.Invoke(() =>
-                    {
-                        SetStatusText(LocalizationService.Get("Turbo mode ENABLED — fans at max duty"));
-                        ReadFanRpm();
-                    });
+                    await _ecSemaphore.WaitAsync(_pageCts.Token);
                 }
-                catch (Exception ex)
+                catch (OperationCanceledException)
                 {
-                    Dispatcher.Invoke(() =>
-                    {
-                        tsTurbo.IsChecked = false;
-                        SetTurboSwitchColor(false);
-                        SetStatusText($"Error: {ex.Message}");
-                        System.Windows.MessageBox.Show(
-                            $"Failed to enable turbo: {ex.Message}",
-                            "Error",
-                            System.Windows.MessageBoxButton.OK,
-                            System.Windows.MessageBoxImage.Error);
-                    });
+                    return;
                 }
+                try
+                {
+                    await _uniwillEc!.ToggleTurboAsync();
+                }
+                finally
+                {
+                    _ecSemaphore.Release();
+                }
+
+                if (_pageCts.IsCancellationRequested) return;
+
+                Dispatcher.Invoke(() =>
+                {
+                    if (_isUnloaded) return;
+                    SetStatusText(LocalizationService.Get("Turbo mode ENABLED — fans at max duty"));
+                    ReadFanRpm();
+                });
             });
         }
 
@@ -1108,30 +1146,34 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             SetStatusText(LocalizationService.Get("Disabling turbo mode..."));
 
-            _ = Task.Run(() =>
+            _ = Task.Run(async () =>
             {
                 try
                 {
-                    _uniwillEc.ToggleTurbo();
-                    Dispatcher.Invoke(() =>
-                    {
-                        SetStatusText(LocalizationService.Get("Turbo mode DISABLED — previous settings restored"));
-                        SetTurboSwitchColor(false);
-                        ReadFanRpm();
-                    });
+                    await _ecSemaphore.WaitAsync(_pageCts.Token);
                 }
-                catch (Exception ex)
+                catch (OperationCanceledException)
                 {
-                    Dispatcher.Invoke(() =>
-                    {
-                        SetStatusText($"Error: {ex.Message}");
-                        System.Windows.MessageBox.Show(
-                            $"Failed to disable turbo: {ex.Message}",
-                            "Error",
-                            System.Windows.MessageBoxButton.OK,
-                            System.Windows.MessageBoxImage.Error);
-                    });
+                    return;
                 }
+                try
+                {
+                    _uniwillEc!.ToggleTurbo();
+                }
+                finally
+                {
+                    _ecSemaphore.Release();
+                }
+
+                if (_pageCts.IsCancellationRequested) return;
+
+                Dispatcher.Invoke(() =>
+                {
+                    if (_isUnloaded) return;
+                    SetStatusText(LocalizationService.Get("Turbo mode DISABLED — previous settings restored"));
+                    SetTurboSwitchColor(false);
+                    ReadFanRpm();
+                });
             });
         }
 
@@ -1162,35 +1204,39 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             SetStatusText(LocalizationService.Get("Resetting fan state..."));
 
-            _ = Task.Run(() =>
+            _ = Task.Run(async () =>
             {
                 try
                 {
-                    _uniwillEc.ResetFanState();
-                    Dispatcher.Invoke(() =>
-                    {
-                        if (tsTurbo.IsChecked == true)
-                        {
-                            tsTurbo.IsChecked = false;
-                            SetTurboSwitchColor(false);
-                        }
-
-                        SetStatusText(LocalizationService.Get("Fan state reset — fans at 100%"));
-                        ReadFanRpm();
-                    });
+                    await _ecSemaphore.WaitAsync(_pageCts.Token);
                 }
-                catch (Exception ex)
+                catch (OperationCanceledException)
                 {
-                    Dispatcher.Invoke(() =>
-                    {
-                        SetStatusText($"Error: {ex.Message}");
-                        System.Windows.MessageBox.Show(
-                            $"Failed to reset fan state: {ex.Message}",
-                            "Error",
-                            System.Windows.MessageBoxButton.OK,
-                            System.Windows.MessageBoxImage.Error);
-                    });
+                    return;
                 }
+                try
+                {
+                    _uniwillEc!.ResetFanState();
+                }
+                finally
+                {
+                    _ecSemaphore.Release();
+                }
+
+                if (_pageCts.IsCancellationRequested) return;
+
+                Dispatcher.Invoke(() =>
+                {
+                    if (_isUnloaded) return;
+                    if (tsTurbo.IsChecked == true)
+                    {
+                        tsTurbo.IsChecked = false;
+                        SetTurboSwitchColor(false);
+                    }
+
+                    SetStatusText(LocalizationService.Get("Fan state reset — fans at 100%"));
+                    ReadFanRpm();
+                });
             });
         }
 
@@ -1254,17 +1300,33 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // blocking the UI while LibreHardwareMonitor probes hardware.
             if (_monitoringLease is null)
             {
-                _ = Task.Run(() =>
+                _ = Task.Run(async () =>
                 {
-                    _monitoringLease = _hardwareMonitoring.Acquire(
-                        HardwareMonitoringCategory.Cpu |
-                        HardwareMonitoringCategory.Gpu);
+                    try
+                    {
+                        await _ecSemaphore.WaitAsync(_pageCts.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return;
+                    }
+                    try
+                    {
+                        _monitoringLease = _hardwareMonitoring.Acquire(
+                            HardwareMonitoringCategory.Cpu |
+                            HardwareMonitoringCategory.Gpu);
+                    }
+                    finally
+                    {
+                        _ecSemaphore.Release();
+                    }
                 });
             }
         }
 
         private void Page_Unloaded(object? sender, EventArgs e)
         {
+            _isUnloaded = true;
             _statusTimer?.Stop();
 
             // Clean up debounce timer
@@ -1275,21 +1337,32 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // Hide adaptive snackbar
             HideAdaptiveSnackbar();
 
-            // Restore auto fan control and release lease on a background thread
-            // to avoid blocking the UI during navigation.
+            // Capture refs before cancellation so we can still clean up.
             var ec = _uniwillEc;
             var lease = _monitoringLease;
             _monitoringLease = null;
 
+            // Signal all waiting tasks to cancel, then wait for the semaphore
+            // to drain so no in-flight EC operation races with RestoreAutoFanControl.
+            _pageCts.Cancel();
+
             if (ec is not null || lease is not null)
             {
-                _ = Task.Run(() =>
+                _ = Task.Run(async () =>
                 {
+                    try
+                    {
+                        // Wait for any in-flight EC operation to finish
+                        await _ecSemaphore.WaitAsync(TimeSpan.FromSeconds(3));
+                    }
+                    catch { /* timeout or cancellation */ }
+
                     try
                     {
                         ec?.RestoreAutoFanControl();
                     }
                     catch { /* silent fail on unload */ }
+
                     lease?.Dispose();
                 });
             }

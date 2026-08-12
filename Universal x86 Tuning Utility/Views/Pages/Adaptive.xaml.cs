@@ -1164,6 +1164,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             byte bs2Brightness = (byte)sliderBs2ProBrightness.Value;
                             string bs2Speed = GetRgbSpeedNameFromSlider((int)sliderBs2ProRgbSpeed.Value);
 
+                            // --- Fan control (differs by mode) ---
                             if (bs2Mode == "Curve")
                             {
                                 // Handle Curve mode via smart control (stateful, can't route through DeviceApplier)
@@ -1243,38 +1244,41 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                                 else if (bs2Mode == "Rpm")
                                     rpm = (ushort)Math.Clamp((int)nudBs2ProRpm.Value, 1300, (FlydigiHardwareDetector.ConnectedDeviceType == ConnectedDeviceType.BS1 ? 3000 : 4000));
 
-                                // Use DeviceApplier for fan + RGB (diff-based to avoid redundant writes)
-                                // Only compare gear/rpm when they're relevant for the current mode.
+                                // Use DeviceApplier for fan (diff-based to avoid redundant writes)
                                 bool fanChanged = bs2Mode != lastBs2ProFanModeText ||
                                     (bs2Mode == "Gear" && gear != lastBs2ProGear) ||
                                     (bs2Mode == "Rpm" && rpm != lastBs2ProRpm);
-                                bool rgbChanged = bs2RgbMode != lastBs2ProRgbMode ||
-                                    bs2R != lastBs2ProRgbR || bs2G != lastBs2ProRgbG ||
-                                    bs2B != lastBs2ProRgbB || bs2Brightness != lastBs2ProBrightness ||
-                                    bs2Speed != lastBs2ProSpeed;
 
-                                if (fanChanged || rgbChanged)
+                                if (fanChanged)
                                 {
-                                    // Only send commands for the portion that actually changed to avoid
-                                    // unnecessary re-transmits that can briefly interrupt the device's RGB effect.
-                                    if (fanChanged)
-                                        await _deviceApplier!.ApplyFlydigiFanAsync(bs2Mode, gear, rpm);
-                                    if (rgbChanged)
-                                        await _deviceApplier!.ApplyFlydigiRgbAsync(bs2RgbMode, bs2R, bs2G, bs2B, bs2Brightness);
-
-                                    // Fire preset-applied event so the Flydigi page can sync its UI.
-                                    _deviceApplier.RaiseFlydigiPresetApplied(bs2Mode, gear, rpm, bs2RgbMode, bs2R, bs2G, bs2B, bs2Brightness);
-
+                                    await _deviceApplier!.ApplyFlydigiFanAsync(bs2Mode, gear, rpm);
                                     lastBs2ProFanModeText = bs2Mode;
                                     lastBs2ProGear = gear ?? lastBs2ProGear;
                                     lastBs2ProRpm = rpm ?? lastBs2ProRpm;
-                                    lastBs2ProRgbMode = bs2RgbMode;
-                                    lastBs2ProRgbR = bs2R;
-                                    lastBs2ProRgbG = bs2G;
-                                    lastBs2ProRgbB = bs2B;
-                                    lastBs2ProBrightness = bs2Brightness;
-                                    lastBs2ProSpeed = bs2Speed;
                                 }
+                            }
+
+                            // --- RGB control (independent of fan mode) ---
+                            bool rgbChanged = bs2RgbMode != lastBs2ProRgbMode ||
+                                bs2R != lastBs2ProRgbR || bs2G != lastBs2ProRgbG ||
+                                bs2B != lastBs2ProRgbB || bs2Brightness != lastBs2ProBrightness ||
+                                bs2Speed != lastBs2ProSpeed;
+
+                            if (rgbChanged)
+                            {
+                                await _deviceApplier!.ApplyFlydigiRgbAsync(bs2RgbMode, bs2R, bs2G, bs2B, bs2Brightness);
+
+                                // Fire preset-applied event so the Flydigi page can sync its UI.
+                                byte? fanGear = bs2Mode == "Gear" ? (byte?)(cbxBs2ProGear.SelectedIndex + 1) : null;
+                                ushort? fanRpm = bs2Mode == "Rpm" ? (ushort?)Math.Clamp((int)nudBs2ProRpm.Value, 1300, (FlydigiHardwareDetector.ConnectedDeviceType == ConnectedDeviceType.BS1 ? 3000 : 4000)) : null;
+                                _deviceApplier.RaiseFlydigiPresetApplied(bs2Mode, fanGear, fanRpm, bs2RgbMode, bs2R, bs2G, bs2B, bs2Brightness);
+
+                                lastBs2ProRgbMode = bs2RgbMode;
+                                lastBs2ProRgbR = bs2R;
+                                lastBs2ProRgbG = bs2G;
+                                lastBs2ProRgbB = bs2B;
+                                lastBs2ProBrightness = bs2Brightness;
+                                lastBs2ProSpeed = bs2Speed;
                             }
                         }
 
@@ -2119,8 +2123,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     Bs2ProRgbStaticBrightnessDivider.Visibility = Visibility.Visible;
                     spBs2ProRgbBrightness.Visibility = Visibility.Visible;
                     break;
-                case 4: // Flowing
-                    Bs2ProRgbSubDivider.Visibility = Visibility.Visible;
+                case 4: // Flowing — no color picker, so skip the sub divider to avoid a bare divider above Brightness
                     Bs2ProRgbStaticBrightnessDivider.Visibility = Visibility.Visible;
                     spBs2ProRgbBrightness.Visibility = Visibility.Visible;
                     Bs2ProRgbFlowingSpeedDivider.Visibility = Visibility.Visible;
