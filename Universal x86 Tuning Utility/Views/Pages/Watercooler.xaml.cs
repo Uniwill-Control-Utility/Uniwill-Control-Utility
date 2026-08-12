@@ -127,6 +127,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             var rgbColor = settings.GetRgbColor();
             cbxRgbColor.SelectedIndex = GetRgbColorIndex(rgbColor);
 
+            // Update color picker visibility based on loaded mode
+            UpdateRgbColorVisibility();
+
             // Restore auto-connect toggle
             tsAutoConnect.IsChecked = settings.AutoConnect;
 
@@ -357,6 +360,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private async void cbxRgbMode_SelectionChanged(object sender, EventArgs e)
         {
+            UpdateRgbColorVisibility();
+
             if (_isSyncingFromPreset) return;
             if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
 
@@ -364,6 +369,16 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             var color = GetSelectedRgbColor();
             await _waterCoolerService.WriteRgbModeAsync(mode, color);
             _waterCoolerService.UpdateRgbMode(mode);
+        }
+
+        /// <summary>Show the color row only for modes that accept a custom color (Static, Breathe).</summary>
+        private void UpdateRgbColorVisibility()
+        {
+            // Off=0, Static=1, Breathe=2, Colorful=3, Breathe Color=4
+            bool showColor = cbxRgbMode.SelectedIndex is 1 or 2;
+            RgbColorRow.Visibility = showColor ? Visibility.Visible : Visibility.Collapsed;
+            // Collapse the content area when no color row is visible, hiding the divider too.
+            RgbCardExpander.IsExpanded = showColor;
         }
 
         private async void cbxRgbColor_SelectionChanged(object sender, EventArgs e)
@@ -635,6 +650,48 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             cbxFanSpeed.SelectedIndex = GetFanSpeedIndex(e.FanSpeed);
             cbxRgbMode.SelectedIndex = GetRgbModeIndex(e.RgbMode);
             cbxRgbColor.SelectedIndex = GetRgbColorIndex(e.RgbColor);
+            UpdateRgbColorVisibility();
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  RGB CardExpander Chevron Hide                                      */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>Hide the CardExpander chevron so the card stays always-expanded.</summary>
+        private void RgbCardExpander_Loaded(object sender, RoutedEventArgs e)
+        {
+            Application.Current.Dispatcher.BeginInvoke(
+                (Action)(() =>
+                {
+                    var toggle = RgbCardExpander.Template?.FindName("ExpanderToggleButton", RgbCardExpander) as System.Windows.Controls.Primitives.ToggleButton;
+                    if (toggle?.Template is not null)
+                    {
+                        var chevronGrid = toggle.Template.FindName("ChevronGrid", toggle) as FrameworkElement;
+                        if (chevronGrid is not null)
+                        {
+                            chevronGrid.Visibility = Visibility.Collapsed;
+                            return;
+                        }
+                    }
+
+                    WalkAndHideChevron(RgbCardExpander);
+                }),
+                System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        private void WalkAndHideChevron(DependencyObject parent)
+        {
+            int count = VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is Wpf.Ui.Controls.SymbolIcon)
+                {
+                    ((FrameworkElement)child).Visibility = Visibility.Collapsed;
+                    return;
+                }
+                WalkAndHideChevron(child);
+            }
         }
 
         /* ------------------------------------------------------------------ */

@@ -1,230 +1,322 @@
 <Page x:Class="Universal_x86_Tuning_Utility.Views.Pages.Watercooler"
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-    Title="Watercooler Control"
-    Unloaded="Page_Unloaded"
-    ScrollViewer.CanContentScroll="False">
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:Universal_x86_Tuning_Utility.Views.Pages"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      mc:Ignorable="d"
+      d:DataContext="{d:DesignInstance local:Watercooler, IsDesignTimeCreatable=False}"
+      d:Background="{DynamicResource ApplicationBackgroundBrush}"
+      d:DesignHeight="650" d:DesignWidth="900"
+      Title="Watercooler Control"
+      Unloaded="Page_Unloaded"
+      SnapsToDevicePixels="True"
+      UseLayoutRounding="True"
+      ScrollViewer.CanContentScroll="False">
 
+    <!-- Root Grid with single row: full-height ScrollViewer for centered max-width layout.
+         The scrollbar is glued to the absolute right edge and spans the entire window vertically. -->
     <Grid>
-        <!-- Content -->
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Row 0: Full-height ScrollViewer -->
         <ScrollViewer x:Name="PageScrollViewer"
+                      Grid.Row="0"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       CanContentScroll="False"
                       PanningMode="VerticalOnly"
                       IsDeferredScrollingEnabled="False">
-            <StackPanel Margin="24">
+            <ScrollViewer.Style>
+                <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource {x:Type ScrollViewer}}">
+                    <Setter Property="Padding" Value="0" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ComputedVerticalScrollBarVisibility, RelativeSource={RelativeSource Self}}"
+                                     Value="Visible">
+                            <Setter Property="Padding" Value="0,0,8,0" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ScrollViewer.Style>
 
-            <!-- Header -->
-            <TextBlock x:Name="tbPageTitle"
-                Text="LCT Watercooler Control"
-                FontSize="20" FontWeight="SemiBold"
-                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                Margin="0,0,0,16"/>
+            <!-- Centered max-width layout container. Header and content share the same axis. -->
+            <Grid MaxWidth="1080" HorizontalAlignment="Stretch">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-            <!-- Device Status Card -->
-            <ui:CardControl Margin="0,0,0,12">
-                <ui:CardControl.Header>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+                <!-- Row 0: Page title block (36px side margin, 24px top for non-Home page) -->
+                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,24,0,0">
+                    <TextBlock x:Name="tbPageTitle"
+                               FontSize="26"
+                               FontWeight="Medium"
+                               Margin="36,0,36,0"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               Text="LCT Watercooler Control" />
+                    <TextBlock Margin="36,8,36,12"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="Control your LCT watercooler's pump speed, fan RPM, RGB lighting, and device settings."
+                               TextWrapping="Wrap" />
+                </StackPanel>
 
-                        <!-- Column 1: Device image with glow -->
-                        <StackPanel Grid.Column="0"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    Margin="16">
-                            <Grid Margin="0,0,0,12">
-                                <!-- Colored glow layer behind -->
-                                <Rectangle x:Name="rectGlowOverlay"
-                                           Width="165"
+                <!-- Row 1: Content cards (36px side margin, 16px top) -->
+                <StackPanel Grid.Row="1" Margin="36,16,36,18">
+
+                <!-- Device Status Card -->
+                <ui:CardControl Margin="0,0,0,8">
+                    <ui:CardControl.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Column 1: Device image with glow -->
+                            <StackPanel Grid.Column="0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Margin="16">
+                                <Grid Margin="0,0,0,12">
+                                    <!-- Colored glow layer behind -->
+                                    <Rectangle x:Name="rectGlowOverlay"
+                                               Width="165"
+                                               Height="140"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Fill="#007ACC"
+                                               Opacity="0"
+                                               RenderOptions.EdgeMode="Unspecified"
+                                               Margin="0,12,0,12">
+                                        <Rectangle.Effect>
+                                            <BlurEffect Radius="60"/>
+                                        </Rectangle.Effect>
+                                        <Rectangle.OpacityMask>
+                                            <ImageBrush ImageSource="pack://application:,,,/Assets/HydroUI/mk2.png"
+                                                        Stretch="Fill" />
+                                        </Rectangle.OpacityMask>
+                                    </Rectangle>
+                                    <!-- Sharp original image on top -->
+                                    <Image x:Name="imgDevice"
+                                           Width="320"
                                            Height="140"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           Fill="#007ACC"
-                                           Opacity="0"
-                                           RenderOptions.EdgeMode="Unspecified"
-                                           Margin="0,12,0,12">
-                                    <Rectangle.Effect>
-                                        <BlurEffect Radius="60"/>
-                                    </Rectangle.Effect>
-                                    <Rectangle.OpacityMask>
-                                        <ImageBrush ImageSource="pack://application:,,,/Assets/HydroUI/mk2.png"
-                                                    Stretch="Fill" />
-                                    </Rectangle.OpacityMask>
-                                </Rectangle>
-                                <!-- Sharp original image on top -->
-                                <Image x:Name="imgDevice"
-                                       Width="320"
-                                       Height="140"
-                                       Stretch="Uniform"
-                                       Source="pack://application:,,,/Assets/HydroUI/mk2.png" 
-                                       RenderOptions.BitmapScalingMode="HighQuality"/>
+                                           Stretch="Uniform"
+                                           Source="pack://application:,,,/Assets/HydroUI/mk2.png"
+                                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- Column 2: Status + action -->
+                            <StackPanel Grid.Column="1"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+
+                                <!-- Connected state -->
+                                <StackPanel x:Name="spConnectedState" Visibility="Collapsed">
+                                    <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                                 Glyph="&#xE73E;"
+                                                 FontSize="24"
+                                                 Foreground="Green"
+                                                 HorizontalAlignment="Center"
+                                                 Margin="0,0,0,8"/>
+                                    <TextBlock Text="Connected"
+                                               FontWeight="SemiBold"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,0,0,16"/>
+                                    <Button x:Name="btnDisconnect"
+                                            Content="Disconnect"
+                                            Width="140"
+                                            Click="btnDisconnect_Click"/>
+                                </StackPanel>
+
+                                <!-- Disconnected state -->
+                                <StackPanel x:Name="spDisconnectedState">
+                                    <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                                 Glyph="&#xE711;"
+                                                 FontSize="24"
+                                                 Foreground="Red"
+                                                 HorizontalAlignment="Center"
+                                                 Margin="0,0,0,8"/>
+                                    <TextBlock Text="Disconnected"
+                                               FontWeight="SemiBold"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,0,0,16"/>
+
+                                    <!-- Device discovery row -->
+                                    <Grid HorizontalAlignment="Center" Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="cbxDevices" Grid.Column="0" Margin="0,0,8,0" MinWidth="200" SelectionChanged="cbxDevices_SelectionChanged">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                                        <TextBlock Text=" (" Margin="6,0,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                                        <TextBlock Text="{Binding Address}" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                                        <TextBlock Text=")" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                                        <TextBlock Text="  RSSI: " Margin="12,0,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
+                                                        <TextBlock Text="{Binding Rssi}" Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                        <Button x:Name="btnScan" Grid.Column="1" Content="Scan" Width="80" Click="btnScan_Click"/>
+                                    </Grid>
+
+                                    <Button x:Name="btnConnect"
+                                            Content="Connect"
+                                            Width="140"
+                                            Click="btnConnect_Click"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </ui:CardControl.Header>
+                </ui:CardControl>
+
+                <!-- Controls (hidden until connected) -->
+                <StackPanel x:Name="spControls" Visibility="Collapsed">
+
+                    <!-- Pump Control -->
+                    <ui:CardControl Margin="0,0,0,8">
+                        <ui:CardControl.Icon>
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE945;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardControl.Icon>
+                        <ui:CardControl.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Pump Voltage" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Select pump voltage level. Higher voltage = more cooling." />
+                            </StackPanel>
+                        </ui:CardControl.Header>
+                        <ComboBox x:Name="cbxPumpVoltage" MinWidth="160" SelectionChanged="cbxPumpVoltage_SelectionChanged">
+                            <ComboBoxItem Content="Off"/>
+                            <ComboBoxItem Content="7V"/>
+                            <ComboBoxItem Content="8V"/>
+                            <ComboBoxItem Content="11V"/>
+                        </ComboBox>
+                    </ui:CardControl>
+
+                    <!-- Fan Control -->
+                    <ui:CardControl Margin="0,0,0,8">
+                        <ui:CardControl.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEC4A;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardControl.Icon>
+                        <ui:CardControl.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Fan Speed" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Select fan duty cycle. Higher = more airflow, more noise." />
+                            </StackPanel>
+                        </ui:CardControl.Header>
+                        <ComboBox x:Name="cbxFanSpeed" MinWidth="160" SelectionChanged="cbxFanSpeed_SelectionChanged">
+                            <ComboBoxItem Content="Off"/>
+                            <ComboBoxItem Content="25%"/>
+                            <ComboBoxItem Content="50%"/>
+                            <ComboBoxItem Content="75%"/>
+                            <ComboBoxItem Content="90%"/>
+                            <ComboBoxItem Content="95%"/>
+                            <ComboBoxItem Content="100%"/>
+                        </ComboBox>
+                    </ui:CardControl>
+
+                    <!-- RGB Control -->
+                    <ui:CardExpander x:Name="RgbCardExpander"
+                                     Margin="0,0,0,8"
+                                     IsExpanded="True"
+                                     Loaded="RgbCardExpander_Loaded">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE781;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="RGB Lighting" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Configure RGB lighting effects and colors." />
+                                </StackPanel>
+                                <ComboBox x:Name="cbxRgbMode"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          Margin="4,0,0,0"
+                                          SelectionChanged="cbxRgbMode_SelectionChanged">
+                                    <ComboBoxItem Content="Off"/>
+                                    <ComboBoxItem Content="Static"/>
+                                    <ComboBoxItem Content="Breathe"/>
+                                    <ComboBoxItem Content="Colorful"/>
+                                    <ComboBoxItem Content="Breathe Color"/>
+                                </ComboBox>
+                            </Grid>
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <Grid x:Name="RgbColorRow">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Color" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Pick the color for the selected RGB mode." />
+                                </StackPanel>
+                                <ComboBox x:Name="cbxRgbColor"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          Margin="4,0,0,0"
+                                          SelectionChanged="cbxRgbColor_SelectionChanged">
+                                    <ComboBoxItem Content="Red"/>
+                                    <ComboBoxItem Content="Green"/>
+                                    <ComboBoxItem Content="Blue"/>
+                                    <ComboBoxItem Content="White"/>
+                                </ComboBox>
                             </Grid>
                         </StackPanel>
+                    </ui:CardExpander>
 
-                        <!-- Column 2: Status + action -->
-                        <StackPanel Grid.Column="1"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center">
-
-                            <!-- Connected state -->
-                            <StackPanel x:Name="spConnectedState" Visibility="Collapsed">
-                                <ui:SymbolIcon Symbol="CheckmarkCircle48"
-                                               Foreground="Green"
-                                               HorizontalAlignment="Center"
-                                               Margin="0,0,0,8"/>
-                                <TextBlock Text="Connected"
-                                           FontWeight="SemiBold"
-                                           HorizontalAlignment="Center"
-                                           Margin="0,0,0,16"/>
-                                <Button x:Name="btnDisconnect"
-                                        Content="Disconnect"
-                                        Width="140"
-                                        Click="btnDisconnect_Click"/>
+                    <!-- Auto-Connect -->
+                    <ui:CardControl Margin="0,0,0,8">
+                        <ui:CardControl.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE777;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardControl.Icon>
+                        <ui:CardControl.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Auto-Connect on Startup" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Automatically connect to the last known device on startup." />
                             </StackPanel>
+                        </ui:CardControl.Header>
+                        <ui:ToggleSwitch x:Name="tsAutoConnect"
+                                         Margin="4,0,0,0"
+                                         LabelPosition="Left"
+                                         OnContent="On"
+                                         OffContent="Off"
+                                         Checked="tsAutoConnect_Checked"
+                                         Unchecked="tsAutoConnect_Unchecked" />
+                    </ui:CardControl>
 
-                            <!-- Disconnected state -->
-                            <StackPanel x:Name="spDisconnectedState">
-                                <ui:SymbolIcon Symbol="DismissCircle48"
-                                               Foreground="Red"
-                                               HorizontalAlignment="Center"
-                                               Margin="0,0,0,8"/>
-                                <TextBlock Text="Disconnected"
-                                           FontWeight="SemiBold"
-                                           HorizontalAlignment="Center"
-                                           Margin="0,0,0,16"/>
-
-                                <!-- Device discovery row -->
-                                <Grid HorizontalAlignment="Center" Margin="0,0,0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <ComboBox x:Name="cbxDevices" Grid.Column="0" Margin="0,0,8,0" MinWidth="200" SelectionChanged="cbxDevices_SelectionChanged">
-                                        <ComboBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <StackPanel Orientation="Horizontal">
-                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
-                                                    <TextBlock Text=" (" Margin="6,0,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                                                    <TextBlock Text="{Binding Address}" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                                                    <TextBlock Text=")" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
-                                                    <TextBlock Text="  RSSI: " Margin="12,0,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
-                                                    <TextBlock Text="{Binding Rssi}" Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
-                                                </StackPanel>
-                                            </DataTemplate>
-                                        </ComboBox.ItemTemplate>
-                                    </ComboBox>
-                                    <Button x:Name="btnScan" Grid.Column="1" Content="Scan" Width="80" Click="btnScan_Click"/>
-                                </Grid>
-
-                                <Button x:Name="btnConnect"
-                                        Content="Connect"
-                                        Width="140"
-                                        Click="btnConnect_Click"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </Grid>
-                </ui:CardControl.Header>
-            </ui:CardControl>
-
-            <!-- Controls (hidden until connected) -->
-            <StackPanel x:Name="spControls" Visibility="Collapsed">
-
-            <!-- Pump Control -->
-            <ui:CardControl Margin="0,0,0,12">
-                <ui:CardControl.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Play24" Margin="0,0,8,0"/>
-                        <TextBlock Text="Pump Voltage"/>
-                    </StackPanel>
-                </ui:CardControl.Header>
-                <StackPanel HorizontalAlignment="Right">
-                    <ComboBox x:Name="cbxPumpVoltage" MinWidth="160" SelectionChanged="cbxPumpVoltage_SelectionChanged">
-                        <ComboBoxItem Content="Off"/>
-                        <ComboBoxItem Content="7V"/>
-                        <ComboBoxItem Content="8V"/>
-                        <ComboBoxItem Content="11V"/>
-                    </ComboBox>
-                    <TextBlock Text="Select pump voltage level. Higher voltage = more cooling."
-                        FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,4,0,0"/>
                 </StackPanel>
-            </ui:CardControl>
 
-            <!-- Fan Control -->
-            <ui:CardControl Margin="0,0,0,12">
-                <ui:CardControl.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="RotateLeft24" Margin="0,0,8,0"/>
-                        <TextBlock Text="Fan Speed"/>
-                    </StackPanel>
-                </ui:CardControl.Header>
-                <StackPanel HorizontalAlignment="Right">
-                    <ComboBox x:Name="cbxFanSpeed" MinWidth="160" SelectionChanged="cbxFanSpeed_SelectionChanged">
-                        <ComboBoxItem Content="Off"/>
-                        <ComboBoxItem Content="25%"/>
-                        <ComboBoxItem Content="50%"/>
-                        <ComboBoxItem Content="75%"/>
-                        <ComboBoxItem Content="90%"/>
-                        <ComboBoxItem Content="95%"/>
-                        <ComboBoxItem Content="100%"/>
-                    </ComboBox>
-                    <TextBlock Text="Select fan duty cycle. Higher = more airflow, more noise."
-                        FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,4,0,0"/>
-                </StackPanel>
-            </ui:CardControl>
-
-            <!-- RGB Control -->
-            <ui:CardControl Margin="0,0,0,12">
-                <ui:CardControl.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Color24" Margin="0,0,8,0"/>
-                        <TextBlock Text="RGB Lighting"/>
-                    </StackPanel>
-                </ui:CardControl.Header>
-                <StackPanel HorizontalAlignment="Right">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <TextBlock Text="Mode:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <ComboBox x:Name="cbxRgbMode" MinWidth="160" SelectionChanged="cbxRgbMode_SelectionChanged">
-                            <ComboBoxItem Content="Off"/>
-                            <ComboBoxItem Content="Static"/>
-                            <ComboBoxItem Content="Breathe"/>
-                            <ComboBoxItem Content="Colorful"/>
-                            <ComboBoxItem Content="Breathe Color"/>
-                        </ComboBox>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Color:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <ComboBox x:Name="cbxRgbColor" MinWidth="160" SelectionChanged="cbxRgbColor_SelectionChanged">
-                            <ComboBoxItem Content="Red"/>
-                            <ComboBoxItem Content="Green"/>
-                            <ComboBoxItem Content="Blue"/>
-                            <ComboBoxItem Content="White"/>
-                        </ComboBox>
-                    </StackPanel>
-                </StackPanel>
-            </ui:CardControl>
-
-            <!-- Settings -->
-            <ui:CardControl Margin="0,0,0,12">
-                <ui:CardControl.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Settings24" Margin="0,0,8,0"/>
-                        <TextBlock Text="Settings"/>
-                    </StackPanel>
-                </ui:CardControl.Header>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <ui:ToggleSwitch x:Name="tsAutoConnect" Margin="0,0,9,0" Checked="tsAutoConnect_Checked" Unchecked="tsAutoConnect_Unchecked"/>
-                    <TextBlock Text="Auto-connect on startup" VerticalAlignment="Center"/>
-                </StackPanel>
-            </ui:CardControl>
-
-        </StackPanel>
-
-    </StackPanel>
+            </StackPanel>
+            </Grid>
         </ScrollViewer>
 
         <!-- Dark overlay to block input when Adaptive Mode override is active -->

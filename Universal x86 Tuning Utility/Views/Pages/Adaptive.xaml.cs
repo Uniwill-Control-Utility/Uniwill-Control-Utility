@@ -603,6 +603,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             RgbState.Static or RgbState.Breathe => Visibility.Visible,
                             _ => Visibility.Collapsed
                         };
+                        WcRgbColorDivider.Visibility = spWcRgbColor.Visibility;
                     }
                     if (Enum.TryParse<RgbColor>(myPreset.WcRgbColor, true, out var rcLoad))
                         cbxWcRgbColor.SelectedIndex = GetRgbColorIndex(rcLoad);
@@ -875,7 +876,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private void cbxBs2ProEnabled_Toggled(object sender, RoutedEventArgs e)
         {
             bool enabled = (bool)cbxBs2ProEnabled.IsChecked;
-            tbBs2ProEnabledLabel.Text = enabled ? "On" : "Off";
             Settings.Default.AdaptiveBs2ProEnabled = enabled;
             Settings.Default.Save();
 
@@ -1817,11 +1817,13 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (spWcRgbColor == null) return;
 
             var mode = GetRgbModeFromIndex(cbxWcRgbMode.SelectedIndex);
-            spWcRgbColor.Visibility = mode switch
+            var visibility = mode switch
             {
                 RgbState.Static or RgbState.Breathe => Visibility.Visible,
                 _ => Visibility.Collapsed
             };
+            spWcRgbColor.Visibility = visibility;
+            WcRgbColorDivider.Visibility = visibility;
         }
 
         #endregion

@@ -732,52 +732,86 @@
 
                     <!-- Hydro UI (Watercooler) - only visible on supported hardware -->
                     <ui:CardExpander Name="sdHydroUI"
-                        Visibility="Collapsed"
-                        IsEnabled="True"
-                        IsExpanded="False"
-                        Icon="Play20" Margin="0,8,15,0">
+                                     Visibility="Collapsed"
+                                     IsEnabled="True"
+                                     IsExpanded="False"
+                                     Margin="0,8,15,0">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEB42;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock
-                                        FontSize="14"
-                                        FontWeight="Medium"
-                                        Text="Hydro UI (Watercooler)" />
-                                    <TextBlock
-                                        FontSize="12"
-                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                        Text="Per-game pump voltage and fan speed for the LCT watercooler."/>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Hydro UI (Watercooler)" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Per-game pump voltage, fan speed, and RGB for the LCT watercooler." />
                                 </StackPanel>
-                                <ui:ToggleSwitch Name="cbxWcEnabled" Grid.Column="1" VerticalAlignment="Center"
-                                    Margin="0,0,9,0"
-                                    ToolTip="Enable Hydro UI controls for this game"
-                                    Checked="cbxWcEnabled_Toggled"
-                                    Unchecked="cbxWcEnabled_Toggled" />
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <ui:ToggleSwitch Name="cbxWcEnabled"
+                                                      Margin="0,0,9,0"
+                                                      LabelPosition="Left"
+                                                      OnContent="On"
+                                                      OffContent="Off"
+                                                      ToolTip="Enable Hydro UI controls for this game"
+                                                      Checked="cbxWcEnabled_Toggled"
+                                                      Unchecked="cbxWcEnabled_Toggled" />
+                                </StackPanel>
                             </Grid>
                         </ui:CardExpander.Header>
                         <StackPanel>
-                            <StackPanel Margin="0,-8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Pump Voltage</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select the pump voltage for this game. Higher voltage = more cooling." VerticalAlignment="Bottom" />
+                            <!-- Row: Pump Voltage -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Pump Voltage" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select the pump voltage for this game. Higher voltage = more cooling." />
                                 </StackPanel>
-                                <ComboBox Name="cbxWcPumpVoltage" MinWidth="160" Margin="0,4,0,0" Height="37" SelectedIndex="1">
+                                <ComboBox Name="cbxWcPumpVoltage"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          Margin="4,0,0,0"
+                                          SelectedIndex="1">
                                     <ComboBoxItem>Off</ComboBoxItem>
                                     <ComboBoxItem>7V</ComboBoxItem>
                                     <ComboBoxItem>8V</ComboBoxItem>
                                     <ComboBoxItem>11V</ComboBoxItem>
                                 </ComboBox>
-                            </StackPanel>
-                            <StackPanel Margin="0,8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Fan Speed</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select the fan duty cycle for this game. Higher = more airflow, more noise." VerticalAlignment="Bottom" />
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Row: Fan Speed -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Fan Speed" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select the fan duty cycle for this game. Higher = more airflow, more noise." />
                                 </StackPanel>
-                                <ComboBox Name="cbxWcFanSpeed" MinWidth="160" Margin="0,4,0,0" Height="37" SelectedIndex="2">
+                                <ComboBox Name="cbxWcFanSpeed"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          Margin="4,0,0,0"
+                                          SelectedIndex="2">
                                     <ComboBoxItem>Off</ComboBoxItem>
                                     <ComboBoxItem>25%</ComboBoxItem>
                                     <ComboBoxItem>50%</ComboBoxItem>
@@ -786,32 +820,65 @@
                                     <ComboBoxItem>95%</ComboBoxItem>
                                     <ComboBoxItem>100%</ComboBoxItem>
                                 </ComboBox>
-                            </StackPanel>
-                            <StackPanel Margin="0,8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">RGB Mode</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select the RGB lighting mode for this game." VerticalAlignment="Bottom" />
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Row: RGB Mode -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="RGB Mode" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select the RGB lighting mode for this game." />
                                 </StackPanel>
-                                <ComboBox Name="cbxWcRgbMode" MinWidth="160" Margin="0,4,0,0" Height="37" SelectedIndex="1" SelectionChanged="cbxWcRgbMode_SelectionChanged">
+                                <ComboBox Name="cbxWcRgbMode"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          Margin="4,0,0,0"
+                                          SelectedIndex="1"
+                                          SelectionChanged="cbxWcRgbMode_SelectionChanged">
                                     <ComboBoxItem>Off</ComboBoxItem>
                                     <ComboBoxItem>Static</ComboBoxItem>
                                     <ComboBoxItem>Breathe</ComboBoxItem>
                                     <ComboBoxItem>Colorful</ComboBoxItem>
                                     <ComboBoxItem>Breathe Color</ComboBoxItem>
                                 </ComboBox>
-                            </StackPanel>
-                            <StackPanel x:Name="spWcRgbColor" Margin="0,8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">RGB Color</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select the RGB color for this game." VerticalAlignment="Bottom" />
+                            </Grid>
+                            <!-- Divider (hidden for modes without color) -->
+                            <Border x:Name="WcRgbColorDivider"
+                                    Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+                            <!-- Row: RGB Color (hidden for Off/Colorful/Breathe Color) -->
+                            <Grid x:Name="spWcRgbColor">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="RGB Color" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select the RGB color for this game." />
                                 </StackPanel>
-                                <ComboBox Name="cbxWcRgbColor" MinWidth="160" Margin="0,4,0,0" Height="37" SelectedIndex="0">
+                                <ComboBox Name="cbxWcRgbColor"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          Margin="4,0,0,0"
+                                          SelectedIndex="0">
                                     <ComboBoxItem>Red</ComboBoxItem>
                                     <ComboBoxItem>Green</ComboBoxItem>
                                     <ComboBoxItem>Blue</ComboBoxItem>
                                     <ComboBoxItem>White</ComboBoxItem>
                                 </ComboBox>
-                            </StackPanel>
+                            </Grid>
                         </StackPanel>
                     </ui:CardExpander>
 
@@ -822,7 +889,7 @@
                                     IsExpanded="False"
                                     Margin="0,8,15,0">
                         <ui:CardExpander.Icon>
-                            <controls:FlydigiIconElement />
+                            <controls:FlydigiIconElement Margin="4,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -843,14 +910,11 @@
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
                                             VerticalAlignment="Center">
-                                    <TextBlock x:Name="tbBs2ProEnabledLabel"
-                                               Margin="0,0,8,0"
-                                               VerticalAlignment="Center"
-                                               FontSize="12"
-                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                               Text="Off" />
                                     <ui:ToggleSwitch x:Name="cbxBs2ProEnabled"
                                                      Margin="0,0,9,0"
+                                                     LabelPosition="Left"
+                                                     OnContent="On"
+                                                     OffContent="Off"
                                                      ToolTip="Enable cooling pad controls for this game"
                                                      Checked="cbxBs2ProEnabled_Toggled"
                                                      Unchecked="cbxBs2ProEnabled_Toggled" />
@@ -1271,7 +1335,7 @@
                         IsExpanded="False"
                         Margin="0,8,15,0">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE92E;" FontSize="20" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE92E;" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>

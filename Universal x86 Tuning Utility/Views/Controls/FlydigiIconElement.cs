@@ -30,8 +30,8 @@ public sealed class FlydigiIconElement : IconElement
         {
             Data = geometry,
             Stretch = Stretch.Uniform,
-            Width = 24,
-            Height = 24,
+            Width = 20,
+            Height = 20,
             SnapsToDevicePixels = true
         };
     }

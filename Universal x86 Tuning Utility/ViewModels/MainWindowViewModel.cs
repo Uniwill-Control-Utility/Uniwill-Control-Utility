@@ -7,12 +7,10 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Data;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Shapes;
 using Universal_x86_Tuning_Utility.Scripts;
 using Universal_x86_Tuning_Utility.Services;
+using Universal_x86_Tuning_Utility.Views.Controls;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
 
@@ -59,7 +57,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
 
         private void InitializeViewModel()
         {
-            ApplicationTitle = "Universal x86 Tuning Utility";
+            ApplicationTitle = "Uniwill Control Utility";
 
             NavigationItems = new ObservableCollection<object>
             {
@@ -79,7 +77,9 @@ namespace Universal_x86_Tuning_Utility.ViewModels
             // Hydro UI in footer for supported watercooler hardware
             if (WaterCoolerHardwareDetector.IsSupportedHardware())
             {
-                NavigationFooter.Add(CreateNavigationItem("Hydro UI", "watercooler", SymbolRegular.Water24, typeof(Views.Pages.Watercooler)));
+                var hydroItem = CreateNavigationItem("Hydro UI", "watercooler", SymbolRegular.Empty, typeof(Views.Pages.Watercooler));
+                hydroItem.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = "\uEB42", FontSize = 20 };
+                NavigationFooter.Add(hydroItem);
             }
 
             // Flydigi cooler in footer
@@ -117,7 +117,6 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                     "games" => SymbolRegular.Games24,
                     "overlay" => SymbolRegular.DesktopPulse24,
                     "auto" => SymbolRegular.Transmission24,
-                    "watercooler" => SymbolRegular.Water24,
                     "fancontrol" => SymbolRegular.Gauge24,
                     "keyboard" => SymbolRegular.Keyboard24,
                     "settings" => SymbolRegular.Settings24,
@@ -187,44 +186,6 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                 TargetPageTag = "flydigicooler",
                 Icon = new FlydigiIconElement()
             };
-        }
-
-        /// <summary>
-        /// A Path-based IconElement for the Flydigi logo. The Fill binds to the inherited
-        /// Foreground from the parent NavigationViewItem, so it follows theme changes.
-        /// </summary>
-        private sealed class FlydigiIconElement : IconElement
-        {
-            private readonly Path _path;
-
-            public FlydigiIconElement()
-            {
-                var geometry = Geometry.Parse(
-                    "M19.015,7.83 L0,0 L15.659,23.488 L16.777,21.251 L10.066,10.066 L15.659,11.185 " +
-                    "L20.287,18.706 L16.777,25.726 L22.369,40.267 L27.962,25.726 L25.609,21.02 " +
-                    "L23.645,24.163 L24.607,25.726 L22.369,40.267 L20.132,25.726 L29.079,11.185 " +
-                    "L34.673,10.066 L27.962,21.251 L29.08,23.488 L45,0 L25.985,7.829 " +
-                    "L22.63,14.54 L19.274,7.83 Z");
-
-                _path = new Path
-                {
-                    Data = geometry,
-                    Stretch = Stretch.Uniform,
-                    Width = 24,
-                    Height = 24,
-                    SnapsToDevicePixels = true
-                };
-            }
-
-            protected override UIElement InitializeChildren()
-            {
-                _path.SetBinding(Path.FillProperty, new Binding("Foreground")
-                {
-                    RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(NavigationViewItem), 1),
-                    Mode = BindingMode.OneWay
-                });
-                return _path;
-            }
         }
 
         private static void OpenUrl(string url) =>
