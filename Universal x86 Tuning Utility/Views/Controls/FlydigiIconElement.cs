@@ -19,6 +19,16 @@ public sealed class FlydigiIconElement : IconElement
 
     public FlydigiIconElement()
     {
+        // Original SVG viewBox is 0 0 45 41 (aspect ratio 1.118, wider than tall).
+        // To keep the logo undistorted, we scale uniformly.  In a 20x20 slot with
+        // Stretch.Uniform the icon renders at 20 x 17.9px — visibly smaller than
+        // FontIcon/SymbolIcon which fill the full em-box.
+        //
+        // Fix: use a larger container so the uniformly-scaled geometry fills the
+        // visual space of a 20px icon.  20 / (40.267/45) = 22.35, rounded to 22.
+        // The IconElement parent grid clips to the available slot so there is no
+        // layout bleed, but the rendered glyph is optically the same size as a
+        // 20px FontIcon.
         var geometry = Geometry.Parse(
             "M19.015,7.83 L0,0 L15.659,23.488 L16.777,21.251 L10.066,10.066 L15.659,11.185 " +
             "L20.287,18.706 L16.777,25.726 L22.369,40.267 L27.962,25.726 L25.609,21.02 " +
@@ -30,8 +40,8 @@ public sealed class FlydigiIconElement : IconElement
         {
             Data = geometry,
             Stretch = Stretch.Uniform,
-            Width = 20,
-            Height = 20,
+            Width = 22,
+            Height = 22,
             SnapsToDevicePixels = true
         };
     }
