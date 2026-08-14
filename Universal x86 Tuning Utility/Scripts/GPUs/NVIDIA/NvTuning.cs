@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using Universal_x86_Tuning_Utility.Scripts.Misc;
 using static NvAPIWrapper.Native.GPU.Structures.PerformanceStates20InfoV1;
 
 namespace Universal_x86_Tuning_Utility.Scripts.GPUs.NVIDIA
@@ -112,22 +113,41 @@ namespace Universal_x86_Tuning_Utility.Scripts.GPUs.NVIDIA
             }
         }
 
-        public static int SetPowerLimit(int watts)
+        public static int SetPowerLimit(int totalWatts, int dbOffset = 0)
         {
             try
             {
-                if (!TryGetNvmlGpu(out IntPtr gpu)) return -1;
-                if (!TryGetPowerLimitInfo(out PowerLimitInfo info)) return -1;
+                if (totalWatts < 5 || totalWatts > 175)
+                {
+                    DiagnosticLogger.LogInfo($"SetPowerLimit({totalWatts}W, db={dbOffset}W): out of range 5-175W, skipped");
+                    return 0;
+                }
 
-                if (watts < info.MinWatts || watts > info.MaxWatts) return 0;
-                if (watts == info.CurrentWatts) return 0;
+                // Laptop GPUs don't support nvmlDeviceSetPowerManagementLimit (returns NOT_SUPPORTED).
+                // Use EC register writes directly (same method as tuxedo-drivers on Linux).
+                // The EC DB offset register (0x0746) accepts 0-25W to add on top of base TGP.
+                var ec = RyzenAdj_To_UXTU.EcService;
+                if (ec == null)
+                {
+                    DiagnosticLogger.LogInfo($"SetPowerLimit({totalWatts}W, db={dbOffset}W): EC service unavailable");
+                    return -1;
+                }
 
-                return Nvml.nvmlDeviceSetPowerManagementLimit(gpu, (uint)watts * 1000) == Nvml.NVML_SUCCESS
-                    ? 1
-                    : -1;
+                // GPU power control on these laptops works through EC registers only.
+                // NVML returns NOT_SUPPORTED on laptops, and NvAPI has no GPU power
+                // control functions (GPUInfoDLL.dll from XMG CC uses only read-only NvAPI).
+                // The EC register sequence (from tuxedo-drivers on Linux):
+                //   0x0743 = enable bits (GENERAL|DB|CTGP)
+                //   0x0744 = cTGP offset
+                //   0x0745 = TPP offset
+                //   0x0746 = Dynamic Boost offset
+                ec.ActivateGpuPowerControl(dbOffset);
+
+                return 1;
             }
-            catch
+            catch (Exception ex)
             {
+                DiagnosticLogger.LogInfo($"SetPowerLimit({totalWatts}W, db={dbOffset}W): EXCEPTION {ex.GetType().Name}: {ex.Message}");
                 return -1;
             }
         }
@@ -145,14 +165,36 @@ namespace Universal_x86_Tuning_Utility.Scripts.GPUs.NVIDIA
 
             try
             {
-                if (!TryGetNvmlGpu(out IntPtr gpu)) return false;
+                if (!TryGetNvmlGpu(out IntPtr gpu))
+                {
+                    DiagnosticLogger.LogInfo("TryGetPowerLimitInfo: NVML GPU handle failed");
+                    return false;
+                }
 
                 int range = Nvml.nvmlDeviceGetPowerManagementLimitConstraints(gpu, out uint minMw, out uint maxMw);
-                int current = Nvml.nvmlDeviceGetPowerManagementLimit(gpu, out uint currentMw);
-                int def = Nvml.nvmlDeviceGetPowerManagementDefaultLimit(gpu, out uint defaultMw);
+                DiagnosticLogger.LogInfo($"TryGetPowerLimitInfo: constraints={range} (min={minMw}mW max={maxMw}mW)");
 
-                if (range != Nvml.NVML_SUCCESS || current != Nvml.NVML_SUCCESS || def != Nvml.NVML_SUCCESS)
+                // nvmlDeviceGetPowerManagementLimit returns NOT_SUPPORTED (3) on many laptop GPUs.
+                // Fall back to the default value if current is unavailable.
+                int current = Nvml.nvmlDeviceGetPowerManagementLimit(gpu, out uint currentMw);
+                DiagnosticLogger.LogInfo($"TryGetPowerLimitInfo: current={current} ({currentMw}mW)");
+
+                int def = Nvml.nvmlDeviceGetPowerManagementDefaultLimit(gpu, out uint defaultMw);
+                DiagnosticLogger.LogInfo($"TryGetPowerLimitInfo: default={def} ({defaultMw}mW)");
+
+                // Constraints and default are required; current is optional (laptops often return NOT_SUPPORTED).
+                if (range != Nvml.NVML_SUCCESS || def != Nvml.NVML_SUCCESS)
+                {
+                    DiagnosticLogger.LogInfo($"TryGetPowerLimitInfo: FAILED range={range} def={def}");
                     return false;
+                }
+
+                // Use default as fallback for current if NOT_SUPPORTED.
+                if (current != Nvml.NVML_SUCCESS)
+                {
+                    currentMw = defaultMw;
+                    DiagnosticLogger.LogInfo($"TryGetPowerLimitInfo: current not supported, falling back to default ({defaultMw}mW)");
+                }
 
                 info = new PowerLimitInfo(
                     (int)(minMw / 1000),
@@ -163,8 +205,9 @@ namespace Universal_x86_Tuning_Utility.Scripts.GPUs.NVIDIA
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                DiagnosticLogger.LogInfo($"TryGetPowerLimitInfo: EXCEPTION {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }

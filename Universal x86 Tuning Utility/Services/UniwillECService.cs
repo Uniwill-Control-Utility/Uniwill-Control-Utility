@@ -76,6 +76,19 @@ namespace Universal_x86_Tuning_Utility.Services
         // --- AP_OEM flags ---
         public const ushort REG_AP_OEM = 0x0741;
 
+        // --- NVIDIA GPU power control (cTGP / Dynamic Boost) ---
+        public const ushort REG_CUSTOM_PROFILE = 0x0727;
+        public const byte CUSTOM_PROFILE_ENABLE = 0x40; // bit 6
+        public const ushort REG_CTGP_DB_ENABLE = 0x0743;       // Enable bits: GENERAL(0x01), DB(0x02), CTGP(0x04)
+        public const ushort REG_CTGP_DB_CTGP_OFFSET = 0x0744;
+        public const ushort REG_CTGP_DB_TPP_OFFSET = 0x0745;
+        public const ushort REG_CTGP_DB_DB_OFFSET = 0x0746;
+
+        // CTGP_DB enable bit masks (from tuxedo-drivers uniwill_interfaces.h)
+        public const byte CTGP_DB_ENABLE_GENERAL = 0x01;
+        public const byte CTGP_DB_ENABLE_DB = 0x02;
+        public const byte CTGP_DB_ENABLE_CTGP = 0x04;
+
         // --- PWM readback ---
         public const ushort REG_PWM_1 = 0x075B;
         public const ushort REG_PWM_2 = 0x075C;
@@ -417,6 +430,107 @@ namespace Universal_x86_Tuning_Utility.Services
                     Thread.Sleep(EcDelayMs);
                 }
             }
+        }
+
+        #endregion
+
+        #region NVIDIA GPU Power Control (cTGP / Dynamic Boost)
+
+        /// <summary>
+        /// Activates the EC GPU power control feature set (cTGP + Dynamic Boost).
+        /// Must be called BEFORE setting GPU power limits via NVML to raise the
+        /// ceiling above NVIDIA's default 150W laptop GPU limit.
+        ///
+        /// From tuxedo-drivers: tuxedo_nb02_nvidia_power_ctrl.c :: init_db_and_ctgp()
+        ///
+        /// WARNING: Registers 0x0743-0x0746 overlap with "manual-mode fan-curve" block.
+        /// Call this AFTER fan initialization to avoid clobbering fan curve data.
+        /// </summary>
+        /// <param name="dbOffset">Dynamic Boost range in watts (0-25). Default 25 gives +25W GPU borrow from CPU.</param>
+        public void ActivateGpuPowerControl(int dbOffset = 25)
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                DebugLog($"ActivateGpuPowerControl(dbOffset={dbOffset})");
+
+                // Prerequisite: enable CUSTOM_PROFILE mode so the EC accepts GPU power writes.
+                byte beforeCp = (byte)ReadEC(REG_CUSTOM_PROFILE);
+                byte customProfile = (byte)(beforeCp | CUSTOM_PROFILE_ENABLE);
+                WriteEC(REG_CUSTOM_PROFILE, customProfile);
+                Thread.Sleep(EcDelayMs);
+
+                // Step 0: Set GPU power management enable flag (0x0741).
+                WriteEC(0x0741, 0x01);
+                Thread.Sleep(EcDelayMs);
+
+                // Step 0.5: Enable CTGP/DB feature in EC (0x0743).
+                // tuxedo-drivers writes this register to enable GPU power control.
+                // Bits: GENERAL(0x01), DB(0x02), CTGP(0x04)
+                // All three must be set for the NVIDIA driver to recognize EC power limits.
+                byte ctgpDbEnable = CTGP_DB_ENABLE_GENERAL | CTGP_DB_ENABLE_DB | CTGP_DB_ENABLE_CTGP; // 0x07
+                WriteEC(REG_CTGP_DB_ENABLE, ctgpDbEnable);
+                Thread.Sleep(EcDelayMs);
+
+                // Step 1: cTGP offset - XMG CC uses 0x37 (55) for Enthusiast/Overboost.
+                WriteEC(REG_CTGP_DB_CTGP_OFFSET, 55);
+                Thread.Sleep(EcDelayMs);
+
+                // Step 2: TPP offset = 255 (max total power pool)
+                WriteEC(REG_CTGP_DB_TPP_OFFSET, 255);
+                Thread.Sleep(EcDelayMs);
+
+                // Step 3: Dynamic Boost offset (watts the GPU can borrow from CPU)
+                byte dbClamped = (byte)Math.Clamp(dbOffset, 0, 25);
+                WriteEC(REG_CTGP_DB_DB_OFFSET, dbClamped);
+                Thread.Sleep(EcDelayMs);
+
+                // Verify writes by reading back all registers
+                byte r0 = (byte)ReadEC(REG_CUSTOM_PROFILE);
+                byte r1 = (byte)ReadEC(REG_CTGP_DB_ENABLE);
+                byte r2 = (byte)ReadEC(REG_CTGP_DB_CTGP_OFFSET);
+                byte r3 = (byte)ReadEC(REG_CTGP_DB_TPP_OFFSET);
+                byte r4 = (byte)ReadEC(REG_CTGP_DB_DB_OFFSET);
+                DebugLog($"ActivateGpuPowerControl readback: 0x0727=0x{r0:X2} 0x0743=0x{r1:X2} 0x0744=0x{r2:X2} 0x0745=0x{r3:X2} 0x0746=0x{r4:X2} (wanted db=0x{dbClamped:X2})");
+            }
+        }
+
+        /// <summary>
+        /// Disables the EC GPU power control feature set. Restores NVIDIA default 150W ceiling.
+        /// </summary>
+        public void DeactivateGpuPowerControl()
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                // Disable CTGP/DB feature in EC (0x0743 = 0x00)
+                WriteEC(REG_CTGP_DB_ENABLE, 0x00);
+                Thread.Sleep(EcDelayMs);
+
+                // Reset offsets to defaults
+                WriteEC(REG_CTGP_DB_CTGP_OFFSET, 55);
+                Thread.Sleep(EcDelayMs);
+                WriteEC(REG_CTGP_DB_TPP_OFFSET, 0);
+                Thread.Sleep(EcDelayMs);
+                WriteEC(REG_CTGP_DB_DB_OFFSET, 0);
+            }
+        }
+
+        /// <summary>
+        /// Gets the current TCC (Thermal Comfort Control) offset from the EC.
+        /// Returns the value of register 0x0746 (Dynamic Boost / TCC offset register).
+        /// </summary>
+        public int GetTccOffset()
+        {
+            return ReadECRegister(REG_CTGP_DB_DB_OFFSET);
+        }
+
+        /// <summary>
+        /// Sets the TCC offset on the EC.
+        /// </summary>
+        public void SetTccOffset(int value)
+        {
+            WriteECRegister(REG_CTGP_DB_DB_OFFSET, (byte)Math.Clamp(value, 0, 255));
         }
 
         #endregion
