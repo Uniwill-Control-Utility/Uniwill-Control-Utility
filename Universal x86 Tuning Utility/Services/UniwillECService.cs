@@ -61,6 +61,7 @@ namespace Universal_x86_Tuning_Utility.Services
         public const ushort REG_PL2_SETTING = 0x0784;
         public const ushort REG_PL4_SETTING = 0x0785;
         public const ushort REG_TCC_OFFSET = 0x0786;
+        public const ushort REG_PL5_SETTING = 0x0788;  // appears to be the authoritative sustained power cap on AM5/FireRange
         public const ushort REG_MODE_INDEX = 0x07AB;
 
         // --- Keyboard backlight ---
@@ -284,15 +285,28 @@ namespace Universal_x86_Tuning_Utility.Services
                 Thread.Sleep(50);
                 DebugLog("[DIAG] UniwillEC: Step 1 — Handshake complete");
 
-                // Step 2: Activation — write 0x05 to 0x741 (AP_OEM)
-                WriteECRaw(0x0741, 0x05);
+                // Step 2: Activation — write 0x01 to 0x0741 (manual mode).
+                // The Linux driver (tuxedo_io) writes 0x01 here. Previously we used 0x05
+                // which may have had a side effect of enforcing the BIOS power ceiling.
+                WriteECRaw(0x0741, 0x01);
                 Thread.Sleep(50);
-                DebugLog("[DIAG] UniwillEC: Step 2 — Activation complete");
+                DebugLog("[DIAG] UniwillEC: Step 2 — Manual mode enabled (0x741=0x01)");
 
                 // Step 3: Feature enable — write 0x81 to 0x748
                 WriteECRaw(0x0748, 0x81);
                 Thread.Sleep(50);
                 DebugLog("[DIAG] UniwillEC: Step 3 — Feature enable complete");
+
+                // Step 3b: Power management activation — set bit 7 of 0x726 and bit 6 of 0x727.
+                // MechControl performs this step between feature enable and fan curve enable.
+                // Without it, the EC may accept power limit writes but not apply them to hardware.
+                byte reg726 = (byte)(ReadECRaw(0x0726) | 0x80);
+                WriteECRaw(0x0726, reg726);
+                Thread.Sleep(50);
+                byte reg727 = (byte)(ReadECRaw(0x0727) | 0x40);
+                WriteECRaw(0x0727, reg727);
+                Thread.Sleep(50);
+                DebugLog($"[DIAG] UniwillEC: Step 3b — Power management activation (0x726=0x{reg726:X2}, 0x727=0x{reg727:X2})");
 
                 // Step 4: Fan curve enable bits — set bits 7,6,5 of 0x7C5 (OR with 0xE0)
                 byte ufCtrl = (byte)(ReadECRaw(0x07C5) | 0xE0);
@@ -518,19 +532,20 @@ namespace Universal_x86_Tuning_Utility.Services
 
         /// <summary>
         /// Gets the current TCC (Thermal Comfort Control) offset from the EC.
-        /// Returns the value of register 0x0746 (Dynamic Boost / TCC offset register).
+        /// Returns the value of register 0x0786 (CPU TCC offset).
         /// </summary>
         public int GetTccOffset()
         {
-            return ReadECRegister(REG_CTGP_DB_DB_OFFSET);
+            return ReadECRegister(REG_TCC_OFFSET);
         }
 
         /// <summary>
-        /// Sets the TCC offset on the EC.
+        /// Sets the TCC offset on the EC (register 0x0786).
+        /// Value is offset from 95°C default. 0 = no offset (95°C), 10 = 85°C throttle.
         /// </summary>
         public void SetTccOffset(int value)
         {
-            WriteECRegister(REG_CTGP_DB_DB_OFFSET, (byte)Math.Clamp(value, 0, 255));
+            WriteECRegister(REG_TCC_OFFSET, (byte)Math.Clamp(value, 0, 255));
         }
 
         #endregion
@@ -1302,6 +1317,210 @@ namespace Universal_x86_Tuning_Utility.Services
         public void SetPl4(int watts)
         {
             WriteECRegister(REG_PL4_SETTING, (byte)Math.Clamp(watts, 0, 255));
+        }
+
+        /// <summary>
+        /// Reads the CPU PL5 (sustained power limit) in watts.
+        /// This appears to be the authoritative power cap on AM5/FireRange.
+        /// </summary>
+        public int GetPl5()
+        {
+            return ReadECRegister(REG_PL5_SETTING);
+        }
+
+        /// <summary>
+        /// Sets the CPU PL5 power limit in watts.
+        /// On AM5/FireRange, this may be the actual enforced sustained power cap.
+        /// </summary>
+        public void SetPl5(int watts)
+        {
+            WriteECRegister(REG_PL5_SETTING, (byte)Math.Clamp(watts, 0, 255));
+        }
+
+        /// <summary>
+        /// Sets the OVERBOOST performance profile on the EC (0x0751 bit 4).
+        /// From tuxedo_io::uw_set_performance_profile_v1(PROFILE_OVERBOOST):
+        ///   read 0x0751, clear bits 1,4,7, then set bit 4 (0x10).
+        /// This must be called BEFORE writing PL1/PL2/PL4 to signal the EC
+        /// to raise the power ceiling. Without this, the EC re-evaluates PL5
+        /// using the default Windows ceiling (55W) when PL1/PL2/PL4 are written.
+        /// </summary>
+        public void SetOverboostProfile()
+        {
+            EnsureInitialized();
+            try
+            {
+                byte current = ReadECRaw(REG_MANUAL_FAN_CTRL);
+                byte next = (byte)(current & ~(0xa0 | 0x10)); // clear bits 1,4,7
+                next |= 0x10; // set bit 4 (OVERBOOST)
+                WriteECRaw(REG_MANUAL_FAN_CTRL, next);
+                Thread.Sleep(50);
+                DebugLog($"[DIAG] UniwillEC: Overboost profile set (0x751: 0x{current:X2} -> 0x{next:X2})");
+            }
+            catch (Exception ex)
+            {
+                DebugLog($"[DIAG] UniwillEC: Failed to set overboost profile: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Ensures the power management activation bits are set before writing power limits.
+        /// The EC may clear these bits after init (e.g., on mode switch or profile change).
+        /// Without them, the EC accepts writes but may not apply them to hardware.
+        ///
+        /// On NB02, this replicates the Linux tuxedo_io driver sequence from uniwill_keyboard_probe:
+        ///   1. uniwill_write_ec_ram(0x0751, 0x00) — reset to balanced
+        ///   2. uniwill_set_custom_profile_mode(true) — clear-then-set toggle on 0x0727 bit 6
+        ///   3. uniwill_write_ec_ram(0x0741, 0x01) — ensure manual mode
+        /// And from uw_set_tdp() (called before each TDP write):
+        ///   4. uw_set_performance_profile_v1(PROFILE_OVERBOOST) — 0x0751 = 0x10
+        /// </summary>
+        public void EnsurePowerManagementActive()
+        {
+            EnsureInitialized();
+            try
+            {
+                // Step 1: Power management activation (0x0726 bit 7)
+                byte cur726 = ReadECRaw(0x0726);
+                byte want726 = (byte)(cur726 | 0x80);
+                if (cur726 != want726)
+                {
+                    WriteECRaw(0x0726, want726);
+                    Thread.Sleep(50);
+                }
+
+                // Step 2: Reset performance profile to balanced (0x00).
+                // Linux driver does this before the custom profile toggle.
+                WriteECRaw(REG_MANUAL_FAN_CTRL, 0x00);
+                Thread.Sleep(50);
+
+                // Step 3: Custom profile mode toggle on 0x0727 bit 6.
+                // From tuxedo_keyboard::uniwill_set_custom_profile_mode(true):
+                //   read 0x0727, clear bit 6, write back, msleep(50), set bit 6, write back
+                byte cur727 = ReadECRaw(REG_CUSTOM_PROFILE);
+                byte clear727 = (byte)(cur727 & ~(1 << 6));
+                WriteECRaw(REG_CUSTOM_PROFILE, clear727);
+                Thread.Sleep(50);
+                byte set727 = (byte)(clear727 | (1 << 6));
+                WriteECRaw(REG_CUSTOM_PROFILE, set727);
+                Thread.Sleep(50);
+                DebugLog($"[DIAG] UniwillEC: Custom profile toggle 0x727: 0x{cur727:X2} -> 0x{clear727:X2} -> 0x{set727:X2}");
+
+                // Step 4: Ensure manual mode (0x0741 = 0x01).
+                // Linux driver writes this after custom profile toggle.
+                WriteECRaw(0x0741, 0x01);
+                Thread.Sleep(50);
+
+                // Step 5: Overboost performance profile (0x0751 = 0x10).
+                // From tuxedo_io::uw_set_performance_profile_v1(PROFILE_OVERBOOST):
+                //   clear bits 1,4,7 (0xa0 | 0x10), then set bit 4 (0x10)
+                WriteECRaw(REG_MANUAL_FAN_CTRL, 0x10);
+                Thread.Sleep(50);
+                DebugLog("[DIAG] UniwillEC: Overboost profile set (0x751=0x10)");
+            }
+            catch (Exception ex)
+            {
+                DebugLog($"[DIAG] UniwillEC: Failed to ensure power management active: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Applies CPU power limits directly to the EC with proper inter-write delays
+        /// matching the fan curve activation pattern. This must be called AFTER SMU
+        /// commands (slow-limit, fast-limit) because the EC enforces a hardware ceiling
+        /// that clamps SMU settings from above.
+        ///
+        /// Uses the same registers as tuxedo-drivers' uw_set_tdp(): PL1 (0x0783),
+        /// PL2 (0x0784), PL4 (0x0785). Sequence mirrors EnsurePowerManagementActive
+        /// followed by EC writes with 50ms delays between each.
+        /// </summary>
+        /// <param name="pl1Watts">Sustained power limit in watts (PL1)</param>
+        /// <param name="pl2Watts">Boost power limit in watts (PL2)</param>
+        public void ApplyCpuPowerLimits(int pl1Watts, int pl2Watts)
+        {
+            EnsureInitialized();
+
+            // PL4 (peak/clamp) should be at least as high as PL2 to avoid capping boost.
+            int pl4Watts = Math.Max(pl1Watts, pl2Watts);
+
+            lock (_lock)
+            {
+                DebugLog($"[DIAG] UniwillEC: ApplyCpuPowerLimits(pl1={pl1Watts}W, pl2={pl2Watts}W, pl4={pl4Watts}W)");
+
+                // Step 1: Ensure power management is active (prerequisite for EC to accept power writes)
+                try
+                {
+                    EnsurePowerManagementActiveInternal();
+                }
+                catch (Exception ex)
+                {
+                    DebugLog($"[WARN] UniwillEC: EnsurePowerManagementActiveInternal failed: {ex.Message}");
+                }
+
+                // Step 2: Write PL1 (0x0783) — sustained power limit
+                WriteECRaw(REG_PL1_SETTING, (byte)Math.Clamp(pl1Watts, 0, 255));
+                Thread.Sleep(50);
+
+                // Step 3: Write PL2 (0x0784) — boost power limit
+                WriteECRaw(REG_PL2_SETTING, (byte)Math.Clamp(pl2Watts, 0, 255));
+                Thread.Sleep(50);
+
+                // Step 4: Write PL4 (0x0785) — peak/clamp power limit
+                WriteECRaw(REG_PL4_SETTING, (byte)Math.Clamp(pl4Watts, 0, 255));
+                Thread.Sleep(100);
+
+                // Verify by reading back
+                byte rPl1 = ReadECRaw(REG_PL1_SETTING);
+                byte rPl2 = ReadECRaw(REG_PL2_SETTING);
+                byte rPl4 = ReadECRaw(REG_PL4_SETTING);
+                DebugLog($"[DIAG] UniwillEC: Readback — PL1=0x{rPl1:X2}({rPl1}W) PL2=0x{rPl2:X2}({rPl2}W) PL4=0x{rPl4:X2}({rPl4}W)");
+            }
+        }
+
+        /// <summary>
+        /// Internal version of EnsurePowerManagementActive without the outer try/catch
+        /// so callers can handle exceptions themselves.
+        /// </summary>
+        private void EnsurePowerManagementActiveInternal()
+        {
+            // Step 1: Power management activation (0x0726 bit 7)
+            byte cur726 = ReadECRaw(0x0726);
+            byte want726 = (byte)(cur726 | 0x80);
+            if (cur726 != want726)
+            {
+                WriteECRaw(0x0726, want726);
+                Thread.Sleep(50);
+            }
+
+            // Step 2: Custom profile mode toggle on 0x0727 bit 6.
+            // From tuxedo_keyboard::uniwill_set_custom_profile_mode(true):
+            //   read 0x0727, clear bit 6, write back, msleep(50), set bit 6, write back
+            byte cur727 = ReadECRaw(REG_CUSTOM_PROFILE);
+            byte clear727 = (byte)(cur727 & ~(1 << 6));
+            WriteECRaw(REG_CUSTOM_PROFILE, clear727);
+            Thread.Sleep(50);
+            byte set727 = (byte)(clear727 | (1 << 6));
+            WriteECRaw(REG_CUSTOM_PROFILE, set727);
+            Thread.Sleep(50);
+
+            // Step 3: Ensure manual mode (0x0741 = 0x01)
+            WriteECRaw(0x0741, 0x01);
+            Thread.Sleep(50);
+
+            // Step 4: Overboost performance profile on 0x0751 using read-modify-write.
+            // CRITICAL: 0x0751 (REG_MANUAL_FAN_CTRL) carries dual-purpose bits:
+            //   bit 4 = performance profile (Overboost)
+            //   bits 5-7 = fan mode (High/Boost/User)
+            //   bits 0-2 = fan level
+            // A hard overwrite (0x00 or 0x10) destroys the fan mode state, causing
+            // the EC to re-enter default fan control and ramp fans to max.
+            // Use read-modify-write to only set bit 4, preserving fan bits.
+            byte cur751 = ReadECRaw(REG_MANUAL_FAN_CTRL);
+            byte want751 = (byte)(cur751 | FAN_MODE_TURBO); // set bit 4 only
+            WriteECRaw(REG_MANUAL_FAN_CTRL, want751);
+            Thread.Sleep(50);
+
+            DebugLog($"[DIAG] UniwillEC: Power management active for CPU power limits (0x751: 0x{cur751:X2} -> 0x{want751:X2})");
         }
 
         #endregion

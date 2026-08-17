@@ -32,6 +32,10 @@ namespace Universal_x86_Tuning_Utility.Scripts
         static string highPerformancePowerScheme = "DED574B5-45A0-4F42-8737-46345C09C238";
         static string powerSaverPowerScheme = "961CC777-2547-4F9D-8174-7D86181b8A7A";
 
+        // Optional EC service reference for --ec-* command routing.
+        // Set from App.xaml.cs or MainWindowViewModel after DI resolves the service.
+        internal static UniwillECService? EcService { get; set; }
+
         public static void Translate(string ryzenAdjString, bool isAutoReapply = false, bool isAutoOC = false, string? appliedName = null, bool localizeAppliedName = false) =>
             _ = TranslateAsync(ryzenAdjString, isAutoReapply, isAutoOC, appliedName, localizeAppliedName);
 
@@ -129,6 +133,39 @@ namespace Universal_x86_Tuning_Utility.Scripts
                                     else if (ryzenAdjCommandString == "intel-gpu") Intel_Management.changeGpuClock(ryzenAdjCommandValue);
                                 }
                             }
+                            else if (ryzenAdjCommandString.StartsWith("ec-"))
+                            {
+                                // EC register write commands for Uniwill EC (XMG / TUXEDO laptops).
+                                if (EcService is null)
+                                {
+                                    DiagnosticLogger.LogDebug($"EC command ignored: {ryzenAdjCommand} (EC service not available)");
+                                    continue;
+                                }
+
+                                // On first EC command in a batch, set OVERBOOST profile.
+                                // This replicates the Linux tuxedo_io driver's uw_set_tdp()
+                                // which calls uw_set_performance_profile_v1(PROFILE_OVERBOOST)
+                                // before writing PL1/PL2/PL4. The OVERBOOST profile signals
+                                // the EC to raise the power ceiling above the default 55W.
+                                if (ryzenAdjCommandString == "ec-overboost")
+                                {
+                                    EcService.SetOverboostProfile();
+                                    DiagnosticLogger.LogDebug($"EC applied: {ryzenAdjCommandString}");
+                                    continue;
+                                }
+
+                                int ecValue = Convert.ToInt32(ryzenAdjCommandValueString);
+
+                                if (ryzenAdjCommandString == "ec-pl1") EcService.SetPl1(ecValue);
+                                else if (ryzenAdjCommandString == "ec-pl2") EcService.SetPl2(ecValue);
+                                else if (ryzenAdjCommandString == "ec-pl4") EcService.SetPl4(ecValue);
+                                else if (ryzenAdjCommandString == "ec-pl5") EcService.SetPl5(ecValue);
+                                else if (ryzenAdjCommandString == "ec-tcc-offset") EcService.SetTccOffset(ecValue);
+                                else if (ryzenAdjCommandString == "ec-mode") EcService.SetPerformanceMode(ecValue);
+                                else DiagnosticLogger.LogDebug($"Unknown EC command: {ryzenAdjCommandString}");
+
+                                DiagnosticLogger.LogDebug($"EC applied: {ryzenAdjCommandString}={ecValue}");
+                            }
                             else
                             {
                                 if (ryzenAdjCommandString == "apu-skin-temp" && !SupportsApuSkinTemperatureLimit())
@@ -149,6 +186,12 @@ namespace Universal_x86_Tuning_Utility.Scripts
                                 else SMUCommands.applySettings(ryzenAdjCommandString, ryzenAdjCommandValue);
 
                                 DiagnosticLogger.LogDebug($"SMU applied: {ryzenAdjCommandString}=0x{ryzenAdjCommandValue:X}");
+
+                                // CRITICAL: 50ms delay between SMU commands. The SMU firmware
+                                // needs time to process each command. Without this delay,
+                                // batch commands cause the SMU to enforce a conservative
+                                // 55W default. The original UXTU includes this delay.
+                                Thread.Sleep(50);
                             }
                         }
                         catch (Exception ex)
@@ -233,19 +276,37 @@ namespace Universal_x86_Tuning_Utility.Scripts
             try
             {
                 DiagnosticLogger.LogDebug($"NVIDIA: {command}={value}");
+                DiagnosticLogger.LogInfo($"NVIDIA: {command}={value}");
                 string[] variables = value.Split('-');
 
-                if (command == "NVIDIA-Clocks" && variables.Length == 2) NvTuning.SetClocks(int.Parse(variables[0]), int.Parse(variables[1]));
+                if (command == "NVIDIA-Clocks" && variables.Length == 2)
+                {
+                    DiagnosticLogger.LogInfo($"NVIDIA: SetClocks({variables[0]}, {variables[1]})");
+                    NvTuning.SetClocks(int.Parse(variables[0]), int.Parse(variables[1]));
+                }
                 else if (command == "NVIDIA-Clocks" && variables.Length == 3)
                 {
+                    DiagnosticLogger.LogInfo($"NVIDIA: SetMaxGPUClock({variables[0]}), SetClocks({variables[1]}, {variables[2]})");
                     NvTuning.SetMaxGPUClock(int.Parse(variables[0]));
                     NvTuning.SetClocks(int.Parse(variables[1]), int.Parse(variables[2]));
                 }
                 else if (command == "NVIDIA-Clocks" && variables.Length == 4)
                 {
+                    // Legacy: 0-core-mem-watts (no DB offset, total watts = watts)
+                    DiagnosticLogger.LogInfo($"NVIDIA: SetMaxGPUClock({variables[0]}), SetClocks({variables[1]}, {variables[2]}), SetPowerLimit({variables[3]}, dbOffset=0)");
                     NvTuning.SetMaxGPUClock(int.Parse(variables[0]));
                     NvTuning.SetClocks(int.Parse(variables[1]), int.Parse(variables[2]));
-                    NvTuning.SetPowerLimit(int.Parse(variables[3]));
+                    NvTuning.SetPowerLimit(int.Parse(variables[3]), 0);
+                    DiagnosticLogger.LogInfo($"NVIDIA: SetPowerLimit returned");
+                }
+                else if (command == "NVIDIA-Clocks" && variables.Length == 5)
+                {
+                    // New: 0-core-mem-totalWatts-dbOffset
+                    DiagnosticLogger.LogInfo($"NVIDIA: SetMaxGPUClock({variables[0]}), SetClocks({variables[1]}, {variables[2]}), SetPowerLimit({variables[3]}, dbOffset={variables[4]})");
+                    NvTuning.SetMaxGPUClock(int.Parse(variables[0]));
+                    NvTuning.SetClocks(int.Parse(variables[1]), int.Parse(variables[2]));
+                    NvTuning.SetPowerLimit(int.Parse(variables[3]), int.Parse(variables[4]));
+                    DiagnosticLogger.LogInfo($"NVIDIA: SetPowerLimit returned");
                 }
             }
             catch (Exception ex)

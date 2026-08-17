@@ -252,6 +252,45 @@ namespace Universal_x86_Tuning_Utility.Scripts.GPUs.NVIDIA
             }
         }
 
+        /// <summary>
+        /// Reads the GPU clock offsets (core and memory) from NVML application clocks.
+        /// On many GPUs, Afterburner sets NVML application clocks as well as NVAPI
+        /// performance states. The offset is appClock - maxClock.
+        /// Returns offsets in MHz.
+        /// </summary>
+        public static bool TryGetClockOffsets(out int coreOffset, out int memOffset)
+        {
+            coreOffset = 0;
+            memOffset = 0;
+
+            try
+            {
+                if (!TryGetNvmlGpu(out IntPtr gpu)) return false;
+
+                uint appCore = 0, appMem = 0;
+                uint maxCore = 0, maxMem = 0;
+
+                int r1 = Nvml.nvmlDeviceGetDefaultApplicationsClock(gpu, NvmlClockType.Graphics, out appCore);
+                int r2 = Nvml.nvmlDeviceGetDefaultApplicationsClock(gpu, NvmlClockType.Memory, out appMem);
+                int r3 = Nvml.nvmlDeviceGetMaxClockInfo(gpu, NvmlClockType.Graphics, out maxCore);
+                int r4 = Nvml.nvmlDeviceGetMaxClockInfo(gpu, NvmlClockType.Memory, out maxMem);
+
+                if (r1 == 0 && r2 == 0 && r3 == 0 && r4 == 0)
+                {
+                    // Only return true if app clocks differ from max (i.e., an offset is set).
+                    // When no overclock is applied, appClock == maxClock so offset is 0.
+                    coreOffset = (int)(appCore - maxCore);
+                    memOffset = (int)(appMem - maxMem);
+                    return true;
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+
         public static bool TryGetGpuInfo(out GpuInfo info)
         {
             info = default;
