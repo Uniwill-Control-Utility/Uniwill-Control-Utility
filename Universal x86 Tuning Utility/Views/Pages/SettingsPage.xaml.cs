@@ -55,7 +55,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             cbxLogLevel.SelectedIndex = Settings.Default.DiagnosticLogLevel;
 
-            tbAppVerion.Text = $"Universal x86 Tuning Utility - {GetAssemblyVersion()}";
+            tbAppVerion.Text = $"Uniwill Control Utility - {GetAssemblyVersion()}";
 
             // Initialize system info
             getDeviceInfo();

@@ -210,7 +210,11 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
 
         private void DrawGraph()
         {
-            var color = Application.Current.Resources["ControlFillColorDefaultBrush"] as SolidColorBrush;
+            // Try multiple brush sources: app resources, then Foreground, then fallback.
+            SolidColorBrush color = (Application.Current.Resources["ControlFillColorDefaultBrush"] as SolidColorBrush)
+                ?? (this.FindResource("ControlFillColorDefaultBrush") as SolidColorBrush)
+                ?? (this.Foreground as SolidColorBrush)
+                ?? new SolidColorBrush(Colors.Gray);
             if (color == null)
                 return;
 

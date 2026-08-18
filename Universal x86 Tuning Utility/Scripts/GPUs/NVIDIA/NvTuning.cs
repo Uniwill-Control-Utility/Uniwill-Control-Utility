@@ -662,6 +662,22 @@ namespace Universal_x86_Tuning_Utility.Scripts.GPUs.NVIDIA
                    matchingVoltage >= Math.Max(1, upper.Count / 2);
         }
 
+        /// <summary>
+        /// Applies a batch of per-point frequency offsets from a V-F curve preset.
+        /// Returns the number of points successfully written.
+        /// </summary>
+        public static int ApplyVfCurveOffsets(Dictionary<int, int> offsetsMHz)
+        {
+            int ok = 0;
+            foreach (var kvp in offsetsMHz)
+            {
+                if (kvp.Value == 0) continue;
+                if (SetVfPointControl(kvp.Key, kvp.Value * 1000, 0))
+                    ok++;
+            }
+            return ok;
+        }
+
         private static bool SetVfPointControl(int pointIndex, int frequencyOffsetKhz, int voltageOffsetUv)
         {
             try

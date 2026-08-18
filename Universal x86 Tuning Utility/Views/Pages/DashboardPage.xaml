@@ -13,7 +13,8 @@
       SnapsToDevicePixels="True"
       UseLayoutRounding="True"
       ScrollViewer.CanContentScroll="False"
-      mc:Ignorable="d">
+      mc:Ignorable="d"
+      >
 
     <!-- Root Grid spans full window space -->
     <Grid>

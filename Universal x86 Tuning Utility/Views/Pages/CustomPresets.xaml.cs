@@ -1171,8 +1171,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             var windowsEpp = cbWindowsEpp.IsChecked == true ? (int)nudWindowsEpp.Value : -1;
             var windowsCoreParking = cbWindowsCoreParking.IsChecked == true ? (int)nudWindowsCoreParking.Value : -1;
             var windowsMaxUnparkedCores = cbWindowsMaxUnparkedCores.IsChecked == true ? (int)nudWindowsMaxUnparkedCores.Value : -1;
+            // AMD Power Slider: 3 = Best performance on AMD; -1 on Intel (setting doesn't exist)
+            int amdPowerSlider = Family.TYPE == Family.ProcessorType.Amd_Apu ? 3 : -1;
             if (windowsBoostMode >= 0 || windowsMinState >= 0 || windowsMaxState >= 0 || windowsMaxFrequency >= 0 || windowsEpp >= 0 || windowsCoreParking >= 0 || windowsMaxUnparkedCores >= 0)
-                commandValues = commandValues + $"--Win-CPU={windowsBoostMode},{windowsMaxState},{windowsMaxFrequency},{windowsEpp},{windowsMinState},{windowsCoreParking},{windowsMaxUnparkedCores} ";
+                commandValues = commandValues + $"--Win-CPU={windowsBoostMode},{windowsMaxState},{windowsMaxFrequency},{windowsEpp},{windowsMinState},{windowsCoreParking},{windowsMaxUnparkedCores},{amdPowerSlider} ";
 
             if (Family.TYPE == Family.ProcessorType.Amd_Apu)
             {

@@ -1424,8 +1424,12 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             var energyPreference = cbWindowsEpp.IsChecked == true ? (int)nudWindowsEpp.Value : -1;
             var minimumUnparkedCores = cbWindowsCoreParking.IsChecked == true ? (int)nudWindowsCoreParking.Value : -1;
             var maximumUnparkedCores = cbWindowsMaxUnparkedCores.IsChecked == true ? (int)nudWindowsMaxUnparkedCores.Value : -1;
+            // AMD Power Slider: 3 = Best performance. Critical on AMD mobile platforms —
+            // Balanced plan defaults to 2 (Better performance) which enforces ~55W ceiling.
+            // Always force 3 on AMD; -1 on Intel (setting doesn't exist).
+            int amdPowerSlider = Family.TYPE == Family.ProcessorType.Amd_Apu ? 3 : -1;
             return boostMode >= 0 || minimumState >= 0 || maximumState >= 0 || maximumFrequency >= 0 || energyPreference >= 0 || minimumUnparkedCores >= 0 || maximumUnparkedCores >= 0
-                ? $"--Win-CPU={boostMode},{maximumState},{maximumFrequency},{energyPreference},{minimumState},{minimumUnparkedCores},{maximumUnparkedCores} "
+                ? $"--Win-CPU={boostMode},{maximumState},{maximumFrequency},{energyPreference},{minimumState},{minimumUnparkedCores},{maximumUnparkedCores},{amdPowerSlider} "
                 : string.Empty;
         }
 

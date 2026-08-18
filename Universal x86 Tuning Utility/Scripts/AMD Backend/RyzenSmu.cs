@@ -553,6 +553,13 @@ namespace RyzenSmu
                 lastStatus = isMp1
                     ? RyzenAccess.SendMp1(address, ref args)
                     : RyzenAccess.SendRsmu(address, ref args);
+
+                // Log which path failed (MP1 vs RSMU) for debugging power limits
+                if (lastStatus != Status.OK)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[SMU] {commandName} via {(isMp1 ? "MP1" : "RSMU")} 0x{address:X} arg=0x{originalArguments[0]:X} -> {lastStatus}");
+                }
+
                 if (lastStatus == Status.OK)
                     return;
             }

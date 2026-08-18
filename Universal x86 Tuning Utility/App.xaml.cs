@@ -208,8 +208,7 @@ namespace Universal_x86_Tuning_Utility
                         // Views and ViewModels
                         services.AddScoped<Views.Pages.DashboardPage>();
                         services.AddScoped<ViewModels.DashboardViewModel>();
-                        services.AddScoped<Views.Pages.CustomPresets>();
-                        services.AddScoped<Views.Pages.Premade>();
+                        services.AddScoped<Views.Pages.Presets>();
                         services.AddScoped<Views.Pages.Adaptive>();
                         services.AddScoped<Views.Pages.Automations>();
                         services.AddScoped<Views.Pages.FanControl>();
@@ -217,7 +216,6 @@ namespace Universal_x86_Tuning_Utility
                         services.AddScoped<Views.Pages.SystemInfo>();
                         services.AddScoped<ViewModels.GamesViewModel>();
                         services.AddScoped<Views.Pages.Games>();
-                        services.AddScoped<ViewModels.CustomPresetsViewModel>();
                         services.AddScoped<Views.Pages.DataPage>();
                         services.AddScoped<ViewModels.DataViewModel>();
                         services.AddScoped<Views.Pages.SettingsPage>();
@@ -330,6 +328,16 @@ namespace Universal_x86_Tuning_Utility
                     File.Delete("C:\\Universal.x86.Tuning.Utility.msi");
 
                 Family.setCpuFamily();
+
+                // Resolve the current laptop SKU (XMG Neo 16 E25/A25 + GPU variant)
+                try
+                {
+                    Services.SkuResolver.Initialize();
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "SkuResolver.Initialize() failed — falling back to generic limits");
+                }
 
                 string path = System.Reflection.Assembly.GetEntryAssembly().Location;
                 path = path.Replace("Universal x86 Tuning Utility.dll", null);

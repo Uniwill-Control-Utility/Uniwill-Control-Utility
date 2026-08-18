@@ -1,0 +1,310 @@
+{
+  "skus": [
+    {
+      "id": "XMG_NEO16_E25_5070Ti",
+      "name": "XMG Neo 16 E25 (RTX 5070 Ti)",
+      "cpu": {
+        "vendor": "Intel",
+        "model": "Core Ultra 9 275HX"
+      },
+      "gpu": {
+        "model": "RTX 5070 Ti Laptop",
+        "nvml_name_pattern": "5070 Ti"
+      },
+      "power_limits": {
+        "air": {
+          "cpu_pl1_sustained": 160,
+          "cpu_pl2_boost": 200,
+          "gpu_tgp_baseline": 115,
+          "gpu_tgp_with_db": 140,
+          "combined_cpu_gpu": 215,
+          "dynamic_boost_max": 25
+        },
+        "water": {
+          "cpu_pl1_sustained": 200,
+          "cpu_pl2_boost": 200,
+          "gpu_tgp_baseline": 115,
+          "gpu_tgp_with_db": 140,
+          "combined_cpu_gpu": 250,
+          "dynamic_boost_max": 25
+        }
+      },
+      "profiles": {
+        "office": {
+          "cpu_pl1": 25,
+          "cpu_pl2": 35,
+          "gpu_tgp": 95,
+          "dynamic_boost": false
+        },
+        "gaming": {
+          "cpu_pl1": 45,
+          "cpu_pl2": 60,
+          "gpu_tgp": 115,
+          "dynamic_boost": false
+        },
+        "turbo": {
+          "uses_cpu_max": true,
+          "gpu_tgp": 115,
+          "dynamic_boost": true,
+          "dynamic_boost_offset": 25
+        }
+      }
+    },
+    {
+      "id": "XMG_NEO16_E25_5080",
+      "name": "XMG Neo 16 E25 (RTX 5080)",
+      "cpu": {
+        "vendor": "Intel",
+        "model": "Core Ultra 9 275HX"
+      },
+      "gpu": {
+        "model": "RTX 5080 Laptop",
+        "nvml_name_pattern": "5080"
+      },
+      "power_limits": {
+        "air": {
+          "cpu_pl1_sustained": 160,
+          "cpu_pl2_boost": 200,
+          "gpu_tgp_baseline": 150,
+          "gpu_tgp_with_db": 175,
+          "combined_cpu_gpu": 240,
+          "dynamic_boost_max": 25
+        },
+        "water": {
+          "cpu_pl1_sustained": 200,
+          "cpu_pl2_boost": 200,
+          "gpu_tgp_baseline": 150,
+          "gpu_tgp_with_db": 175,
+          "combined_cpu_gpu": 280,
+          "dynamic_boost_max": 25
+        }
+      },
+      "profiles": {
+        "office": {
+          "cpu_pl1": 25,
+          "cpu_pl2": 35,
+          "gpu_tgp": 95,
+          "dynamic_boost": false
+        },
+        "gaming": {
+          "cpu_pl1": 45,
+          "cpu_pl2": 60,
+          "gpu_tgp": 150,
+          "dynamic_boost": false
+        },
+        "turbo": {
+          "uses_cpu_max": true,
+          "gpu_tgp": 150,
+          "dynamic_boost": true,
+          "dynamic_boost_offset": 25
+        }
+      }
+    },
+    {
+      "id": "XMG_NEO16_E25_5090",
+      "name": "XMG Neo 16 E25 (RTX 5090)",
+      "cpu": {
+        "vendor": "Intel",
+        "model": "Core Ultra 9 275HX"
+      },
+      "gpu": {
+        "model": "RTX 5090 Laptop",
+        "nvml_name_pattern": "5090"
+      },
+      "power_limits": {
+        "air": {
+          "cpu_pl1_sustained": 160,
+          "cpu_pl2_boost": 200,
+          "gpu_tgp_baseline": 150,
+          "gpu_tgp_with_db": 175,
+          "combined_cpu_gpu": 240,
+          "dynamic_boost_max": 25
+        },
+        "water": {
+          "cpu_pl1_sustained": 200,
+          "cpu_pl2_boost": 200,
+          "gpu_tgp_baseline": 150,
+          "gpu_tgp_with_db": 175,
+          "combined_cpu_gpu": 280,
+          "dynamic_boost_max": 25
+        }
+      },
+      "profiles": {
+        "office": {
+          "cpu_pl1": 25,
+          "cpu_pl2": 35,
+          "gpu_tgp": 95,
+          "dynamic_boost": false
+        },
+        "gaming": {
+          "cpu_pl1": 45,
+          "cpu_pl2": 60,
+          "gpu_tgp": 150,
+          "dynamic_boost": false
+        },
+        "turbo": {
+          "uses_cpu_max": true,
+          "gpu_tgp": 150,
+          "dynamic_boost": true,
+          "dynamic_boost_offset": 25
+        }
+      }
+    },
+    {
+      "id": "XMG_NEO16_A25_5070Ti",
+      "name": "XMG Neo 16 A25 (RTX 5070 Ti)",
+      "cpu": {
+        "vendor": "AMD",
+        "model": "Ryzen 9 9955HX/3D"
+      },
+      "gpu": {
+        "model": "RTX 5070 Ti Laptop",
+        "nvml_name_pattern": "5070 Ti"
+      },
+      "power_limits": {
+        "air": {
+          "cpu_pl1_sustained": 130,
+          "cpu_pl2_boost": 135,
+          "gpu_tgp_baseline": 115,
+          "gpu_tgp_with_db": 140,
+          "combined_cpu_gpu": 215,
+          "dynamic_boost_max": 25
+        },
+        "water": {
+          "cpu_pl1_sustained": 160,
+          "cpu_pl2_boost": 160,
+          "gpu_tgp_baseline": 115,
+          "gpu_tgp_with_db": 140,
+          "combined_cpu_gpu": 250,
+          "dynamic_boost_max": 25
+        }
+      },
+      "profiles": {
+        "office": {
+          "cpu_pl1": 45,
+          "cpu_pl2": 45,
+          "cpu_pl4": 45,
+          "gpu_tgp": 95,
+          "dynamic_boost": false
+        },
+        "gaming": {
+          "cpu_pl1": 75,
+          "cpu_pl2": 85,
+          "cpu_pl4": 85,
+          "gpu_tgp": 115,
+          "dynamic_boost": false
+        },
+        "turbo": {
+          "uses_cpu_max": true,
+          "gpu_tgp": 115,
+          "dynamic_boost": true,
+          "dynamic_boost_offset": 25
+        }
+      }
+    },
+    {
+      "id": "XMG_NEO16_A25_5080",
+      "name": "XMG Neo 16 A25 (RTX 5080)",
+      "cpu": {
+        "vendor": "AMD",
+        "model": "Ryzen 9 9955HX/3D"
+      },
+      "gpu": {
+        "model": "RTX 5080 Laptop",
+        "nvml_name_pattern": "5080"
+      },
+      "power_limits": {
+        "air": {
+          "cpu_pl1_sustained": 130,
+          "cpu_pl2_boost": 135,
+          "gpu_tgp_baseline": 150,
+          "gpu_tgp_with_db": 175,
+          "combined_cpu_gpu": 240,
+          "dynamic_boost_max": 25
+        },
+        "water": {
+          "cpu_pl1_sustained": 160,
+          "cpu_pl2_boost": 160,
+          "gpu_tgp_baseline": 150,
+          "gpu_tgp_with_db": 175,
+          "combined_cpu_gpu": 280,
+          "dynamic_boost_max": 25
+        }
+      },
+      "profiles": {
+        "office": {
+          "cpu_pl1": 45,
+          "cpu_pl2": 45,
+          "cpu_pl4": 45,
+          "gpu_tgp": 95,
+          "dynamic_boost": false
+        },
+        "gaming": {
+          "cpu_pl1": 75,
+          "cpu_pl2": 85,
+          "cpu_pl4": 85,
+          "gpu_tgp": 150,
+          "dynamic_boost": false
+        },
+        "turbo": {
+          "uses_cpu_max": true,
+          "gpu_tgp": 150,
+          "dynamic_boost": true,
+          "dynamic_boost_offset": 25
+        }
+      }
+    },
+    {
+      "id": "XMG_NEO16_A25_5090",
+      "name": "XMG Neo 16 A25 (RTX 5090)",
+      "cpu": {
+        "vendor": "AMD",
+        "model": "Ryzen 9 9955HX/3D"
+      },
+      "gpu": {
+        "model": "RTX 5090 Laptop",
+        "nvml_name_pattern": "5090"
+      },
+      "power_limits": {
+        "air": {
+          "cpu_pl1_sustained": 130,
+          "cpu_pl2_boost": 135,
+          "gpu_tgp_baseline": 150,
+          "gpu_tgp_with_db": 175,
+          "combined_cpu_gpu": 240,
+          "dynamic_boost_max": 25
+        },
+        "water": {
+          "cpu_pl1_sustained": 160,
+          "cpu_pl2_boost": 160,
+          "gpu_tgp_baseline": 150,
+          "gpu_tgp_with_db": 175,
+          "combined_cpu_gpu": 280,
+          "dynamic_boost_max": 25
+        }
+      },
+      "profiles": {
+        "office": {
+          "cpu_pl1": 45,
+          "cpu_pl2": 45,
+          "cpu_pl4": 45,
+          "gpu_tgp": 95,
+          "dynamic_boost": false
+        },
+        "gaming": {
+          "cpu_pl1": 75,
+          "cpu_pl2": 85,
+          "cpu_pl4": 85,
+          "gpu_tgp": 150,
+          "dynamic_boost": false
+        },
+        "turbo": {
+          "uses_cpu_max": true,
+          "gpu_tgp": 150,
+          "dynamic_boost": true,
+          "dynamic_boost_offset": 25
+        }
+      }
+    }
+  ]
+}

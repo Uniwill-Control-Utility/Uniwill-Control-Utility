@@ -76,7 +76,6 @@
     <None Remove="AMDFamily10.bin" />
     <None Remove="AMDFamily17.bin" />
     <None Remove="AMDReset.bin" />
-    <None Remove="Assets\applicationIcon-1024.png" />
     <None Remove="Assets\BuiltInScaleModels.json" />
     <None Remove="Assets\config-DT-AM4.png" />
     <None Remove="Assets\config-DT-AM5.png" />
@@ -145,6 +144,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Fan Configs\GPD_1619-04.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="SkuData\skus.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
@@ -217,6 +219,10 @@
     </None>
     <None Update="ADLX_PerformanceMetrics.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\applicationIcon-1024.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
     </None>
     <None Update="Assets\applicationIcon-256.png">
       <Pack>True</Pack>

@@ -8,6 +8,14 @@ namespace Universal_x86_Tuning_Utility.Scripts.Misc
 {
     internal static class DiagnosticLogger
     {
+        // Event fires for every log message regardless of level gating — allows UI to capture logs.
+        public static event Action<string>? OnMessage;
+
+        private static void Fire(string line)
+        {
+            OnMessage?.Invoke(line);
+        }
+
         public static readonly LoggingLevelSwitch LevelSwitch = new(LogEventLevel.Warning);
 
         public static void ApplySettingsLevel()
@@ -28,8 +36,9 @@ namespace Universal_x86_Tuning_Utility.Scripts.Misc
             [CallerMemberName] string caller = "",
             [CallerFilePath] string file = "")
         {
-            Log.Warning(ex, "[{Source}.{Caller}] {Context}",
-                System.IO.Path.GetFileNameWithoutExtension(file), caller, context);
+            var source = System.IO.Path.GetFileNameWithoutExtension(file);
+            Fire($"[{source}.{caller}] ERROR: {context}");
+            Log.Warning(ex, "[{Source}.{Caller}] {Context}", source, caller, context);
         }
 
         public static void LogInfo(
@@ -37,8 +46,9 @@ namespace Universal_x86_Tuning_Utility.Scripts.Misc
             [CallerMemberName] string caller = "",
             [CallerFilePath] string file = "")
         {
-            Log.Information("[{Source}.{Caller}] {Message}",
-                System.IO.Path.GetFileNameWithoutExtension(file), caller, message);
+            var source = System.IO.Path.GetFileNameWithoutExtension(file);
+            Fire($"[{source}.{caller}] {message}");
+            Log.Information("[{Source}.{Caller}] {Message}", source, caller, message);
         }
 
         public static void LogDebug(
@@ -46,8 +56,9 @@ namespace Universal_x86_Tuning_Utility.Scripts.Misc
             [CallerMemberName] string caller = "",
             [CallerFilePath] string file = "")
         {
-            Log.Debug("[{Source}.{Caller}] {Message}",
-                System.IO.Path.GetFileNameWithoutExtension(file), caller, message);
+            var source = System.IO.Path.GetFileNameWithoutExtension(file);
+            Fire($"[{source}.{caller}] DEBUG: {message}");
+            Log.Debug("[{Source}.{Caller}] {Message}", source, caller, message);
         }
     }
 }

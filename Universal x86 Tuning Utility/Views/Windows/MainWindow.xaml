@@ -39,22 +39,34 @@
         <!--  The title bar contains window navigation elements and some Tray related extras.  -->
         <!--  You can put additional controls in the header, such as a search bar.  -->
         <ui:TitleBar
-            x:Name="tbMain"
-            Grid.Row="0"
-            Title="Uniwill Control Utility">
+    x:Name="tbMain"
+    Grid.Row="0"
+    Title="Uniwill Control Utility">
+
+            <ui:TitleBar.Resources>
+                <Style TargetType="{x:Type ui:TitleBarButton}" BasedOn="{StaticResource {x:Type ui:TitleBarButton}}">
+                    <!-- Force the buttons to match the height of the TitleBar -->
+                    <Setter Property="Height" Value="{Binding RelativeSource={RelativeSource AncestorType=ui:TitleBar}, Path=ActualHeight}" />
+                    <!-- Ensure they stretch properly -->
+                    <Setter Property="VerticalAlignment" Value="Stretch" />
+                </Style>
+            </ui:TitleBar.Resources>
+
             <ui:TitleBar.Icon>
-                <ui:ImageIcon Source="pack://application:,,,/Assets/applicationIcon-256.png" Margin="11,0,0,0"/>
+                <ui:ImageIcon Source="pack://application:,,,/Assets/applicationIcon-1024.png" 
+                      Margin="11,0,0,0" 
+                      RenderOptions.BitmapScalingMode="HighQuality"/>
             </ui:TitleBar.Icon>
+
             <ui:TitleBar.Header>
                 <TextBlock x:Name="ModelNameText"
-                           FontSize="11"
-                           FontWeight="Bold"
-                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                           VerticalAlignment="Center"
-                           Margin="4,0,0,0"
-                           Text="Uniwill Control Utility" />
+                   FontSize="11"
+                   FontWeight="Bold"
+                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                   VerticalAlignment="Center"
+                   Margin="4,0,0,0"
+                   Text="Uniwill Control Utility" />
             </ui:TitleBar.Header>
-            
         </ui:TitleBar>
 
         <ui:NavigationView x:Name="RootNavigation"
@@ -86,7 +98,7 @@
                          FocusOnLeftClick="False"
                          Icon="pack://application:,,,/Assets/applicationIcon-256.png"
                          MenuOnRightClick="True"
-                         TooltipText="Universal x86 Tuning Utility"
+                         TooltipText="Uniwill Control Utility"
                          Width="48"
                          Height="48">
             <tray:NotifyIcon.Menu>

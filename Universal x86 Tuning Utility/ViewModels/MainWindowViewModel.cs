@@ -48,6 +48,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
         public MainWindowViewModel(INavigationService navigationService, UniwillECService? uniwillEc = null)
         {
             _uniwillEc = uniwillEc;
+            RyzenAdj_To_UXTU.EcService = uniwillEc;
             InitializeViewModel();
             LocalizationService.CultureChanged += OnCultureChanged;
             LastAppliedSettingsService.Changed += OnLastAppliedSettingsChanged;
@@ -64,9 +65,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                 CreateNavigationItem("Home", "dashboard", SymbolRegular.Home24, typeof(Views.Pages.DashboardPage))
             };
 
-            NavigationItems.Add(CreateNavigationItem("Premade", "premade", SymbolRegular.Predictions24, typeof(Views.Pages.Premade)));
-
-            NavigationItems.Add(CreateNavigationItem("Custom", "custom", SymbolRegular.Book24, typeof(Views.Pages.CustomPresets)));
+            NavigationItems.Add(CreateNavigationItem("Presets", "presets", SymbolRegular.Predictions24, typeof(Views.Pages.Presets)));
             NavigationItems.Add(CreateNavigationItem("Adaptive", "adaptive", SymbolRegular.Radar20, typeof(Views.Pages.Adaptive)));
             NavigationItems.Add(CreateNavigationItem("Games", "games", SymbolRegular.Games24, typeof(Views.Pages.Games)));
             NavigationItems.Add(CreateNavigationItem("Overlay", "overlay", SymbolRegular.DesktopPulse24, typeof(Views.Pages.OverlaySettingsPage)));

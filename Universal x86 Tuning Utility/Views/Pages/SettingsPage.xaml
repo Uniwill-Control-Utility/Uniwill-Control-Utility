@@ -450,7 +450,7 @@
                     <StackPanel>
                         <TextBlock FontSize="17"
                                    FontWeight="Medium"
-                                   Text="About Universal x86 Tuning Utility" />
+                                   Text="About Uniwill Control Utility" />
 
                         <TextBlock x:Name="tbAppVerion"
                                    Margin="0,7,0,12" />

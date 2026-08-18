@@ -745,7 +745,7 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
+                                <StackPanel Grid.Column="0  ">
                                     <ui:TextBlock FontTypography="Body" Text="Hydro UI (Watercooler)" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"

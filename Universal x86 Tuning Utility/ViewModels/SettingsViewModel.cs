@@ -27,7 +27,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
         private void InitializeViewModel()
         {
             CurrentTheme = Wpf.Ui.Appearance.ApplicationThemeManager.GetAppTheme();
-            AppVersion = $"Universal x86 Tuning Utility - {GetAssemblyVersion()}";
+            AppVersion = $"Uniwill Control Utility - {GetAssemblyVersion()}";
         }
 
         private string GetAssemblyVersion()

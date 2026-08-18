@@ -133,9 +133,9 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
 
         private void SetupUI()
         {
-            ModelNameText.Text = "Universal x86 Tuning Utility";
+            ModelNameText.Text = "Uniwill Control Utility";
 
-            tbMain.Title = "Universal x86 Tuning Utility";
+            tbMain.Title = "Uniwill Control Utility";
 
             try
             {
@@ -146,7 +146,7 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
                 Log.Logger.Error(ex, "Failed to setup MagWindow");
             }
 
-             Wpf.Ui.Appearance.SystemThemeWatcher.Watch(this, WindowBackdropType.Mica, true);
+             Wpf.Ui.Appearance.SystemThemeWatcher.Watch(this, WindowBackdropType.Acrylic, true);
         }
 
         private async void ApplyOnStart()
