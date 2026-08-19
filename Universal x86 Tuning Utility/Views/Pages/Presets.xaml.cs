@@ -29,6 +29,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private VfCurvePreset[] _vfPresets = Array.Empty<VfCurvePreset>();
         private int _vfActivePreset = -1;
         private Views.Windows.VfCurveEditorWindow? _vfEditorWindow;
+        private bool _userTouchedCoreSlider; // true when user manually changes the core clock slider
 
         // DEBUG: on-page log viewer
         private readonly List<string> _debugLines = new();
@@ -334,6 +335,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void Slider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
+            if (sender == sdNvCore)
+                _userTouchedCoreSlider = true;
             updateAllLabels();
         }
 
@@ -367,7 +370,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             lblNvPower.Text = $"{sdNvPower.Value:F0} W";
             lblNvDbOffset.Text = $"{sdNvDbOffset.Value:F0} W";
-            lblNvCore.Text = VfCurveActive ? "Curve" : $"{sdNvCore.Value:F0} MHz";
+            // Show "Curve" only if curve is active AND user hasn't touched the slider.
+            // If the user manually changes the slider, the curve is ignored for Apply.
+            lblNvCore.Text = (VfCurveActive && !_userTouchedCoreSlider) ? "Curve" : $"{sdNvCore.Value:F0} MHz";
             lblNvMem.Text = $"{sdNvMem.Value:F0} MHz";
         }
 
@@ -712,6 +717,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             sdNvDbOffset.Value = Math.Max(0, gpuDbOffset);
             spNvDbOffset.Visibility = gpuDb ? Visibility.Visible : Visibility.Collapsed;
 
+            // Reset the flag when loading profile values — start fresh.
+            _userTouchedCoreSlider = false;
+
             // Update labels
             updateAllLabels();
         }
@@ -765,10 +773,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 await RyzenAdj_To_UXTU.TranslateAsync(command, appliedName: _currentProfile + " Profile", localizeAppliedName: false);
                 DebugLog($"  TranslateAsync completed");
 
-                // Apply V-F curve offsets (if curve mode is active) after the uniform
-                // clock offset has been applied via TranslateAsync.
+                // Apply V-F curve offsets (if curve mode is active and user hasn't touched the slider)
+                // after the uniform clock offset has been applied via TranslateAsync.
                 // Reload from file because the editor window auto-saves independently.
-                if (VfCurveActive)
+                if (VfCurveActive && !_userTouchedCoreSlider)
                 {
                     var fresh = VfCurvePresetStore.Load();
                     int activeSlot = _vfActivePreset >= 0 ? _vfActivePreset : 0;
@@ -940,8 +948,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // These GPU-specific EC writes are independent of the CPU power clamp issue.
             if (sdNvidia.Visibility == Visibility.Visible)
             {
-                // In curve mode, core offset is 0 (per-point offsets are applied separately via ApplyVfCurveOffsets).
-                int core = VfCurveActive ? 0 : (int)sdNvCore.Value;
+                // In curve mode (and user hasn't touched the slider), core offset is 0
+                // (per-point offsets are applied separately via ApplyVfCurveOffsets).
+                bool useCurve = VfCurveActive && !_userTouchedCoreSlider;
+                int core = useCurve ? 0 : (int)sdNvCore.Value;
                 int mem = (int)sdNvMem.Value;
                 int tgp = (int)sdNvPower.Value;
                 bool dbEnabled = togDynamicBoost.IsChecked == true;

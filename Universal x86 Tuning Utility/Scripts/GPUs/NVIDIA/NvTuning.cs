@@ -664,17 +664,25 @@ namespace Universal_x86_Tuning_Utility.Scripts.GPUs.NVIDIA
 
         /// <summary>
         /// Applies a batch of per-point frequency offsets from a V-F curve preset.
+        /// Reads the control table once, then writes each point individually.
         /// Returns the number of points successfully written.
         /// </summary>
         public static int ApplyVfCurveOffsets(Dictionary<int, int> offsetsMHz)
         {
+            DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets: {offsetsMHz.Count} points received");
             int ok = 0;
+            int skip = 0;
+            int fail = 0;
+
             foreach (var kvp in offsetsMHz)
             {
-                if (kvp.Value == 0) continue;
-                if (SetVfPointControl(kvp.Key, kvp.Value * 1000, 0))
-                    ok++;
+                if (kvp.Value == 0) { skip++; continue; }
+                bool written = SetVfPointControl(kvp.Key, kvp.Value * 1000, 0);
+                DiagnosticLogger.LogInfo($"  Point {kvp.Key}: offset={kvp.Value}MHz, result={written}");
+                if (written) ok++; else fail++;
             }
+
+            DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets: {ok} ok, {fail} failed, {skip} skipped");
             return ok;
         }
 
@@ -685,27 +693,23 @@ namespace Universal_x86_Tuning_Utility.Scripts.GPUs.NVIDIA
                 if (pointIndex < 0 || pointIndex >= UsableVfPointCount) return false;
                 if (!NvApiPrivate.TryGetFirstGpuHandle(out IntPtr gpu)) return false;
 
+                // Read current control table via getControl before writing (required by driver).
+                // Green-curve reads the base control, modifies the delta, then writes back.
+                if (!ReadControlTable(gpu, out byte[] buffer)) return false;
+
                 IntPtr setControlPtr = NvApiPrivate.QueryInterface(0x0733E009);
                 if (setControlPtr == IntPtr.Zero) return false;
 
                 var setControl = Marshal.GetDelegateForFunctionPointer<NvApiPrivate.GpuBufferDelegate>(setControlPtr);
 
-                const int controlSize = 0x2420;
-                const int controlVersion = (1 << 16) | controlSize;
-                const int controlMaskOffset = 0x04;
-                const int controlEntriesOffset = 0x20;
-                const int controlEntryStride = 0x48;
+                // Clear the 32-byte mask region, then set the single point bit.
+                Array.Clear(buffer, 0x04, 32);
+                buffer[0x04 + pointIndex / 8] = (byte)(1 << (pointIndex % 8));
 
-                byte[] buffer = new byte[controlSize];
-
-                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0, 4), controlVersion);
-
-                buffer[controlMaskOffset + pointIndex / 8] = (byte)(1 << (pointIndex % 8));
-
-                int entryOffset = controlEntriesOffset + pointIndex * controlEntryStride;
-
-                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(entryOffset + 0, 4), frequencyOffsetKhz);
-                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(entryOffset + 4, 4), voltageOffsetUv);
+                // Delta offset: baseOffset + pointIndex * stride + deltaOffset
+                // From green-curve: controlEntryBaseOffset=0x44, stride=0x24, deltaOffset=0x14
+                int deltaOffset = 0x44 + pointIndex * 0x24 + 0x14;
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(deltaOffset, 4), frequencyOffsetKhz);
 
                 return setControl(gpu, buffer) == 0;
             }
@@ -713,6 +717,32 @@ namespace Universal_x86_Tuning_Utility.Scripts.GPUs.NVIDIA
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Reads the current VF control table via NvAPI getControl (0x23F1B133).
+        /// Required before setControl — the driver expects a valid base state.
+        /// </summary>
+        private static bool ReadControlTable(IntPtr gpu, out byte[] buffer)
+        {
+            buffer = Array.Empty<byte>();
+
+            IntPtr getControlPtr = NvApiPrivate.QueryInterface(0x23F1B133);
+            if (getControlPtr == IntPtr.Zero) return false;
+
+            var getControl = Marshal.GetDelegateForFunctionPointer<NvApiPrivate.GpuBufferDelegate>(getControlPtr);
+
+            const int controlSize = 0x2420;
+            const int controlVersion = (1 << 16) | controlSize;
+
+            buffer = new byte[controlSize];
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0, 4), controlVersion);
+
+            // Set 32-byte mask to all 1s (request all points).
+            for (int i = 0; i < 32; i++)
+                buffer[0x04 + i] = 0xFF;
+
+            return getControl(gpu, buffer) == 0;
         }
 
         private static bool TryGetNvmlGpu(out IntPtr gpu)
