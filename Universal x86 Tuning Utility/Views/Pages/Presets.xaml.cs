@@ -28,6 +28,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         // V-F curve preset state
         private VfCurvePreset[] _vfPresets = Array.Empty<VfCurvePreset>();
         private int _vfActivePreset = -1;
+        private Views.Windows.VfCurveEditorWindow? _vfEditorWindow;
 
         // DEBUG: on-page log viewer
         private readonly List<string> _debugLines = new();
@@ -356,7 +357,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             lblSustained.Text = $"{sdSustained.Value:F0} W";
             lblBoost.Text = $"{sdBoost.Value:F0} W";
-            lblTjMax.Text = $"{sdTjMax.Value:F0} °C";
+            lblTjMax.Text = $"{sdTjMax.Value:F0} Â°C";
 
             lblCoAll.Text = $"{sdCoAll.Value:F0}";
 
@@ -366,7 +367,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             lblNvPower.Text = $"{sdNvPower.Value:F0} W";
             lblNvDbOffset.Text = $"{sdNvDbOffset.Value:F0} W";
-            lblNvCore.Text = $"{sdNvCore.Value:F0} MHz";
+            lblNvCore.Text = VfCurveActive ? "Curve" : $"{sdNvCore.Value:F0} MHz";
             lblNvMem.Text = $"{sdNvMem.Value:F0} MHz";
         }
 
@@ -383,7 +384,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 sdIntelTuning.Visibility = Visibility.Collapsed;
             }
 
-            // NVIDIA visibility — check GPU inventory or fall back to NvTuning probe
+            // NVIDIA visibility â€” check GPU inventory or fall back to NvTuning probe
             bool hasNvidia = false;
             if (_gpuInventory != null)
             {
@@ -467,10 +468,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 sdIntelPl2.Maximum = pl.CpuPl2Boost;
             }
 
-            // GPU TGP slider — limit to the GPU's baseline TGP
+            // GPU TGP slider â€” limit to the GPU's baseline TGP
             sdNvPower.Maximum = pl.GpuTgpBaseline;
 
-            // Dynamic Boost offset — max is the DB max from SKU config
+            // Dynamic Boost offset â€” max is the DB max from SKU config
             sdNvDbOffset.Maximum = pl.DynamicBoostMax;
         }
 
@@ -547,9 +548,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
             else
             {
-                btnOffice.ToolTip = "Office power profile — low power, quiet operation";
-                btnGaming.ToolTip = "Gaming power profile — balanced performance";
-                btnTurbo.ToolTip = "Turbo power profile — maximum performance";
+                btnOffice.ToolTip = "Office power profile â€” low power, quiet operation";
+                btnGaming.ToolTip = "Gaming power profile â€” balanced performance";
+                btnTurbo.ToolTip = "Turbo power profile â€” maximum performance";
                 btnCustom.ToolTip = "Apply your own custom power settings using the sliders below.";
             }
         }
@@ -676,12 +677,12 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // Only apply when explicitly requested (button click), not on page load
             if (apply)
             {
-                DebugLog($"selectProfile: {profile} — apply");
+                DebugLog($"selectProfile: {profile} â€” apply");
                 _ = applyProfileAsync();
             }
             else
             {
-                DebugLog($"selectProfile: {profile} — no apply (page load / Custom)");
+                DebugLog($"selectProfile: {profile} â€” no apply (page load / Custom)");
             }
         }
 
@@ -766,9 +767,13 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                 // Apply V-F curve offsets (if curve mode is active) after the uniform
                 // clock offset has been applied via TranslateAsync.
-                if (togVfCurve.IsChecked == true && spVfCurveEditor.Visibility == Visibility.Visible)
+                // Reload from file because the editor window auto-saves independently.
+                if (VfCurveActive)
                 {
-                    var offsets = VfCurveEditor.GetOffsets();
+                    var fresh = VfCurvePresetStore.Load();
+                    int activeSlot = _vfActivePreset >= 0 ? _vfActivePreset : 0;
+                    var offsets = activeSlot < fresh.Length && fresh[activeSlot].HasChanges
+                        ? fresh[activeSlot].Offsets : new Dictionary<int, int>();
                     if (offsets.Count > 0)
                     {
                         int written = NvTuning.ApplyVfCurveOffsets(offsets);
@@ -792,7 +797,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     }
                     else
                     {
-                        DebugLog($"  EC service unavailable — CPU power limits may be clamped");
+                        DebugLog($"  EC service unavailable â€” CPU power limits may be clamped");
                     }
                 }
 
@@ -913,8 +918,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 // The original UXTU does not use --Win-CPU at all.
                 //
                 // Values are in milliwatts (W * 1000), matching original UXTU convention.
-                int slowLimit = (int)sdSustained.Value * 1000;   // Sustained → slow-limit
-                int fastLimit = (int)sdBoost.Value * 1000;   // Boost → fast-limit
+                int slowLimit = (int)sdSustained.Value * 1000;   // Sustained â†’ slow-limit
+                int fastLimit = (int)sdBoost.Value * 1000;   // Boost â†’ fast-limit
 
                 parts.Add($"--slow-limit={slowLimit}");
                 parts.Add($"--fast-limit={fastLimit}");
@@ -931,12 +936,12 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     parts.Add($"--intel-volt-cpu={sdIntelVolt.Value:F0}");
             }
 
-            // NVIDIA — GPU power control via EC Dynamic Boost registers (0x0743-0x0746).
+            // NVIDIA â€” GPU power control via EC Dynamic Boost registers (0x0743-0x0746).
             // These GPU-specific EC writes are independent of the CPU power clamp issue.
             if (sdNvidia.Visibility == Visibility.Visible)
             {
                 // In curve mode, core offset is 0 (per-point offsets are applied separately via ApplyVfCurveOffsets).
-                int core = togVfCurve.IsChecked == true ? 0 : (int)sdNvCore.Value;
+                int core = VfCurveActive ? 0 : (int)sdNvCore.Value;
                 int mem = (int)sdNvMem.Value;
                 int tgp = (int)sdNvPower.Value;
                 bool dbEnabled = togDynamicBoost.IsChecked == true;
@@ -955,12 +960,29 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             e.Handled = true;
         }
 
-        #region V-F Curve Editor
+        #region V-F Curve Editor (popup window)
 
-        private void togVfCurve_Checked(object sender, RoutedEventArgs e)
+        /// <summary> True when a V-F curve preset has non-zero offsets applied. Reloads from file for freshness. </summary>
+        private bool VfCurveActive
         {
-            spCoreSlider.Visibility = Visibility.Collapsed;
-            spVfCurveEditor.Visibility = Visibility.Visible;
+            get
+            {
+                if (_vfActivePreset < 0) return false;
+                var fresh = VfCurvePresetStore.Load();
+                int slot = _vfActivePreset >= 0 ? _vfActivePreset : 0;
+                return slot < fresh.Length && fresh[slot].HasChanges;
+            }
+        }
+
+        private void btnVfCurve_Click(object sender, RoutedEventArgs e)
+        {
+            // Only one curve editor window at a time — bring existing to front.
+            // Note: _vfEditorWindow is set to null in the Closed handler, so null check is sufficient.
+            if (_vfEditorWindow != null)
+            {
+                _vfEditorWindow.Activate();
+                return;
+            }
 
             // Load presets if not already loaded
             if (_vfPresets.Length == 0)
@@ -971,98 +993,19 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (_vfActivePreset >= 0 && _vfActivePreset < _vfPresets.Length && _vfPresets[_vfActivePreset].HasChanges)
                 offsets = _vfPresets[_vfActivePreset].Offsets;
 
-            VfCurveEditor.LoadCurve(offsets);
-            updateVfPresetButtons();
-        }
+            // Open non-modal curve editor window — user can interact with both windows.
+            // The editor auto-saves to file, so Apply reads fresh data on each click.
+            _vfEditorWindow = new Views.Windows.VfCurveEditorWindow(offsets);
+            _vfEditorWindow.Owner = Application.Current.MainWindow;
+            _vfEditorWindow.Closed += (_, _) => _vfEditorWindow = null;
+            _vfEditorWindow.CurveChanged += (_, _) => updateAllLabels();
+            _vfEditorWindow.Show();
 
-        private void togVfCurve_Unchecked(object sender, RoutedEventArgs e)
-        {
-            spCoreSlider.Visibility = Visibility.Visible;
-            spVfCurveEditor.Visibility = Visibility.Collapsed;
-            sdNvCore.Value = 0;
-            updateAllLabels();
-        }
-
-        private void VfCurveEditor_CurveChanged(object? sender, EventArgs e)
-        {
-            // Auto-save current preset when curve changes
-            if (_vfActivePreset >= 0 && _vfActivePreset < _vfPresets.Length)
-            {
-                _vfPresets[_vfActivePreset].Offsets = VfCurveEditor.GetOffsets();
-                VfCurvePresetStore.Save(_vfPresets);
-            }
-        }
-
-        private void btnVfPreset_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not Button btn || btn.Tag is not string tag) return;
-            int slot = int.Parse(tag);
-
-            // If clicking the already-active preset, do nothing
-            if (_vfActivePreset == slot) return;
-
-            // Save current preset state first
-            if (_vfActivePreset >= 0 && _vfActivePreset < _vfPresets.Length)
-                _vfPresets[_vfActivePreset].Offsets = VfCurveEditor.GetOffsets();
-
-            _vfActivePreset = slot;
-            var offsets = _vfPresets[slot].HasChanges ? _vfPresets[slot].Offsets : null;
-            VfCurveEditor.LoadCurve(offsets);
-            updateVfPresetButtons();
-            VfCurvePresetStore.Save(_vfPresets);
-        }
-
-        private void btnVfSavePreset_Click(object sender, RoutedEventArgs e)
-        {
-            if (_vfActivePreset < 0 || _vfActivePreset >= _vfPresets.Length)
-            {
-                // Auto-select preset 1 if none active
-                _vfActivePreset = 0;
-            }
-
-            _vfPresets[_vfActivePreset].Offsets = VfCurveEditor.GetAllOffsets();
-            _vfPresets[_vfActivePreset].Name = $"Preset {_vfActivePreset + 1}";
-            VfCurvePresetStore.Save(_vfPresets);
-            updateVfPresetButtons();
-            DebugLog($"V-F curve preset {_vfActivePreset + 1} saved");
-        }
-
-        private void btnVfReset_Click(object sender, RoutedEventArgs e)
-        {
-            VfCurveEditor.ResetOffsets();
-            if (_vfActivePreset >= 0 && _vfActivePreset < _vfPresets.Length)
-            {
-                _vfPresets[_vfActivePreset].Offsets = new Dictionary<int, int>();
-                VfCurvePresetStore.Save(_vfPresets);
-            }
-            DebugLog("V-F curve offsets reset to stock");
-        }
-
-        private void updateVfPresetButtons()
-        {
-            var buttons = new[] { btnVfPreset1, btnVfPreset2, btnVfPreset3, btnVfPreset4, btnVfPreset5 };
-            for (int i = 0; i < buttons.Length; i++)
-            {
-                var hasData = i < _vfPresets.Length && _vfPresets[i].HasChanges;
-                buttons[i].Background = hasData
-                    ? (Brush?)FindResource("AccentFillColorDefaultBrush")
-                    : null;
-                buttons[i].Foreground = hasData
-                    ? (Brush?)FindResource("TextOnAccentFillColorPrimaryBrush")
-                    : null;
-
-                if (i == _vfActivePreset)
-                {
-                    buttons[i].BorderThickness = new Thickness(2);
-                    buttons[i].BorderBrush = (Brush?)FindResource("AccentFillColorDefaultBrush");
-                }
-                else
-                {
-                    buttons[i].BorderThickness = new Thickness(0);
-                }
-            }
+            // Track active preset slot
+            if (_vfActivePreset < 0) _vfActivePreset = 0;
         }
 
         #endregion
+
     }
 }
