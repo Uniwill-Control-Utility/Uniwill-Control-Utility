@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Media;
 using Universal_x86_Tuning_Utility.Models;
+using Universal_x86_Tuning_Utility.Scripts.GPUs.NVIDIA;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
 
@@ -78,12 +79,19 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
 
         private void btnReset_Click(object sender, RoutedEventArgs e)
         {
+            // Reset the live GPU curve to stock (zero offsets on all points).
+            NvTuning.ResetVfCurveOffsets();
+
+            // Clear UI offsets and save empty preset to disk.
             _editor.ResetOffsets();
             if (_activePreset < _presets.Length)
             {
                 _presets[_activePreset].Offsets = new Dictionary<int, int>();
                 VfCurvePresetStore.Save(_presets);
             }
+
+            // Notify parent page so labels refresh and slider flag resets.
+            CurveChanged?.Invoke(this, EventArgs.Empty);
             updatePresetButtons();
         }
 

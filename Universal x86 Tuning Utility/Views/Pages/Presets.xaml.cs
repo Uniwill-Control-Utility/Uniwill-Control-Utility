@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -215,6 +216,15 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             txtDebugLog.Text = "";
         }
 
+        private void btnProbeVfCurve_Click(object sender, RoutedEventArgs e)
+        {
+            DebugLog("--- VFCurve Interface Probe ---");
+            string diagnostic = VfCurveApi.RunDiagnostic();
+            foreach (string line in diagnostic.Split('\n'))
+                DebugLog(line);
+            DebugLog("");
+        }
+
         // Stored profile values for status card (independent of slider UI state).
         private double _profileSustained = 75;
         private double _profileBoost = 85;
@@ -270,7 +280,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 line.Contains("[UniwillECService.") ||
                 line.Contains("[Presets.") ||
                 line.Contains("[Translate") ||
-                line.Contains("[WinPower]"))
+                line.Contains("[WinPower]") ||
+                line.Contains("[VfCurveEditor."))
             {
                 DebugLog(line);
             }
@@ -776,16 +787,51 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 // Apply V-F curve offsets (if curve mode is active and user hasn't touched the slider)
                 // after the uniform clock offset has been applied via TranslateAsync.
                 // Reload from file because the editor window auto-saves independently.
+                DebugLog($"  V-F curve check: VfCurveActive={VfCurveActive}, _userTouchedCoreSlider={_userTouchedCoreSlider}, _vfActivePreset={_vfActivePreset}");
                 if (VfCurveActive && !_userTouchedCoreSlider)
                 {
                     var fresh = VfCurvePresetStore.Load();
                     int activeSlot = _vfActivePreset >= 0 ? _vfActivePreset : 0;
                     var offsets = activeSlot < fresh.Length && fresh[activeSlot].HasChanges
                         ? fresh[activeSlot].Offsets : new Dictionary<int, int>();
+                    DebugLog($"  V-F curve: activeSlot={activeSlot}, offsets.Count={offsets.Count}");
                     if (offsets.Count > 0)
                     {
-                        int written = NvTuning.ApplyVfCurveOffsets(offsets);
-                        DebugLog($"  V-F curve applied: {written}/{offsets.Count} points written");
+                        // Apply EC power limit BEFORE the curve write. The NVIDIA driver
+                        // on Blackwell laptops may check the EC power ceiling when applying
+                        // VF offsets and further reduce power if it sees a low ceiling.
+                        int tgp = (int)sdNvPower.Value;
+                        bool dbEnabled = togDynamicBoost.IsChecked == true;
+                        int dbOffset = dbEnabled ? (int)sdNvDbOffset.Value : 0;
+                        NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
+                        DebugLog($"  V-F curve: pre-apply power limit: {tgp + dbOffset}W, dbOffset={dbOffset}W");
+
+                        int result = NvTuning.ApplyVfCurveOffsets_ClockBoostTable(offsets);
+                        DebugLog($"  V-F curve applied: {(result > 0 ? "OK" : "failed")}");
+
+                        // Also re-apply AFTER in case the driver overrides the EC ceiling.
+                        NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
+                        DebugLog($"  V-F curve: post-apply power limit re-applied: {tgp + dbOffset}W, dbOffset={dbOffset}W");
+
+                        // Post-apply: read live curve to verify GPU actually changed.
+                        if (NvTuning.TryGetVfCurve(out var liveCurve))
+                        {
+                            // Log a few representative points (first, middle, last from editor range).
+                            var editorIndices = offsets.Keys.OrderBy(k => k).ToList();
+                            if (editorIndices.Count >= 3)
+                            {
+                                int[] sampleIndices = new[] { editorIndices[0], editorIndices[editorIndices.Count / 2], editorIndices[^1] };
+                                foreach (int idx in sampleIndices)
+                                {
+                                    var point = liveCurve.FirstOrDefault(p => p.Index == idx);
+                                    int offset = offsets.GetValueOrDefault(idx, 0);
+                                    if (point != null)
+                                    {
+                                        DebugLog($"  Live check idx={idx}: freq={point.FrequencyMHz}MHz @ {point.VoltageMv}mV, offset={offset}MHz");
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -944,20 +990,28 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     parts.Add($"--intel-volt-cpu={sdIntelVolt.Value:F0}");
             }
 
-            // NVIDIA â€” GPU power control via EC Dynamic Boost registers (0x0743-0x0746).
+            // NVIDIA — GPU power control via EC Dynamic Boost registers (0x0743-0x0746).
             // These GPU-specific EC writes are independent of the CPU power clamp issue.
             if (sdNvidia.Visibility == Visibility.Visible)
             {
-                // In curve mode (and user hasn't touched the slider), core offset is 0
-                // (per-point offsets are applied separately via ApplyVfCurveOffsets).
+                // In curve mode, skip power limit here — it's applied AFTER the V-F curve
+                // in applyProfileAsync to avoid the driver re-negotiating power after the curve write.
+                // When the slider is used, apply everything normally.
                 bool useCurve = VfCurveActive && !_userTouchedCoreSlider;
-                int core = useCurve ? 0 : (int)sdNvCore.Value;
-                int mem = (int)sdNvMem.Value;
-                int tgp = (int)sdNvPower.Value;
-                bool dbEnabled = togDynamicBoost.IsChecked == true;
-                int dbOffset = dbEnabled ? (int)sdNvDbOffset.Value : 0;
-                int totalWatts = tgp + dbOffset;
-                parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
+                if (useCurve)
+                {
+                    // Nothing here — power is applied after the curve.
+                }
+                else
+                {
+                    int core = (int)sdNvCore.Value;
+                    int mem = (int)sdNvMem.Value;
+                    int tgp = (int)sdNvPower.Value;
+                    bool dbEnabled = togDynamicBoost.IsChecked == true;
+                    int dbOffset = dbEnabled ? (int)sdNvDbOffset.Value : 0;
+                    int totalWatts = tgp + dbOffset;
+                    parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
+                }
             }
 
             return string.Join(" ", parts) + " ";
@@ -994,13 +1048,16 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 return;
             }
 
-            // Load presets if not already loaded
-            if (_vfPresets.Length == 0)
-                _vfPresets = VfCurvePresetStore.Load();
+            // Always reload from disk — the editor window auto-saves independently,
+            // so the in-memory copy may be stale after a previous edit session.
+            _vfPresets = VfCurvePresetStore.Load();
+
+            // Default to preset slot 0 if not yet set.
+            if (_vfActivePreset < 0) _vfActivePreset = 0;
 
             // Load the curve editor (with active preset if one is selected)
             Dictionary<int, int>? offsets = null;
-            if (_vfActivePreset >= 0 && _vfActivePreset < _vfPresets.Length && _vfPresets[_vfActivePreset].HasChanges)
+            if (_vfActivePreset < _vfPresets.Length && _vfPresets[_vfActivePreset].HasChanges)
                 offsets = _vfPresets[_vfActivePreset].Offsets;
 
             // Open non-modal curve editor window — user can interact with both windows.
@@ -1008,11 +1065,12 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _vfEditorWindow = new Views.Windows.VfCurveEditorWindow(offsets);
             _vfEditorWindow.Owner = Application.Current.MainWindow;
             _vfEditorWindow.Closed += (_, _) => _vfEditorWindow = null;
-            _vfEditorWindow.CurveChanged += (_, _) => updateAllLabels();
+            _vfEditorWindow.CurveChanged += (_, _) =>
+                {
+                    _userTouchedCoreSlider = false; // User went back to curve — reclaim from slider
+                    updateAllLabels();
+                };
             _vfEditorWindow.Show();
-
-            // Track active preset slot
-            if (_vfActivePreset < 0) _vfActivePreset = 0;
         }
 
         #endregion

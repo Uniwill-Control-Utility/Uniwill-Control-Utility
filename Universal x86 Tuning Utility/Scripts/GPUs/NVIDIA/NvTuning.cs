@@ -444,24 +444,53 @@ namespace Universal_x86_Tuning_Utility.Scripts.GPUs.NVIDIA
 
         public static int ResetVfCurveOffsets()
         {
+            DiagnosticLogger.LogInfo("ResetVfCurveOffsets: reset GPU clock offsets to zero");
             try
             {
-                if (!TryGetVfCurve(out List<VfPoint> curve)) return -1;
+                // Use the same public NVAPI path as the Core Clock Offset slider
+                // (GPUApi.SetPerformanceStates20) to apply a uniform zero offset.
+                // This is the reliable path that works on Blackwell laptops.
+                PhysicalGPU internalGpu = PhysicalGPU.GetPhysicalGPUs().FirstOrDefault();
+                if (internalGpu == null) return -1;
 
-                int ok = 0;
-                int fail = 0;
+                var coreClock = new PerformanceStates20ClockEntryV1(
+                    PublicClockDomain.Graphics,
+                    new PerformanceStates20ParameterDelta(0)
+                );
 
-                foreach (VfPoint point in curve.Where(p => p.Index >= 0 && p.Index < UsableVfPointCount))
+                var memoryClock = new PerformanceStates20ClockEntryV1(
+                    PublicClockDomain.Memory,
+                    new PerformanceStates20ParameterDelta(0)
+                );
+
+                var clocks = new[] { coreClock, memoryClock };
+                var voltages = Array.Empty<PerformanceStates20BaseVoltageEntryV1>();
+
+                var performanceStates = new[]
                 {
-                    if (SetVfPointControl(point.Index, 0, 0)) ok++;
-                    else fail++;
-                }
+                    new PerformanceState20(
+                        PerformanceStateId.P0_3DPerformance,
+                        clocks,
+                        voltages
+                    )
+                };
 
-                if (ok == 0) return -1;
-                return fail == 0 ? 1 : 0;
+                var overclock = new PerformanceStates20InfoV1(performanceStates, 2, 0);
+                GPUApi.SetPerformanceStates20(internalGpu.Handle, overclock);
+                DiagnosticLogger.LogInfo("ResetVfCurveOffsets: SetPerformanceStates20 completed");
+
+                // Also clear any per-point V-F curve offsets applied via the ClockBoostTable path.
+                // Build a full zero-offset dictionary for all 127 points.
+                var zeroOffsets = new Dictionary<int, int>();
+                for (int i = 0; i < UsableVfPointCount; i++)
+                    zeroOffsets[i] = 0;
+                ApplyVfCurveOffsets_ClockBoostTable(zeroOffsets);
+
+                return 1;
             }
-            catch
+            catch (Exception ex)
             {
+                DiagnosticLogger.LogInfo($"ResetVfCurveOffsets: EXCEPTION {ex.Message}");
                 return -1;
             }
         }
@@ -720,6 +749,207 @@ namespace Universal_x86_Tuning_Utility.Scripts.GPUs.NVIDIA
         }
 
         /// <summary>
+        /// Applies per-point frequency offsets using NvAPI_GPU_SetClockBoostTable (0x0733E009)
+        /// with the correct PrivateClockBoostTableV1 struct layout from LTT.NvAPIWrapper.
+        /// Struct: version(4) + masks(4*4) + unknown1(12*4) + gpuDeltas(80*36) + memFilled(23*4) + memDeltas(23*4) + unknown2(1529*4)
+        /// Each GPUDelta: 9 uint32 fields, _FrequencyDeltaInkHz at offset 0x14 (20 bytes per entry).
+        /// Total struct size: 0x2420 (9248 bytes) — matches our existing controlSize.
+        /// </summary>
+        public static int ApplyVfCurveOffsets_ClockBoostTable(Dictionary<int, int> offsetsMHz)
+        {
+            DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostTable: {offsetsMHz.Count} points");
+            try
+            {
+                if (!NvApiPrivate.TryGetFirstGpuHandle(out IntPtr gpu)) return -1;
+
+                IntPtr setPtr = NvApiPrivate.QueryInterface(0x0733E009);
+                if (setPtr == IntPtr.Zero)
+                {
+                    DiagnosticLogger.LogInfo("ApplyVfCurveOffsets_ClockBoostTable: setControl(0x0733E009) not available");
+                    return -1;
+                }
+
+                var setControl = Marshal.GetDelegateForFunctionPointer<NvApiPrivate.GpuBufferDelegate>(setPtr);
+
+                // Green-curve buffer layout (verified working):
+                // Offset 0x00: version (v1, (1<<16) | size)
+                // Offset 0x04: 32-byte bitmap mask (one bit per point index)
+                // Offset 0x24: padding / unknown (0x24 to 0x44)
+                // Offset 0x44: entries start, stride = 0x24 (36 bytes) per point
+                //   Each entry: 5 uint32 + FrequencyDeltaInkHz(4) + 3 uint32 = 36 bytes
+                //   FrequencyDeltaInkHz at offset 0x14 within each entry
+                // Total buffer: 0x2420 (9248 bytes) — supports up to 255 point indices
+
+                const int bufferSize = 0x2420;
+                const int entryStride = 0x24; // 36 bytes per entry
+                const int freqDeltaOffset = 0x14; // _FrequencyDeltaInkHz within each entry
+
+                byte[] buffer = new byte[bufferSize];
+
+                // Version: v1, size = bufferSize
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0, 4), (1 << 16) | bufferSize);
+
+                // Set mask bits and frequency deltas for all points.
+                // Match green-curve's per-point layout: clear 32-byte mask region,
+                // then set bits and write deltas in a single batch.
+                foreach (var kvp in offsetsMHz)
+                {
+                    int pointIndex = kvp.Key;
+                    if (pointIndex < 0 || pointIndex >= UsableVfPointCount) continue;
+
+                    // Set mask bit — bitmap at offset 0x04, one bit per point index
+                    int maskByteOffset = 0x04 + (pointIndex / 8);
+                    int maskBit = pointIndex % 8;
+                    buffer[maskByteOffset] |= (byte)(1 << maskBit);
+
+                    // Write frequency delta (kHz)
+                    int deltaOffset = 0x44 + pointIndex * entryStride + freqDeltaOffset;
+                    if (deltaOffset + 4 <= bufferSize)
+                    {
+                        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(deltaOffset, 4), kvp.Value * 1000);
+                    }
+                }
+
+                int status = setControl(gpu, buffer);
+                DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostTable: setControl returned 0x{status:X}");
+                return status == 0 ? offsetsMHz.Count : -1;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostTable: EXCEPTION {ex.Message}");
+                return -1;
+            }
+        }
+
+        /// <summary>
+        /// Applies per-point frequency offsets using NvAPI_GPU_SetClockBoostLock (0x39442CFB).
+        /// This is marked as NVAPI_ID_CURVE_SET in LTT.NvAPIWrapper.
+        /// PrivateClockBoostLockV2 layout:
+        //  version(4) + unknown(4) + count(4) + locks[32]
+        /// Each ClockBoostLock: domain(4) + mode(4) + lockMode(4) + value(4) + voltageInMicroV(4) + flag(4) = 24 bytes
+        /// Total: 12 + 32*24 = 780 bytes
+        /// LockMode: 0=None, 1=P-State, 2=Frequency, 3=Manual
+        /// For frequency locks, voltageInMicroV field holds the frequency in kHz.
+        /// </summary>
+        public static int ApplyVfCurveOffsets_ClockBoostLock(Dictionary<int, int> offsetsMHz)
+        {
+            DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostLock: {offsetsMHz.Count} points");
+            try
+            {
+                if (!NvApiPrivate.TryGetFirstGpuHandle(out IntPtr gpu)) return -1;
+
+                IntPtr setPtr = NvApiPrivate.QueryInterface(0x39442CFB);
+                if (setPtr == IntPtr.Zero)
+                {
+                    DiagnosticLogger.LogInfo("ApplyVfCurveOffsets_ClockBoostLock: 0x39442CFB not available");
+                    return -1;
+                }
+
+                var setControl = Marshal.GetDelegateForFunctionPointer<NvApiPrivate.GpuBufferDelegate>(setPtr);
+
+                // PrivateClockBoostLockV2 layout (Pack=8):
+                // Offset 0x00: _Version (StructureVersion = uint32, v2)
+                // Offset 0x04: _Unknown (uint32)
+                // Offset 0x08: _ClockBoostLocksCount (uint32)
+                // Offset 0x0C: _ClockBoostLocks[32] (24 bytes each)
+                // Total: 0x0C + 32*24 = 0x30C (780 bytes)
+
+                const int bufferSize = 0x30C; // 780 bytes — Marshal.SizeOf<PrivateClockBoostLockV2>()
+                const int lockStride = 24;
+                const int maxLocks = 32;
+
+                byte[] buffer = new byte[bufferSize];
+
+                // Version: v2
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0, 4), (2 << 16) | bufferSize);
+                // Count
+                int lockCount = Math.Min(offsetsMHz.Count, maxLocks);
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0x08, 4), lockCount);
+
+                int i = 0;
+                foreach (var kvp in offsetsMHz)
+                {
+                    if (i >= maxLocks) break;
+                    if (kvp.Value == 0) { i++; continue; }
+
+                    int lockOffset = 0x0C + i * lockStride;
+                    if (lockOffset + lockStride > bufferSize) break;
+
+                    // ClockBoostLock (Pack=8):
+                    // _ClockDomain(4) + _Mode(4) + _LockMode(4) + _Value(4) + _VoltageInMicroV(4) + _Flag(4)
+                    // For frequency lock: domain=0(Graphics), lockMode=2(Frequency), voltageInMicroV=freqInKhz
+                    BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(lockOffset, 4), 0);       // Graphics domain
+                    BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(lockOffset + 4, 4), 0);  // mode
+                    BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(lockOffset + 8, 4), 2);  // Frequency lock
+                    BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(lockOffset + 12, 4), (uint)kvp.Key); // point index
+                    BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(lockOffset + 16, 4), (uint)(kvp.Value * 1000)); // freq delta in kHz
+                    BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(lockOffset + 20, 4), 0);  // flag
+
+                    i++;
+                }
+
+                int status = setControl(gpu, buffer);
+                DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostLock: setControl returned 0x{status:X}");
+                return status == 0 ? i : -1;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostLock: EXCEPTION {ex.Message}");
+                return -1;
+            }
+        }
+
+        /// <summary>
+        /// Applies per-point frequency offsets using NvAPI_GPU_SetClocks (0x6F151055).
+        /// Unexposed function — buffer layout is unknown. Using a minimal structure
+        /// based on PerformanceStates20Info patterns.
+        /// </summary>
+        public static int ApplyVfCurveOffsets_SetClocks(Dictionary<int, int> offsetsMHz)
+        {
+            DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_SetClocks: {offsetsMHz.Count} points");
+            try
+            {
+                if (!NvApiPrivate.TryGetFirstGpuHandle(out IntPtr gpu)) return -1;
+
+                IntPtr setPtr = NvApiPrivate.QueryInterface(0x6F151055);
+                if (setPtr == IntPtr.Zero)
+                {
+                    DiagnosticLogger.LogInfo("ApplyVfCurveOffsets_SetClocks: 0x6F151055 not available");
+                    return -1;
+                }
+
+                var setControl = Marshal.GetDelegateForFunctionPointer<NvApiPrivate.GpuBufferDelegate>(setPtr);
+
+                // Unknown buffer layout. Try a minimal structure similar to PerformanceStates20InfoV1.
+                // This is speculative — we're guessing based on the pattern of other NvAPI GPU set functions.
+                const int bufferSize = 0x200;
+                byte[] buffer = new byte[bufferSize];
+
+                // Version: v1
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0, 4), (1 << 16) | bufferSize);
+
+                // Write frequency offsets as a simple array after version
+                int i = 0;
+                foreach (var kvp in offsetsMHz)
+                {
+                    int offset = 0x04 + i * 4;
+                    if (offset + 4 > bufferSize) break;
+                    BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(offset, 4), kvp.Value * 1000);
+                    i++;
+                }
+
+                int status = setControl(gpu, buffer);
+                DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_SetClocks: setControl returned 0x{status:X}");
+                return status == 0 ? i : -1;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_SetClocks: EXCEPTION {ex.Message}");
+                return -1;
+            }
+        }
+
+        /// <summary>
         /// Reads the current VF control table via NvAPI getControl (0x23F1B133).
         /// Required before setControl — the driver expects a valid base state.
         /// </summary>
@@ -843,6 +1073,190 @@ namespace Universal_x86_Tuning_Utility.Scripts.GPUs.NVIDIA
 
             gpu = handles[0];
             return true;
+        }
+    }
+
+    /// <summary>
+    /// VFCurve-specific NvAPI interfaces discovered from RTHAL.dll reverse engineering.
+    /// MSI Afterburner uses these instead of the generic setControl(0x0733E009).
+    /// </summary>
+    internal static class VfCurveApi
+    {
+        /// <summary>VFCurve getInfo interface (discovered from RTHAL.dll function 0x82F40).</summary>
+        public const uint InterfaceGetInfo = 0x2A70;
+
+        /// <summary>VFCurve setControl interface (discovered from RTHAL.dll function 0x82F40).</summary>
+        public const uint InterfaceSetControl = 0x2A7C;
+
+        /// <summary>
+        /// Buffer size for VFCurve getInfo (from RTHAL 0x82F40: lea eax, [ebp-0x2A74]).
+        /// </summary>
+        public const int GetInfoBufferSize = 0x2A74; // 10868 bytes
+
+        /// <summary>
+        /// Buffer size for VFCurve SetCurve (from RTHAL 0x816D0: sub esp, 0x5A0).
+        /// </summary>
+        public const int SetCurveBufferSize = 0x5A0; // 1440 bytes
+
+        /// <summary>
+        /// Buffer size for VFCurve SetClockBoost (from RTHAL 0x3EB90: push 0x14).
+        /// </summary>
+        public const int SetClockBoostBufferSize = 0x14; // 20 bytes
+
+        /// <summary>
+        /// Result of querying the VFCurve-specific interfaces.
+        /// </summary>
+        public readonly record struct VfCurveInterfaceResult(
+            bool GetInfoAvailable,
+            bool SetControlAvailable,
+            IntPtr GetInfoPtr,
+            IntPtr SetControlPtr,
+            string Detail
+        );
+
+        /// <summary>
+        /// Queries the VFCurve-specific NvAPI interfaces to check availability.
+        /// Read-only — does not call the interfaces, only queries them.
+        /// </summary>
+        public static VfCurveInterfaceResult QueryInterfaces()
+        {
+            try
+            {
+                IntPtr getInfoPtr = NvApiPrivate.QueryInterface(InterfaceGetInfo);
+                IntPtr setControlPtr = NvApiPrivate.QueryInterface(InterfaceSetControl);
+
+                string detail = string.Format(
+                    "VFCurve interfaces: getInfo(0x{0:X}) = {1}, setControl(0x{2:X}) = {3}",
+                    InterfaceGetInfo,
+                    getInfoPtr == IntPtr.Zero ? "null" : getInfoPtr.ToString(),
+                    InterfaceSetControl,
+                    setControlPtr == IntPtr.Zero ? "null" : setControlPtr.ToString()
+                );
+
+                return new VfCurveInterfaceResult(
+                    getInfoPtr != IntPtr.Zero,
+                    setControlPtr != IntPtr.Zero,
+                    getInfoPtr,
+                    setControlPtr,
+                    detail
+                );
+            }
+            catch (Exception ex)
+            {
+                return new VfCurveInterfaceResult(false, false, IntPtr.Zero, IntPtr.Zero,
+                    $"Exception during query: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Attempts to read VFCurve data using the VFCurve-specific getInfo interface (0x2A70).
+        /// Read-only probe — does not modify GPU state.
+        /// </summary>
+        public static bool TryReadVfCurveGetInfo(
+            IntPtr gpu,
+            out byte[] buffer,
+            out string detail)
+        {
+            buffer = Array.Empty<byte>();
+            detail = string.Empty;
+
+            try
+            {
+                IntPtr getInfoPtr = NvApiPrivate.QueryInterface(InterfaceGetInfo);
+                if (getInfoPtr == IntPtr.Zero)
+                {
+                    detail = "VFCurve getInfo interface (0x2A70) not available";
+                    return false;
+                }
+
+                var getInfo = Marshal.GetDelegateForFunctionPointer<NvApiPrivate.GpuBufferDelegate>(getInfoPtr);
+
+                buffer = new byte[GetInfoBufferSize];
+
+                // Set version field (same pattern as existing getControl/getStatus calls).
+                int version = (1 << 16) | GetInfoBufferSize;
+                BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(0, 4), version);
+
+                int status = getInfo(gpu, buffer);
+
+                if (status != 0)
+                {
+                    detail = string.Format(
+                        "VFCurve getInfo returned 0x{0:X} (expected 0)",
+                        status
+                    );
+                    return false;
+                }
+
+                // Log first 64 bytes as hex for analysis.
+                var hexParts = new System.Collections.Generic.List<string>();
+                for (int i = 0; i < Math.Min(64, buffer.Length); i += 16)
+                {
+                    string hex = BitConverter.ToString(buffer, i, Math.Min(16, buffer.Length - i));
+                    hexParts.Add(hex);
+                }
+                detail = string.Format(
+                    "VFCurve getInfo succeeded ({0} bytes). First 64 bytes:\n{1}",
+                    buffer.Length,
+                    string.Join("\n", hexParts)
+                );
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                detail = $"Exception: {ex.GetType().Name}: {ex.Message}";
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Runs a full diagnostic probe of the VFCurve-specific interfaces.
+        /// Read-only — does not modify GPU state.
+        /// </summary>
+        public static string RunDiagnostic()
+        {
+            var lines = new System.Collections.Generic.List<string>();
+            lines.Add("=== VFCurve Interface Diagnostic ===");
+
+            // 1. Query interfaces
+            var query = QueryInterfaces();
+            lines.Add(query.Detail);
+
+            // 2. Try to get GPU handle
+            if (!NvApiPrivate.TryGetFirstGpuHandle(out IntPtr gpu))
+            {
+                lines.Add("GPU handle: FAILED");
+                return string.Join("\n", lines);
+            }
+            lines.Add($"GPU handle: {gpu}");
+
+            // 3. Try getInfo call (read-only)
+            if (query.GetInfoAvailable)
+            {
+                bool getInfoOk = TryReadVfCurveGetInfo(gpu, out byte[] infoBuffer, out string getInfoDetail);
+                lines.Add($"getInfo probe: {(getInfoOk ? "SUCCESS" : "FAILED")}");
+                lines.Add(getInfoDetail);
+            }
+            else
+            {
+                lines.Add("getInfo probe: SKIPPED (interface not available)");
+            }
+
+            // 4. Compare with generic interfaces
+            lines.Add("");
+            lines.Add("=== Generic Interface Comparison ===");
+            IntPtr genericGetInfo = NvApiPrivate.QueryInterface(0x507B4B59);
+            IntPtr genericGetControl = NvApiPrivate.QueryInterface(0x23F1B133);
+            IntPtr genericSetControl = NvApiPrivate.QueryInterface(0x0733E009);
+            IntPtr genericGetStatus = NvApiPrivate.QueryInterface(0x21537AD4);
+
+            lines.Add($"Generic getInfo(0x507B4B59): {(genericGetInfo == IntPtr.Zero ? "null" : genericGetInfo.ToString())}");
+            lines.Add($"Generic getControl(0x23F1B133): {(genericGetControl == IntPtr.Zero ? "null" : genericGetControl.ToString())}");
+            lines.Add($"Generic setControl(0x0733E009): {(genericSetControl == IntPtr.Zero ? "null" : genericSetControl.ToString())}");
+            lines.Add($"Generic getStatus(0x21537AD4): {(genericGetStatus == IntPtr.Zero ? "null" : genericGetStatus.ToString())}");
+
+            return string.Join("\n", lines);
         }
     }
 }
