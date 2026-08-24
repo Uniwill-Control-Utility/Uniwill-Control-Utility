@@ -535,7 +535,7 @@
                                 </StackPanel>
                                 <!-- Divider -->
                                 <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                                <!-- Curve Editor Toggle -->
+                                <!-- Curve Editor Button -->
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -544,28 +544,24 @@
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="Curve Editor" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Per-point V-F curve editor replaces the uniform Core Offset slider" VerticalAlignment="Top" />
+                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Per-point V-F curve editor" VerticalAlignment="Top" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                        Text="Edit voltage-frequency curve per point" />
                                     </StackPanel>
-                                    <ui:ToggleSwitch x:Name="togVfCurve"
-                                                     Grid.Column="1"
-                                                     Margin="4,0,0,0"
-                                                     LabelPosition="Left"
-                                                     OnContent="On"
-                                                     OffContent="Off"
-                                                     IsChecked="False"
-                                                     Checked="togVfCurve_Checked"
-                                                     Unchecked="togVfCurve_Unchecked" />
+                                    <Button x:Name="btnVfCurve"
+                                            Grid.Column="1"
+                                            Content="Edit Curve"
+                                            Click="btnVfCurve_Click"
+                                            Margin="4,0,0,0"
+                                            Padding="12,4" />
                                 </Grid>
-                                <!-- Core Clock Offset (visible when toggle is OFF) -->
-                                <StackPanel x:Name="spCoreSlider" Visibility="Visible">
-                                    <!-- Divider -->
-                                    <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                                    <Grid>
+                                <!-- Divider -->
+                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <!-- Core Clock Offset (always visible) -->
+                                <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
@@ -599,26 +595,6 @@
                                                     ValueChanged="Slider_ValueChanged" />
                                         </StackPanel>
                                     </Grid>
-                                </StackPanel>
-                                <!-- V-F Curve Editor (visible when toggle is ON) -->
-                                <StackPanel x:Name="spVfCurveEditor" Visibility="Collapsed">
-                                    <!-- Divider -->
-                                    <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                                    <!-- Preset buttons -->
-                                    <StackPanel Orientation="Horizontal" Margin="0,12,0,4">
-                                        <ui:TextBlock Text="Preset: " VerticalAlignment="Center" FontSize="12" Margin="0,0,8,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                        <UniformGrid Columns="5" Rows="1" Margin="0,0,0,0">
-                                            <Button x:Name="btnVfPreset1" Content="1" Width="28" Height="24" FontSize="11" Margin="2" Click="btnVfPreset_Click" Tag="0" />
-                                            <Button x:Name="btnVfPreset2" Content="2" Width="28" Height="24" FontSize="11" Margin="2" Click="btnVfPreset_Click" Tag="1" />
-                                            <Button x:Name="btnVfPreset3" Content="3" Width="28" Height="24" FontSize="11" Margin="2" Click="btnVfPreset_Click" Tag="2" />
-                                            <Button x:Name="btnVfPreset4" Content="4" Width="28" Height="24" FontSize="11" Margin="2" Click="btnVfPreset_Click" Tag="3" />
-                                            <Button x:Name="btnVfPreset5" Content="5" Width="28" Height="24" FontSize="11" Margin="2" Click="btnVfPreset_Click" Tag="4" />
-                                        </UniformGrid>
-                                        <ui:Button x:Name="btnVfSavePreset" Content="Save" Width="40" Height="24" FontSize="11" Margin="8,0,2,0" Click="btnVfSavePreset_Click" />
-                                        <ui:Button x:Name="btnVfReset" Content="Reset" Width="40" Height="24" FontSize="11" Margin="2,0,0,0" Appearance="Caution" Click="btnVfReset_Click" />
-                                    </StackPanel>
-                                    <controls:VfCurveEditor x:Name="VfCurveEditor" MinHeight="200" CurveChanged="VfCurveEditor_CurveChanged" />
-                                </StackPanel>
                                 <!-- Divider -->
                                 <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                                 <!-- Memory Clock Offset -->
@@ -676,6 +652,9 @@
                                 </ui:Button>
                                 <ui:Button Padding="8,4" Click="btnDumpGpuEc_Click">
                                     <TextBlock Text="Dump GPU EC" FontSize="12" />
+                                </ui:Button>
+                                <ui:Button Padding="8,4" Click="btnProbeVfCurve_Click">
+                                    <TextBlock Text="Probe VFCurve" FontSize="12" />
                                 </ui:Button>
                                 <ui:Button Padding="8,4" Click="btnCopyDebugLog_Click">
                                     <TextBlock Text="Copy" FontSize="12" />

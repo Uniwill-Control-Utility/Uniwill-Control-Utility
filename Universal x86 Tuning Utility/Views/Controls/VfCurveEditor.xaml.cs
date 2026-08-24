@@ -10,6 +10,8 @@ using System.Windows.Shapes;
 using System.Windows.Threading;
 using Universal_x86_Tuning_Utility.Models;
 using Universal_x86_Tuning_Utility.Scripts.GPUs.NVIDIA;
+using Universal_x86_Tuning_Utility.Scripts.Misc;
+using Wpf.Ui.Appearance;
 
 namespace Universal_x86_Tuning_Utility.Views.Controls
 {
@@ -78,22 +80,24 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
         private Line? _crosshairV;
         private TextBlock? _crosshairLabel;
 
-        // Theme change detection
-        private DispatcherTimer? _themeWatchTimer;
-        private SolidColorBrush? _lastAccentBrush;
-        private SolidColorBrush? _lastTextBrush;
-
         // Resize debounce – pause crosshair while window is being resized
         private DispatcherTimer? _resizeDebounceTimer;
 
         // Selection model (Phase 1)
         private int? _selectedPoint;          // Single active point
         private List<int>? _rangeSelection;    // Range of selected points (null = no range)
-        private Ellipse? _selectionRing;       // Visual ring around selected point
         private Rectangle? _rangeHighlight;    // Semi-transparent rect over range
-        private DateTime _lastMouseDown;       // For double-click detection
-        private int? _lastClickedPoint;        // Last clicked point index for double-click
+        private int? _pendingSelectedPoint;    // Pending selection from MouseDown (applied in MouseUp based on ClickCount)
+        private List<int>? _pendingRangeSelection; // Pending range selection from Shift+click
+        private bool _clickStartShift;         // Shift state at MouseDown
+        private bool _clickStartCtrl;          // Ctrl state at MouseDown
+        private int? _clickStartNearest;       // Nearest point at MouseDown
+        private Point? _clickStartPos;         // Click position at MouseDown
         private Ellipse? _placementDot;       // Zero-size anchor for tooltip placement near points
+
+        // Undo/redo stacks
+        private Stack<Dictionary<int, int>> _undoStack = new();
+        private Stack<Dictionary<int, int>> _redoStack = new();
 
         /// <summary> Fired whenever the user drags a point (curve changes). </summary>
         public event EventHandler? CurveChanged;
@@ -114,34 +118,8 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
                 UpdateCrosshair(clocks.CurrentCoreMHz);
             }, Dispatcher);
 
-            // Poll for theme/accent color changes so the graph updates live without reopening the window.
-            _themeWatchTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (s, e) =>
-            {
-                bool themeChanged = false;
-
-                // Detect accent color change.
-                var currentAccent = accentBrush;
-                if (currentAccent != null && currentAccent.Color != _lastAccentBrush?.Color)
-                {
-                    _lastAccentBrush = currentAccent;
-                    themeChanged = true;
-                }
-
-                // Detect text/theme color change (light/dark theme switch).
-                var currentText = Application.Current.Resources["TextFillColorPrimaryBrush"] as SolidColorBrush;
-                if (currentText != null && currentText.Color != _lastTextBrush?.Color)
-                {
-                    _lastTextBrush = currentText;
-                    themeChanged = true;
-                }
-
-                if (themeChanged)
-                {
-                    BuildAxisLabels();
-                    DrawGraph();
-                    UpdateSelectionVisuals();
-                }
-            }, Dispatcher);
+            // Listen for theme/accent color changes via WPF-UI's event-driven notification.
+            ApplicationThemeManager.Changed += OnThemeChanged;
 
             // Re-draw graph when canvas size changes (window resize, popup open, etc.)
             // Hide crosshair during resize, show again after resize settles.
@@ -151,9 +129,15 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
                 {
                     _liveFreqTimer?.Stop();
                     RemoveCrosshair(); // hide completely during resize
-                    BuildAxisLabels();
-                    DrawGraph();
-                    UpdateSelectionVisuals();
+
+                    // Defer to ContextIdle so _yAxisLabels.ActualHeight is final
+                    // before we position labels (fixes maximize/minimize misalignment).
+                    Dispatcher.InvokeAsync(() =>
+                    {
+                        BuildAxisLabels();
+                        DrawGraph();
+                        UpdateSelectionVisuals();
+                    }, DispatcherPriority.ContextIdle);
 
                     // Debounce: restore crosshair 300ms after resize stops.
                     if (_resizeDebounceTimer == null)
@@ -173,10 +157,17 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
             Unloaded += (s, e) =>
             {
                 _liveFreqTimer?.Stop();
-                _themeWatchTimer?.Stop();
+                ApplicationThemeManager.Changed -= OnThemeChanged;
                 _resizeDebounceTimer?.Stop();
                 RemoveCrosshair();
             };
+        }
+
+        private void OnThemeChanged(ApplicationTheme theme, Color accent)
+        {
+            BuildAxisLabels();
+            DrawGraph();
+            UpdateSelectionVisuals();
         }
 
         /// <summary>
@@ -220,6 +211,13 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
             }
 
             // Build point list (all usable points).
+            // Cache stock voltages for nearest-neighbor lookup.
+            int[] stockVolts = _stockCurve!.Keys.OrderBy(v => v).ToArray();
+
+            // Debug: log stock curve range and count.
+            DiagnosticLogger.LogInfo($"VfCurveEditor: stock curve loaded — {_stockCurve.Count} points, voltages {stockVolts.Min()}-{stockVolts.Max()} mV");
+            DiagnosticLogger.LogInfo($"VfCurveEditor: live curve — {selected.Count} editor points, indices {selected[0].Index}-{selected.Last().Index}");
+
             _allPoints.Clear();
             _editorPoints.Clear();
             for (int i = 0; i < selected.Count; i++)
@@ -227,7 +225,15 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
                 var p = selected[i];
                 int offset = 0;
                 savedOffsets?.TryGetValue(p.Index, out offset);
-                int baseFreq = _stockCurve!.GetValueOrDefault(p.VoltageMv, p.FrequencyMHz);
+
+                // Find nearest stock voltage within ±15 mV tolerance.
+                int baseFreq = FindNearestStockFreq(stockVolts, p.VoltageMv, 15, p.FrequencyMHz);
+
+                // Debug: log first, middle, and last editor point to verify stock lookup.
+                if (i == 0 || i == selected.Count / 2 || i == selected.Count - 1)
+                {
+                    DiagnosticLogger.LogInfo($"VfCurveEditor: idx={p.Index} volt={p.VoltageMv}mV liveFreq={p.FrequencyMHz}MHz baseFreq={baseFreq}MHz offset={offset}MHz");
+                }
 
                 var point = new VfEditorPoint
                 {
@@ -265,6 +271,9 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
                 .ToDictionary(p => p.Index, p => p.OffsetMHz);
         }
 
+        /// <summary> Gives keyboard focus to the canvas so shortcuts (Ctrl+A, Ctrl+D) work. </summary>
+        public void FocusCanvas() => _canvas.Focus();
+
         /// <summary>
         /// Resets all offsets to zero (reverts to stock curve).
         /// </summary>
@@ -275,6 +284,30 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
             ClearSelection();
             DrawGraph();
             CurveChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Finds the stock frequency for the nearest voltage within tolerance.
+        /// Falls back to live frequency if no stock point is close enough.
+        /// </summary>
+        private int FindNearestStockFreq(int[] sortedVolts, int targetMv, int toleranceMv, int fallbackFreq)
+        {
+            int bestVolt = -1;
+            int bestDist = int.MaxValue;
+            for (int i = 0; i < sortedVolts.Length; i++)
+            {
+                int dist = Math.Abs(sortedVolts[i] - targetMv);
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    bestVolt = sortedVolts[i];
+                }
+            }
+            if (bestDist <= toleranceMv && _stockCurve!.TryGetValue(bestVolt, out int freq))
+                return freq;
+            // Fallback to live frequency — log warning so we can diagnose voltage mismatch.
+            DiagnosticLogger.LogInfo($"VfCurveEditor: WARNING — stock lookup fallback for {targetMv}mV (nearest={bestVolt}mV, dist={bestDist}mV > {toleranceMv}mV), using live freq={fallbackFreq}MHz");
+            return fallbackFreq;
         }
 
         /// <summary>
@@ -312,7 +345,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
         private void BuildAxisLabels()
         {
             double h = _yAxisLabels.ActualHeight;
-            double w = _xAxisLabels.ActualWidth;
+            double w = _canvas.ActualWidth;
 
             // Defer one-shot if layout dimensions aren't available yet (control just became Visible).
             if (h < 10 || w < 10)
@@ -410,10 +443,16 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
         /* ------------------------------------------------------------------ */
 
         private void DrawGraph()
-        {
+       {
             if (_editorPoints.Count < 2) return;
 
-            var color = accentBrush;
+            var defaultColor = Application.Current.Resources["ControlStrongFillColorDefaultBrush"] as SolidColorBrush
+                ?? _fallbackBrush;
+            var selectedIndices = new HashSet<int>();
+            if (_selectedPoint.HasValue)
+                selectedIndices.Add(_selectedPoint.Value);
+            if (_rangeSelection != null)
+                selectedIndices.UnionWith(_rangeSelection);
 
             double w = _canvas.ActualWidth;
             double h = _canvas.ActualHeight;
@@ -431,7 +470,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
 
             // Preserve crosshair and selection elements so they survive the clear
             bool hadCrosshair = _crosshairH != null;
-            bool hadSelection = _selectionRing != null || _rangeSelection != null;
+            bool hadSelection = _rangeSelection != null;
             _canvas.Children.Clear();
 
             int count = _editorPoints.Count;
@@ -513,7 +552,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
             {
                 Stroke = (Brush?)FindResource("TextFillColorPrimaryBrush") ?? Brushes.Gray,
                 StrokeThickness = 1.5,
-                Opacity = 0.5,
+                Opacity = 0.125,
                 StrokeStartLineCap = PenLineCap.Round,
                 StrokeEndLineCap = PenLineCap.Round,
                 Data = new PathGeometry { Figures = new PathFigureCollection { stockFigure } }
@@ -527,7 +566,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
                 Y1 = coords[0].Y,
                 X2 = coords[0].X,
                 Y2 = coords[0].Y,
-                Stroke = color,
+                Stroke = defaultColor,
                 StrokeThickness = 2,
                 Opacity = 0.5,
                 StrokeEndLineCap = PenLineCap.Round
@@ -540,7 +579,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
                 Y1 = coords[^1].Y,
                 X2 = drawW,
                 Y2 = coords[^1].Y,
-                Stroke = color,
+                Stroke = defaultColor,
                 StrokeThickness = 2,
                 Opacity = 0.5,
                 StrokeStartLineCap = PenLineCap.Round
@@ -560,7 +599,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
 
             var path = new Path
             {
-                Stroke = color,
+                Stroke = defaultColor,
                 StrokeThickness = 2,
                 Opacity = 0.5,
                 StrokeStartLineCap = PenLineCap.Round,
@@ -569,16 +608,16 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
             };
             _canvas.Children.Add(path);
 
-            // Draggable dots
+            // Draggable dots — selected points use accent color, others use default color
             for (int i = 0; i < coords.Count; i++)
             {
+                bool isSelected = selectedIndices.Contains(i);
                 var ellipse = new Ellipse
                 {
                     Width = 8,
                     Height = 8,
-                    Fill = color,
-                    Stroke = (Brush?)FindResource("TextOnAccentFillColorPrimaryBrush") ?? Brushes.White,
-                    StrokeThickness = 1.5,
+                    Fill = isSelected ? (Brush?)accentBrush : defaultColor,
+                    Opacity = isSelected ? 1.0 : 0.8,
                     Tag = i
                 };
                 ellipse.SetValue(Canvas.LeftProperty, coords[i].X - 4);
@@ -594,13 +633,13 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
                 _canvas.Children.Add(_crosshairLabel!);
             }
 
-            // Re-add selection visuals on top
+            // Re-add selection highlight at the bottom so it doesn't block mouse events on dots
             if (hadSelection)
             {
                 if (_rangeHighlight != null && _rangeHighlight.Visibility == Visibility.Visible)
-                    _canvas.Children.Add(_rangeHighlight);
-                if (_selectionRing != null && _selectionRing.Visibility == Visibility.Visible)
-                    _canvas.Children.Add(_selectionRing);
+                {
+                    _canvas.Children.Insert(0, _rangeHighlight);
+                }
             }
 
             // Re-add tooltip placement anchor on top
@@ -747,32 +786,13 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
 
         private void RemoveSelectionVisuals()
         {
-            if (_selectionRing != null && _canvas.Children.Contains(_selectionRing))
-                _canvas.Children.Remove(_selectionRing);
             if (_rangeHighlight != null && _canvas.Children.Contains(_rangeHighlight))
                 _canvas.Children.Remove(_rangeHighlight);
-
-            _selectionRing = null;
             _rangeHighlight = null;
         }
 
         private void EnsureSelectionVisuals()
         {
-            if (_selectionRing == null)
-            {
-                var color = accentBrush;
-                _selectionRing = new Ellipse
-                {
-                    Width = 14,
-                    Height = 14,
-                    Stroke = color,
-                    StrokeThickness = 2,
-                    Fill = null,
-                    IsHitTestVisible = false
-                };
-                _canvas.Children.Add(_selectionRing);
-            }
-
             if (_rangeHighlight == null)
             {
                 _rangeHighlight = new Rectangle
@@ -780,7 +800,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
                     Fill = new SolidColorBrush(accentBrush.Color) { Opacity = 0.25 },
                     IsHitTestVisible = false
                 };
-                _canvas.Children.Add(_rangeHighlight);
+                _canvas.Children.Insert(0, _rangeHighlight);
             }
         }
 
@@ -790,7 +810,6 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
 
             // Keep highlight brush in sync with current accent color (theme-reactive).
             _rangeHighlight.Fill = new SolidColorBrush(accentBrush.Color) { Opacity = 0.25 };
-            _selectionRing.Stroke = accentBrush;
 
             double w = _canvas.ActualWidth;
             double h = _canvas.ActualHeight;
@@ -801,7 +820,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
             {
                 // Re-add to canvas if it was removed (e.g., by DrawGraph clearing children).
                 if (!_canvas.Children.Contains(_rangeHighlight))
-                    _canvas.Children.Add(_rangeHighlight);
+                    _canvas.Children.Insert(0, _rangeHighlight);
 
                 // Show range highlight rect — edges centered on first/last selected points.
                 int minIdx = _rangeSelection.Min();
@@ -816,27 +835,9 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
                 Canvas.SetLeft(_rangeHighlight, Math.Min(x1, x2));
                 Canvas.SetTop(_rangeHighlight, 0);
                 _rangeHighlight.Visibility = Visibility.Visible;
-                _selectionRing.Visibility = Visibility.Collapsed;
-            }
-            else if (_selectedPoint.HasValue)
-            {
-                // Re-add to canvas if it was removed (e.g., by DrawGraph clearing children).
-                if (!_canvas.Children.Contains(_selectionRing))
-                    _canvas.Children.Add(_selectionRing);
-
-                // Show single selection ring
-                int i = _selectedPoint.Value;
-                double x = PointX(i, count, drawW);
-                double y = FreqToY(_editorPoints[i].EffectiveFrequencyMHz(), YAxisMin, YAxisMax, h);
-
-                _selectionRing.SetValue(Canvas.LeftProperty, x - 7);
-                _selectionRing.SetValue(Canvas.TopProperty, y - 7);
-                _selectionRing.Visibility = Visibility.Visible;
-                _rangeHighlight.Visibility = Visibility.Collapsed;
             }
             else
             {
-                _selectionRing.Visibility = Visibility.Collapsed;
                 _rangeHighlight.Visibility = Visibility.Collapsed;
             }
         }
@@ -867,6 +868,12 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
         /// <summary> Minimum mouse movement (px) before a click becomes a drag. Prevents accidental moves when clicking to select. </summary>
         private const int DragThresholdPx = 4;
 
+        /// <summary> Ensures the canvas has focus on any mouse click so keyboard shortcuts work. </summary>
+        private void Grid_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _canvas.Focus();
+        }
+
         private void Canvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             _canvas.Focus();
@@ -874,116 +881,139 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
             var pos = e.GetPosition(_canvas);
             int? nearest = FindNearestPoint(pos);
             bool shift = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift);
+            bool ctrl = Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl);
 
-            // --- Double-click detection ---
-            bool isDoubleClick = (DateTime.Now - _lastMouseDown).TotalMilliseconds < 500
-                                 && _lastClickedPoint == nearest;
-            _lastMouseDown = DateTime.Now;
-            _lastClickedPoint = nearest;
+            // Store click info — we defer all selection decisions to MouseLeftButtonUp
+            // where e.ClickCount reliably tells us single vs double click.
+            _clickStartPos = pos;
+            _clickStartNearest = nearest;
+            _clickStartShift = shift;
+            _clickStartCtrl = ctrl;
 
-            if (isDoubleClick)
+            // Always capture mouse so we get MouseUp even for clicks in empty space.
+            _canvas.CaptureMouse();
+
+            if (nearest.HasValue)
             {
-                if (nearest.HasValue)
-                {
-                    // Double-click on point: select it only
-                    _selectedPoint = nearest.Value;
-                    _rangeSelection = null;
-                    _isShiftSelecting = false;
-                    UpdateSelectionVisuals();
-                }
-                else
-                {
-                    // Double-click empty space: clear selection
-                    ClearSelection();
-                }
-                e.Handled = true;
-                return;
-            }
-
-            if (shift)
-            {
-                // Shift+click anywhere: start selection phase (no movement).
-                // Find point by X coordinate — works even in empty space.
-                int anchor = _selectedPoint ?? FindPointAtX(pos.X).GetValueOrDefault(0);
-
-                _selectedPoint = anchor;
-                _rangeSelection = new List<int> { anchor };
-                _isShiftSelecting = true;
-                _dragStartIndex = anchor;
-                _dragStartPos = pos;
-                _dragStartOffset = _editorPoints[anchor].OffsetMHz;
-
-                // Capture per-point offsets at selection start
-                _dragStartOffsets.Clear();
-                _dragStartOffsets[anchor] = _editorPoints[anchor].OffsetMHz;
-
-                UpdateSelectionVisuals();
-                _canvas.CaptureMouse();
-            }
-            else if (nearest.HasValue)
-            {
-                // Plain click on point: prepare for drag.
-                // If there's an existing multi-point selection and user clicked on a selected point,
-                // preserve the range selection so dragging moves all selected points together.
+                // Click on a point — prepare drag on that point.
                 bool clickedOnSelected = _rangeSelection != null && _rangeSelection.Contains(nearest.Value);
 
-                if (!clickedOnSelected)
+                // Store pending selection to apply in MouseUp (only if not part of a double-click).
+                if (ctrl)
                 {
-                    // Click on a new point — single select
-                    _selectedPoint = nearest.Value;
-                    _rangeSelection = null;
+                    // Ctrl+click on point: select all points, no highlight background.
+                    _pendingSelectedPoint = 0;
+                    _pendingRangeSelection = new List<int>(_editorPoints.Count);
+                    for (int i = 0; i < _editorPoints.Count; i++)
+                        _pendingRangeSelection.Add(i);
+                    _isShiftSelecting = false;
                 }
-                // else: keep existing _rangeSelection intact
-
-                _isShiftSelecting = false;
-                UpdateSelectionVisuals();
+                else if (shift)
+                {
+                    // Shift+click on point: create range from existing selection to clicked point.
+                    int anchor = _selectedPoint ?? nearest.Value;
+                    int start = Math.Min(anchor, nearest.Value);
+                    int end = Math.Max(anchor, nearest.Value);
+                    _pendingSelectedPoint = anchor;
+                    _pendingRangeSelection = new List<int>();
+                    for (int i = start; i <= end; i++)
+                        _pendingRangeSelection.Add(i);
+                    _isShiftSelecting = true;
+                }
+                else if (!clickedOnSelected)
+                {
+                    // Plain click on a new point — single select.
+                    _pendingSelectedPoint = nearest.Value;
+                    _pendingRangeSelection = null;
+                    _isShiftSelecting = false;
+                }
+                // else: clicked on already-selected point in existing range — keep current selection.
 
                 _dragStartIndex = nearest.Value;
                 _dragStartPos = pos;
                 _dragStartOffset = _editorPoints[nearest.Value].OffsetMHz;
 
                 // Capture per-point offsets for multi-point drag
-                if (clickedOnSelected && _rangeSelection != null)
+                _dragStartOffsets.Clear();
+                if (ctrl && _pendingRangeSelection != null)
                 {
-                    _dragStartOffsets.Clear();
+                    // Ctrl+click: capture offsets for all points
+                    foreach (int idx in _pendingRangeSelection)
+                        _dragStartOffsets[idx] = _editorPoints[idx].OffsetMHz;
+                }
+                else if (shift && _pendingRangeSelection != null)
+                {
+                    // Shift+click: capture offsets for the entire pending range
+                    foreach (int idx in _pendingRangeSelection)
+                        _dragStartOffsets[idx] = _editorPoints[idx].OffsetMHz;
+                }
+                else if (clickedOnSelected && _rangeSelection != null)
+                {
                     foreach (int idx in _rangeSelection)
                         _dragStartOffsets[idx] = _editorPoints[idx].OffsetMHz;
                 }
                 else
                 {
-                    _dragStartOffsets.Clear();
                     _dragStartOffsets[nearest.Value] = _editorPoints[nearest.Value].OffsetMHz;
                 }
-
-                _canvas.CaptureMouse();
             }
+            // else: click in empty space — no action.
         }
 
         private void Canvas_MouseMove(object sender, MouseEventArgs e)
         {
             var pos = e.GetPosition(_canvas);
 
-            /* --- Shift-selection mode (selection only, no movement) --- */
+            /* --- Shift-selection mode (selection + transition to movement) --- */
             if (_isShiftSelecting && _dragStartIndex.HasValue)
             {
-                int targetIdx = FindPointAtX(pos.X).GetValueOrDefault(-1);
-                if (targetIdx >= 0)
+                // Check if this is a vertical drag (movement) vs horizontal drag (selection).
+                double dx = Math.Abs(pos.X - _dragStartPos.Value.X);
+                double dy = Math.Abs(pos.Y - _dragStartPos.Value.Y);
+
+                if (dy >= DragThresholdPx && dx < DragThresholdPx * 2)
                 {
-                    int anchor = _dragStartIndex.Value;
-                    int start = Math.Min(anchor, targetIdx);
-                    int end = Math.Max(anchor, targetIdx);
-                    _rangeSelection = new List<int>();
-                    for (int i = start; i <= end; i++)
+                    // Vertical movement detected — transition from selection to drag mode.
+                    _isShiftSelecting = false;
+                    _dragIndex = _dragStartIndex.Value;
+                    SaveUndoState(); // Save state when drag begins
+
+                    // Apply pending selection so the drag shows correct colors
+                    if (_pendingSelectedPoint.HasValue)
                     {
-                        _rangeSelection.Add(i);
-                        if (!_dragStartOffsets.ContainsKey(i))
-                            _dragStartOffsets[i] = _editorPoints[i].OffsetMHz;
+                        _selectedPoint = _pendingSelectedPoint.Value;
+                        _rangeSelection = _pendingRangeSelection;
+                        _pendingSelectedPoint = null;
+                        _pendingRangeSelection = null;
+                        UpdateSelectionVisuals();
+                        DrawGraph();
                     }
-                    _selectedPoint = anchor;
-                    UpdateSelectionVisuals();
+                    _canvas.Cursor = Cursors.Hand;
+                    // Fall through to active drag handling below
                 }
-                _canvas.Cursor = Cursors.Hand;
-                return;
+                else
+                {
+                    // Horizontal movement — expand range selection
+                    int targetIdx = FindPointAtX(pos.X).GetValueOrDefault(-1);
+                    if (targetIdx >= 0)
+                    {
+                        int anchor = _dragStartIndex.Value;
+                        int start = Math.Min(anchor, targetIdx);
+                        int end = Math.Max(anchor, targetIdx);
+                        _rangeSelection = new List<int>();
+                        for (int i = start; i <= end; i++)
+                        {
+                            _rangeSelection.Add(i);
+                            if (!_dragStartOffsets.ContainsKey(i))
+                                _dragStartOffsets[i] = _editorPoints[i].OffsetMHz;
+                        }
+                        _selectedPoint = anchor;
+                        UpdateSelectionVisuals();
+                        DrawGraph();
+                    }
+                    _canvas.Cursor = Cursors.Hand;
+                    return;
+                }
             }
 
             /* --- Pending drag threshold check --- */
@@ -992,7 +1022,24 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
                 double dx = pos.X - _dragStartPos.Value.X;
                 double dy = pos.Y - _dragStartPos.Value.Y;
                 if (Math.Sqrt(dx * dx + dy * dy) >= DragThresholdPx)
+                {
                     _dragIndex = _dragStartIndex.Value;
+                    SaveUndoState(); // Save state when drag begins
+
+                    // Apply pending selection now so the drag shows correct colors
+                    if (_pendingSelectedPoint.HasValue)
+                    {
+                        _selectedPoint = _pendingSelectedPoint.Value;
+                        _rangeSelection = _pendingRangeSelection;
+                        _pendingSelectedPoint = null; // Only apply once
+                        _pendingRangeSelection = null;
+                        if (!_clickStartCtrl)
+                            UpdateSelectionVisuals();
+                        else
+                            RemoveSelectionVisuals();
+                        DrawGraph();
+                    }
+                }
             }
 
             /* --- Active drag --- */
@@ -1032,24 +1079,66 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
 
         private void Canvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (_dragIndex.HasValue || _dragStartIndex.HasValue)
+            // Hide movement tooltip on release
+            if (_movementTooltip != null) _movementTooltip.IsOpen = false;
+
+            // Apply pending selection from MouseDown.
+            // No double-click handling — use Ctrl+D to clear selection.
+            bool dragHappened = _dragIndex.HasValue;
+
+            // Fire CurveChanged after a drag completes so the editor window can auto-save.
+            if (dragHappened)
             {
-                // Hide movement tooltip on release
-                if (_movementTooltip != null) _movementTooltip.IsOpen = false;
-
-                _dragIndex = null;
-                _dragStartIndex = null;
-                _dragStartPos = null;
-                _isShiftSelecting = false;
-                _dragStartOffsets.Clear();
-                _canvas.ReleaseMouseCapture();
-                _tooltip.IsOpen = false;
-
-                // Re-apply selection visuals after drag ends so the highlight persists.
-                UpdateSelectionVisuals();
-
                 CurveChanged?.Invoke(this, EventArgs.Empty);
             }
+
+            if (_pendingSelectedPoint.HasValue && !dragHappened)
+            {
+                // If Shift+drag already built a multi-point range in MouseMove, don't overwrite it.
+                bool shiftDragBuiltRange = _clickStartShift && _rangeSelection != null && _rangeSelection.Count > 1;
+
+                if (!shiftDragBuiltRange)
+                {
+                    if (_clickStartCtrl)
+                    {
+                        // Ctrl+click: select all, no range highlight background.
+                        _selectedPoint = _pendingSelectedPoint.Value;
+                        _rangeSelection = _pendingRangeSelection;
+                        _isShiftSelecting = false;
+                        RemoveSelectionVisuals(); // remove any previous highlight
+                        DrawGraph();
+                    }
+                    else if (_clickStartShift)
+                    {
+                        _selectedPoint = _pendingSelectedPoint.Value;
+                        _rangeSelection = _pendingRangeSelection;
+                        _isShiftSelecting = false;
+                        UpdateSelectionVisuals();
+                        DrawGraph();
+                    }
+                    else if (_clickStartNearest.HasValue)
+                    {
+                        _selectedPoint = _pendingSelectedPoint.Value;
+                        _rangeSelection = _pendingRangeSelection;
+                        _isShiftSelecting = false;
+                        UpdateSelectionVisuals();
+                        DrawGraph();
+                    }
+                    CurveChanged?.Invoke(this, EventArgs.Empty);
+                }
+            }
+
+            // Clean up drag state
+            _dragIndex = null;
+            _dragStartIndex = null;
+            _dragStartPos = null;
+            _isShiftSelecting = false;
+            _dragStartOffsets.Clear();
+            _pendingSelectedPoint = null;
+            _pendingRangeSelection = null;
+            _tooltip.IsOpen = false;
+            if (_canvas.IsMouseCaptured)
+                _canvas.ReleaseMouseCapture();
         }
 
         private void Canvas_MouseLeave(object sender, MouseEventArgs e)
@@ -1058,41 +1147,35 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
             if (_movementTooltip != null) _movementTooltip.IsOpen = false;
             if (_dragIndex.HasValue || _dragStartIndex.HasValue)
             {
+                // Fire CurveChanged before clearing state so offsets are saved.
+                CurveChanged?.Invoke(this, EventArgs.Empty);
                 _dragIndex = null;
                 _dragStartIndex = null;
                 _dragStartPos = null;
                 _isShiftSelecting = false;
+                _pendingSelectedPoint = null;
+                _pendingRangeSelection = null;
                 _canvas.ReleaseMouseCapture();
             }
         }
 
-        /// <summary>
-        /// Handles double-click on empty space to clear selection.
-        /// Note: double-click on a point is handled in MouseLeftButtonDown via timestamp detection.
-        /// For empty-space double-click, we use the MouseLeftButtonDown double-click path
-        /// where FindNearestPoint returns null.
-        /// </summary>
-        private void Canvas_MouseLeftButtonDblClick(object sender, MouseButtonEventArgs e)
-        {
-            var pos = e.GetPosition(_canvas);
-            if (FindNearestPoint(pos) == null)
-            {
-                // Double-click on empty space: clear selection
-                ClearSelection();
-                e.Handled = true;
-            }
-        }
-
+ 
         /// <summary>
         /// Handles keyboard shortcuts for point navigation and selection.
         /// Tab: next point, Shift+Tab: previous point.
-        /// Only active when canvas has keyboard focus.
+        /// Up/Down: move all selected points by FrequencyStep.
+        /// Shift+Up/Down: move single selected point by FrequencyStep.
+        /// Ctrl+A: select all points.
+        /// Ctrl+D: clear selection.
+        /// Ctrl+Z: undo, Ctrl+Y: redo.
+        /// Shift+Enter (double-press): flatten range to first point's frequency.
         /// </summary>
-        private void Canvas_PreviewKeyDown(object sender, KeyEventArgs e)
+        private void Grid_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (_editorPoints.Count == 0) return;
 
             bool shift = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift);
+            bool ctrl = Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl);
 
             if (e.Key == Key.Tab && !shift)
             {
@@ -1102,6 +1185,7 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
                 else
                     _selectedPoint = 0;
                 _rangeSelection = null;
+                DrawGraph();
                 UpdateSelectionVisuals();
                 e.Handled = true;
             }
@@ -1113,9 +1197,165 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
                 else
                     _selectedPoint = _editorPoints.Count - 1;
                 _rangeSelection = null;
+                DrawGraph();
                 UpdateSelectionVisuals();
                 e.Handled = true;
             }
+            else if (e.Key == Key.Up)
+            {
+                if (_selectedPoint.HasValue)
+                {
+                    if (shift)
+                    {
+                        // Shift+Up: move single selected point
+                        SaveUndoState();
+                        MovePoint(_selectedPoint.Value, FrequencyStep);
+                    }
+                    else
+                    {
+                        // Up: move all selected points (or just the active one)
+                        SaveUndoState();
+                        var targets = _rangeSelection != null && _rangeSelection.Count > 1 ? _rangeSelection : new List<int> { _selectedPoint.Value };
+                        foreach (int idx in targets)
+                            MovePoint(idx, FrequencyStep);
+                    }
+                    DrawGraph();
+                    UpdateSelectionVisuals();
+                    e.Handled = true;
+                }
+            }
+            else if (e.Key == Key.Down)
+            {
+                if (_selectedPoint.HasValue)
+                {
+                    if (shift)
+                    {
+                        // Shift+Down: move single selected point
+                        SaveUndoState();
+                        MovePoint(_selectedPoint.Value, -FrequencyStep);
+                    }
+                    else
+                    {
+                        // Down: move all selected points (or just the active one)
+                        SaveUndoState();
+                        var targets = _rangeSelection != null && _rangeSelection.Count > 1 ? _rangeSelection : new List<int> { _selectedPoint.Value };
+                        foreach (int idx in targets)
+                            MovePoint(idx, -FrequencyStep);
+                    }
+                    DrawGraph();
+                    UpdateSelectionVisuals();
+                    e.Handled = true;
+                }
+            }
+            else if (e.Key == Key.Z && ctrl && !shift)
+            {
+                // Ctrl+Z: undo
+                if (Undo())
+                    e.Handled = true;
+            }
+            else if (e.Key == Key.Y && ctrl && !shift)
+            {
+                // Ctrl+Y: redo
+                if (Redo())
+                    e.Handled = true;
+            }
+            else if (e.Key == Key.A && ctrl)
+            {
+                // Ctrl+A: select all points
+                _selectedPoint = 0;
+                _rangeSelection = new List<int>(_editorPoints.Count);
+                for (int i = 0; i < _editorPoints.Count; i++)
+                    _rangeSelection.Add(i);
+                UpdateSelectionVisuals();
+                DrawGraph();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.D && ctrl)
+            {
+                // Ctrl+D: clear selection
+                ClearSelection();
+                DrawGraph();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter && shift)
+            {
+                // Shift+Enter double-press: flatten range to first point's frequency
+                if (_rangeSelection != null && _rangeSelection.Count >= 2)
+                {
+                    var now = DateTime.UtcNow;
+                    if (_lastShiftEnterTime.HasValue && (now - _lastShiftEnterTime.Value).TotalMilliseconds < 500)
+                    {
+                        // Double press confirmed — flatten all points to first point's frequency
+                        SaveUndoState();
+                        int firstIdx = _rangeSelection[0];
+                        int targetFreq = _editorPoints[firstIdx].EffectiveFrequencyMHz();
+                        DiagnosticLogger.LogInfo($"VfCurveEditor: flatten { _rangeSelection.Count} points to {targetFreq}MHz");
+                        foreach (int idx in _rangeSelection)
+                        {
+                            _editorPoints[idx].OffsetMHz = targetFreq - _editorPoints[idx].BaseFrequencyMHz;
+                        }
+                        DrawGraph();
+                        UpdateSelectionVisuals();
+                        CurveChanged?.Invoke(this, EventArgs.Empty);
+                        _lastShiftEnterTime = null;
+                        e.Handled = true;
+                        return;
+                    }
+                    _lastShiftEnterTime = now;
+                    DiagnosticLogger.LogInfo($"VfCurveEditor: Shift+Enter — press again within 500ms to flatten {_rangeSelection.Count} points");
+                    e.Handled = true;
+                }
+            }
+        }
+
+        private DateTime? _lastShiftEnterTime;
+
+        private void MovePoint(int index, int freqDelta)
+        {
+            int newFreq = _editorPoints[index].EffectiveFrequencyMHz() + freqDelta;
+            newFreq = Math.Max(MinDraggableFreq, Math.Min(YAxisMax, newFreq));
+            _editorPoints[index].OffsetMHz = newFreq - _editorPoints[index].BaseFrequencyMHz;
+        }
+
+        private void SaveUndoState()
+        {
+            var snapshot = new Dictionary<int, int>(_editorPoints.Count);
+            for (int i = 0; i < _editorPoints.Count; i++)
+                snapshot[i] = _editorPoints[i].OffsetMHz;
+            _undoStack.Push(snapshot);
+            _redoStack.Clear(); // New action clears redo stack
+        }
+
+        private bool Undo()
+        {
+            if (_undoStack.Count == 0) return false;
+            var redoSnapshot = new Dictionary<int, int>(_editorPoints.Count);
+            for (int i = 0; i < _editorPoints.Count; i++)
+                redoSnapshot[i] = _editorPoints[i].OffsetMHz;
+            _redoStack.Push(redoSnapshot);
+
+            var prev = _undoStack.Pop();
+            foreach (var kvp in prev)
+                _editorPoints[kvp.Key].OffsetMHz = kvp.Value;
+            DrawGraph();
+            UpdateSelectionVisuals();
+            return true;
+        }
+
+        private bool Redo()
+        {
+            if (_redoStack.Count == 0) return false;
+            var undoSnapshot = new Dictionary<int, int>(_editorPoints.Count);
+            for (int i = 0; i < _editorPoints.Count; i++)
+                undoSnapshot[i] = _editorPoints[i].OffsetMHz;
+            _undoStack.Push(undoSnapshot);
+
+            var next = _redoStack.Pop();
+            foreach (var kvp in next)
+                _editorPoints[kvp.Key].OffsetMHz = kvp.Value;
+            DrawGraph();
+            UpdateSelectionVisuals();
+            return true;
         }
 
         private int? FindNearestPoint(Point pos)

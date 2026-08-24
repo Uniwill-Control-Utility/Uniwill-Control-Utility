@@ -6,7 +6,6 @@
              Title="GPU Curve Editor"
              Width="780" Height="520"
              MinHeight="500" MinWidth="700"
-             MaxHeight="1200" MaxWidth="800"
              ResizeMode="CanResizeWithGrip"
              WindowStartupLocation="CenterOwner"
              ExtendsContentIntoTitleBar="True"
@@ -36,12 +35,34 @@
             </Grid.RowDefinitions>
 
             <!-- Header -->
-            <TextBlock Grid.Row="0"
-                       Text="Drag points to adjust GPU frequency per voltage. Tab to navigate, Shift+Click for range selection."
-                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                       FontSize="12"
-                       Margin="0,0,0,8"
-                       TextWrapping="Wrap"/>
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBlock Text="Drag points to adjust GPU frequency per voltage. Tab to navigate, Shift+Click for range selection."
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="0,0,8,0"/>
+                <Button Style="{StaticResource DefaultButtonStyle}"
+                        Background="Transparent" BorderBrush="Transparent"
+                        Padding="4" Cursor="Hand" HorizontalAlignment="Right">
+                    <Button.ToolTip>
+                        <Border Background="{DynamicResource ControlFillColorDefaultBrush}"
+                                BorderBrush="{DynamicResource ControlElevationBorderBrush}"
+                                BorderThickness="1" Padding="12,10">
+                            <StackPanel>
+                                <TextBlock Text="Shift + Click point — range select" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,6"/>
+                                <TextBlock Text="Ctrl + Click point — select all, move all" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,6"/>
+                                <TextBlock Text="Ctrl + A — select all" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,6"/>
+                                <TextBlock Text="Ctrl + D — clear selection" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,6"/>
+                                <TextBlock Text="Tab / Shift + Tab — navigate points" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,6"/>
+                                <TextBlock Text="Up / Down — adjust frequency" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,6"/>
+                                <TextBlock Text="Ctrl + Z / Y — undo / redo" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                            </StackPanel>
+                        </Border>
+                    </Button.ToolTip>
+                    <ui:SymbolIcon Symbol="Info20" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                </Button>
+            </StackPanel>
 
             <!-- Curve Editor -->
             <controls:VfCurveEditor x:Name="_editor" Grid.Row="1"/>
@@ -59,13 +80,11 @@
             </StackPanel>
         </Grid>
 
-        <!-- Bottom bar -->
+        <!-- Bottom bar — Reset only (auto-save, no Save/Cancel needed) -->
         <Grid Grid.Row="2" Margin="16,8">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="Reset" Width="70" Click="btnReset_Click" Margin="0,0,8,0"
                         Style="{StaticResource DefaultButtonStyle}"/>
-                <Button Content="Save" Width="70" Click="btnSave_Click" Margin="0,0,8,0"/>
-                <Button Content="Cancel" Width="70" IsCancel="True"/>
             </StackPanel>
         </Grid>
     </Grid>

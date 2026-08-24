@@ -4,7 +4,7 @@
              FlowDirection="LeftToRight"
              MinHeight="200">
 
-    <Grid Margin="0,8,0,8">
+    <Grid Margin="0,8,0,8" PreviewKeyDown="Grid_PreviewKeyDown" MouseLeftButtonDown="Grid_MouseLeftButtonDown">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
@@ -17,11 +17,9 @@
         <!-- Y-axis labels (Frequency MHz) — Canvas for pixel-precise positioning -->
         <Canvas x:Name="_yAxisLabels"
                 Grid.Row="0" Grid.Column="0"
-                Width="40">
-            <Canvas.Height>
-                <Binding ElementName="_graphBorder" Path="ActualHeight" Mode="OneWay"/>
-            </Canvas.Height>
-        </Canvas>
+                Width="40"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"/>
 
         <!-- Graph area — uses explicit lines instead of Border for precise axis alignment -->
         <Border x:Name="_graphBorder"
@@ -48,8 +46,7 @@
                 MouseMove="Canvas_MouseMove"
                 MouseLeave="Canvas_MouseLeave"
                 MouseLeftButtonDown="Canvas_MouseLeftButtonDown"
-                MouseLeftButtonUp="Canvas_MouseLeftButtonUp"
-                PreviewKeyDown="Canvas_PreviewKeyDown"/>
+                MouseLeftButtonUp="Canvas_MouseLeftButtonUp"/>
 
         <!-- X-axis labels (Voltage mV) — fills grid column like the canvas -->
         <Canvas x:Name="_xAxisLabels"
