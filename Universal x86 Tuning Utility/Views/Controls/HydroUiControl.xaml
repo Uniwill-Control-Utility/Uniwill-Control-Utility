@@ -25,30 +25,88 @@
                        FontWeight="Medium"
                        Text="Hydro UI" />
 
-            <Label Grid.Row="1" Grid.Column="0"
-                   VerticalContentAlignment="Center"
-                   Content="Fan"
-                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-            <ProgressBar x:Name="_fanBar"
-                         Grid.Row="1" Grid.Column="2"
-                         Minimum="0" Maximum="100" Value="0" />
-            <Label x:Name="_fanLabel"
-                   Grid.Row="1" Grid.Column="4"
-                   HorizontalContentAlignment="Right"
-                   VerticalContentAlignment="Center"
-                   Content="--"
-                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <!-- Connected state: Fan + Pump metrics -->
+            <StackPanel x:Name="spConnected"
+                        Grid.Row="1" Grid.Column="0" Grid.RowSpan="2" Grid.ColumnSpan="5">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="100" />
+                    </Grid.ColumnDefinitions>
 
-            <Label Grid.Row="2" Grid.Column="0"
-                   VerticalContentAlignment="Center"
-                   Content="Pump"
-                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-            <Label x:Name="_pumpLabel"
-                   Grid.Row="2" Grid.Column="2"
-                   Grid.ColumnSpan="2"
-                   VerticalContentAlignment="Center"
-                   Content="--"
-                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <Label Grid.Column="0"
+                           VerticalContentAlignment="Center"
+                           Content="Fan"
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                    <ProgressBar x:Name="_fanBar"
+                                 Grid.Column="2"
+                                 Minimum="0" Maximum="100" Value="0" />
+                    <Label x:Name="_fanLabel"
+                           Grid.Column="4"
+                           HorizontalContentAlignment="Right"
+                           VerticalContentAlignment="Center"
+                           Content="--"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </Grid>
+
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="100" />
+                    </Grid.ColumnDefinitions>
+
+                    <Label Grid.Column="0"
+                           VerticalContentAlignment="Center"
+                           Content="Pump"
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                    <Label x:Name="_pumpLabel"
+                           Grid.Column="2"
+                           Grid.ColumnSpan="3"
+                           VerticalContentAlignment="Center"
+                           Content="--"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </Grid>
+            </StackPanel>
+
+            <!-- Disconnected state: status indicator + connect button -->
+            <StackPanel x:Name="spDisconnected"
+                        Grid.Row="1" Grid.Column="0" Grid.RowSpan="2" Grid.ColumnSpan="5"
+                        Visibility="Collapsed">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="100" />
+                    </Grid.ColumnDefinitions>
+
+                    <ui:FontIcon x:Name="_statusIcon"
+                                 Grid.Column="0"
+                                 VerticalAlignment="Center"
+                                 FontFamily="Segoe Fluent Icons"
+                                 Glyph="&#xE711;"
+                                 FontSize="16"
+                                 Foreground="Red" />
+
+                    <Label x:Name="_statusLabel"
+                           Grid.Column="2"
+                           VerticalContentAlignment="Center"
+                           Content="Disconnected"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+                    <Button x:Name="_connectBtn"
+                            Grid.Column="4"
+                            Content="Connect"
+                            Click="OnConnectClick" />
+                </Grid>
+            </StackPanel>
         </Grid>
     </ui:Card>
 </UserControl>

@@ -5,6 +5,7 @@ using System.Windows.Media.Imaging;
 using Universal_x86_Tuning_Utility.Scripts;
 using Universal_x86_Tuning_Utility.Services;
 using Universal_x86_Tuning_Utility.ViewModels;
+using Wpf.Ui;
 using Wpf.Ui.Abstractions.Controls;
 
 namespace Universal_x86_Tuning_Utility.Views.Pages
@@ -28,6 +29,19 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             ViewModel.DeviceMetricsUpdated += OnDeviceMetricsUpdated;
 
             InitializeDeviceInfo();
+            InitializeDeviceControls();
+        }
+
+        private void InitializeDeviceControls()
+        {
+            // Gate Hydro UI control by hardware support
+            bool hasWatercooler = WaterCoolerHardwareDetector.IsSupportedHardware();
+            _hydroUi.Visibility = hasWatercooler ? Visibility.Visible : Visibility.Collapsed;
+
+            // Pass navigation service to device controls for "Connect" buttons
+            var navService = ViewModel.GetNavigationService();
+            _hydroUi.SetNavigationService(navService);
+            _flydigi.SetNavigationService(navService);
         }
 
         private void InitializeDeviceInfo()

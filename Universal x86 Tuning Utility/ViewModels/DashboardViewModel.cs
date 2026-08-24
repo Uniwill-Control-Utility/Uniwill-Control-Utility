@@ -93,6 +93,11 @@ namespace Universal_x86_Tuning_Utility.ViewModels
         public event EventHandler<HardwareMetricsSnapshot>? MetricsUpdated;
         public event EventHandler<DeviceMetricsSnapshot>? DeviceMetricsUpdated;
 
+        /// <summary>
+        /// Returns the navigation service for use by dashboard controls.
+        /// </summary>
+        public INavigationService GetNavigationService() => _navigationService;
+
         private DeviceMetricsSnapshot BuildDeviceSnapshot()
         {
             // Hydro UI (LCT watercooler)

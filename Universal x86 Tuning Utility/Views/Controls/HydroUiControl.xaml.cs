@@ -1,14 +1,25 @@
 using System.Windows;
 using System.Windows.Controls;
 using Universal_x86_Tuning_Utility.Services;
+using Wpf.Ui;
 
 namespace Universal_x86_Tuning_Utility.Views.Controls
 {
     public partial class HydroUiControl : UserControl
     {
+        private INavigationService? _navigationService;
+
         public HydroUiControl()
         {
             InitializeComponent();
+        }
+
+        /// <summary>
+        /// Sets the navigation service so the "Connect" button can navigate to the Watercooler page.
+        /// </summary>
+        public void SetNavigationService(INavigationService navigationService)
+        {
+            _navigationService = navigationService;
         }
 
         public void UpdateMetrics(DeviceMetricsSnapshot snapshot)
@@ -16,6 +27,8 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
             if (snapshot.HydroUiConnected)
             {
                 this.Visibility = Visibility.Visible;
+                spConnected.Visibility = Visibility.Visible;
+                spDisconnected.Visibility = Visibility.Collapsed;
 
                 string pumpText = snapshot.HydroUiPumpVoltage switch
                 {
@@ -45,8 +58,16 @@ namespace Universal_x86_Tuning_Utility.Views.Controls
             }
             else
             {
-                this.Visibility = Visibility.Collapsed;
+                // Show the control but display the disconnected state
+                this.Visibility = Visibility.Visible;
+                spConnected.Visibility = Visibility.Collapsed;
+                spDisconnected.Visibility = Visibility.Visible;
             }
+        }
+
+        private void OnConnectClick(object sender, RoutedEventArgs e)
+        {
+            _navigationService?.Navigate("watercooler");
         }
     }
 }
