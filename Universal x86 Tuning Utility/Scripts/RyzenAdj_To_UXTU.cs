@@ -277,7 +277,12 @@ namespace Universal_x86_Tuning_Utility.Scripts
             {
                 DiagnosticLogger.LogDebug($"NVIDIA: {command}={value}");
                 DiagnosticLogger.LogInfo($"NVIDIA: {command}={value}");
-                string[] variables = value.Split('-');
+
+                // Split on '-' but keep negative numbers intact.
+                // "0--300-0-175-25" → ["0", "-300", "0", "175", "25"]
+                // Strategy: replace "--" with "-|", split on "-", then merge empty tokens back to the next token.
+                string[] variables = ParseNvidiaClocks(value);
+                DiagnosticLogger.LogInfo($"NVIDIA: parsed {variables.Length} tokens: [{string.Join(", ", variables)}]");
 
                 if (command == "NVIDIA-Clocks" && variables.Length == 2)
                 {
@@ -313,6 +318,39 @@ namespace Universal_x86_Tuning_Utility.Scripts
             {
                 DiagnosticLogger.LogError(ex, "Failed to apply NVIDIA clocks");
             }
+        }
+
+        /// <summary>
+        /// Split a dash-delimited value while keeping negative numbers intact.
+        /// "0--300-0-175-25" → ["0", "-300", "0", "175", "25"]
+        /// "0-100-200" → ["0", "100", "200"]
+        /// </summary>
+        private static string[] ParseNvidiaClocks(string value)
+        {
+            // Replace "--" (separator followed by negative sign) with a unique delimiter.
+            // Then split on both "-" and the delimiter, reassembling negatives.
+            string normalized = value.Replace("--", "-\u0000-");
+            string[] parts = normalized.Split('-');
+
+            var result = new System.Collections.Generic.List<string>();
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (parts[i] == "\u0000")
+                {
+                    // This was a "--" → the next part is the negative number.
+                    if (i + 1 < parts.Length)
+                    {
+                        result.Add("-" + parts[i + 1]);
+                        i++; // skip the consumed part
+                    }
+                }
+                else
+                {
+                    result.Add(parts[i]);
+                }
+            }
+
+            return result.ToArray();
         }
 
         static bool isMessageBoxOpen = false, isUpdatingUltiMode = false;
