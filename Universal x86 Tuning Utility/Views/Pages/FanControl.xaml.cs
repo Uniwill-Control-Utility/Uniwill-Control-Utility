@@ -1,5 +1,6 @@
-ï»¿using System;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,6 +19,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 {
     public partial class FanControl : Page
     {
+ 
         private readonly IHardwareMonitoringService _hardwareMonitoring;
         private readonly UniwillECService? _uniwillEc;
         private readonly FlydigiCoolerService _flydigiService;
@@ -32,7 +34,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         // Concurrency: serialize all EC access to prevent AccessViolationException
         // from concurrent native I/O on the same handle.
         private readonly SemaphoreSlim _ecSemaphore = new(1, 1);
-        private readonly CancellationTokenSource _pageCts = new();
+        private CancellationTokenSource _pageCts = new();
         private bool _isUnloaded;
 
         public FanControl(
@@ -125,8 +127,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         }
 
         /// <summary>
-        /// Schedules an auto-apply of the current fan curve after 5 seconds of inactivity.
-        /// Each call resets the timer â€” the curve only applies after the user stops interacting.
+        /// Schedules a debounced auto-apply of the current fan curve after 5 seconds
+        /// of slider inactivity. Each call resets the timer — the curve only applies
+        /// after the user stops dragging sliders. Used only for slider edits.
         /// </summary>
         private void ScheduleAutoApply()
         {
@@ -145,6 +148,22 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _applyDebounceTimer.Start();
         }
 
+        /// <summary>
+        /// Applies the current fan curve to the EC immediately. Used for toggle
+        /// switches and preset changes where the user expects instant feedback.
+        /// Cancels any pending debounced apply from slider edits.
+        /// </summary>
+        private void ApplyCurveNow()
+        {
+            if (_loadingSettings) return;
+
+            // Cancel any pending debounced apply so we don't get a duplicate
+            _applyDebounceTimer?.Stop();
+
+            // Apply directly — the caller has already updated all UI state.
+            ApplyCurveInBackground();
+        }
+
         #region Adaptive Mode Override
 
         private void OnEcFanOverrideChanged(object? sender, bool isOverridden)
@@ -154,7 +173,18 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void OnEcFanPresetApplied(object? sender, EcFanPresetAppliedEventArgs e)
         {
-            // Update UI controls to reflect the preset being applied
+            // Only update UI if the page is currently loaded and visible.
+            // If the page is unloaded (user navigated away), skip — the next
+            // navigation will load settings from disk via ApplySettings.
+            if (_isUnloaded) return;
+
+            // Cancel any pending auto-apply from the debounce timer. The preset
+            // was already applied to the EC by the caller (DeviceApplier).
+            _applyDebounceTimer?.Stop();
+
+            // Update UI controls to reflect the preset being applied.
+            // Use _loadingSettings to prevent SelectionChanged handlers from
+            // firing and corrupting state during the bulk update.
             _loadingSettings = true;
             try
             {
@@ -172,7 +202,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         foreach (var d in e.CustomDuties)
                             curve.Duties.Add(Math.Clamp(d, 0, 100));
                         FanCurveEditor.SetCurve(curve);
-                        FanCurveEditor.IsReadOnly = true;
+                        FanCurveEditor.IsReadOnly = false; // Custom is editable
                     }
                     else
                     {
@@ -207,7 +237,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         foreach (var d in e.CpuPresetDuties)
                             cpuCurve.Duties.Add(Math.Clamp(d, 0, 100));
                         CpuFanCurveEditor.SetCurve(cpuCurve);
-                        CpuFanCurveEditor.IsReadOnly = true;
+                        CpuFanCurveEditor.IsReadOnly = false; // Custom is editable
                     }
 
                     // GPU
@@ -219,7 +249,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         foreach (var d in e.GpuPresetDuties)
                             gpuCurve.Duties.Add(Math.Clamp(d, 0, 100));
                         GpuFanCurveEditor.SetCurve(gpuCurve);
-                        GpuFanCurveEditor.IsReadOnly = true;
+                        GpuFanCurveEditor.IsReadOnly = false; // Custom is editable
                     }
 
                     if (e.CpuTemps != null)
@@ -303,7 +333,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 if (_uniwillEc is null) return;
 
                 // Try to acquire the semaphore with a short timeout to avoid blocking the UI.
-                // Reads are non-critical â€” skip if an EC operation is in progress.
+                // Reads are non-critical — skip if an EC operation is in progress.
                 if (!_ecSemaphore.Wait(500)) return;
                 try
                 {
@@ -330,7 +360,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 var snapshot = _hardwareMonitoring.ReadSnapshot();
 
                 // Enrich with EC fan speed data if available.
-                // Try to acquire the semaphore with a short timeout â€” reads are non-critical.
+                // Try to acquire the semaphore with a short timeout — reads are non-critical.
                 if (_uniwillEc is not null && _ecSemaphore.Wait(500))
                 {
                     try
@@ -414,7 +444,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private BannerState GetBannerState()
         {
-            // Skip temperature warnings when a Flydigi cooler is connected â€” it handles its own cooling.
+            // Skip temperature warnings when a Flydigi cooler is connected — it handles its own cooling.
             if (_flydigiService.IsConnected || _bs1Service.IsConnected)
                 return BannerState.Info;
 
@@ -779,7 +809,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (!_loadingSettings)
             {
                 SaveCurrentSettings();
-                ScheduleAutoApply();
+                ApplyCurveNow();
             }
             UpdateBanner();
         }
@@ -792,7 +822,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (!_loadingSettings)
             {
                 SaveCurrentSettings();
-                ScheduleAutoApply();
+                ApplyCurveNow();
             }
             UpdateBanner();
         }
@@ -805,7 +835,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (!_loadingSettings)
             {
                 SaveCurrentSettings();
-                ScheduleAutoApply();
+                ApplyCurveNow();
             }
             UpdateBanner();
         }
@@ -880,20 +910,25 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             // Guard against SelectionChanged events firing and corrupting state
             _loadingSettings = true;
+            try
+            {
+                // Load unified preset into the unified editor
+                LoadPresetIntoEditor(FanCurveEditor, cbPreset, settings.UnifiedPreset, settings.UnifiedDuties);
 
-            // Load unified preset into the unified editor
-            LoadPresetIntoEditor(FanCurveEditor, cbPreset, settings.UnifiedPreset, settings.UnifiedDuties);
+                // Expand the card, hide split panel
+                UnifiedCard.IsExpanded = true;
+                SplitCurvePanel.Visibility = Visibility.Collapsed;
+            }
+            finally
+            {
+                _loadingSettings = false;
+            }
 
-            // Expand the card, hide split panel
-            UnifiedCard.IsExpanded = true;
-            SplitCurvePanel.Visibility = Visibility.Collapsed;
-
-            _loadingSettings = false;
             settings.UnifiedMode = true;
             FanControlSettingsService.Save(settings);
 
-            // Auto-apply curve after debounce
-            ScheduleAutoApply();
+            // Apply immediately — user expects instant feedback on toggle
+            ApplyCurveNow();
             UpdateBanner();
         }
 
@@ -910,21 +945,26 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             // Guard against SelectionChanged events firing and corrupting state
             _loadingSettings = true;
+            try
+            {
+                // Restore saved CPU/GPU state
+                LoadPresetIntoEditor(CpuFanCurveEditor, cbCpuPreset, settings.CpuPreset, settings.CpuDuties);
+                LoadPresetIntoEditor(GpuFanCurveEditor, cbGpuPreset, settings.GpuPreset, settings.GpuDuties);
 
-            // Restore saved CPU/GPU state
-            LoadPresetIntoEditor(CpuFanCurveEditor, cbCpuPreset, settings.CpuPreset, settings.CpuDuties);
-            LoadPresetIntoEditor(GpuFanCurveEditor, cbGpuPreset, settings.GpuPreset, settings.GpuDuties);
+                // Collapse the card, show split panel
+                UnifiedCard.IsExpanded = false;
+                SplitCurvePanel.Visibility = Visibility.Visible;
+            }
+            finally
+            {
+                _loadingSettings = false;
+            }
 
-            // Collapse the card, show split panel
-            UnifiedCard.IsExpanded = false;
-            SplitCurvePanel.Visibility = Visibility.Visible;
-
-            _loadingSettings = false;
             settings.UnifiedMode = false;
             FanControlSettingsService.Save(settings);
 
-            // Auto-apply curves after debounce
-            ScheduleAutoApply();
+            // Apply immediately — user expects instant feedback on toggle
+            ApplyCurveNow();
             UpdateBanner();
         }
 
@@ -935,7 +975,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         {
             if (tsUnifiedCurve.IsChecked != true)
             {
-                // Chevron was clicked â€” sync toggle and apply unified logic
+                // Chevron was clicked — sync toggle and apply unified logic
                 tsUnifiedCurve.IsChecked = true;
                 var cpuCurve = CpuFanCurveEditor.GetCurve();
                 FanCurveEditor.SetCurve(cpuCurve);
@@ -950,7 +990,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         {
             if (tsUnifiedCurve.IsChecked != false)
             {
-                // Chevron was clicked â€” sync toggle and apply split logic
+                // Chevron was clicked — sync toggle and apply split logic
                 tsUnifiedCurve.IsChecked = false;
                 var unifiedCurve = FanCurveEditor.GetCurve();
                 CpuFanCurveEditor.SetCurve(unifiedCurve);
@@ -964,11 +1004,15 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         /// <summary>
         /// Captures the current curve state and applies it to the EC in the background.
-        /// Returns immediately â€” the UI never blocks.
+        /// Returns immediately — the UI never blocks.
         /// </summary>
         private void ApplyCurveInBackground()
         {
-            if (_uniwillEc is null) return;
+            if (_uniwillEc is null)
+            {
+                SetStatusText("EC not available");
+                return;
+            }
 
             // Capture the curve data on the UI thread, then send to EC in the background.
             EcFanCurve cpuCurve;
@@ -994,6 +1038,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 gpuTemps = GpuFanCurveEditor.Temperatures;
             }
 
+            SetStatusText("Applying fan curve...");
+
             _ = Task.Run(async () =>
             {
                 try
@@ -1008,13 +1054,25 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 {
                     _uniwillEc!.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
                 }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"ERROR | FanControl: ApplyCurveInBackground failed: {ex}");
+                    Dispatcher.Invoke(() =>
+                    {
+                        if (!_isUnloaded)
+                            SetStatusText($"Failed: {ex.Message}");
+                    });
+                }
                 finally
                 {
                     _ecSemaphore.Release();
                 }
 
                 // Check cancellation before UI update
-                if (_pageCts.IsCancellationRequested) return;
+                if (_pageCts.IsCancellationRequested)
+                {
+                    return;
+                }
 
                 Dispatcher.Invoke(() =>
                 {
@@ -1124,17 +1182,23 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 {
                     await _uniwillEc!.ToggleTurboAsync();
                 }
+                catch (Exception ex)
+                {
+                }
                 finally
                 {
                     _ecSemaphore.Release();
                 }
 
-                if (_pageCts.IsCancellationRequested) return;
+                if (_pageCts.IsCancellationRequested)
+                {
+                    return;
+                }
 
                 Dispatcher.Invoke(() =>
                 {
                     if (_isUnloaded) return;
-                    SetStatusText(LocalizationService.Get("Turbo mode ENABLED â€” fans at max duty"));
+                    SetStatusText(LocalizationService.Get("Turbo mode ENABLED — fans at max duty"));
                     ReadFanRpm();
                 });
             });
@@ -1160,17 +1224,23 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 {
                     _uniwillEc!.ToggleTurbo();
                 }
+                catch (Exception ex)
+                {
+                }
                 finally
                 {
                     _ecSemaphore.Release();
                 }
 
-                if (_pageCts.IsCancellationRequested) return;
+                if (_pageCts.IsCancellationRequested)
+                {
+                    return;
+                }
 
                 Dispatcher.Invoke(() =>
                 {
                     if (_isUnloaded) return;
-                    SetStatusText(LocalizationService.Get("Turbo mode DISABLED â€” previous settings restored"));
+                    SetStatusText(LocalizationService.Get("Turbo mode DISABLED — previous settings restored"));
                     SetTurboSwitchColor(false);
                     ReadFanRpm();
                 });
@@ -1234,7 +1304,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         SetTurboSwitchColor(false);
                     }
 
-                    SetStatusText(LocalizationService.Get("Fan state reset â€” fans at 100%"));
+                    SetStatusText(LocalizationService.Get("Fan state reset — fans at 100%"));
                     ReadFanRpm();
                 });
             });
@@ -1286,6 +1356,22 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
+            _isUnloaded = false;
+
+            // Replace the canceled token source so background tasks aren't
+            // immediately canceled on the next navigation back.
+            _pageCts.Dispose();
+            _pageCts = new CancellationTokenSource();
+
+            // Reload settings from disk — the Presets page may have changed
+            // the fan curve while we were unloaded (e.g., applying a power
+            // profile maps to a fan preset). Reloading keeps the UI in sync.
+            var settings = FanControlSettingsService.Load();
+            _loadingSettings = true;
+            ApplySettings(settings);
+            InitializeTempThresholdInputs();
+            _loadingSettings = false;
+
             _statusTimer?.Start();
             UpdateBanner();
 
@@ -1296,30 +1382,22 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             bool isOverridden = _deviceApplier.IsEcFanOverridden;
             ApplyOverrideState(isOverridden);
 
+            // NOTE: Fan curve auto-apply is handled in DashboardViewModel.OnNavigatedToAsync
+            // (the app always launches on Dashboard). This page does not auto-apply on
+            // navigation — the user explicitly applies via the 5s debounce timer.
+
             // Acquire hardware monitoring lease on a background thread to avoid
             // blocking the UI while LibreHardwareMonitor probes hardware.
+            // NOTE: Do NOT hold _ecSemaphore during Acquire — it probes hardware
+            // sensors (not the EC) and can block for seconds, which would deadlock
+            // all fan control operations waiting on the semaphore.
             if (_monitoringLease is null)
             {
-                _ = Task.Run(async () =>
+                _ = Task.Run(() =>
                 {
-                    try
-                    {
-                        await _ecSemaphore.WaitAsync(_pageCts.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        return;
-                    }
-                    try
-                    {
-                        _monitoringLease = _hardwareMonitoring.Acquire(
-                            HardwareMonitoringCategory.Cpu |
-                            HardwareMonitoringCategory.Gpu);
-                    }
-                    finally
-                    {
-                        _ecSemaphore.Release();
-                    }
+                    _monitoringLease = _hardwareMonitoring.Acquire(
+                        HardwareMonitoringCategory.Cpu |
+                        HardwareMonitoringCategory.Gpu);
                 });
             }
         }
@@ -1338,34 +1416,32 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             HideAdaptiveSnackbar();
 
             // Capture refs before cancellation so we can still clean up.
-            var ec = _uniwillEc;
             var lease = _monitoringLease;
             _monitoringLease = null;
 
-            // Signal all waiting tasks to cancel, then wait for the semaphore
-            // to drain so no in-flight EC operation races with RestoreAutoFanControl.
+            // Signal all waiting tasks to cancel.
             _pageCts.Cancel();
 
-            if (ec is not null || lease is not null)
+            if (lease is not null)
             {
                 _ = Task.Run(async () =>
                 {
+                    bool acquired = await _ecSemaphore.WaitAsync(TimeSpan.FromSeconds(3));
                     try
                     {
-                        // Wait for any in-flight EC operation to finish
-                        await _ecSemaphore.WaitAsync(TimeSpan.FromSeconds(3));
+                        lease?.Dispose();
                     }
-                    catch { /* timeout or cancellation */ }
-
-                    try
+                    finally
                     {
-                        ec?.RestoreAutoFanControl();
+                        if (acquired)
+                            _ecSemaphore.Release();
                     }
-                    catch { /* silent fail on unload */ }
-
-                    lease?.Dispose();
                 });
             }
+
+            // NOTE: Do NOT call RestoreAutoFanControl() here.
+            // The user's fan curve should persist across app shutdowns.
+            // On next startup, the curve is auto-applied in Page_Loaded.
         }
 
         #endregion

@@ -229,6 +229,47 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                         _uniwillEc.Initialize();
                     }
                     catch { /* EC not available on this hardware */ }
+
+                    // Auto-apply the saved fan curve on startup. The app always launches
+                    // on Dashboard, so this is the right place to apply the last saved curve.
+                    try
+                    {
+                        var settings = FanControlSettingsService.Load();
+                        Models.EcFanCurve cpuCurve;
+                        Models.EcFanCurve gpuCurve;
+
+                        if (settings.UnifiedMode)
+                        {
+                            var unifiedCurve = settings.UnifiedPreset == "Custom" && settings.UnifiedDuties?.Length == 11
+                                ? BuildCustomCurve(settings.UnifiedDuties)
+                                : GetPresetCurve(settings.UnifiedPreset);
+                            cpuCurve = unifiedCurve;
+                            gpuCurve = unifiedCurve;
+                        }
+                        else
+                        {
+                            cpuCurve = settings.CpuPreset == "Custom" && settings.CpuDuties?.Length == 11
+                                ? BuildCustomCurve(settings.CpuDuties)
+                                : GetPresetCurve(settings.CpuPreset);
+                            gpuCurve = settings.GpuPreset == "Custom" && settings.GpuDuties?.Length == 11
+                                ? BuildCustomCurve(settings.GpuDuties)
+                                : GetPresetCurve(settings.GpuPreset);
+                        }
+
+                        var cpuTemps = settings.UnifiedMode
+                            ? (settings.UnifiedTempThresholds ?? Models.EcFanCurve.CpuTemperatures)
+                            : (settings.CpuTempThresholds ?? Models.EcFanCurve.CpuTemperatures);
+                        var gpuTemps = settings.UnifiedMode
+                            ? cpuTemps
+                            : (settings.GpuTempThresholds ?? Models.EcFanCurve.GpuTemperatures);
+
+                        _uniwillEc.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                        Debug.WriteLine("INFO | DashboardViewModel: Fan curve auto-applied on startup");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"WARN | DashboardViewModel: Fan curve auto-apply failed: {ex.Message}");
+                    }
                 }
 
                 _lease = _hardwareMonitoring.Acquire(
@@ -300,5 +341,28 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                     $"Could not open '{url}': {exception}");
             }
         }
+
+        #region Fan Curve Startup Helpers
+
+        private static Models.EcFanCurve GetPresetCurve(string? name) => name switch
+        {
+            "Silent" => Models.EcFanCurve.CreateSilent(),
+            "Balanced" => Models.EcFanCurve.CreateBalanced(),
+            "Performance" => Models.EcFanCurve.CreatePerformance(),
+            "Full Speed" => Models.EcFanCurve.CreateFullSpeed(),
+            "Off" => Models.EcFanCurve.CreateOff(),
+            _ => Models.EcFanCurve.CreateBalanced()
+        };
+
+        private static Models.EcFanCurve BuildCustomCurve(int[] duties)
+        {
+            var curve = new Models.EcFanCurve { Name = "Custom" };
+            curve.Duties.Clear();
+            foreach (var d in duties)
+                curve.Duties.Add(Math.Clamp(d, 0, 100));
+            return curve;
+        }
+
+        #endregion
     }
 }

@@ -133,15 +133,31 @@ namespace Universal_x86_Tuning_Utility.Scripts.GPUs.NVIDIA
                     return -1;
                 }
 
+                // Compute cTGP offset from target wattage.
+                // Per UCC/tuxedo-drivers: cTGP offset = targetWatts - defaultWatts.
+                // The kernel driver writes this value directly to EC register 0x0744.
+                int ctgpOffset = 0;
+                if (TryGetPowerLimitInfo(out PowerLimitInfo info))
+                {
+                    ctgpOffset = Math.Clamp(totalWatts - info.DefaultWatts, 0, 255);
+                    DiagnosticLogger.LogInfo($"SetPowerLimit: default={info.DefaultWatts}W, target={totalWatts}W → cTGP offset={ctgpOffset}");
+                }
+                else
+                {
+                    // Fallback: assume 80W default (matches UCC fallback).
+                    ctgpOffset = Math.Clamp(totalWatts - 80, 0, 255);
+                    DiagnosticLogger.LogInfo($"SetPowerLimit: NVML default unavailable, assuming 80W → cTGP offset={ctgpOffset}");
+                }
+
                 // GPU power control on these laptops works through EC registers only.
                 // NVML returns NOT_SUPPORTED on laptops, and NvAPI has no GPU power
                 // control functions (GPUInfoDLL.dll from XMG CC uses only read-only NvAPI).
                 // The EC register sequence (from tuxedo-drivers on Linux):
                 //   0x0743 = enable bits (GENERAL|DB|CTGP)
-                //   0x0744 = cTGP offset
+                //   0x0744 = cTGP offset (targetWatts - defaultWatts)
                 //   0x0745 = TPP offset
                 //   0x0746 = Dynamic Boost offset
-                ec.ActivateGpuPowerControl(dbOffset);
+                ec.ActivateGpuPowerControl(ctgpOffset, dbOffset);
 
                 return 1;
             }

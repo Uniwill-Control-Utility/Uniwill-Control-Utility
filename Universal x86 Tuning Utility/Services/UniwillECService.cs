@@ -321,6 +321,7 @@ namespace Universal_x86_Tuning_Utility.Services
                 WriteECRegistersRaw(REG_CPU_TEMP_END_TABLE, DefaultCpuTempUp);
                 WriteECRegistersRaw(REG_CPU_TEMP_START_TABLE, DefaultCpuTempDown);
                 WriteECRegistersRaw(REG_CPU_FAN_SPEED_TABLE, DefaultCpuDuty);
+                Thread.Sleep(150); // EC needs time to process CPU tables before GPU
                 WriteECRegistersRaw(REG_GPU_TEMP_END_TABLE, DefaultGpuTempUp);
                 WriteECRegistersRaw(REG_GPU_TEMP_START_TABLE, DefaultGpuTempDown);
                 WriteECRegistersRaw(REG_GPU_FAN_SPEED_TABLE, DefaultGpuDuty);
@@ -462,11 +463,20 @@ namespace Universal_x86_Tuning_Utility.Services
         /// </summary>
         /// <param name="dbOffset">Dynamic Boost range in watts (0-25). Default 25 gives +25W GPU borrow from CPU.</param>
         public void ActivateGpuPowerControl(int dbOffset = 25)
+            => ActivateGpuPowerControl(55, dbOffset); // Legacy: hardcoded cTGP=55 for backward compat.
+
+        /// <summary>
+        /// Activates GPU power control on the EC with explicit cTGP and Dynamic Boost offsets.
+        /// </summary>
+        /// <param name="ctgpOffset">cTGP offset written to EC register 0x0744. Computed as (targetWatts - defaultWatts) per UCC/tuxedo-drivers.</param>
+        /// <param name="dbOffset">Dynamic Boost range in watts (0-25). Default 25 gives +25W GPU borrow from CPU.</param>
+        public void ActivateGpuPowerControl(int ctgpOffset, int dbOffset)
         {
             EnsureInitialized();
             lock (_lock)
             {
-                DebugLog($"ActivateGpuPowerControl(dbOffset={dbOffset})");
+                ctgpOffset = Math.Clamp(ctgpOffset, 0, 255);
+                DebugLog($"ActivateGpuPowerControl(ctgpOffset={ctgpOffset}, dbOffset={dbOffset})");
 
                 // Prerequisite: enable CUSTOM_PROFILE mode so the EC accepts GPU power writes.
                 byte beforeCp = (byte)ReadEC(REG_CUSTOM_PROFILE);
@@ -486,8 +496,8 @@ namespace Universal_x86_Tuning_Utility.Services
                 WriteEC(REG_CTGP_DB_ENABLE, ctgpDbEnable);
                 Thread.Sleep(EcDelayMs);
 
-                // Step 1: cTGP offset - XMG CC uses 0x37 (55) for Enthusiast/Overboost.
-                WriteEC(REG_CTGP_DB_CTGP_OFFSET, 55);
+                // Step 1: cTGP offset (targetWatts - defaultWatts, per UCC/tuxedo-drivers).
+                WriteEC(REG_CTGP_DB_CTGP_OFFSET, (byte)ctgpOffset);
                 Thread.Sleep(EcDelayMs);
 
                 // Step 2: TPP offset = 255 (max total power pool)
@@ -505,7 +515,7 @@ namespace Universal_x86_Tuning_Utility.Services
                 byte r2 = (byte)ReadEC(REG_CTGP_DB_CTGP_OFFSET);
                 byte r3 = (byte)ReadEC(REG_CTGP_DB_TPP_OFFSET);
                 byte r4 = (byte)ReadEC(REG_CTGP_DB_DB_OFFSET);
-                DebugLog($"ActivateGpuPowerControl readback: 0x0727=0x{r0:X2} 0x0743=0x{r1:X2} 0x0744=0x{r2:X2} 0x0745=0x{r3:X2} 0x0746=0x{r4:X2} (wanted db=0x{dbClamped:X2})");
+                DebugLog($"ActivateGpuPowerControl readback: 0x0727=0x{r0:X2} 0x0743=0x{r1:X2} 0x0744=0x{r2:X2} (wanted 0x{ctgpOffset:X2}) 0x0745=0x{r3:X2} 0x0746=0x{r4:X2} (wanted db=0x{dbClamped:X2})");
             }
         }
 
@@ -644,6 +654,9 @@ namespace Universal_x86_Tuning_Utility.Services
             WriteECRegisters(REG_CPU_TEMP_START_TABLE, cpuTempDown);
             WriteECRegisters(REG_CPU_FAN_SPEED_TABLE, cpuDuty);
 
+            // Give the EC time to process CPU tables before GPU writes.
+            Thread.Sleep(150);
+
             // Write GPU fan curve table
             WriteECRegisters(REG_GPU_TEMP_END_TABLE, gpuTempUp);
             WriteECRegisters(REG_GPU_TEMP_START_TABLE, gpuTempDown);
@@ -775,6 +788,10 @@ namespace Universal_x86_Tuning_Utility.Services
                 // --- DISABLE TURBO: restore saved state ---
                 if (_savedCpuDuty.Length == 16)
                     WriteECRegisters(REG_CPU_FAN_SPEED_TABLE, _savedCpuDuty);
+
+                // Give the EC time to process CPU table before GPU table.
+                Thread.Sleep(150);
+
                 if (_savedGpuDuty.Length == 16)
                     WriteECRegisters(REG_GPU_FAN_SPEED_TABLE, _savedGpuDuty);
 
@@ -883,6 +900,7 @@ namespace Universal_x86_Tuning_Utility.Services
             byte[] safeGpuDuty = ScaleDutyGradient(OemDefaultGpuDuty, 200);
 
             WriteECRegisters(REG_CPU_FAN_SPEED_TABLE, safeCpuDuty);
+            Thread.Sleep(150); // EC needs time to process CPU table before GPU
             WriteECRegisters(REG_GPU_FAN_SPEED_TABLE, safeGpuDuty);
 
             // Step 4: Wait for tables to settle
@@ -989,9 +1007,18 @@ namespace Universal_x86_Tuning_Utility.Services
             WriteECRegisters(REG_CPU_TEMP_START_TABLE, finalCpuTempDown);
             WriteECRegisters(REG_CPU_FAN_SPEED_TABLE, cpuDuty);
 
+            // Give the EC time to process the CPU table writes before sending GPU
+            // data. The EC appears to use a shared internal buffer for both fan
+            // table regions, and rapid back-to-back writes can cause the GPU
+            // writes to be dropped or partially applied.
+            Thread.Sleep(150);
+
             WriteECRegisters(REG_GPU_TEMP_END_TABLE, finalGpuTempUp);
             WriteECRegisters(REG_GPU_TEMP_START_TABLE, finalGpuTempDown);
             WriteECRegisters(REG_GPU_FAN_SPEED_TABLE, gpuDuty);
+
+            // Wait for GPU tables to settle before touching control registers.
+            Thread.Sleep(150);
 
             // Clear boost mode
             byte fanCtrl = ReadECRegister(REG_MANUAL_FAN_CTRL);
@@ -1012,11 +1039,11 @@ namespace Universal_x86_Tuning_Utility.Services
             byte apOem6 = ReadECRegister(REG_AP_OEM_6);
             apOem6 = (byte)(apOem6 & ~ENABLE_UNIVERSAL_FAN_CTRL);
             WriteECRegister(REG_AP_OEM_6, apOem6);
-            Thread.Sleep(100);
+            Thread.Sleep(150);
             apOem6 = ReadECRegister(REG_AP_OEM_6);
             apOem6 |= ENABLE_UNIVERSAL_FAN_CTRL;
             WriteECRegister(REG_AP_OEM_6, apOem6);
-            Thread.Sleep(100);
+            Thread.Sleep(150);
 
             DebugLog($"[DIAG] UniwillEC: Applied fan curves — CPU '{cpuCurve.Name}': [{string.Join(", ", cpuDuty)}] | GPU '{gpuCurve.Name}': [{string.Join(", ", gpuDuty)}]");
         }

@@ -24,6 +24,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private readonly ILogger<Presets> _logger;
         private readonly GpuInventoryService? _gpuInventory;
         private readonly WaterCoolerService? _waterCooler;
+        private readonly DeviceApplier? _deviceApplier;
         private string _currentProfile = "Gaming";
 
         // V-F curve preset state
@@ -31,6 +32,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private int _vfActivePreset = -1;
         private Views.Windows.VfCurveEditorWindow? _vfEditorWindow;
         private bool _userTouchedCoreSlider; // true when user manually changes the core clock slider
+
+        // Custom profile fan curve persistence
+        private FanControlSettings? _savedCustomFanSettings;
 
         // DEBUG: on-page log viewer
         private readonly List<string> _debugLines = new();
@@ -236,11 +240,12 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private double _profileIntelPl1 = 45;
         private double _profileIntelPl2 = 60;
 
-        public Presets(ILogger<Presets> logger, GpuInventoryService? gpuInventory = null, WaterCoolerService? waterCooler = null)
+        public Presets(ILogger<Presets> logger, GpuInventoryService? gpuInventory = null, WaterCoolerService? waterCooler = null, DeviceApplier? deviceApplier = null)
         {
             _logger = logger;
             _gpuInventory = gpuInventory;
             _waterCooler = waterCooler;
+            _deviceApplier = deviceApplier;
             InitializeComponent();
             _ = Tablet.TabletDevices;
         }
@@ -289,6 +294,12 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
+            // Detect if a V-F curve preset has non-zero offsets on disk and activate it.
+            // _vfActivePreset starts at -1; it gets set to 0 when the user opens the
+            // curve editor. On app restart we need to re-detect so the "Curve" label
+            // shows correctly even if the editor was never opened in this session.
+            detectAndActivateVfCurve();
+
             // For Custom profile, restore saved slider values from settings.
             if (_currentProfile == "Custom")
             {
@@ -371,7 +382,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             lblSustained.Text = $"{sdSustained.Value:F0} W";
             lblBoost.Text = $"{sdBoost.Value:F0} W";
-            lblTjMax.Text = $"{sdTjMax.Value:F0} Â°C";
+            lblTjMax.Text = $"{sdTjMax.Value:F0} °C";
 
             lblCoAll.Text = $"{sdCoAll.Value:F0}";
 
@@ -607,12 +618,20 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private void btnTurbo_Click(object sender, RoutedEventArgs e) => selectProfile("Turbo", apply: true);
         private void btnCustom_Click(object sender, RoutedEventArgs e)
             {
-                SaveCustomValues();
                 selectProfile("Custom", apply: false);
             }
 
         private void selectProfile(string profile, bool apply = false)
         {
+            string oldProfile = _currentProfile;
+
+            // Save Custom slider values before switching away — setProfileValues below
+            // will overwrite the sliders with the new profile's defaults.
+            if (oldProfile == "Custom" && profile != "Custom")
+            {
+                SaveCustomValues();
+            }
+
             _currentProfile = profile;
 
             // Update button styles
@@ -677,9 +696,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     _profileIntelPl2 = cpuMax;
                 }
             }
-            // Custom: update labels if custom panel is visible
+            // Custom: restore saved slider values and update labels
             if (profile == "Custom")
             {
+                LoadCustomValues();
                 updateAllLabels();
             }
 
@@ -693,12 +713,53 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // Only apply when explicitly requested (button click), not on page load
             if (apply)
             {
-                DebugLog($"selectProfile: {profile} â€” apply");
+                DebugLog($"selectProfile: {profile} — apply");
+
+                // Handle fan curve persistence when switching profiles
+                if (_deviceApplier is not null)
+                {
+                    if (profile == "Custom")
+                    {
+                        if (_savedCustomFanSettings is not null)
+                        {
+                            // Restore Custom fan settings and apply to EC
+                            FanControlSettingsService.Save(_savedCustomFanSettings);
+                            DebugLog($"selectProfile: Restored and applying Custom fan settings");
+                            ApplyCustomFanCurveFromSettings(_savedCustomFanSettings);
+                        }
+                        else
+                        {
+                            // No saved Custom fan settings — apply default Balanced curve
+                            DebugLog($"selectProfile: No saved Custom fan settings, applying default Balanced");
+                            ApplyFanCurveFromPreset("Balanced");
+                        }
+                    }
+                    else if (profile != "Custom")
+                    {
+                        // Save current fan settings before switching away from Custom
+                        if (oldProfile == "Custom")
+                        {
+                            _savedCustomFanSettings = FanControlSettingsService.Load();
+                            DebugLog($"selectProfile: Saved Custom fan settings before switching to {profile}");
+                        }
+
+                        // Apply mapped fan curve for default profiles
+                        string fanPreset = profile switch
+                        {
+                            "Office" => "Silent",
+                            "Gaming" => "Balanced",
+                            "Turbo" => "Performance",
+                            _ => "Balanced"
+                        };
+                        ApplyFanCurveFromPreset(fanPreset);
+                    }
+                }
+
                 _ = applyProfileAsync();
             }
             else
             {
-                DebugLog($"selectProfile: {profile} â€” no apply (page load / Custom)");
+                DebugLog($"selectProfile: {profile} — no apply (page load / Custom)");
             }
         }
 
@@ -784,11 +845,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 await RyzenAdj_To_UXTU.TranslateAsync(command, appliedName: _currentProfile + " Profile", localizeAppliedName: false);
                 DebugLog($"  TranslateAsync completed");
 
-                // Apply V-F curve offsets (if curve mode is active and user hasn't touched the slider)
-                // after the uniform clock offset has been applied via TranslateAsync.
-                // Reload from file because the editor window auto-saves independently.
-                DebugLog($"  V-F curve check: VfCurveActive={VfCurveActive}, _userTouchedCoreSlider={_userTouchedCoreSlider}, _vfActivePreset={_vfActivePreset}");
-                if (VfCurveActive && !_userTouchedCoreSlider)
+                // Apply V-F curve offsets only on Custom profile.
+                // Stock profiles (Office/Gaming/Turbo) always use the slider values (0 MHz),
+                // even if a curve exists on disk from a previous Custom session.
+                DebugLog($"  V-F curve check: VfCurveActive={VfCurveActive}, _userTouchedCoreSlider={_userTouchedCoreSlider}, _vfActivePreset={_vfActivePreset}, _currentProfile={_currentProfile}");
+                if (_currentProfile == "Custom" && VfCurveActive && !_userTouchedCoreSlider)
                 {
                     var fresh = VfCurvePresetStore.Load();
                     int activeSlot = _vfActivePreset >= 0 ? _vfActivePreset : 0;
@@ -994,10 +1055,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // These GPU-specific EC writes are independent of the CPU power clamp issue.
             if (sdNvidia.Visibility == Visibility.Visible)
             {
-                // In curve mode, skip power limit here — it's applied AFTER the V-F curve
-                // in applyProfileAsync to avoid the driver re-negotiating power after the curve write.
-                // When the slider is used, apply everything normally.
-                bool useCurve = VfCurveActive && !_userTouchedCoreSlider;
+                // In curve mode (Custom profile only), skip power limit here — it's applied
+                // AFTER the V-F curve in applyProfileAsync to avoid the driver re-negotiating
+                // power after the curve write. When the slider is used, apply everything normally.
+                // Stock profiles always use the slider path, even if a curve exists on disk.
+                bool useCurve = _currentProfile == "Custom" && VfCurveActive && !_userTouchedCoreSlider;
                 if (useCurve)
                 {
                     // Nothing here — power is applied after the curve.
@@ -1025,6 +1087,26 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         }
 
         #region V-F Curve Editor (popup window)
+
+        /// <summary>
+        /// Scans preset slots on disk for any non-zero offsets and activates the first one found.
+        /// Called on startup so that _vfActivePreset is set even when the curve editor
+        /// was last used in a previous app session.
+        /// </summary>
+        private void detectAndActivateVfCurve()
+        {
+            if (_vfActivePreset >= 0) return; // Already active from this session.
+            var presets = VfCurvePresetStore.Load();
+            for (int i = 0; i < presets.Length; i++)
+            {
+                if (presets[i].HasChanges)
+                {
+                    _vfActivePreset = i;
+                    DebugLog($"V-F curve auto-detected on slot {i}");
+                    return;
+                }
+            }
+        }
 
         /// <summary> True when a V-F curve preset has non-zero offsets applied. Reloads from file for freshness. </summary>
         private bool VfCurveActive
@@ -1075,5 +1157,90 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         #endregion
 
+        #region Fan Curve Mapping
+
+        /// <summary>
+        /// Applies a Custom fan curve from saved FanControlSettings to the EC.
+        /// Used when switching to the Custom power profile.
+        /// </summary>
+        private void ApplyCustomFanCurveFromSettings(FanControlSettings settings)
+        {
+            if (_deviceApplier is null) return;
+
+            if (settings.UnifiedMode)
+            {
+                // Unified mode — apply the unified curve
+                int[]? customDuties = null;
+                string presetName = settings.UnifiedPreset;
+
+                if (presetName == "Custom" && settings.UnifiedDuties?.Length == 11)
+                {
+                    customDuties = settings.UnifiedDuties;
+                    presetName = "Custom";
+                }
+
+                _deviceApplier.ApplyEcFanFromPreset(
+                    unifiedMode: true,
+                    presetName: presetName,
+                    customDuties: customDuties,
+                    cpuPresetDuties: null,
+                    gpuPresetDuties: null,
+                    cpuTemps: settings.UnifiedTempThresholds);
+
+                DebugLog($"ApplyCustomFanCurveFromSettings: Unified {presetName} applied");
+            }
+            else
+            {
+                // Split mode — apply separate CPU/GPU curves
+                int[]? cpuDuties = null;
+                int[]? gpuDuties = null;
+
+                if (settings.CpuPreset == "Custom" && settings.CpuDuties?.Length == 11)
+                    cpuDuties = settings.CpuDuties;
+                if (settings.GpuPreset == "Custom" && settings.GpuDuties?.Length == 11)
+                    gpuDuties = settings.GpuDuties;
+
+                // For split mode, use the CPU preset name as the base
+                _deviceApplier.ApplyEcFanFromPreset(
+                    unifiedMode: false,
+                    presetName: settings.CpuPreset,
+                    customDuties: null,
+                    cpuPresetDuties: cpuDuties,
+                    gpuPresetDuties: gpuDuties,
+                    cpuTemps: settings.CpuTempThresholds,
+                    gpuTemps: settings.GpuTempThresholds);
+
+                DebugLog($"ApplyCustomFanCurveFromSettings: Split CPU={settings.CpuPreset} GPU={settings.GpuPreset} applied");
+            }
+        }
+
+        /// <summary>
+        /// Applies a fan curve preset to the EC from a power profile switch.
+        /// Maps profile names to fan presets: Office→Silent, Gaming→Balanced, Turbo→Performance.
+        /// </summary>
+        private void ApplyFanCurveFromPreset(string fanPresetName)
+        {
+            if (_deviceApplier is null) return;
+
+            DebugLog($"ApplyFanCurveFromPreset: {fanPresetName}");
+
+            // Update the FanControlSettings so the Fan Control page shows the correct preset
+            var settings = FanControlSettingsService.Load();
+            settings.UnifiedMode = true;
+            settings.UnifiedPreset = fanPresetName;
+            FanControlSettingsService.Save(settings);
+
+            // Apply to EC immediately via DeviceApplier
+            _deviceApplier.ApplyEcFanFromPreset(
+                unifiedMode: true,
+                presetName: fanPresetName,
+                customDuties: null,
+                cpuPresetDuties: null,
+                gpuPresetDuties: null);
+
+            DebugLog($"ApplyFanCurveFromPreset: {fanPresetName} applied to EC");
+        }
+
+        #endregion
     }
 }

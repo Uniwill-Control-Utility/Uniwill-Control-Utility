@@ -246,13 +246,10 @@
                                                      FontSize="20"
                                                      Margin="0,0,12,0"
                                                      VerticalAlignment="Center" />
-                                        <StackPanel Grid.Column="1">
-                                            <ui:TextBlock FontTypography="Body" Text="CPU Fan Curve" />
-                                            <ui:TextBlock FontTypography="Caption"
-                                                       Text="Drag the sliders to set fan speed at each temperature."
-                                                       TextWrapping="Wrap" />
-                                        </StackPanel>
-                                        <ComboBox x:Name="cbCpuPreset"
+                                                <ui:TextBlock FontTypography="Body" 
+                                                              Text="CPU"
+                                                              Grid.Column="1"/>
+                                                <ComboBox x:Name="cbCpuPreset"
                                                   Grid.Column="2"
                                                   Width="120"
                                                   Padding="8,4"
@@ -297,12 +294,9 @@
                                                      FontSize="20"
                                                      Margin="0,0,12,0"
                                                      VerticalAlignment="Center" />
-                                        <StackPanel Grid.Column="1">
-                                            <ui:TextBlock FontTypography="Body" Text="GPU Fan Curve" />
-                                            <ui:TextBlock FontTypography="Caption"
-                                                       Text="Applies when GPU crosses temperature thresholds."
-                                                       TextWrapping="Wrap" />
-                                        </StackPanel>
+                                        <ui:TextBlock FontTypography="Body" 
+                                                      Text="GPU"  
+                                                      Grid.Column="1"/>
                                         <ComboBox x:Name="cbGpuPreset"
                                                   Grid.Column="2"
                                                   Width="120"
