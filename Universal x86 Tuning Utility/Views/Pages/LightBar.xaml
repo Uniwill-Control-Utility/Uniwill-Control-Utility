@@ -149,11 +149,13 @@
                                        Text="100" />
                             <Slider x:Name="BrightnessSlider"
                                     Width="140"
-                                    Minimum="1"
+                                    Minimum="0"
                                     Maximum="100"
                                     Value="100"
+                                    TickFrequency="10"
                                     IsSnapToTickEnabled="True"
                                     IsMoveToPointEnabled="False"
+                                    TickPlacement="Both"
                                     ValueChanged="BrightnessSlider_ValueChanged" />
                         </StackPanel>
                     </ui:CardControl>
@@ -161,7 +163,7 @@
                     <!-- Effect selector -->
                     <ui:CardControl Margin="0,0,0,8">
                         <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xED39;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>
                         <ui:CardControl.Header>
                             <StackPanel>
@@ -213,6 +215,7 @@
                                     Value="5"
                                     IsSnapToTickEnabled="True"
                                     IsMoveToPointEnabled="False"
+                                    TickPlacement="Both"
                                     ValueChanged="SpeedSlider_ValueChanged" />
                         </StackPanel>
                     </ui:CardControl>
