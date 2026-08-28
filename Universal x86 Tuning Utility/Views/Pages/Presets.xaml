@@ -432,42 +432,6 @@
                                         <Slider x:Name="sdIntelVolt" Width="140" Maximum="0" Minimum="-150" TickFrequency="10" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </StackPanel>
-                                <!-- Divider -->
-                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                                <!-- Intel Temperature Limit -->
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <StackPanel Orientation="Horizontal">
-                                            <ui:TextBlock FontTypography="Body" Text="Temperature Limit" />
-                                            <CheckBox x:Name="cbIntelTemp"
-                                                      Margin="6,0,0,0"
-                                                      IsChecked="False"
-                                                      ToolTip="Write CPU temp limit to EC register (requires restart)"
-                                                      VerticalAlignment="Center" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="CPU temperature limit via EC register 0x0786 (readback at 0x0463)" VerticalAlignment="Top" />
-                                        </StackPanel>
-                                        <ui:TextBlock Margin="0,2,0,0"
-                                                       FontTypography="Caption"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Thermal throttle temperature (EC write, matches AMD TjMax)" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1"
-                                                Orientation="Horizontal"
-                                                HorizontalAlignment="Right"
-                                                VerticalAlignment="Center">
-                                        <TextBlock x:Name="lblIntelTemp"
-                                                   Width="48"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"
-                                                   Margin="0,0,8,0"
-                                                   Text="95 °C" />
-                                        <Slider x:Name="sdIntelTemp" Width="140" Maximum="105" Minimum="70" TickFrequency="1" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
-                                    </StackPanel>
-                                </Grid>
                             </StackPanel>
                         </ui:CardExpander>
 

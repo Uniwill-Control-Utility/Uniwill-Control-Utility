@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -1788,7 +1788,7 @@ namespace Universal_x86_Tuning_Utility.Services
         {  
             EnsureInitialized();  
             byte val = ReadECRegister(REG_CPU_TEMP_LIMIT_READ);  
-            int temp = 105 - val;  
+            int temp = 105 - (val & 0x7F);  
             DebugLog($"[CPU Temp] GetCpuTempLimit: raw=0x{val:X2}, temp={temp}Â°C");  
             return temp;  
         }  
@@ -1802,6 +1802,7 @@ namespace Universal_x86_Tuning_Utility.Services
         {  
             EnsureInitialized();  
             temp = Math.Clamp(temp, 80, 95);  
+            EnsurePowerManagementActive();
             byte val = EncodeCpuTempLimit(temp);  
             WriteECRegister(REG_TCC_OFFSET, val);  
             DebugLog($"[CPU Temp] SetCpuTempLimit: temp={temp}Â°C, encoded=0x{val:X2}");  
@@ -1814,7 +1815,7 @@ namespace Universal_x86_Tuning_Utility.Services
         public static byte EncodeCpuTempLimit(int temp)  
         {  
             temp = Math.Clamp(temp, 80, 95);  
-            return (byte)(105 - temp);  
+            return (byte)(0x80 | (105 - temp));  
         }  
   
         #endregion  
