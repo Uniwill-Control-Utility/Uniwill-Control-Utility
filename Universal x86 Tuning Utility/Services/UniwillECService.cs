@@ -131,8 +131,6 @@ namespace Universal_x86_Tuning_Utility.Services
         public const byte FAN_TURBO_SUPPORTED = 0x10; // bit 4
         public const byte FAN_SUPPORT = 0x20;       // bit 5
 
-        // --- MiniLED ---
-        public const ushort REG_MINI_LED_LOCAL_DIMMING_SUPPORT = 0x0D4F;
         // --- Battery ---
         public const ushort REG_BATTERY_MODE = 0x07A6;
         public const ushort REG_BATTERY_SOC = 0x04AB;
