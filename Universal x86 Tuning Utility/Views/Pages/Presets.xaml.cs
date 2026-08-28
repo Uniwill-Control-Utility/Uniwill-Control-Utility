@@ -1,12 +1,12 @@
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Threading;
 using Universal_x86_Tuning_Utility.Models;
 using Universal_x86_Tuning_Utility.Properties;
@@ -36,197 +36,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         // Custom profile fan curve persistence
         private FanControlSettings? _savedCustomFanSettings;
 
-        // DEBUG: on-page log viewer
-        private readonly List<string> _debugLines = new();
+        // Diagnostic logging (visible in Visual Studio Output / debug console)
         private void DebugLog(string message)
         {
-            var line = $"[{DateTime.Now:HH:mm:ss.fff}] {message}{Environment.NewLine}";
-            _debugLines.Add(line);
-            Application.Current.Dispatcher.Invoke(DispatcherPriority.Background, new Action(() =>
-            {
-                txtDebugLog.Text = string.Join("", _debugLines);
-                var parent = VisualTreeHelper.GetParent(txtDebugLog) as ScrollViewer;
-                if (parent != null) parent.ScrollToEnd();
-            }));
-        }
-
-        private void btnDumpGpuEc_Click(object sender, RoutedEventArgs e)
-        {
-            var ec = RyzenAdj_To_UXTU.EcService;
-            if (ec == null)
-            {
-                DebugLog("Dump GPU EC: EC service unavailable");
-                return;
-            }
-
-            // Dump the full GPU power control register range and surrounding area
-            DebugLog("=== GPU EC Register Dump ===");
-
-            // Key GPU power registers
-            ushort[] keyRegs =
-            {
-                0x0727, // CUSTOM_PROFILE
-                0x0743, // CTGP_DB_ENABLE
-                0x0744, // CTGP_DB_CTGP_OFFSET
-                0x0745, // CTGP_DB_TPP_OFFSET
-                0x0746, // CTGP_DB_DB_OFFSET
-                0x0747, // unknown (fan-curve overlap)
-            };
-
-            foreach (var reg in keyRegs)
-            {
-                try
-                {
-                    byte val = ec.ReadECRegister(reg);
-                    DebugLog($"  0x{reg:X3} = 0x{val:X2} ({val})");
-                }
-                catch (Exception ex)
-                {
-                    DebugLog($"  0x{reg:X3} = READ FAILED: {ex.Message}");
-                }
-            }
-
-            // Sweep 0x0740-0x075F for anything interesting
-            DebugLog("  Sweep 0x0740-0x075F:");
-            for (ushort reg = 0x0740; reg <= 0x075F; reg++)
-            {
-                try
-                {
-                    byte val = ec.ReadECRegister(reg);
-                    DebugLog($"    0x{reg:X3} = 0x{val:X2}");
-                }
-                catch
-                {
-                    // skip unreadable
-                }
-            }
-
-            // Also sweep 0x0720-0x073F (CUSTOM_PROFILE area)
-            DebugLog("  Sweep 0x0720-0x073F:");
-            for (ushort reg = 0x0720; reg <= 0x073F; reg++)
-            {
-                try
-                {
-                    byte val = ec.ReadECRegister(reg);
-                    DebugLog($"    0x{reg:X3} = 0x{val:X2}");
-                }
-                catch
-                {
-                    // skip unreadable
-                }
-            }
-
-            DebugLog("=== End Dump ===");
-        }
-
-        private void btnDumpCpuEc_Click(object sender, RoutedEventArgs e)
-        {
-            var ec = RyzenAdj_To_UXTU.EcService;
-            if (ec == null)
-            {
-                DebugLog("Dump CPU EC: EC service unavailable");
-                return;
-            }
-
-            DebugLog("=== CPU EC Register Dump ===");
-
-            // Key CPU power limit registers
-            DebugLog("  Power Limits (0x0780-0x078F):");
-            var cpuPowerRegs = new (ushort Reg, string Label)[]
-            {
-                (0x0782, "BIOS_OEM_2"),
-                (0x0783, "PL1_SETTING"),
-                (0x0784, "PL2_SETTING"),
-                (0x0785, "PL4_SETTING"),
-                (0x0786, "TCC_OFFSET"),
-                (0x0787, "FAN_SWITCH_SPEED"),
-                (0x0788, "PL5_SETTING"),
-                (0x0789, "unknown"),
-                (0x078A, "unknown"),
-                (0x078B, "unknown"),
-                (0x078C, "KBD_STATUS"),
-            };
-
-            foreach (var (reg, label) in cpuPowerRegs)
-            {
-                try
-                {
-                    byte val = ec.ReadECRegister(reg);
-                    DebugLog($"    0x{reg:X3} ({label,-18}) = 0x{val:X2} ({val})");
-                }
-                catch (Exception ex)
-                {
-                    DebugLog($"    0x{reg:X3} ({label,-18}) = FAILED: {ex.Message}");
-                }
-            }
-
-            // Power management activation (0x0720-0x072F)
-            DebugLog("  Power Mgmt Activation (0x0720-0x072F):");
-            var pmRegs = new (ushort Reg, string Label)[]
-            {
-                (0x0726, "power_mgmt_1"),
-                (0x0727, "CUSTOM_PROFILE"),
-                (0x0741, "MANUAL_MODE"),
-                (0x0751, "MANUAL_FAN_CTRL"),
-            };
-            foreach (var (reg, label) in pmRegs)
-            {
-                try
-                {
-                    byte val = ec.ReadECRegister(reg);
-                    DebugLog($"    0x{reg:X3} ({label,-18}) = 0x{val:X2} (0b{val:B8})");
-                }
-                catch (Exception ex)
-                {
-                    DebugLog($"    0x{reg:X3} ({label,-18}) = FAILED: {ex.Message}");
-                }
-            }
-
-            // MODE_INDEX and surrounding
-            DebugLog("  Mode/Index (0x07A0-0x07AF):");
-            for (ushort reg = 0x07A0; reg <= 0x07AF; reg++)
-            {
-                try
-                {
-                    byte val = ec.ReadECRegister(reg);
-                    DebugLog($"    0x{reg:X3} = 0x{val:X2}");
-                }
-                catch { /* skip unreadable */ }
-            }
-
-            // Universal fan control area (0x07C0-0x07CF)
-            DebugLog("  Fan/Universal Ctrl (0x07C0-0x07CF):");
-            for (ushort reg = 0x07C0; reg <= 0x07CF; reg++)
-            {
-                try
-                {
-                    byte val = ec.ReadECRegister(reg);
-                    DebugLog($"    0x{reg:X3} = 0x{val:X2}");
-                }
-                catch { /* skip unreadable */ }
-            }
-
-            DebugLog("=== End CPU Dump ===");
-        }
-
-        private void btnCopyDebugLog_Click(object sender, RoutedEventArgs e)
-        {
-            Clipboard.SetText(string.Join("", _debugLines));
-        }
-
-        private void btnClearDebugLog_Click(object sender, RoutedEventArgs e)
-        {
-            _debugLines.Clear();
-            txtDebugLog.Text = "";
-        }
-
-        private void btnProbeVfCurve_Click(object sender, RoutedEventArgs e)
-        {
-            DebugLog("--- VFCurve Interface Probe ---");
-            string diagnostic = VfCurveApi.RunDiagnostic();
-            foreach (string line in diagnostic.Split('\n'))
-                DebugLog(line);
-            DebugLog("");
+            Debug.WriteLine($"[Presets] {message}");
         }
 
         // Stored profile values for status card (independent of slider UI state).

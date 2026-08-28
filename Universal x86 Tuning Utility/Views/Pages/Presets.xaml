@@ -647,38 +647,6 @@
                         </ui:Button>
                     </StackPanel>
                     <!-- end customScroll StackPanel -->
-
-                    <!-- DEBUG: On-page log viewer (temporary, remove after debugging) -->
-                    <ui:Card Margin="0,0,0,8" Padding="12">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal">
-                                <ui:TextBlock FontTypography="BodyStrong" Text="Debug Log" />
-                                <ui:Button Margin="12,0,0,0" Padding="8,4" Click="btnDumpCpuEc_Click">
-                                    <TextBlock Text="Dump CPU EC" FontSize="12" />
-                                </ui:Button>
-                                <ui:Button Padding="8,4" Click="btnDumpGpuEc_Click">
-                                    <TextBlock Text="Dump GPU EC" FontSize="12" />
-                                </ui:Button>
-                                <ui:Button Padding="8,4" Click="btnProbeVfCurve_Click">
-                                    <TextBlock Text="Probe VFCurve" FontSize="12" />
-                                </ui:Button>
-                                <ui:Button Padding="8,4" Click="btnCopyDebugLog_Click">
-                                    <TextBlock Text="Copy" FontSize="12" />
-                                </ui:Button>
-                                <ui:Button Padding="8,4" Appearance="Caution" Click="btnClearDebugLog_Click">
-                                    <TextBlock Text="Clear" FontSize="12" />
-                                </ui:Button>
-                            </StackPanel>
-                            <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1">
-                                <TextBlock x:Name="txtDebugLog"
-                                           FontFamily="Consolas"
-                                           FontSize="11"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                                           TextWrapping="NoWrap"
-                                           Margin="4" />
-                            </ScrollViewer>
-                        </StackPanel>
-                    </ui:Card>
                 </StackPanel>
                 <!-- end Row 1 content StackPanel -->
             </Grid>
