@@ -316,6 +316,7 @@ namespace Universal_x86_Tuning_Utility.Services
 
         private readonly object _lock = new object();
         private SafeFileHandle? _keyboardHandle;
+        private SafeFileHandle? _lightBarHandle;
         private bool _disposed;
 
         #endregion
@@ -416,6 +417,12 @@ namespace Universal_x86_Tuning_Utility.Services
                     {
                         _keyboardHandle = OpenWriteHandle(keyboardPath);
                         DebugLog($"[KBD-HID] Zone 0 (keyboard): {(_keyboardHandle != null && !_keyboardHandle.IsInvalid ? "opened" : "FAILED")}");
+                    }
+                    // Open light bar handle from usage 2 device (light bar + logo)
+                    if (usageMap.TryGetValue(2, out string? lightBarPath))
+                    {
+                        _lightBarHandle = OpenWriteHandle(lightBarPath);
+                        DebugLog($"[KBD-HID] Zone 2 (light bar): {(_lightBarHandle != null && !_lightBarHandle.IsInvalid ? "opened" : "FAILED")}");
                     }
                 }
 
@@ -1282,6 +1289,169 @@ namespace Universal_x86_Tuning_Utility.Services
                 return;
             _disposed = true;
             _keyboardHandle?.Dispose();
+            _lightBarHandle?.Dispose();
+        }
+
+        #endregion
+
+        #region Light Bar (Zone 2)
+
+        /// <summary>
+        /// Gets whether the light bar HID device is available.
+        /// </summary>
+        public bool IsLightBarAvailable => _lightBarHandle != null && !_lightBarHandle.IsInvalid;
+
+        /// <summary>
+        /// Turns on the light bar with the specified color and brightness.
+        /// Sends 3 HID feature reports: activation, color, brightness.
+        /// </summary>
+        public void LightBarTurnOn(byte r, byte g, byte b, int brightness)
+        {
+            if (_lightBarHandle == null || _lightBarHandle.IsInvalid)
+                return;
+
+            int clampedBrightness = Math.Clamp(brightness, 0, 100);
+
+            // Report 1 — Activation (0x1A)
+            SendReportHandle(_lightBarHandle, new byte[] { 0x00, CMD_ZONE_ON_OFF, ZoneLightBar, 0x01, 0x04, 0x00, 0x00, 0x00, 0x01 });
+
+            // Report 2 — Color (0x14)
+            SendReportHandle(_lightBarHandle, new byte[] { 0x00, CMD_SET_COLOR, ZoneLightBar, 0x01, r, g, b, 0x00, 0x00 });
+
+            // Report 3 — Brightness (0x08)
+            SendReportHandle(_lightBarHandle, new byte[] { 0x00, CMD_MODE_BRIGHTNESS, ZoneMaskLightBar, 0x01, 0x01, (byte)clampedBrightness, 0x01, 0x00, 0x00 });
+        }
+
+        /// <summary>
+        /// Turns off the light bar.
+        /// Sends 3 HID feature reports to disable the zone.
+        /// </summary>
+        public void LightBarTurnOff()
+        {
+            if (_lightBarHandle == null || _lightBarHandle.IsInvalid)
+                return;
+
+            // Report 1 — Reset
+            SendReportHandle(_lightBarHandle, new byte[] { 0x00, CMD_MODE_BRIGHTNESS, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });
+
+            // Report 2 — Zone disable
+            SendReportHandle(_lightBarHandle, new byte[] { 0x00, CMD_MODE_BRIGHTNESS, 0x01, (byte)ZoneLightBar, 0x00, 0x00, 0x00, 0x00, 0x00 });
+
+            // Report 3 — Off (0x1A)
+            SendReportHandle(_lightBarHandle, new byte[] { 0x00, CMD_ZONE_ON_OFF, ZoneLightBar, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 });
+        }
+
+        /// <summary>
+        /// Changes the light bar color (keeps brightness).
+        /// Sends 2 HID feature reports: color, brightness.
+        /// </summary>
+        public void LightBarSetColor(byte r, byte g, byte b, int brightness)
+        {
+            if (_lightBarHandle == null || _lightBarHandle.IsInvalid)
+                return;
+
+            int clampedBrightness = Math.Clamp(brightness, 0, 100);
+
+            // Report 1 — Color (0x14)
+            SendReportHandle(_lightBarHandle, new byte[] { 0x00, CMD_SET_COLOR, ZoneLightBar, 0x01, r, g, b, 0x00, 0x00 });
+
+            // Report 2 — Brightness (0x08)
+            SendReportHandle(_lightBarHandle, new byte[] { 0x00, CMD_MODE_BRIGHTNESS, ZoneMaskLightBar, 0x01, 0x01, (byte)clampedBrightness, 0x01, 0x00, 0x00 });
+        }
+
+        /// <summary>
+        /// Saves the light bar state to BIOS NVRAM for persistence across reboots.
+        /// Sends activation + color + brightness with commit byte = 0x01.
+        /// </summary>
+        public void LightBarSaveToBios(byte r, byte g, byte b, int brightness)
+        {
+            if (_lightBarHandle == null || _lightBarHandle.IsInvalid)
+                return;
+
+            int clampedBrightness = Math.Clamp(brightness, 0, 100);
+
+            // Activation
+            SendReportHandle(_lightBarHandle, new byte[] { 0x00, CMD_ZONE_ON_OFF, 0x00, 0x01, 0x04, 0x00, 0x00, 0x00, 0x01 });
+
+            // Color save (commit byte = 0x01)
+            SendReportHandle(_lightBarHandle, new byte[] { 0x00, CMD_SET_COLOR, ZoneLightBar, 0x01, r, g, b, 0x00, 0x01 });
+
+            // Brightness save (commit byte = 0x01)
+            SendReportHandle(_lightBarHandle, new byte[] { 0x00, CMD_MODE_BRIGHTNESS, ZoneMaskLightBar, 0x01, 0x01, (byte)clampedBrightness, 0x01, 0x00, 0x01 });
+        }
+
+        /// <summary>
+        /// Sends an effect to the light bar via CMD_MODE_BRIGHTNESS (0x08).
+        /// Single zone-specific report for all effects.
+        /// </summary>
+        public void LightBarSetEffect(byte effect, byte speed, int brightness)
+        {
+            if (_lightBarHandle == null || _lightBarHandle.IsInvalid)
+                return;
+
+            int clampedBrightness = Math.Clamp(brightness, 0, 100);
+            byte clampedSpeed = (byte)Math.Clamp((int)speed, 0, 0x0B);
+
+            SendReportHandle(_lightBarHandle, new byte[]
+            {
+                0x00, CMD_MODE_BRIGHTNESS, ZoneMaskLightBar,
+                effect, clampedSpeed, (byte)clampedBrightness,
+                0x01, 0x00, 0x00
+            });
+        }
+
+        /// <summary>
+        /// Sends a raw 9-byte HID feature report to the light bar handle.
+        /// Used for debugging and experimentation.
+        /// </summary>
+        public bool SendRawLightBarReport(byte[] report)
+        {
+            if (_lightBarHandle == null || _lightBarHandle.IsInvalid || report.Length != 9)
+                return false;
+
+            bool success = HidD_SetFeature(_lightBarHandle, report, report.Length);
+            if (!success)
+            {
+                int error = Marshal.GetLastWin32Error();
+                DebugLog($"[KBD-HID] Raw LightBar report failed: 0x{error:X8} bytes={BitConverter.ToString(report)}");
+            }
+            else
+            {
+                DebugLog($"[KBD-HID] Raw LightBar report sent: {BitConverter.ToString(report)}");
+            }
+            return success;
+        }
+
+        /// <summary>
+        /// Sends a raw 9-byte HID feature report to the keyboard handle.
+        /// Used for debugging and experimentation.
+        /// </summary>
+        public bool SendRawKeyboardReport(byte[] report)
+        {
+            if (_keyboardHandle == null || _keyboardHandle.IsInvalid || report.Length != 9)
+                return false;
+
+            bool success = HidD_SetFeature(_keyboardHandle, report, report.Length);
+            if (!success)
+            {
+                int error = Marshal.GetLastWin32Error();
+                DebugLog($"[KBD-HID] Raw Keyboard report failed: 0x{error:X8} bytes={BitConverter.ToString(report)}");
+            }
+            else
+            {
+                DebugLog($"[KBD-HID] Raw Keyboard report sent: {BitConverter.ToString(report)}");
+            }
+            return success;
+        }
+
+        private static void SendReportHandle(SafeFileHandle handle, byte[] report)
+        {
+            bool success = HidD_SetFeature(handle, report, report.Length);
+            if (!success)
+            {
+                int error = Marshal.GetLastWin32Error();
+                DebugLog($"[KBD-HID] HidD_SetFeature failed: 0x{error:X8}");
+            }
         }
 
         #endregion

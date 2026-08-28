@@ -38,6 +38,7 @@ namespace Universal_x86_Tuning_Utility.Services
 
         public int IntelPL1 { get; set; }
         public int IntelPL2 { get; set; }
+        public int IntelCpuTemp { get; set; }
 
         public bool IsIntelVolt { get; set; }
         public int IntelVoltCPU { get; set; }
@@ -128,6 +129,7 @@ namespace Universal_x86_Tuning_Utility.Services
 
         public bool isIntelPL1 { get; set; }
         public bool isIntelPL2 { get; set; }
+        public bool isIntelCpuTemp { get; set; }
 
         public bool isRadeonGraphics { get; set; }
         public bool isAntiLag { get; set; }

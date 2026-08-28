@@ -84,11 +84,21 @@ namespace Universal_x86_Tuning_Utility.ViewModels
             // Flydigi cooler in footer
             NavigationFooter.Add(CreateFlydigiNavItem());
 
-            // Fan Control & Keyboard in footer for Uniwill EC hardware (XMG / TUXEDO)
+            // Fan Control, Keyboard, Light Bar, Battery, CPU Temp Limit in footer for Uniwill EC hardware (XMG / TUXEDO)
             if (_uniwillEc is not null && _uniwillEc.Initialize())
             {
                 NavigationFooter.Add(CreateNavigationItem("Fan Control", "fancontrol", SymbolRegular.Gauge24, typeof(Views.Pages.FanControl)));
                 NavigationFooter.Add(CreateNavigationItem("Keyboard", "keyboard", SymbolRegular.Keyboard24, typeof(Views.Pages.Keyboard)));
+
+                // Light Bar (HID lighting zone)
+                var lightBarItem = CreateNavigationItem("Light Bar", "lightbar", SymbolRegular.Empty, typeof(Views.Pages.LightBar));
+                lightBarItem.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = "\uED39", FontSize = 20 };
+                NavigationFooter.Add(lightBarItem);
+
+                // Battery (charging mode + telemetry)
+                var batteryItem = CreateNavigationItem("Battery", "battery", SymbolRegular.Empty, typeof(Views.Pages.Battery));
+                batteryItem.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = "\uEBC0", FontSize = 20 };
+                NavigationFooter.Add(batteryItem);
             }
 
             // Settings at the bottom of footer
@@ -118,6 +128,7 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                     "auto" => SymbolRegular.Transmission24,
                     "fancontrol" => SymbolRegular.Gauge24,
                     "keyboard" => SymbolRegular.Keyboard24,
+                    "battery" => SymbolRegular.Empty, // uses FontIcon, not SymbolIcon
                     "settings" => SymbolRegular.Settings24,
                     _ => SymbolRegular.Empty
                 };

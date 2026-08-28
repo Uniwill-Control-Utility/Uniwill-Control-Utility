@@ -83,7 +83,7 @@
                 <StackPanel x:Name="UniwillAvailable">
                     <!-- Info banner -->
                     <Border x:Name="InfoBanner"
-                            Margin="-1,8,-1,12"
+                            Margin="-1,8,-1,8"
                             Padding="14,12"
                             BorderThickness="1"
                             BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}"
@@ -110,7 +110,7 @@
 
                     <!-- Unified curve toggle with expander -->
                     <ui:CardExpander x:Name="UnifiedCard"
-                                     Margin="0,0,0,12"
+                                     Margin="0,0,0,8"
                                      IsExpanded="False"
                                      Expanded="UnifiedCard_Expanded"
                                      Collapsed="UnifiedCard_Collapsed"
@@ -198,8 +198,8 @@
                                     </UniformGrid>
                                     <UniformGrid x:Name="ugUnifiedTempInputs"
                                                  Columns="11" Rows="1" />
-                                            <ui:Button Margin="0,8,0,0"
-                                                       HorizontalAlignment="Left"
+                                            <ui:Button Margin="0,12,0,0"
+                                                       HorizontalAlignment="Right"
                                                        Appearance="Transparent"
                                                        Click="btnResetUnifiedTemps_Click">
                                                 <StackPanel Orientation="Horizontal">
@@ -213,7 +213,7 @@
                     </ui:CardExpander>
 
                     <!-- CPU & GPU Fan curve editors side by side (visible when unified is OFF) -->
-                    <StackPanel x:Name="SplitCurvePanel" Margin="0,8,0,0">
+                    <StackPanel x:Name="SplitCurvePanel" Margin="0,0,0,0">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -324,7 +324,7 @@
                             <!-- Merged temperature thresholds editor for both CPU and GPU -->
                             <ui:CardExpander Grid.Row="1"
                                          Grid.ColumnSpan="3"
-                                         Margin="0,12,0,0"
+                                         Margin="0,12,0,12"
                                          Header="Thermal Thresholds"
                                          IsExpanded="False">
                             <ui:CardExpander.Icon>
@@ -409,7 +409,7 @@
                     </StackPanel>
 
                     <!-- Fan Turbo toggle -->
-                    <ui:CardControl Margin="0,0,0,12"
+                    <ui:CardControl Margin="0,0,0,8"
                                     Background="{DynamicResource SystemFillColorCriticalBackgroundBrush}">
                         <ui:CardControl.Icon>
                             <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xECAD;" FontSize="20" />

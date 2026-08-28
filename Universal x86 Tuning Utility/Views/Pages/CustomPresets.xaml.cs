@@ -86,6 +86,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private PresetManager presetManager;
         private readonly GpuInventoryService gpuInventory;
+        private readonly UniwillECService? _ecService;
         private bool deferredSetupComplete;
         private bool isUpdatingPresetValues;
         private int radeonGpuCount;
@@ -97,6 +98,12 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         {
             this.gpuInventory = gpuInventory;
             InitializeComponent();
+
+            _ecService = App.GetService<UniwillECService>();
+            if (_ecService is not null)
+            {
+                try { _ecService.Initialize(); } catch { }
+            }
             _ = Tablet.TabletDevices;
 
             presetManager = new PresetManager(Settings.Default.Path + GetPresetFileName());
@@ -112,6 +119,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 sdAmdCPU.Visibility = Visibility.Collapsed;
                 sdAmdCpuThermal.Visibility = Visibility.Collapsed;
                 sdIntelCPU.Visibility = Visibility.Collapsed;
+                sdIntelCpuThermal.Visibility = Visibility.Collapsed;
                 sdIntelUV.Visibility = Visibility.Collapsed;
                 sdIntelBal.Visibility = Visibility.Collapsed;
                 sdIntelCoreRatio.Visibility = Visibility.Collapsed;
@@ -269,6 +277,38 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (commandValues != "" && commandValues != null)
             {
                 await RyzenAdj_To_UXTU.TranslateAsync(commandValues, appliedName: GetSelectedPresetName());
+
+                // Apply EC CPU temp limit if available and checkbox is checked
+                if (_ecService is not null)
+                {
+                    if (Family.TYPE == Family.ProcessorType.Amd_Apu && cbCPUTemp.IsChecked == true)
+                    {
+                        try
+                        {
+                            int temp = (int)nudCPUTemp.Value;
+                            _ecService.SetCpuTempLimit(temp);
+                            Debug.WriteLine($"[CustomPresets] EC CPU temp limit set to {temp} °C");
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[CustomPresets] Failed to set EC CPU temp limit: {ex.Message}");
+                        }
+                    }
+                    else if (Family.TYPE == Family.ProcessorType.Intel && cbIntelCpuTemp.IsChecked == true)
+                    {
+                        try
+                        {
+                            int temp = (int)nudIntelCpuTemp.Value;
+                            _ecService.SetCpuTempLimit(temp);
+                            Debug.WriteLine($"[CustomPresets] EC CPU temp limit set to {temp} °C");
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[CustomPresets] Failed to set EC CPU temp limit: {ex.Message}");
+                        }
+                    }
+                }
+
                 ToastNotification.ShowToastNotification("Preset Applied", $"Your custom preset settings have been applied!");
             }
 
@@ -592,6 +632,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         {
                             IntelPL1 = (int)nudIntelPL1.Value,
                             IntelPL2 = (int)nudIntelPL2.Value,
+                            IntelCpuTemp = (int)nudIntelCpuTemp.Value,
                             IntelVoltCPU = (int)nudIntelCoreUV.Value,
                             IntelVoltGPU = (int)nudIntelGfxUV.Value,
                             IntelVoltCache = (int)nudIntelCacheUV.Value,
@@ -616,6 +657,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                             isIntelPL1 = (bool)cbIntelPL1.IsChecked,
                             isIntelPL2 = (bool)cbIntelPL2.IsChecked,
+                            isIntelCpuTemp = (bool)cbIntelCpuTemp.IsChecked,
                             IsIntelVolt = (bool)tsIntelUV.IsChecked,
                             IsIntelBal = (bool)tsIntelBal.IsChecked,
 
@@ -1067,6 +1109,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                     cbIntelPL1.IsChecked = myPreset.isIntelPL1;
                     cbIntelPL2.IsChecked = myPreset.isIntelPL2;
+
+                    nudIntelCpuTemp.Value = myPreset.IntelCpuTemp;
+                    cbIntelCpuTemp.IsChecked = myPreset.isIntelCpuTemp;
 
                     nudAPUiGPUClk.Value = myPreset.apuGfxClk;
 

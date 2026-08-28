@@ -99,10 +99,12 @@ namespace Universal_x86_Tuning_Utility.Services
 
         private static SkuEntry? MatchSku(SkuDatabase database, string cpuVendor, string gpuName)
         {
-            // Filter by CPU vendor first (AMD → A25, Intel → E25), then match GPU.
+            // Filter by CPU vendor from the entry's cpu.vendor field, then match GPU.
+            // Platform-agnostic — does not rely on XMG chassis codes (A25/E25) in the SKU ID,
+            // so PCSpecialist, TUXEDO, and other rebrands with the same hardware will match.
             // Order by NvmlNamePattern length descending so "5070 Ti" is checked before "5070".
             var candidates = database.Skus
-                .Where(s => s.Id.Contains(cpuVendor == "Intel" ? "E25" : "A25", StringComparison.Ordinal))
+                .Where(s => s.Cpu.Vendor.Equals(cpuVendor, StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(s => s.Gpu.NvmlNamePattern.Length)
                 .ToList();
 

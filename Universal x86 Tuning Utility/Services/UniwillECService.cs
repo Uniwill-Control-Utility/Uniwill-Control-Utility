@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Serilog;
+using System.Management;
 
 namespace Universal_x86_Tuning_Utility.Services
 {
@@ -129,6 +130,12 @@ namespace Universal_x86_Tuning_Utility.Services
         // --- SUPPORT_5 bits ---
         public const byte FAN_TURBO_SUPPORTED = 0x10; // bit 4
         public const byte FAN_SUPPORT = 0x20;       // bit 5
+
+        // --- MiniLED ---
+        public const ushort REG_MINI_LED_LOCAL_DIMMING_SUPPORT = 0x0D4F;
+        // --- Battery ---
+        public const ushort REG_BATTERY_MODE = 0x07A6;
+        public const ushort REG_BATTERY_SOC = 0x04AB;
 
         #endregion
 
@@ -261,7 +268,7 @@ namespace Universal_x86_Tuning_Utility.Services
         /// custom fan curves. Without it, writes to the fan table registers are accepted
         /// but ignored by the fan control engine.
         ///
-        /// This method is idempotent — it only runs once per service lifetime. Subsequent
+        /// This method is idempotent â€” it only runs once per service lifetime. Subsequent
         /// calls are no-ops to avoid confusing the EC state machine with repeated handshakes.
         /// </summary>
         public void InitializeEc()
@@ -272,32 +279,32 @@ namespace Universal_x86_Tuning_Utility.Services
             {
                 if (_ecHandshakeDone)
                 {
-                    DebugLog("[DIAG] UniwillEC: EC handshake already done — skipping");
+                    DebugLog("[DIAG] UniwillEC: EC handshake already done â€” skipping");
                     return;
                 }
 
                 DebugLog("[DIAG] UniwillEC: Starting EC activation handshake...");
 
-                // Step 1: Handshake — write to 0x709 then 0x708
+                // Step 1: Handshake â€” write to 0x709 then 0x708
                 WriteECRaw(0x0709, 0x05);
                 Thread.Sleep(50);
                 WriteECRaw(0x0708, 0x01);
                 Thread.Sleep(50);
-                DebugLog("[DIAG] UniwillEC: Step 1 — Handshake complete");
+                DebugLog("[DIAG] UniwillEC: Step 1 â€” Handshake complete");
 
-                // Step 2: Activation — write 0x01 to 0x0741 (manual mode).
+                // Step 2: Activation â€” write 0x01 to 0x0741 (manual mode).
                 // The Linux driver (tuxedo_io) writes 0x01 here. Previously we used 0x05
                 // which may have had a side effect of enforcing the BIOS power ceiling.
                 WriteECRaw(0x0741, 0x01);
                 Thread.Sleep(50);
-                DebugLog("[DIAG] UniwillEC: Step 2 — Manual mode enabled (0x741=0x01)");
+                DebugLog("[DIAG] UniwillEC: Step 2 â€” Manual mode enabled (0x741=0x01)");
 
-                // Step 3: Feature enable — write 0x81 to 0x748
+                // Step 3: Feature enable â€” write 0x81 to 0x748
                 WriteECRaw(0x0748, 0x81);
                 Thread.Sleep(50);
-                DebugLog("[DIAG] UniwillEC: Step 3 — Feature enable complete");
+                DebugLog("[DIAG] UniwillEC: Step 3 â€” Feature enable complete");
 
-                // Step 3b: Power management activation — set bit 7 of 0x726 and bit 6 of 0x727.
+                // Step 3b: Power management activation â€” set bit 7 of 0x726 and bit 6 of 0x727.
                 // MechControl performs this step between feature enable and fan curve enable.
                 // Without it, the EC may accept power limit writes but not apply them to hardware.
                 byte reg726 = (byte)(ReadECRaw(0x0726) | 0x80);
@@ -306,18 +313,18 @@ namespace Universal_x86_Tuning_Utility.Services
                 byte reg727 = (byte)(ReadECRaw(0x0727) | 0x40);
                 WriteECRaw(0x0727, reg727);
                 Thread.Sleep(50);
-                DebugLog($"[DIAG] UniwillEC: Step 3b — Power management activation (0x726=0x{reg726:X2}, 0x727=0x{reg727:X2})");
+                DebugLog($"[DIAG] UniwillEC: Step 3b â€” Power management activation (0x726=0x{reg726:X2}, 0x727=0x{reg727:X2})");
 
-                // Step 4: Fan curve enable bits — set bits 7,6,5 of 0x7C5 (OR with 0xE0)
+                // Step 4: Fan curve enable bits â€” set bits 7,6,5 of 0x7C5 (OR with 0xE0)
                 byte ufCtrl = (byte)(ReadECRaw(0x07C5) | 0xE0);
                 WriteECRaw(0x07C5, ufCtrl);
                 Thread.Sleep(50);
-                DebugLog($"[DIAG] UniwillEC: Step 4 — Fan curve enable bits set (0x{ufCtrl:X2})");
+                DebugLog($"[DIAG] UniwillEC: Step 4 â€” Fan curve enable bits set (0x{ufCtrl:X2})");
 
                 // Step 5: Write default OEM fan tables.
                 // The EC expects this as part of the init sequence. Skipping it causes
                 // the EC to reject subsequent custom table writes.
-                DebugLog("[DIAG] UniwillEC: Step 5 — Writing default OEM fan tables...");
+                DebugLog("[DIAG] UniwillEC: Step 5 â€” Writing default OEM fan tables...");
                 WriteECRegistersRaw(REG_CPU_TEMP_END_TABLE, DefaultCpuTempUp);
                 WriteECRegistersRaw(REG_CPU_TEMP_START_TABLE, DefaultCpuTempDown);
                 WriteECRegistersRaw(REG_CPU_FAN_SPEED_TABLE, DefaultCpuDuty);
@@ -325,25 +332,25 @@ namespace Universal_x86_Tuning_Utility.Services
                 WriteECRegistersRaw(REG_GPU_TEMP_END_TABLE, DefaultGpuTempUp);
                 WriteECRegistersRaw(REG_GPU_TEMP_START_TABLE, DefaultGpuTempDown);
                 WriteECRegistersRaw(REG_GPU_FAN_SPEED_TABLE, DefaultGpuDuty);
-                DebugLog("[DIAG] UniwillEC: Step 5 — Default fan tables written");
+                DebugLog("[DIAG] UniwillEC: Step 5 â€” Default fan tables written");
 
-                // Step 6: Fan curve parameter — write 0x0C to 0x7C7
+                // Step 6: Fan curve parameter â€” write 0x0C to 0x7C7
                 WriteECRaw(0x07C7, 0x0C);
                 Thread.Sleep(50);
-                DebugLog("[DIAG] UniwillEC: Step 6 — Fan curve parameter set");
+                DebugLog("[DIAG] UniwillEC: Step 6 â€” Fan curve parameter set");
 
-                // Step 7: Fan curve mode — write 0x04 to 0x7C6
+                // Step 7: Fan curve mode â€” write 0x04 to 0x7C6
                 WriteECRaw(0x07C6, 0x04);
                 Thread.Sleep(50);
-                DebugLog("[DIAG] UniwillEC: Step 7 — Fan curve mode enabled");
+                DebugLog("[DIAG] UniwillEC: Step 7 â€” Fan curve mode enabled");
 
-                // Step 8: BIOS_CTRL — write 0x41 to 0x706
+                // Step 8: BIOS_CTRL â€” write 0x41 to 0x706
                 WriteECRaw(0x0706, 0x41);
                 Thread.Sleep(50);
-                DebugLog("[DIAG] UniwillEC: Step 8 — BIOS_CTRL set");
+                DebugLog("[DIAG] UniwillEC: Step 8 â€” BIOS_CTRL set");
 
                 _ecHandshakeDone = true;
-                DebugLog("[DIAG] UniwillEC: EC activation handshake complete — fan curves should now apply");
+                DebugLog("[DIAG] UniwillEC: EC activation handshake complete â€” fan curves should now apply");
             }
         }
 
@@ -551,7 +558,7 @@ namespace Universal_x86_Tuning_Utility.Services
 
         /// <summary>
         /// Sets the TCC offset on the EC (register 0x0786).
-        /// Value is offset from 95°C default. 0 = no offset (95°C), 10 = 85°C throttle.
+        /// Value is offset from 95Â°C default. 0 = no offset (95Â°C), 10 = 85Â°C throttle.
         /// </summary>
         public void SetTccOffset(int value)
         {
@@ -613,11 +620,11 @@ namespace Universal_x86_Tuning_Utility.Services
         ///
         /// The EC rejects perfectly flat tables (all zones = same duty). Instead we write
         /// a near-flat curve: zone 0 = 0 (fan off at lowest temp), zones 1-15 = target duty.
-        /// This effectively gives a fixed speed for any real-world temperature (&gt;0°C).
+        /// This effectively gives a fixed speed for any real-world temperature (&gt;0Â°C).
         ///
         /// IMPORTANT: The EC fan curve state machine can lock up if SPLIT_TABLES is
         /// cleared while custom mode is already active. This method avoids toggling
-        /// SPLIT_TABLES if it's already set — it only does a False→True transition
+        /// SPLIT_TABLES if it's already set â€” it only does a Falseâ†’True transition
         /// when the bit is actually cleared.
         ///
         /// CRITICAL: The EC requires an 8-step activation handshake (from MechControl)
@@ -629,12 +636,12 @@ namespace Universal_x86_Tuning_Utility.Services
             percent = Math.Clamp(percent, 0, 100);
             byte targetDuty = (byte)(percent * 2); // EC uses 0-200 scale
 
-            // Run the EC activation handshake (idempotent — only runs once).
+            // Run the EC activation handshake (idempotent â€” only runs once).
             InitializeEc();
 
             // Build near-flat duty tables: zone 0 = 0, zones 1-15 = target duty.
             // The EC rejects perfectly flat tables, so zone 0 stays at 0.
-            // All real-world temps (&gt;0°C) will hit zone 1+ and get the target duty.
+            // All real-world temps (&gt;0Â°C) will hit zone 1+ and get the target duty.
             byte[] cpuDuty = new byte[16];
             byte[] gpuDuty = new byte[16];
             for (int i = 1; i < 16; i++)
@@ -664,7 +671,7 @@ namespace Universal_x86_Tuning_Utility.Services
 
             DebugLog($"[DIAG] UniwillEC: Wrote near-flat duty tables (targetDuty={targetDuty}) for {percent}% speed");
 
-            // Clear boost mode — custom tables don't need it
+            // Clear boost mode â€” custom tables don't need it
             byte fanCtrl = ReadECRegister(REG_MANUAL_FAN_CTRL);
             fanCtrl = (byte)(fanCtrl & ~FAN_MODE_BOOST);
             WriteECRegister(REG_MANUAL_FAN_CTRL, fanCtrl);
@@ -678,7 +685,7 @@ namespace Universal_x86_Tuning_Utility.Services
 
             if (splitWasSet)
             {
-                // SPLIT is already True — just ensure ENABLE_CUSTOM is set.
+                // SPLIT is already True â€” just ensure ENABLE_CUSTOM is set.
                 // Toggle ENABLE_CUSTOM off then on to force the EC to re-read the new tables.
                 byte apOem6 = ReadECRegister(REG_AP_OEM_6);
                 apOem6 = (byte)(apOem6 & ~ENABLE_UNIVERSAL_FAN_CTRL);
@@ -687,11 +694,11 @@ namespace Universal_x86_Tuning_Utility.Services
                 apOem6 = ReadECRegister(REG_AP_OEM_6);
                 apOem6 |= ENABLE_UNIVERSAL_FAN_CTRL;
                 WriteECRegister(REG_AP_OEM_6, apOem6);
-                DebugLog($"[DIAG] UniwillEC: Set fan speed to {percent}% (targetDuty {targetDuty}), SPLIT already True — toggled custom to force re-read");
+                DebugLog($"[DIAG] UniwillEC: Set fan speed to {percent}% (targetDuty {targetDuty}), SPLIT already True â€” toggled custom to force re-read");
             }
             else
             {
-                // SPLIT is False — do a proper False→True transition.
+                // SPLIT is False â€” do a proper Falseâ†’True transition.
                 // Add a delay after writing tables to let the EC settle.
                 Thread.Sleep(50);
 
@@ -703,7 +710,7 @@ namespace Universal_x86_Tuning_Utility.Services
                 apOem6 |= ENABLE_UNIVERSAL_FAN_CTRL;
                 WriteECRegister(REG_AP_OEM_6, apOem6);
 
-                DebugLog($"[DIAG] UniwillEC: Set fan speed to {percent}% (targetDuty {targetDuty}) via SPLIT False→True transition");
+                DebugLog($"[DIAG] UniwillEC: Set fan speed to {percent}% (targetDuty {targetDuty}) via SPLIT Falseâ†’True transition");
             }
         }
 
@@ -800,7 +807,7 @@ namespace Universal_x86_Tuning_Utility.Services
                 WriteECRegister(REG_UNIVERSAL_FAN_CTRL, _savedUfCtrl);
 
                 _turboActive = false;
-                DebugLog("[DIAG] UniwillEC: Turbo mode DISABLED — state restored");
+                DebugLog("[DIAG] UniwillEC: Turbo mode DISABLED â€” state restored");
                 return;
             }
 
@@ -821,7 +828,7 @@ namespace Universal_x86_Tuning_Utility.Services
             WriteECRegister(REG_UNIVERSAL_FAN_CTRL, SPLIT_TABLES);
 
             _turboActive = true;
-            DebugLog("[DIAG] UniwillEC: Turbo mode ENABLED — fans at max duty");
+            DebugLog("[DIAG] UniwillEC: Turbo mode ENABLED â€” fans at max duty");
         }
 
         /// <summary>
@@ -832,7 +839,7 @@ namespace Universal_x86_Tuning_Utility.Services
         {
             if (_turboActive)
             {
-                // Disable path is fast — no need for background thread
+                // Disable path is fast â€” no need for background thread
                 ToggleTurbo();
                 return;
             }
@@ -858,7 +865,7 @@ namespace Universal_x86_Tuning_Utility.Services
                 WriteECRegister(REG_UNIVERSAL_FAN_CTRL, SPLIT_TABLES);
 
                 _turboActive = true;
-                DebugLog("[DIAG] UniwillEC: Turbo mode ENABLED — fans at max duty (async)");
+                DebugLog("[DIAG] UniwillEC: Turbo mode ENABLED â€” fans at max duty (async)");
             });
         }
 
@@ -870,7 +877,7 @@ namespace Universal_x86_Tuning_Utility.Services
         /// <summary>
         /// Attempts to recover from an EC fan state machine lockup by performing
         /// a full reset sequence: clear all control bits, write safe default tables,
-        /// then re-enable with a clean False→True SPLIT transition.
+        /// then re-enable with a clean Falseâ†’True SPLIT transition.
         ///
         /// Use this when fans are stuck and neither UXTU nor XMG Control Center can
         /// change the PWM. This avoids requiring a full reboot.
@@ -915,12 +922,12 @@ namespace Universal_x86_Tuning_Utility.Services
             apOem6 |= ENABLE_UNIVERSAL_FAN_CTRL;
             WriteECRegister(REG_AP_OEM_6, apOem6);
 
-            DebugLog("[DIAG] UniwillEC: Fan state reset complete — fans at 100%");
+            DebugLog("[DIAG] UniwillEC: Fan state reset complete â€” fans at 100%");
         }
 
         /// <summary>
         /// Uploads a fan curve table to the EC.
-        /// Each zone has: temp_up (°C), temp_down (°C, hysteresis), duty (0-200 scale).
+        /// Each zone has: temp_up (Â°C), temp_down (Â°C, hysteresis), duty (0-200 scale).
         /// The table has 16 zones (indices 0-15).
         /// </summary>
         public void UploadFanCurve(FanCurveSource source, int[] tempUp, int[] tempDown, int[] duty)
@@ -1045,7 +1052,7 @@ namespace Universal_x86_Tuning_Utility.Services
             WriteECRegister(REG_AP_OEM_6, apOem6);
             Thread.Sleep(150);
 
-            DebugLog($"[DIAG] UniwillEC: Applied fan curves — CPU '{cpuCurve.Name}': [{string.Join(", ", cpuDuty)}] | GPU '{gpuCurve.Name}': [{string.Join(", ", gpuDuty)}]");
+            DebugLog($"[DIAG] UniwillEC: Applied fan curves â€” CPU '{cpuCurve.Name}': [{string.Join(", ", cpuDuty)}] | GPU '{gpuCurve.Name}': [{string.Join(", ", gpuDuty)}]");
         }
 
         /// <summary>
@@ -1124,7 +1131,7 @@ namespace Universal_x86_Tuning_Utility.Services
         {
             rpm = Math.Clamp(rpm, 100, 12700);
 
-            // fanSwitchSpeed is a u16 — write low byte then high byte
+            // fanSwitchSpeed is a u16 â€” write low byte then high byte
             byte lo = (byte)(rpm & 0xFF);
             byte hi = (byte)((rpm >> 8) & 0xFF);
 
@@ -1192,7 +1199,7 @@ namespace Universal_x86_Tuning_Utility.Services
         {
             byte support2 = ReadECRegister(REG_SUPPORT_2);
             bool isRgb = (support2 & RGB_KEYBOARD) != 0;
-            DebugLog($"[KBD] UniwillEC: IsRgbKeyboard check — SUPPORT_2(0x{REG_SUPPORT_2:X4}) = 0x{support2:X2}, RGB bit = {isRgb}");
+            DebugLog($"[KBD] UniwillEC: IsRgbKeyboard check â€” SUPPORT_2(0x{REG_SUPPORT_2:X4}) = 0x{support2:X2}, RGB bit = {isRgb}");
             return isRgb;
         }
 
@@ -1202,7 +1209,7 @@ namespace Universal_x86_Tuning_Utility.Services
         public bool IsWhiteOnlyKeyboard()
         {
             byte kbdStatus = ReadECRegister(REG_KBD_STATUS);
-            DebugLog($"[KBD] UniwillEC: IsWhiteOnlyKeyboard check — KBD_STATUS(0x{REG_KBD_STATUS:X4}) = 0x{kbdStatus:X2}, WHITE_ONLY bit = {(kbdStatus & KBD_WHITE_ONLY) != 0}");
+            DebugLog($"[KBD] UniwillEC: IsWhiteOnlyKeyboard check â€” KBD_STATUS(0x{REG_KBD_STATUS:X4}) = 0x{kbdStatus:X2}, WHITE_ONLY bit = {(kbdStatus & KBD_WHITE_ONLY) != 0}");
             return (kbdStatus & KBD_WHITE_ONLY) != 0;
         }
 
@@ -1215,7 +1222,7 @@ namespace Universal_x86_Tuning_Utility.Services
             byte biosOem2 = ReadECRegister(REG_BIOS_OEM_2);
             biosOem2 |= ENABLE_CHINA_MODE; // set bit 6
             WriteECRegister(REG_BIOS_OEM_2, biosOem2);
-            DebugLog($"[KBD] UniwillEC: Set China mode — BIOS_OEM_2(0x{REG_BIOS_OEM_2:X4}) = 0x{biosOem2:X2}");
+            DebugLog($"[KBD] UniwillEC: Set China mode â€” BIOS_OEM_2(0x{REG_BIOS_OEM_2:X4}) = 0x{biosOem2:X2}");
         }
 
         /// <summary>
@@ -1260,7 +1267,7 @@ namespace Universal_x86_Tuning_Utility.Services
         public void TurnOnKeyboard()
         {
             byte kbdStatus = ReadECRegister(REG_KBD_STATUS);
-            DebugLog($"[KBD] UniwillEC: TurnOnKeyboard — current KBD_STATUS = 0x{kbdStatus:X2}");
+            DebugLog($"[KBD] UniwillEC: TurnOnKeyboard â€” current KBD_STATUS = 0x{kbdStatus:X2}");
             kbdStatus &= unchecked((byte)~KBD_POWER_OFF); // clear bit 1
             kbdStatus |= KBD_APPLY;     // set bit 4 to tell EC to apply the change
             WriteECRegister(REG_KBD_STATUS, kbdStatus);
@@ -1396,11 +1403,11 @@ namespace Universal_x86_Tuning_Utility.Services
         /// Without them, the EC accepts writes but may not apply them to hardware.
         ///
         /// On NB02, this replicates the Linux tuxedo_io driver sequence from uniwill_keyboard_probe:
-        ///   1. uniwill_write_ec_ram(0x0751, 0x00) — reset to balanced
-        ///   2. uniwill_set_custom_profile_mode(true) — clear-then-set toggle on 0x0727 bit 6
-        ///   3. uniwill_write_ec_ram(0x0741, 0x01) — ensure manual mode
+        ///   1. uniwill_write_ec_ram(0x0751, 0x00) â€” reset to balanced
+        ///   2. uniwill_set_custom_profile_mode(true) â€” clear-then-set toggle on 0x0727 bit 6
+        ///   3. uniwill_write_ec_ram(0x0741, 0x01) â€” ensure manual mode
         /// And from uw_set_tdp() (called before each TDP write):
-        ///   4. uw_set_performance_profile_v1(PROFILE_OVERBOOST) — 0x0751 = 0x10
+        ///   4. uw_set_performance_profile_v1(PROFILE_OVERBOOST) â€” 0x0751 = 0x10
         /// </summary>
         public void EnsurePowerManagementActive()
         {
@@ -1484,15 +1491,15 @@ namespace Universal_x86_Tuning_Utility.Services
                     DebugLog($"[WARN] UniwillEC: EnsurePowerManagementActiveInternal failed: {ex.Message}");
                 }
 
-                // Step 2: Write PL1 (0x0783) — sustained power limit
+                // Step 2: Write PL1 (0x0783) â€” sustained power limit
                 WriteECRaw(REG_PL1_SETTING, (byte)Math.Clamp(pl1Watts, 0, 255));
                 Thread.Sleep(50);
 
-                // Step 3: Write PL2 (0x0784) — boost power limit
+                // Step 3: Write PL2 (0x0784) â€” boost power limit
                 WriteECRaw(REG_PL2_SETTING, (byte)Math.Clamp(pl2Watts, 0, 255));
                 Thread.Sleep(50);
 
-                // Step 4: Write PL4 (0x0785) — peak/clamp power limit
+                // Step 4: Write PL4 (0x0785) â€” peak/clamp power limit
                 WriteECRaw(REG_PL4_SETTING, (byte)Math.Clamp(pl4Watts, 0, 255));
                 Thread.Sleep(100);
 
@@ -1500,7 +1507,7 @@ namespace Universal_x86_Tuning_Utility.Services
                 byte rPl1 = ReadECRaw(REG_PL1_SETTING);
                 byte rPl2 = ReadECRaw(REG_PL2_SETTING);
                 byte rPl4 = ReadECRaw(REG_PL4_SETTING);
-                DebugLog($"[DIAG] UniwillEC: Readback — PL1=0x{rPl1:X2}({rPl1}W) PL2=0x{rPl2:X2}({rPl2}W) PL4=0x{rPl4:X2}({rPl4}W)");
+                DebugLog($"[DIAG] UniwillEC: Readback â€” PL1=0x{rPl1:X2}({rPl1}W) PL2=0x{rPl2:X2}({rPl2}W) PL4=0x{rPl4:X2}({rPl4}W)");
             }
         }
 
@@ -1630,6 +1637,190 @@ namespace Universal_x86_Tuning_Utility.Services
         }
 
         #endregion
+        #region Battery
+
+        /// <summary>
+        /// Battery telemetry data read from EC registers and Windows battery API.
+        /// </summary>
+        public struct BatteryTelemetry
+        {
+            public bool IsAcPowered;
+            public int StateOfCharge;       // percentage 0-100
+            public int HealthPercent;       // percentage, 0 if unknown
+            public int TemperatureC;        // Celsius, negative if unknown
+            public int CycleCount;          // -1 if unknown
+            public int PresentVoltageMv;    // millivolts, 0 if unknown
+            public int ChargeRateMa;        // milliamps (positive=charging, negative=discharging), 0 if unknown
+        }
+
+        // Battery mode raw values from MechControl IDY_7Y profile.
+        // bitfields: batteryMode mask 0x38 (bits 3-5 of register 0x7A6)
+        // batteryModes: High Capacity (0x08), Balanced (0x18), Stationary (0x28)
+        private static readonly byte[] BatteryModeValues = { 0x08, 0x18, 0x28 };
+
+        /// <summary>
+        /// Reads the battery charging mode from EC register 0x7A6.
+        /// Mode bits are in bits 3-5 (mask 0x38). Raw values: 0x08, 0x18, 0x28.
+        /// Returns: 0 = 100% (High Capacity), 1 = 80% (Balanced), 2 = 60% (Stationary)
+        /// Returns 0 if no mode is set (raw bits 3-5 are clear).
+        /// </summary>
+        public int GetBatteryMode()
+        {
+            EnsureInitialized();
+            byte val = ReadECRegister(REG_BATTERY_MODE);
+            // Extract mode from known raw values: 0x08→0, 0x18→1, 0x28→2
+            int mode = Array.IndexOf(BatteryModeValues, val);
+            if (mode < 0)
+                mode = 0; // Default to High Capacity if value unrecognized
+            DebugLog($"[Battery] GetBatteryMode: raw=0x{val:X2}, mode={mode}");
+            return mode;
+        }
+
+        /// <summary>
+        /// Writes the battery charging mode to EC register 0x7A6.
+        /// Mode: 0 = 100% (High Capacity, 0x08), 1 = 80% (Balanced, 0x18), 2 = 60% (Stationary, 0x28)
+        /// </summary>
+        public void SetBatteryMode(int mode)
+        {
+            EnsureInitialized();
+            if (mode < 0 || mode > 2)
+                throw new ArgumentOutOfRangeException(nameof(mode), "Battery mode must be 0, 1, or 2.");
+
+            byte val = BatteryModeValues[mode];
+            WriteECRegister(REG_BATTERY_MODE, val);
+            DebugLog($"[Battery] SetBatteryMode: mode={mode} (raw=0x{val:X2})");
+        }
+
+      // Battery telemetry EC registers (from MechControl decompiled analysis)
+        // All multi-byte values are little-endian uint16
+        public const ushort REG_BATTERY_POWER_SOURCE = 0x0490;  // bit 0 = AC connected
+        public const ushort REG_BATTERY_DESIGN_CAP_LO = 0x0402; // Design capacity (mAh, LE u16)
+        public const ushort REG_BATTERY_FULL_CHARGE_CAP_LO = 0x0404; // Full charge capacity (mAh, LE u16)
+        public const ushort REG_BATTERY_DESIGN_VOLTAGE_LO = 0x0408; // Design voltage (mV, LE u16)
+        public const ushort REG_BATTERY_CHARGE_RATE_LO = 0x0434; // Charge rate (mA, LE u16)
+        public const ushort REG_BATTERY_REMAINING_CAP_LO = 0x0436; // Remaining capacity (mAh, LE u16)
+        public const ushort REG_BATTERY_PRESENT_VOLTAGE_LO = 0x0438; // Present voltage (mV, LE u16)
+        public const ushort REG_BATTERY_TEMP_LO = 0x04A2; // Temperature (Kelvin×10, LE u16)
+        public const ushort REG_BATTERY_CYCLE_COUNT_LO = 0x04A6; // Cycle count (LE u16)
+
+        /// <summary>
+        /// Reads battery telemetry directly from EC registers (matches MechControl approach).
+        /// Returns null if battery info is unavailable.
+        /// </summary>
+        public BatteryTelemetry? ReadBatteryTelemetry()
+        {
+            EnsureInitialized();
+            try
+            {
+                // Power source: bit 0 of 0x490
+                byte powerSource = ReadECRegister(REG_BATTERY_POWER_SOURCE);
+                bool isAcPowered = (powerSource & 1) != 0;
+
+                // State of charge from 0x4AB (byte, percentage)
+                int stateOfCharge = ReadECRegister(REG_BATTERY_SOC);
+
+                // Cycle count: LE u16 at 0x4A6
+                int cycleCount = ReadEcUInt16(REG_BATTERY_CYCLE_COUNT_LO);
+
+                // Temperature: LE u16 at 0x4A2, value is Kelvin×10
+                int tempKelvinX10 = ReadEcUInt16(REG_BATTERY_TEMP_LO);
+                int temperatureC = (int)(tempKelvinX10 / 10.0 - 273.15);
+
+                // Present voltage: LE u16 at 0x438 (mV)
+                int presentVoltageMv = ReadEcUInt16(REG_BATTERY_PRESENT_VOLTAGE_LO);
+
+                // Charge rate: LE u16 at 0x434 (mA)
+                int chargeRateMa = ReadEcUInt16(REG_BATTERY_CHARGE_RATE_LO);
+
+                // Health: FullChargeCapacity / DesignCapacity × 100
+                int designCapacityMah = ReadEcUInt16(REG_BATTERY_DESIGN_CAP_LO);
+                int fullChargeCapacityMah = ReadEcUInt16(REG_BATTERY_FULL_CHARGE_CAP_LO);
+                int healthPercent = designCapacityMah > 0
+                    ? (int)((long)fullChargeCapacityMah * 100 / designCapacityMah)
+                    : 0;
+
+                var telemetry = new BatteryTelemetry
+                {
+                    IsAcPowered = isAcPowered,
+                    StateOfCharge = stateOfCharge,
+                    HealthPercent = healthPercent,
+                    TemperatureC = temperatureC,
+                    CycleCount = cycleCount,
+                    PresentVoltageMv = presentVoltageMv,
+                    ChargeRateMa = chargeRateMa
+                };
+
+                DebugLog($"[Battery] ReadBatteryTelemetry: AC={(isAcPowered ? "plugged" : "unplugged")}, SoC={stateOfCharge}%, Health={healthPercent}%, Temp={temperatureC}°C, Cycles={cycleCount}, Voltage={presentVoltageMv}mV, ChargeRate={chargeRateMa}mA");
+                return telemetry;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Reads a little-endian uint16 from two consecutive EC registers.
+        /// </summary>
+        private int ReadEcUInt16(ushort loAddress)
+        {
+            byte lo = ReadECRegister(loAddress);
+            byte hi = ReadECRegister((ushort)(loAddress + 1));
+            return (hi << 8) | lo;
+        }
+
+        #endregion
+  
+        #region CPU Temperature Limit  
+  
+        /// <summary>  
+        /// EC register for CPU temperature limit readback.  
+        /// MechControl: cpuTempLimitRead (0x463): encoding=inverted_offset, tjMax=105  
+        /// </summary>  
+        public const ushort REG_CPU_TEMP_LIMIT_READ = 0x0463;  
+  
+        /// <summary>  
+        /// Reads the CPU temperature limit from EC register 0x0463.  
+        /// Encoding: inverted_offset from tjMax=105. temp = 105 - raw_value.  
+        /// Returns temperature in Â°C. Valid range: 80-95.  
+        /// </summary>  
+        public int GetCpuTempLimit()  
+        {  
+            EnsureInitialized();  
+            byte val = ReadECRegister(REG_CPU_TEMP_LIMIT_READ);  
+            int temp = 105 - val;  
+            DebugLog($"[CPU Temp] GetCpuTempLimit: raw=0x{val:X2}, temp={temp}Â°C");  
+            return temp;  
+        }  
+  
+        /// <summary>  
+        /// Writes the CPU temperature limit to EC register 0x0786 (TCC offset).  
+        /// Temperature in Â°C, valid range 80-95.  
+        /// Encoding: value = 105 - temp (inverted offset from tjMax).  
+        /// </summary>  
+        public void SetCpuTempLimit(int temp)  
+        {  
+            EnsureInitialized();  
+            temp = Math.Clamp(temp, 80, 95);  
+            byte val = EncodeCpuTempLimit(temp);  
+            WriteECRegister(REG_TCC_OFFSET, val);  
+            DebugLog($"[CPU Temp] SetCpuTempLimit: temp={temp}Â°C, encoded=0x{val:X2}");  
+        }  
+  
+        /// <summary>  
+        /// Encodes a CPU temperature (Â°C) to the EC byte value.  
+        /// Encoding: value = 105 - temp (inverted offset from tjMax).  
+        /// </summary>  
+        public static byte EncodeCpuTempLimit(int temp)  
+        {  
+            temp = Math.Clamp(temp, 80, 95);  
+            return (byte)(105 - temp);  
+        }  
+  
+        #endregion  
+  
+        
+
 
         #region IDisposable
 
@@ -1653,3 +1844,4 @@ namespace Universal_x86_Tuning_Utility.Services
         #endregion
     }
 }
+

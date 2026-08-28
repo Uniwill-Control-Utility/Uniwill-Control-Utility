@@ -5,7 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              x:Name="root"
-             Height="350"
+             Height="300"
              SnapsToDevicePixels="True"
              UseLayoutRounding="True"
              mc:Ignorable="d">

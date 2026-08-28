@@ -934,5 +934,101 @@ namespace Universal_x86_Tuning_Utility.Properties {
                 this["Language"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool LightBarEnabled {
+            get {
+                return ((bool)(this["LightBarEnabled"]));
+            }
+            set {
+                this["LightBarEnabled"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public byte LightBarR {
+            get {
+                return ((byte)(this["LightBarR"]));
+            }
+            set {
+                this["LightBarR"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("255")]
+        public byte LightBarG {
+            get {
+                return ((byte)(this["LightBarG"]));
+            }
+            set {
+                this["LightBarG"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("255")]
+        public byte LightBarB {
+            get {
+                return ((byte)(this["LightBarB"]));
+            }
+            set {
+                this["LightBarB"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        public int LightBarBrightness {
+            get {
+                return ((int)(this["LightBarBrightness"]));
+            }
+            set {
+                this["LightBarBrightness"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int BatteryMode {
+            get {
+                return ((int)(this["BatteryMode"]));
+            }
+            set {
+                this["BatteryMode"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int LightBarEffectIndex {
+            get {
+                return ((int)(this["LightBarEffectIndex"]));
+            }
+            set {
+                this["LightBarEffectIndex"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("5")]
+        public int LightBarSpeed {
+            get {
+                return ((int)(this["LightBarSpeed"]));
+            }
+            set {
+                this["LightBarSpeed"] = value;
+            }
+        }
     }
 }

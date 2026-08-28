@@ -465,6 +465,52 @@
             Margin="0,8,15,0"
             IsEnabled="True"
             IsExpanded="False"
+            Icon="{ui:SymbolIcon Temperature20}"
+                        Name="sdIntelCpuThermal">
+                        <ui:CardExpander.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock
+                            FontSize="14"
+                            FontWeight="Medium"
+                            Text="CPU Temperature Tuning" />
+                                    <TextBlock
+                            FontSize="12"
+                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                            Text="Provides the ability to set CPU thermal targets."/>
+                                </StackPanel>
+                            </Grid>
+                        </ui:CardExpander.Header>
+
+                        <StackPanel>
+                            <StackPanel Margin="0,-8,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Temperature Limit (°C)</TextBlock>
+                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Controls the temperature limit at which the CPU starts hard throttling" VerticalAlignment="Bottom" />
+                                </StackPanel>
+
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="33" />
+                                        <ColumnDefinition Width="150" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox Name="cbIntelCpuTemp"/>
+                                    <ui:NumberBox Name="nudIntelCpuTemp" Value="{Binding ElementName=sdIntelCpuTemp, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Maximum="95" Minimum="10" Grid.Column="1" SmallChange="1" MaxDecimalPlaces="0" />
+                                    <Slider Name="sdIntelCpuTemp" Maximum="95" Minimum="10" Grid.Column="2" Margin="12,0,0,0" TickFrequency="1" VerticalAlignment="Center" IsSnapToTickEnabled="True" TouchDown="SizeSlider_TouchDown"/>
+                                </Grid>
+                            </StackPanel>
+
+                        </StackPanel>
+                    </ui:CardExpander>
+                    <ui:CardExpander
+            Margin="0,8,15,0"
+            IsEnabled="True"
+            IsExpanded="False"
             Icon="{ui:SymbolIcon Flash20}"
                         Name="sdAmdApuVRM">
                         <ui:CardExpander.Header>

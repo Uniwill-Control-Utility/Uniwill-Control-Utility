@@ -1,6 +1,7 @@
-﻿using Microsoft.Win32.TaskScheduler;
+using Microsoft.Win32.TaskScheduler;
 using System;
 using System.Diagnostics;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Management;
@@ -8,6 +9,7 @@ using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Forms;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Extensions.Logging;
 using Universal_x86_Tuning_Utility.Properties;
@@ -25,6 +27,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
     {
         private readonly ILogger<SettingsPage> _logger;
         private bool _languageSelectionReady;
+        private bool _miniLedInit;
+
+        // MiniLED debug log
+        private readonly List<string> _miniLedDebugLines = new();
 
         public ViewModels.SettingsViewModel ViewModel
         {
@@ -69,6 +75,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             {
                 sdBattery.Visibility = Visibility.Collapsed;
             }
+
+            // Initialize MiniLED toggle (only on Uniwill hardware with MiniLED support)
+            initMiniLedToggle();
 
             checkUpdate();
         }
@@ -479,6 +488,129 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 Settings.Default.Save();
             }
         }
+
+        #region MiniLED Local Dimming
+
+        private void initMiniLedToggle()
+        {
+            UniwillECService? ecService;
+            try
+            {
+                ecService = App.GetService<UniwillECService>();
+            }
+            catch
+            {
+                CardMiniLed.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            if (ecService == null)
+            {
+                CardMiniLed.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            try
+            {
+                bool hasMiniLed = false;
+                if (!hasMiniLed)
+                {
+                    CardMiniLed.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                CardMiniLed.Visibility = Visibility.Visible;
+                CardMiniLedDebug.Visibility = Visibility.Visible;
+                MiniLedDebugLog("MiniLED init: support=" + hasMiniLed);
+                tbMiniLedStatus.Text = "Checking...";
+
+                // Read current state from registry (since we can't read it from EC)
+                bool currentOn = true; // BIOS default
+                try
+                {
+                    using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\OEM\GamingCenter2\MySetting\LocalDimming"))
+                    {
+                        if (key != null)
+                        {
+                            var val = key.GetValue("LocalDimmingStatus");
+                            if (val != null)
+                            {
+                                currentOn = Convert.ToInt32(val) == 1;
+                            }
+                        }
+                    }
+                }
+                catch { /* registry not available */ }
+
+                // Set UI state without triggering the toggle handler
+                _miniLedInit = true;
+                tsMiniLed.IsChecked = currentOn;
+                tbMiniLedStatus.Text = currentOn ? "Enabled" : "Disabled";
+                _miniLedInit = false;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to initialize MiniLED toggle");
+                CardMiniLed.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void tsMiniLed_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_miniLedInit || tsMiniLed == null)
+                return;
+
+            var ecService = App.GetService<UniwillECService>();
+            if (ecService == null)
+                return;
+
+            bool enable = tsMiniLed.IsChecked == true;
+            bool success = false;
+            MiniLedDebugLog("Toggle requested: " + (enable ? "ON" : "OFF"));
+
+            MiniLedDebugLog("SetMiniLedLocalDimming result: " + success);
+            if (!success)
+            {
+                tbMiniLedStatus.Text = "Failed to toggle";
+            }
+            else
+            {
+                tbMiniLedStatus.Text = enable ? "Enabled" : "Disabled";
+            }
+        }
+
+        private void MiniLedDebugLog(string message)
+        {
+            if (Dispatcher.CheckAccess())
+            {
+                var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+                var line = "[" + timestamp + "] " + message + "\n";
+                _miniLedDebugLines.Add(line);
+                if (_miniLedDebugLines.Count > 500)
+                    _miniLedDebugLines.RemoveAt(0);
+                txtMiniLedDebugLog.Text = string.Join("", _miniLedDebugLines);
+                var parent = VisualTreeHelper.GetParent(txtMiniLedDebugLog) as System.Windows.Controls.ScrollViewer;
+                parent?.ScrollToBottom();
+            }
+            else
+            {
+                Dispatcher.Invoke(() => MiniLedDebugLog(message));
+            }
+        }
+
+        private void btnCopyMiniLedDebugLog_Click(object sender, RoutedEventArgs e)
+        {
+            if (txtMiniLedDebugLog.Text.Length > 0)
+                System.Windows.Clipboard.SetText(txtMiniLedDebugLog.Text);
+        }
+
+        private void btnClearMiniLedDebugLog_Click(object sender, RoutedEventArgs e)
+        {
+            txtMiniLedDebugLog.Text = "";
+            _miniLedDebugLines.Clear();
+        }
+
+        #endregion
 
         private async void btnBackupPresets_Click(object sender, RoutedEventArgs e)
         {

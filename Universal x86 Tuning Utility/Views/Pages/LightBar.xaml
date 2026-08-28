@@ -1,0 +1,246 @@
+<Page x:Class="Universal_x86_Tuning_Utility.Views.Pages.LightBar"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:Universal_x86_Tuning_Utility.Views.Pages"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:controls="clr-namespace:Universal_x86_Tuning_Utility.Views.Controls"
+      mc:Ignorable="d"
+      d:DesignHeight="500" d:DesignWidth="800"
+      Title="Light Bar"
+      Loaded="Page_Loaded"
+      Unloaded="Page_Unloaded"
+      SnapsToDevicePixels="True"
+      UseLayoutRounding="True"
+      ScrollViewer.CanContentScroll="False">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  CanContentScroll="False"
+                  PanningMode="VerticalOnly"
+                  IsDeferredScrollingEnabled="False">
+        <ScrollViewer.Style>
+            <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource {x:Type ScrollViewer}}">
+                <Setter Property="Padding" Value="0" />
+            </Style>
+        </ScrollViewer.Style>
+
+        <Grid MaxWidth="1080" HorizontalAlignment="Stretch">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Page title block -->
+            <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,24,0,0">
+                <TextBlock FontSize="26"
+                           FontWeight="Medium"
+                           Margin="36,0,36,0"
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                           Text="Light Bar" />
+                <TextBlock Margin="36,8,36,12"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           Text="Control the front light bar on your laptop."
+                           TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- Content cards -->
+            <StackPanel Grid.Row="1" Margin="36,16,36,18">
+
+                <!-- Unavailable state -->
+                <StackPanel x:Name="LightBarUnavailable" Visibility="Collapsed">
+                    <Border Margin="0,8,0,0"
+                            Padding="14,12"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}"
+                            CornerRadius="4">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ui:FontIcon Grid.Column="0"
+                                         FontFamily="Segoe Fluent Icons"
+                                         Glyph="&#xE7A7;"
+                                         FontSize="16"
+                                         Margin="0,0,10,0"
+                                         Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                         VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Light bar control is not available on this device. This feature requires an ITE HID lighting controller (vid_048d) with a front light bar zone."
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <!-- Available content -->
+                <StackPanel x:Name="LightBarAvailable" Visibility="Visible">
+
+                    <!-- Power toggle -->
+                    <ui:CardControl Margin="0,0,0,8">
+                        <ui:CardControl.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7E8;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardControl.Icon>
+                        <ui:CardControl.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Light Bar" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Turn the front light bar on or off." />
+                            </StackPanel>
+                        </ui:CardControl.Header>
+                        <ui:ToggleSwitch x:Name="tsLightBarPower"
+                                         LabelPosition="Left"
+                                         OnContent="On"
+                                         OffContent="Off"
+                                         IsChecked="False"
+                                         Checked="TsLightBarPower_Toggled"
+                                         Unchecked="TsLightBarPower_Toggled" />
+                    </ui:CardControl>
+
+                    <!-- Color (single) -->
+                    <ui:CardControl x:Name="ColorCard" Margin="0,0,0,8">
+                        <ui:CardControl.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardControl.Icon>
+                        <ui:CardControl.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Color" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Choose the light bar color." />
+                            </StackPanel>
+                        </ui:CardControl.Header>
+                        <controls:ColorPickerControl x:Name="ColorPicker"
+                                                     HorizontalAlignment="Right"
+                                                     VerticalAlignment="Center"
+                                                     SelectedColor="Aqua"
+                                                     ColorChangedDelayed="ColorPicker_ColorChangedDelayed" />
+                    </ui:CardControl>
+
+                    <!-- Brightness -->
+                    <ui:CardControl Margin="0,0,0,8">
+                        <ui:CardControl.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE706;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardControl.Icon>
+                        <ui:CardControl.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Brightness" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Adjust the light bar brightness level." />
+                            </StackPanel>
+                        </ui:CardControl.Header>
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center">
+                            <TextBlock x:Name="BrightnessValueText"
+                                       Width="35"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Text="100" />
+                            <Slider x:Name="BrightnessSlider"
+                                    Width="140"
+                                    Minimum="1"
+                                    Maximum="100"
+                                    Value="100"
+                                    IsSnapToTickEnabled="True"
+                                    IsMoveToPointEnabled="False"
+                                    ValueChanged="BrightnessSlider_ValueChanged" />
+                        </StackPanel>
+                    </ui:CardControl>
+
+                    <!-- Effect selector -->
+                    <ui:CardControl Margin="0,0,0,8">
+                        <ui:CardControl.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xED39;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardControl.Icon>
+                        <ui:CardControl.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Effect" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Select a lighting effect for the light bar." />
+                            </StackPanel>
+                        </ui:CardControl.Header>
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center">
+                            <ComboBox x:Name="cbEffect"
+                                      Width="180"
+                                      HorizontalAlignment="Right"
+                                      VerticalAlignment="Center"
+                                      SelectedIndex="0"
+                                      SelectionChanged="CbEffect_SelectionChanged" />
+                        </StackPanel>
+                    </ui:CardControl>
+
+                    <!-- Speed (hidden for Static) -->
+                    <ui:CardControl x:Name="SpeedCard" Margin="0,0,0,8" Visibility="Collapsed">
+                        <ui:CardControl.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEB9D;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardControl.Icon>
+                        <ui:CardControl.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Speed" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Control the animation speed." />
+                            </StackPanel>
+                        </ui:CardControl.Header>
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center">
+                            <TextBlock x:Name="SpeedValueText"
+                                       Width="30"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Text="5" />
+                            <Slider x:Name="SpeedSlider"
+                                    Width="140"
+                                    Minimum="0"
+                                    Maximum="11"
+                                    Value="5"
+                                    IsSnapToTickEnabled="True"
+                                    IsMoveToPointEnabled="False"
+                                    ValueChanged="SpeedSlider_ValueChanged" />
+                        </StackPanel>
+                    </ui:CardControl>
+
+                    <!-- Save to BIOS -->
+                    <ui:CardControl Margin="0,0,0,8">
+                        <ui:CardControl.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE964;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardControl.Icon>
+                        <ui:CardControl.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Save to BIOS" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Persist the light bar settings across reboots." />
+                            </StackPanel>
+                        </ui:CardControl.Header>
+                        <Button x:Name="btnSaveBios"
+                                Content="Save to BIOS"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Click="BtnSaveBios_Click" />
+                    </ui:CardControl>
+
+ 
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</Page>

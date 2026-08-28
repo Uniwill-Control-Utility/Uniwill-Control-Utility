@@ -239,6 +239,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private double _profileGpuDbOffset = 0;
         private double _profileIntelPl1 = 45;
         private double _profileIntelPl2 = 60;
+        private int _profileIntelTemp = 95;
 
         public Presets(ILogger<Presets> logger, GpuInventoryService? gpuInventory = null, WaterCoolerService? waterCooler = null, DeviceApplier? deviceApplier = null)
         {
@@ -389,6 +390,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             lblIntelPl1.Text = $"{sdIntelPl1.Value:F0} W";
             lblIntelPl2.Text = $"{sdIntelPl2.Value:F0} W";
             lblIntelVolt.Text = $"{sdIntelVolt.Value:F0} mV";
+            lblIntelTemp.Text = $"{sdIntelTemp.Value:F0} °C";
 
             lblNvPower.Text = $"{sdNvPower.Value:F0} W";
             lblNvDbOffset.Text = $"{sdNvDbOffset.Value:F0} W";
@@ -813,7 +815,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             {
                 tbPl1.Text = $"{_profileIntelPl1:F0} W";
                 tbPl2.Text = $"{_profileIntelPl2:F0} W";
-                tbTjMax.Text = "-- \u00B0C";
+                tbTjMax.Text = $"{_profileIntelTemp} \u00B0C";
                 tbCoAll.Text = "--";
                 tbGpuTgp.Text = $"{_profileGpuTgp:F0} W";
                 tbGpuDb.Text = _profileGpuDb ? $"+{_profileGpuDbOffset:F0} W" : "Off";
@@ -912,7 +914,18 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     }
                     else
                     {
-                        DebugLog($"  EC service unavailable â€” CPU power limits may be clamped");
+                        DebugLog($"  EC service unavailable - CPU power limits may be clamped");
+                    }
+                }
+                else if (Family.TYPE == Family.ProcessorType.Intel)
+                {
+                    var ec = RyzenAdj_To_UXTU.EcService;
+                    if (ec != null && customScroll.Visibility == Visibility.Visible && cbIntelTemp.IsChecked == true)
+                    {
+                        int temp = (int)sdIntelTemp.Value;
+                        DebugLog($"  Applying EC Intel CPU temp limit: {temp} °C");
+                        ec.SetCpuTempLimit(temp);
+                        DebugLog($"  EC Intel CPU temp limit applied");
                     }
                 }
 
@@ -934,6 +947,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     _profileCoAll = (int)sdCoAll.Value;
                     _profileIntelPl1 = sdIntelPl1.Value;
                     _profileIntelPl2 = sdIntelPl2.Value;
+                    _profileIntelTemp = (int)sdIntelTemp.Value;
                     _profileGpuTgp = sdNvPower.Value;
                     _profileGpuDb = togDynamicBoost.IsChecked == true;
                     _profileGpuDbOffset = sdNvDbOffset.Value;

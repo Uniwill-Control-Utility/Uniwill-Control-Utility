@@ -31,19 +31,20 @@
       },
       "profiles": {
         "office": {
-          "cpu_pl1": 25,
-          "cpu_pl2": 35,
+          "cpu_pl1": 45,
+          "cpu_pl2": 45,
           "gpu_tgp": 95,
           "dynamic_boost": false
         },
         "gaming": {
-          "cpu_pl1": 45,
-          "cpu_pl2": 60,
+          "cpu_pl1": 75,
+          "cpu_pl2": 75,
           "gpu_tgp": 115,
           "dynamic_boost": false
         },
         "turbo": {
-          "uses_cpu_max": true,
+          "cpu_pl1": 160,
+          "cpu_pl2": 200,
           "gpu_tgp": 115,
           "dynamic_boost": true,
           "dynamic_boost_offset": 25
@@ -81,19 +82,20 @@
       },
       "profiles": {
         "office": {
-          "cpu_pl1": 25,
-          "cpu_pl2": 35,
+          "cpu_pl1": 45,
+          "cpu_pl2": 45,
           "gpu_tgp": 95,
           "dynamic_boost": false
         },
         "gaming": {
-          "cpu_pl1": 45,
-          "cpu_pl2": 60,
+          "cpu_pl1": 75,
+          "cpu_pl2": 75,
           "gpu_tgp": 150,
           "dynamic_boost": false
         },
         "turbo": {
-          "uses_cpu_max": true,
+          "cpu_pl1": 160,
+          "cpu_pl2": 200,
           "gpu_tgp": 150,
           "dynamic_boost": true,
           "dynamic_boost_offset": 25
@@ -131,19 +133,20 @@
       },
       "profiles": {
         "office": {
-          "cpu_pl1": 25,
-          "cpu_pl2": 35,
+          "cpu_pl1": 45,
+          "cpu_pl2": 45,
           "gpu_tgp": 95,
           "dynamic_boost": false
         },
         "gaming": {
-          "cpu_pl1": 45,
-          "cpu_pl2": 60,
+          "cpu_pl1": 75,
+          "cpu_pl2": 75,
           "gpu_tgp": 150,
           "dynamic_boost": false
         },
         "turbo": {
-          "uses_cpu_max": true,
+          "cpu_pl1": 160,
+          "cpu_pl2": 200,
           "gpu_tgp": 150,
           "dynamic_boost": true,
           "dynamic_boost_offset": 25
