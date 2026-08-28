@@ -1768,55 +1768,7 @@ namespace Universal_x86_Tuning_Utility.Services
         }
 
         #endregion
-  
-        #region CPU Temperature Limit  
-  
-        /// <summary>  
-        /// EC register for CPU temperature limit readback.  
-        /// MechControl: cpuTempLimitRead (0x463): encoding=inverted_offset, tjMax=105  
-        /// </summary>  
-        public const ushort REG_CPU_TEMP_LIMIT_READ = 0x0463;  
-  
-        /// <summary>  
-        /// Reads the CPU temperature limit from EC register 0x0463.  
-        /// Encoding: inverted_offset from tjMax=105. temp = 105 - raw_value.  
-        /// Returns temperature in Â°C. Valid range: 80-95.  
-        /// </summary>  
-        public int GetCpuTempLimit()  
-        {  
-            EnsureInitialized();  
-            byte val = ReadECRegister(REG_CPU_TEMP_LIMIT_READ);  
-            int temp = 105 - (val & 0x7F);  
-            DebugLog($"[CPU Temp] GetCpuTempLimit: raw=0x{val:X2}, temp={temp}Â°C");  
-            return temp;  
-        }  
-  
-        /// <summary>  
-        /// Writes the CPU temperature limit to EC register 0x0786 (TCC offset).  
-        /// Temperature in Â°C, valid range 80-95.  
-        /// Encoding: value = 105 - temp (inverted offset from tjMax).  
-        /// </summary>  
-        public void SetCpuTempLimit(int temp)  
-        {  
-            EnsureInitialized();  
-            temp = Math.Clamp(temp, 80, 95);  
-            EnsurePowerManagementActive();
-            byte val = EncodeCpuTempLimit(temp);  
-            WriteECRegister(REG_TCC_OFFSET, val);  
-            DebugLog($"[CPU Temp] SetCpuTempLimit: temp={temp}Â°C, encoded=0x{val:X2}");  
-        }  
-  
-        /// <summary>  
-        /// Encodes a CPU temperature (Â°C) to the EC byte value.  
-        /// Encoding: value = 105 - temp (inverted offset from tjMax).  
-        /// </summary>  
-        public static byte EncodeCpuTempLimit(int temp)  
-        {  
-            temp = Math.Clamp(temp, 80, 95);  
-            return (byte)(0x80 | (105 - temp));  
-        }  
-  
-        #endregion  
+    
   
         
 

@@ -146,8 +146,14 @@
                                     <TextBlock Grid.Row="1" Grid.Column="0" FontSize="13" Text="Boost (FPL)" Margin="0,4,0,0" />
                                     <TextBlock Grid.Row="1" Grid.Column="1" x:Name="tbPl2" FontSize="13" FontWeight="SemiBold" Text="-- W" Margin="0,4,0,0" />
 
-                                    <TextBlock Grid.Row="2" Grid.Column="0" FontSize="13" Text="TjMax" Margin="0,4,0,0" />
-                                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="tbTjMax" FontSize="13" FontWeight="SemiBold" Text="-- °C" Margin="0,4,0,0" />
+                                    <Grid x:Name="gridStatusTjMax" Grid.Row="2" Grid.Column="0" ColumnSpan="2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" FontSize="13" Text="TjMax" Margin="0,4,0,0" />
+                                        <TextBlock Grid.Column="1" x:Name="tbTjMax" FontSize="13" FontWeight="SemiBold" Text="-- °C" Margin="0,4,0,0" />
+                                    </Grid>
 
                                     <TextBlock Grid.Row="3" Grid.Column="0" FontSize="13" Text="Curve Optimizer" Margin="0,4,0,0" />
                                     <TextBlock Grid.Row="3" Grid.Column="1" x:Name="tbCoAll" FontSize="13" FontWeight="SemiBold" Text="--" Margin="0,4,0,0" />
@@ -263,8 +269,8 @@
                                 </Grid>
                                 <!-- Divider -->
                                 <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                                <!-- TjMax -->
-                                <Grid>
+                                <!-- TjMax (AMD only) -->
+                                <Grid x:Name="gridCustomTjMax">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
@@ -289,11 +295,11 @@
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0"
                                                    Text="95 °C" />
-                                        <Slider x:Name="sdTjMax" Width="140" Maximum="105" Minimum="70" TickFrequency="1" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
+                                        <Slider x:Name="sdTjMax" Width="140" Maximum="105" Minimum="70" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                  <!-- Divider -->
-                                 <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                 <Border x:Name="dividerAfterTjMax" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                                  <!-- Curve Optimizer (AMD only) -->
                                  <Grid x:Name="sdAmdCoAll">
                                      <Grid.ColumnDefinitions>

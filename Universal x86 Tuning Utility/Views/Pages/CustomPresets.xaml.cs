@@ -278,37 +278,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             {
                 await RyzenAdj_To_UXTU.TranslateAsync(commandValues, appliedName: GetSelectedPresetName());
 
-                // Apply EC CPU temp limit if available and checkbox is checked
-                if (_ecService is not null)
-                {
-                    if (Family.TYPE == Family.ProcessorType.Amd_Apu && cbCPUTemp.IsChecked == true)
-                    {
-                        try
-                        {
-                            int temp = (int)nudCPUTemp.Value;
-                            _ecService.SetCpuTempLimit(temp);
-                            Debug.WriteLine($"[CustomPresets] EC CPU temp limit set to {temp} °C");
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"[CustomPresets] Failed to set EC CPU temp limit: {ex.Message}");
-                        }
-                    }
-                    else if (Family.TYPE == Family.ProcessorType.Intel && cbIntelCpuTemp.IsChecked == true)
-                    {
-                        try
-                        {
-                            int temp = (int)nudIntelCpuTemp.Value;
-                            _ecService.SetCpuTempLimit(temp);
-                            Debug.WriteLine($"[CustomPresets] EC CPU temp limit set to {temp} °C");
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"[CustomPresets] Failed to set EC CPU temp limit: {ex.Message}");
-                        }
-                    }
-                }
-
                 ToastNotification.ShowToastNotification("Preset Applied", $"Your custom preset settings have been applied!");
             }
 

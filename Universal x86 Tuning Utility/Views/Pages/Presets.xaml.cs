@@ -404,6 +404,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (Family.TYPE == Family.ProcessorType.Intel)
             {
                 sdAmdCoAll.Visibility = Visibility.Collapsed;
+                gridStatusTjMax.Visibility = Visibility.Collapsed;
+                gridCustomTjMax.Visibility = Visibility.Collapsed;
+                dividerAfterTjMax.Visibility = Visibility.Collapsed;
             }
             // Hide Intel-specific controls on AMD
             else
@@ -910,29 +913,12 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         ec.ApplyCpuPowerLimits(pl1, pl2);
                         DebugLog($"  EC CPU power limits applied");
 
-                        // EC CPU temp limit — secondary hardware ceiling alongside RyzenAdj --tctl-limit
-                        if (customScroll.Visibility == Visibility.Visible)
-                        {
-                            int temp = (int)sdTjMax.Value;
-                            DebugLog($"  Applying EC CPU temp limit: {temp} °C");
-                            ec.SetCpuTempLimit(temp);
-                            DebugLog($"  EC CPU temp limit applied");
-                        }
+                        // TjMax is now handled via SMU path (--tctl-temp) in buildCommandString().
+                        // The EC register 0x0786 write was causing a 20W TDP lockup.
                     }
                     else
                     {
                         DebugLog($"  EC service unavailable - CPU power limits may be clamped");
-                    }
-                }
-                else if (Family.TYPE == Family.ProcessorType.Intel)
-                {
-                    var ec = RyzenAdj_To_UXTU.EcService;
-                    if (ec != null && customScroll.Visibility == Visibility.Visible)
-                    {
-                        int temp = (int)sdTjMax.Value;
-                        DebugLog($"  Applying EC Intel CPU temp limit: {temp} °C");
-                        ec.SetCpuTempLimit(temp);
-                        DebugLog($"  EC Intel CPU temp limit applied");
                     }
                 }
 
@@ -1058,6 +1044,15 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                 parts.Add($"--slow-limit={slowLimit}");
                 parts.Add($"--fast-limit={fastLimit}");
+
+                // CPU temperature limit via SMU (same path as Adaptive Mode).
+                // Previously used ec.SetCpuTempLimit() writing to EC register 0x0786,
+                // but 0x0786 is actually a fan curve register (0x0786-0x078A) on NB02.
+                // Corrupting fan curve data caused a 20W TDP lockup.
+                // tuxedo-drivers has NO CPU temp limit EC support — SMU is the only path.
+                int tjMax = (int)sdTjMax.Value;
+                parts.Add($"--tctl-temp={tjMax}");
+                parts.Add($"--cHTC-temp={tjMax}");
 
                 // Curve Optimizer
                 if (sdCoAll.Value > 0)
