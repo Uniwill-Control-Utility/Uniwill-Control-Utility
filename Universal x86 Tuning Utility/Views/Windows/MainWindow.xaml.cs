@@ -590,6 +590,40 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
                             if (lastAppliedState != "resume") ToastNotification.ShowToastNotification("Resume Preset Applied!", $"Your resume preset settings have been applied!");
                             lastAppliedState = "resume";
                         }
+
+                        // Auto-reconnect Hydro UI watercooler after resume.
+                        // The BLE radio link is torn down during sleep/hibernation, but the
+                        // WaterCoolerService may still hold a zombie device handle.
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                // Give the BLE radio a moment to reinitialize after resume
+                                await Task.Delay(1500);
+
+                                var waterCoolerService = App.GetService<WaterCoolerService>();
+                                if (waterCoolerService == null)
+                                    return;
+
+                                // If the service still thinks it's connected, the BLE link is a
+                                // zombie — force a disconnect before attempting reconnect.
+                                if (waterCoolerService.IsConnected)
+                                {
+                                    Debug.WriteLine("[WaterCooler] Resuming from sleep — disconnecting zombie BLE link");
+                                    await waterCoolerService.DisconnectAsync();
+                                    await Task.Delay(500);
+                                }
+
+                                // Attempt auto-reconnect if the user has it enabled
+                                bool connected = await waterCoolerService.TryAutoConnectAsync();
+                                if (connected)
+                                    Debug.WriteLine("[WaterCooler] Auto-reconnected after system resume");
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[WaterCooler] Auto-reconnect after resume failed: {ex.Message}");
+                            }
+                        });
                     }
                 }
             }
