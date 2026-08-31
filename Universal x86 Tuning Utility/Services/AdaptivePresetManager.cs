@@ -12,53 +12,6 @@ namespace Universal_x86_Tuning_Utility.Services
 {
     public class AdaptivePreset
     {
-        public int Temp { get; set; }
-        public int Power { get; set; }
-        public int CO { get; set; }
-        public int minGFX { get; set; }
-        public int MaxGFX { get; set; }
-        public int minCPU { get; set; }
-        public bool isCO { get; set; }
-        public bool isGFX { get; set; }
-
-        public int rsr { get; set; }
-        public int boost { get; set; }
-        public int imageSharp { get; set; }
-
-        public bool isRadeonGraphics { get; set; }
-        public bool isAntiLag { get; set; }
-        public bool isRSR { get; set; }
-        public bool isBoost { get; set; }
-        public bool isImageSharp { get; set; }
-        public bool isSync { get; set; }
-
-        public bool isNVIDIA { get; set; }
-        public int nvMaxCoreClk { get; set; } = 4000;
-        public int nvCoreClk { get; set; }
-        public int nvMemClk { get; set; }
-
-        public int asusPowerProfile { get; set; }
-
-        public int windowsBoostMode { get; set; }
-        public bool isWindowsMinState { get; set; }
-        public int windowsMinState { get; set; } = 5;
-        public bool isWindowsMaxState { get; set; }
-        public int windowsMaxState { get; set; } = 100;
-        public bool isWindowsMaxFrequency { get; set; }
-        public int windowsMaxFrequency { get; set; } = 5000;
-        public bool isWindowsEpp { get; set; }
-        public int windowsEpp { get; set; } = 50;
-        public bool isWindowsCoreParking { get; set; }
-        public int windowsCoreParking { get; set; } = 100;
-        public bool isWindowsMaxUnparkedCores { get; set; }
-        public int windowsMaxUnparkedCores { get; set; } = 100;
-
-        public bool isMag { get; set; }
-        public bool isVsync { get; set; }
-        public bool isRecap { get; set; }
-        public int Sharpness { get; set; }
-        public int ResScaleIndex { get; set; }
-
         // Watercooler (Hydro UI) per-game settings
         public bool WcEnabled { get; set; } = false;
         public string WcPumpVoltage { get; set; } = "V7";
@@ -72,6 +25,7 @@ namespace Universal_x86_Tuning_Utility.Services
         public int Bs2ProGear { get; set; } = 1;           // 1-4 (Quiet/Standard/Strong/Overclock)
         public ushort Bs2ProRpm { get; set; } = 2000;      // 1300-4000 manual RPM
         public string Bs2ProCurveProfileId { get; set; } = string.Empty; // GUID of active curve profile
+        public string Bs2ProCurvePointsJson { get; set; } = string.Empty; // JSON of curve points for per-game Custom curve
 
         // BS2 Pro RGB per-game settings
         public string Bs2ProRgbMode { get; set; } = "Static"; // "Off", "SmartTemp", "Static", "Flowing", "Breathing"
@@ -79,6 +33,7 @@ namespace Universal_x86_Tuning_Utility.Services
         public byte Bs2ProRgbG { get; set; } = 0;
         public byte Bs2ProRgbB { get; set; } = 255;
         public byte Bs2ProBrightness { get; set; } = 100;
+        public byte Bs2ProRgbSpeed { get; set; } = 5;
 
         // EC Fan Control per-game settings
         public bool EcFanEnabled { get; set; } = false;
@@ -107,6 +62,38 @@ namespace Universal_x86_Tuning_Utility.Services
         public byte KbRestColorB { get; set; } = 255;
         public string KbMultiColors { get; set; } = "";
         public string? KbPerKeyColors { get; set; }
+
+        // CPU per-game settings (Presets-style)
+        public bool CpuEnabled { get; set; } = false;
+        // AMD SMU
+        public int CpuSustained { get; set; } = 75;    // 5-255W (SPL)
+        public int CpuBoost { get; set; } = 85;        // 5-255W (FPL)
+        public int CpuTjMax { get; set; } = 95;        // 70-105°C (AMD only)
+        public int CpuCo { get; set; } = 0;            // -50 to 0 (AMD only, Curve Optimizer)
+        // Intel MSR
+        public int CpuPl1 { get; set; } = 45;          // 5-400W (Intel only)
+        public int CpuPl2 { get; set; } = 60;          // 5-400W (Intel only)
+        public int CpuUndervolt { get; set; } = 0;     // -150 to 0 (Intel only)
+
+        // GPU per-game settings (Presets-style)
+        public bool GpuEnabled { get; set; } = false;
+        public int GpuTgp { get; set; } = 150;         // 0-150W
+        public bool GpuDynamicBoost { get; set; } = false;
+        public int GpuDbOffset { get; set; } = 5;      // 0-25W
+        public int GpuCoreClock { get; set; } = 0;     // -1000 to 1000 MHz
+        public int GpuMemClock { get; set; } = 0;      // -1000 to 2000 MHz
+        public string GpuVfCurveName { get; set; } = string.Empty; // Active V-F curve preset name (slot 1-5)
+
+
+        // Light Bar per-game settings
+        public bool LbEnabled { get; set; } = false;
+        public bool LbPower { get; set; } = true;
+        public byte LbColorR { get; set; } = 0;
+        public byte LbColorG { get; set; } = 255;
+        public byte LbColorB { get; set; } = 255;
+        public int LbBrightness { get; set; } = 100;   // 0-100
+        public int LbEffect { get; set; } = 0;          // 0=Static, 1=Breathing, 2=Wave, 3=Loading, 4=Marquee, 5=Meteor
+        public int LbSpeed { get; set; } = 5;           // 0-11
 
         [DefaultValue(true)]
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]

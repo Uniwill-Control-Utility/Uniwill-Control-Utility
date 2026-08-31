@@ -126,611 +126,460 @@
                                         Text="Enable this preset for automatic switching. Can be used to exclude games/apps from auto switch."/>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Grid.Column="1">
-                                    <ui:ToggleSwitch Name="tsAutoSwitch" Margin="0,0,9,0"/>
+                                    <ui:ToggleSwitch 
+                                        Name="tsAutoSwitch" 
+                                        Margin="0,0,9,0"
+                                        LabelPosition="Left"
+                                        OnContent="On"
+                                        OffContent="Off"/>
                                 </StackPanel>
                             </Grid>
                         </ui:CardControl.Header>
                     </ui:CardControl>
-                <ui:CardExpander Name="sdBasic"
-                    IsEnabled="True"
-                    IsExpanded="False"
-                    Icon="{ui:SymbolIcon Book20}" VerticalAlignment="Top" Margin="0,8,15,0">
-                    <ui:CardExpander.Header>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock
-                            FontSize="14"
-                            FontWeight="Medium"
-                            Text="Basic Adaptive Mode Settings" />
-                                <TextBlock
-                            FontSize="12"
-                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                            Text="Provides the ability to toggle/set adaptive mode targets."/>
-                            </StackPanel>
-                        </Grid>
-                    </ui:CardExpander.Header>
 
-                    <StackPanel>
-                        <StackPanel Margin="0,-8,0,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Max Temperature Limit (°C)</TextBlock>
-                                <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Controls the max temperature limit adaptive mode is allowed to set" VerticalAlignment="Bottom" />
-                            </StackPanel>
-
-                            <Grid Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="0" />
-                                    <ColumnDefinition Width="150" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-
-                                <ui:NumberBox Name="nudTemp" Value="{Binding ElementName=sdTemp, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Maximum="105" Minimum="10" Grid.Column="1" SmallChange="1" MaxDecimalPlaces="0" />
-                                <Slider Name="sdTemp" Maximum="105" Minimum="10" Grid.Column="2" Margin="12,0,0,0" TickFrequency="1" VerticalAlignment="Center" IsSnapToTickEnabled="True" TouchDown="SizeSlider_TouchDown"/>
-                            </Grid>
-                        </StackPanel>
-                        <StackPanel Margin="0,8,0,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Max Power Limit (W)</TextBlock>
-                                <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Controls the max power limit adpative mode is allowed to set" VerticalAlignment="Bottom"/>
-                            </StackPanel>
-                            <Grid Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="0" />
-                                    <ColumnDefinition Width="150" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-
-                                <ui:NumberBox Name="nudPowerLimit" Value="{Binding ElementName=sdPowerLimit, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Maximum="300" Minimum="8" Grid.Column="1" SmallChange="1" MaxDecimalPlaces="0" />
-                                <Slider Name="sdPowerLimit" Maximum="300" Minimum="8" Grid.Column="2" Margin="12,0,0,0" TickFrequency="1" VerticalAlignment="Center" IsSnapToTickEnabled="True" TouchDown="SizeSlider_TouchDown"/>
-                            </Grid>
-                        </StackPanel>
-                        <StackPanel Margin="0,8,0,0" Name="spCO">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Max Curve Optimiser Limit (-)</TextBlock>
-                                <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Controls the max negative curve optimiser limit adpative mode is allowed to set" VerticalAlignment="Bottom"/>
-                            </StackPanel>
-                            <Grid Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="33" />
-                                    <ColumnDefinition Width="150" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <CheckBox Name="cbCurve"/>
-                                <ui:NumberBox Name="nudCurve" Value="{Binding ElementName=sdCurve, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Maximum="50" Minimum="0" Grid.Column="1" SmallChange="1" MaxDecimalPlaces="0" />
-                                <Slider Name="sdCurve" Maximum="50" Minimum="0" Grid.Column="2" Margin="12,0,0,0" TickFrequency="1" VerticalAlignment="Center" IsSnapToTickEnabled="True" TouchDown="SizeSlider_TouchDown"/>
-                            </Grid>
-                        </StackPanel>
-                    </StackPanel>
-                </ui:CardExpander>
-
-                <ui:CardExpander Name="sdTBOiGPU"
-                    IsEnabled="True"
-                    IsExpanded="False"
-                    Icon="{ui:SymbolIcon Pulse20}" VerticalAlignment="Top" Margin="0,8,15,0">
-                    <ui:CardExpander.Header>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock
-                            FontSize="14"
-                            FontWeight="Medium"
-                            Text="Turbo Boost Overdrive iGPU Settings" />
-                                <TextBlock
-                            FontSize="12"
-                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                            Text="Provides the ability to toggle/set Turbo Boost Overdrive iGPU targets."/>
-                            </StackPanel>
-                                <StackPanel Orientation="Horizontal" Grid.Column="1">
-                                    <ui:ToggleSwitch Name="tsTBOiGPU" Margin="0,0,9,0"/>
-                                </StackPanel>
-                            </Grid>
-                    </ui:CardExpander.Header>
-
-                    <StackPanel>
-                        <StackPanel Margin="0,-8,0,0">
-                            <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Maximum iGPU Clock Limit (MHz)</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Controls the maximum iGPU clock speed adaptive mode is allowed to set" VerticalAlignment="Bottom" />
-                            </StackPanel>
-
-                            <Grid Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="0" />
-                                    <ColumnDefinition Width="150" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-
-                                    <ui:NumberBox Name="nudMaxGfxClk" Value="{Binding ElementName=sdMaxGfxClk, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Maximum="3400" Minimum="200" Grid.Column="1" SmallChange="25" MaxDecimalPlaces="0" />
-                                    <Slider Name="sdMaxGfxClk" Maximum="3400" Minimum="200" Grid.Column="2" Margin="12,0,0,0" TickFrequency="25" VerticalAlignment="Center" IsSnapToTickEnabled="True" TouchDown="SizeSlider_TouchDown"/>
-                            </Grid>
-                        </StackPanel>
-
-                            <StackPanel Margin="0,8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Minimum iGPU Clock Limit (MHz)</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Controls the minimum iGPU clock speed adaptive mode is allowed to set" VerticalAlignment="Bottom" />
-                                </StackPanel>
-
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="0" />
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-
-                                    <ui:NumberBox Name="nudMinGfxClk" Value="{Binding ElementName=sdMinGfxClk, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Maximum="3400" Minimum="200" Grid.Column="1" SmallChange="25" MaxDecimalPlaces="0"/>
-                                    <Slider Name="sdMinGfxClk" Maximum="3400" Minimum="200" Grid.Column="2" Margin="12,0,0,0" TickFrequency="25" VerticalAlignment="Center" IsSnapToTickEnabled="True" TouchDown="SizeSlider_TouchDown"/>
-                                </Grid>
-                            </StackPanel>
-                            <StackPanel Margin="0,8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Minimum CPU Clock Limit (MHz)</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Controls the minimum CPU clock speed at which adaptive mode will start throttling iGPU clocks" VerticalAlignment="Bottom" />
-                                </StackPanel>
-
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="0" />
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-
-                                    <ui:NumberBox Name="nudMinCpuClk" Value="{Binding ElementName=sdMinCpuClk, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Maximum="4000" Minimum="1000" Grid.Column="1" SmallChange="25" MaxDecimalPlaces="0"/>
-                                    <Slider Name="sdMinCpuClk" Maximum="4000" Minimum="1000" Grid.Column="2" Margin="12,0,0,0" TickFrequency="25" VerticalAlignment="Center" IsSnapToTickEnabled="True" TouchDown="SizeSlider_TouchDown"/>
-                                </Grid>
-                            </StackPanel>
-                            <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}">Notes: Ensure you balance CPU and iGPU clocks out for the best performance!</TextBlock>
-                        </StackPanel>
-                </ui:CardExpander>
-                    <ui:CardExpander Name="sdUXTUSR"
-                        IsEnabled="True"
-                        IsExpanded="False"
-                        Icon="{ui:SymbolIcon Image24}" Margin="0,8,15,0">
+                    <!-- CPU Settings -->
+                    <ui:CardExpander x:Name="sdCpuSettings"
+                                    IsEnabled="True"
+                                    IsExpanded="False"
+                                    Margin="0,8,15,0">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE950;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock
-                                        FontSize="14"
-                                        FontWeight="Medium"
-                                        Text="UXTU Super Resolution" />
-                                    <TextBlock
-                                        FontSize="12"
-                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                        Text="Powered by a customised version of Magpie. Use Alt+F to toggle."/>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="CPU Settings" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Per-game CPU power, thermal, and voltage tuning."
+                                                   TextWrapping="Wrap" />
                                 </StackPanel>
-                                <StackPanel Orientation="Horizontal" Grid.Column="1">
-                                    <ui:ToggleSwitch Name="tsUXTUSR" Margin="0,0,9,0"/>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <ui:ToggleSwitch x:Name="cbxCpuEnabled"
+                                                     Margin="0,0,9,0"
+                                                     LabelPosition="Left"
+                                                     OnContent="On"
+                                                     OffContent="Off"
+                                                     ToolTip="Enable CPU controls for this game"
+                                                     Checked="cbxCpuEnabled_Toggled"
+                                                     Unchecked="cbxCpuEnabled_Toggled" />
                                 </StackPanel>
                             </Grid>
                         </ui:CardExpander.Header>
-
                         <StackPanel>
-                            <StackPanel Margin="0,-8,0,0">
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
+                            <!-- Sustained Power Limit (SPL) -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Sustained (SPL)" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Sustained power limit (SMU slow-limit)" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblSustained"
+                                               Width="48"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="75 W" />
+                                    <Slider x:Name="AdpSdSustained" Width="140" Maximum="255" Minimum="5" Value="75" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Boost Power Limit (FPL) -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Boost (FPL)" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Boost power limit (SMU fast-limit)" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblBoost"
+                                               Width="48"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="85 W" />
+                                    <Slider x:Name="AdpSdBoost" Width="140" Maximum="255" Minimum="5" Value="85" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- TjMax (AMD only) -->
+                            <Grid x:Name="AdpGridTjMax">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="TjMax" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Thermal throttle temperature" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblTjMax"
+                                               Width="48"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="95 °C" />
+                                    <Slider x:Name="AdpSdTjMax" Width="140" Maximum="105" Minimum="70" Value="95" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border x:Name="AdpDividerAfterTjMax" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Curve Optimizer (AMD only) -->
+                            <Grid x:Name="AdpGridCoAll">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Curve Optimizer" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Global voltage offset (all cores)" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblCoAll"
+                                               Width="40"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="0" />
+                                    <Slider x:Name="AdpSdCoAll" Width="140" Maximum="0" Minimum="-50" Value="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border x:Name="AdpDividerAfterCoAll" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Intel PL1 -->
+                            <Grid x:Name="AdpGridIntelPl1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="PL1" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Sustained power limit" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblIntelPl1"
+                                               Width="48"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="45 W" />
+                                    <Slider x:Name="AdpSdIntelPl1" Width="140" Maximum="400" Minimum="5" Value="45" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border x:Name="AdpDividerAfterIntelPl1" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Intel PL2 -->
+                            <Grid x:Name="AdpGridIntelPl2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="PL2" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Boost power limit" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblIntelPl2"
+                                               Width="48"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="60 W" />
+                                    <Slider x:Name="AdpSdIntelPl2" Width="140" Maximum="400" Minimum="5" Value="60" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border x:Name="AdpDividerAfterIntelPl2" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Intel CPU Undervolt -->
+                            <Grid x:Name="AdpGridIntelUndervolt">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="CPU Undervolt" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="CPU voltage offset" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblIntelUndervolt"
+                                               Width="48"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="0 mV" />
+                                    <Slider x:Name="AdpSdIntelUndervolt" Width="140" Maximum="0" Minimum="-150" Value="0" TickFrequency="10" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </ui:CardExpander>
 
+                    <!-- GPU Settings -->
+                    <ui:CardExpander x:Name="sdGpuSettings"
+                                    Visibility="Collapsed"
+                                    IsEnabled="True"
+                                    IsExpanded="False"
+                                    Margin="0,8,15,0">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF211;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="GPU Settings" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Per-game GPU power, clock offsets, and curve editing."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <ui:ToggleSwitch x:Name="cbxGpuEnabled"
+                                                     Margin="0,0,9,0"
+                                                     LabelPosition="Left"
+                                                     OnContent="On"
+                                                     OffContent="Off"
+                                                     ToolTip="Enable GPU controls for this game"
+                                                     Checked="cbxGpuEnabled_Toggled"
+                                                     Unchecked="cbxGpuEnabled_Toggled" />
+                                </StackPanel>
+                            </Grid>
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <!-- GPU TGP -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="GPU TGP" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Base power limit" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblNvPower"
+                                               Width="48"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="150 W" />
+                                    <Slider x:Name="AdpSdNvPower" Width="140" Maximum="150" Minimum="0" Value="150" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Dynamic Boost Toggle -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Dynamic Boost" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Enable NVIDIA Dynamic Boost" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="AdpTogDynamicBoost"
+                                                 Grid.Column="1"
+                                                 Margin="4,0,0,0"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="AdpTogDynamicBoost_Checked"
+                                                 Unchecked="AdpTogDynamicBoost_Unchecked" />
+                            </Grid>
+                            <!-- Dynamic Boost Offset (hidden when toggle is off) -->
+                            <StackPanel x:Name="AdpSpNvDbOffset" Visibility="Collapsed">
+                                <!-- Divider -->
+                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <Grid Margin="0,0,0,0">
+                                    <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox Name="cbVSync" Checked="cb_Checked" FontSize="13" FontWeight="DemiBold" Content="Enable VSync" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
-                                        <ui:SymbolIcon Symbol="Info20" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="6,0,0,-4" ToolTip="Synchronises capture frame rate to display refresh rate." VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Dynamic Boost Offset" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Extra GPU power borrowed from CPU" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center">
+                                        <TextBlock x:Name="AdpLblNvDbOffset"
+                                                   Width="48"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,8,0"
+                                                   Text="5 W" />
+                                        <Slider x:Name="AdpSdNvDbOffset" Width="140" Maximum="25" Minimum="0" Value="5" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                             </StackPanel>
-                            <StackPanel Margin="0,-8,0,0">
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox Width="130" Name="cbAutoCap" Checked="cb_Checked" FontSize="13" FontWeight="DemiBold" Content="Auto Recapture" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
-                                        <ui:SymbolIcon Symbol="Info20" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="6,0,0,-4" ToolTip="Auto recaptures the previous capture window after focus was lost and restored." VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </Grid>
-                            </StackPanel>
-
-                            <StackPanel Margin="0,8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Capture Sharpness (%)</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Controls UXTU Super Resolution capture image sharpness." VerticalAlignment="Bottom" />
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Curve Editor Button -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Curve Editor" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Edit voltage-frequency curve per point" />
                                 </StackPanel>
-
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <ui:NumberBox Name="nudSharp" Value="{Binding ElementName=sdSharp, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Maximum="100" Minimum="5" Grid.Column="0" SmallChange="1" MaxDecimalPlaces="0"  />
-                                    <Slider Name="sdSharp" Maximum="100" Minimum="5" Grid.Column="1" Margin="12,0,0,0" TickFrequency="1" VerticalAlignment="Center" IsSnapToTickEnabled="True" TouchDown="SizeSlider_TouchDown"/>
-                                </Grid>
-                            </StackPanel>
-
-                            <StackPanel Margin="0,8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Resolution Scale</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Controls the resolution of the window being captured. Use application controlled if you do not want UXTU to override the window resolution. Not all applications will be compatible with this mode!" VerticalAlignment="Bottom" />
-                                </StackPanel>
-
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="208" />
-                                    </Grid.ColumnDefinitions>
-                                    <ComboBox
+                                <Button x:Name="AdpBtnVfCurve"
                                         Grid.Column="1"
-                                        VerticalAlignment="Center" SelectedIndex="0" MinWidth="138" Name="cbxResScale" Height="37">
-                                        <ComboBoxItem>Application Controlled</ComboBoxItem>
-                                        <ComboBoxItem>Ultra Quality (77%)</ComboBoxItem>
-                                        <ComboBoxItem>Quality (67%)</ComboBoxItem>
-                                        <ComboBoxItem>Balanced (59%)</ComboBoxItem>
-                                        <ComboBoxItem>Performance (50%)</ComboBoxItem>
-                                        <ComboBoxItem>Ultra Performance (33%)</ComboBoxItem>
-                                    </ComboBox>
-                                </Grid>
-                            </StackPanel>
-                        </StackPanel>
-                    </ui:CardExpander>
-                    <ui:CardExpander Name="sdADLX"
-                        IsEnabled="True"
-                        IsExpanded="False"
-                        Icon="{ui:SymbolIcon Image24}" Margin="0,8,15,0">
-                        <ui:CardExpander.Header>
+                                        Content="Edit Curve"
+                                        Click="AdpBtnVfCurve_Click"
+                                        Margin="4,0,0,0"
+                                        Padding="12,4" />
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Core Clock Offset -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock
-                            FontSize="14"
-                            FontWeight="Medium"
-                            Text="Radeon™ Graphics Options" />
-                                    <TextBlock
-                            FontSize="12"
-                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                            Text="Provides the ability to customise driver graphics options"/>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Core Clock Offset" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Uniform core frequency offset" />
                                 </StackPanel>
-                                <StackPanel Orientation="Horizontal" Grid.Column="1">
-                                    <ui:ToggleSwitch Name="tsRadeonGraph" Margin="0,0,9,0"/>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblNvCore"
+                                               Width="60"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="0 MHz" />
+                                    <Slider x:Name="AdpSdNvCore"
+                                            Width="140"
+                                            Maximum="1000"
+                                            Minimum="-1000"
+                                            Value="0"
+                                            TickFrequency="50"
+                                            IsSnapToTickEnabled="True"
+                                            TickPlacement="None"
+                                            VerticalAlignment="Center"
+                                            ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
-                        </ui:CardExpander.Header>
-
-                        <StackPanel>
-                            <StackPanel Margin="0,-8,0,0">
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox Name="cbAntiLag" Checked="cb_Checked" FontSize="13" FontWeight="DemiBold" Content="Radeon™ Anti-Lag" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
-                                        <ui:SymbolIcon Symbol="Info20" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="6,0,0,-4" ToolTip="Enables AMD Radeon™ Anti-Lag within drivers on supported hardware." VerticalAlignment="Center" />
-                                    </StackPanel>
-
-                                </Grid>
-                            </StackPanel>
-                            <StackPanel Margin="0,8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Radeon™ Super Resolution (%)</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Enables AMD Radeon™ Super Resolution within drivers on supported hardware. Also allows you to set a custom sharpness effect." VerticalAlignment="Bottom" />
-                                </StackPanel>
-
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="33" />
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <CheckBox Name="cbRSR" Checked="cb_Checked"/>
-                                    <ui:NumberBox Name="nudRSR" Value="{Binding ElementName=sdRSR, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Maximum="100" Minimum="5" Grid.Column="1" SmallChange="1" MaxDecimalPlaces="0"/>
-                                    <Slider Name="sdRSR" Maximum="100" Minimum="5" Grid.Column="2" Margin="12,0,0,0" TickFrequency="1" VerticalAlignment="Center" IsSnapToTickEnabled="True" TouchDown="SizeSlider_TouchDown"/>
-                                </Grid>
-                            </StackPanel>
-                            <StackPanel Margin="0,8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Radeon™ Boost (%)</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Enables AMD Radeon™ Boost within drivers on supported hardware. Also allows you to set a minimum resolution in %." VerticalAlignment="Bottom" />
-                                </StackPanel>
-
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="33" />
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <CheckBox Name="cbBoost" Checked="cb_Checked"/>
-                                    <ui:NumberBox Name="nudBoost" Value="{Binding ElementName=sdBoost, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Maximum="83" Minimum="50" Grid.Column="1" SmallChange="1" MaxDecimalPlaces="0"/>
-                                    <Slider Name="sdBoost" Maximum="83" Minimum="50" Grid.Column="2" Margin="12,0,0,0" TickFrequency="1" VerticalAlignment="Center" IsSnapToTickEnabled="True" TouchDown="SizeSlider_TouchDown"/>
-                                </Grid>
-                            </StackPanel>
-                            <StackPanel Margin="0,8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Radeon™ Image Sharpening (%)</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Enables AMD Radeon™ Image Sharpening within drivers on supported hardware. Allows you to set a custom sharpness effect." VerticalAlignment="Bottom" />
-                                </StackPanel>
-
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="33" />
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <CheckBox Name="cbImageSharp" Checked="cb_Checked"/>
-                                    <ui:NumberBox Name="nudImageSharp" Value="{Binding ElementName=sdImageSharp, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Maximum="100" Minimum="10" Grid.Column="1" SmallChange="5" MaxDecimalPlaces="0"/>
-                                    <Slider Name="sdImageSharp" Maximum="100" Minimum="10" Grid.Column="2" Margin="12,0,0,0" TickFrequency="5" VerticalAlignment="Center" IsSnapToTickEnabled="True" TouchDown="SizeSlider_TouchDown"/>
-                                </Grid>
-                            </StackPanel>
-
-                            <StackPanel Margin="0,8,0,0">
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox Name="cbSync" Checked="cb_Checked" FontSize="13" FontWeight="DemiBold" Content="Enhanced Sync" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
-                                        <ui:SymbolIcon Symbol="Info20" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="6,0,0,-4" ToolTip="Enables AMD Enhanced Sync within drivers on supported hardware." VerticalAlignment="Center" />
-                                    </StackPanel>
-
-                                </Grid>
-                            </StackPanel>
-                        </StackPanel>
-                    </ui:CardExpander>
-                    <ui:CardExpander Name="sdNVIDIA"
-                        IsEnabled="True"
-                        IsExpanded="False"
-                        Icon="{ui:SymbolIcon Pulse20}" Margin="0,8,15,0">
-                        <ui:CardExpander.Header>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Memory Clock Offset -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock
-                                        FontSize="14"
-                                        FontWeight="Medium"
-                                        Text="NVIDIA GPU Tuning" />
-                                    <TextBlock
-                                        FontSize="12"
-                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                        Text="Provides the ability to set tune your NVIDIA GPU."/>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Memory Clock Offset" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Memory frequency offset" />
                                 </StackPanel>
-
-                                <StackPanel Orientation="Horizontal" Grid.Column="1">
-                                    <ui:ToggleSwitch Name="tsNV" Margin="0,0,9,0"/>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblNvMem"
+                                               Width="60"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="0 MHz" />
+                                    <Slider x:Name="AdpSdNvMem" Width="140" Maximum="2000" Minimum="-1000" Value="0" TickFrequency="50" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
-                        </ui:CardExpander.Header>
-
-                        <StackPanel>
-                            <StackPanel Margin="0,-8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">Frequency-Adjusted Voltage Limit (MHz)</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Controls the maximum voltage your GPU will run within the Frequency/Voltage curve based on clock speed. You can undervolt your NVIDIA GPU by lowering this clock speed below stock and increasing the core clock offset. Start at your GPU's rated boost clock and work down. To reset it, set it to the maximum possible clock the slider allows." VerticalAlignment="Bottom" />
-                                </StackPanel>
-
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <ui:NumberBox Name="nudNVMaxCore" Value="{Binding ElementName=sdNVMaxCore, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Maximum="4000" Minimum="400" Grid.Column="0" SmallChange="5" MaxDecimalPlaces="0" />
-                                    <Slider Name="sdNVMaxCore" Maximum="4000" Minimum="400" Grid.Column="1" Margin="12,0,0,0" TickFrequency="5" VerticalAlignment="Center" IsSnapToTickEnabled="True" TouchDown="SizeSlider_TouchDown"/>
-                                </Grid>
-                            </StackPanel>
-                            <StackPanel Margin="0,8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">GPU Core Clock Offset (MHz)</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Controls the clock offset for your NVIDIA GPU's core clock" VerticalAlignment="Bottom" />
-                                </StackPanel>
-
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <ui:NumberBox Name="nudNVCore" Value="{Binding ElementName=sdNVCore, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Maximum="2000" Minimum="-500" Grid.Column="0" SmallChange="5" MaxDecimalPlaces="0" />
-                                    <Slider Name="sdNVCore" Maximum="2000" Minimum="-500" Grid.Column="1" Margin="12,0,0,0" TickFrequency="5" VerticalAlignment="Center" IsSnapToTickEnabled="True" TouchDown="SizeSlider_TouchDown"/>
-                                </Grid>
-                            </StackPanel>
-                            <StackPanel Margin="0,8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">GPU Memory Clock (MHz)</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Controls the clock offset for your NVIDIA GPU's VRAM clock" VerticalAlignment="Bottom" />
-                                </StackPanel>
-
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <ui:NumberBox Name="nudNVMem" Value="{Binding ElementName=sdNVMem, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Maximum="2000" Minimum="-500" Grid.Column="0" SmallChange="25" MaxDecimalPlaces="0" />
-                                    <Slider Name="sdNVMem" Maximum="2000" Minimum="-500" Grid.Column="1" Margin="12,0,0,0" TickFrequency="25" VerticalAlignment="Center" IsSnapToTickEnabled="True" TouchDown="SizeSlider_TouchDown"/>
-                                </Grid>
-                            </StackPanel>
-
-                            <TextBlock
-                                FontSize="12"
-                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                Text="Warning: We are not liable for any damages to hardware or resulting instabilities caused by adjustment of frequencies and voltages." TextWrapping="WrapWithOverflow" Margin="0,8,0,0"/>
                         </StackPanel>
                     </ui:CardExpander>
-                    <ui:CardExpander Name="sdWindowsProcessorPower"
-                                     Margin="0,8,15,0"
-                                     IsEnabled="True"
-                                     IsExpanded="False"
-                                     Icon="{ui:SymbolIcon Power20}">
-                        <ui:CardExpander.Header>
-                            <StackPanel>
-                                <TextBlock FontSize="14" FontWeight="Medium" Text="Windows Processor Power" />
-                                <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Controls Windows processor boost, performance limits, core parking and energy preference." TextWrapping="Wrap" />
-                            </StackPanel>
-                        </ui:CardExpander.Header>
-                        <StackPanel>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="200" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock FontSize="13" FontWeight="DemiBold" Text="Processor Boost Mode" />
-                                    <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Selects how Windows requests processor boost performance." TextWrapping="Wrap" />
-                                </StackPanel>
-                                <ComboBox x:Name="cbxWindowsBoostMode" Grid.Column="1" Height="37" SelectedIndex="0">
-                                    <ComboBoxItem>System Controlled</ComboBoxItem>
-                                    <ComboBoxItem>Disabled</ComboBoxItem>
-                                    <ComboBoxItem>Enabled</ComboBoxItem>
-                                    <ComboBoxItem>Aggressive</ComboBoxItem>
-                                    <ComboBoxItem>Efficient Enabled</ComboBoxItem>
-                                    <ComboBoxItem>Efficient Aggressive</ComboBoxItem>
-                                    <ComboBoxItem>Aggressive at Guaranteed Performance</ComboBoxItem>
-                                    <ComboBoxItem>Efficient Aggressive at Guaranteed Performance</ComboBoxItem>
-                                </ComboBox>
-                            </Grid>
-                            <StackPanel Margin="0,12,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontSize="13" FontWeight="DemiBold" Text="Minimum Processor State (%)" />
-                                    <ui:SymbolIcon Margin="6,0,0,-2" Symbol="Info20" ToolTip="Sets the minimum processor performance state as a percentage." />
-                                </StackPanel>
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="33" />
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <CheckBox x:Name="cbWindowsMinState" />
-                                    <ui:NumberBox x:Name="nudWindowsMinState" Grid.Column="1" Minimum="0" Maximum="100" SmallChange="1" MaxDecimalPlaces="0" Value="{Binding ElementName=sdWindowsMinState, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    <Slider x:Name="sdWindowsMinState" Grid.Column="2" Margin="12,0,0,0" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" />
-                                </Grid>
-                            </StackPanel>
-                            <StackPanel Margin="0,12,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontSize="13" FontWeight="DemiBold" Text="Maximum Processor State (%)" />
-                                    <ui:SymbolIcon Margin="6,0,0,-2" Symbol="Info20" ToolTip="Limits the maximum processor performance state as a percentage." />
-                                </StackPanel>
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="33" />
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <CheckBox x:Name="cbWindowsMaxState" />
-                                    <ui:NumberBox x:Name="nudWindowsMaxState" Grid.Column="1" Minimum="1" Maximum="100" SmallChange="1" MaxDecimalPlaces="0" Value="{Binding ElementName=sdWindowsMaxState, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    <Slider x:Name="sdWindowsMaxState" Grid.Column="2" Margin="12,0,0,0" Minimum="1" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" />
-                                </Grid>
-                            </StackPanel>
-                            <StackPanel Margin="0,12,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontSize="13" FontWeight="DemiBold" Text="Maximum Processor Frequency (MHz)" />
-                                    <ui:SymbolIcon Margin="6,0,0,-2" Symbol="Info20" ToolTip="Limits the maximum processor frequency requested by Windows." />
-                                </StackPanel>
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="33" />
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <CheckBox x:Name="cbWindowsMaxFrequency" />
-                                    <ui:NumberBox x:Name="nudWindowsMaxFrequency" Grid.Column="1" Minimum="100" Maximum="8000" SmallChange="100" MaxDecimalPlaces="0" Value="{Binding ElementName=sdWindowsMaxFrequency, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    <Slider x:Name="sdWindowsMaxFrequency" Grid.Column="2" Margin="12,0,0,0" Minimum="100" Maximum="8000" TickFrequency="100" IsSnapToTickEnabled="True" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" />
-                                </Grid>
-                            </StackPanel>
-                            <StackPanel Margin="0,12,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontSize="13" FontWeight="DemiBold" Text="Energy Performance Preference (%)" />
-                                    <ui:SymbolIcon Margin="6,0,0,-2" Symbol="Info20" ToolTip="Lower values favour performance; higher values favour energy savings." />
-                                </StackPanel>
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="33" />
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <CheckBox x:Name="cbWindowsEpp" />
-                                    <ui:NumberBox x:Name="nudWindowsEpp" Grid.Column="1" Minimum="0" Maximum="100" SmallChange="1" MaxDecimalPlaces="0" Value="{Binding ElementName=sdWindowsEpp, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    <Slider x:Name="sdWindowsEpp" Grid.Column="2" Margin="12,0,0,0" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" />
-                                </Grid>
-                            </StackPanel>
-                            <StackPanel Margin="0,12,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontSize="13" FontWeight="DemiBold" Text="Minimum Unparked Cores (%)" />
-                                    <ui:SymbolIcon Margin="6,0,0,-2" Symbol="Info20" ToolTip="Sets the minimum percentage of processor cores that Windows keeps available instead of parked." />
-                                </StackPanel>
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="33" />
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <CheckBox x:Name="cbWindowsCoreParking" />
-                                    <ui:NumberBox x:Name="nudWindowsCoreParking" Grid.Column="1" Minimum="0" Maximum="100" SmallChange="1" MaxDecimalPlaces="0" Value="{Binding ElementName=sdWindowsCoreParking, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    <Slider x:Name="sdWindowsCoreParking" Grid.Column="2" Margin="12,0,0,0" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" />
-                                </Grid>
-                            </StackPanel>
-                            <StackPanel Margin="0,12,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontSize="13" FontWeight="DemiBold" Text="Maximum Unparked Cores (%)" />
-                                    <ui:SymbolIcon Margin="6,0,0,-2" Symbol="Info20" ToolTip="Sets the maximum percentage of processor cores that Windows may keep unparked." />
-                                </StackPanel>
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="33" />
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <CheckBox x:Name="cbWindowsMaxUnparkedCores" />
-                                    <ui:NumberBox x:Name="nudWindowsMaxUnparkedCores" Grid.Column="1" Minimum="0" Maximum="100" SmallChange="1" MaxDecimalPlaces="0" Value="{Binding ElementName=sdWindowsMaxUnparkedCores, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    <Slider x:Name="sdWindowsMaxUnparkedCores" Grid.Column="2" Margin="12,0,0,0" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" />
-                                </Grid>
-                            </StackPanel>
-                        </StackPanel>
-                    </ui:CardExpander>
-                    <ui:CardControl Name="sdAsusPower"
-                        IsEnabled="True"
-                        Icon="{ui:SymbolIcon Power20}" Margin="0,8,15,0">
-                        <ui:CardControl.Header>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock
-                                        FontSize="14"
-                                        FontWeight="Medium"
-                                        Text="ASUS Power Profile" />
-                                    <TextBlock
-                                        FontSize="12"
-                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                        Text="Provides the ability to set an ASUS power profile. This will override Armoury Crate!"/>
-                                </StackPanel>
-                                <ComboBox
-                                    Grid.Column="1"
-                                    VerticalAlignment="Center" SelectedIndex="0" MinWidth="164" Name="cbxAsusPower" Height="37">
-                                    <ComboBoxItem>AC Controlled</ComboBoxItem>
-                                    <ComboBoxItem>Silent</ComboBoxItem>
-                                    <ComboBoxItem>Performance</ComboBoxItem>
-                                    <ComboBoxItem>Turbo</ComboBoxItem>
-                                </ComboBox>
 
-                            </Grid>
-                        </ui:CardControl.Header>
-                    </ui:CardControl>
-
-                    <!-- Hydro UI (Watercooler) - only visible on supported hardware -->
+                    <!-- Hydro UI - only visible on supported hardware -->
                     <ui:CardExpander Name="sdHydroUI"
                                      Visibility="Collapsed"
                                      IsEnabled="True"
@@ -746,7 +595,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0  ">
-                                    <ui:TextBlock FontTypography="Body" Text="Hydro UI (Watercooler)" />
+                                    <ui:TextBlock FontTypography="Body" Text="Hydro UI" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
@@ -1241,33 +1090,41 @@
                         </StackPanel>
                     </ui:CardExpander>
 
-                    <!-- EC Fan Control - only visible on supported hardware -->
-                    <ui:CardExpander Name="sdEcFan"
-                        Visibility="Collapsed"
-                        IsEnabled="True"
-                        IsExpanded="False"
-                        Icon="Gauge20" Margin="0,8,15,0">
+                    <!-- Fan Control - only visible on supported hardware -->
+                    <ui:CardExpander x:Name="sdEcFan"
+                                    Visibility="Collapsed"
+                                    IsEnabled="True"
+                                    IsExpanded="False"
+                                    Margin="0,8,15,0">
+                        <ui:CardExpander.Icon>
+                            <ui:SymbolIcon Symbol="Gauge24" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock
-                                        FontSize="14"
-                                        FontWeight="Medium"
-                                        Text="EC Fan Control" />
-                                    <TextBlock
-                                        FontSize="12"
-                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                        Text="Per-game fan curve control for the EC fan controller."/>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Fan Control" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Per-game fan curve control for the EC fan controller."
+                                                   TextWrapping="Wrap" />
                                 </StackPanel>
-                                <ui:ToggleSwitch Name="cbxEcFanEnabled" Grid.Column="1" VerticalAlignment="Center"
-                                    Margin="0,0,9,0"
-                                    ToolTip="Enable EC fan controls for this game"
-                                    Checked="cbxEcFanEnabled_Toggled"
-                                    Unchecked="cbxEcFanEnabled_Toggled" />
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <ui:ToggleSwitch x:Name="cbxEcFanEnabled"
+                                                     Margin="0,0,9,0"
+                                                     LabelPosition="Left"
+                                                     OnContent="On"
+                                                     OffContent="Off"
+                                                     ToolTip="Enable EC fan controls for this game"
+                                                     Checked="cbxEcFanEnabled_Toggled"
+                                                     Unchecked="cbxEcFanEnabled_Toggled" />
+                                </StackPanel>
                             </Grid>
                         </ui:CardExpander.Header>
                         <StackPanel>
@@ -1355,6 +1212,9 @@
                                 </StackPanel>
                                 <ui:ToggleSwitch Name="cbxKbEnabled" Grid.Column="1" VerticalAlignment="Center"
                                     Margin="0,0,9,0"
+                                    LabelPosition="Left"
+                                    OnContent="On"
+                                    OffContent="Off"
                                     ToolTip="Enable keyboard RGB controls for this game"
                                     Checked="cbxKbEnabled_Toggled"
                                     Unchecked="cbxKbEnabled_Toggled" />
@@ -1566,50 +1426,194 @@
                         </StackPanel>
                     </ui:CardExpander>
 
-                    <ui:CardExpander Name="sdRTSS" Visibility="Collapsed"
-                        IsEnabled="True"
-                        IsExpanded="False"
-                        Icon="{ui:SymbolIcon Pulse20}" Margin="0,8,15,0">
+                    <!-- Light Bar - only visible on supported hardware -->
+                    <ui:CardExpander x:Name="sdLightBar"
+                                    Visibility="Collapsed"
+                                    IsEnabled="True"
+                                    IsExpanded="False"
+                                    Margin="0,8,15,0">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xED39;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock
-                                        FontSize="14"
-                                        FontWeight="Medium"
-                                        Text="Static RTSS Frame Rate" />
-                                    <TextBlock
-                                        FontSize="12"
-                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                        Text="Provides the ability to set a custom RTSS frame limit."/>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Light Bar" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Per-game front light bar control."
+                                                   TextWrapping="Wrap" />
                                 </StackPanel>
-
-                                <StackPanel Orientation="Horizontal" Grid.Column="1">
-                                    <ui:ToggleSwitch Name="tsRTSS" Margin="0,0,9,0"/>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <ui:ToggleSwitch x:Name="cbxLbEnabled"
+                                                     Margin="0,0,9,0"
+                                                     LabelPosition="Left"
+                                                     OnContent="On"
+                                                     OffContent="Off"
+                                                     ToolTip="Enable Light Bar controls for this game"
+                                                     Checked="cbxLbEnabled_Toggled"
+                                                     Unchecked="cbxLbEnabled_Toggled" />
                                 </StackPanel>
                             </Grid>
                         </ui:CardExpander.Header>
-
                         <StackPanel>
-                            <StackPanel Margin="0,-8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock FontWeight="DemiBold" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}">RTSS Frame Limit (FPS)</TextBlock>
-                                    <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Controls the set FPS limit in RTSS" VerticalAlignment="Bottom" />
+                            <!-- Light Bar Power -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Power" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Turn the front light bar on or off." />
                                 </StackPanel>
-
-                                <Grid Margin="0,8,0,0">
+                                <ui:ToggleSwitch x:Name="AdpTsLightBarPower"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 IsChecked="True"
+                                                 Checked="AdpTsLightBarPower_Toggled"
+                                                 Unchecked="AdpTsLightBarPower_Toggled" />
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Color -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Color" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Choose the light bar color." />
+                                </StackPanel>
+                                <controls:ColorPickerControl x:Name="AdpLbColorPicker"
+                                                             HorizontalAlignment="Right"
+                                                             VerticalAlignment="Center"
+                                                             SelectedColor="Aqua"
+                                                             ColorChangedDelayed="AdpLbColorPicker_ColorChangedDelayed" />
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Brightness -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Brightness" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Adjust the light bar brightness level." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLbBrightnessValueText"
+                                               Width="35"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="100" />
+                                    <Slider x:Name="AdpLbBrightnessSlider"
+                                            Width="140"
+                                            Minimum="0"
+                                            Maximum="100"
+                                            Value="100"
+                                            TickFrequency="10"
+                                            IsSnapToTickEnabled="True"
+                                            IsMoveToPointEnabled="False"
+                                            TickPlacement="Both"
+                                            ValueChanged="AdpLbBrightnessSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Effect selector -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Effect" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select a lighting effect for the light bar." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <ComboBox x:Name="AdpLbEffect"
+                                              Width="180"
+                                              HorizontalAlignment="Right"
+                                              VerticalAlignment="Center"
+                                              SelectedIndex="0"
+                                              SelectionChanged="AdpLbEffect_SelectionChanged">
+                                        <ComboBoxItem>Static</ComboBoxItem>
+                                        <ComboBoxItem>Breathing</ComboBoxItem>
+                                        <ComboBoxItem>Wave</ComboBoxItem>
+                                        <ComboBoxItem>Loading</ComboBoxItem>
+                                        <ComboBoxItem>Marquee</ComboBoxItem>
+                                        <ComboBoxItem>Meteor</ComboBoxItem>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+                            <!-- Speed (hidden for Static) -->
+                            <StackPanel x:Name="AdpSpLbSpeed" Visibility="Collapsed">
+                                <!-- Divider -->
+                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="150" />
                                         <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <ui:NumberBox Name="nudRTSS" Value="{Binding ElementName=sdRTSSLim, Path=Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Maximum="999" Minimum="0" Grid.Column="0" SmallChange="2" MaxDecimalPlaces="0" />
-                                    <Slider Name="sdRTSSLim" Maximum="999" Minimum="0" Grid.Column="1" Margin="12,0,0,0" TickFrequency="2" VerticalAlignment="Center" IsSnapToTickEnabled="True" TouchDown="SizeSlider_TouchDown"/>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Speed" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Control the animation speed." />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center">
+                                        <TextBlock x:Name="AdpLbSpeedValueText"
+                                                   Width="30"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Text="5" />
+                                        <Slider x:Name="AdpLbSpeedSlider"
+                                                Width="140"
+                                                Minimum="0"
+                                                Maximum="11"
+                                                Value="5"
+                                                IsSnapToTickEnabled="True"
+                                                IsMoveToPointEnabled="False"
+                                                TickPlacement="Both"
+                                                ValueChanged="AdpLbSpeedSlider_ValueChanged" />
+                                    </StackPanel>
                                 </Grid>
                             </StackPanel>
-
                         </StackPanel>
                     </ui:CardExpander>
 

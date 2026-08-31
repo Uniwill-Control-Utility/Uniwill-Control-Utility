@@ -854,6 +854,42 @@ namespace Universal_x86_Tuning_Utility.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool AdaptiveCpuEnabled {
+            get {
+                return ((bool)(this["AdaptiveCpuEnabled"]));
+            }
+            set {
+                this["AdaptiveCpuEnabled"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool AdaptiveGpuEnabled {
+            get {
+                return ((bool)(this["AdaptiveGpuEnabled"]));
+            }
+            set {
+                this["AdaptiveGpuEnabled"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool AdaptiveLbEnabled {
+            get {
+                return ((bool)(this["AdaptiveLbEnabled"]));
+            }
+            set {
+                this["AdaptiveLbEnabled"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool isTrack {
             get {
                 return ((bool)(this["isTrack"]));

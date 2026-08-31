@@ -100,9 +100,7 @@
                                           MinWidth="150"
                                           Height="37"
                                           SelectedIndex="0"
-                                          SelectionChanged="cbxCharge_SelectionChanged">
-                                    <ComboBoxItem>None</ComboBoxItem>
-                                </ComboBox>
+                                          SelectionChanged="cbxCharge_SelectionChanged" />
                                 <ui:Button x:Name="btnChargeLoad"
                                            Width="44"
                                            Height="37"
@@ -140,9 +138,7 @@
                                           MinWidth="150"
                                           Height="37"
                                           SelectedIndex="0"
-                                          SelectionChanged="cbxDischarge_SelectionChanged">
-                                    <ComboBoxItem>None</ComboBoxItem>
-                                </ComboBox>
+                                          SelectionChanged="cbxDischarge_SelectionChanged" />
                                 <ui:Button x:Name="btnDischargeLoad"
                                            Width="44"
                                            Height="37"
@@ -180,9 +176,7 @@
                                           MinWidth="150"
                                           Height="37"
                                           SelectedIndex="0"
-                                          SelectionChanged="cbxResume_SelectionChanged">
-                                    <ComboBoxItem>None</ComboBoxItem>
-                                </ComboBox>
+                                          SelectionChanged="cbxResume_SelectionChanged" />
                                 <ui:Button x:Name="btnResumeLoad"
                                            Width="44"
                                            Height="37"

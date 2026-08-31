@@ -161,8 +161,10 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
 
                         if (statuscode == 2 || statuscode == 6 || statuscode == 7 || statuscode == 8)
                         {
-                            if (Settings.Default.acCommandString != null && Settings.Default.acCommandString != "")
+                            if (Settings.Default.acPreset != "None" && !string.IsNullOrEmpty(Settings.Default.acPreset))
                             {
+                                Settings.Default.acCommandString = PresetProfileApplier.BuildCommandString(
+                                    ResolveAutomationProfile(Settings.Default.acPreset));
                                 Settings.Default.CommandString = Settings.Default.acCommandString;
                                 Settings.Default.Save();
                                 await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset);
@@ -176,8 +178,10 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
                         }
                         else
                         {
-                            if (Settings.Default.dcCommandString != null && Settings.Default.dcCommandString != "")
+                            if (Settings.Default.dcPreset != "None" && !string.IsNullOrEmpty(Settings.Default.dcPreset))
                             {
+                                Settings.Default.dcCommandString = PresetProfileApplier.BuildCommandString(
+                                    ResolveAutomationProfile(Settings.Default.dcPreset));
                                 Settings.Default.CommandString = Settings.Default.dcCommandString;
                                 Settings.Default.Save();
                                 await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset);
@@ -490,33 +494,13 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
                     if (e.Mode == PowerModes.StatusChange)
                     {
                         await Task.Run(() => GetBatteryStatus());
-                        await Task.Run(() => PremadePresets.SetPremadePresets());
 
                         if (statuscode == 2 || statuscode == 6 || statuscode == 7 || statuscode == 8)
                         {
-                            if (Settings.Default.acCommandString != null && Settings.Default.acCommandString != "" && Settings.Default.acPreset != "None")
+                            if (Settings.Default.acPreset != "None" && !string.IsNullOrEmpty(Settings.Default.acPreset))
                             {
-                                if (Settings.Default.acPreset.Contains("PM - Eco"))
-                                {
-                                    Settings.Default.premadePreset = 0;
-                                    Settings.Default.acCommandString = PremadePresets.EcoPreset;
-                                }
-                                else if (Settings.Default.acPreset.Contains("PM - Bal"))
-                                {
-                                    Settings.Default.premadePreset = 1;
-                                    Settings.Default.acCommandString = PremadePresets.BalPreset;
-                                }
-                                else if (Settings.Default.acPreset.Contains("PM - Perf"))
-                                {
-                                    Settings.Default.premadePreset = 2;
-                                    Settings.Default.acCommandString = PremadePresets.PerformancePreset;
-                                }
-                                else if (Settings.Default.acPreset.Contains("PM - Ext"))
-                                {
-                                    Settings.Default.premadePreset = 3;
-                                    Settings.Default.acCommandString = PremadePresets.ExtremePreset;
-                                }
-
+                                Settings.Default.acCommandString = PresetProfileApplier.BuildCommandString(
+                                    ResolveAutomationProfile(Settings.Default.acPreset));
                                 Settings.Default.CommandString = Settings.Default.acCommandString;
                                 Settings.Default.Save();
                                 await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset);
@@ -527,28 +511,10 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
                         }
                         else
                         {
-                            if (Settings.Default.dcCommandString != null && Settings.Default.dcCommandString != "" && Settings.Default.dcPreset != "None")
+                            if (Settings.Default.dcPreset != "None" && !string.IsNullOrEmpty(Settings.Default.dcPreset))
                             {
-                                if (Settings.Default.dcPreset.Contains("PM - Eco"))
-                                {
-                                    Settings.Default.premadePreset = 0;
-                                    Settings.Default.dcCommandString = PremadePresets.EcoPreset;
-                                }
-                                else if (Settings.Default.dcPreset.Contains("PM - Bal"))
-                                {
-                                    Settings.Default.premadePreset = 1;
-                                    Settings.Default.dcCommandString = PremadePresets.BalPreset;
-                                }
-                                else if (Settings.Default.dcPreset.Contains("PM - Perf"))
-                                {
-                                    Settings.Default.premadePreset = 2;
-                                    Settings.Default.dcCommandString = PremadePresets.PerformancePreset;
-                                }
-                                else if (Settings.Default.dcPreset.Contains("PM - Ext"))
-                                {
-                                    Settings.Default.premadePreset = 3;
-                                    Settings.Default.dcCommandString = PremadePresets.ExtremePreset;
-                                }
+                                Settings.Default.dcCommandString = PresetProfileApplier.BuildCommandString(
+                                    ResolveAutomationProfile(Settings.Default.dcPreset));
                                 Settings.Default.CommandString = Settings.Default.dcCommandString;
                                 Settings.Default.Save();
                                 await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset);
@@ -561,28 +527,10 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
 
                     if (e.Mode == PowerModes.Resume)
                     {
-                        if (Settings.Default.resumeCommandString != null && Settings.Default.resumeCommandString != "" && Settings.Default.resumePreset != "None")
+                        if (Settings.Default.resumePreset != "None" && !string.IsNullOrEmpty(Settings.Default.resumePreset))
                         {
-                            if (Settings.Default.resumePreset.Contains("PM - Eco"))
-                            {
-                                Settings.Default.premadePreset = 0;
-                                Settings.Default.resumeCommandString = PremadePresets.EcoPreset;
-                            }
-                            else if (Settings.Default.resumePreset.Contains("PM - Bal"))
-                            {
-                                Settings.Default.premadePreset = 1;
-                                Settings.Default.resumeCommandString = PremadePresets.BalPreset;
-                            }
-                            else if (Settings.Default.resumePreset.Contains("PM - Perf"))
-                            {
-                                Settings.Default.premadePreset = 2;
-                                Settings.Default.resumeCommandString = PremadePresets.PerformancePreset;
-                            }
-                            else if (Settings.Default.resumePreset.Contains("PM - Ext"))
-                            {
-                                Settings.Default.premadePreset = 3;
-                                Settings.Default.resumeCommandString = PremadePresets.ExtremePreset;
-                            }
+                            Settings.Default.resumeCommandString = PresetProfileApplier.BuildCommandString(
+                                ResolveAutomationProfile(Settings.Default.resumePreset));
                             Settings.Default.CommandString = Settings.Default.resumeCommandString;
                             Settings.Default.Save();
                             _ = TranslatePresetAsync(Settings.Default.resumeCommandString, Settings.Default.resumePreset);
@@ -826,19 +774,36 @@ namespace Universal_x86_Tuning_Utility.Views.Windows
             return new PresetManager(Settings.Default.Path + fileName);
         }
 
-        private static Task TranslatePresetAsync(string commands, string? configuredName)
+        private static async Task TranslatePresetAsync(string commands, string? configuredName)
         {
-            var context = configuredName switch
+            string profileName = ResolveAutomationProfile(configuredName);
+            if (string.IsNullOrEmpty(profileName))
             {
-                string value when value.Contains("PM - Eco", StringComparison.Ordinal) => ("Eco Preset", true),
-                string value when value.Contains("PM - Bal", StringComparison.Ordinal) => ("Balanced Preset", true),
-                string value when value.Contains("PM - Perf", StringComparison.Ordinal) => ("Performance Preset", true),
-                string value when value.Contains("PM - Ext", StringComparison.Ordinal) => ("Extreme Preset", true),
-                string value when !string.IsNullOrWhiteSpace(value) && !string.Equals(value, "None", StringComparison.OrdinalIgnoreCase) => (value, false),
-                _ => ((string?)null, false)
-            };
+                // Unknown profile — fall back to raw command execution
+                await RyzenAdj_To_UXTU.TranslateAsync(commands, appliedName: configuredName, localizeAppliedName: false);
+                return;
+            }
 
-            return RyzenAdj_To_UXTU.TranslateAsync(commands, appliedName: context.Item1, localizeAppliedName: context.Item2);
+            // Full apply: RyzenAdj + V-F curve (Custom) + EC limits (AMD)
+            await PresetProfileApplier.ApplyProfileAsync(profileName, PresetProfileApplier.DisplayName(profileName));
+        }
+
+        /// <summary>
+        /// Maps a saved preset display name (e.g. "Office Preset") back to the profile key ("Office").
+        /// </summary>
+        private static string ResolveAutomationProfile(string? presetName)
+        {
+            if (string.IsNullOrEmpty(presetName))
+                return string.Empty;
+
+            return presetName switch
+            {
+                string s when s.Contains("Office", StringComparison.OrdinalIgnoreCase) => "Office",
+                string s when s.Contains("Gaming", StringComparison.OrdinalIgnoreCase) => "Gaming",
+                string s when s.Contains("Turbo", StringComparison.OrdinalIgnoreCase) => "Turbo",
+                string s when s.Contains("Custom", StringComparison.OrdinalIgnoreCase) => "Custom",
+                _ => string.Empty
+            };
         }
 
         private void RefreshTrayPremadePresetChecks()

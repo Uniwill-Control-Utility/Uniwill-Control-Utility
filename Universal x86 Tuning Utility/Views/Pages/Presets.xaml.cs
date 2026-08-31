@@ -361,8 +361,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
-                int cpuMax = limits?.CpuPl1Sustained ?? 160;
-
                 string officeCpu = officeProfile != null
                     ? $"PL1: {officeProfile.CpuPl1}W | PL2: {officeProfile.CpuPl2}W"
                     : "PL1: 25W | PL2: 35W";
@@ -377,6 +375,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     ? $"TGP: {gamingProfile.GpuTgp}W | Dynamic Boost: Off"
                     : "TGP: 150W | Dynamic Boost: Off";
 
+                string turboCpu = turboProfile != null
+                    ? $"PL1: {turboProfile.CpuPl1}W | PL2: {turboProfile.CpuPl2}W"
+                    : "PL1: 160W | PL2: 200W";
                 string turboGpu = turboProfile != null
                     ? $"TGP: {turboProfile.GpuTgp}W | Dynamic Boost: On (+{turboProfile.DynamicBoostOffset}W)"
                     : "TGP: 150W | Dynamic Boost: On (+25W)";
@@ -384,7 +385,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 btnOffice.ToolTip = CreateTooltip("Office", "CPU Power Limits", officeCpu, "GPU Power Limits", officeGpu);
                 btnGaming.ToolTip = CreateTooltip("Gaming", "CPU Power Limits", gamingCpu, "GPU Power Limits", gamingGpu);
                 btnTurbo.ToolTip = CreateTooltip("Turbo",
-                    "CPU Power Limits", $"PL1: {cpuMax}W | PL2: {cpuMax}W{coolingLabel}",
+                    "CPU Power Limits", turboCpu,
                     "GPU Power Limits", turboGpu);
 
                 btnCustom.ToolTip = "Apply your own custom power settings using the sliders below.";

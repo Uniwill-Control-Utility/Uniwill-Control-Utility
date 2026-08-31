@@ -1,44 +1,33 @@
-ï»¿using GameLib.Core;
+using GameLib.Core;
 using GameLib;
 using LibreHardwareMonitor.Hardware;
-using RTSSSharedMemoryNET;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.Tracing;
-using System.DirectoryServices.ActiveDirectory;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
-using System.Windows.Shapes;
 using System.Windows.Threading;
 using Universal_x86_Tuning_Utility.Properties;
 using Universal_x86_Tuning_Utility.Scripts;
-using Universal_x86_Tuning_Utility.Scripts.Adaptive;
 using Universal_x86_Tuning_Utility.Models;
 using Universal_x86_Tuning_Utility.Scripts.Misc;
 using Universal_x86_Tuning_Utility.Services;
-using static System.Net.Mime.MediaTypeNames;
+using Universal_x86_Tuning_Utility.Scripts.GPUs.NVIDIA;
 using GameLib.Plugin.Steam.Model;
-using Windows.ApplicationModel.Search;
 using Windows.Gaming.Preview.GamesEnumeration;
 using System.Management;
-using RyzenSmu;
-using Universal_x86_Tuning_Utility.Scripts.GPUs.AMD;
-using static Universal_x86_Tuning_Utility.Scripts.Game_Manager;
 using System.ComponentModel;
+using static Universal_x86_Tuning_Utility.Scripts.Game_Manager;
 
 namespace Universal_x86_Tuning_Utility.Views.Pages
 {
@@ -78,15 +67,23 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             cbxBs2ProEnabled.IsChecked = Settings.Default.AdaptiveBs2ProEnabled;
             cbxWcEnabled.IsChecked = Settings.Default.AdaptiveWcEnabled;
             cbxKbEnabled.IsChecked = Settings.Default.AdaptiveKeyboardEnabled;
-
-            if (!Settings.Default.isASUS) sdAsusPower.Visibility = Visibility.Collapsed;
+            cbxCpuEnabled.IsChecked = Settings.Default.AdaptiveCpuEnabled;
+            cbxGpuEnabled.IsChecked = Settings.Default.AdaptiveGpuEnabled;
+            cbxLbEnabled.IsChecked = Settings.Default.AdaptiveLbEnabled;
 
             sdHydroUI.Visibility = WaterCoolerHardwareDetector.IsSupportedHardware() ? Visibility.Visible : Visibility.Collapsed;
             UpdateFlydigiCardVisibility();
 
+            // Show/hide AMD vs Intel CPU controls
+            UpdateAdpCpuUI();
+
+            // Show/hide GPU card based on NVIDIA availability
+            bool hasNvidia = !string.IsNullOrEmpty(NvTuning.GetGpuName());
+            sdGpuSettings.Visibility = hasNvidia ? Visibility.Visible : Visibility.Collapsed;
+
             // Show/hide EC Fan card based on Uniwill EC availability.
             // Run the hardware probe on a background thread to avoid blocking
-            // the initial page render â€” EC register reads can take seconds.
+            // the initial page render — EC register reads can take seconds.
             _ = Task.Run(() =>
             {
                 bool uniwillAvailable = false;
@@ -102,6 +99,23 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     if (uniwillAvailable)
                         sdEcFan.Visibility = Visibility.Visible;
                 });
+            });
+
+            // Probe Light Bar availability and open HID device
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    _hidService = new KeyboardHidService();
+                    bool lbAvailable = _hidService.Open() && _hidService.IsLightBarAvailable;
+
+                    Dispatcher.Invoke(() =>
+                    {
+                        if (lbAvailable)
+                            sdLightBar.Visibility = Visibility.Visible;
+                    });
+                }
+                catch { /* HID not available */ }
             });
         }
 
@@ -126,7 +140,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             bool isBs1 = deviceType == ConnectedDeviceType.BS1;
             tbBs2ProTitle.Text = "Flydigi Cooler";
 
-            // BS1 has no RGB â€” hide the RGB divider and all RGB controls
+            // BS1 has no RGB — hide the RGB divider and all RGB controls
             if (Bs2ProRgbDivider != null)
                 Bs2ProRgbDivider.Visibility = isBs1 ? Visibility.Collapsed : Visibility.Visible;
             if (spBs2ProRgbMode != null)
@@ -137,7 +151,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             if (isBs1)
             {
-                // BS1 supports Curve (Auto) via app-localized Bs1SmartControl â€” keep all 3 fan modes.
+                // BS1 supports Curve (Auto) via app-localized Bs1SmartControl — keep all 3 fan modes.
                 // BS1 max RPM is 3000
                 nudBs2ProRpm.Maximum = 3000;
                 sdBs2ProRpm.Maximum = 3000;
@@ -188,29 +202,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 radeonGpuCount = inventory.RadeonCount;
                 nvidiaGpuCount = inventory.NvidiaCount;
 
-                if (radeonGpuCount <= 0)
-                {
-                    sdTBOiGPU.Visibility = Visibility.Collapsed;
-                    sdADLX.Visibility = Visibility.Collapsed;
-                }
-
-                if (nvidiaGpuCount < 1) sdNVIDIA.Visibility = Visibility.Collapsed;
-
-                bool watercoolerActive = App.GetService<WaterCoolerService>().IsConnected
-                    || App.GetService<FlydigiCoolerService>().IsConnected;
-                nudPowerLimit.Value = Family.GetRecommendedPowerLimit(watercoolerActive);
-                nudMaxGfxClk.Value = 1900;
-                nudMinGfxClk.Value = 400;
-                nudTemp.Value = 95;
-                nudMinCpuClk.Value = 1500;
-                nudNVMaxCore.Value = 4000;
-                nudWindowsMinState.Value = 5;
-                nudWindowsMaxState.Value = 100;
-                nudWindowsMaxFrequency.Value = 5000;
-                nudWindowsEpp.Value = 50;
-                nudWindowsCoreParking.Value = 100;
-                nudWindowsMaxUnparkedCores.Value = 100;
-                cbxWindowsBoostMode.SelectedIndex = 0;
                 tsAutoSwitch.IsChecked = true;
 
                 await Task.Run(() => Game_Manager.installedGames = Game_Manager.syncGame_Library(true));
@@ -235,46 +226,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     {
                         AdaptivePreset preset = new AdaptivePreset
                         {
-                            Temp = (int)nudTemp.Value,
-                            Power = (int)nudPowerLimit.Value,
-                            CO = (int)nudCurve.Value,
-                            minGFX = (int)nudMinGfxClk.Value,
-                            MaxGFX = (int)nudMaxGfxClk.Value,
-                            minCPU = (int)nudMinCpuClk.Value,
-                            isCO = (bool)cbCurve.IsChecked,
-                            isGFX = (bool)tsTBOiGPU.IsChecked,
-                            rsr = (int)nudRSR.Value,
-                            boost = (int)nudBoost.Value,
-                            imageSharp = (int)nudImageSharp.Value,
-                            isRadeonGraphics = (bool)tsRadeonGraph.IsChecked,
-                            isRSR = (bool)cbRSR.IsChecked,
-                            isBoost = (bool)cbBoost.IsChecked,
-                            isAntiLag = (bool)cbAntiLag.IsChecked,
-                            isImageSharp = (bool)cbImageSharp.IsChecked,
-                            isSync = (bool)cbSync.IsChecked,
-                            isNVIDIA = (bool)tsNV.IsChecked,
-                            nvMaxCoreClk = (int)nudNVMaxCore.Value,
-                            nvCoreClk = (int)nudNVCore.Value,
-                            nvMemClk = (int)nudNVMem.Value,
-                            asusPowerProfile = (int)cbxAsusPower.SelectedIndex,
-                            windowsBoostMode = cbxWindowsBoostMode.SelectedIndex,
-                            isWindowsMinState = (bool)cbWindowsMinState.IsChecked,
-                            windowsMinState = (int)nudWindowsMinState.Value,
-                            isWindowsMaxState = (bool)cbWindowsMaxState.IsChecked,
-                            windowsMaxState = (int)nudWindowsMaxState.Value,
-                            isWindowsMaxFrequency = (bool)cbWindowsMaxFrequency.IsChecked,
-                            windowsMaxFrequency = (int)nudWindowsMaxFrequency.Value,
-                            isWindowsEpp = (bool)cbWindowsEpp.IsChecked,
-                            windowsEpp = (int)nudWindowsEpp.Value,
-                            isWindowsCoreParking = (bool)cbWindowsCoreParking.IsChecked,
-                            windowsCoreParking = (int)nudWindowsCoreParking.Value,
-                            isWindowsMaxUnparkedCores = (bool)cbWindowsMaxUnparkedCores.IsChecked,
-                            windowsMaxUnparkedCores = (int)nudWindowsMaxUnparkedCores.Value,
-                            isMag = (bool)tsUXTUSR.IsChecked,
-                            isVsync = (bool)cbVSync.IsChecked,
-                            isRecap = (bool)cbAutoCap.IsChecked,
-                            Sharpness = (int)nudSharp.Value,
-                            ResScaleIndex = (int)cbxResScale.SelectedIndex,
                             WcEnabled = true,
                             WcPumpVoltage = "V7",
                             WcFanSpeed = "Percent50",
@@ -290,22 +241,44 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             Bs2ProRgbG = 0,
                             Bs2ProRgbB = 255,
                             Bs2ProBrightness = 100,
+                            Bs2ProRgbSpeed = 5,
+                            Bs2ProCurvePointsJson = string.Empty,
                             EcFanEnabled = true,
                             EcFanUnifiedMode = false,
                             EcFanPreset = "Balanced",
                             EcFanCpuPreset = "Balanced",
                             EcFanGpuPreset = "Balanced",
-                            isAutoSwitch = (bool)tsAutoSwitch.IsChecked
+                            EcFanCustomDuties = null,
+                            EcFanCpuCustomDuties = null,
+                            EcFanGpuCustomDuties = null,
+                            isAutoSwitch = (bool)tsAutoSwitch.IsChecked,
+                            // CPU defaults
+                            CpuSustained = 75,
+                            CpuBoost = 85,
+                            CpuTjMax = 95,
+                            CpuCo = 0,
+                            CpuPl1 = 45,
+                            CpuPl2 = 60,
+                            CpuUndervolt = 0,
+                            // GPU defaults
+                            GpuTgp = 150,
+                            GpuDynamicBoost = false,
+                            GpuDbOffset = 5,
+                            GpuCoreClock = 0,
+                            GpuMemClock = 0,
+                            GpuVfCurveName = string.Empty,
+                            // Light Bar defaults
+                            LbEnabled = false,
+                            LbPower = true,
+                            LbColorR = 0,
+                            LbColorG = 255,
+                            LbColorB = 255,
+                            LbBrightness = 100,
+                            LbEffect = 0,
+                            LbSpeed = 5
                         };
                         adaptivePresetManager.SavePreset(item.gameName, preset);
                     }
-
-                    if (Family.TYPE == Family.ProcessorType.Intel)
-                    {
-                        spCO.Visibility = Visibility.Collapsed;
-                        sdTBOiGPU.Visibility = Visibility.Collapsed;
-                    }
-
                 }
 
                 foreach (var item in new System.Management.ManagementObjectSearcher("Select * from Win32_Processor").Get()) coreCount += int.Parse(item["NumberOfCores"].ToString());
@@ -403,11 +376,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             "ForegroundStaging"          // Foreground staging
         };
 
-        private void SizeSlider_TouchDown(object sender, TouchEventArgs e)
-        {
-            // Mark event as handled
-            e.Handled = true;
-        }
         bool start = false;
         private void btnStart_Click(object sender, RoutedEventArgs e)
         {
@@ -482,7 +450,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             if (IsScrollBarVisible(mainScroll)) mainCon.Margin = new Thickness(0, 0, -12, 0);
             else mainCon.Margin = new Thickness(0, 0, 0, 0);
         }
-        int i = 0;
 
         private async void adaptive_Tick(object sender, EventArgs e)
         {
@@ -540,57 +507,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                 if (myPreset != null)
                 {
-                    // Capture current DeviceApplier override state so we can reconcile
-                    // it with the preset's per-profile values below without firing Toggled.
-                    bool prevBs2ProEnabled = (bool)cbxBs2ProEnabled.IsChecked;
-                    bool prevWcEnabled = (bool)cbxWcEnabled.IsChecked;
                     tsAutoSwitch.IsChecked = myPreset.isAutoSwitch;
-
-                    nudTemp.Value = myPreset.Temp;
-                    nudPowerLimit.Value = myPreset.Power;
-                    nudCurve.Value = myPreset.CO;
-                    nudMaxGfxClk.Value = myPreset.MaxGFX;
-                    nudMinGfxClk.Value = myPreset.minGFX;
-                    nudMinCpuClk.Value = myPreset.minCPU;
-
-                    cbCurve.IsChecked = myPreset.isCO;
-                    tsTBOiGPU.IsChecked = myPreset.isGFX;
-
-                    tsRadeonGraph.IsChecked = myPreset.isRadeonGraphics;
-                    cbAntiLag.IsChecked = myPreset.isAntiLag;
-                    cbRSR.IsChecked = myPreset.isRSR;
-                    cbBoost.IsChecked = myPreset.isBoost;
-                    cbImageSharp.IsChecked = myPreset.isImageSharp;
-                    cbSync.IsChecked = myPreset.isSync;
-                    nudRSR.Value = myPreset.rsr;
-                    nudBoost.Value = myPreset.boost;
-                    nudImageSharp.Value = myPreset.imageSharp;
-
-                    tsNV.IsChecked = myPreset.isNVIDIA;
-                    nudNVMaxCore.Value = myPreset.nvMaxCoreClk;
-                    nudNVCore.Value = myPreset.nvCoreClk;
-                    nudNVMem.Value = myPreset.nvMemClk;
-
-                    cbxAsusPower.SelectedIndex = myPreset.asusPowerProfile;
-                    cbxWindowsBoostMode.SelectedIndex = myPreset.windowsBoostMode;
-                    cbWindowsMinState.IsChecked = myPreset.isWindowsMinState;
-                    nudWindowsMinState.Value = myPreset.windowsMinState;
-                    cbWindowsMaxState.IsChecked = myPreset.isWindowsMaxState;
-                    nudWindowsMaxState.Value = myPreset.windowsMaxState;
-                    cbWindowsMaxFrequency.IsChecked = myPreset.isWindowsMaxFrequency;
-                    nudWindowsMaxFrequency.Value = myPreset.windowsMaxFrequency;
-                    cbWindowsEpp.IsChecked = myPreset.isWindowsEpp;
-                    nudWindowsEpp.Value = myPreset.windowsEpp;
-                    cbWindowsCoreParking.IsChecked = myPreset.isWindowsCoreParking;
-                    nudWindowsCoreParking.Value = myPreset.windowsCoreParking;
-                    cbWindowsMaxUnparkedCores.IsChecked = myPreset.isWindowsMaxUnparkedCores;
-                    nudWindowsMaxUnparkedCores.Value = myPreset.windowsMaxUnparkedCores;
-
-                    tsUXTUSR.IsChecked = myPreset.isMag;
-                    cbVSync.IsChecked = myPreset.isVsync;
-                    cbAutoCap.IsChecked = myPreset.isRecap;
-                    nudSharp.Value = myPreset.Sharpness;
-                    cbxResScale.SelectedIndex = myPreset.ResScaleIndex;
 
                     // Watercooler
                     cbxWcPumpVoltage.SelectedIndex = GetPumpVoltageIndex(myPreset.WcPumpVoltage);
@@ -608,7 +525,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     if (Enum.TryParse<RgbColor>(myPreset.WcRgbColor, true, out var rcLoad))
                         cbxWcRgbColor.SelectedIndex = GetRgbColorIndex(rcLoad);
 
-                    // BS2 Pro â€” guard: CardExpander content is null until expanded
+                    // BS2 Pro — guard: CardExpander content is null until expanded
                     if (cbxBs2ProFanMode is not null)
                     {
                         cbxBs2ProFanMode.SelectedIndex = GetBs2ProFanModeIndex(myPreset.Bs2ProFanMode);
@@ -616,6 +533,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         cbxBs2ProGear.SelectedIndex = Math.Clamp(myPreset.Bs2ProGear - 1, 0, 3);
                         nudBs2ProRpm.Value = Math.Clamp((int)myPreset.Bs2ProRpm, 1300, 4000);
                         cbxBs2ProCurve.SelectedIndex = GetBs2ProCurveIndex(myPreset.Bs2ProCurveProfileId);
+
+                        // Gap 3: Restore Flydigi custom curve points per-game
+                        ApplyBs2ProCurvePoints(myPreset.Bs2ProCurvePointsJson);
 
                         cbxBs2ProRgbMode.SelectedIndex = GetBs2ProRgbModeIndex(myPreset.Bs2ProRgbMode);
                         UpdateBs2ProRgbUI();
@@ -625,6 +545,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         Bs2ProRgbColorPicker.SelectedColor = Color.FromRgb(myPreset.Bs2ProRgbR, myPreset.Bs2ProRgbG, myPreset.Bs2ProRgbB);
                         sliderBs2ProBrightness.Value = myPreset.Bs2ProBrightness;
                         Bs2ProRgbBrightnessValueText.Text = myPreset.Bs2ProBrightness.ToString();
+                        // Gap 2: Restore Flydigi RGB speed per-game
+                        if (sliderBs2ProRgbSpeed != null)
+                            sliderBs2ProRgbSpeed.Value = myPreset.Bs2ProRgbSpeed;
                         int rpm = Math.Clamp((int)myPreset.Bs2ProRpm, 1300, 4000);
                         Bs2ProRpmValueText.Text = rpm.ToString();
                         sdBs2ProRpm.Value = rpm;
@@ -638,6 +561,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         cbxEcFanPreset.SelectedIndex = GetEcFanPresetIndex(myPreset.EcFanPreset);
                         cbxEcFanCpuPreset.SelectedIndex = GetEcFanPresetIndex(myPreset.EcFanCpuPreset);
                         cbxEcFanGpuPreset.SelectedIndex = GetEcFanPresetIndex(myPreset.EcFanGpuPreset);
+                        // Gap 1: Restore EC Fan custom curves per-game
+                        ApplyEcFanCustomDuties(myPreset.EcFanPreset, myPreset.EcFanCustomDuties,
+                            myPreset.EcFanCpuPreset, myPreset.EcFanCpuCustomDuties,
+                            myPreset.EcFanGpuPreset, myPreset.EcFanGpuCustomDuties);
                         UpdateEcFanModeUI();
                     }
 
@@ -669,13 +596,59 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
                     // Push the preset's per-key colors to the global keyboard settings
                     // so that update() picks them up when in per-key mode. Only do this
-                    // when keyboard override is active â€” don't overwrite the user's
+                    // when keyboard override is active — don't overwrite the user's
                     // own per-key colors with stale preset data.
                     if (!string.IsNullOrEmpty(myPreset.KbPerKeyColors) && _deviceApplier?.IsKeyboardOverridden == true)
                     {
                         var kbSettings = KeyboardSettingsService.Load();
                         kbSettings.PerKeyColors = myPreset.KbPerKeyColors;
                         KeyboardSettingsService.Save(kbSettings);
+                    }
+
+                    // CPU Settings
+                    if (Family.TYPE == Family.ProcessorType.Amd_Apu)
+                    {
+                        AdpSdSustained.Value = Math.Clamp(myPreset.CpuSustained, 5, 255);
+                        AdpSdBoost.Value = Math.Clamp(myPreset.CpuBoost, 5, 255);
+                        AdpSdTjMax.Value = Math.Clamp(myPreset.CpuTjMax, 70, 105);
+                        AdpSdCoAll.Value = Math.Clamp(myPreset.CpuCo, -50, 0);
+                    }
+                    else if (Family.TYPE == Family.ProcessorType.Intel)
+                    {
+                        AdpSdIntelPl1.Value = Math.Clamp(myPreset.CpuPl1, 5, 400);
+                        AdpSdIntelPl2.Value = Math.Clamp(myPreset.CpuPl2, 5, 400);
+                        AdpSdIntelUndervolt.Value = Math.Clamp(myPreset.CpuUndervolt, -150, 0);
+                    }
+
+                    // GPU Settings
+                    if (sdGpuSettings.Visibility == Visibility.Visible)
+                    {
+                        AdpSdNvPower.Value = Math.Clamp(myPreset.GpuTgp, 0, 150);
+                        AdpTogDynamicBoost.IsChecked = myPreset.GpuDynamicBoost;
+                        AdpSdNvDbOffset.Value = Math.Clamp(myPreset.GpuDbOffset, 0, 25);
+                        AdpSdNvCore.Value = Math.Clamp(myPreset.GpuCoreClock, -1000, 1000);
+                        AdpSdNvMem.Value = Math.Clamp(myPreset.GpuMemClock, -1000, 2000);
+                        // Show/hide Dynamic Boost offset based on toggle
+                        AdpSpNvDbOffset.Visibility = myPreset.GpuDynamicBoost ? Visibility.Visible : Visibility.Collapsed;
+                        // Reset user-touched flag when loading preset — start fresh
+                        _adpUserTouchedCoreSlider = false;
+                        // Gap 4: Track which curve this profile wants (apply deferred to update() loop)
+                        _adpActiveCurveName = myPreset.GpuVfCurveName;
+                        updateAdpCoreLabel();
+                    }
+
+                    // Light Bar Settings
+                    if (sdLightBar.Visibility == Visibility.Visible)
+                    {
+                        AdpTsLightBarPower.IsChecked = myPreset.LbPower;
+                        AdpLbColorPicker.SelectedColor = Color.FromRgb(myPreset.LbColorR, myPreset.LbColorG, myPreset.LbColorB);
+                        AdpLbBrightnessSlider.Value = Math.Clamp(myPreset.LbBrightness, 0, 100);
+                        AdpLbBrightnessValueText.Text = Math.Clamp(myPreset.LbBrightness, 0, 100).ToString();
+                        AdpLbEffect.SelectedIndex = Math.Clamp(myPreset.LbEffect, 0, 5);
+                        AdpLbSpeedSlider.Value = Math.Clamp(myPreset.LbSpeed, 0, 11);
+                        AdpLbSpeedValueText.Text = Math.Clamp(myPreset.LbSpeed, 0, 11).ToString();
+                        // Show/hide speed control (hidden for Static)
+                        AdpSpLbSpeed.Visibility = myPreset.LbEffect != 0 ? Visibility.Visible : Visibility.Collapsed;
                     }
 
                     // Apply the preset's per-profile override flags only when resetTracking
@@ -690,12 +663,21 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             cbxWcEnabled.IsChecked = myPreset.WcEnabled;
                         if (cbxKbEnabled.IsChecked != myPreset.KbEnabled)
                             cbxKbEnabled.IsChecked = myPreset.KbEnabled;
+                        if (cbxCpuEnabled.IsChecked != myPreset.CpuEnabled)
+                            cbxCpuEnabled.IsChecked = myPreset.CpuEnabled;
+                        if (cbxGpuEnabled.IsChecked != myPreset.GpuEnabled)
+                            cbxGpuEnabled.IsChecked = myPreset.GpuEnabled;
+                        if (cbxLbEnabled.IsChecked != myPreset.LbEnabled)
+                            cbxLbEnabled.IsChecked = myPreset.LbEnabled;
 
                         // Sync global settings to the active preset's override state so that
                         // App.xaml.cs startup restoration reads the correct values.
                         Settings.Default.AdaptiveBs2ProEnabled = myPreset.Bs2ProEnabled;
                         Settings.Default.AdaptiveWcEnabled = myPreset.WcEnabled;
                         Settings.Default.AdaptiveKeyboardEnabled = myPreset.KbEnabled;
+                        Settings.Default.AdaptiveCpuEnabled = myPreset.CpuEnabled;
+                        Settings.Default.AdaptiveGpuEnabled = myPreset.GpuEnabled;
+                        Settings.Default.AdaptiveLbEnabled = myPreset.LbEnabled;
                         Settings.Default.Save();
                     }
 
@@ -733,6 +715,32 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                         lastKbRestColorB = 0;
                         lastKbMultiColors = "";
                         lastKbDirection = "";
+
+                        // CPU tracking
+                        lastCpuSustained = 0;
+                        lastCpuBoost = 0;
+                        lastCpuTjMax = 0;
+                        lastCpuCo = 0;
+                        lastCpuPl1 = 0;
+                        lastCpuPl2 = 0;
+                        lastCpuUndervolt = 0;
+
+                        // GPU tracking
+                        lastGpuTgp = 0;
+                        lastGpuDynamicBoost = false;
+                        lastGpuDbOffset = 0;
+                        lastGpuCoreClock = 0;
+                        lastGpuMemClock = 0;
+                        lastGpuVfCurveName = string.Empty;
+
+                        // Light Bar tracking
+                        lastLbPower = false;
+                        lastLbColorR = 0;
+                        lastLbColorG = 0;
+                        lastLbColorB = 0;
+                        lastLbBrightness = 0;
+                        lastLbEffect = 0;
+                        lastLbSpeed = 0;
                     }
                     // When resetTracking is false (Page_Loaded, game detection), leave
                     // tracking vars unchanged so update() won't re-send device commands
@@ -755,46 +763,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             {
                 AdaptivePreset preset = new AdaptivePreset
                 {
-                    Temp = (int)nudTemp.Value,
-                    Power = (int)nudPowerLimit.Value,
-                    CO = (int)nudCurve.Value,
-                    minGFX = (int)nudMinGfxClk.Value,
-                    MaxGFX = (int)nudMaxGfxClk.Value,
-                    minCPU = (int)nudMinCpuClk.Value,
-                    isCO = (bool)cbCurve.IsChecked,
-                    isGFX = (bool)tsTBOiGPU.IsChecked,
-                    rsr = (int)nudRSR.Value,
-                    boost = (int)nudBoost.Value,
-                    imageSharp = (int)nudImageSharp.Value,
-                    isRadeonGraphics = (bool)tsRadeonGraph.IsChecked,
-                    isRSR = (bool)cbRSR.IsChecked,
-                    isBoost = (bool)cbBoost.IsChecked,
-                    isAntiLag = (bool)cbAntiLag.IsChecked,
-                    isImageSharp = (bool)cbImageSharp.IsChecked,
-                    isSync = (bool)cbSync.IsChecked,
-                    isNVIDIA = (bool)tsNV.IsChecked,
-                    nvMaxCoreClk = (int)nudNVMaxCore.Value,
-                    nvCoreClk = (int)nudNVCore.Value,
-                    nvMemClk = (int)nudNVMem.Value,
-                    asusPowerProfile = (int)cbxAsusPower.SelectedIndex,
-                    windowsBoostMode = cbxWindowsBoostMode.SelectedIndex,
-                    isWindowsMinState = (bool)cbWindowsMinState.IsChecked,
-                    windowsMinState = (int)nudWindowsMinState.Value,
-                    isWindowsMaxState = (bool)cbWindowsMaxState.IsChecked,
-                    windowsMaxState = (int)nudWindowsMaxState.Value,
-                    isWindowsMaxFrequency = (bool)cbWindowsMaxFrequency.IsChecked,
-                    windowsMaxFrequency = (int)nudWindowsMaxFrequency.Value,
-                    isWindowsEpp = (bool)cbWindowsEpp.IsChecked,
-                    windowsEpp = (int)nudWindowsEpp.Value,
-                    isWindowsCoreParking = (bool)cbWindowsCoreParking.IsChecked,
-                    windowsCoreParking = (int)nudWindowsCoreParking.Value,
-                    isWindowsMaxUnparkedCores = (bool)cbWindowsMaxUnparkedCores.IsChecked,
-                    windowsMaxUnparkedCores = (int)nudWindowsMaxUnparkedCores.Value,
-                    isMag = (bool)tsUXTUSR.IsChecked,
-                    isVsync = (bool)cbVSync.IsChecked,
-                    isRecap = (bool)cbAutoCap.IsChecked,
-                    Sharpness = (int)nudSharp.Value,
-                    ResScaleIndex = (int)cbxResScale.SelectedIndex,
                     WcEnabled = (bool)cbxWcEnabled.IsChecked,
                     WcPumpVoltage = GetPumpVoltageFromIndex(cbxWcPumpVoltage.SelectedIndex).ToString(),
                     WcFanSpeed = GetFanSpeedFromIndex(cbxWcFanSpeed.SelectedIndex).ToString(),
@@ -805,16 +773,27 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     Bs2ProGear = cbxBs2ProGear.SelectedIndex + 1,
                     Bs2ProRpm = (ushort)Math.Clamp((int)nudBs2ProRpm.Value, 1300, 4000),
                     Bs2ProCurveProfileId = GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex),
+                    // Gap 3: Save Flydigi custom curve points per-game
+                    Bs2ProCurvePointsJson = GetBs2ProCurvePointsJson(),
                     Bs2ProRgbMode = GetBs2ProRgbModeFromIndex(cbxBs2ProRgbMode.SelectedIndex),
                     Bs2ProRgbR = (byte)nudBs2ProRgbR.Value,
                     Bs2ProRgbG = (byte)nudBs2ProRgbG.Value,
                     Bs2ProRgbB = (byte)nudBs2ProRgbB.Value,
                     Bs2ProBrightness = (byte)sliderBs2ProBrightness.Value,
+                    // Gap 2: Save Flydigi RGB speed per-game
+                    Bs2ProRgbSpeed = (byte)sliderBs2ProRgbSpeed.Value,
                     EcFanEnabled = sdEcFan.Visibility == Visibility.Visible ? (bool)cbxEcFanEnabled.IsChecked : false,
                     EcFanUnifiedMode = sdEcFan.Visibility == Visibility.Visible ? cbxEcFanMode.SelectedIndex == 0 : false,
                     EcFanPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanPreset.SelectedIndex) : "Balanced",
                     EcFanCpuPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanCpuPreset.SelectedIndex) : "Balanced",
                     EcFanGpuPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanGpuPreset.SelectedIndex) : "Balanced",
+                    // Gap 1: Save EC Fan custom curves per-game
+                    EcFanCustomDuties = sdEcFan.Visibility == Visibility.Visible && GetEcFanPresetFromIndex(cbxEcFanPreset.SelectedIndex) == "Custom"
+                        ? FanControlSettingsService.Load().UnifiedDuties?.ToArray() : null,
+                    EcFanCpuCustomDuties = sdEcFan.Visibility == Visibility.Visible && GetEcFanPresetFromIndex(cbxEcFanCpuPreset.SelectedIndex) == "Custom"
+                        ? FanControlSettingsService.Load().CpuDuties?.ToArray() : null,
+                    EcFanGpuCustomDuties = sdEcFan.Visibility == Visibility.Visible && GetEcFanPresetFromIndex(cbxEcFanGpuPreset.SelectedIndex) == "Custom"
+                        ? FanControlSettingsService.Load().GpuDuties?.ToArray() : null,
                     KbEnabled = (bool)cbxKbEnabled.IsChecked,
                     KbPerKeyMode = cbxKbMode.SelectedIndex == 1,
                     KbBrightness = (int)sdKbBrightness.Value,
@@ -831,7 +810,34 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     KbMultiColors = SerializeColors(KbMultiColorPicker.Colors),
                     KbPerKeyColors = KeyboardSettingsService.Load().PerKeyColors,
                     KbDirection = _kbDirection,
-                    isAutoSwitch = (bool)tsAutoSwitch.IsChecked
+                    isAutoSwitch = (bool)tsAutoSwitch.IsChecked,
+                    // CPU
+                    CpuEnabled = (bool)cbxCpuEnabled.IsChecked,
+                    CpuSustained = (int)AdpSdSustained.Value,
+                    CpuBoost = (int)AdpSdBoost.Value,
+                    CpuTjMax = (int)AdpSdTjMax.Value,
+                    CpuCo = (int)AdpSdCoAll.Value,
+                    CpuPl1 = (int)AdpSdIntelPl1.Value,
+                    CpuPl2 = (int)AdpSdIntelPl2.Value,
+                    CpuUndervolt = (int)AdpSdIntelUndervolt.Value,
+                    // GPU
+                    GpuEnabled = sdGpuSettings.Visibility == Visibility.Visible ? (bool)cbxGpuEnabled.IsChecked : false,
+                    GpuTgp = (int)AdpSdNvPower.Value,
+                    GpuDynamicBoost = AdpTogDynamicBoost.IsChecked == true,
+                    GpuDbOffset = (int)AdpSdNvDbOffset.Value,
+                    GpuCoreClock = (int)AdpSdNvCore.Value,
+                    GpuMemClock = (int)AdpSdNvMem.Value,
+                    // Gap 4: Save GPU V-F curve preset name per-game
+                    GpuVfCurveName = GetActiveVfCurveName(),
+                    // Light Bar
+                    LbEnabled = sdLightBar.Visibility == Visibility.Visible ? (bool)cbxLbEnabled.IsChecked : false,
+                    LbPower = AdpTsLightBarPower.IsChecked == true,
+                    LbColorR = AdpLbColorPicker.SelectedColor.R,
+                    LbColorG = AdpLbColorPicker.SelectedColor.G,
+                    LbColorB = AdpLbColorPicker.SelectedColor.B,
+                    LbBrightness = (int)AdpLbBrightnessSlider.Value,
+                    LbEffect = AdpLbEffect.SelectedIndex,
+                    LbSpeed = (int)AdpLbSpeedSlider.Value
                 };
                 adaptivePresetManager.SavePreset(presetName, preset);
             }
@@ -842,8 +848,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         }
 
         private static LASTINPUTINFO lastInput = new LASTINPUTINFO();
-
-        private static int minCPUClock = 1440;
 
         private async void btnReloadApps_Click(object sender, RoutedEventArgs e)
         {
@@ -870,6 +874,9 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             // Sync active settings so other pages can detect the change immediately
             Settings.Default.AdaptiveBs2ProEnabled = (bool)cbxBs2ProEnabled.IsChecked;
             Settings.Default.AdaptiveWcEnabled = (bool)cbxWcEnabled.IsChecked;
+            Settings.Default.AdaptiveCpuEnabled = (bool)cbxCpuEnabled.IsChecked;
+            Settings.Default.AdaptiveGpuEnabled = (bool)cbxGpuEnabled.IsChecked;
+            Settings.Default.AdaptiveLbEnabled = (bool)cbxLbEnabled.IsChecked;
             Settings.Default.Save();
         }
 
@@ -944,7 +951,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             spEcFanSplit.Visibility = unified ? Visibility.Collapsed : Visibility.Visible;
         }
 
-        private static int newMinCPUClock = 1440;
         private async void sensors_Tick(object sender, EventArgs e)
         {
             try
@@ -953,41 +959,8 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 {
                     await Task.Run(() =>
                     {
-                        if (Family.TYPE == Family.ProcessorType.Intel) CPUTemp = (int)GetSensor.GetCPUInfo(SensorType.Temperature, "Package");
-                        else CPUTemp = (int)GetSensor.GetCPUInfo(SensorType.Temperature, "Core");
-                        CPULoad = (int)GetSensor.GetCPUInfo(SensorType.Load, "Total");
-
-                        int clockTotal = 0;
-                        int clockSamples = 0;
-                        for (int core = 1; core <= coreCount; core++)
-                        {
-                            int clock = (int)GetSensor.GetCPUInfo(SensorType.Clock, $"Core #{core}");
-                            if (clock <= 0)
-                                continue;
-                            clockTotal += clock;
-                            clockSamples++;
-                        }
-
-                        CPUClock = clockSamples > 0 ? clockTotal / clockSamples : 0;
-
-                        //CPUPower = (int)GetSensor.getCPUInfo(SensorType.Power, "Package");
-
-                        if (radeonGpuCount > 0)
-                        {
-                            GPULoad = ADLXBackend.GetGPUMetrics(0, 7);
-                            GPUClock = ADLXBackend.GetGPUMetrics(0, 0);
-                            GPUMemClock = ADLXBackend.GetGPUMetrics(0, 1);
-                        }
-
                         isGameRunning();
                     });
-
-                    if (nvidiaGpuCount < 1) sdNVIDIA.Visibility = Visibility.Collapsed;
-
-                    minCPUClock = Convert.ToInt32(nudMinCpuClk.Value);
-                    if (CPULoad < (100 / coreCount) + 5) newMinCPUClock = minCPUClock + 500;
-                    else newMinCPUClock = minCPUClock;
-
 
                     if (cbxPowerPreset.Items.Count > 0 && cbAutoSwitch.IsChecked == true)
                     {
@@ -1015,9 +988,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
         }
 
-        string lastCPU = "";
-        string lastCO = "";
-        string lastiGPU = "";
         PumpVoltage lastWcPump = PumpVoltage.Off;
         FanSpeed lastWcFan = FanSpeed.Off;
         RgbState lastWcRgbMode = RgbState.Off;
@@ -1050,7 +1020,37 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private string lastKbMultiColors = "";
         private string _kbDirection = "LeftRight";
         private string lastKbDirection = "";
-        string lastWindowsProcessorPower = "";
+        // CPU diff-tracking
+        private int lastCpuSustained = 0;
+        private int lastCpuBoost = 0;
+        private int lastCpuTjMax = 0;
+        private int lastCpuCo = 0;
+        private int lastCpuPl1 = 0;
+        private int lastCpuPl2 = 0;
+        private int lastCpuUndervolt = 0;
+        // GPU diff-tracking
+        private int lastGpuTgp = 0;
+        private bool lastGpuDynamicBoost = false;
+        private int lastGpuDbOffset = 0;
+        private int lastGpuCoreClock = 0;
+        private int lastGpuMemClock = 0;
+        private string lastGpuVfCurveName = string.Empty;
+        // Light Bar diff-tracking
+        private bool lastLbPower = false;
+        private byte lastLbColorR = 0;
+        private byte lastLbColorG = 0;
+        private byte lastLbColorB = 0;
+        private int lastLbBrightness = 0;
+        private int lastLbEffect = 0;
+        private int lastLbSpeed = 0;
+        // V-F Curve editor window (singleton, like Presets page)
+        private Views.Windows.VfCurveEditorWindow? _vfEditorWindow;
+        // True when user manually changes the core clock slider — curve label is suppressed
+        private bool _adpUserTouchedCoreSlider;
+        // Name of the V-F curve loaded by the current per-game profile (empty = no curve)
+        private string _adpActiveCurveName = string.Empty;
+        // KeyboardHidService for Light Bar control
+        private KeyboardHidService? _hidService;
         private SemaphoreSlim _updateSemaphore = new(1, 1);
         private async void update()
         {
@@ -1062,79 +1062,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             {
                 if (start == true)
                 {
-                    if (i < 2)
-                    {
-                        CPUControl.UpdatePowerLimit(CPUTemp, CPULoad, (int)nudPowerLimit.Value, (int)nudPowerLimit.Value - 5, (int)nudTemp.Value);
-                        CPUControl.UpdatePowerLimit(CPUTemp, CPULoad, (int)nudPowerLimit.Value, (int)nudPowerLimit.Value - 5, (int)nudTemp.Value);
-                        CPUControl.UpdatePowerLimit(CPUTemp, CPULoad, (int)nudPowerLimit.Value, (int)nudPowerLimit.Value - 5, (int)nudTemp.Value);
-                        i++;
-                    }
-                    else
-                    {
-                        CPUControl.UpdatePowerLimit(CPUTemp, CPULoad, (int)nudPowerLimit.Value, 8, (int)nudTemp.Value);
-
-                        if (cbCurve.IsChecked == true) CPUControl.CurveOptimiserLimit(CPULoad, (int)nudCurve.Value);
-
-                        if (tsTBOiGPU.IsChecked == true) iGPUControl.UpdateiGPUClock((int)nudMaxGfxClk.Value, (int)nudMinGfxClk.Value, (int)nudTemp.Value, CPUPower, CPUTemp, GPUClock, GPULoad, GPUMemClock, CPUClock, minCPUClock);
-
-                        string commandString = "";
-
-                        commandString = commandString + $"--UXTUSR={tsUXTUSR.IsChecked}-{cbVSync.IsChecked}-{nudSharp.Value / 100}-{cbxResScale.SelectedIndex}-{cbAutoCap.IsChecked} ";
-
-                        if (Settings.Default.isASUS)
-                        {
-                            if (cbxAsusPower.SelectedIndex > 0) commandString = commandString + $"--ASUS-Power={cbxAsusPower.SelectedIndex} ";
-                        }
-
-                        var windowsProcessorPower = GetWindowsProcessorPowerCommand();
-                        if (windowsProcessorPower != lastWindowsProcessorPower)
-                        {
-                            commandString = commandString + windowsProcessorPower;
-                            lastWindowsProcessorPower = windowsProcessorPower;
-                        }
-
-                        if (CPUControl.cpuCommand != lastCPU)
-                        {
-                            commandString = commandString + CPUControl.cpuCommand;
-                            lastCPU = CPUControl.cpuCommand;
-                        }
-
-                        if (CPUControl.coCommand != null && CPUControl.coCommand != "" && cbCurve.IsChecked == true && CPUControl.coCommand != lastCO)
-                        {
-                            commandString = commandString + CPUControl.coCommand;
-                            lastCO = CPUControl.coCommand;
-                        }
-
-                        if (iGPUControl.commmand != null && iGPUControl.commmand != "" && tsTBOiGPU.IsChecked == true && iGPUControl.commmand != lastiGPU)
-                        {
-                            commandString = commandString + iGPUControl.commmand;
-                            lastiGPU = iGPUControl.commmand;
-                        }
-
-                        if (tsRadeonGraph.IsChecked == true)
-                        {
-                            if (cbAntiLag.IsChecked == true) commandString = commandString + $"--ADLX-Lag=0-true --ADLX-Lag=1-true ";
-                            else commandString = commandString + $"--ADLX-Lag=0-false --ADLX-Lag=1-false ";
-
-                            if (cbRSR.IsChecked == true) commandString = commandString + $"--ADLX-RSR=true-{(int)nudRSR.Value} ";
-                            else commandString = commandString + $"--ADLX-RSR=false-{(int)nudRSR.Value} ";
-
-                            if (cbBoost.IsChecked == true) commandString = commandString + $"--ADLX-Boost=0-true-{(int)nudBoost.Value} --ADLX-Boost=1-true-{(int)nudBoost.Value} ";
-                            else commandString = commandString + $"--ADLX-Boost=0-false-{(int)nudBoost.Value} --ADLX-Boost=1-false-{(int)nudBoost.Value} ";
-
-                            if (cbImageSharp.IsChecked == true) commandString = commandString + $"--ADLX-ImageSharp=0-true-{(int)nudImageSharp.Value} --ADLX-ImageSharp=1-true-{(int)nudImageSharp.Value} ";
-                            else commandString = commandString + $"--ADLX-ImageSharp=0-false-{(int)nudImageSharp.Value} --ADLX-ImageSharp=1-false-{(int)nudImageSharp.Value} ";
-
-                            if (cbSync.IsChecked == true) commandString = commandString + $"--ADLX-Sync=0-true --ADLX-Sync=1-true ";
-                            else commandString = commandString + $"--ADLX-Sync=0-false --ADLX-Sync=1-false ";
-                        }
-
-                        if (tsNV.IsChecked == true)
-                        {
-                            commandString = commandString + $"--NVIDIA-Clocks={nudNVMaxCore.Value}-{nudNVCore.Value}-{nudNVMem.Value} ";
-                        }
-
-                        // Apply watercooler settings if enabled
+                    // Apply watercooler settings if enabled
                         if ((bool)cbxWcEnabled.IsChecked)
                         {
                             PumpVoltage curPump = GetPumpVoltageFromIndex(cbxWcPumpVoltage.SelectedIndex);
@@ -1381,28 +1309,171 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                             }
                         }
 
-                        if (commandString != null && commandString != "") await RyzenAdj_To_UXTU.TranslateAsync(commandString, appliedName: "Adaptive Mode", localizeAppliedName: true);
-                    }
+                        // Apply CPU settings if enabled
+                        if ((bool)cbxCpuEnabled.IsChecked)
+                        {
+                            if (Family.TYPE == Family.ProcessorType.Amd_Apu)
+                            {
+                                int sustained = (int)AdpSdSustained.Value;
+                                int boost = (int)AdpSdBoost.Value;
+                                int tjMax = (int)AdpSdTjMax.Value;
+                                int co = (int)AdpSdCoAll.Value;
 
-                    if (RTSS.RTSSRunning() && tsRTSS.IsChecked == true) RTSS.setRTSSFPSLimit((int)nudRTSS.Value);
-                    
+                                if (sustained != lastCpuSustained || boost != lastCpuBoost ||
+                                    tjMax != lastCpuTjMax || co != lastCpuCo)
+                                {
+                                    try
+                                    {
+                                        // Build SMU command string (same format as Presets page)
+                                        var parts = new System.Collections.Generic.List<string>();
+                                        parts.Add($"--slow-limit={sustained * 1000}");
+                                        parts.Add($"--fast-limit={boost * 1000}");
+                                        parts.Add($"--tctl-temp={tjMax}");
+                                        parts.Add($"--cHTC-temp={tjMax}");
+                                        if (co > 0)
+                                            parts.Add($"--set-coall={(byte)co}");
 
-                    //if (RTSS.RTSSRunning())
-                    //{
-                    //    int i = 0;
-                    //    bool found = false;
-                    //    do
-                    //    {
-                    //        AppFlags appFlag = RunningGames.appFlags[i];
-                    //        var appEntries = OSD.GetAppEntries(appFlag);
-                    //        foreach (var app in appEntries)
-                    //        {
-                    //            found = true;
-                    //            osd.Update($"{RunningGames.appFlags[i]} {app.InstantaneousFrames}FPS {app.InstantaneousFrameTime.Milliseconds}ms");
-                    //        }
-                    //        i++;
-                    //    } while (i < RunningGames.appFlags.Count && found == false);
-                    //}
+                                        string cmd = string.Join(" ", parts);
+                                        _ = RyzenAdj_To_UXTU.TranslateAsync(cmd);
+
+                                        // Also write EC CPU power limits
+                                        var ec = RyzenAdj_To_UXTU.EcService;
+                                        if (ec != null)
+                                            ec.ApplyCpuPowerLimits(sustained, boost);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        DiagnosticLogger.LogError(ex, "Failed to apply CPU settings in Adaptive Mode");
+                                    }
+
+                                    lastCpuSustained = sustained;
+                                    lastCpuBoost = boost;
+                                    lastCpuTjMax = tjMax;
+                                    lastCpuCo = co;
+                                }
+                            }
+                            else if (Family.TYPE == Family.ProcessorType.Intel)
+                            {
+                                int pl1 = (int)AdpSdIntelPl1.Value;
+                                int pl2 = (int)AdpSdIntelPl2.Value;
+                                int uv = (int)AdpSdIntelUndervolt.Value;
+
+                                if (pl1 != lastCpuPl1 || pl2 != lastCpuPl2 || uv != lastCpuUndervolt)
+                                {
+                                    try
+                                    {
+                                        // Build Intel MSR command string (same format as Presets page)
+                                        var parts = new System.Collections.Generic.List<string>();
+                                        parts.Add($"--intel-pl={pl1:F0},{pl2:F0}");
+                                        if (uv < 0)
+                                            parts.Add($"--intel-volt-cpu={uv:F0}");
+
+                                        string cmd = string.Join(" ", parts);
+                                        _ = RyzenAdj_To_UXTU.TranslateAsync(cmd);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        DiagnosticLogger.LogError(ex, "Failed to apply Intel CPU settings in Adaptive Mode");
+                                    }
+
+                                    lastCpuPl1 = pl1;
+                                    lastCpuPl2 = pl2;
+                                    lastCpuUndervolt = uv;
+                                }
+                            }
+                        }
+
+                        // Apply GPU settings if enabled
+                        if ((bool)cbxGpuEnabled.IsChecked && sdGpuSettings.Visibility == Visibility.Visible)
+                        {
+                            int tgp = (int)AdpSdNvPower.Value;
+                            bool dbEnabled = AdpTogDynamicBoost.IsChecked == true;
+                            int dbOffset = dbEnabled ? (int)AdpSdNvDbOffset.Value : 0;
+                            int memClock = (int)AdpSdNvMem.Value;
+
+                            // When a V-F curve is active and user hasn't touched the slider,
+                            // skip the core clock offset — the curve handles per-point frequency.
+                            int coreClock = (AdpVfCurveActive && !_adpUserTouchedCoreSlider) ? 0 : (int)AdpSdNvCore.Value;
+
+                            bool changed = tgp != lastGpuTgp ||
+                                dbEnabled != lastGpuDynamicBoost ||
+                                dbOffset != lastGpuDbOffset ||
+                                coreClock != lastGpuCoreClock ||
+                                memClock != lastGpuMemClock;
+
+                            if (changed)
+                            {
+                                try
+                                {
+                                    int totalWatts = tgp + dbOffset;
+                                    // Apply via the same NVIDIA command format as Presets page
+                                    string nvCmd = $"--NVIDIA-Clocks=0-{coreClock}-{memClock}-{totalWatts}-{dbOffset}";
+                                    _ = RyzenAdj_To_UXTU.TranslateAsync(nvCmd);
+                                }
+                                catch (Exception ex)
+                                {
+                                    DiagnosticLogger.LogError(ex, "Failed to apply GPU settings in Adaptive Mode");
+                                }
+
+                                lastGpuTgp = tgp;
+                                lastGpuDynamicBoost = dbEnabled;
+                                lastGpuDbOffset = dbOffset;
+                                lastGpuCoreClock = coreClock;
+                                lastGpuMemClock = memClock;
+                            }
+
+                            // Apply V-F curve if it changed (only when Adaptive Mode running + GPU enabled)
+                            if (_adpActiveCurveName != lastGpuVfCurveName)
+                            {
+                                ApplyActiveVfCurveToGpu();
+                                lastGpuVfCurveName = _adpActiveCurveName;
+                            }
+                        }
+
+                        // Apply Light Bar settings if enabled
+                        if ((bool)cbxLbEnabled.IsChecked && sdLightBar.Visibility == Visibility.Visible && _hidService != null)
+                        {
+                            bool lbPower = AdpTsLightBarPower.IsChecked == true;
+                            byte lbR = AdpLbColorPicker.SelectedColor.R;
+                            byte lbG = AdpLbColorPicker.SelectedColor.G;
+                            byte lbB = AdpLbColorPicker.SelectedColor.B;
+                            int lbBrightness = (int)AdpLbBrightnessSlider.Value;
+                            int lbEffect = AdpLbEffect.SelectedIndex;
+                            int lbSpeed = (int)AdpLbSpeedSlider.Value;
+
+                            bool lbChanged = lbPower != lastLbPower ||
+                                lbR != lastLbColorR || lbG != lastLbColorG || lbB != lastLbColorB ||
+                                lbBrightness != lastLbBrightness ||
+                                lbEffect != lastLbEffect || lbSpeed != lastLbSpeed;
+
+                            if (lbChanged)
+                            {
+                                try
+                                {
+                                    if (lbPower)
+                                    {
+                                        _hidService.LightBarSetColor(lbR, lbG, lbB, lbBrightness);
+                                        _hidService.LightBarSetEffect((byte)lbEffect, (byte)lbSpeed, lbBrightness);
+                                    }
+                                    else
+                                    {
+                                        _hidService.LightBarTurnOff();
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    DiagnosticLogger.LogError(ex, "Failed to apply Light Bar settings in Adaptive Mode");
+                                }
+
+                                lastLbPower = lbPower;
+                                lastLbColorR = lbR;
+                                lastLbColorG = lbG;
+                                lastLbColorB = lbB;
+                                lastLbBrightness = lbBrightness;
+                                lastLbEffect = lbEffect;
+                                lastLbSpeed = lbSpeed;
+                            }
+                        }
                 }
             }
             catch (Exception ex)
@@ -1413,24 +1484,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             {
                 _updateSemaphore.Release();
             }
-        }
-
-        private string GetWindowsProcessorPowerCommand()
-        {
-            var boostMode = cbxWindowsBoostMode.SelectedIndex > 0 ? cbxWindowsBoostMode.SelectedIndex - 1 : -1;
-            var minimumState = cbWindowsMinState.IsChecked == true ? (int)nudWindowsMinState.Value : -1;
-            var maximumState = cbWindowsMaxState.IsChecked == true ? (int)nudWindowsMaxState.Value : -1;
-            var maximumFrequency = cbWindowsMaxFrequency.IsChecked == true ? (int)nudWindowsMaxFrequency.Value : -1;
-            var energyPreference = cbWindowsEpp.IsChecked == true ? (int)nudWindowsEpp.Value : -1;
-            var minimumUnparkedCores = cbWindowsCoreParking.IsChecked == true ? (int)nudWindowsCoreParking.Value : -1;
-            var maximumUnparkedCores = cbWindowsMaxUnparkedCores.IsChecked == true ? (int)nudWindowsMaxUnparkedCores.Value : -1;
-            // AMD Power Slider: 3 = Best performance. Critical on AMD mobile platforms â€”
-            // Balanced plan defaults to 2 (Better performance) which enforces ~55W ceiling.
-            // Always force 3 on AMD; -1 on Intel (setting doesn't exist).
-            int amdPowerSlider = Family.TYPE == Family.ProcessorType.Amd_Apu ? 3 : -1;
-            return boostMode >= 0 || minimumState >= 0 || maximumState >= 0 || maximumFrequency >= 0 || energyPreference >= 0 || minimumUnparkedCores >= 0 || maximumUnparkedCores >= 0
-                ? $"--Win-CPU={boostMode},{maximumState},{maximumFrequency},{energyPreference},{minimumState},{minimumUnparkedCores},{maximumUnparkedCores},{amdPowerSlider} "
-                : string.Empty;
         }
 
         public bool IsScrollBarVisible(ScrollViewer scrollViewer)
@@ -1460,8 +1513,12 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 Dispatcher.InvokeAsync(() =>
                 {
                     adaptivePresetManager = new AdaptivePresetManager(Settings.Default.Path + "adaptivePresets.json");
-                    // Don't reset tracking on navigation â€” just load the preset UI values
+                    // Don't reset tracking on navigation — just load the preset UI values
                     loadPreset(presetName, resetTracking: false);
+                    // Ensure Keyboard RGB effect controls visibility matches the mode selector.
+                    // Needed because loadPreset skips UI updates when myPreset is null
+                    // (first-time load with no saved presets).
+                    UpdateKbModeUI();
                 }, DispatcherPriority.Loaded);
             }
         }
@@ -1633,7 +1690,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 // No game detected this poll.
                 if (lastConfirmedGame != DefaultProfileName)
                 {
-                    // Game was previously detected but is now missing â€” count misses.
+                    // Game was previously detected but is now missing — count misses.
                     gameMissingCount++;
                     if (gameMissingCount >= maxGameMisses)
                     {
@@ -1659,7 +1716,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     _isUpdatingPresetSelection = false;
 
                     // Load the new preset's UI values. The device override flags being
-                    // active does not prevent profile switching â€” the new profile may
+                    // active does not prevent profile switching — the new profile may
                     // have different override settings (ON vs OFF) that need to apply.
                     // Use resetTracking: true so the next update() tick applies the
                     // new preset's settings to the device and CPU/GPU controls.
@@ -1675,29 +1732,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
              // Use resetTracking: true so the next update() tick applies the Default preset.
             loadPreset(DefaultProfileName, resetTracking: true);
-        }
-
-        private void cb_Checked(object sender, RoutedEventArgs e)
-        {
-            System.Windows.Controls.CheckBox checkBox = (System.Windows.Controls.CheckBox)sender;
-            if (checkBox == cbBoost)
-            {
-                cbRSR.IsChecked = false;
-                cbAntiLag.IsChecked = false;
-            }
-
-            if (checkBox == cbAntiLag)
-            {
-                cbBoost.IsChecked = false;
-            }
-
-            if (checkBox == cbRSR)
-            {
-                cbBoost.IsChecked = false;
-                cbImageSharp.IsChecked = false;
-            }
-
-            if (checkBox == cbImageSharp) cbRSR.IsChecked = false;
         }
 
         #region Watercooler Helpers
@@ -1918,7 +1952,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
             catch
             {
-                // Corrupted custom curve JSON â€” fall back to Balanced
+                // Corrupted custom curve JSON — fall back to Balanced
             }
             return FlydigiFanCurveProfile.CreateBalanced();
         }
@@ -1936,7 +1970,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
             catch
             {
-                // Corrupted custom curve JSON â€” fall back to Balanced
+                // Corrupted custom curve JSON — fall back to Balanced
             }
             return FlydigiFanCurveProfile.CreateBalanced();
         }
@@ -1958,7 +1992,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             spBs2ProRpm.Visibility = mode == 1 ? Visibility.Visible : Visibility.Collapsed;
             spBs2ProCurve.Visibility = mode == 2 ? Visibility.Visible : Visibility.Collapsed;
 
-            // Hide curve editor when leaving Curve (Auto) mode â€” it only makes sense
+            // Hide curve editor when leaving Curve (Auto) mode — it only makes sense
             // inside the Curve mode sub-pane. Re-show if already in Curve + Custom.
             if (mode != 2)
             {
@@ -1967,7 +2001,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
             else if (Bs2ProCurveEditor is not null && cbxBs2ProCurve?.SelectedIndex == 3)
             {
-                // Re-entering Curve mode with Custom selected â€” re-show editor
+                // Re-entering Curve mode with Custom selected — re-show editor
                 Bs2ProCurveEditorDivider.Visibility = Visibility.Visible;
                 Bs2ProCurveEditor.Visibility = Visibility.Visible;
                 try
@@ -2129,7 +2163,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     Bs2ProRgbStaticBrightnessDivider.Visibility = Visibility.Visible;
                     spBs2ProRgbBrightness.Visibility = Visibility.Visible;
                     break;
-                case 4: // Flowing â€” no color picker, so skip the sub divider to avoid a bare divider above Brightness
+                case 4: // Flowing — no color picker, so skip the sub divider to avoid a bare divider above Brightness
                     Bs2ProRgbStaticBrightnessDivider.Visibility = Visibility.Visible;
                     spBs2ProRgbBrightness.Visibility = Visibility.Visible;
                     Bs2ProRgbFlowingSpeedDivider.Visibility = Visibility.Visible;
@@ -2297,7 +2331,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         /// <summary>
         /// Shows/hides Color, Multi-Color, Rest color, and Speed controls based on the
-        /// selected effect â€” mirroring the Keyboard page's UpdateEffectUi().
+        /// selected effect — mirroring the Keyboard page's UpdateEffectUi().
         /// </summary>
         private void UpdateKbEffectUi()
         {
@@ -2320,7 +2354,7 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             string effect = GetKbEffectFromIndex(cbxKbEffect.SelectedIndex);
 
-            // Rainbow has fixed colors â€” no color controls, no speed.
+            // Rainbow has fixed colors — no color controls, no speed.
             if (ParseKbEffect(effect) == KeyboardEffect.Rainbow)
             {
                 sepKbColor.Visibility = Visibility.Collapsed;
@@ -2393,17 +2427,17 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void KbMultiColorPicker_ColorsChanged(object sender, EventArgs e)
         {
-            // Multi-color colors changed â€” will be picked up by update() loop's diff tracking
+            // Multi-color colors changed — will be picked up by update() loop's diff tracking
         }
 
         private void KbColorPicker_ColorChangedDelayed(object sender, EventArgs e)
         {
-            // Color changed â€” will be picked up by update() loop's diff tracking
+            // Color changed — will be picked up by update() loop's diff tracking
         }
 
         private void KbRestColorPicker_ColorChangedDelayed(object sender, EventArgs e)
         {
-            // Rest color changed â€” will be picked up by update() loop's diff tracking
+            // Rest color changed — will be picked up by update() loop's diff tracking
         }
 
         /// <summary>
@@ -2593,6 +2627,425 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 catch { }
             }
             return result;
+        }
+
+        #endregion
+
+        #region CPU / GPU / Light Bar event handlers
+
+        /// <summary>
+        /// Shows/hide AMD vs Intel CPU controls based on the detected CPU type.
+        /// </summary>
+        private void UpdateAdpCpuUI()
+        {
+            if (Family.TYPE == Family.ProcessorType.Intel)
+            {
+                // Hide AMD-specific controls
+                AdpGridTjMax.Visibility = Visibility.Collapsed;
+                AdpDividerAfterTjMax.Visibility = Visibility.Collapsed;
+                AdpGridCoAll.Visibility = Visibility.Collapsed;
+                AdpDividerAfterCoAll.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                // Hide Intel-specific controls
+                AdpGridIntelPl1.Visibility = Visibility.Collapsed;
+                AdpDividerAfterIntelPl1.Visibility = Visibility.Collapsed;
+                AdpGridIntelPl2.Visibility = Visibility.Collapsed;
+                AdpDividerAfterIntelPl2.Visibility = Visibility.Collapsed;
+                AdpGridIntelUndervolt.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        /// <summary>
+        /// Shared ValueChanged handler for all Adaptive sliders.
+        /// Updates the corresponding label text based on the sender.
+        /// </summary>
+        private void AdpSlider_ValueChanged(object? sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (sender is not Slider slider)
+                return;
+
+            switch (slider.Name)
+            {
+                case "AdpSdSustained":
+                    AdpLblSustained.Text = $"{slider.Value:F0} W";
+                    break;
+                case "AdpSdBoost":
+                    AdpLblBoost.Text = $"{slider.Value:F0} W";
+                    break;
+                case "AdpSdTjMax":
+                    AdpLblTjMax.Text = $"{slider.Value:F0} °C";
+                    break;
+                case "AdpSdCoAll":
+                    AdpLblCoAll.Text = $"{slider.Value:F0}";
+                    break;
+                case "AdpSdIntelPl1":
+                    AdpLblIntelPl1.Text = $"{slider.Value:F0} W";
+                    break;
+                case "AdpSdIntelPl2":
+                    AdpLblIntelPl2.Text = $"{slider.Value:F0} W";
+                    break;
+                case "AdpSdIntelUndervolt":
+                    AdpLblIntelUndervolt.Text = $"{slider.Value:F0} mV";
+                    break;
+                case "AdpSdNvPower":
+                    AdpLblNvPower.Text = $"{slider.Value:F0} W";
+                    break;
+                case "AdpSdNvDbOffset":
+                    AdpLblNvDbOffset.Text = $"{slider.Value:F0} W";
+                    break;
+                case "AdpSdNvCore":
+                    _adpUserTouchedCoreSlider = true;
+                    updateAdpCoreLabel();
+                    break;
+                case "AdpSdNvMem":
+                    AdpLblNvMem.Text = $"{slider.Value:F0} MHz";
+                    break;
+            }
+        }
+
+        private void cbxCpuEnabled_Toggled(object sender, RoutedEventArgs e)
+        {
+            bool enabled = (bool)cbxCpuEnabled.IsChecked;
+            Settings.Default.AdaptiveCpuEnabled = enabled;
+            Settings.Default.Save();
+
+            // Reset tracking so the next update() tick force-applies CPU settings
+            if (enabled)
+            {
+                lastCpuSustained = 0;
+                lastCpuBoost = 0;
+                lastCpuTjMax = 0;
+                lastCpuCo = 0;
+                lastCpuPl1 = 0;
+                lastCpuPl2 = 0;
+                lastCpuUndervolt = 0;
+            }
+        }
+
+        private void cbxGpuEnabled_Toggled(object sender, RoutedEventArgs e)
+        {
+            bool enabled = (bool)cbxGpuEnabled.IsChecked;
+            Settings.Default.AdaptiveGpuEnabled = enabled;
+            Settings.Default.Save();
+
+            // Reset tracking so the next update() tick force-applies GPU settings
+            if (enabled)
+            {
+                lastGpuTgp = 0;
+                lastGpuDynamicBoost = false;
+                lastGpuDbOffset = 0;
+                lastGpuCoreClock = 0;
+                lastGpuMemClock = 0;
+                lastGpuVfCurveName = string.Empty;
+            }
+        }
+
+        private void cbxLbEnabled_Toggled(object sender, RoutedEventArgs e)
+        {
+            bool enabled = (bool)cbxLbEnabled.IsChecked;
+            Settings.Default.AdaptiveLbEnabled = enabled;
+            Settings.Default.Save();
+
+            // Reset tracking so the next update() tick force-applies Light Bar settings
+            if (enabled)
+            {
+                lastLbPower = false;
+                lastLbColorR = 0;
+                lastLbColorG = 0;
+                lastLbColorB = 0;
+                lastLbBrightness = 0;
+                lastLbEffect = 0;
+                lastLbSpeed = 0;
+            }
+        }
+
+        private void AdpTogDynamicBoost_Checked(object sender, RoutedEventArgs e)
+        {
+            if (AdpSpNvDbOffset == null) return;
+            AdpSpNvDbOffset.Visibility = Visibility.Visible;
+        }
+
+        private void AdpTogDynamicBoost_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (AdpSpNvDbOffset == null) return;
+            AdpSpNvDbOffset.Visibility = Visibility.Collapsed;
+        }
+
+        private void AdpBtnVfCurve_Click(object sender, RoutedEventArgs e)
+        {
+            // Reuse existing window if already open
+            if (_vfEditorWindow != null)
+            {
+                _vfEditorWindow.Activate();
+                return;
+            }
+
+            // Reload presets from disk — editor auto-saves independently
+            var presets = Universal_x86_Tuning_Utility.Models.VfCurvePresetStore.Load();
+
+            // Find active preset (first with changes)
+            Dictionary<int, int>? offsets = null;
+            foreach (var preset in presets)
+            {
+                if (!string.IsNullOrEmpty(preset.Name) && preset.HasChanges)
+                {
+                    offsets = preset.Offsets;
+                    break;
+                }
+            }
+
+            // Open non-modal curve editor window
+            _vfEditorWindow = new Views.Windows.VfCurveEditorWindow(offsets);
+            _vfEditorWindow.Owner = Application.Current.MainWindow;
+            _vfEditorWindow.Closed += (_, _) => _vfEditorWindow = null;
+            _vfEditorWindow.CurveChanged += (_, _) =>
+            {
+                _adpUserTouchedCoreSlider = false; // User went back to curve — reclaim from slider
+                updateAdpCoreLabel();
+                // Only apply to hardware if Adaptive Mode is running AND GPU Settings is enabled
+                if (start && (bool)cbxGpuEnabled.IsChecked)
+                    ApplyActiveVfCurveToGpu();
+            };
+            _vfEditorWindow.Show();
+        }
+
+        private void AdpTsLightBarPower_Toggled(object sender, RoutedEventArgs e)
+        {
+            bool isOn = AdpTsLightBarPower.IsChecked == true;
+            if (_hidService == null)
+                return;
+
+            byte r = AdpLbColorPicker.SelectedColor.R;
+            byte g = AdpLbColorPicker.SelectedColor.G;
+            byte b = AdpLbColorPicker.SelectedColor.B;
+            int brightness = (int)AdpLbBrightnessSlider.Value;
+            int effect = AdpLbEffect.SelectedIndex;
+            int speed = (int)AdpLbSpeedSlider.Value;
+
+            try
+            {
+                if (isOn)
+                {
+                    _hidService.LightBarTurnOn(r, g, b, brightness);
+                    _hidService.LightBarSetEffect((byte)effect, (byte)speed, brightness);
+                }
+                else
+                {
+                    _hidService.LightBarTurnOff();
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to toggle Light Bar power in Adaptive Mode");
+            }
+        }
+
+        private void AdpLbColorPicker_ColorChangedDelayed(object sender, EventArgs e)
+        {
+            // Will be picked up by update() loop diff tracking
+        }
+
+        private void AdpLbBrightnessSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (AdpLbBrightnessValueText != null)
+                AdpLbBrightnessValueText.Text = ((int)AdpLbBrightnessSlider.Value).ToString();
+        }
+
+        private void AdpLbEffect_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Guard against calls before XAML fields are loaded (e.g. constructor, Page_Loaded).
+            if (AdpSpLbSpeed == null || AdpLbEffect == null)
+                return;
+
+            // Show/hide speed control (hidden for Static = index 0)
+            AdpSpLbSpeed.Visibility = AdpLbEffect.SelectedIndex != 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void AdpLbSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (AdpLbSpeedValueText != null)
+                AdpLbSpeedValueText.Text = ((int)AdpLbSpeedSlider.Value).ToString();
+        }
+
+        #endregion
+
+        #region Per-game profile helpers (gaps)
+
+        /// <summary>True when the currently loaded per-game profile has a V-F curve with changes.</summary>
+        private bool AdpVfCurveActive
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(_adpActiveCurveName))
+                    return false;
+                try
+                {
+                    var presets = Universal_x86_Tuning_Utility.Models.VfCurvePresetStore.Load();
+                    var target = presets.FirstOrDefault(p => p.Name == _adpActiveCurveName);
+                    return target != null && target.HasChanges;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>Updates the core clock label to show "Curve" when active, or slider value otherwise.</summary>
+        private void updateAdpCoreLabel()
+        {
+            AdpLblNvCore.Text = (AdpVfCurveActive && !_adpUserTouchedCoreSlider)
+                ? "Curve"
+                : $"{AdpSdNvCore.Value:F0} MHz";
+        }
+
+        /// <summary>Applies the active V-F curve preset to the GPU hardware. Used by Adaptive page (no Apply button).</summary>
+        private void ApplyActiveVfCurveToGpu()
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(_adpActiveCurveName))
+                    return;
+
+                var presets = Universal_x86_Tuning_Utility.Models.VfCurvePresetStore.Load();
+                var target = presets.FirstOrDefault(p => p.Name == _adpActiveCurveName);
+                if (target == null || !target.HasChanges)
+                    return;
+
+                // Apply EC power limit BEFORE the curve write (same as Presets page).
+                // The NVIDIA driver on Blackwell laptops may check the EC power ceiling
+                // when applying VF offsets and further reduce power if it sees a low ceiling.
+                int tgp = (int)AdpSdNvPower.Value;
+                bool dbEnabled = AdpTogDynamicBoost.IsChecked == true;
+                int dbOffset = dbEnabled ? (int)AdpSdNvDbOffset.Value : 0;
+                NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
+
+                NvTuning.ApplyVfCurveOffsets_ClockBoostTable(target.Offsets);
+
+                // Re-apply power limit after in case the driver overrides the EC ceiling.
+                NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to apply V-F curve to GPU in Adaptive Mode");
+            }
+        }
+
+        /// <summary>Gap 1: Restores EC Fan custom duties from per-game profile into FanControlSettings.</summary>
+        private void ApplyEcFanCustomDuties(string unifiedPreset, int[]? unifiedDuties,
+            string cpuPreset, int[]? cpuDuties,
+            string gpuPreset, int[]? gpuDuties)
+        {
+            try
+            {
+                var settings = FanControlSettingsService.Load();
+
+                if (unifiedPreset == "Custom" && unifiedDuties != null)
+                    settings.UnifiedDuties = unifiedDuties.ToArray();
+
+                if (cpuPreset == "Custom" && cpuDuties != null)
+                    settings.CpuDuties = cpuDuties.ToArray();
+
+                if (gpuPreset == "Custom" && gpuDuties != null)
+                    settings.GpuDuties = gpuDuties.ToArray();
+
+                FanControlSettingsService.Save(settings);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to apply EC Fan custom duties from preset");
+            }
+        }
+
+        /// <summary>Gap 3: Serializes the current Flydigi custom curve points to JSON for per-game save.</summary>
+        private string GetBs2ProCurvePointsJson()
+        {
+            try
+            {
+                // Only save custom curve points when Custom is selected
+                if (GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex) != "Custom")
+                    return string.Empty;
+
+                if (Bs2ProCurveEditor is not null)
+                {
+                    var curve = Bs2ProCurveEditor.GetCurve();
+                    return curve.ToJSON();
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to get Flydigi custom curve points");
+            }
+            return string.Empty;
+        }
+
+        /// <summary>Gap 3: Restores Flydigi custom curve points from per-game profile into the editor.</summary>
+        private void ApplyBs2ProCurvePoints(string curvePointsJson)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(curvePointsJson))
+                    return;
+
+                var profile = FlydigiFanCurveProfile.FromJSON(curvePointsJson);
+                if (Bs2ProCurveEditor is not null)
+                    Bs2ProCurveEditor.SetCurve(profile);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to apply Flydigi custom curve points from preset");
+            }
+        }
+
+        /// <summary>Gap 4: Returns the name of the currently active V-F curve preset, or empty string if none.</summary>
+        private static string GetActiveVfCurveName()
+        {
+            try
+            {
+                var presets = Universal_x86_Tuning_Utility.Models.VfCurvePresetStore.Load();
+                foreach (var preset in presets)
+                {
+                    if (!string.IsNullOrEmpty(preset.Name) && preset.HasChanges)
+                        return preset.Name;
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to get active V-F curve name");
+            }
+            return string.Empty;
+        }
+
+        /// <summary>Gap 4: Applies the named V-F curve preset to the GPU hardware, or resets to stock if name is empty.</summary>
+        private static void ApplyVfCurveByName(string curveName)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(curveName))
+                {
+                    // Profile has no curve — reset GPU to stock to clear any previous game's curve
+                    NvTuning.ResetVfCurveOffsets();
+                    return;
+                }
+
+                var presets = Universal_x86_Tuning_Utility.Models.VfCurvePresetStore.Load();
+                var target = presets.FirstOrDefault(p => p.Name == curveName);
+                if (target == null || !target.HasChanges)
+                {
+                    // Named curve not found — reset to stock
+                    NvTuning.ResetVfCurveOffsets();
+                    return;
+                }
+
+                // Apply EC power limit BEFORE the curve write (same as Presets page).
+                NvTuning.ApplyVfCurveOffsets_ClockBoostTable(target.Offsets);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to apply V-F curve from preset");
+            }
         }
 
         #endregion
