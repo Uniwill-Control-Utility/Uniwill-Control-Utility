@@ -1,0 +1,545 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>10.0</LangVersion>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>favicon.ico</ApplicationIcon>
+    <Platforms>AnyCPU;x64</Platforms>
+    <AssemblyName>Uniwill-Control-Utility</AssemblyName>
+    <PackageIcon>Assets/applicationIcon-256.png</PackageIcon>
+    <Title>$(AssemblyName)</Title>
+    <Authors>jgudec</Authors>
+    <UseWindowsForms>True</UseWindowsForms>
+    <SignAssembly>False</SignAssembly>
+    <Copyright>© UCU Team 2020 - 2026</Copyright>
+    <AssemblyVersion>26.2.2</AssemblyVersion>
+    <FileVersion>26.2.2</FileVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <SupportedOSPlatformVersion>10.0.22621.0</SupportedOSPlatformVersion>
+    <Version>26.2.2</Version>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <Optimize>True</Optimize>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Optimize>True</Optimize>
+  </PropertyGroup>
+
+  <!-- Self-contained publish settings (use: dotnet publish -c Release -r win-x64 /p:SelfContained=true) -->
+  <PropertyGroup Condition="'$(SelfContained)'=='true'">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeAllContentForSelfExtracting>true</IncludeAllContentForSelfExtracting>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <TrimMode>partial</TrimMode>
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <PublishReadyToRun>false</PublishReadyToRun>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Localization\*.json" />
+    <PackageReference Include="Accord.Math" Version="3.8.0" />
+    <PackageReference Include="craftersmine.SteamGridDB.Net" Version="1.1.7" />
+    <PackageReference Include="FuzzyStrings.NetStandard" Version="1.0.1" />
+    <PackageReference Include="GameLib.NET" Version="1.4.1" />
+    <PackageReference Include="hidlibrary" Version="3.3.40" />
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+    <PackageReference Include="LLT.NvAPIWrapper.Net" Version="1.1.9-pre.21" />
+    <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1839" />
+    <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.2.3" />
+    <PackageReference Include="MouseKeyHook" Version="5.7.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="Octokit" Version="14.0.0" />
+    <PackageReference Include="SecretNest.SequentialScheduler" Version="1.1.0" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="System.Diagnostics.EventLog" Version="10.0.9" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.9" />
+    <PackageReference Include="System.Management" Version="10.0.9" />
+    <PackageReference Include="TaskScheduler" Version="2.12.2" />
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+    <PackageReference Include="WPF-UI.Tray" Version="4.3.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="PixiEditor.ColorPicker" Version="3.4.2.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="AMDFamily0F.bin" />
+    <None Remove="AMDFamily10.bin" />
+    <None Remove="AMDFamily17.bin" />
+    <None Remove="AMDReset.bin" />
+    <None Remove="Assets\BuiltInScaleModels.json" />
+    <None Remove="Assets\config-DT-AM4.png" />
+    <None Remove="Assets\config-DT-AM5.png" />
+    <None Remove="Assets\config-FL1.png" />
+    <None Remove="Assets\config.png" />
+    <None Remove="Assets\icon.png" />
+    <None Remove="Assets\Flydigi\bs1.png" />
+    <None Remove="Assets\Flydigi\bs2.png" />
+    <None Remove="Assets\Flydigi\bs2-pro.png" />
+    <None Remove="Assets\Flydigi\bs3.png" />
+    <None Remove="Assets\Flydigi\bs3-pro.png" />
+    <None Remove="Assets\HydroUI\mk1.png" />
+    <None Remove="Assets\HydroUI\mk2.png" />
+    <None Remove="Assets\Flydigi\logo.svg" />
+    <None Remove="Assets\Laptops\Framework\framework-laptop-13.png" />
+    <None Remove="Assets\Laptops\Framework\framework-laptop-16.png" />
+    <None Remove="Assets\Laptops\PCSpecialist\Recoil-3-16-AMD.png" />
+    <None Remove="Assets\Laptops\PCSpecialist\Recoil-3-16-Intel.png" />
+    <None Remove="Assets\Laptops\XMG\Neo-25.png" />
+    <None Remove="Assets\PCC Banner.png" />
+    <None Remove="Assets\pexels-photo-8037008.jpeg" />
+    <None Remove="Fan Configs\AOKZOE_AOKZOE A1 AR07.json" />
+    <None Remove="Fan Configs\AYANEO_AYANEO 2.json" />
+    <None Remove="Fan Configs\AYANEO_GEEK.json" />
+    <None Remove="Fan Configs\GPD_1618-04.json" />
+    <None Remove="Fan Configs\GPD_1619-04.json" />
+    <None Remove="Fan Configs\ONE-NETBOOK TECHNOLOGY CO., LTD._ONE-NETBOOK_V03.json" />
+    <None Remove="Fan Configs\ONE-NETBOOK TECHNOLOGY CO., LTD._ONEXPLAYER 2 ARP23.json" />
+    <None Remove="Fan Configs\ONE-NETBOOK_ONEXPLAYER 2 ARP23.json" />
+    <None Remove="Fan Configs\ONE-NETBOOK_V03.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\AMD\PawnIO\AMDFamily0F.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\AMD\PawnIO\AMDFamily10.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\AMD\PawnIO\AMDFamily17.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\AMD\PawnIO\AMDReset.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="favicon.ico" />
+    <Content Include="Fan Configs\AYANEO_GEEK.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Fan Configs\GPD_1618-04.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Fan Configs\ONE-NETBOOK TECHNOLOGY CO., LTD._ONE-NETBOOK_V03.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Fan Configs\AOKZOE_AOKZOE A1 AR07.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Fan Configs\ONE-NETBOOK_V03.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Fan Configs\ONE-NETBOOK_ONEXPLAYER 2 ARP23.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Fan Configs\ONE-NETBOOK TECHNOLOGY CO., LTD._ONEXPLAYER 2 ARP23.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Fan Configs\GPD_1619-04.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="SkuData\skus.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\BuiltInScaleModels.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Assets\icon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Assets\applicationIcon-1024.png" />
+    <Resource Include="Assets\applicationIcon-256.png" />
+    <Resource Include="Assets\Flydigi\bs1.png" />
+    <Resource Include="Assets\Flydigi\bs2.png" />
+    <Resource Include="Assets\Flydigi\bs2-pro.png" />
+    <Resource Include="Assets\Flydigi\bs3.png" />
+    <Resource Include="Assets\Flydigi\bs3-pro.png" />
+    <Resource Include="Assets\HydroUI\mk1.png" />
+    <Resource Include="Assets\HydroUI\mk2.png" />
+    <Resource Include="Assets\Flydigi\logo.svg" />
+    <Resource Include="Assets\config-DT-AM4.png" />
+    <Resource Include="Assets\config-DT-AM5.png" />
+    <Resource Include="Assets\config-FL1.png" />
+    <Resource Include="Assets\config.png" />
+    <Resource Include="Assets\Laptops\Framework\framework-laptop-13.png" />
+    <Resource Include="Assets\Laptops\Framework\framework-laptop-16.png" />
+    <Resource Include="Assets\Laptops\PCSpecialist\Recoil-3-16-AMD.png" />
+    <Resource Include="Assets\Laptops\PCSpecialist\Recoil-3-16-Intel.png" />
+    <Resource Include="Assets\Laptops\XMG\Neo-25.png" />
+    <Resource Include="Assets\PCC Banner.png" />
+    <Resource Include="Assets\pexels-photo-8037008.jpeg" />
+    <Content Include="Fan Configs\AYANEO_AYANEO 2.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="AutoOC">
+      <HintPath>..\..\AutoOC\AutoOC.dll</HintPath>
+    </Reference>
+    <Reference Include="RTSSSharedMemoryNET">
+      <HintPath>Assets\RTSS\RTSSSharedMemoryNET.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\Settings.Designer.cs">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+    <Compile Update="Views\Pages\Adaptive.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="ACPIDriverDll.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="ADLX_3DSettings.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="ADLX_AutoTuning.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="ADLX_DisplaySettings.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="ADLX_PerformanceMetrics.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\applicationIcon-1024.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Update="Assets\applicationIcon-256.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Update="Assets\GameImages\default.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Intel\PawnIO\IntelMCHBAR.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Intel\PawnIO\IntelMSR.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\RTSS\RTSSHooks64.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\RTSS\RTSSSharedMemoryNET.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Stress-Test\AVX2 Stress Test.deps.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Stress-Test\AVX2 Stress Test.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Stress-Test\AVX2 Stress Test.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Stress-Test\AVX2 Stress Test.pdb">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Stress-Test\AVX2 Stress Test.runtimeconfig.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\ACNet.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\AdaptiveSharpen.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_3D_AA_Upscale_US.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_3D_Upscale_US.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Denoise_Bilateral_Mean.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Denoise_Bilateral_Median.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Denoise_Bilateral_Mode.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Restore_L.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Restore_M.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Restore_Soft_L.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Restore_Soft_M.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Restore_VL.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Thin_HQ.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Upscale_Denoise_L.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Upscale_Denoise_S.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Upscale_Denoise_UL.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Upscale_Denoise_VL.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Upscale_GAN_x2_S.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Upscale_L.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Upscale_S.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Upscale_UL.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Anime4K_Upscale_VL.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Bicubic.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Bilinear.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\CAS.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\CAS_Scaling.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\CatmullRom.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\CRT_Easymode.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\CRT_Geom.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\CRT_Hyllian.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\CRT_Lottes.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\FineSharp.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\FSRCNNX.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\FSRCNNX_LineArt.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\FSR_EASU.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\FSR_RCAS.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\FXAA.hlsli">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\FXAA_High.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\FXAA_Medium.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\FXAA_Ultra.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\GTU_v050.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\ImageAdjustment.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Jinc.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Lanczos.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\LCAS.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\LumaSharpen.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\MMPX.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Nearest.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\NIS.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\NIS_Coef_Scale.dds">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\NIS_Coef_USM.dds">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\NNEDI3_nns16_win8x4.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\NNEDI3_nns64_win8x6.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\NVSharpen.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\Pixellate.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\RAVU_Lite_R3.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\RAVU_Lite_R3_Weights.dds">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\RAVU_Zoom_R3.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\RAVU_Zoom_R3_Weights.dds">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\SharpBilinear.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\SMAA.hlsli">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\SMAA_AreaTex.dds">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\SMAA_High.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\SMAA_Low.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\SMAA_Medium.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\SMAA_SearchTex.dds">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\SMAA_Ultra.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\SSimDownscaler.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\xBRZ_2x.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\xBRZ_3x.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\xBRZ_4x.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\xBRZ_5x.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\xBRZ_6x.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="effects\xBRZ_Freescale.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="kernel32.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Magpie.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Magpie.pdb">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="MagpieRT.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="MagpieRT.exp">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="MagpieRT.lib">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="PerformanceMetrics.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="favicon.ico">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Update="inpoutx64.lib">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+    <None Update="RTSSSharedMemoryNET.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\AMD\PawnIO\RyzenSMU.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="ucrtbased.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="vcruntime140d.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="vcruntime140_1d.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="WinRing0x64_Fan.sys">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="WinRing0x64.sys">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="WinRing0x64_Mem.sys">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="WinRing0_Mem.sys">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,1721 @@
+<Page x:Class="Uniwill_Control_Utility.Views.Pages.Adaptive"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:Uniwill_Control_Utility.Views.Pages"
+      xmlns:controls="clr-namespace:Uniwill_Control_Utility.Views.Controls"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      d:DataContext="{d:DesignInstance local:Adaptive, IsDesignTimeCreatable=False}"
+      d:Background="{DynamicResource ApplicationBackgroundBrush}"
+      Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+      mc:Ignorable="d"
+      d:DesignHeight="1000" d:DesignWidth="800"
+      Title="Adaptive Mode"
+      Loaded="Page_Loaded"
+      Unloaded="Page_Unloaded"
+      ScrollViewer.CanContentScroll="False"
+      SnapsToDevicePixels="True"
+      UseLayoutRounding="True">
+
+    <Page.Resources>
+        <Style TargetType="{x:Type CheckBox}"
+               BasedOn="{StaticResource DefaultCheckBoxStyle}">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Style.Triggers>
+                <Trigger Property="Content" Value="{x:Null}">
+                    <Setter Property="Width" Value="20" />
+                    <Setter Property="Height" Value="20" />
+                    <Setter Property="MinWidth" Value="20" />
+                    <Setter Property="MinHeight" Value="20" />
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="HorizontalAlignment" Value="Center" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Row 0: Scrollable content -->
+        <ScrollViewer Grid.Row="0"
+                      x:Name="mainScroll"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      CanContentScroll="False"
+                      PanningMode="VerticalOnly"
+                      IsDeferredScrollingEnabled="False"
+                      ScrollChanged="mainScroll_ScrollChanged">
+                <ScrollViewer.Style>
+                    <Style TargetType="{x:Type ScrollViewer}"
+                        BasedOn="{StaticResource {x:Type ScrollViewer}}">
+
+                        <Setter Property="Padding"
+                             Value="0" />
+                        <Style.Triggers>
+                            <DataTrigger
+                                Binding="{Binding ComputedVerticalScrollBarVisibility,
+                                                RelativeSource={RelativeSource Self}}"
+                                Value="Visible">
+
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ScrollViewer.Style>
+
+                    <!-- Centered max-width layout container -->
+                    <Grid MaxWidth="1080" HorizontalAlignment="Stretch" Margin="16,0,24,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Row 0: Page title block -->
+                        <StackPanel Grid.Row="0" Margin="0,24,0,12">
+                            <TextBlock FontSize="26"
+                                       FontWeight="Medium"
+                                       Margin="0,0,36,0"
+                                       Text="Adaptive Mode" />
+                            <TextBlock Margin="0,8,36,12"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Per-game profile presets with automatic switching."
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <!-- Row 1: Content cards -->
+                        <StackPanel x:Name="mainCon" Grid.Row="1" Margin="16,16,20,18">
+                            <ui:CardControl Name="sdEnabled"
+                                           IsEnabled="True"
+                                           Icon="{ui:SymbolIcon PresenceAvailable10}"
+                                           Margin="0,0,0,8"
+                                            RenderOptions.EdgeMode="Unspecified"
+ClipToBounds="True">
+
+                        <ui:CardControl.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock
+                                        FontSize="14"
+                                        FontWeight="Medium"
+                                        Text="Auto Switch" />
+                                    <TextBlock
+                                        FontSize="12"
+                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                        Text="Enable this preset for automatic switching. Can be used to exclude games/apps from auto switch."/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Grid.Column="1">
+                                    <ui:ToggleSwitch 
+                                        Name="tsAutoSwitch" 
+                                        Margin="0,0,9,0"
+                                        LabelPosition="Left"
+                                        OnContent="On"
+                                        OffContent="Off"/>
+                                </StackPanel>
+                            </Grid>
+                        </ui:CardControl.Header>
+                    </ui:CardControl>
+
+                    <!-- CPU Settings -->
+                    <ui:CardExpander x:Name="sdCpuSettings"
+                                    IsEnabled="True"
+                                    IsExpanded="False"
+                                    Margin="0,0,0,8">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE950;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="CPU Settings" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Per-game CPU power, thermal, and voltage tuning."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <ui:ToggleSwitch x:Name="cbxCpuEnabled"
+                                                     Margin="0,0,9,0"
+                                                     LabelPosition="Left"
+                                                     OnContent="On"
+                                                     OffContent="Off"
+                                                     ToolTip="Enable CPU controls for this game"
+                                                     Checked="cbxCpuEnabled_Toggled"
+                                                     Unchecked="cbxCpuEnabled_Toggled" />
+                                </StackPanel>
+                            </Grid>
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <!-- Sustained Power Limit (SPL) -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Sustained (SPL)" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Sustained power limit (SMU slow-limit)" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblSustained"
+                                               Width="48"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="75 W" />
+                                    <Slider x:Name="AdpSdSustained" Width="140" Maximum="255" Minimum="5" Value="75" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Boost Power Limit (FPL) -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Boost (FPL)" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Boost power limit (SMU fast-limit)" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblBoost"
+                                               Width="48"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="85 W" />
+                                    <Slider x:Name="AdpSdBoost" Width="140" Maximum="255" Minimum="5" Value="85" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- TjMax (AMD only) -->
+                            <Grid x:Name="AdpGridTjMax">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="TjMax" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Thermal throttle temperature" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblTjMax"
+                                               Width="48"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="95 °C" />
+                                    <Slider x:Name="AdpSdTjMax" Width="140" Maximum="105" Minimum="70" Value="95" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border x:Name="AdpDividerAfterTjMax" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Curve Optimizer (AMD only) -->
+                            <Grid x:Name="AdpGridCoAll">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Curve Optimizer" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Global voltage offset (all cores)" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblCoAll"
+                                               Width="40"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="0" />
+                                    <Slider x:Name="AdpSdCoAll" Width="140" Maximum="0" Minimum="-50" Value="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Intel PL1 -->
+                            <Grid x:Name="AdpGridIntelPl1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="PL1" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Sustained power limit" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblIntelPl1"
+                                               Width="48"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="45 W" />
+                                    <Slider x:Name="AdpSdIntelPl1" Width="140" Maximum="400" Minimum="5" Value="45" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border x:Name="AdpDividerAfterIntelPl1" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Intel PL2 -->
+                            <Grid x:Name="AdpGridIntelPl2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="PL2" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Boost power limit" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblIntelPl2"
+                                               Width="48"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="60 W" />
+                                    <Slider x:Name="AdpSdIntelPl2" Width="140" Maximum="400" Minimum="5" Value="60" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border x:Name="AdpDividerAfterIntelPl2" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Intel CPU Undervolt -->
+                            <Grid x:Name="AdpGridIntelUndervolt">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="CPU Undervolt" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="CPU voltage offset" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblIntelUndervolt"
+                                               Width="48"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="0 mV" />
+                                    <Slider x:Name="AdpSdIntelUndervolt" Width="140" Maximum="0" Minimum="-150" Value="0" TickFrequency="10" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </ui:CardExpander>
+
+                    <!-- GPU Settings -->
+                    <ui:CardExpander x:Name="sdGpuSettings"
+                                    Visibility="Collapsed"
+                                    IsEnabled="True"
+                                    IsExpanded="False"
+                                    Margin="0,0,0,8">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF211;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="GPU Settings" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Per-game GPU power, clock offsets, and curve editing."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <ui:ToggleSwitch x:Name="cbxGpuEnabled"
+                                                     Margin="0,0,9,0"
+                                                     LabelPosition="Left"
+                                                     OnContent="On"
+                                                     OffContent="Off"
+                                                     ToolTip="Enable GPU controls for this game"
+                                                     Checked="cbxGpuEnabled_Toggled"
+                                                     Unchecked="cbxGpuEnabled_Toggled" 
+                                                     RenderOptions.EdgeMode="Unspecified"
+                                                     RenderOptions.BitmapScalingMode="HighQuality"
+                                                     SnapsToDevicePixels="False"/>
+                                </StackPanel>
+                            </Grid>
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <!-- GPU TGP -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="GPU TGP" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Base power limit" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblNvPower"
+                                               Width="48"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="150 W" />
+                                    <Slider x:Name="AdpSdNvPower" Width="140" Maximum="150" Minimum="0" Value="150" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Dynamic Boost Toggle -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Dynamic Boost" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Enable NVIDIA Dynamic Boost" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="AdpTogDynamicBoost"
+                                                 Grid.Column="1"
+                                                 Margin="4,0,0,0"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="AdpTogDynamicBoost_Checked"
+                                                 Unchecked="AdpTogDynamicBoost_Unchecked" />
+                            </Grid>
+                            <!-- Dynamic Boost Offset (hidden when toggle is off) -->
+                            <StackPanel x:Name="AdpSpNvDbOffset" Visibility="Collapsed">
+                                <!-- Divider -->
+                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <Grid Margin="0,0,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Dynamic Boost Offset" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Extra GPU power borrowed from CPU" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center">
+                                        <TextBlock x:Name="AdpLblNvDbOffset"
+                                                   Width="48"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,8,0"
+                                                   Text="5 W" />
+                                        <Slider x:Name="AdpSdNvDbOffset" Width="140" Maximum="25" Minimum="0" Value="5" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Curve Editor Button -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Curve Editor" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Edit voltage-frequency curve per point" />
+                                </StackPanel>
+                                <Button x:Name="AdpBtnVfCurve"
+                                        Grid.Column="1"
+                                        Content="Edit Curve"
+                                        Click="AdpBtnVfCurve_Click"
+                                        Margin="4,0,0,0"
+                                        Padding="12,4" />
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Core Clock Offset -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Core Clock Offset" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Uniform core frequency offset" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblNvCore"
+                                               Width="60"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="0 MHz" />
+                                    <Slider x:Name="AdpSdNvCore"
+                                            Width="140"
+                                            Maximum="1000"
+                                            Minimum="-1000"
+                                            Value="0"
+                                            TickFrequency="50"
+                                            IsSnapToTickEnabled="True"
+                                            TickPlacement="None"
+                                            VerticalAlignment="Center"
+                                            ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Memory Clock Offset -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Memory Clock Offset" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Memory frequency offset" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblNvMem"
+                                               Width="60"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="0 MHz" />
+                                    <Slider x:Name="AdpSdNvMem" Width="140" Maximum="2000" Minimum="-1000" Value="0" TickFrequency="50" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </ui:CardExpander>
+
+                    <!-- Hydro UI - only visible on supported hardware -->
+                    <ui:CardExpander Name="sdHydroUI"
+                                     Visibility="Collapsed"
+                                     IsEnabled="True"
+                                     IsExpanded="False"
+                                     Margin="0,0,0,8">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEB42;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0  ">
+                                    <ui:TextBlock FontTypography="Body" Text="Hydro UI" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Per-game pump voltage, fan speed, and RGB for the LCT watercooler." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <ui:ToggleSwitch Name="cbxWcEnabled"
+                                                      Margin="0,0,9,0"
+                                                      LabelPosition="Left"
+                                                      OnContent="On"
+                                                      OffContent="Off"
+                                                      ToolTip="Enable Hydro UI controls for this game"
+                                                      Checked="cbxWcEnabled_Toggled"
+                                                      Unchecked="cbxWcEnabled_Toggled" />
+                                </StackPanel>
+                            </Grid>
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <!-- Row: Pump Voltage -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Pump Voltage" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select the pump voltage for this game. Higher voltage = more cooling." />
+                                </StackPanel>
+                                <ComboBox Name="cbxWcPumpVoltage"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          Margin="4,0,0,0"
+                                          SelectedIndex="1">
+                                    <ComboBoxItem>Off</ComboBoxItem>
+                                    <ComboBoxItem>7V</ComboBoxItem>
+                                    <ComboBoxItem>8V</ComboBoxItem>
+                                    <ComboBoxItem>11V</ComboBoxItem>
+                                </ComboBox>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Row: Fan Speed -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Fan Speed" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select the fan duty cycle for this game. Higher = more airflow, more noise." />
+                                </StackPanel>
+                                <ComboBox Name="cbxWcFanSpeed"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          Margin="4,0,0,0"
+                                          SelectedIndex="2">
+                                    <ComboBoxItem>Off</ComboBoxItem>
+                                    <ComboBoxItem>25%</ComboBoxItem>
+                                    <ComboBoxItem>50%</ComboBoxItem>
+                                    <ComboBoxItem>75%</ComboBoxItem>
+                                    <ComboBoxItem>90%</ComboBoxItem>
+                                    <ComboBoxItem>95%</ComboBoxItem>
+                                    <ComboBoxItem>100%</ComboBoxItem>
+                                </ComboBox>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Row: RGB Mode -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="RGB Mode" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select the RGB lighting mode for this game." />
+                                </StackPanel>
+                                <ComboBox Name="cbxWcRgbMode"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          Margin="4,0,0,0"
+                                          SelectedIndex="1"
+                                          SelectionChanged="cbxWcRgbMode_SelectionChanged">
+                                    <ComboBoxItem>Off</ComboBoxItem>
+                                    <ComboBoxItem>Static</ComboBoxItem>
+                                    <ComboBoxItem>Breathe</ComboBoxItem>
+                                    <ComboBoxItem>Colorful</ComboBoxItem>
+                                    <ComboBoxItem>Breathe Color</ComboBoxItem>
+                                </ComboBox>
+                            </Grid>
+                            <!-- Divider (hidden for modes without color) -->
+                            <Border x:Name="WcRgbColorDivider"
+                                    Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+                            <!-- Row: RGB Color (hidden for Off/Colorful/Breathe Color) -->
+                            <Grid x:Name="spWcRgbColor">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="RGB Color" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select the RGB color for this game." />
+                                </StackPanel>
+                                <ComboBox Name="cbxWcRgbColor"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          Margin="4,0,0,0"
+                                          SelectedIndex="0">
+                                    <ComboBoxItem>Red</ComboBoxItem>
+                                    <ComboBoxItem>Green</ComboBoxItem>
+                                    <ComboBoxItem>Blue</ComboBoxItem>
+                                    <ComboBoxItem>White</ComboBoxItem>
+                                </ComboBox>
+                            </Grid>
+                        </StackPanel>
+                    </ui:CardExpander>
+
+                    <!-- Flydigi Cooler - only visible on supported hardware -->
+                    <ui:CardExpander x:Name="sdBs2Pro"
+                                    Visibility="Collapsed"
+                                    IsEnabled="True"
+                                    IsExpanded="False"
+                                    Margin="0,0,0,8">
+                        <ui:CardExpander.Icon>
+                            <controls:FlydigiIconElement Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock x:Name="tbBs2ProTitle"
+                                                   FontTypography="Body"
+                                                   Text="Flydigi Cooler" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Per-game fan control for the Flydigi cooling pad."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <ui:ToggleSwitch x:Name="cbxBs2ProEnabled"
+                                                     Margin="0,0,9,0"
+                                                     LabelPosition="Left"
+                                                     OnContent="On"
+                                                     OffContent="Off"
+                                                     ToolTip="Enable cooling pad controls for this game"
+                                                     Checked="cbxBs2ProEnabled_Toggled"
+                                                     Unchecked="cbxBs2ProEnabled_Toggled" />
+                                </StackPanel>
+                            </Grid>
+                        </ui:CardExpander.Header>
+
+                        <StackPanel>
+                            <!-- Row: Fan Mode (ComboBox in content, not header) -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Fan Mode" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select the fan control mode for this game."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ComboBox x:Name="cbxBs2ProFanMode"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          SelectedIndex="0"
+                                          SelectionChanged="cbxBs2ProFanMode_SelectionChanged">
+                                    <ComboBoxItem Content="Gear Preset"/>
+                                    <ComboBoxItem Content="Manual RPM"/>
+                                    <ComboBoxItem Content="Curve (Auto)"/>
+                                </ComboBox>
+                            </Grid>
+
+                            <!-- Divider before fan sub-controls (visible for any mode) -->
+                            <Border x:Name="Bs2ProFanSubDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Gear Preset (visible for Gear mode) -->
+                            <Grid x:Name="spBs2ProGear" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Gear Preset" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select a preset gear level."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ComboBox x:Name="cbxBs2ProGear"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          SelectedIndex="0">
+                                    <ComboBoxItem Content="1 - Quiet"/>
+                                    <ComboBoxItem Content="2 - Standard"/>
+                                    <ComboBoxItem Content="3 - Strong"/>
+                                    <ComboBoxItem Content="4 - Overclock"/>
+                                </ComboBox>
+                            </Grid>
+
+                            <!-- Row: Manual RPM (visible for Manual mode) -->
+                            <Grid x:Name="spBs2ProRpm" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="RPM" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Set fan speed between 1300 and 4000 RPM."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="Bs2ProRpmValueText"
+                                               Width="50"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="2000" />
+                                    <Slider x:Name="sdBs2ProRpm"
+                                            Width="140"
+                                            Minimum="1300"
+                                            Maximum="4000"
+                                            Value="2000"
+                                            TickFrequency="50"
+                                            IsMoveToPointEnabled="False"
+                                            IsSnapToTickEnabled="True"
+                                            ValueChanged="Bs2ProRpmSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Hidden NumberBox retained for backward compatibility with preset save/load -->
+                            <ui:NumberBox x:Name="nudBs2ProRpm" Width="0" Height="0" Visibility="Collapsed"
+                                          Minimum="1300" Maximum="4000" SmallChange="50" MaxDecimalPlaces="0" />
+
+                            <!-- Row: Curve Profile (visible for Curve mode) -->
+                            <Grid x:Name="spBs2ProCurve" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Curve Profile" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select a temperature-to-RPM fan curve."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ComboBox x:Name="cbxBs2ProCurve"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          SelectedIndex="0"
+                                          SelectionChanged="cbxBs2ProCurve_SelectionChanged">
+                                    <ComboBoxItem Content="Silent"/>
+                                    <ComboBoxItem Content="Balanced"/>
+                                    <ComboBoxItem Content="Performance"/>
+                                    <ComboBoxItem Content="Custom"/>
+                                </ComboBox>
+                            </Grid>
+
+                            <!-- Divider before embedded curve editor (only visible for Custom) -->
+                            <Border x:Name="Bs2ProCurveEditorDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Embedded Curve Editor — full-width row (visible only for Custom profile) -->
+                            <controls:FlydigiFanCurveEditor x:Name="Bs2ProCurveEditor"
+                                                            Visibility="Collapsed"
+                                                            Margin="0,4,0,4"/>
+
+                            <!-- ==================================================== -->
+                            <!-- RGB Section (hidden for BS1)                         -->
+                            <!-- ==================================================== -->
+
+                            <!-- Divider before RGB Mode -->
+                            <Border x:Name="Bs2ProRgbDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Row: RGB Mode -->
+                            <Grid x:Name="spBs2ProRgbMode" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="RGB Mode" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Configure RGB lighting effects and colors."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ComboBox x:Name="cbxBs2ProRgbMode"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          SelectedIndex="1"
+                                          SelectionChanged="cbxBs2ProRgbMode_SelectionChanged">
+                                    <ComboBoxItem Content="Off"/>
+                                    <ComboBoxItem Content="Smart-Temp"/>
+                                    <ComboBoxItem Content="Static"/>
+                                    <ComboBoxItem Content="Breathing"/>
+                                    <ComboBoxItem Content="Flowing"/>
+                                </ComboBox>
+                            </Grid>
+
+                            <!-- Divider before RGB sub-controls (visible for any mode except Off/Smart-Temp which show messages) -->
+                            <Border x:Name="Bs2ProRgbSubDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Off message (visible for Off) -->
+                            <Grid x:Name="spBs2ProRgbOff" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="RGB disabled" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="No customization available while RGB effects are turned off."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Row: Smart-Temp message (visible for Smart-Temp) -->
+                            <Grid x:Name="spBs2ProRgbSmartTemp" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Smart-Temp mode" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Smart-Temp automatically adjusts colors based on device temperature and has no additional controls."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Row: Color picker (visible for Static/Breathing) -->
+                            <Grid x:Name="spBs2ProRgbColorPicker" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Color" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Pick a color for this effect." />
+                                </StackPanel>
+                                <controls:ColorPickerControl x:Name="Bs2ProRgbColorPicker"
+                                                             Grid.Column="1"
+                                                             HorizontalAlignment="Right"
+                                                             VerticalAlignment="Center"
+                                                             SelectedColor="Aqua"
+                                                             ColorChangedDelayed="Bs2ProRgbColorPicker_ColorChangedDelayed" />
+                            </Grid>
+
+                            <!-- Hidden NumberBoxes retained for backward compatibility with preset save/load -->
+                            <ui:NumberBox x:Name="nudBs2ProRgbR" Width="0" Height="0" Visibility="Collapsed"
+                                          Minimum="0" Maximum="255" SmallChange="1" MaxDecimalPlaces="0" />
+                            <ui:NumberBox x:Name="nudBs2ProRgbG" Width="0" Height="0" Visibility="Collapsed"
+                                          Minimum="0" Maximum="255" SmallChange="1" MaxDecimalPlaces="0" />
+                            <ui:NumberBox x:Name="nudBs2ProRgbB" Width="0" Height="0" Visibility="Collapsed"
+                                          Minimum="0" Maximum="255" SmallChange="1" MaxDecimalPlaces="0" />
+
+                            <!-- Divider before Brightness (Static/Breathing) -->
+                            <Border x:Name="Bs2ProRgbStaticBrightnessDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Row: Brightness (visible for Static/Breathing/Flowing) — shared slider -->
+                            <Grid x:Name="spBs2ProRgbBrightness" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Brightness" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Adjust the brightness level." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="Bs2ProRgbBrightnessValueText"
+                                               Width="30"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="100" />
+                                    <Slider x:Name="sliderBs2ProBrightness"
+                                            Width="140"
+                                            Minimum="0"
+                                            Maximum="100"
+                                            Value="100"
+                                            TickFrequency="1"
+                                            IsMoveToPointEnabled="False"
+                                            ValueChanged="Bs2ProBrightnessSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Divider before Flowing Speed -->
+                            <Border x:Name="Bs2ProRgbFlowingSpeedDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Row: Speed (visible for Flowing) -->
+                            <Grid x:Name="spBs2ProRgbSpeed" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Speed" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Control the flowing animation speed." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="Bs2ProRgbSpeedValueText"
+                                               Width="60"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="Medium" />
+                                    <Slider x:Name="sliderBs2ProRgbSpeed"
+                                            Width="140"
+                                            Minimum="0"
+                                            Maximum="2"
+                                            Value="1"
+                                            IsSnapToTickEnabled="True"
+                                            TickFrequency="1"
+                                            TickPlacement="Both"
+                                            IsMoveToPointEnabled="False"
+                                            ValueChanged="Bs2ProRgbSpeedSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </ui:CardExpander>
+
+                    <!-- Fan Control - only visible on supported hardware -->
+                    <ui:CardExpander x:Name="sdEcFan"
+                                    Visibility="Collapsed"
+                                    IsEnabled="True"
+                                    IsExpanded="False"
+                                    Margin="0,0,0,8">
+                        <ui:CardExpander.Icon>
+                            <ui:SymbolIcon Symbol="Gauge24" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:TextBlock FontTypography="Body" Text="Fan Control" />
+                                        <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Custom curves are saved per-game and applied automatically when this profile is active." VerticalAlignment="Bottom" />
+                                    </StackPanel>
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Per-game fan curve control for the EC fan controller."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <ui:ToggleSwitch x:Name="cbxEcFanEnabled"
+                                                     Margin="0,0,9,0"
+                                                     LabelPosition="Left"
+                                                     OnContent="On"
+                                                     OffContent="Off"
+                                                     ToolTip="Enable EC fan controls for this game"
+                                                     Checked="cbxEcFanEnabled_Toggled"
+                                                     Unchecked="cbxEcFanEnabled_Toggled" />
+                                </StackPanel>
+                            </Grid>
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <!-- Fan Curve Mode selector -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:TextBlock FontTypography="Body" Text="Fan Curve Mode" />
+                                        <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select Unified (single curve) or Split (separate CPU/GPU curves)." VerticalAlignment="Bottom" />
+                                    </StackPanel>
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Unified uses a single curve; Split allows separate CPU and GPU curves." />
+                                </StackPanel>
+                                <ComboBox Name="cbxEcFanMode" Grid.Column="1" Width="180" HorizontalAlignment="Right" VerticalAlignment="Center" SelectedIndex="0" SelectionChanged="cbxEcFanMode_SelectionChanged">
+                                    <ComboBoxItem>Unified</ComboBoxItem>
+                                    <ComboBoxItem>Split (CPU + GPU)</ComboBoxItem>
+                                </ComboBox>
+                            </Grid>
+
+                            <!-- Unified preset selector -->
+                            <StackPanel Name="spEcFanUnified" Visibility="Visible">
+                                <!-- Divider -->
+                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <!-- Profile -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:TextBlock FontTypography="Body" Text="Fan Curve Profile" />
+                                            <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select a fan curve profile for this game." VerticalAlignment="Bottom" />
+                                        </StackPanel>
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Preset or custom fan curve applied to both CPU and GPU." />
+                                    </StackPanel>
+                                    <ComboBox Name="cbxEcFanPreset" Grid.Column="1" Width="180" HorizontalAlignment="Right" VerticalAlignment="Center" SelectedIndex="1">
+                                        <ComboBoxItem>Silent</ComboBoxItem>
+                                        <ComboBoxItem>Balanced</ComboBoxItem>
+                                        <ComboBoxItem>Performance</ComboBoxItem>
+                                        <ComboBoxItem>Full Speed</ComboBoxItem>
+                                        <ComboBoxItem>Off</ComboBoxItem>
+                                        <ComboBoxItem>Custom</ComboBoxItem>
+                                    </ComboBox>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- Split CPU/GPU preset selectors -->
+                            <StackPanel Name="spEcFanSplit" Visibility="Collapsed">
+                                <!-- Divider -->
+                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <!-- CPU Fan Curve -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="CPU Fan Curve" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Fan curve driven by CPU temperature." />
+                                    </StackPanel>
+                                    <ComboBox Name="cbxEcFanCpuPreset" Grid.Column="1" Width="180" HorizontalAlignment="Right" VerticalAlignment="Center" SelectedIndex="1">
+                                        <ComboBoxItem>Silent</ComboBoxItem>
+                                        <ComboBoxItem>Balanced</ComboBoxItem>
+                                        <ComboBoxItem>Performance</ComboBoxItem>
+                                        <ComboBoxItem>Full Speed</ComboBoxItem>
+                                        <ComboBoxItem>Off</ComboBoxItem>
+                                        <ComboBoxItem>Custom</ComboBoxItem>
+                                    </ComboBox>
+                                </Grid>
+                                <!-- Divider -->
+                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <!-- GPU Fan Curve -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="GPU Fan Curve" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Fan curve driven by GPU temperature." />
+                                    </StackPanel>
+                                    <ComboBox Name="cbxEcFanGpuPreset" Grid.Column="1" Width="180" HorizontalAlignment="Right" VerticalAlignment="Center" SelectedIndex="1">
+                                        <ComboBoxItem>Silent</ComboBoxItem>
+                                        <ComboBoxItem>Balanced</ComboBoxItem>
+                                        <ComboBoxItem>Performance</ComboBoxItem>
+                                        <ComboBoxItem>Full Speed</ComboBoxItem>
+                                        <ComboBoxItem>Off</ComboBoxItem>
+                                        <ComboBoxItem>Custom</ComboBoxItem>
+                                    </ComboBox>
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+                    </ui:CardExpander>
+
+                    <!-- Keyboard RGB - per-game keyboard backlight control -->
+                    <ui:CardExpander Name="sdKeyboard"
+                        IsEnabled="True"
+                        IsExpanded="False"
+                        Margin="0,0,0,8">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE92E;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock
+                                        FontSize="14"
+                                        FontWeight="Medium"
+                                        Text="Keyboard RGB" />
+                                    <TextBlock
+                                        FontSize="12"
+                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                        Text="Per-game keyboard backlight control for ITE HID keyboards."/>
+                                </StackPanel>
+                                <ui:ToggleSwitch Name="cbxKbEnabled" Grid.Column="1" VerticalAlignment="Center"
+                                    Margin="0,0,9,0"
+                                    LabelPosition="Left"
+                                    OnContent="On"
+                                    OffContent="Off"
+                                    ToolTip="Enable keyboard RGB controls for this game"
+                                    Checked="cbxKbEnabled_Toggled"
+                                    Unchecked="cbxKbEnabled_Toggled" />
+                            </Grid>
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <!-- Mode: Effects / Per-Key -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Mode" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Choose between animation effects or per-key color control." />
+                                </StackPanel>
+                                <ComboBox Name="cbxKbMode" Grid.Column="1" Width="180" HorizontalAlignment="Right" VerticalAlignment="Center" SelectedIndex="0" SelectionChanged="cbxKbMode_SelectionChanged">
+                                    <ComboBoxItem>Effects</ComboBoxItem>
+                                    <ComboBoxItem>Per-Key RGB</ComboBoxItem>
+                                </ComboBox>
+                            </Grid>
+
+                            <!-- Effect controls (visible in Effects mode) -->
+                            <StackPanel Name="spKbEffectControls" Visibility="Collapsed">
+                                <!-- Divider before Effect -->
+                                <Border Name="sepKbEffect" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                                <!-- Effect Type -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Effect" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Choose an animation effect." />
+                                    </StackPanel>
+                                    <ComboBox Name="cbxKbEffect" Grid.Column="1" Width="180" HorizontalAlignment="Right" VerticalAlignment="Center" SelectedIndex="0" SelectionChanged="cbxKbEffect_SelectionChanged">
+                                        <ComboBoxItem>Static</ComboBoxItem>
+                                        <ComboBoxItem>Breathing</ComboBoxItem>
+                                        <ComboBoxItem>Wave</ComboBoxItem>
+                                        <ComboBoxItem>Reactive</ComboBoxItem>
+                                        <ComboBoxItem>Rainbow</ComboBoxItem>
+                                        <ComboBoxItem>Ripple</ComboBoxItem>
+                                        <ComboBoxItem>Touch Ripple</ComboBoxItem>
+                                        <ComboBoxItem>Marquee</ComboBoxItem>
+                                        <ComboBoxItem>Raindrop</ComboBoxItem>
+                                        <ComboBoxItem>Aurora</ComboBoxItem>
+                                        <ComboBoxItem>Touch Aurora</ComboBoxItem>
+                                        <ComboBoxItem>Touch Spark</ComboBoxItem>
+                                        <ComboBoxItem>Spark</ComboBoxItem>
+                                        <ComboBoxItem>Gaming Mode</ComboBoxItem>
+                                        <ComboBoxItem>Gaming Mode Full</ComboBoxItem>
+                                        <ComboBoxItem>Music</ComboBoxItem>
+                                    </ComboBox>
+                                </Grid>
+
+                                <!-- Divider before Color -->
+                                <Border Name="sepKbColor" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
+
+                                <!-- Color (visible for single-color effects) -->
+                                <Grid Name="spKbColor" Visibility="Visible">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Color" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Single color for static and single-color effects." />
+                                    </StackPanel>
+                                    <controls:ColorPickerControl x:Name="KbColorPicker" Grid.Column="1"
+                                                                     HorizontalAlignment="Right"
+                                                                     VerticalAlignment="Center"
+                                                                     SelectedColor="Aqua"
+                                                                     ColorChangedDelayed="KbColorPicker_ColorChangedDelayed" />
+                                </Grid>
+
+                                <!-- Multi-color picker (visible for multi-color effects) — shares sepKbColor -->
+                                <Grid Name="spKbMultiColor" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Name="tbKbMultiColorTitle" Text="Effect Colors" />
+                                        <ui:TextBlock x:Name="tbKbMultiColorSubtitle" Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="7 colors required for this effect." />
+                                    </StackPanel>
+                                    <controls:KeyboardMultiColorPickerControl x:Name="KbMultiColorPicker" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" ColorsChanged="KbMultiColorPicker_ColorsChanged"/>
+                                </Grid>
+
+                                <!-- Rest color for GamingModeFull — shares sepKbColor -->
+                                <Grid Name="spKbGamingRest" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Rest of Keyboard" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Color for non-WASD/arrow keys." />
+                                    </StackPanel>
+                                    <controls:ColorPickerControl x:Name="KbRestColorPicker" Grid.Column="1"
+                                                                     HorizontalAlignment="Right"
+                                                                     VerticalAlignment="Center"
+                                                                     SelectedColor="White"
+                                                                     ColorChangedDelayed="KbRestColorPicker_ColorChangedDelayed" />
+                                </Grid>
+
+                                <!-- Divider before GamingRest -->
+                                <Border Name="sepKbGamingRest" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
+
+                                <!-- Divider before Direction -->
+                                <Border Name="sepKbDirection" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
+
+                                <!-- Direction (Wave only) -->
+                                <Grid Name="grKbDirection" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Direction" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Animation direction for Wave effect." />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <ui:Button x:Name="btnKbDirLeftRight" Width="40" Height="36" Margin="0,0,4,0"
+                                                   Appearance="Transparent" Click="KbDirectionButton_Click" Tag="LeftRight">
+                                            <TextBlock Text="→" FontSize="18" HorizontalAlignment="Center"/>
+                                        </ui:Button>
+                                        <ui:Button x:Name="btnKbDirRightLeft" Width="40" Height="36" Margin="0,0,4,0"
+                                                   Appearance="Transparent" Click="KbDirectionButton_Click" Tag="RightLeft">
+                                            <TextBlock Text="←" FontSize="18" HorizontalAlignment="Center"/>
+                                        </ui:Button>
+                                        <ui:Button x:Name="btnKbDirDownUp" Width="40" Height="36" Margin="0,0,4,0"
+                                                   Appearance="Transparent" Click="KbDirectionButton_Click" Tag="DownUp">
+                                            <TextBlock Text="↑" FontSize="18" HorizontalAlignment="Center"/>
+                                        </ui:Button>
+                                        <ui:Button x:Name="btnKbDirUpDown" Width="40" Height="36" Margin="0,0,4,0"
+                                                   Appearance="Transparent" Click="KbDirectionButton_Click" Tag="UpDown">
+                                            <TextBlock Text="↓" FontSize="18" HorizontalAlignment="Center"/>
+                                        </ui:Button>
+                                        <ui:Button x:Name="btnKbDiagBRTL" Width="40" Height="36" Margin="0,0,4,0"
+                                                   Appearance="Transparent" Click="KbDirectionButton_Click" Tag="DiagonalBottomRightToTopLeft">
+                                            <TextBlock Text="↖" FontSize="18" HorizontalAlignment="Center"/>
+                                        </ui:Button>
+                                        <ui:Button x:Name="btnKbDiagBLTR" Width="40" Height="36" Margin="0,0,0,0"
+                                                   Appearance="Transparent" Click="KbDirectionButton_Click" Tag="DiagonalBottomLeftToTopRight">
+                                            <TextBlock Text="↗" FontSize="18" HorizontalAlignment="Center"/>
+                                        </ui:Button>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Divider before Brightness -->
+                                <Border Name="sepKbBrightness" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                                <!-- Brightness -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Brightness" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Backlight brightness level 1-7." />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock Name="tbKbBrightnessValue" Width="30" HorizontalAlignment="Center" Margin="0,0,8,0" Text="5" />
+                                        <Slider Name="sdKbBrightness" Width="140" Maximum="7" Minimum="1" TickFrequency="1" TickPlacement="Both" IsSnapToTickEnabled="True" Value="5" IsMoveToPointEnabled="False" ValueChanged="sdKbBrightness_ValueChanged"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Divider before Speed -->
+                                <Border Name="sepKbSpeed" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
+
+                                <!-- Speed (hidden for Static, Rainbow, GamingMode, GamingModeFull) -->
+                                <Grid Name="spKbSpeed" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Speed" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Animation speed (1=fastest, 10=slowest)." />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <TextBlock Name="tbKbSpeedValue" Width="30" HorizontalAlignment="Center" Margin="0,0,8,0" Text="5" />
+                                        <Slider Name="sdKbSpeed" Width="140" Maximum="10" Minimum="1" TickFrequency="1" TickPlacement="Both" IsSnapToTickEnabled="True" Value="5" IsMoveToPointEnabled="False" ValueChanged="sdKbSpeed_ValueChanged"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- Per-Key controls (visible in Per-Key mode) -->
+                            <StackPanel Name="spKbPerKeyNote" Visibility="Collapsed">
+                                <Border Padding="12" Background="{DynamicResource ControlFillColorDefaultBrush}" CornerRadius="4">
+                                    <StackPanel>
+                                        <ui:TextBlock FontTypography="Body" Text="Per-Key RGB Mode" />
+                                        <ui:TextBlock Margin="0,2,0,8"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Configure individual key colors for this profile."
+                                                       TextWrapping="Wrap" />
+                                        <ui:Button Name="btnKbEditPerKey"
+                                                   Appearance="Primary"
+                                                   Content="Edit Per-Key Colors"
+                                                   HorizontalAlignment="Left" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+                    </ui:CardExpander>
+
+                    <!-- Light Bar - only visible on supported hardware -->
+                    <ui:CardExpander x:Name="sdLightBar"
+                                    Visibility="Collapsed"
+                                    IsEnabled="True"
+                                    IsExpanded="False"
+                                    Margin="0,0,0,8">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xED39;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Light Bar" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Per-game front light bar control."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <ui:ToggleSwitch x:Name="cbxLbEnabled"
+                                                     Margin="0,0,9,0"
+                                                     LabelPosition="Left"
+                                                     OnContent="On"
+                                                     OffContent="Off"
+                                                     ToolTip="Enable Light Bar controls for this game"
+                                                     Checked="cbxLbEnabled_Toggled"
+                                                     Unchecked="cbxLbEnabled_Toggled" />
+                                </StackPanel>
+                            </Grid>
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <!-- Light Bar Power -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Power" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Turn the front light bar on or off." />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="AdpTsLightBarPower"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 IsChecked="True"
+                                                 Checked="AdpTsLightBarPower_Toggled"
+                                                 Unchecked="AdpTsLightBarPower_Toggled" />
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Color -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Color" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Choose the light bar color." />
+                                </StackPanel>
+                                <controls:ColorPickerControl x:Name="AdpLbColorPicker"
+                                                             HorizontalAlignment="Right"
+                                                             VerticalAlignment="Center"
+                                                             SelectedColor="Aqua"
+                                                             ColorChangedDelayed="AdpLbColorPicker_ColorChangedDelayed" />
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Brightness -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Brightness" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Adjust the light bar brightness level." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLbBrightnessValueText"
+                                               Width="35"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="100" />
+                                    <Slider x:Name="AdpLbBrightnessSlider"
+                                            Width="140"
+                                            Minimum="0"
+                                            Maximum="100"
+                                            Value="100"
+                                            TickFrequency="10"
+                                            IsSnapToTickEnabled="True"
+                                            IsMoveToPointEnabled="False"
+                                            TickPlacement="Both"
+                                            ValueChanged="AdpLbBrightnessSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Effect selector -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Effect" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select a lighting effect for the light bar." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <ComboBox x:Name="AdpLbEffect"
+                                              Width="180"
+                                              HorizontalAlignment="Right"
+                                              VerticalAlignment="Center"
+                                              SelectedIndex="0"
+                                              SelectionChanged="AdpLbEffect_SelectionChanged">
+                                        <ComboBoxItem>Static</ComboBoxItem>
+                                        <ComboBoxItem>Breathing</ComboBoxItem>
+                                        <ComboBoxItem>Wave</ComboBoxItem>
+                                        <ComboBoxItem>Loading</ComboBoxItem>
+                                        <ComboBoxItem>Marquee</ComboBoxItem>
+                                        <ComboBoxItem>Meteor</ComboBoxItem>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+                            <!-- Speed (hidden for Static) -->
+                            <StackPanel x:Name="AdpSpLbSpeed" Visibility="Collapsed">
+                                <!-- Divider -->
+                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Speed" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Control the animation speed." />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center">
+                                        <TextBlock x:Name="AdpLbSpeedValueText"
+                                                   Width="30"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Text="5" />
+                                        <Slider x:Name="AdpLbSpeedSlider"
+                                                Width="140"
+                                                Minimum="0"
+                                                Maximum="11"
+                                                Value="5"
+                                                IsSnapToTickEnabled="True"
+                                                IsMoveToPointEnabled="False"
+                                                TickPlacement="Both"
+                                                ValueChanged="AdpLbSpeedSlider_ValueChanged" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+                    </ui:CardExpander>
+
+                    <TextBlock Name="tbLog" Margin="0,9,0,0"></TextBlock>
+                        </StackPanel>
+                    </Grid>
+                </ScrollViewer>
+
+        <!-- Row 1: Bottom bar -->
+        <Grid Grid.Row="1" MaxWidth="1080" HorizontalAlignment="Stretch" Margin="36,12,36,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: Games/Apps selector -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock Text="Games/Apps:" VerticalAlignment="Center" FontSize="13" FontWeight="Medium" Margin="2,0,12,0"/>
+                <ComboBox Width="225" Name="cbxPowerPreset" SelectionChanged="cbxPowerPreset_SelectionChanged" Height="37" Margin="0,0,9,0"/>
+                <ui:Button Height="37" Width="50" Name="btnReloadApps" ToolTip="Updates dropdown list with games/apps" Click="btnReloadApps_Click">
+                    <ui:SymbolIcon Symbol="ArrowSync20" FontSize="24"/>
+                </ui:Button>
+            </StackPanel>
+
+            <!-- Right: Controls -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                <TextBlock Text="Polling Rate" VerticalAlignment="Center" FontSize="13" Margin="0,0,8,0" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                <ui:NumberBox x:Name="nudPolling" Minimum="1" Maximum="8" Value="2" SmallChange="0.05" MaxDecimalPlaces="2" Margin="0,0,12,0"/>
+                <CheckBox Name="cbAutoSwitch" Content="Auto switch app profile" VerticalAlignment="Center" Click="cbAutoSwitch_Click" Margin="0,0,12,0" Visibility="Collapsed"/>
+                <ui:Button Width="50" Name="btnSave" ToolTip="Save current settings" Click="btnSave_Click" IsEnabled="False" Margin="0,0,8,0">
+                    <ui:SymbolIcon Symbol="Save20" FontSize="24"/>
+                </ui:Button>
+                <ui:Button Width="185" Name="btnStart" Click="btnStart_Click" IsEnabled="False">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Name="siStartIcon" Symbol="Play20" FontSize="24"/>
+                        <TextBlock Name="tbxStartText" VerticalAlignment="Center" Margin="9,0,0,0">Start Adaptive Mode</TextBlock>
+                    </StackPanel>
+                </ui:Button>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Page>

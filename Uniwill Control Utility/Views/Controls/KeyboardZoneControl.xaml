@@ -1,0 +1,64 @@
+<UserControl x:Class="Uniwill_Control_Utility.Views.Controls.KeyboardZoneControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+    <ToggleButton x:Name="_button"
+                  Background="Transparent"
+                  BorderThickness="0"
+                  Padding="0"
+                  Click="_button_Click"
+                  SnapsToDevicePixels="True"
+                  UseLayoutRounding="True">
+        <ToggleButton.Style>
+            <Style TargetType="ToggleButton">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <Grid>
+                                <!-- Black underlay: ensures hover/selection overlays
+                                     show the picker color cleanly without mixing with
+                                     the existing zone color underneath -->
+                                <Border CornerRadius="3"
+                                        Background="Black" />
+                                <!-- Default state: semi-transparent zone color fill -->
+                                <Border x:Name="colorBg"
+                                        CornerRadius="3"
+                                        Opacity="0.55"
+                                        Background="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=ZoneBrush}" />
+                                <!-- Hover overlay: picker color -->
+                                <Border x:Name="hoverBg"
+                                        CornerRadius="3"
+                                        Opacity="0"
+                                        Background="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=PickerBrush}" />
+                                <!-- Selection overlay: picker color -->
+                                <Border x:Name="selectOverlay"
+                                        CornerRadius="3"
+                                        Opacity="0"
+                                        Background="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=PickerBrush}" />
+                                <!-- Key label -->
+                                <TextBlock HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="8"
+                                           FontWeight="SemiBold"
+                                           Foreground="White"
+                                           Text="{Binding RelativeSource={RelativeSource AncestorType=UserControl}, Path=Label}"
+                                           TextOptions.TextFormattingMode="Display"
+                                           TextOptions.TextRenderingMode="ClearType" />
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <!-- Selected state: picker color overlay -->
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="selectOverlay" Property="Opacity" Value="0.25" />
+                                </Trigger>
+                                <!-- Hover state: picker color overlay -->
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="hoverBg" Property="Opacity" Value="0.75" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ToggleButton.Style>
+    </ToggleButton>
+</UserControl>

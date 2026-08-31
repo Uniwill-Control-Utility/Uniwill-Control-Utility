@@ -1,0 +1,892 @@
+using Accord.Math.Distances;
+using AutoOC.Controllers;
+using AutoOC.Monitors;
+using DuoVia.FuzzyStrings;
+using GameLib.Plugin.RiotGames.Model;
+using Gma.System.MouseKeyHook;
+using HidSharp.Utility;
+using Microsoft.Win32;
+using RyzenSmu;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Management;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Forms;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Threading;
+using Uniwill_Control_Utility.Models;
+using Uniwill_Control_Utility.Properties;
+using Uniwill_Control_Utility.Scripts;
+using Uniwill_Control_Utility.Scripts.Intel_Backend;
+using Uniwill_Control_Utility.Scripts.Misc;
+using Uniwill_Control_Utility.Scripts.UCU_Super_Resolution;
+using Uniwill_Control_Utility.Services;
+using Wpf.Ui.Controls;
+using Wpf.Ui;
+using Wpf.Ui.Abstractions;
+using static Uniwill_Control_Utility.Scripts.Game_Manager;
+using Application = System.Windows.Application;
+using MessageBox = System.Windows.Forms.MessageBox;
+using Settings = Uniwill_Control_Utility.Properties.Settings;
+
+namespace Uniwill_Control_Utility.Views.Windows
+{
+    public partial class MainWindow : INavigationWindow
+    {
+        public ViewModels.MainWindowViewModel ViewModel { get; set; }
+
+        DispatcherTimer Misc = new DispatcherTimer();
+        public DispatcherTimer autoReapply = new DispatcherTimer();
+        public DispatcherTimer autoRestore = new DispatcherTimer();
+
+        public static bool isMini { get; private set; }
+        public static NavigationView _mainWindowNav;
+        public static MainWindow? Instance { get; private set; }
+        private static INavigationService _navigationService;
+        private bool _isTrayPresetApplying;
+        private System.Windows.Controls.MenuItem _miCustomPresets;
+        public static bool IsPageSelected(Type pageType) =>
+            _mainWindowNav?.SelectedItem is INavigationViewItem item && item.TargetPageType == pageType;
+
+        public MainWindow(ViewModels.MainWindowViewModel viewModel, INavigationViewPageProvider pageProvider, INavigationService navigationService)
+        {
+            ViewModel = viewModel;
+            DataContext = this;
+            InitializeComponent();
+
+            _navigationService = navigationService;
+            _mainWindowNav = RootNavigation;
+
+            Misc.Interval = TimeSpan.FromSeconds(1);
+            Misc.Tick += Misc_Tick;
+            Misc.Start();
+
+            autoReapply.Interval = TimeSpan.FromSeconds((int)Settings.Default.AutoReapplyTime);
+            autoReapply.Tick += AutoReapply_Tick;
+            autoReapply.Start();
+
+            autoRestore.Interval = TimeSpan.FromSeconds(1);
+            autoRestore.Tick += Controller.AutoRestore_Tick;
+            autoRestore.Start();
+
+            SetupNavigationService(pageProvider);
+            SetupUI();
+            ApplyOnStart();
+
+            SystemEvents.PowerModeChanged += HandlePowerModeChange;
+
+            Instance = this;
+
+            // Ensure tray icon is visible
+            niTray.Visibility = Visibility.Visible;
+
+            // Reference the XAML-generated custom presets menu item
+            _miCustomPresets = miCustomPresets;
+        }
+
+        /// <summary>Restores the window when the tray icon is left-clicked.</summary>
+        private void NotifyIcon_LeftClick(Wpf.Ui.Tray.Controls.NotifyIcon sender, RoutedEventArgs e)
+        {
+            if (this.Visibility != Visibility.Visible || this.WindowState == WindowState.Minimized)
+            {
+                this.Show();
+                this.WindowState = WindowState.Normal;
+                this.Activate();
+            }
+        }
+
+        private void TrayMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            PopulateTrayCustomPresets();
+        }
+
+        private async void TrayPremadePresets_SubmenuOpened(object sender, RoutedEventArgs e)
+        {
+            await Task.Run(PremadePresets.SetPremadePresets);
+            this.Dispatcher.Invoke(() => RefreshTrayPremadePresetChecks());
+        }
+
+        private void SetupNavigationService(INavigationViewPageProvider pageProvider)
+        {
+            _navigationService.SetNavigationControl(RootNavigation);
+            RootNavigation.SetPageProviderService(pageProvider);
+            RootNavigation.SelectionChanged += OnNavigationSelectionChanged;
+        }
+
+        private void OnNavigationSelectionChanged(INavigationView sender, RoutedEventArgs e)
+        {
+            bool isDashboard = IsPageSelected(typeof(Views.Pages.DashboardPage));
+            ModelNameText.Visibility = isDashboard ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private void SetupUI()
+        {
+            ModelNameText.Text = "Uniwill Control Utility";
+
+            tbMain.Title = "Uniwill Control Utility";
+
+            try
+            {
+                Controller.SetUpMagWindow(this);
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "Failed to setup MagWindow");
+            }
+
+             Wpf.Ui.Appearance.SystemThemeWatcher.Watch(this, WindowBackdropType.Acrylic, true);
+        }
+
+        private async void ApplyOnStart()
+        {
+            try
+            {
+                if (Settings.Default.ApplyOnStart)
+                    if (Settings.Default.CommandString != null && Settings.Default.CommandString != "")
+                    {
+
+                        await Task.Run(() => GetBatteryStatus());
+
+                        if (statuscode == 2 || statuscode == 6 || statuscode == 7 || statuscode == 8)
+                        {
+                            if (Settings.Default.acPreset != "None" && !string.IsNullOrEmpty(Settings.Default.acPreset))
+                            {
+                                Settings.Default.acCommandString = PresetProfileApplier.BuildCommandString(
+                                    ResolveAutomationProfile(Settings.Default.acPreset));
+                                Settings.Default.CommandString = Settings.Default.acCommandString;
+                                Settings.Default.Save();
+                                await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset);
+                                ToastNotification.ShowToastNotification("Charge Preset Applied!", $"Your charge preset settings have been applied!");
+                            }
+                            else
+                            {
+                                await RyzenAdj_To_UCU.TranslateAsync(Settings.Default.CommandString);
+                                ToastNotification.ShowToastNotification("Settings Reapplied!", $"Your last applied settings have been reapplied!");
+                            }
+                        }
+                        else
+                        {
+                            if (Settings.Default.dcPreset != "None" && !string.IsNullOrEmpty(Settings.Default.dcPreset))
+                            {
+                                Settings.Default.dcCommandString = PresetProfileApplier.BuildCommandString(
+                                    ResolveAutomationProfile(Settings.Default.dcPreset));
+                                Settings.Default.CommandString = Settings.Default.dcCommandString;
+                                Settings.Default.Save();
+                                await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset);
+                                ToastNotification.ShowToastNotification("Discharge Preset Applied!", $"Your discharge preset settings have been applied!");
+                            }
+                            else
+                            {
+                                await RyzenAdj_To_UCU.TranslateAsync(Settings.Default.CommandString);
+                                ToastNotification.ShowToastNotification("Settings Reapplied!", $"Your last applied settings have been reapplied!");
+                            }
+                        }
+                    }
+
+                // Apply keyboard RGB settings on startup (runs on background thread)
+                Task.Run(ApplyKeyboardOnStart);
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "Failed to apply settings on start");
+            }
+        }
+
+        /// <summary>Applies persisted keyboard RGB settings at app startup.</summary>
+        private void ApplyKeyboardOnStart()
+        {
+            try
+            {
+                var hidService = new KeyboardHidService();
+                if (!hidService.Open())
+                {
+                    hidService.Dispose();
+                    return;
+                }
+
+                var settings = KeyboardSettingsService.Load();
+
+                if (settings.PowerOn)
+                {
+                    if (settings.PerKeyMode)
+                    {
+                        // Per-key mode: apply saved per-key colors
+                        int brightnessPercent = (settings.Brightness * 100) / 7;
+                        hidService.TurnOn(settings.ColorR, settings.ColorG, settings.ColorB, brightnessPercent);
+                        hidService.SetEffect(Uniwill_Control_Utility.Models.KeyboardEffect.Static);
+
+                        var colors = settings.GetPerKeyColors();
+                        hidService.SendAllPerKeyColorsFromDict(colors);
+
+                        System.Diagnostics.Debug.WriteLine("[KBD] Startup apply: per-key mode");
+                    }
+                    else
+                    {
+                        // Effects mode: apply saved effect settings using TurnOnWithEffect
+                        // to combine power-on and effect into one sequence, avoiding a
+                        // visible flash of intermediate Static color.
+                        // The ITE firmware needs ~500ms to settle after the HID handle
+                        // is opened before it accepts direction bytes. Without this delay
+                        // the direction silently falls back to Left?Right.
+                        int brightnessPercent = (settings.Brightness * 100) / 7;
+                        byte speed = (byte)Math.Clamp((int)settings.Speed, 0, 11);
+                        if (settings.Direction != KeyboardDirection.LeftRight)
+                        {
+                            System.Threading.Thread.Sleep(500);
+                        }
+                        hidService.TurnOnWithEffect(settings.ColorR, settings.ColorG, settings.ColorB,
+                            brightnessPercent, settings.EffectMode, speed, settings.Direction);
+
+                        // Send multi-color palette for effects that need it
+                        if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor7Effect(settings.EffectMode))
+                        {
+                            var colors = ParseKeyboardColorString(settings.MultiColors, 7);
+                            if (colors.Count > 0)
+                            {
+                                // Marquee displays colors in reverse order on the HID controller
+                                if (settings.EffectMode == Uniwill_Control_Utility.Models.KeyboardEffect.Marquee)
+                                    colors = colors.AsEnumerable().Reverse().ToList();
+                                hidService.SetMultiColor(colors);
+                            }
+                        }
+                        else if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor4Effect(settings.EffectMode))
+                        {
+                            var colors = ParseKeyboardColorString(settings.MultiColors, 4);
+                            if (colors.Count > 0)
+                                hidService.SetMultiColor(colors);
+                        }
+                        else if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor4Plus1Effect(settings.EffectMode))
+                        {
+                            var colors = ParseKeyboardColorString(settings.MultiColors, 4);
+                            if (colors.Count > 0)
+                                hidService.SetMultiColor(colors);
+                        }
+
+                        System.Diagnostics.Debug.WriteLine($"[KBD] Startup apply: effect {settings.EffectMode}");
+                    }
+                }
+                else
+                {
+                    hidService.TurnOff();
+                }
+
+                hidService.Dispose();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[KBD] Startup apply failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>Parses a comma-separated hex color string, padded to the requested count.</summary>
+        private static List<System.Windows.Media.Color> ParseKeyboardColorString(string data, int count)
+        {
+            var defaults = new[]
+            {
+                System.Windows.Media.Color.FromRgb(255, 0, 0),
+                System.Windows.Media.Color.FromRgb(255, 123, 0),
+                System.Windows.Media.Color.FromRgb(255, 183, 0),
+                System.Windows.Media.Color.FromRgb(0, 255, 0),
+                System.Windows.Media.Color.FromRgb(0, 255, 255),
+                System.Windows.Media.Color.FromRgb(0, 0, 255),
+                System.Windows.Media.Color.FromRgb(139, 0, 255),
+            };
+
+            var result = new List<System.Windows.Media.Color>();
+            if (!string.IsNullOrEmpty(data))
+            {
+                foreach (var part in data.Split(',', System.StringSplitOptions.RemoveEmptyEntries))
+                {
+                    try
+                    {
+                        var hex = part.Trim();
+                        if (hex.StartsWith("#")) hex = hex.Substring(1);
+                        if (hex.Length == 6)
+                        {
+                            var r = byte.Parse(hex.Substring(0, 2), System.Globalization.NumberStyles.HexNumber);
+                            var g = byte.Parse(hex.Substring(2, 2), System.Globalization.NumberStyles.HexNumber);
+                            var b = byte.Parse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber);
+                            result.Add(System.Windows.Media.Color.FromRgb(r, g, b));
+                        }
+                    }
+                    catch { /* skip invalid */ }
+                }
+            }
+
+            // Pad with defaults
+            while (result.Count < count)
+                result.Add(defaults[result.Count % defaults.Length]);
+
+            return result.Take(count).ToList();
+        }
+
+
+        InstabilityMonitor monitor = null;
+
+        AdaptiveUndervoltController cpuController = null;
+        AdaptiveUndervoltController iGpuController = null;
+
+        int lastCPUUVOffset = 0;
+        int lastiGPUUVOffset = 0;
+        private async void Misc_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if(Settings.Default.isAutoUvCPU == true)
+                {
+
+                    if(monitor == null) monitor = new InstabilityMonitor();
+
+                    if (cpuController == null) cpuController = new AdaptiveUndervoltController(
+                        monitor,
+                        minOffset: -50,
+                        stepSize: 1,
+                        stableThreshold: 8,
+                        cooldownThreshold: 4,
+                        isIgpu: false
+                    );
+
+                    var newOffset = cpuController.UpdateOffset();
+                    var commandValues = "";
+
+                    if (Family.FAM < Family.RyzenFamily.Renoir) commandValues = $"--set-coper={(0 << 20) | (newOffset & 0xFFFF)} ";
+                    else
+                    {
+                        if (newOffset >= 0) commandValues = commandValues + $"--set-coall={newOffset} ";
+                        if (newOffset < 0) commandValues = commandValues + $"--set-coall={Convert.ToUInt32(0x100000 - (uint)(-1 * (int)newOffset))} ";
+                    }
+
+                    if (lastCPUUVOffset != newOffset)
+                    {
+                        await RyzenAdj_To_UCU.TranslateAsync(commandValues, false, true);
+                        lastCPUUVOffset = newOffset;
+                    }
+
+                    cpuController.RecordAppliedOffset(newOffset);
+                }
+                else if (Settings.Default.isAutoUvCPU == false && cpuController != null)
+                {
+                    cpuController.Dispose();
+                    cpuController = null;
+                }
+
+
+                if (Settings.Default.isAutoUviGPU == true)
+                {
+                    if (monitor == null) monitor = new InstabilityMonitor();
+
+                    if(iGpuController == null) iGpuController = new AdaptiveUndervoltController(
+                        monitor,
+                        minOffset: -50,
+                        stepSize: 1,
+                        stableThreshold: 8,
+                        cooldownThreshold: 4,
+                        isIgpu : true
+                    );
+
+                    var newOffset = iGpuController.UpdateOffset();
+                    var commandValues = "";
+
+                    if (newOffset >= 0) commandValues = commandValues + $"--set-cogfx={newOffset} ";
+                    if (newOffset < 0) commandValues = commandValues + $"--set-cogfx={Convert.ToUInt32(0x100000 - (uint)(-1 * (int)newOffset))} ";
+
+                    if (lastiGPUUVOffset != newOffset)
+                    {
+                        await RyzenAdj_To_UCU.TranslateAsync(commandValues, false, true);
+                        lastiGPUUVOffset = newOffset;
+                    }
+
+                    iGpuController.RecordAppliedOffset(newOffset);
+                }
+                else if (Settings.Default.isAutoUviGPU == false && iGpuController != null)
+                {
+                    iGpuController.Dispose();
+                    iGpuController = null;
+                }
+
+                if(Settings.Default.isAutoUvCPU == false && Settings.Default.isAutoUviGPU == false && monitor != null)
+                {
+                    monitor.Stop();
+                    monitor = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed during adaptive undervolt monitoring tick");
+            }
+        }
+
+        private static ushort statuscode;
+
+        public static void GetBatteryStatus()
+        {
+            try
+            {
+                var batteryClass = new ManagementClass("Win32_Battery");
+                var batteries = batteryClass.GetInstances();
+
+                foreach (var battery in batteries)
+                {
+                    statuscode = (ushort)battery["BatteryStatus"];
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle exceptions if necessary
+                DiagnosticLogger.LogError(ex, "Failed to get battery status");
+            }
+        }
+
+        private async void AutoReapply_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if ((bool)Settings.Default.AutoReapply == true && (bool)Settings.Default.isAdaptiveModeRunning == false)
+                {
+                    string commands = (string)Settings.Default.CommandString;
+                    //Check if RyzenAdjArguments is populated
+                    if (commands != null && commands != "")
+                    {
+                        await RyzenAdj_To_UCU.TranslateAsync(commands);
+                    }
+
+                    if (autoReapply.Interval != TimeSpan.FromSeconds((int)Settings.Default.AutoReapplyTime))
+                    {
+                        autoReapply.Stop();
+                        autoReapply.Interval = TimeSpan.FromSeconds((int)Settings.Default.AutoReapplyTime);
+                        autoReapply.Start();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed during auto-reapply tick");
+            }
+        }
+        private static void UpdateTimerInterval(DispatcherTimer timer, int newInterval)
+        {
+            if (timer.Interval == TimeSpan.FromSeconds(newInterval)) return;
+
+            timer.Stop();
+            timer.Interval = TimeSpan.FromSeconds(newInterval);
+            timer.Start();
+        }
+
+        static string lastAppliedState = "";
+        private async void HandlePowerModeChange(object sender, PowerModeChangedEventArgs e)
+        {
+            try
+            {
+                if ((bool)Settings.Default.isAdaptiveModeRunning == false)
+                {
+                    if (e.Mode == PowerModes.StatusChange)
+                    {
+                        await Task.Run(() => GetBatteryStatus());
+
+                        if (statuscode == 2 || statuscode == 6 || statuscode == 7 || statuscode == 8)
+                        {
+                            if (Settings.Default.acPreset != "None" && !string.IsNullOrEmpty(Settings.Default.acPreset))
+                            {
+                                Settings.Default.acCommandString = PresetProfileApplier.BuildCommandString(
+                                    ResolveAutomationProfile(Settings.Default.acPreset));
+                                Settings.Default.CommandString = Settings.Default.acCommandString;
+                                Settings.Default.Save();
+                                await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset);
+
+                                if (lastAppliedState != "ac") ToastNotification.ShowToastNotification("Charge Preset Applied!", $"Your charge preset settings have been applied!");
+                                lastAppliedState = "ac";
+                            }
+                        }
+                        else
+                        {
+                            if (Settings.Default.dcPreset != "None" && !string.IsNullOrEmpty(Settings.Default.dcPreset))
+                            {
+                                Settings.Default.dcCommandString = PresetProfileApplier.BuildCommandString(
+                                    ResolveAutomationProfile(Settings.Default.dcPreset));
+                                Settings.Default.CommandString = Settings.Default.dcCommandString;
+                                Settings.Default.Save();
+                                await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset);
+
+                                if (lastAppliedState != "dc") ToastNotification.ShowToastNotification("Discharge Preset Applied!", $"Your discharge preset settings have been applied!");
+                                lastAppliedState = "dc";
+                            }
+                        }
+                    }
+
+                    if (e.Mode == PowerModes.Resume)
+                    {
+                        if (Settings.Default.resumePreset != "None" && !string.IsNullOrEmpty(Settings.Default.resumePreset))
+                        {
+                            Settings.Default.resumeCommandString = PresetProfileApplier.BuildCommandString(
+                                ResolveAutomationProfile(Settings.Default.resumePreset));
+                            Settings.Default.CommandString = Settings.Default.resumeCommandString;
+                            Settings.Default.Save();
+                            _ = TranslatePresetAsync(Settings.Default.resumeCommandString, Settings.Default.resumePreset);
+
+                            if (lastAppliedState != "resume") ToastNotification.ShowToastNotification("Resume Preset Applied!", $"Your resume preset settings have been applied!");
+                            lastAppliedState = "resume";
+                        }
+
+                        // Auto-reconnect Hydro UI watercooler after resume.
+                        // The BLE radio link is torn down during sleep/hibernation, but the
+                        // WaterCoolerService may still hold a zombie device handle.
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                // Give the BLE radio a moment to reinitialize after resume
+                                await Task.Delay(1500);
+
+                                var waterCoolerService = App.GetService<WaterCoolerService>();
+                                if (waterCoolerService == null)
+                                    return;
+
+                                // If the service still thinks it's connected, the BLE link is a
+                                // zombie — force a disconnect before attempting reconnect.
+                                if (waterCoolerService.IsConnected)
+                                {
+                                    Debug.WriteLine("[WaterCooler] Resuming from sleep — disconnecting zombie BLE link");
+                                    await waterCoolerService.DisconnectAsync();
+                                    await Task.Delay(500);
+                                }
+
+                                // Attempt auto-reconnect if the user has it enabled
+                                bool connected = await waterCoolerService.TryAutoConnectAsync();
+                                if (connected)
+                                    Debug.WriteLine("[WaterCooler] Auto-reconnected after system resume");
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[WaterCooler] Auto-reconnect after resume failed: {ex.Message}");
+                            }
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed during power mode change handling");
+            }
+        }
+
+        #region INavigationWindow Methods
+
+        public INavigationView GetNavigation() => RootNavigation;
+
+        public bool Navigate(Type pageType)
+        {
+            bool result = RootNavigation.Navigate(pageType);
+            ModelNameText.Visibility = pageType == typeof(Views.Pages.DashboardPage)
+                ? Visibility.Collapsed : Visibility.Visible;
+            return result;
+        }
+
+        public void SetPageService(INavigationViewPageProvider pageProvider) => RootNavigation.SetPageProviderService(pageProvider);
+
+        public void SetServiceProvider(IServiceProvider serviceProvider)
+        {
+            if (serviceProvider.GetService(typeof(INavigationViewPageProvider)) is INavigationViewPageProvider pageProvider)
+                SetPageService(pageProvider);
+        }
+
+        public void ShowWindow() => Show();
+
+        public void CloseWindow() => Close();
+
+        #endregion
+
+        protected override void OnClosed(EventArgs e)
+        {
+            base.OnClosed(e);
+            Application.Current.Shutdown();
+        }
+
+        private void UiWindow_StateChanged(object sender, EventArgs e)
+        {
+            if (this.WindowState == WindowState.Minimized)
+            {
+                isMini = true;
+                this.WindowStyle = WindowStyle.ToolWindow;
+                this.ShowInTaskbar = false;
+            }
+            else
+            {
+                isMini = false;
+                this.WindowStyle = WindowStyle.SingleBorderWindow;
+                this.ShowInTaskbar = true;
+            }
+
+        }
+
+        private async void TrayPremadePreset_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_isTrayPresetApplying || sender is not System.Windows.Controls.MenuItem menuItem)
+            {
+                return;
+            }
+
+            string? presetId = menuItem.Tag?.ToString();
+
+            if (string.IsNullOrEmpty(presetId))
+            {
+                return;
+            }
+
+            _isTrayPresetApplying = true;
+            try
+            {
+                await Task.Run(PremadePresets.SetPremadePresets);
+
+                var selection = presetId switch
+                {
+                    "eco" => (0, PremadePresets.EcoPreset, "Eco Preset", "Eco Preset Applied!", "The eco premade power preset has been applied!"),
+                    "balanced" => (1, PremadePresets.BalPreset, "Balanced Preset", "Balanced Preset Applied!", "The balanced premade power preset has been applied!"),
+                    "performance" => (2, PremadePresets.PerformancePreset, "Performance Preset", "Performance Preset Applied!", "The performance premade power preset has been applied!"),
+                    "extreme" => (3, PremadePresets.ExtremePreset, "Extreme Preset", "Extreme Preset Applied!", "The extreme premade power preset has been applied!"),
+                    _ => (-1, string.Empty, string.Empty, string.Empty, string.Empty)
+                };
+
+                if (selection.Item1 < 0 || string.IsNullOrWhiteSpace(selection.Item2))
+                {
+                    return;
+                }
+
+                await RyzenAdj_To_UCU.TranslateAsync(selection.Item2, appliedName: selection.Item3, localizeAppliedName: true);
+                Settings.Default.CommandString = selection.Item2;
+                Settings.Default.premadePreset = selection.Item1;
+                Settings.Default.Save();
+                ToastNotification.ShowToastNotification(selection.Item4, selection.Item5);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to apply a premade preset from the tray menu");
+            }
+            finally
+            {
+                RefreshTrayPremadePresetChecks();
+                _isTrayPresetApplying = false;
+            }
+        }
+
+        private void PopulateTrayCustomPresets()
+        {
+            _miCustomPresets.Items.Clear();
+            try
+            {
+                var manager = CreateCustomPresetManager();
+                var names = manager.GetPresetNames()
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)
+                    .ToArray();
+
+                if (names.Length == 0)
+                {
+                    _miCustomPresets.Items.Add(new System.Windows.Controls.MenuItem
+                    {
+                        Header = LocalizationService.Get("No custom presets found"),
+                        IsEnabled = false
+                    });
+                    return;
+                }
+
+                foreach (var name in names)
+                {
+                    var item = new System.Windows.Controls.MenuItem
+                    {
+                        Header = name,
+                        Tag = name
+                    };
+                    item.Click += (s, ev) => TrayCustomPreset_ClickAsync(name);
+                    _miCustomPresets.Items.Add(item);
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to populate custom presets in the tray menu");
+                _miCustomPresets.Items.Add(new System.Windows.Controls.MenuItem
+                {
+                    Header = LocalizationService.Get("No custom presets found"),
+                    IsEnabled = false
+                });
+            }
+        }
+
+        private async void TrayCustomPreset_ClickAsync(string presetName)
+        {
+            if (_isTrayPresetApplying)
+            {
+                return;
+            }
+
+            _isTrayPresetApplying = true;
+            try
+            {
+                var preset = CreateCustomPresetManager().GetPreset(presetName);
+                if (preset == null)
+                {
+                    return;
+                }
+
+                var command = preset.commandValue ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(command))
+                {
+                    await RyzenAdj_To_UCU.TranslateAsync(command, appliedName: presetName);
+                    ToastNotification.ShowToastNotification("Preset Applied", "Your custom preset settings have been applied!");
+                }
+
+                Settings.Default.cstmPreset = presetName;
+                Settings.Default.CommandString = command;
+                Settings.Default.Save();
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to apply a custom preset from the tray menu");
+            }
+            finally
+            {
+                RefreshTrayPremadePresetChecks();
+                _isTrayPresetApplying = false;
+            }
+        }
+
+        private static PresetManager CreateCustomPresetManager()
+        {
+            var fileName = Family.TYPE switch
+            {
+                Family.ProcessorType.Amd_Apu => "apuPresets.json",
+                Family.ProcessorType.Amd_Desktop_Cpu => "amdDtCpuPresets.json",
+                Family.ProcessorType.Intel => "intelPresets.json",
+                _ => "apuPresets.json"
+            };
+
+            return new PresetManager(Settings.Default.Path + fileName);
+        }
+
+        private static async Task TranslatePresetAsync(string commands, string? configuredName)
+        {
+            string profileName = ResolveAutomationProfile(configuredName);
+            if (string.IsNullOrEmpty(profileName))
+            {
+                // Unknown profile — fall back to raw command execution
+                await RyzenAdj_To_UCU.TranslateAsync(commands, appliedName: configuredName, localizeAppliedName: false);
+                return;
+            }
+
+            // Full apply: RyzenAdj + V-F curve (Custom) + EC limits (AMD)
+            await PresetProfileApplier.ApplyProfileAsync(profileName, PresetProfileApplier.DisplayName(profileName));
+        }
+
+        /// <summary>
+        /// Maps a saved preset display name (e.g. "Office Preset") back to the profile key ("Office").
+        /// </summary>
+        private static string ResolveAutomationProfile(string? presetName)
+        {
+            if (string.IsNullOrEmpty(presetName))
+                return string.Empty;
+
+            return presetName switch
+            {
+                string s when s.Contains("Office", StringComparison.OrdinalIgnoreCase) => "Office",
+                string s when s.Contains("Gaming", StringComparison.OrdinalIgnoreCase) => "Gaming",
+                string s when s.Contains("Turbo", StringComparison.OrdinalIgnoreCase) => "Turbo",
+                string s when s.Contains("Custom", StringComparison.OrdinalIgnoreCase) => "Custom",
+                _ => string.Empty
+            };
+        }
+
+        private void RefreshTrayPremadePresetChecks()
+        {
+            var command = Settings.Default.CommandString;
+            miTrayEcoPreset.IsChecked = !string.IsNullOrWhiteSpace(PremadePresets.EcoPreset) && string.Equals(command, PremadePresets.EcoPreset, StringComparison.Ordinal);
+            miTrayBalancedPreset.IsChecked = !string.IsNullOrWhiteSpace(PremadePresets.BalPreset) && string.Equals(command, PremadePresets.BalPreset, StringComparison.Ordinal);
+            miTrayPerformancePreset.IsChecked = !string.IsNullOrWhiteSpace(PremadePresets.PerformancePreset) && string.Equals(command, PremadePresets.PerformancePreset, StringComparison.Ordinal);
+            miTrayExtremePreset.IsChecked = !string.IsNullOrWhiteSpace(PremadePresets.ExtremePreset) && string.Equals(command, PremadePresets.ExtremePreset, StringComparison.Ordinal);
+        }
+
+        private void miClose_Click(object? sender, RoutedEventArgs e)
+        {
+            Settings.Default.isAdaptiveModeRunning = false;
+            Settings.Default.Save();
+            Controller.magWindow?.Dispose();
+            Application.Current.Shutdown();
+        }
+
+        private void UiWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (Settings.Default.MinimizeClose)
+            {
+                WindowState = WindowState.Minimized;
+                e.Cancel = true;
+                return;
+            }
+            
+            Settings.Default.isAdaptiveModeRunning = false;
+            Settings.Default.Save();
+            Controller.magWindow?.Dispose();
+            //Fan_Control.disableFanControl();
+        }
+
+        private void mainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            Dispatcher.BeginInvoke(
+                DispatcherPriority.ApplicationIdle,
+                new Action(() =>
+                {
+                    Controller.SetUpMagWindow(this);
+                }));
+
+            if (Settings.Default.StartMini == true)
+            {
+                this.WindowState = WindowState.Minimized;
+            }
+            else
+            {
+                if (GetSystemInfo.Manufacturer.ToUpper().Contains("AYANEO") || GetSystemInfo.Manufacturer.ToUpper().Contains("GPD") || GetSystemInfo.Product.ToUpper().Contains("ONEXPLAYER"))
+                {
+                    int displayCount = Screen.AllScreens.Length;
+                    if (displayCount < 2)
+                    {
+                        this.MaxHeight = SystemParameters.MaximizedPrimaryScreenHeight;
+                        this.WindowState = WindowState.Maximized;
+                    }
+                }
+            }
+
+            _ = Task.Run(PremadePresets.SetPremadePresets);
+
+            // Eagerly instantiate the Adaptive page so its constructor runs (starts the
+            // sensor polling timer and auto-starts Adaptive Mode if isStartAdpative is set).
+            // Without this, the page is lazily created on first navigation, meaning the
+            // timer never starts and Adaptive Mode doesn't activate on app launch.
+            // Set isAdaptiveModeRunning synchronously so other pages (Flydigi) can detect
+            // the override state before ToggleAdaptiveMode() completes its async work.
+            if (Settings.Default.isStartAdpative)
+            {
+                Settings.Default.isAdaptiveModeRunning = true;
+                Settings.Default.Save();
+                var adaptivePage = App.GetService<Views.Pages.Adaptive>();
+            }
+
+            // Eagerly instantiate Hydro UI and Flydigi cooler pages to avoid a 1-2 second
+            // delay on first navigation. These pages do heavy work in Loaded (service
+            // resolution, event subscriptions, settings loading) which is noticeable
+            // when the page is created lazily on first visit.
+            _ = App.GetService<Views.Pages.Watercooler>();
+            _ = App.GetService<Views.Pages.FlydigiCooler>();
+
+            Task.Run(Garbage.Garbage_Collect);
+        }
+    }
+}

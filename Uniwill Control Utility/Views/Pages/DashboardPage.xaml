@@ -1,0 +1,98 @@
+<Page x:Class="Uniwill_Control_Utility.Views.Pages.DashboardPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:Uniwill_Control_Utility.Views.Pages"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:controls="clr-namespace:Uniwill_Control_Utility.Views.Controls"
+      Title="Dashboard"
+      d:DataContext="{d:DesignInstance local:DashboardPage, IsDesignTimeCreatable=False}"
+      d:DesignHeight="800"
+      d:DesignWidth="1000"
+      SnapsToDevicePixels="True"
+      UseLayoutRounding="True"
+      ScrollViewer.CanContentScroll="False"
+      mc:Ignorable="d"
+      d:Background="{DynamicResource MicaBackgroundFillColorBaseBrush}"
+      >
+
+    <!-- Root Grid spans full window space -->
+    <Grid>
+
+        <!-- 1. Full-width, full-height ScrollViewer -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      CanContentScroll="False"
+                      PanningMode="VerticalOnly"
+                      IsDeferredScrollingEnabled="False">
+            <ScrollViewer.Style>
+                <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource {x:Type ScrollViewer}}">
+                    <Setter Property="Padding" Value="0" />
+                </Style>
+            </ScrollViewer.Style>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Row 0: Header with top-left rounded corner, inset to match content -->
+                <controls:DashboardHeaderControl x:Name="_header"
+                                                 Grid.Row="0"
+                                                 MaxWidth="1080"
+                                                 Margin="16,0,16,0" />
+
+                <!-- Row 1: Centered max-width content cards -->
+                <StackPanel Grid.Row="1"
+                            MaxWidth="1080"
+                            HorizontalAlignment="Stretch"
+                            Margin="16,16,16,18">
+
+                    <!-- Hardware metrics: CPU & GPU -->
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <controls:CpuControl x:Name="_cpu"
+                                             Grid.Column="0" />
+                        <controls:GpuControl x:Name="_gpu"
+                                             Grid.Column="2" />
+                    </Grid>
+
+                    <!-- Memory & Battery row -->
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <controls:MemoryControl x:Name="_memory"
+                                                Grid.Column="0" />
+                        <controls:BatteryControl x:Name="_battery"
+                                                 Grid.Column="2" />
+                    </Grid>
+
+                    <!-- Device status row: Hydro UI & Flydigi Cooler -->
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <controls:HydroUiControl x:Name="_hydroUi"
+                                                 Grid.Column="0" />
+                        <controls:FlydigiControl x:Name="_flydigi"
+                                                 Grid.Column="2" />
+                    </Grid>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</Page>

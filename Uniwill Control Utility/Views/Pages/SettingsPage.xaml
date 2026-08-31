@@ -1,0 +1,511 @@
+<Page x:Class="Uniwill_Control_Utility.Views.Pages.SettingsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:helpers="clr-namespace:Uniwill_Control_Utility.Helpers"
+      xmlns:local="clr-namespace:Uniwill_Control_Utility.Views.Pages"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Settings"
+      d:DataContext="{d:DesignInstance local:SettingsPage,
+                              IsDesignTimeCreatable=False}"
+      d:DesignHeight="850"
+      d:DesignWidth="800"
+      d:Background="{DynamicResource ApplicationBackgroundBrush}"
+      Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+      ScrollViewer.CanContentScroll="False"
+      mc:Ignorable="d"
+      Loaded="UiPage_Loaded"
+      SnapsToDevicePixels="True"
+      UseLayoutRounding="True">
+
+    <Page.Resources>
+        <helpers:EnumToBooleanConverter x:Key="EnumToBooleanConverter" />
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Row 0: Scrollable content -->
+        <ScrollViewer x:Name="SettingsScrollViewer"
+                      Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      CanContentScroll="False"
+                      PanningMode="VerticalOnly"
+                      IsDeferredScrollingEnabled="False">
+            <ScrollViewer.Style>
+                <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource {x:Type ScrollViewer}}">
+                    <Setter Property="Padding" Value="0" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ComputedVerticalScrollBarVisibility, RelativeSource={RelativeSource Self}}"
+                                     Value="Visible">
+                            <Setter Property="Padding" Value="0,0,8,0" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ScrollViewer.Style>
+
+            <Grid MaxWidth="1080" HorizontalAlignment="Stretch">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Page title block -->
+                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,24,0,0">
+                    <TextBlock FontSize="26"
+                               FontWeight="Medium"
+                               Margin="16,0,16,0"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               Text="Settings" />
+                    <TextBlock Margin="16,8,16,12"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="Configure startup behaviour, automation, diagnostics and updates."
+                               TextWrapping="Wrap" />
+                </StackPanel>
+
+                <!-- Content cards -->
+                <StackPanel Grid.Row="1" Margin="16,16,16,18">
+
+                    <!-- Application behaviour -->
+                    <ui:Card Margin="0,0,0,8">
+                        <StackPanel>
+                            <TextBlock FontSize="17"
+                                       FontWeight="Medium"
+                                       Text="Application behaviour" />
+
+                            <TextBlock Margin="0,10,0,5"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Language" />
+
+                            <ComboBox x:Name="cbxLanguage"
+                                      Width="220"
+                                      HorizontalAlignment="Left"
+                                      DisplayMemberPath="DisplayName"
+                                      SelectionChanged="cbxLanguage_SelectionChanged" />
+
+                            <CheckBox x:Name="cbStartBoot"
+                                      Margin="0,10,0,0"
+                                      Click="cbStartBoot_Click"
+                                      Content="Start on system boot" />
+
+                            <CheckBox x:Name="cbStartMini"
+                                      Margin="0,4,0,0"
+                                      Click="cbStartMini_Click"
+                                      Content="Start minimised" />
+
+                            <CheckBox x:Name="cbMinimizeClose"
+                                      Margin="0,4,0,0"
+                                      Click="cbMinimizeClose_Click"
+                                      Content="Minimise instead of closing" />
+
+                            <CheckBox x:Name="cbApplyStart"
+                                      Margin="0,4,0,0"
+                                      Click="cbApplyStart_Click"
+                                      Content="Reapply settings on start" />
+
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <CheckBox x:Name="cbAutoReapply"
+                                          VerticalAlignment="Center"
+                                          Click="cbAutoReapply_Click"
+                                          Content="Automatically reapply every" />
+
+                                <ui:NumberBox x:Name="nudAutoReapply"
+                                              Grid.Column="1"
+                                              Width="128"
+                                              Margin="10,0,0,0"
+                                              Minimum="1"
+                                              Maximum="90"
+                                              MaxDecimalPlaces="0"
+                                              TextChanged="nudAutoReapply_TextChanged"
+                                              ValueChanged="nudAutoReapply_ValueChanged" />
+
+                                <TextBlock Grid.Column="2"
+                                           Margin="8,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Text="seconds" />
+                            </Grid>
+
+                            <CheckBox x:Name="cbAutoCheck"
+                                      Margin="0,4,0,0"
+                                      Click="cbAutoCheck_Click"
+                                      Content="Check for updates automatically" />
+
+                            <CheckBox x:Name="cbAdaptive"
+                                      Margin="0,4,0,0"
+                                      Click="cbAdaptive_Click"
+                                      Content="Start Adaptive Mode automatically" />
+
+                            <CheckBox x:Name="cbTrack"
+                                      Margin="0,4,0,0"
+                                      Click="cbTrack_Click"
+                                      Content="Track games" />
+                        </StackPanel>
+                    </ui:Card>
+
+                    <!-- Preset backup -->
+                    <ui:Card Margin="0,0,0,8">
+
+                        <StackPanel>
+                            <TextBlock FontSize="17"
+                                       FontWeight="Medium"
+                                       Text="Preset backup" />
+
+                            <TextBlock Margin="0,5,0,0"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Back up or import custom and adaptive mode presets."
+                                       TextWrapping="Wrap" />
+
+                            <TextBlock Margin="0,3,0,0"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Existing presets with the same name will be replaced during import."
+                                       TextWrapping="Wrap" />
+
+                            <StackPanel Margin="0,14,0,0"
+                                        Orientation="Horizontal">
+                                <ui:Button x:Name="btnBackupPresets"
+                                           Width="190"
+                                           Click="btnBackupPresets_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Margin="0,0,8,0"
+                                                       FontSize="22"
+                                                       Symbol="ArrowDownload20" />
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Text="Back up presets" />
+                                    </StackPanel>
+                                </ui:Button>
+
+                                <ui:Button x:Name="btnImportPresets"
+                                           Width="190"
+                                           Margin="9,0,0,0"
+                                           Appearance="Primary"
+                                           Click="btnImportPresets_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Margin="0,0,8,0"
+                                                       FontSize="22"
+                                                       Symbol="ArrowUpload20" />
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Text="Import presets" />
+                                    </StackPanel>
+                                </ui:Button>
+                            </StackPanel>
+
+                            <ui:InfoBar x:Name="PresetBackupStatus"
+                                        Margin="0,10,0,0"
+                                        IsClosable="True"
+                                        IsOpen="False" />
+                        </StackPanel>
+                    </ui:Card>
+
+                    <!-- Diagnostics -->
+                    <ui:Card Margin="0,0,0,8">
+
+                        <StackPanel>
+                            <TextBlock FontSize="17"
+                                       FontWeight="Medium"
+                                       Text="Diagnostics" />
+
+                            <TextBlock Margin="0,10,0,5"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Diagnostic logging" />
+
+                            <ComboBox x:Name="cbxLogLevel"
+                                      Width="220"
+                                      HorizontalAlignment="Left"
+                                      SelectionChanged="cbxLogLevel_SelectionChanged">
+
+                                <ComboBoxItem>Off</ComboBoxItem>
+                                <ComboBoxItem>Error only</ComboBoxItem>
+                                <ComboBoxItem>Info</ComboBoxItem>
+                                <ComboBoxItem>Debug</ComboBoxItem>
+                            </ComboBox>
+
+                            <ui:Button x:Name="btnStressTest"
+                                       Width="190"
+                                       Margin="0,14,0,0"
+                                       HorizontalAlignment="Left"
+                                       Appearance="Caution"
+                                       Click="btnStressTest_Click">
+
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="Fire20"
+                                                   FontSize="22"
+                                                   Margin="0,0,8,0" />
+
+                                    <TextBlock VerticalAlignment="Center"
+                                               Text="Start Stress Test" />
+                                </StackPanel>
+                            </ui:Button>
+
+                            <ui:InfoBar Margin="0,10,0,0"
+                                        IsOpen="True"
+                                        IsClosable="False"
+                                        Severity="Warning"
+                                        Title="High CPU load"
+                                        Message="The stress test places extreme load on the CPU. Ensure cooling is adequate and proceed at your own risk." />
+                        </StackPanel>
+                    </ui:Card>
+
+                    <!-- About Uniwill Control Utility -->
+                    <ui:Card Margin="0,0,0,8">
+                        <StackPanel>
+                            <TextBlock FontSize="17"
+                                       FontWeight="Medium"
+                                       Text="About Uniwill Control Utility" />
+
+                            <TextBlock x:Name="tbAppVerion"
+                                       Margin="0,7,0,12" />
+
+                            <StackPanel Orientation="Horizontal">
+                                <ui:Button x:Name="btnCheck"
+                                           Width="178"
+                                           Click="btnCheck_Click">
+
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="ArrowSync20"
+                                                       FontSize="22"
+                                                       Margin="0,0,8,0" />
+
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Text="Check for Updates" />
+                                    </StackPanel>
+                                </ui:Button>
+
+                                <ui:Button x:Name="btnDownload"
+                                           Width="178"
+                                           Margin="9,0,0,0"
+                                           Appearance="Primary"
+                                           Visibility="Collapsed"
+                                           Click="btnDownload_Click">
+
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="ArrowDownload20"
+                                                       FontSize="22"
+                                                       Margin="0,0,8,0" />
+
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Text="Download Update" />
+                                    </StackPanel>
+                                </ui:Button>
+                            </StackPanel>
+
+                            <TextBlock x:Name="tbDownloadMsg"
+                                       Margin="0,10,0,0"
+                                       HorizontalAlignment="Stretch"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ui:Card>
+
+                    <!-- System Info section -->
+                    <TextBlock Margin="0,16,0,0"
+                               FontSize="20"
+                               FontWeight="Medium"
+                               Text="System Info" />
+
+                    <TextBlock Margin="0,4,0,0"
+                               FontSize="14"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="Review detailed device, processor, memory and battery information."
+                               TextWrapping="Wrap" />
+
+                    <ui:CardExpander x:Name="sdWindows"
+                                     Margin="0,12,0,0"
+                                     IsEnabled="True"
+                                     IsExpanded="False"
+                                     Icon="{ui:SymbolIcon Desktop20}">
+                        <ui:CardExpander.Header>
+                            <TextBlock FontSize="14"
+                                       FontWeight="Medium"
+                                       Text="Device Information" />
+                        </ui:CardExpander.Header>
+
+                        <Grid Margin="24,0,0,0"
+                              HorizontalAlignment="Stretch">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="112" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="DemiBold" Text="Name" />
+                            <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Producer" />
+                            <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Model" />
+
+                            <TextBlock x:Name="tbDeviceName"
+                                       Grid.Row="0"
+                                       Grid.Column="2"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock x:Name="tbDeviceProducer"
+                                       Grid.Row="1"
+                                       Grid.Column="2"
+                                       Margin="0,8,0,0"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock x:Name="tbDeviceModel"
+                                       Grid.Row="2"
+                                       Grid.Column="2"
+                                       Margin="0,8,0,0"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       TextWrapping="Wrap" />
+                        </Grid>
+                    </ui:CardExpander>
+
+                    <ui:CardExpander x:Name="sdCPU"
+                                     Margin="0,8,0,0"
+                                     IsEnabled="True"
+                                     IsExpanded="False"
+                                     Icon="{ui:SymbolIcon DeveloperBoard20}">
+                        <ui:CardExpander.Header>
+                            <TextBlock FontSize="14"
+                                       FontWeight="Medium"
+                                       Text="Processor Information" />
+                        </ui:CardExpander.Header>
+
+                        <Grid Margin="24,0,0,0"
+                              HorizontalAlignment="Stretch">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="112" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="DemiBold" Text="Processor" />
+                            <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Producer" />
+                            <TextBlock x:Name="tbCode" Grid.Row="2" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Codename" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Caption" />
+                            <TextBlock Grid.Row="4" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Cores" />
+                            <TextBlock Grid.Row="5" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Threads" />
+                            <TextBlock Grid.Row="6" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Base Clock" />
+                            <TextBlock Grid.Row="7" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="L1 Cache" />
+                            <TextBlock Grid.Row="8" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="L2 Cache" />
+                            <TextBlock Grid.Row="9" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="L3 Cache" />
+                            <TextBlock Grid.Row="10" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Instructions" />
+
+                            <TextBlock x:Name="tbProcessor" Grid.Row="0" Grid.Column="2" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="tbProducer" Grid.Row="1" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="tbCodename" Grid.Row="2" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="tbCaption" Grid.Row="3" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="tbCores" Grid.Row="4" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="tbThreads" Grid.Row="5" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="tbBaseClock" Grid.Row="6" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="tbL1Cache" Grid.Row="7" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="tbL2Cache" Grid.Row="8" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="tbL3Cache" Grid.Row="9" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="tbInstructions" Grid.Row="10" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                        </Grid>
+                    </ui:CardExpander>
+
+                    <ui:CardExpander x:Name="sdRAM"
+                                     Margin="0,8,0,0"
+                                     IsEnabled="True"
+                                     IsExpanded="False"
+                                     Icon="{ui:SymbolIcon Ram20}">
+                        <ui:CardExpander.Header>
+                            <TextBlock FontSize="14"
+                                       FontWeight="Medium"
+                                       Text="Memory Information" />
+                        </ui:CardExpander.Header>
+
+                        <StackPanel>
+                            <Grid Margin="24,0,0,0"
+                                  HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="112" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="DemiBold" Text="Memory" />
+                                <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Producer" />
+                                <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Model" />
+                                <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Width" />
+                                <TextBlock Grid.Row="4" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Modules" />
+
+                                <TextBlock x:Name="tbRAM" Grid.Row="0" Grid.Column="2" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                                <TextBlock x:Name="tbRAMProducer" Grid.Row="1" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                                <TextBlock x:Name="tbRAMModel" Grid.Row="2" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                                <TextBlock x:Name="tbWidth" Grid.Row="3" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                                <TextBlock x:Name="tbSlots" Grid.Row="4" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                            </Grid>
+                        </StackPanel>
+                    </ui:CardExpander>
+
+                    <ui:CardExpander x:Name="sdBattery"
+                                     Margin="0,8,0,0"
+                                     IsEnabled="True"
+                                     IsExpanded="False"
+                                     Icon="{ui:SymbolIcon Battery920}">
+                        <ui:CardExpander.Header>
+                            <TextBlock FontSize="14"
+                                       FontWeight="Medium"
+                                       Text="Battery Information" />
+                        </ui:CardExpander.Header>
+
+                        <Grid Margin="24,0,0,0"
+                              HorizontalAlignment="Stretch">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="112" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="DemiBold" Text="Health" />
+                            <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Cycles" />
+                            <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Capacity" />
+                            <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Charge Rate" />
+
+                            <TextBlock x:Name="tbHealth" Grid.Row="0" Grid.Column="2" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="tbCycle" Grid.Row="1" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="tbCapcity" Grid.Row="2" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="tbChargeRate" Grid.Row="3" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                        </Grid>
+                    </ui:CardExpander>
+
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</Page>

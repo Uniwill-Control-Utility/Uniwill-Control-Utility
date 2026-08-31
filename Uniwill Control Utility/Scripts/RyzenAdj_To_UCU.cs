@@ -1,0 +1,440 @@
+using CpuAffinityUtility;
+using GameLib.Plugin.RiotGames.Model;
+using NvAPIWrapper.Display;
+using RyzenSmu;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using Uniwill_Control_Utility.Scripts.ASUS;
+using Uniwill_Control_Utility.Scripts.GPUs.AMD;
+using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
+using Uniwill_Control_Utility.Scripts.Intel_Backend;
+using Uniwill_Control_Utility.Scripts.Misc;
+using Uniwill_Control_Utility.Services;
+using Settings = Uniwill_Control_Utility.Properties.Settings;
+
+namespace Uniwill_Control_Utility.Scripts
+{
+    internal class RyzenAdj_To_UCU
+    {
+        static int i = 0;
+
+        [DllImport("powrprof.dll", EntryPoint = "PowerSetActiveOverlayScheme")]
+        public static extern uint PowerSetActiveOverlayScheme(Guid OverlaySchemeGuid);
+
+        static string balancedPowerScheme = "00000000-0000-0000-0000-000000000000";
+        static string highPerformancePowerScheme = "DED574B5-45A0-4F42-8737-46345C09C238";
+        static string powerSaverPowerScheme = "961CC777-2547-4F9D-8174-7D86181b8A7A";
+
+        // Optional EC service reference for --ec-* command routing.
+        // Set from App.xaml.cs or MainWindowViewModel after DI resolves the service.
+        internal static UniwillECService? EcService { get; set; }
+
+        public static void Translate(string ryzenAdjString, bool isAutoReapply = false, bool isAutoOC = false, string? appliedName = null, bool localizeAppliedName = false) =>
+            _ = TranslateAsync(ryzenAdjString, isAutoReapply, isAutoOC, appliedName, localizeAppliedName);
+
+        public static Task TranslateAsync(string ryzenAdjString, bool isAutoReapply = false, bool isAutoOC = false, string? appliedName = null, bool localizeAppliedName = false) =>
+            Task.Run(() => TranslateCore(ryzenAdjString, isAutoReapply, isAutoOC, appliedName, localizeAppliedName));
+
+        private static void TranslateCore(string ryzenAdjString, bool isAutoReapply, bool isAutoOC, string? appliedName, bool localizeAppliedName)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(ryzenAdjString))
+                    return;
+
+                string normalizedCommands = ryzenAdjString.Trim();
+                string[] ryzenAdjCommands = normalizedCommands
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray();
+
+                DiagnosticLogger.LogDebug($"Translate string: {normalizedCommands}");
+                foreach (string ryzenAdjCommand in ryzenAdjCommands)
+                {
+                        try
+                        {
+                            int separatorIndex = ryzenAdjCommand.IndexOf('=');
+                            string ryzenAdjCommandString = (separatorIndex >= 0 ? ryzenAdjCommand[..separatorIndex] : ryzenAdjCommand).TrimStart('-');
+                            string ryzenAdjCommandValueString = separatorIndex >= 0 ? ryzenAdjCommand[(separatorIndex + 1)..] : "0";
+
+                            DiagnosticLogger.LogDebug($"Processing: {ryzenAdjCommandString}={ryzenAdjCommandValueString}");
+
+                            if (ryzenAdjCommandString.Contains("UCUSR"))
+                            {
+                                UCUSR(ryzenAdjCommandString, ryzenAdjCommandValueString);
+                            }
+                            else if (ryzenAdjCommandString.Contains("CCD-Affinity"))
+                            {
+                                CpuAffinityManager.SetGlobalAffinity(Convert.ToInt32(ryzenAdjCommandValueString));
+                            }
+                            else if (ryzenAdjCommandString.Contains("Win-Power"))
+                            {
+                                if(ryzenAdjCommandValueString == "0") PowerSetActiveOverlayScheme(new Guid(powerSaverPowerScheme.ToLower()));
+                                else if (ryzenAdjCommandValueString == "1") PowerSetActiveOverlayScheme(new Guid(balancedPowerScheme.ToLower()));
+                                else if (ryzenAdjCommandValueString == "2") PowerSetActiveOverlayScheme(new Guid(highPerformancePowerScheme.ToLower()));
+                            }
+                            else if (ryzenAdjCommandString.Contains("Win-CPU"))
+                            {
+                                WindowsProcessorPower.Apply(ryzenAdjCommandValueString);
+                            }
+                            else if (ryzenAdjCommandString.Contains("ASUS"))
+                            {
+                                AsusWmi(ryzenAdjCommandString, ryzenAdjCommandValueString);
+                            }
+                            else if (ryzenAdjCommandString.Contains("Refresh-Rate"))
+                            {
+                                Uniwill_Control_Utility.Scripts.Misc.Display.ApplySettings(Convert.ToInt32(ryzenAdjCommandValueString));
+                            }
+                            else if (ryzenAdjCommandString.Contains("ADLX"))
+                            {
+                                ADLX(ryzenAdjCommandString, ryzenAdjCommandValueString);
+                            }
+                            else if (ryzenAdjCommandString.Contains("NVIDIA"))
+                            {
+                                NVIDIA(ryzenAdjCommandString, ryzenAdjCommandValueString);
+                            }
+                            else if (ryzenAdjCommandString.Contains("intel"))
+                            {
+                                if (ryzenAdjCommandString == "intel-pl")
+                                {
+                                    string[] limits = ryzenAdjCommandValueString.Split(',');
+                                    if (limits.Length == 2)
+                                        Intel_Management.changeTDP(int.Parse(limits[0]), int.Parse(limits[1]));
+                                    else
+                                        Intel_Management.changeTDPAll(int.Parse(ryzenAdjCommandValueString));
+                                }
+                                else if (ryzenAdjCommandValueString.Contains("-"))
+                                {
+                                    if (ryzenAdjCommandString == "intel-ratio")
+                                    {
+                                        string[] stringArray = ryzenAdjCommandValueString.Split('-');
+                                        int[] intArray = stringArray.Select(int.Parse).ToArray();
+
+                                        Intel_Management.changeClockRatioOffset(intArray);
+                                    }
+                                }
+                                else
+                                {
+                                    int ryzenAdjCommandValue = Convert.ToInt32(ryzenAdjCommandValueString);
+
+                                    if (ryzenAdjCommandString == "intel-volt-cpu") Intel_Management.changeVoltageOffset(ryzenAdjCommandValue, 0);
+                                    else if (ryzenAdjCommandString == "intel-volt-gpu") Intel_Management.changeVoltageOffset(ryzenAdjCommandValue, 1);
+                                    else if (ryzenAdjCommandString == "intel-volt-cache") Intel_Management.changeVoltageOffset(ryzenAdjCommandValue, 2);
+                                    else if (ryzenAdjCommandString == "intel-volt-sa") Intel_Management.changeVoltageOffset(ryzenAdjCommandValue, 3);
+                                    else if (ryzenAdjCommandString == "intel-bal-cpu") Intel_Management.changePowerBalance(ryzenAdjCommandValue, 0);
+                                    else if (ryzenAdjCommandString == "intel-bal-gpu") Intel_Management.changePowerBalance(ryzenAdjCommandValue, 1);
+                                    else if (ryzenAdjCommandString == "intel-gpu") Intel_Management.changeGpuClock(ryzenAdjCommandValue);
+                                }
+                            }
+                            else if (ryzenAdjCommandString.StartsWith("ec-"))
+                            {
+                                // EC register write commands for Uniwill EC (XMG / TUXEDO laptops).
+                                if (EcService is null)
+                                {
+                                    DiagnosticLogger.LogDebug($"EC command ignored: {ryzenAdjCommand} (EC service not available)");
+                                    continue;
+                                }
+
+                                // On first EC command in a batch, set OVERBOOST profile.
+                                // This replicates the Linux tuxedo_io driver's uw_set_tdp()
+                                // which calls uw_set_performance_profile_v1(PROFILE_OVERBOOST)
+                                // before writing PL1/PL2/PL4. The OVERBOOST profile signals
+                                // the EC to raise the power ceiling above the default 55W.
+                                if (ryzenAdjCommandString == "ec-overboost")
+                                {
+                                    EcService.SetOverboostProfile();
+                                    DiagnosticLogger.LogDebug($"EC applied: {ryzenAdjCommandString}");
+                                    continue;
+                                }
+
+                                int ecValue = Convert.ToInt32(ryzenAdjCommandValueString);
+
+                                if (ryzenAdjCommandString == "ec-pl1") EcService.SetPl1(ecValue);
+                                else if (ryzenAdjCommandString == "ec-pl2") EcService.SetPl2(ecValue);
+                                else if (ryzenAdjCommandString == "ec-pl4") EcService.SetPl4(ecValue);
+                                else if (ryzenAdjCommandString == "ec-pl5") EcService.SetPl5(ecValue);
+                                else if (ryzenAdjCommandString == "ec-tcc-offset") EcService.SetTccOffset(ecValue);
+                                else if (ryzenAdjCommandString == "ec-mode") EcService.SetPerformanceMode(ecValue);
+                                else DiagnosticLogger.LogDebug($"Unknown EC command: {ryzenAdjCommandString}");
+
+                                DiagnosticLogger.LogDebug($"EC applied: {ryzenAdjCommandString}={ecValue}");
+                            }
+                            else
+                            {
+                                if (ryzenAdjCommandString == "apu-skin-temp" && !SupportsApuSkinTemperatureLimit())
+                                {
+                                    DiagnosticLogger.LogDebug($"APU skin temperature limit is not supported on {Family.FAM}.");
+                                    continue;
+                                }
+
+                                uint ryzenAdjCommandValue = Convert.ToUInt32(ryzenAdjCommandValueString);
+
+                                if (ryzenAdjCommand.Contains("skin")) ryzenAdjCommandValue *= 256;
+
+                                if (ryzenAdjCommand.Contains("coall") && Settings.Default.isAutoUvCPU == true && isAutoOC == false) continue;
+                                if (ryzenAdjCommand.Contains("coper") && Settings.Default.isAutoUvCPU == true && isAutoOC == false) continue;
+                                if (ryzenAdjCommand.Contains("cogfx") && Settings.Default.isAutoUviGPU == true && isAutoOC == false) continue;
+
+                                if (ryzenAdjCommandValue <= 0 && !ryzenAdjCommandString.Contains("co")) SMUCommands.applySettings(ryzenAdjCommandString, 0x0);
+                                else SMUCommands.applySettings(ryzenAdjCommandString, ryzenAdjCommandValue);
+
+                                DiagnosticLogger.LogDebug($"SMU applied: {ryzenAdjCommandString}=0x{ryzenAdjCommandValue:X}");
+
+                                // CRITICAL: 50ms delay between SMU commands. The SMU firmware
+                                // needs time to process each command. Without this delay,
+                                // batch commands cause the SMU to enforce a conservative
+                                // 55W default. The original UCU includes this delay.
+                                Thread.Sleep(50);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            DiagnosticLogger.LogError(ex, $"Failed to process command: {ryzenAdjCommand}");
+                        }
+                }
+
+                if (!isAutoOC)
+                {
+                    LastAppliedSettingsService.Update(normalizedCommands, appliedName, localizeAppliedName);
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to translate RyzenAdj command string");
+            }
+        }
+
+        private static bool SupportsApuSkinTemperatureLimit() =>
+            Family.FAM is Family.RyzenFamily.Renoir
+                or Family.RyzenFamily.Lucienne
+                or Family.RyzenFamily.Cezanne_Barcelo
+                or Family.RyzenFamily.VanGogh
+                or Family.RyzenFamily.Rembrandt
+                or Family.RyzenFamily.Mendocino
+                or Family.RyzenFamily.PhoenixPoint
+                or Family.RyzenFamily.PhoenixPoint2
+                or Family.RyzenFamily.HawkPoint
+                or Family.RyzenFamily.HawkPoint2;
+
+        private static void ADLX(string command, string value)
+        {
+            try
+            {
+                DiagnosticLogger.LogDebug($"ADLX: {command}={value}");
+                string[] variables = value.Split('-');
+
+                if (command == "ADLX-Lag") ADLXBackend.SetAntiLag(int.Parse(variables[0]), bool.Parse(variables[1]));
+                if (command == "ADLX-Boost") ADLXBackend.SetBoost(int.Parse(variables[0]), bool.Parse(variables[1]), int.Parse(variables[2]));
+                if (command == "ADLX-RSR")
+                {
+                    ADLXBackend.SetRSR(bool.Parse(variables[0]));
+                    ADLXBackend.SetRSRSharpness(int.Parse(variables[1]));
+                }
+                if (command == "ADLX-Chill") ADLXBackend.SetChill(int.Parse(variables[0]), bool.Parse(variables[1]), int.Parse(variables[2]), int.Parse(variables[3]));
+                if (command == "ADLX-Sync") ADLXBackend.SetEnhancedSync(int.Parse(variables[0]), bool.Parse(variables[1]));
+                if (command == "ADLX-ImageSharp") ADLXBackend.SetImageSharpning(int.Parse(variables[0]), bool.Parse(variables[1]), int.Parse(variables[2]));
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to apply ADLX settings");
+            }
+        }
+
+        private static void UCUSR(string command, string value)
+        {
+            try
+            {
+                DiagnosticLogger.LogDebug($"UCUSR: {command}={value}");
+                string[] variables = value.Split('-');
+
+                if (command == "UCUSR")
+                {
+                    Uniwill_Control_Utility.Properties.Settings.Default.AdapterIdx = 0;
+                    Uniwill_Control_Utility.Properties.Settings.Default.isMagpie = Convert.ToBoolean(variables[0]);
+                    Uniwill_Control_Utility.Properties.Settings.Default.VSync = Convert.ToBoolean(variables[1]);
+                    Uniwill_Control_Utility.Properties.Settings.Default.Sharpness = Convert.ToDouble(variables[2]);
+                    Uniwill_Control_Utility.Properties.Settings.Default.ResMode = Convert.ToInt32(variables[3]);
+                    Uniwill_Control_Utility.Properties.Settings.Default.AutoRestore = Convert.ToBoolean(variables[0]);
+                    Uniwill_Control_Utility.Properties.Settings.Default.Save();
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to apply UCUSR settings");
+            }
+        }
+
+        private static void NVIDIA(string command, string value)
+        {
+            try
+            {
+                DiagnosticLogger.LogDebug($"NVIDIA: {command}={value}");
+                DiagnosticLogger.LogInfo($"NVIDIA: {command}={value}");
+
+                // Split on '-' but keep negative numbers intact.
+                // "0--300-0-175-25" ? ["0", "-300", "0", "175", "25"]
+                // Strategy: replace "--" with "-|", split on "-", then merge empty tokens back to the next token.
+                string[] variables = ParseNvidiaClocks(value);
+                DiagnosticLogger.LogInfo($"NVIDIA: parsed {variables.Length} tokens: [{string.Join(", ", variables)}]");
+
+                if (command == "NVIDIA-Clocks" && variables.Length == 2)
+                {
+                    DiagnosticLogger.LogInfo($"NVIDIA: SetClocks({variables[0]}, {variables[1]})");
+                    NvTuning.SetClocks(int.Parse(variables[0]), int.Parse(variables[1]));
+                }
+                else if (command == "NVIDIA-Clocks" && variables.Length == 3)
+                {
+                    DiagnosticLogger.LogInfo($"NVIDIA: SetMaxGPUClock({variables[0]}), SetClocks({variables[1]}, {variables[2]})");
+                    NvTuning.SetMaxGPUClock(int.Parse(variables[0]));
+                    NvTuning.SetClocks(int.Parse(variables[1]), int.Parse(variables[2]));
+                }
+                else if (command == "NVIDIA-Clocks" && variables.Length == 4)
+                {
+                    // Legacy: 0-core-mem-watts (no DB offset, total watts = watts)
+                    DiagnosticLogger.LogInfo($"NVIDIA: SetMaxGPUClock({variables[0]}), SetClocks({variables[1]}, {variables[2]}), SetPowerLimit({variables[3]}, dbOffset=0)");
+                    NvTuning.SetMaxGPUClock(int.Parse(variables[0]));
+                    NvTuning.SetClocks(int.Parse(variables[1]), int.Parse(variables[2]));
+                    NvTuning.SetPowerLimit(int.Parse(variables[3]), 0);
+                    DiagnosticLogger.LogInfo($"NVIDIA: SetPowerLimit returned");
+                }
+                else if (command == "NVIDIA-Clocks" && variables.Length == 5)
+                {
+                    // New: 0-core-mem-totalWatts-dbOffset
+                    DiagnosticLogger.LogInfo($"NVIDIA: SetMaxGPUClock({variables[0]}), SetClocks({variables[1]}, {variables[2]}), SetPowerLimit({variables[3]}, dbOffset={variables[4]})");
+                    NvTuning.SetMaxGPUClock(int.Parse(variables[0]));
+                    NvTuning.SetClocks(int.Parse(variables[1]), int.Parse(variables[2]));
+                    NvTuning.SetPowerLimit(int.Parse(variables[3]), int.Parse(variables[4]));
+                    DiagnosticLogger.LogInfo($"NVIDIA: SetPowerLimit returned");
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to apply NVIDIA clocks");
+            }
+        }
+
+        /// <summary>
+        /// Split a dash-delimited value while keeping negative numbers intact.
+        /// "0--300-0-175-25" ? ["0", "-300", "0", "175", "25"]
+        /// "0-100-200" ? ["0", "100", "200"]
+        /// </summary>
+        private static string[] ParseNvidiaClocks(string value)
+        {
+            // Replace "--" (separator followed by negative sign) with a unique delimiter.
+            // Then split on both "-" and the delimiter, reassembling negatives.
+            string normalized = value.Replace("--", "-\u0000-");
+            string[] parts = normalized.Split('-');
+
+            var result = new System.Collections.Generic.List<string>();
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (parts[i] == "\u0000")
+                {
+                    // This was a "--" ? the next part is the negative number.
+                    if (i + 1 < parts.Length)
+                    {
+                        result.Add("-" + parts[i + 1]);
+                        i++; // skip the consumed part
+                    }
+                }
+                else
+                {
+                    result.Add(parts[i]);
+                }
+            }
+
+            return result.ToArray();
+        }
+
+        static bool isMessageBoxOpen = false, isUpdatingUltiMode = false;
+        private static async void AsusWmi(string command, string value)
+        {
+            try
+            {
+                DiagnosticLogger.LogDebug($"AsusWmi: {command}={value}");
+                uint id = 0;
+                int mode = 0;
+                if (command == "ASUS-Power")
+                {
+                    if (App.product.Contains("ROG") || App.product.Contains("TUF")) id = ASUSWmi.PerformanceMode;
+                    else id = ASUSWmi.VivoBookMode;
+
+                    mode = (int)ASUSWmi.AsusMode.Balanced;
+                    if(value == "1") mode = (int)ASUSWmi.AsusMode.Silent;
+                    else if (value == "2") mode = (int)ASUSWmi.AsusMode.Balanced;
+                    else if (value == "3") mode = (int)ASUSWmi.AsusMode.Turbo;
+                    if (App.wmi.DeviceGet(id) != mode) App.wmi.DeviceSet(id, mode, "PowerMode");
+                }
+                if(command == "ASUS-Eco")
+                {
+                    if(value.ToLower() == "true") App.wmi.SetGPUEco(1);
+                    else App.wmi.SetGPUEco(0);
+                }
+                if (command == "ASUS-MUX")
+                {
+                    if (!isMessageBoxOpen && !isUpdatingUltiMode)
+                    {
+                        if (App.product.Contains("ROG") || App.product.Contains("TUF")) id = ASUSWmi.GPUMux;
+                        else id = ASUSWmi.GPUMuxVivo;
+
+                        int mux = App.wmi.DeviceGet(id);
+                        if (mux > 0 && value.ToLower() == "true")
+                        {
+                            isMessageBoxOpen = true;
+
+                            var messageBox = new Wpf.Ui.Controls.MessageBox();
+
+                            messageBox.Title = LocalizationService.Get("GPU Ultimate Mode");
+                            messageBox.Content = LocalizationService.Get("Switching the GPU to Ultimate Mode requires a restart to take effect!");
+                            messageBox.PrimaryButtonText = LocalizationService.Get("Restart");
+                            messageBox.CloseButtonText = LocalizationService.Get("Cancel");
+
+                            if (await messageBox.ShowDialogAsync() == Wpf.Ui.Controls.MessageBoxResult.Primary)
+                                RestartWithMuxMode(id, 0);
+                            else
+                                isMessageBoxOpen = false;
+
+
+                        }
+                        else if (mux < 1 && mux > -1 && value.ToLower() == "false")
+                        {
+                            isMessageBoxOpen = true;
+
+                            var messageBox = new Wpf.Ui.Controls.MessageBox();
+
+                            messageBox.Title = LocalizationService.Get("GPU Ultimate Mode");
+                            messageBox.Content = LocalizationService.Get("Disabling GPU Ultimate Mode requires a restart to take effect!");
+                            messageBox.PrimaryButtonText = LocalizationService.Get("Restart");
+                            messageBox.CloseButtonText = LocalizationService.Get("Cancel");
+
+                            if (await messageBox.ShowDialogAsync() == Wpf.Ui.Controls.MessageBoxResult.Primary)
+                                RestartWithMuxMode(id, 1);
+                            else
+                                isMessageBoxOpen = false;
+                        }
+                    }
+                }
+            } 
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to apply ASUS WMI settings");
+            }
+        }
+
+        private static void RestartWithMuxMode(uint id, int mode)
+        {
+            App.wmi.DeviceSet(id, mode, "MUX");
+            isMessageBoxOpen = false;
+            isUpdatingUltiMode = true;
+            Process.Start("shutdown", "/r /t 1");
+        }
+
+    }
+}

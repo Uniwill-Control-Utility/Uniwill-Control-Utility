@@ -1,0 +1,21 @@
+<UserControl x:Class="Uniwill_Control_Utility.Views.Controls.KeyboardVisualizerControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent"
+             SnapsToDevicePixels="True"
+             UseLayoutRounding="True">
+    <Border Background="#181818"
+            CornerRadius="4"
+            Padding="12,0,0,10">
+        <Viewbox Stretch="Uniform"
+                 StretchDirection="Both"
+                 HorizontalAlignment="Center">
+            <Canvas x:Name="_keyboardCanvas"
+                    Width="736"
+                    Height="280"
+                    Background="Transparent">
+                <!-- Keys are added programmatically in code-behind -->
+            </Canvas>
+        </Viewbox>
+    </Border>
+</UserControl>

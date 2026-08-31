@@ -1,0 +1,275 @@
+using System;
+using System.Threading;
+using Uniwill_Control_Utility.Models;
+
+namespace Uniwill_Control_Utility.Services
+{
+    /// <summary>
+    /// Temperature-driven fan control service for Flydigi cooler devices.
+    /// Reads temperatures on a timer, applies a fan curve profile, and writes
+    /// the resulting RPM to the cooler with smoothing and safety overrides.
+    /// </summary>
+    public class FlydigiSmartControl : IDisposable
+    {
+        private readonly FlydigiCoolerService _coolerService;
+        private readonly FlydigiTemperatureProvider _temperatureProvider;
+        private Timer? _timer;
+        private bool _disposed;
+
+        /// <summary>EWMA-filtered temperature carried across ticks.</summary>
+        private double? _filteredTemperature;
+
+        /// <summary>Last RPM value actually commanded to the device (for ramp limiting).</summary>
+        private ushort? _lastCommandedRpm;
+
+        /// <summary>Tick counter for periodic keepalive (re-send RPM to maintain device realtime mode).</summary>
+        private int _tickCounter;
+
+        /* ------------------------------------------------------------------ */
+        /*  Public state                                                       */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>Whether the control loop is currently running.</summary>
+        public bool IsActive { get; private set; }
+
+        /// <summary>Latest filtered temperature reading.</summary>
+        public double? CurrentTemperature { get; private set; }
+
+        /// <summary>Latest target RPM computed by the control loop.</summary>
+        public ushort? TargetRpm { get; private set; }
+
+        /// <summary>Active fan curve profile. Setting a new profile forces re-evaluation on the next tick.</summary>
+        public FlydigiFanCurveProfile? ActiveProfile
+        {
+            get => _activeProfile;
+            set
+            {
+                _activeProfile = value;
+                // Force re-evaluation on next tick so the new profile takes effect immediately
+                // without being blocked by hysteresis or ramp limiting.
+                _filteredTemperature = null;
+                _lastCommandedRpm = null;
+                _tickCounter = 0;
+            }
+        }
+        private FlydigiFanCurveProfile? _activeProfile;
+
+        /// <summary>Settings for avoidance zones and temperature source.</summary>
+        public Bs2ProSettings? Settings { get; set; }
+
+        /* ------------------------------------------------------------------ */
+        /*  Configuration                                                      */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>How often (ms) to read temperature and update fan speed. Default 1000.</summary>
+        public int PollIntervalMs { get; set; } = 1000;
+
+        /// <summary>Maximum RPM change allowed per cycle (ramp limiter). Default 200.</summary>
+        public int MaxRpmChangePerCycle { get; set; } = 200;
+
+        /// <summary>
+        /// Hysteresis deadzone in degrees Celsius. Temperature changes smaller than
+        /// this threshold are ignored to prevent oscillation. Default 2.0.
+        /// </summary>
+        public double HysteresisDeadzone { get; set; } = 2.0;
+
+        /// <summary>
+        /// Temperature source: "cpu", "gpu", or "max" (default).
+        /// </summary>
+        public string TempSource { get; set; } = "max";
+
+        /* ------------------------------------------------------------------ */
+        /*  Events                                                             */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>
+        /// Raised on each successful control cycle with the latest filtered
+        /// temperature and the RPM that was sent to the device.
+        /// </summary>
+        public event EventHandler<(double? Temp, ushort? Rpm)>? TemperatureUpdated;
+
+        /* ------------------------------------------------------------------ */
+        /*  Constructor                                                        */
+        /* ------------------------------------------------------------------ */
+
+        public FlydigiSmartControl(FlydigiCoolerService coolerService, FlydigiTemperatureProvider temperatureProvider)
+        {
+            _coolerService = coolerService;
+            _temperatureProvider = temperatureProvider;
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Lifecycle                                                          */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>
+        /// Starts the control loop timer.
+        /// </summary>
+        public void Start()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(FlydigiSmartControl));
+
+            Stop();
+
+            IsActive = true;
+            _timer = new Timer(Tick, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(PollIntervalMs));
+        }
+
+        /// <summary>
+        /// Stops the control loop and disposes the timer.
+        /// </summary>
+        public void Stop()
+        {
+            IsActive = false;
+            _timer?.Dispose();
+            _timer = null;
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Control loop tick                                                  */
+        /* ------------------------------------------------------------------ */
+
+        private void Tick(object? state)
+        {
+            _tickCounter++;
+
+            // 1. Guard: connected + profile
+            if (!_coolerService.IsConnected || ActiveProfile == null)
+                return;
+
+            // Periodic keepalive: re-send the last RPM every 5 ticks (~5 seconds) to maintain
+            // the device's realtime mode. The BS2 Pro device will exit realtime mode if it
+            // doesn't receive RPM commands regularly.
+            if (_tickCounter % 5 == 0 && _lastCommandedRpm.HasValue && _lastCommandedRpm.Value > 0)
+            {
+                _ = _coolerService.WriteRealtimeRpmAsync(_lastCommandedRpm.Value);
+            }
+
+            // 2. Read temperature based on TempSource
+            double? rawTemp = ReadTemperature();
+            if (!rawTemp.HasValue)
+                return;
+
+            // 3. Asymmetric EWMA filtering
+            double filtered = ApplyEwmaFilter(rawTemp.Value);
+
+            // 4. Hysteresis deadzone check
+            if (_filteredTemperature.HasValue && Math.Abs(filtered - _filteredTemperature.Value) < HysteresisDeadzone)
+                return;
+
+            _filteredTemperature = filtered;
+
+            // 5. Compute target RPM from fan curve
+            ushort targetRpm = ActiveProfile.GetRpmForTemperature(filtered);
+
+            // 6. Apply speed avoidance
+            if (Settings != null)
+            {
+                targetRpm = FlydigiSpeedAvoidance.Apply(
+                    targetRpm,
+                    Settings.AvoidanceEnabled,
+                    Settings.AvoidanceStartRpm,
+                    Settings.AvoidanceEndRpm,
+                    filtered);
+            }
+
+            // 7. Critical temperature overrides
+            targetRpm = ApplyCriticalTempOverride(targetRpm, filtered);
+
+            // 8. Ramp limiting
+            targetRpm = ApplyRampLimit(targetRpm);
+
+            // 9. Send to device (fire-and-forget)
+            _ = _coolerService.WriteRealtimeRpmAsync(targetRpm);
+            _lastCommandedRpm = targetRpm;
+
+            // 10. Update properties and raise event
+            CurrentTemperature = filtered;
+            TargetRpm = targetRpm;
+            TemperatureUpdated?.Invoke(this, (filtered, targetRpm));
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Temperature reading                                                */
+        /* ------------------------------------------------------------------ */
+
+        private double? ReadTemperature()
+        {
+            return TempSource.ToLowerInvariant() switch
+            {
+                "cpu" => _temperatureProvider.GetCpuTemperature(),
+                "gpu" => _temperatureProvider.GetGpuTemperature(),
+                "max" => _temperatureProvider.GetMaxTemperature(),
+                _ => _temperatureProvider.GetMaxTemperature()
+            };
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  EWMA filter                                                        */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>
+        /// Applies asymmetric exponential weighted moving average.
+        /// Rising temperatures use alpha=0.5 (fast response).
+        /// Falling temperatures use alpha=0.15 (slow decay, prevents fan flutter).
+        /// </summary>
+        private double ApplyEwmaFilter(double rawTemp)
+        {
+            if (!_filteredTemperature.HasValue)
+                return rawTemp;
+
+            double alpha = rawTemp >= _filteredTemperature.Value ? 0.5 : 0.15;
+            return alpha * rawTemp + (1.0 - alpha) * _filteredTemperature.Value;
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Critical temperature override                                      */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>
+        /// Forces high fan speed when temperature reaches critical levels.
+        /// >= 90°C → 4000 RPM (full speed).
+        /// >= 85°C → at least 3500 RPM.
+        /// </summary>
+        private ushort ApplyCriticalTempOverride(ushort targetRpm, double temp)
+        {
+            if (temp >= 90.0)
+                return 4000;
+            if (temp >= 85.0)
+                return (ushort)Math.Max((int)targetRpm, 3500);
+            return targetRpm;
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Ramp limiting                                                      */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>
+        /// Clamps the RPM change to ±MaxRpmChangePerCycle from the last commanded RPM.
+        /// Prevents sudden, jarring fan speed jumps.
+        /// </summary>
+        private ushort ApplyRampLimit(ushort targetRpm)
+        {
+            if (!_lastCommandedRpm.HasValue)
+                return targetRpm;
+
+            int delta = targetRpm - _lastCommandedRpm.Value;
+            int clampedDelta = Math.Clamp(delta, -MaxRpmChangePerCycle, MaxRpmChangePerCycle);
+            return (ushort)(_lastCommandedRpm.Value + clampedDelta);
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  IDisposable                                                        */
+        /* ------------------------------------------------------------------ */
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                Stop();
+                _disposed = true;
+            }
+        }
+    }
+}
