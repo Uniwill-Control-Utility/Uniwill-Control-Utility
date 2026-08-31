@@ -18,7 +18,11 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _overlay = overlay ?? throw new ArgumentNullException(nameof(overlay));
 
             InitializeComponent();
+            ScaleSlider.ValueChanged += (_, __) => ScaleValueText.Text = ScaleSlider.Value.ToString("P0");
+            OpacitySlider.ValueChanged += (_, __) => OpacityValueText.Text = OpacitySlider.Value.ToString("P0");
             LoadOptions(_overlay.CurrentOptions);
+            ScaleValueText.Text = ScaleSlider.Value.ToString("P0");
+            OpacityValueText.Text = OpacitySlider.Value.ToString("P0");
         }
 
         private void LoadOptions(OverlayOptions options)

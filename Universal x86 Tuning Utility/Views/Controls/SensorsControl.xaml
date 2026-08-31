@@ -4,7 +4,9 @@
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              FlowDirection="LeftToRight">
 
-    <ui:Card Padding="18">
+    <ui:Card Padding="18"
+             RenderOptions.EdgeMode="Aliased"
+             SnapsToDevicePixels="True">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />

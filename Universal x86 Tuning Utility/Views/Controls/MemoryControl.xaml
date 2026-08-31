@@ -4,7 +4,13 @@
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              FlowDirection="LeftToRight">
 
-    <ui:Card Padding="18">
+    <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="16"
+            RenderOptions.EdgeMode="Aliased"
+            SnapsToDevicePixels="True">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
@@ -23,7 +29,8 @@
                        Margin="0,0,0,16"
                        FontSize="18"
                        FontWeight="Medium"
-                       Text="Memory" />
+                       Text="Memory"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
 
             <Label Grid.Row="1" Grid.Column="0"
                    VerticalContentAlignment="Center"
@@ -50,5 +57,5 @@
                    Content="--"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
         </Grid>
-    </ui:Card>
+    </Border>
 </UserControl>

@@ -44,22 +44,22 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <!-- Row 0: Page title block (36px side margin, 24px top for non-Home page) -->
+                <!-- Row 0: Page title block (16px side margin, 24px top for non-Home page) -->
                 <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,24,0,0">
                     <TextBlock FontSize="26"
                                FontWeight="Medium"
-                               Margin="36,0,36,0"
+                               Margin="16,0,16,0"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                Text="Keyboard" />
-                    <TextBlock Margin="36,8,36,12"
+                    <TextBlock Margin="16,8,16,12"
                                FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                Text="Customize your keyboard backlight and lighting effects."
                                TextWrapping="Wrap" />
                 </StackPanel>
 
-                <!-- Row 1: Content cards (36px side margin, 16px top to match Dashboard) -->
-                <StackPanel Grid.Row="1" Margin="36,16,36,18">
+                <!-- Row 1: Content cards (16px side margin, 16px top to match Dashboard) -->
+                <StackPanel Grid.Row="1" Margin="16,16,16,18">
 
                     <!-- Unavailable state -->
                     <StackPanel x:Name="KeyboardUnavailable" Visibility="Collapsed">
@@ -511,7 +511,7 @@
         <Grid x:Name="PerKeyBottomBar"
               Grid.Row="1"
               Visibility="Collapsed"
-              Margin="36,12,36,12">
+              Margin="16,12,16,12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />

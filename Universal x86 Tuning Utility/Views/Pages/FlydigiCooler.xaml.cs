@@ -1449,49 +1449,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             _coolerService.PersistSettings();
         }
 
-        private void tsLearning_Checked(object sender, RoutedEventArgs e)
-        {
-            if (_coolerService == null) return;
-            var settings = _coolerService.GetSettings();
-            settings.LearningEnabled = true;
-            _coolerService.PersistSettings();
-
-            // Show Learning Bias row + divider
-            LearningBiasDivider.Visibility = Visibility.Visible;
-            LearningBiasRow.Visibility = Visibility.Visible;
-        }
-
-        private void tsLearning_Unchecked(object sender, RoutedEventArgs e)
-        {
-            if (_coolerService == null) return;
-            var settings = _coolerService.GetSettings();
-            settings.LearningEnabled = false;
-            _coolerService.PersistSettings();
-
-            // Hide Learning Bias row + divider
-            LearningBiasDivider.Visibility = Visibility.Collapsed;
-            LearningBiasRow.Visibility = Visibility.Collapsed;
-        }
-
-        private void cbxLearningBias_SelectionChanged(object sender, EventArgs e)
-        {
-            if (_coolerService == null) return;
-
-            var bias = cbxLearningBias.SelectedIndex switch
-            {
-                0 => "balanced",
-                1 => "cooling",
-                2 => "quiet",
-                _ => "balanced"
-            };
-
-            var settings = _coolerService.GetSettings();
-            settings.LearningBias = bias;
-            _coolerService.PersistSettings();
-            // Store learning bias in settings for persistence
-            // The FlydigiLearningEngine reads BiasMode from configuration
-        }
-
         /* ------------------------------------------------------------------ */
         /*  Event Callbacks                                                    */
         /* ------------------------------------------------------------------ */
@@ -1679,12 +1636,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     _ => 0
                 };
 
-                // Hide learning for BS1 (not supported)
-                tsLearning.Visibility = Visibility.Collapsed;
-                var learningBiasPanel = tsLearning.Parent as StackPanel;
-                if (learningBiasPanel != null)
-                    learningBiasPanel.Visibility = Visibility.Collapsed;
-
                 // Curve profile — restore BEFORE fan mode so _activeProfile is ready
                 // when the fan mode combo box fires SelectionChanged and tries to start
                 // auto control (BS1 Auto is app-side, unlike BS2+ which does it on-device).
@@ -1793,21 +1744,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 _ => 0
             };
             cbxTempSource.SelectedIndex = tempSourceIndex;
-
-            // Learning settings
-            tsLearning.IsChecked = settings.LearningEnabled;
-            var biasIndex = settings.LearningBias.ToLowerInvariant() switch
-            {
-                "cooling" => 1,
-                "quiet" => 2,
-                _ => 0
-            };
-            cbxLearningBias.SelectedIndex = biasIndex;
-
-            // Show/hide Learning Bias based on toggle state
-            var learningVisible = settings.LearningEnabled ? Visibility.Visible : Visibility.Collapsed;
-            LearningBiasDivider.Visibility = learningVisible;
-            LearningBiasRow.Visibility = learningVisible;
 
             // Curve profile — restore before fan mode so _activeProfile is ready for auto control
             // Save the selected profile name BEFORE LoadCurveProfiles repopulates the combo box,
@@ -2199,8 +2135,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             nudAvoidanceStart.IsEnabled = enabled;
             nudAvoidanceEnd.IsEnabled = enabled;
             cbxTempSource.IsEnabled = enabled;
-            tsLearning.IsEnabled = enabled;
-            cbxLearningBias.IsEnabled = enabled;
         }
 
         private static int GetRgbModeIndex(string mode) => mode.ToLowerInvariant() switch

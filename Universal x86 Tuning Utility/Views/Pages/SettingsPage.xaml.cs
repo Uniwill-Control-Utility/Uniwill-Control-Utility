@@ -27,6 +27,16 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
         private readonly ILogger<SettingsPage> _logger;
         private bool _languageSelectionReady;
 
+        // Backing fields for async system info
+        private string _deviceName = "", _deviceModel = "", _deviceProducer = "";
+        private string _cpuName = "", _cpuDescription = "", _cpuManufacturer = "", _cpuCodeName = "", _cpuBaseClock = "", _cpuInstructions = "";
+        private int _cpuCores = 0, _cpuLogicalProcessors = 0;
+        private double _cpuL2Size = 0, _cpuL3Size = 0;
+        private decimal _cpuL1Cache = 0, _cpuL2Cache = 0;
+        private double _ramCapacity = 0;
+        private int _ramSpeed = 0, _ramType = 0, _ramWidth = 0, _ramSlots = 0;
+        private string _ramProducer = "", _ramModel = "";
+
         public ViewModels.SettingsViewModel ViewModel
         {
             get;
@@ -58,19 +68,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
             tbAppVerion.Text = $"Uniwill Control Utility - {GetAssemblyVersion()}";
 
-            // Initialize system info
-            getDeviceInfo();
-            getCPUInfo();
-            getRAMInfo();
-            if (SystemInformation.PowerStatus.BatteryChargeStatus != BatteryChargeStatus.NoSystemBattery)
-            {
-                getBatteryInfo();
-            }
-            else
-            {
-                sdBattery.Visibility = Visibility.Collapsed;
-            }
-
             checkUpdate();
         }
         private string GetAssemblyVersion()
@@ -82,78 +79,50 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         private void getDeviceInfo()
         {
-            tbDeviceName.Text = GetSystemInfo.SystemName;
-            tbDeviceModel.Text = GetSystemInfo.Product;
-            tbDeviceProducer.Text = GetSystemInfo.Manufacturer;
+            _deviceName = GetSystemInfo.SystemName;
+            _deviceModel = GetSystemInfo.Product;
+            _deviceProducer = GetSystemInfo.Manufacturer;
         }
 
-        private async void getCPUInfo()
+        private void applyDeviceInfo()
+        {
+            tbDeviceName.Text = _deviceName;
+            tbDeviceModel.Text = _deviceModel;
+            tbDeviceProducer.Text = _deviceProducer;
+        }
+
+        private void getCPUInfoSync()
         {
             try
             {
-                sdCPU.Visibility = Visibility.Collapsed;
-                ManagementObjectSearcher searcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_Processor");
-
-                string name = "";
-                string description = "";
-                string manufacturer = "";
-                int numberOfCores = 0;
-                int numberOfLogicalProcessors = 0;
-                double l2Size = 0;
-                double l3Size = 0;
-                string baseClock = "";
-
-                await System.Threading.Tasks.Task.Run(() =>
+                using (ManagementObjectSearcher searcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_Processor"))
                 {
                     foreach (ManagementObject queryObj in searcher.Get())
                     {
-                        name = queryObj["Name"].ToString();
-                        description = queryObj["Description"].ToString();
-                        manufacturer = queryObj["Manufacturer"].ToString();
-                        numberOfCores = Convert.ToInt32(queryObj["NumberOfCores"]);
-                        numberOfLogicalProcessors = Convert.ToInt32(queryObj["NumberOfLogicalProcessors"]);
-                        l2Size = Convert.ToDouble(queryObj["L2CacheSize"]) / 1024;
-                        l3Size = Convert.ToDouble(queryObj["L3CacheSize"]) / 1024;
-                        baseClock = queryObj["MaxClockSpeed"].ToString();
+                        _cpuName = queryObj["Name"].ToString();
+                        _cpuDescription = queryObj["Description"].ToString();
+                        _cpuManufacturer = queryObj["Manufacturer"].ToString();
+                        _cpuCores = Convert.ToInt32(queryObj["NumberOfCores"]);
+                        _cpuLogicalProcessors = Convert.ToInt32(queryObj["NumberOfLogicalProcessors"]);
+                        _cpuL2Size = Convert.ToDouble(queryObj["L2CacheSize"]) / 1024;
+                        _cpuL3Size = Convert.ToDouble(queryObj["L3CacheSize"]) / 1024;
+                        _cpuBaseClock = queryObj["MaxClockSpeed"].ToString();
                     }
-                });
-
-                tbProcessor.Text = name;
-                tbCaption.Text = description;
-                string codeName = GetSystemInfo.Codename();
-                if (codeName != "")
-                {
-                    tbCodename.Text = codeName;
-                }
-                else
-                {
-                    tbCode.Visibility = Visibility.Collapsed;
-                    tbCodename.Visibility = Visibility.Collapsed;
                 }
 
-                tbProducer.Text = manufacturer;
-                if (numberOfLogicalProcessors == numberOfCores)
-                    tbCores.Text = numberOfCores.ToString();
-                else
-                    tbCores.Text = GetSystemInfo.getBigLITTLE(numberOfCores, l2Size);
-                tbThreads.Text = numberOfLogicalProcessors.ToString();
-                tbL3Cache.Text = $"{l3Size.ToString("0.##")} MB";
+                _cpuCodeName = GetSystemInfo.Codename();
 
                 uint sum = 0;
                 foreach (uint number in GetSystemInfo.GetCacheSizes(GetSystemInfo.CacheLevel.Level1))
                     sum += number;
-                decimal total = sum / 1024;
-                tbL1Cache.Text = $"{total.ToString("0.##")} MB";
+                _cpuL1Cache = sum / 1024;
 
                 sum = 0;
                 foreach (uint number in GetSystemInfo.GetCacheSizes(GetSystemInfo.CacheLevel.Level2))
                     sum += number;
-                total = sum / 1024;
-                tbL2Cache.Text = $"{total.ToString("0.##")} MB";
+                _cpuL2Cache = sum / 1024;
 
-                tbBaseClock.Text = $"{baseClock} MHz";
-                tbInstructions.Text = GetSystemInfo.InstructionSets();
-                sdCPU.Visibility = Visibility.Visible;
+                _cpuInstructions = GetSystemInfo.InstructionSets();
             }
             catch (ManagementException ex)
             {
@@ -161,70 +130,90 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             }
         }
 
-        private async void getRAMInfo()
+        private void applyCPUInfo()
+        {
+            tbProcessor.Text = _cpuName;
+            tbCaption.Text = _cpuDescription;
+
+            if (_cpuCodeName != "")
+            {
+                tbCodename.Text = _cpuCodeName;
+            }
+            else
+            {
+                tbCode.Visibility = Visibility.Collapsed;
+                tbCodename.Visibility = Visibility.Collapsed;
+            }
+
+            tbProducer.Text = _cpuManufacturer;
+            if (_cpuLogicalProcessors == _cpuCores)
+                tbCores.Text = _cpuCores.ToString();
+            else
+                tbCores.Text = GetSystemInfo.getBigLITTLE(_cpuCores, _cpuL2Size);
+            tbThreads.Text = _cpuLogicalProcessors.ToString();
+            tbL3Cache.Text = $"{_cpuL3Size.ToString("0.##")} MB";
+            tbL1Cache.Text = $"{_cpuL1Cache.ToString("0.##")} MB";
+            tbL2Cache.Text = $"{_cpuL2Cache.ToString("0.##")} MB";
+            tbBaseClock.Text = $"{_cpuBaseClock} MHz";
+            tbInstructions.Text = _cpuInstructions;
+            sdCPU.Visibility = Visibility.Visible;
+        }
+
+        private void getRAMInfoSync()
         {
             try
             {
-                sdRAM.Visibility = Visibility.Collapsed;
-                double capacity = 0;
-                int speed = 0;
-                int type = 0;
-                int width = 0;
-                string producer = "";
-                string model = "";
-                int slots = 0;
-
-                ManagementObjectSearcher searcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_PhysicalMemory");
-
-                await System.Threading.Tasks.Task.Run(() =>
+                using (ManagementObjectSearcher searcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_PhysicalMemory"))
                 {
                     foreach (ManagementObject queryObj in searcher.Get())
                     {
-                        if (producer == "") producer = queryObj["Manufacturer"].ToString();
-                        else if (!producer.Contains(queryObj["Manufacturer"].ToString()))
-                            producer = $"{producer}/{queryObj["Manufacturer"]}";
+                        if (_ramProducer == "") _ramProducer = queryObj["Manufacturer"].ToString();
+                        else if (!_ramProducer.Contains(queryObj["Manufacturer"].ToString()))
+                            _ramProducer = $"{_ramProducer}/{queryObj["Manufacturer"]}";
 
-                        if (model == "") model = queryObj["PartNumber"].ToString();
-                        else if (!model.Contains(queryObj["PartNumber"].ToString()))
-                            model = $"{model}/{queryObj["PartNumber"]}";
+                        if (_ramModel == "") _ramModel = queryObj["PartNumber"].ToString();
+                        else if (!_ramModel.Contains(queryObj["PartNumber"].ToString()))
+                            _ramModel = $"{_ramModel}/{queryObj["PartNumber"]}";
 
-                        capacity = capacity + Convert.ToDouble(queryObj["Capacity"]);
-                        speed = Convert.ToInt32(queryObj["ConfiguredClockSpeed"]);
-                        type = Convert.ToInt32(queryObj["SMBIOSMemoryType"]);
-                        width = width + Convert.ToInt32(queryObj["DataWidth"]);
-                        slots++;
+                        _ramCapacity = _ramCapacity + Convert.ToDouble(queryObj["Capacity"]);
+                        _ramSpeed = Convert.ToInt32(queryObj["ConfiguredClockSpeed"]);
+                        _ramType = Convert.ToInt32(queryObj["SMBIOSMemoryType"]);
+                        _ramWidth = _ramWidth + Convert.ToInt32(queryObj["DataWidth"]);
+                        _ramSlots++;
                     }
-                });
+                }
 
-                if (width > 128 && Family.FAM == Family.RyzenFamily.StrixHalo)
-                    if (width > 256) width = 256;
-                    else if (width > 64 && Family.FAM == Family.RyzenFamily.Mendocino) width = 64;
-                    else if (width > 128 && Family.FAM < Family.RyzenFamily.FireRange && Family.TYPE != Family.ProcessorType.Intel)
-                        width = 128;
+                if (_ramWidth > 128 && Family.FAM == Family.RyzenFamily.StrixHalo)
+                    if (_ramWidth > 256) _ramWidth = 256;
+                    else if (_ramWidth > 64 && Family.FAM == Family.RyzenFamily.Mendocino) _ramWidth = 64;
+                    else if (_ramWidth > 128 && Family.FAM < Family.RyzenFamily.FireRange && Family.TYPE != Family.ProcessorType.Intel)
+                        _ramWidth = 128;
 
-                capacity = capacity / 1024 / 1024 / 1024;
-
-                string DDRType = type switch
-                {
-                    20 => "DDR",
-                    21 => "DDR2",
-                    24 => "DDR3",
-                    26 => "DDR4",
-                    30 => "LPDDR4",
-                    34 => "DDR5",
-                    35 => "LPDDR5",
-                    _ => $"Unknown ({type})"
-                };
-
-                tbRAM.Text = $"{capacity} GB {DDRType} @ {speed} MT/s";
-                tbRAMProducer.Text = producer;
-                tbRAMModel.Text = model.Replace(" ", null!);
-                tbWidth.Text = $"{width} bit";
-                tbSlots.Text = $"{slots} * {width / slots} bit";
-
-                sdRAM.Visibility = Visibility.Visible;
+                _ramCapacity = _ramCapacity / 1024 / 1024 / 1024;
             }
             catch { }
+        }
+
+        private void applyRAMInfo()
+        {
+            string DDRType = _ramType switch
+            {
+                20 => "DDR",
+                21 => "DDR2",
+                24 => "DDR3",
+                26 => "DDR4",
+                30 => "LPDDR4",
+                34 => "DDR5",
+                35 => "LPDDR5",
+                _ => $"Unknown ({_ramType})"
+            };
+
+            tbRAM.Text = $"{_ramCapacity} GB {DDRType} @ {_ramSpeed} MT/s";
+            tbRAMProducer.Text = _ramProducer;
+            tbRAMModel.Text = _ramModel.Replace(" ", null!);
+            tbWidth.Text = $"{_ramWidth} bit";
+            tbSlots.Text = $"{_ramSlots} * {_ramWidth / _ramSlots} bit";
+            sdRAM.Visibility = Visibility.Visible;
         }
 
         private void getBatteryInfo()
@@ -419,8 +408,42 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
 
         }
 
-        private void UiPage_Loaded(object sender, RoutedEventArgs e)
+        private async void UiPage_Loaded(object sender, RoutedEventArgs e)
         {
+            await LoadSystemInfoAsync();
+        }
+
+        private async System.Threading.Tasks.Task LoadSystemInfoAsync()
+        {
+            // Hide expanders immediately so the page renders clean
+            sdCPU.Visibility = Visibility.Collapsed;
+            sdRAM.Visibility = Visibility.Collapsed;
+
+            if (SystemInformation.PowerStatus.BatteryChargeStatus == BatteryChargeStatus.NoSystemBattery)
+            {
+                sdBattery.Visibility = Visibility.Collapsed;
+            }
+
+            // Offload all heavy WMI queries and processing to a background thread
+            await System.Threading.Tasks.Task.Run(() =>
+            {
+                getDeviceInfo();
+                getCPUInfoSync();
+                getRAMInfoSync();
+            });
+
+            // Update UI on the dispatcher thread
+            this.Dispatcher.Invoke(() =>
+            {
+                applyDeviceInfo();
+                applyCPUInfo();
+                applyRAMInfo();
+
+                if (SystemInformation.PowerStatus.BatteryChargeStatus != BatteryChargeStatus.NoSystemBattery)
+                {
+                    getBatteryInfo();
+                }
+            });
         }
 
         private void btnStressTest_Click(object sender, RoutedEventArgs e)

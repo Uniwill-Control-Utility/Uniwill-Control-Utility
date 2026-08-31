@@ -35,7 +35,9 @@
                      ShowMinimize="False"
                      ShowClose="False" />
 
-        <ui:Card Grid.Row="1" Margin="18,12,18,18" Padding="20">
+        <ui:Card Grid.Row="1" Margin="18,12,18,18" Padding="20"
+                 RenderOptions.EdgeMode="Aliased"
+                 SnapsToDevicePixels="True">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />

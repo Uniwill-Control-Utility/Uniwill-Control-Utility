@@ -60,13 +60,13 @@
                 </Grid.RowDefinitions>
 
                 <!-- Row 0: Page title block -->
-                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,12,0,8">
+                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,24,0,8">
                     <TextBlock FontSize="26"
                                FontWeight="Medium"
-                               Margin="24,0,24,0"
+                               Margin="16,0,24,0"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                Text="Automations" />
-                    <TextBlock Margin="24,8,24,12"
+                    <TextBlock Margin="16,8,24,12"
                                FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                Text="Apply presets automatically when power or system state changes."
@@ -74,10 +74,10 @@
                 </StackPanel>
 
                 <!-- Row 1: Content cards -->
-                <StackPanel Grid.Row="1" Margin="24,0,24,18">
+                <StackPanel Grid.Row="1" Margin="16,0,16,16">
 
                 <!-- Preset on Battery Charge -->
-                <ui:CardControl Margin="0,0,0,12">
+                <ui:CardControl Margin="0,0,0,8">
                     <ui:CardControl.Icon>
                         <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE897;" FontSize="20" Margin="4,0,6,0" />
                     </ui:CardControl.Icon>
@@ -115,7 +115,7 @@
                 </ui:CardControl>
 
                 <!-- Preset on Battery Discharge -->
-                <ui:CardControl Margin="0,0,0,12">
+                <ui:CardControl Margin="0,0,0,8">
                     <ui:CardControl.Icon>
                         <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE97E;" FontSize="20" Margin="4,0,6,0" />
                     </ui:CardControl.Icon>
@@ -153,7 +153,7 @@
                 </ui:CardControl>
 
                 <!-- Preset on System Resume -->
-                <ui:CardControl Margin="0,0,0,12">
+                <ui:CardControl Margin="0,0,0,8">
                     <ui:CardControl.Icon>
                         <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C5;" FontSize="20" Margin="4,0,6,0" />
                     </ui:CardControl.Icon>
@@ -192,7 +192,7 @@
 
                 <!-- AutoOC: Adaptive CPU Undervolt -->
                 <ui:CardControl x:Name="ccAutoOcCpuUv"
-                                Margin="0,0,0,12">
+                                Margin="0,0,0,8">
                     <ui:CardControl.Icon>
                         <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BA;" FontSize="20" Margin="4,0,6,0" />
                     </ui:CardControl.Icon>
@@ -220,7 +220,7 @@
 
                 <!-- AutoOC: Adaptive iGPU Undervolt -->
                 <ui:CardControl x:Name="ccAutoOcIgpuUv"
-                                Margin="0,0,0,12">
+                                Margin="0,0,0,8">
                     <ui:CardControl.Icon>
                         <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BA;" FontSize="20" Margin="4,0,6,0" />
                     </ui:CardControl.Icon>

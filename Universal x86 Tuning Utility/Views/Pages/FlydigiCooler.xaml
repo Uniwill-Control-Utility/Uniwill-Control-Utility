@@ -51,147 +51,155 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <!-- Row 0: Page title block (36px side margin, 24px top for non-Home page) -->
+                <!-- Row 0: Page title block (16px side margin, 24px top for non-Home page) -->
                 <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,24,0,0">
                     <TextBlock x:Name="tbPageTitle"
                                FontSize="26"
                                FontWeight="Medium"
-                               Margin="36,0,36,0"
+                               Margin="16,0,36,0"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                Text="Flydigi Cooler Control" />
-                    <TextBlock Margin="36,8,36,12"
+                    <TextBlock Margin="16,8,36,12"
                                FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                               Text="Control your Flydigi CPU cooler's fan speed, RGB lighting, and device settings."
+                               Text="Control your Flydigi laptop cooler's fan speed, RGB lighting, and other settings."
                                TextWrapping="Wrap" />
                 </StackPanel>
 
-                <!-- Row 1: Content cards (36px side margin, 16px top) -->
-                <StackPanel Grid.Row="1" Margin="36,16,36,18">
+                <!-- Row 1: Content cards (16px side margin, 16px top) -->
+                <StackPanel Grid.Row="1" Margin="16,16,16,18">
 
-                <!-- Device Status Card -->
-                <ui:CardControl Margin="0,0,0,8">
-                    <ui:CardControl.Header>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+                <!-- Device Status  -->
+                    <Grid Margin="0,0,0,24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                            <!-- Column 1: Device image + live metrics -->
-                            <StackPanel Grid.Column="0"
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center"
-                                        Margin="64,0,0,0">
-                                <!-- Device image with glow effect -->
-                                <Grid x:Name="glowDeviceGrid"
-                                      Margin="0,24,0,24"
-                                      RenderOptions.EdgeMode="Unspecified">
-                                    <!-- Colored glow layer behind (blurred, slightly larger than device image) -->
-                                    <Rectangle x:Name="rectGlowOverlay"
-                                               Width="330"
-                                               Height="140"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               Fill="#007ACC"
-                                               Opacity="0"
-                                               RenderOptions.EdgeMode="Unspecified"
-                                               Margin="0,12,0,12">
-                                        <Rectangle.Effect>
-                                            <BlurEffect Radius="60"/>
-                                        </Rectangle.Effect>
-                                        <Rectangle.OpacityMask>
-                                            <ImageBrush ImageSource="pack://application:,,,/Assets/Flydigi/bs2-pro.png"
-                                                        Stretch="Fill"
-                                                        RenderOptions.BitmapScalingMode="HighQuality"/>
-                                        </Rectangle.OpacityMask>
-                                    </Rectangle>
-                                    <!-- Sharp original image on top -->
-                                    <Image x:Name="imgDevice"
-                                           Width="320"
-                                           Height="140"
-                                           Stretch="Uniform"
-                                           Source="pack://application:,,,/Assets/Flydigi/bs2-pro.png"
-                                           RenderOptions.BitmapScalingMode="HighQuality"/>
-                                </Grid>
-                                <Grid>
+                        <!-- Column 1: Device image + live metrics -->
+                        <StackPanel Grid.Column="0"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Margin="64,0,0,0">
+                            <!-- Device image with glow effect -->
+                            <Grid x:Name="glowDeviceGrid"
+                                    Margin="0,24,0,24"
+                                    RenderOptions.EdgeMode="Unspecified">
+                                <!-- Colored glow layer behind (blurred, slightly larger than device image) -->
+                                <Rectangle x:Name="rectGlowOverlay"
+                                            Width="330"
+                                            Height="140"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Fill="#007ACC"
+                                            Opacity="0"
+                                            RenderOptions.EdgeMode="Unspecified"
+                                            Margin="0,12,0,12">
+                                    <Rectangle.Effect>
+                                        <BlurEffect Radius="60"/>
+                                    </Rectangle.Effect>
+                                    <Rectangle.OpacityMask>
+                                        <ImageBrush ImageSource="pack://application:,,,/Assets/Flydigi/bs2-pro.png"
+                                                    Stretch="Fill"
+                                                    />
+                                    </Rectangle.OpacityMask>
+                                </Rectangle>
+                                <!-- Sharp original image on top -->
+                                <Image x:Name="imgDevice"
+                                        Width="320"
+                                        Height="140"
+                                        Stretch="Uniform"
+                                        Source="pack://application:,,,/Assets/Flydigi/bs2-pro.png"
+                                        RenderOptions.BitmapScalingMode="HighQuality"/>
+                            </Grid>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                                    <TextBlock Text="Current Speed" 
+                                               FontWeight="SemiBold" 
+                                               HorizontalAlignment="Center" 
+                                               FontSize="12" 
+                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                    <TextBlock Name="tbCurrentRpm" 
+                                               Text="--" 
+                                               HorizontalAlignment="Center" 
+                                               FontWeight="SemiBold" 
+                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                </StackPanel>
+                                <Rectangle Grid.Column="1"
+                                            Height="30"
+                                            Width="1"
+                                            Fill="{DynamicResource ControlFillColorSecondaryBrush}"
+                                            Margin="16,4"/>
+                                <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                                    <TextBlock Text="Device Temp" FontWeight="SemiBold" HorizontalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                    <TextBlock Name="tbTemperature" Text="--" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Column 2: Status + action -->
+                        <StackPanel Grid.Column="1"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Margin="12,0,0,0">
+
+                            <!-- Connected state -->
+                            <StackPanel x:Name="spConnectedState" Visibility="Collapsed">
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                                Glyph="&#xE73E;"
+                                                FontSize="24"
+                                                Foreground="Green"
+                                                HorizontalAlignment="Center"
+                                                Margin="0,0,0,8"/>
+                                <TextBlock Text="Connected"
+                                            FontWeight="SemiBold"
+                                            HorizontalAlignment="Center"
+                                            Margin="0,0,0,16"
+                                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                           />
+                                <Button Name="btnDisconnect"
+                                        Content="Disconnect"
+                                        Width="140"
+                                        Click="btnDisconnect_Click"/>
+                            </StackPanel>
+
+                            <!-- Disconnected state -->
+                            <StackPanel x:Name="spDisconnectedState">
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                                Glyph="&#xE711;"
+                                                FontSize="24"
+                                                Foreground="Red"
+                                                HorizontalAlignment="Center"
+                                                Margin="0,0,0,8"/>
+                                <TextBlock Text="Disconnected"
+                                            FontWeight="SemiBold"
+                                            HorizontalAlignment="Center"
+                                            Margin="0,0,0,16"
+                                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+
+                                <!-- Device discovery row -->
+                                <Grid HorizontalAlignment="Center" Margin="0,0,0,8">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" HorizontalAlignment="Center">
-                                        <TextBlock Text="Current Speed" FontWeight="SemiBold" HorizontalAlignment="Center" FontSize="12"/>
-                                        <TextBlock Name="tbCurrentRpm" Text="--" HorizontalAlignment="Center" FontWeight="SemiBold"/>
-                                    </StackPanel>
-                                    <Rectangle Grid.Column="1"
-                                               Height="30"
-                                               Width="1"
-                                               Fill="{DynamicResource ControlFillColorSecondaryBrush}"
-                                               Margin="16,4"/>
-                                    <StackPanel Grid.Column="2" HorizontalAlignment="Center">
-                                        <TextBlock Text="Device Temp" FontWeight="SemiBold" HorizontalAlignment="Center" FontSize="12"/>
-                                        <TextBlock Name="tbTemperature" Text="--" HorizontalAlignment="Center" FontWeight="SemiBold"/>
-                                    </StackPanel>
+                                    <ComboBox Name="cbxDevices" Grid.Column="0" Margin="0,0,8,0" MinWidth="200"/>
+                                    <Button Name="btnScan" Grid.Column="1" Content="Scan" Width="80" Click="btnScan_Click"/>
                                 </Grid>
+
+                                <Button Name="btnConnect"
+                                        Content="Connect"
+                                        Width="140"
+                                        Click="btnConnect_Click"/>
                             </StackPanel>
+                        </StackPanel>
+                    </Grid>
 
-                            <!-- Column 2: Status + action -->
-                            <StackPanel Grid.Column="1"
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center"
-                                        Margin="12,0,0,0">
-
-                                <!-- Connected state -->
-                                <StackPanel x:Name="spConnectedState" Visibility="Collapsed">
-                                    <ui:FontIcon FontFamily="Segoe Fluent Icons"
-                                                 Glyph="&#xE73E;"
-                                                 FontSize="24"
-                                                 Foreground="Green"
-                                                 HorizontalAlignment="Center"
-                                                 Margin="0,0,0,8"/>
-                                    <TextBlock Text="Connected"
-                                               FontWeight="SemiBold"
-                                               HorizontalAlignment="Center"
-                                               Margin="0,0,0,16"/>
-                                    <Button Name="btnDisconnect"
-                                            Content="Disconnect"
-                                            Width="140"
-                                            Click="btnDisconnect_Click"/>
-                                </StackPanel>
-
-                                <!-- Disconnected state -->
-                                <StackPanel x:Name="spDisconnectedState">
-                                    <ui:FontIcon FontFamily="Segoe Fluent Icons"
-                                                 Glyph="&#xE711;"
-                                                 FontSize="24"
-                                                 Foreground="Red"
-                                                 HorizontalAlignment="Center"
-                                                 Margin="0,0,0,8"/>
-                                    <TextBlock Text="Disconnected"
-                                               FontWeight="SemiBold"
-                                               HorizontalAlignment="Center"
-                                               Margin="0,0,0,16"/>
-
-                                    <!-- Device discovery row -->
-                                    <Grid HorizontalAlignment="Center" Margin="0,0,0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <ComboBox Name="cbxDevices" Grid.Column="0" Margin="0,0,8,0" MinWidth="200"/>
-                                        <Button Name="btnScan" Grid.Column="1" Content="Scan" Width="80" Click="btnScan_Click"/>
-                                    </Grid>
-
-                                    <Button Name="btnConnect"
-                                            Content="Connect"
-                                            Width="140"
-                                            Click="btnConnect_Click"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </Grid>
-                    </ui:CardControl.Header>
-                </ui:CardControl>
 
                 <!-- Controls (hidden until connected) -->
                 <StackPanel Name="spControls" Visibility="Collapsed">
@@ -805,94 +813,37 @@
                                     Visibility="Collapsed" />
 
                             <!-- Row: Avoidance Range (collapsed by default, shown with toggle) -->
-                            <Grid x:Name="AvoidanceRangeRow" Visibility="Collapsed">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Avoidance Range" />
-                                    <ui:TextBlock Margin="0,2,0,0"
+                                <Grid x:Name="AvoidanceRangeRow" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Avoidance Range" />
+                                        <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                    Text="RPM range to skip when avoidance is enabled." />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1"
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
                                             HorizontalAlignment="Right"
                                             VerticalAlignment="Center">
-                                    <ui:NumberBox Name="nudAvoidanceStart"
+                                        <ui:NumberBox Name="nudAvoidanceStart"
                                                   Width="120"
                                                   Minimum="1300" Maximum="4000"
                                                   SmallChange="100" MaxDecimalPlaces="0"
                                                   Margin="0,0,4,0"
                                                   ValueChanged="nudAvoidance_ValueChanged"/>
-                                    <TextBlock Text="-" VerticalAlignment="Center" Margin="4,0,4,0"/>
-                                    <ui:NumberBox Name="nudAvoidanceEnd"
+                                        <TextBlock Text="-" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                                        <ui:NumberBox Name="nudAvoidanceEnd"
                                                   Width="120"
                                                   Minimum="1300" Maximum="4000"
                                                   SmallChange="100" MaxDecimalPlaces="0"
                                                   ValueChanged="nudAvoidance_ValueChanged"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <!-- Divider before Learning -->
-                            <Border x:Name="LearningDivider" Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- Row: Learning -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Learning" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Automatically learn optimal fan curves from usage patterns." />
-                                </StackPanel>
-                                <ui:ToggleSwitch Name="tsLearning"
-                                                 Grid.Column="1"
-                                                 LabelPosition="Left"
-                                                 OnContent="On"
-                                                 OffContent="Off"
-                                                 Checked="tsLearning_Checked"
-                                                 Unchecked="tsLearning_Unchecked"/>
-                            </Grid>
-
-                            <!-- Divider before Learning Bias (collapsed by default, shown with toggle) -->
-                            <Border x:Name="LearningBiasDivider" Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
-                                    Visibility="Collapsed" />
-
-                            <!-- Row: Learning Bias (collapsed by default, shown with toggle) -->
-                            <Grid x:Name="LearningBiasRow" Visibility="Collapsed">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Learning Bias" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Prioritize cooling performance or quiet operation." />
-                                </StackPanel>
-                                <ComboBox Name="cbxLearningBias"
-                                          Grid.Column="1"
-                                          MinWidth="120"
-                                          HorizontalAlignment="Right"
-                                          VerticalAlignment="Center"
-                                          SelectionChanged="cbxLearningBias_SelectionChanged"
-                                          MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown">
-                                    <ComboBoxItem Content="Balanced"/>
-                                    <ComboBoxItem Content="Cooling"/>
-                                    <ComboBoxItem Content="Quiet"/>
-                                </ComboBox>
-                            </Grid>
-                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
                     </ui:CardExpander>
 
                 </StackPanel>

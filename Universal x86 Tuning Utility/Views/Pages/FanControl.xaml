@@ -51,13 +51,13 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <!-- Row 0: Page title (36px side margin for non-Home page) -->
+                <!-- Row 0: Page title (16px side margin for non-Home page) -->
                 <StackPanel Grid.Row="0" Margin="0,24,0,0">
                     <TextBlock FontSize="26"
                                FontWeight="Medium"
-                               Margin="36,0,36,0"
+                               Margin="16,0,16,0"
                                Text="Fan Control" />
-                    <TextBlock Margin="36,8,36,12"
+                    <TextBlock Margin="16,8,16,12"
                                FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                Text="Manage fan speeds and temperature curves for your device."
@@ -65,7 +65,7 @@
                 </StackPanel>
 
                 <!-- Row 1: Content -->
-                <StackPanel Grid.Row="1" Margin="36,16,36,18">
+                <StackPanel Grid.Row="1" Margin="16,16,16,18">
 
                 <!-- CPU & GPU status cards side by side -->
                 <Grid Margin="0,8,0,0">
@@ -457,7 +457,7 @@
         </ScrollViewer>
 
         <!-- Row 1: Bottom bar — status (left) + buttons (right) -->
-        <Grid x:Name="bottomBar" Grid.Row="1" MaxWidth="1080" HorizontalAlignment="Stretch" Margin="36,12,36,12">
+        <Grid x:Name="bottomBar" Grid.Row="1" MaxWidth="1080" HorizontalAlignment="Stretch" Margin="16,12,16,12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />

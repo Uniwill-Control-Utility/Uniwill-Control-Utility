@@ -74,10 +74,10 @@
                 <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,24,0,0">
                     <TextBlock FontSize="26"
                                FontWeight="Medium"
-                               Margin="36,0,36,0"
+                               Margin="16,0,16,0"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                Text="Power Profiles" />
-                    <TextBlock Margin="36,8,36,12"
+                    <TextBlock Margin="16,8,16,12"
                                FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                Text="Select a power profile or customize your own settings."
@@ -85,10 +85,13 @@
                 </StackPanel>
 
                 <!-- Row 1: Content cards -->
-                <StackPanel Grid.Row="1" Margin="36,16,36,18">
+                <StackPanel Grid.Row="1" Margin="16,16,16,18">
 
                     <!-- Profile Selector Card -->
-                    <ui:Card Margin="0,0,0,8" Padding="8">
+                    <ui:Card Margin="0,0,0,8"
+                             Padding="8"
+                             RenderOptions.EdgeMode="Aliased"
+                             SnapsToDevicePixels="True">
                         <UniformGrid Columns="4" Rows="1">
                             <Button x:Name="btnOffice" Style="{StaticResource ProfileButtonStyle}" Click="btnOffice_Click">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -118,7 +121,10 @@
                     </ui:Card>
 
                     <!-- Status Card -->
-                    <ui:Card Margin="0,0,0,8" Padding="15">
+                    <ui:Card Margin="0,0,0,8" 
+                             Padding="15"
+                             RenderOptions.EdgeMode="Aliased"
+                             SnapsToDevicePixels="True">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />

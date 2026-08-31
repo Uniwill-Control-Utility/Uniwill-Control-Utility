@@ -255,36 +255,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
             SaveSettings();
         }
 
-        private void BtnSaveBios_Click(object sender, RoutedEventArgs e)
-        {
-            if (_hidService == null)
-                return;
-
-            var color = ColorPicker.SelectedColor;
-            int brightness = (int)BrightnessSlider.Value;
-
-            _ = Task.Run(() =>
-            {
-                try
-                {
-                    // Apply live first, then save to BIOS
-                    if (tsLightBarPower.IsChecked == true)
-                    {
-                        _hidService?.LightBarTurnOn(color.R, color.G, color.B, brightness);
-                        Thread.Sleep(100);
-                    }
-                    _hidService?.LightBarSaveToBios(color.R, color.G, color.B, brightness);
-                    Debug.WriteLine($"[LB] Saved to BIOS: color=({color.R},{color.G},{color.B}), brightness={brightness}");
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[LB] BIOS save failed: {ex.Message}");
-                }
-            });
-
-            SaveSettings();
-        }
-
         private void ApplyToHid()
         {
             if (_hidService == null)

@@ -9,7 +9,7 @@
       x:Name="mainWindow"
     Title="{Binding ViewModel.ApplicationTitle, Mode=OneWay}"
     Width="1080"
-    Height="860"
+    Height="800"
     MinWidth="1000"
     MinHeight="614"
     d:DataContext="{d:DesignInstance local:MainWindow, IsDesignTimeCreatable=True}"
@@ -83,6 +83,26 @@
                    d:Background="{DynamicResource MicaBackgroundFillColorBaseBrush}">
 
             <ui:NavigationView.Resources>
+                <!-- Forces the main frame content background to be transparent -->
+                <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+                <SolidColorBrush x:Key="NavigationViewContentGridBackground" Color="Transparent" />
+
+                <!-- Secondary safety overrides for specific WPF UI version templates -->
+                <SolidColorBrush x:Key="FrameBackground" Color="Transparent" />
+                <SolidColorBrush x:Key="ContentPresenterBackground" Color="Transparent" />
+
+                <!-- Explicitly target alternative grid and control layout border keys -->
+                <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="Transparent" />
+                <SolidColorBrush x:Key="NavigationViewBorderBrush" Color="Transparent" />
+
+                <!-- Override the frame template control properties locally -->
+                <Thickness x:Key="NavigationViewContentGridBorderThickness">0</Thickness>
+                <Thickness x:Key="NavigationViewBorderThickness">0</Thickness>
+
+                <!-- Clears any hardcoded padding pushing the inner content away from the navigation menu -->
+                <Thickness x:Key="NavigationViewContentMargin">0</Thickness>
+                <Thickness x:Key="NavigationViewContentPadding">0</Thickness>
+                
                 <DataTemplate x:Key="NavigationLabelTemplate">
                     <TextBlock Text="{Binding}"
                        FontSize="11"

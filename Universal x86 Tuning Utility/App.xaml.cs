@@ -216,8 +216,6 @@ namespace Universal_x86_Tuning_Utility
                         services.AddScoped<Views.Pages.LightBar>();
                         services.AddScoped<Views.Pages.Battery>();
                         services.AddScoped<Views.Pages.SystemInfo>();
-                        services.AddScoped<ViewModels.GamesViewModel>();
-                        services.AddScoped<Views.Pages.Games>();
                         services.AddScoped<Views.Pages.DataPage>();
                         services.AddScoped<ViewModels.DataViewModel>();
                         services.AddScoped<Views.Pages.SettingsPage>();
@@ -598,11 +596,6 @@ namespace Universal_x86_Tuning_Utility
                 _host.StopAsync(CancellationToken.None).Wait();
                 _host.Dispose();
             });
-
-            if (Games.CustomGameIconsDirectoryPath != null) //will be refactored in the future
-            {
-                try { Directory.Delete(Games.CustomGameIconsDirectoryPath, true); } catch { /* ignore */ }
-            }
         }
 
         /// <summary>

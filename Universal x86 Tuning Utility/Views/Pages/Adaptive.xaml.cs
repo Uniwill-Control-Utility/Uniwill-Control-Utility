@@ -2652,7 +2652,6 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                 AdpGridTjMax.Visibility = Visibility.Collapsed;
                 AdpDividerAfterTjMax.Visibility = Visibility.Collapsed;
                 AdpGridCoAll.Visibility = Visibility.Collapsed;
-                AdpDividerAfterCoAll.Visibility = Visibility.Collapsed;
             }
             else
             {

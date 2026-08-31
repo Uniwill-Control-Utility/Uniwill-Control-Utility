@@ -68,7 +68,7 @@
                 </ScrollViewer.Style>
 
                     <!-- Centered max-width layout container -->
-                    <Grid MaxWidth="1080" HorizontalAlignment="Stretch" Margin="36,0,36,0">
+                    <Grid MaxWidth="1080" HorizontalAlignment="Stretch" Margin="16,0,24,0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
@@ -88,11 +88,13 @@
                         </StackPanel>
 
                         <!-- Row 1: Content cards -->
-                        <StackPanel x:Name="mainCon" Grid.Row="1" Margin="36,16,36,18">
+                        <StackPanel x:Name="mainCon" Grid.Row="1" Margin="16,16,20,18">
                             <ui:CardControl Name="sdEnabled"
                                            IsEnabled="True"
                                            Icon="{ui:SymbolIcon PresenceAvailable10}"
-                                           Margin="0,0,0,8">
+                                           Margin="0,0,0,8"
+                                            RenderOptions.EdgeMode="Unspecified"
+ClipToBounds="True">
 
                         <ui:CardControl.Header>
                             <Grid>
@@ -269,8 +271,6 @@
                                     <Slider x:Name="AdpSdCoAll" Width="140" Maximum="0" Minimum="-50" Value="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
-                            <!-- Divider -->
-                            <Border x:Name="AdpDividerAfterCoAll" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                             <!-- Intel PL1 -->
                             <Grid x:Name="AdpGridIntelPl1">
                                 <Grid.ColumnDefinitions>
@@ -389,7 +389,10 @@
                                                      OffContent="Off"
                                                      ToolTip="Enable GPU controls for this game"
                                                      Checked="cbxGpuEnabled_Toggled"
-                                                     Unchecked="cbxGpuEnabled_Toggled" />
+                                                     Unchecked="cbxGpuEnabled_Toggled" 
+                                                     RenderOptions.EdgeMode="Unspecified"
+                                                     RenderOptions.BitmapScalingMode="HighQuality"
+                                                     SnapsToDevicePixels="False"/>
                                 </StackPanel>
                             </Grid>
                         </ui:CardExpander.Header>

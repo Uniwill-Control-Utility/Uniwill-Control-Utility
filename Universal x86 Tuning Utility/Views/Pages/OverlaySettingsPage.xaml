@@ -72,9 +72,9 @@
                 <StackPanel Grid.Row="0" Margin="0,24,0,0">
                     <TextBlock FontSize="26"
                                FontWeight="Medium"
-                               Margin="36,0,36,0"
+                               Margin="16,0,36,0"
                                Text="Game Overlay" />
-                    <TextBlock Margin="36,8,36,12"
+                    <TextBlock Margin="16,8,36,12"
                                FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                Text="Configure the click-through performance overlay and its global shortcuts."
@@ -82,18 +82,21 @@
                 </StackPanel>
 
                 <!-- Row 1: Content cards -->
-                <StackPanel x:Name="mainCon" Grid.Row="1" Margin="36,16,36,18">
+                <StackPanel x:Name="mainCon" Grid.Row="1" Margin="16,16,16,18">
                     <!-- Overlay behaviour -->
-                    <ui:Card Margin="0,0,0,8">
+                    <ui:Card Margin="0,0,0,8"
+                             RenderOptions.EdgeMode="Aliased"
+                             SnapsToDevicePixels="True">
                         <StackPanel>
-                            <StackPanel>
-                                <ui:TextBlock FontTypography="Body" Text="Overlay behaviour" />
+                            <StackPanel VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" 
+                                              Text="Overlay behaviour"/>
                                 <ui:TextBlock Margin="0,2,0,0"
-                                               FontTypography="Caption"
-                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Control when the overlay appears and configure global shortcuts." />
+                                              FontTypography="Caption"
+                                              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                              Text="Control when the overlay appears and configure global shortcuts."/>
                             </StackPanel>
-                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <Border Height="1" Margin="-14,12,-14,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                             <CheckBox x:Name="EnabledCheckBox"
                                       Content="Enable the game overlay and global shortcuts" />
 
@@ -102,7 +105,7 @@
                                       Content="Show the overlay when UXTU starts" />
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <Border Height="1" Margin="-14,12,-14,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                             <!-- Show or hide overlay -->
                             <Grid>
@@ -128,7 +131,7 @@
                             </Grid>
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <Border Height="1" Margin="-14,12,-14,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                             <!-- Show or hide contents -->
                             <Grid>
@@ -156,7 +159,9 @@
                     </ui:Card>
 
                     <!-- Visible information -->
-                    <ui:Card Margin="0,0,0,8">
+                    <ui:Card Margin="0,0,0,8"
+                             RenderOptions.EdgeMode="Aliased"
+                             SnapsToDevicePixels="True">
                         <StackPanel>
                             <StackPanel>
                                 <ui:TextBlock FontTypography="Body" Text="Visible information" />
@@ -165,7 +170,7 @@
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                Text="Choose which sensor tiles appear in the overlay." />
                             </StackPanel>
-                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <Border Height="1" Margin="-14,12,-14,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                             <UniformGrid Margin="0,4,0,0" Columns="2">
                                 <CheckBox x:Name="ShowFpsCheckBox"
                                           Margin="0,4"
@@ -194,7 +199,9 @@
                     </ui:Card>
 
                     <!-- Size and refresh rate -->
-                    <ui:Card Margin="0,0,0,8">
+                    <ui:Card Margin="0,0,0,8"
+                             RenderOptions.EdgeMode="Aliased"
+                             SnapsToDevicePixels="True">
                         <StackPanel>
                             <StackPanel>
                                 <ui:TextBlock FontTypography="Body" Text="Size and refresh rate" />
@@ -203,7 +210,7 @@
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                Text="Adjust the overlay scale, opacity, and polling interval." />
                             </StackPanel>
-                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <Border Height="1" Margin="-14,12,-14,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                             <!-- Overlay scale -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -218,6 +225,10 @@
                                                    Text="Scale the overlay from 50% to 200%." />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <TextBlock x:Name="ScaleValueText"
+                                               FontSize="13"
+                                               Margin="0,0,8,0"
+                                               VerticalAlignment="Center" />
                                     <Slider x:Name="ScaleSlider"
                                             Width="140"
                                             Minimum="0.5"
@@ -228,7 +239,7 @@
                             </Grid>
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <Border Height="1" Margin="-14,12,-14,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                             <!-- Panel opacity -->
                             <Grid>
@@ -244,6 +255,10 @@
                                                    Text="Adjust the overlay panel transparency." />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <TextBlock x:Name="OpacityValueText"
+                                               FontSize="13"
+                                               Margin="0,0,8,0"
+                                               VerticalAlignment="Center" />
                                     <Slider x:Name="OpacitySlider"
                                             Width="140"
                                             Minimum="0.25"
@@ -254,7 +269,7 @@
                             </Grid>
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <Border Height="1" Margin="-14,12,-14,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                             <!-- Refresh interval -->
                             <Grid>
@@ -286,7 +301,7 @@
         </ScrollViewer>
 
         <!-- Row 1: Bottom bar -->
-        <Grid Grid.Row="1" MaxWidth="1080" HorizontalAlignment="Stretch" Margin="36,12,36,12">
+        <Grid Grid.Row="1" MaxWidth="1080" HorizontalAlignment="Stretch" Margin="16,12,36,12">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <ui:Button Width="50" Margin="0,0,8,0" ToolTip="Show overlay" Click="PreviewButton_Click">
                     <ui:SymbolIcon Symbol="Eye20" FontSize="24" />

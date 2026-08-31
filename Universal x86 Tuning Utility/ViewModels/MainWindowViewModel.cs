@@ -67,7 +67,6 @@ namespace Universal_x86_Tuning_Utility.ViewModels
 
             NavigationItems.Add(CreateNavigationItem("Presets", "presets", SymbolRegular.Predictions24, typeof(Views.Pages.Presets)));
             NavigationItems.Add(CreateNavigationItem("Adaptive", "adaptive", SymbolRegular.Radar20, typeof(Views.Pages.Adaptive)));
-            NavigationItems.Add(CreateNavigationItem("Games", "games", SymbolRegular.Games24, typeof(Views.Pages.Games)));
             NavigationItems.Add(CreateNavigationItem("Overlay", "overlay", SymbolRegular.DesktopPulse24, typeof(Views.Pages.OverlaySettingsPage)));
             NavigationItems.Add(CreateNavigationItem("Auto", "auto", SymbolRegular.Transmission24, typeof(Views.Pages.Automations)));
 
@@ -120,10 +119,8 @@ namespace Universal_x86_Tuning_Utility.ViewModels
                 var symbol = item.TargetPageTag switch
                 {
                     "dashboard" => SymbolRegular.Home24,
-                    "premade" => SymbolRegular.Predictions24,
-                    "custom" => SymbolRegular.Book24,
+                    "presets" => SymbolRegular.Predictions24,
                     "adaptive" => SymbolRegular.Radar20,
-                    "games" => SymbolRegular.Games24,
                     "overlay" => SymbolRegular.DesktopPulse24,
                     "auto" => SymbolRegular.Transmission24,
                     "fancontrol" => SymbolRegular.Gauge24,
