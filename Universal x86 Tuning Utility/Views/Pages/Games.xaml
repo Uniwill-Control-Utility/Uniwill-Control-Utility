@@ -19,26 +19,12 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Row 0: Page title block -->
-        <StackPanel Orientation="Vertical" Grid.Row="0" Margin="36,24,36,0">
-            <TextBlock FontSize="26"
-                       FontWeight="Medium"
-                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                       Text="Game Library" />
-            <TextBlock Margin="0,8,0,12"
-                       FontSize="12"
-                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                       Text="Launch tracked games and review their recorded performance data."
-                       TextWrapping="Wrap" />
-        </StackPanel>
-
-        <!-- Row 1: Games list -->
-        <ScrollViewer Grid.Row="1"
+        <!-- Row 0: Scrollable content -->
+        <ScrollViewer Grid.Row="0"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       CanContentScroll="False"
@@ -56,8 +42,29 @@
                 </Style>
             </ScrollViewer.Style>
 
-            <Grid>
-                <ListBox x:Name="lbGames"
+            <!-- Centered max-width layout container -->
+            <Grid MaxWidth="1080" HorizontalAlignment="Stretch">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Row 0: Page title block -->
+                <StackPanel Grid.Row="0" Margin="0,24,0,0">
+                    <TextBlock FontSize="26"
+                               FontWeight="Medium"
+                               Margin="36,0,36,0"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               Text="Game Library" />
+                    <TextBlock Margin="36,8,36,12"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="Launch tracked games and review their recorded performance data."
+                               TextWrapping="Wrap" />
+                </StackPanel>
+
+                <!-- Row 1: Games list -->
+                <ListBox Grid.Row="1" x:Name="lbGames"
                          Margin="36,16,36,18"
                          HorizontalAlignment="Stretch"
                          HorizontalContentAlignment="Stretch"
@@ -184,12 +191,11 @@
             </Grid>
         </ScrollViewer>
 
-        <!-- Row 2: Action buttons -->
-        <StackPanel x:Name="ActionsPanel"
-                    Grid.Row="2"
-                    Margin="0,12,36,12"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right">
+        <!-- Row 1: Action buttons -->
+        <Grid Grid.Row="1" MaxWidth="1080" HorizontalAlignment="Stretch" Margin="36,12,36,12">
+            <StackPanel x:Name="ActionsPanel"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right">
             <ui:Button x:Name="btnLoad"
                        Width="48"
                        Height="40"
@@ -205,10 +211,11 @@
                        Click="addGameBtn_Click">
                 <ui:SymbolIcon Symbol="Add20" FontSize="22" />
             </ui:Button>
-        </StackPanel>
+            </StackPanel>
+        </Grid>
 
         <!-- Loading overlay -->
-        <Grid Grid.Row="0" Grid.RowSpan="3" Panel.ZIndex="10">
+        <Grid Grid.Row="0" Grid.RowSpan="2" Panel.ZIndex="10">
             <ui:Card x:Name="ccLoading"
                      Padding="56,34"
                      HorizontalAlignment="Center"
