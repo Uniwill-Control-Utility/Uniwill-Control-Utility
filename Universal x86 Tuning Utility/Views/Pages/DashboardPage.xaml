@@ -14,6 +14,8 @@
       UseLayoutRounding="True"
       ScrollViewer.CanContentScroll="False"
       mc:Ignorable="d"
+      d:Background="{DynamicResource MicaBackgroundFillColorBaseBrush}"
+
       >
 
     <!-- Root Grid spans full window space -->

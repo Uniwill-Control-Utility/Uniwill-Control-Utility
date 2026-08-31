@@ -13,7 +13,7 @@
     MinWidth="1000"
     MinHeight="614"
     d:DataContext="{d:DesignInstance local:MainWindow, IsDesignTimeCreatable=True}"
-    d:Background="{DynamicResource ApplicationBackgroundBrush}"
+    d:Background="{DynamicResource MicaBackgroundFillColorBaseBrush}"
     Foreground="{DynamicResource TextFillColorPrimaryBrush}"
     ExtendsContentIntoTitleBar="True"
     WindowBackdropType="Mica"
@@ -79,7 +79,8 @@
                    HeaderVisibility="Collapsed"
                    HorizontalContentAlignment="Center"
                    MenuItemsSource="{Binding ViewModel.NavigationItems}"
-                   FooterMenuItemsSource="{Binding ViewModel.NavigationFooter}">
+                   FooterMenuItemsSource="{Binding ViewModel.NavigationFooter}"
+                   d:Background="{DynamicResource MicaBackgroundFillColorBaseBrush}">
 
             <ui:NavigationView.Resources>
                 <DataTemplate x:Key="NavigationLabelTemplate">

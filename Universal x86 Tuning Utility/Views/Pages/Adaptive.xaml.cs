@@ -394,6 +394,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     GetSensor.CloseSensor();
                     Settings.Default.isAdaptiveModeRunning = false;
                     Settings.Default.isStartAdpative = false;
+
+                    // Disable auto-switch when Adaptive Mode stops
+                    cbAutoSwitch.IsChecked = false;
+                    Settings.Default.autoSwitch = false;
                     Settings.Default.Save();
 
                     // Stop smart control when Adaptive Mode stops
@@ -419,6 +423,10 @@ namespace Universal_x86_Tuning_Utility.Views.Pages
                     await Task.Run(() => GetSensor.OpenSensor());
                     Settings.Default.isAdaptiveModeRunning = true;
                     Settings.Default.isStartAdpative = true;
+
+                    // Enable auto-switch when Adaptive Mode starts
+                    cbAutoSwitch.IsChecked = true;
+                    Settings.Default.autoSwitch = true;
                     Settings.Default.Save();
 
                     // Sync DeviceApplier override state to the current checkbox values
