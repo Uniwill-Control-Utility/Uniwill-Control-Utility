@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Services;
 using Uniwill_Control_Utility.Views.Controls;
@@ -67,38 +68,42 @@ namespace Uniwill_Control_Utility.ViewModels
 
             NavigationItems.Add(CreateNavigationItem("Presets", "presets", SymbolRegular.Predictions24, typeof(Views.Pages.Presets)));
             NavigationItems.Add(CreateNavigationItem("Adaptive", "adaptive", SymbolRegular.Radar20, typeof(Views.Pages.Adaptive)));
-            NavigationItems.Add(CreateNavigationItem("Overlay", "overlay", SymbolRegular.DesktopPulse24, typeof(Views.Pages.OverlaySettingsPage)));
-            NavigationItems.Add(CreateNavigationItem("Auto", "auto", SymbolRegular.Transmission24, typeof(Views.Pages.Automations)));
+            
 
-            NavigationFooter = new ObservableCollection<object>();
 
             // Hydro UI in footer for supported watercooler hardware
             if (WaterCoolerHardwareDetector.IsSupportedHardware())
             {
                 var hydroItem = CreateNavigationItem("Hydro UI", "watercooler", SymbolRegular.Empty, typeof(Views.Pages.Watercooler));
                 hydroItem.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = "\uEB42", FontSize = 20 };
-                NavigationFooter.Add(hydroItem);
+                NavigationItems.Add(hydroItem);
             }
 
-            // Flydigi cooler in footer
-            NavigationFooter.Add(CreateFlydigiNavItem());
+            // Flydigi cooler in footer (hidden if user has disabled it in Settings)
+            if (!Settings.Default.HideFlydigi)
+            {
+                NavigationFooter.Add(CreateFlydigiNavItem());
+            }
 
             // Fan Control, Keyboard, Light Bar, Battery, CPU Temp Limit in footer for Uniwill EC hardware (XMG / TUXEDO)
             if (_uniwillEc is not null && _uniwillEc.Initialize())
             {
-                NavigationFooter.Add(CreateNavigationItem("Fan Control", "fancontrol", SymbolRegular.Gauge24, typeof(Views.Pages.FanControl)));
-                NavigationFooter.Add(CreateNavigationItem("Keyboard", "keyboard", SymbolRegular.Keyboard24, typeof(Views.Pages.Keyboard)));
+                NavigationItems.Add(CreateNavigationItem("Fan Control", "fancontrol", SymbolRegular.Gauge24, typeof(Views.Pages.FanControl)));
+                NavigationItems.Add(CreateNavigationItem("Keyboard", "keyboard", SymbolRegular.Keyboard24, typeof(Views.Pages.Keyboard)));
 
                 // Light Bar (HID lighting zone)
                 var lightBarItem = CreateNavigationItem("Light Bar", "lightbar", SymbolRegular.Empty, typeof(Views.Pages.LightBar));
                 lightBarItem.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = "\uED39", FontSize = 20 };
-                NavigationFooter.Add(lightBarItem);
+                NavigationItems.Add(lightBarItem);
 
                 // Battery (charging mode + telemetry)
                 var batteryItem = CreateNavigationItem("Battery", "battery", SymbolRegular.Empty, typeof(Views.Pages.Battery));
                 batteryItem.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = "\uEBC0", FontSize = 20 };
-                NavigationFooter.Add(batteryItem);
+                NavigationItems.Add(batteryItem);
             }
+
+            NavigationItems.Add(CreateNavigationItem("Overlay", "overlay", SymbolRegular.DesktopPulse24, typeof(Views.Pages.OverlaySettingsPage)));
+            NavigationItems.Add(CreateNavigationItem("Auto", "auto", SymbolRegular.Transmission24, typeof(Views.Pages.Automations)));
 
             // Settings at the bottom of footer
             NavigationFooter.Add(CreateNavigationItem("Settings", "settings", SymbolRegular.Settings24, typeof(Views.Pages.SettingsPage)));
@@ -186,7 +191,7 @@ namespace Uniwill_Control_Utility.ViewModels
         /// Uses a FlydigiIconElement (a Path-based IconElement) whose Fill binds to the
         /// parent NavigationViewItem's Foreground, so it follows theme changes automatically.
         /// </summary>
-        private static NavigationViewItem CreateFlydigiNavItem()
+        public static NavigationViewItem CreateFlydigiNavItem()
         {
             return new NavigationViewItem("Flydigi", SymbolRegular.Empty, typeof(Views.Pages.FlydigiCooler))
             {

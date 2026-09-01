@@ -14,18 +14,17 @@
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="16" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="16" />
-                <ColumnDefinition Width="90" />
+                <ColumnDefinition Width="70" />
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0" Grid.ColumnSpan="5"
+            <TextBlock Grid.Row="0" Grid.Column="0"
                        Margin="0,0,0,16"
                        FontSize="18"
                        FontWeight="Medium"
@@ -37,10 +36,11 @@
                    Content="Used"
                    Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
             <ProgressBar x:Name="_memoryBar"
-                         Grid.Row="1" Grid.Column="2"
+                         Grid.Row="1" Grid.Column="1"
+                         Margin="16,0,16,0"
                          Minimum="0" Maximum="100" Value="0" />
             <Label x:Name="_memoryLabel"
-                   Grid.Row="1" Grid.Column="4"
+                   Grid.Row="1" Grid.Column="2"
                    HorizontalContentAlignment="Right"
                    VerticalContentAlignment="Center"
                    Content="--"
@@ -48,11 +48,30 @@
 
             <Label Grid.Row="2" Grid.Column="0"
                    VerticalContentAlignment="Center"
-                   Content="Temperature"
+                   Content="DIMM #1"
                    Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-            <Label x:Name="_memoryTempLabel"
+            <ProgressBar x:Name="_memoryTemp1Bar"
+                         Grid.Row="2" Grid.Column="1"
+                         Margin="16,0,16,0"
+                         Minimum="0" Maximum="100" Value="0" />
+            <Label x:Name="_memoryTemp1Label"
                    Grid.Row="2" Grid.Column="2"
-                   Grid.ColumnSpan="2"
+                   HorizontalContentAlignment="Right"
+                   VerticalContentAlignment="Center"
+                   Content="--"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+            <Label Grid.Row="3" Grid.Column="0"
+                   VerticalContentAlignment="Center"
+                   Content="DIMM #2"
+                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+            <ProgressBar x:Name="_memoryTemp2Bar"
+                         Grid.Row="3" Grid.Column="1"
+                         Margin="16,0,16,0"
+                         Minimum="0" Maximum="100" Value="0" />
+            <Label x:Name="_memoryTemp2Label"
+                   Grid.Row="3" Grid.Column="2"
+                   HorizontalContentAlignment="Right"
                    VerticalContentAlignment="Center"
                    Content="--"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />

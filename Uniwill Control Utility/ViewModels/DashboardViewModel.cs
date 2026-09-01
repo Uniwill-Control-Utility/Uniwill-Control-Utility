@@ -23,7 +23,11 @@ namespace Uniwill_Control_Utility.ViewModels
         private readonly FlydigiCoolerService _flydigiService;
         private readonly Bs1Service _bs1Service;
         private readonly DispatcherTimer _refreshTimer;
+        private readonly DispatcherTimer _batteryEcTimer;
         private IDisposable? _lease;
+        private int _batteryHealthPercent;
+        private int _batteryTemperatureC;
+        private int _batteryChargeLimit;
 
         public DashboardViewModel(
             INavigationService navigationService,
@@ -48,10 +52,22 @@ namespace Uniwill_Control_Utility.ViewModels
                 IsEnabled = false
             };
             _refreshTimer.Tick += OnRefreshTimerTick;
+
+            _batteryEcTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(10),
+                IsEnabled = false
+            };
+            _batteryEcTimer.Tick += OnBatteryEcTimerTick;
         }
 
         private void OnRefreshTimerTick(object? sender, EventArgs e)
         {
+            // Skip polling when the app is minimized — no point reading hardware
+            // while the user isn't looking at the UI.
+            if (Application.Current.MainWindow?.WindowState == WindowState.Minimized)
+                return;
+
             try
             {
                 HardwareMetricsSnapshot snapshot = _hardwareMonitoring.ReadSnapshot();
@@ -72,6 +88,14 @@ namespace Uniwill_Control_Utility.ViewModels
                     catch { /* EC read failed, fan speed stays 0 */ }
                 }
 
+                // Enrich with cached battery EC data (refreshed every 10s)
+                snapshot = snapshot with
+                {
+                    BatteryHealthPercent = _batteryHealthPercent,
+                    BatteryTemperatureC = _batteryTemperatureC,
+                    BatteryChargeLimit = _batteryChargeLimit
+                };
+
                 MetricsUpdated?.Invoke(this, snapshot);
             }
             catch
@@ -88,6 +112,25 @@ namespace Uniwill_Control_Utility.ViewModels
             {
                 // Silently ignore transient device reading errors
             }
+        }
+
+        private void OnBatteryEcTimerTick(object? sender, EventArgs e)
+        {
+            // Skip polling when the app is minimized.
+            if (Application.Current.MainWindow?.WindowState == WindowState.Minimized)
+                return;
+
+            if (_uniwillEc is null)
+                return;
+
+            // Only refresh temperature on the timer; health and charge limit
+            // are fetched once on navigation and cached.
+            try
+            {
+                int temp = _uniwillEc.ReadBatteryTemperatureC();
+                _batteryTemperatureC = temp;
+            }
+            catch { /* EC read failed, keep cached value */ }
         }
 
         public event EventHandler<HardwareMetricsSnapshot>? MetricsUpdated;
@@ -278,10 +321,33 @@ namespace Uniwill_Control_Utility.ViewModels
                     HardwareMonitoringCategory.Memory |
                     HardwareMonitoringCategory.Battery);
 
-                // Start the timer on the UI thread
+                // Fetch static battery data (health, charge limit) once on navigation.
+                // Temperature is refreshed on the timer below.
+                if (_uniwillEc is not null)
+                {
+                    try
+                    {
+                        var telemetry = _uniwillEc.ReadBatteryTelemetry();
+                        if (telemetry is not null)
+                        {
+                            _batteryHealthPercent = telemetry.Value.HealthPercent;
+                            _batteryTemperatureC = telemetry.Value.TemperatureC;
+                        }
+                    }
+                    catch { /* EC read failed */ }
+
+                    try
+                    {
+                        _batteryChargeLimit = _uniwillEc.GetBatteryMode();
+                    }
+                    catch { /* EC read failed */ }
+                }
+
+                // Start the timers on the UI thread
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     _refreshTimer.IsEnabled = true;
+                    _batteryEcTimer.IsEnabled = true;
                     OnRefreshTimerTick(null, EventArgs.Empty);
                 });
             });
@@ -295,6 +361,7 @@ namespace Uniwill_Control_Utility.ViewModels
                 $"INFO | {nameof(DashboardViewModel)} navigated from.");
 
             _refreshTimer.IsEnabled = false;
+            _batteryEcTimer.IsEnabled = false;
 
             // Dispose lease on a background thread to avoid _computer.Close()
             // blocking the UI during navigation.

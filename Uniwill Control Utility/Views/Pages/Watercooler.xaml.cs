@@ -658,42 +658,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /* ------------------------------------------------------------------ */
 
         /// <summary>Hide the CardExpander chevron so the card stays always-expanded.</summary>
-        private void RgbCardExpander_Loaded(object sender, RoutedEventArgs e)
-        {
-            Application.Current.Dispatcher.BeginInvoke(
-                (Action)(() =>
-                {
-                    var toggle = RgbCardExpander.Template?.FindName("ExpanderToggleButton", RgbCardExpander) as System.Windows.Controls.Primitives.ToggleButton;
-                    if (toggle?.Template is not null)
-                    {
-                        var chevronGrid = toggle.Template.FindName("ChevronGrid", toggle) as FrameworkElement;
-                        if (chevronGrid is not null)
-                        {
-                            chevronGrid.Visibility = Visibility.Collapsed;
-                            return;
-                        }
-                    }
-
-                    WalkAndHideChevron(RgbCardExpander);
-                }),
-                System.Windows.Threading.DispatcherPriority.Loaded);
-        }
-
-        private void WalkAndHideChevron(DependencyObject parent)
-        {
-            int count = VisualTreeHelper.GetChildrenCount(parent);
-            for (int i = 0; i < count; i++)
-            {
-                var child = VisualTreeHelper.GetChild(parent, i);
-                if (child is Wpf.Ui.Controls.SymbolIcon)
-                {
-                    ((FrameworkElement)child).Visibility = Visibility.Collapsed;
-                    return;
-                }
-                WalkAndHideChevron(child);
-            }
-        }
-
+ 
         /* ------------------------------------------------------------------ */
         /*  Device Glow                                                        */
         /* ------------------------------------------------------------------ */

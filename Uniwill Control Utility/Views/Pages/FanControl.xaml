@@ -36,12 +36,6 @@
                 <Style TargetType="{x:Type ScrollViewer}"
                        BasedOn="{StaticResource {x:Type ScrollViewer}}">
                     <Setter Property="Padding" Value="0" />
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding ComputedVerticalScrollBarVisibility, RelativeSource={RelativeSource Self}}"
-                                     Value="Visible">
-                            <Setter Property="Padding" Value="0,0,8,0" />
-                        </DataTrigger>
-                    </Style.Triggers>
                 </Style>
             </ScrollViewer.Style>
             <!-- Centered max-width layout container -->
@@ -457,58 +451,60 @@
         </ScrollViewer>
 
         <!-- Row 1: Bottom bar — status (left) + buttons (right) -->
-        <Grid x:Name="bottomBar" Grid.Row="1" MaxWidth="1080" HorizontalAlignment="Stretch" Margin="16,12,16,12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+        <ui:Card x:Name="bottomBar" Grid.Row="1" MaxWidth="1052" HorizontalAlignment="Stretch" Margin="16,8,16,12" Padding="12,8" >
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-            <!-- Status indicator (left) -->
-            <Border Grid.Column="0"
-                    Padding="12,8"
-                    BorderThickness="1"
-                    BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}"
-                    CornerRadius="4"
-                    VerticalAlignment="Center">
-                <StackPanel Orientation="Horizontal">
-                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;"
-                                 Margin="0,0,12,0"
-                                 VerticalAlignment="Center" />
-                    <TextBlock x:Name="StatusText"
-                               VerticalAlignment="Center"
-                               FontSize="12"
-                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                               Text="Ready" />
-                </StackPanel>
-            </Border>
+                <!-- Status indicator (left) -->
+                <Border Grid.Column="0"
+                        Padding="12,8"
+                        BorderThickness="1"
+                        BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}"
+                        CornerRadius="4"
+                        VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;"
+                                     Margin="0,0,12,0"
+                                     VerticalAlignment="Center" />
+                        <TextBlock x:Name="StatusText"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                   Text="Ready" />
+                    </StackPanel>
+                </Border>
 
-            <!-- Action buttons (right) -->
-            <WrapPanel Grid.Column="1"
-                       HorizontalAlignment="Right"
-                       VerticalAlignment="Center">
-                <ui:Button x:Name="btnResetFanState"
-                       MinWidth="150"
-                       Margin="0,0,8,0"
-                       Appearance="Danger"
-                       Click="btnResetFanState_Click"
-                       ToolTip="Force fans to 100% and reset the EC fan controller. Use if fans are stuck or behaving erratically.">
-                <StackPanel Orientation="Horizontal">
-                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" Margin="0,0,12,0" />
-                    <TextBlock Text="Reset Fan State" />
-                </StackPanel>
-            </ui:Button>
-            <ui:Button x:Name="btnRestore"
-                       MinWidth="138"
-                       Margin="0,0,0,0"
-                       Click="btnRestore_Click"
-                       ToolTip="Undo all custom fan curves and let the system manage fan speeds automatically.">
-                <StackPanel Orientation="Horizontal">
-                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE777;" Margin="0,0,12,0" />
-                    <TextBlock Text="Restore Auto" />
-                </StackPanel>
-            </ui:Button>
-            </WrapPanel>
-        </Grid>
+                <!-- Action buttons (right) -->
+                <WrapPanel Grid.Column="1"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center">
+                    <ui:Button x:Name="btnResetFanState"
+                           MinWidth="150"
+                           Margin="0,0,8,0"
+                           Appearance="Danger"
+                           Click="btnResetFanState_Click"
+                           ToolTip="Force fans to 100% and reset the EC fan controller. Use if fans are stuck or behaving erratically.">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" Margin="0,0,12,0" />
+                        <TextBlock Text="Reset Fan State" />
+                    </StackPanel>
+                </ui:Button>
+                <ui:Button x:Name="btnRestore"
+                           MinWidth="138"
+                           Margin="0,0,0,0"
+                           Click="btnRestore_Click"
+                           ToolTip="Undo all custom fan curves and let the system manage fan speeds automatically.">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE777;" Margin="0,0,12,0" />
+                        <TextBlock Text="Restore Auto" />
+                    </StackPanel>
+                </ui:Button>
+                </WrapPanel>
+            </Grid>
+        </ui:Card>
 
         <!-- Dark overlay for Adaptive Mode override (full-page, outside margins) -->
         <Border x:Name="overlayAdaptiveWarning" Visibility="Collapsed" Background="Black" Opacity="0.4" CornerRadius="4"/>

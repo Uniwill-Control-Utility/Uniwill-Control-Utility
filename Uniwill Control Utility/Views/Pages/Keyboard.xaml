@@ -508,59 +508,64 @@
         </ScrollViewer>
 
         <!-- Row 1: Bottom bar for per-key mode action row (glued to bottom, content scrolls under) -->
-        <Grid x:Name="PerKeyBottomBar"
+        <ui:Card x:Name="PerKeyBottomBar"
               Grid.Row="1"
+              MaxWidth="1052"
+              HorizontalAlignment="Stretch"
               Visibility="Collapsed"
-              Margin="16,12,16,12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+              Margin="15,8,15,12"
+              Padding="12,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-            <!-- Status (left) -->
-            <TextBlock x:Name="_statusText"
-                       Grid.Column="0"
-                       FontSize="12"
-                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                       Text="Select keys to edit their color."
-                       VerticalAlignment="Center" />
+                <!-- Status (left) -->
+                <TextBlock x:Name="_statusText"
+                           Grid.Column="0"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           Text="Select keys to edit their color."
+                           VerticalAlignment="Center" />
 
-            <!-- Action buttons (center) -->
-            <StackPanel Grid.Column="1"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center"
-                        Margin="12,0,12,0">
-                <ui:Button x:Name="_selectAllBtn"
-                           Appearance="Transparent"
-                           Content="Select All"
-                           Click="SelectAll_Click"
-                           Margin="0,0,8,0" />
-                <ui:Button x:Name="_clearSelectBtn"
-                           Appearance="Transparent"
-                           Content="Clear Selection"
-                           Click="ClearSelection_Click"
-                           Margin="0,0,8,0" />
-                <ui:Button x:Name="_fillAllBtn"
-                           Appearance="Transparent"
-                           Content="Fill All"
-                           Click="FillAll_Click" />
-            </StackPanel>
+                <!-- Action buttons (center) -->
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="12,0,12,0">
+                    <ui:Button x:Name="_selectAllBtn"
+                               Appearance="Transparent"
+                               Content="Select All"
+                               Click="SelectAll_Click"
+                               Margin="0,0,8,0" />
+                    <ui:Button x:Name="_clearSelectBtn"
+                               Appearance="Transparent"
+                               Content="Clear Selection"
+                               Click="ClearSelection_Click"
+                               Margin="0,0,8,0" />
+                    <ui:Button x:Name="_fillAllBtn"
+                               Appearance="Transparent"
+                               Content="Fill All"
+                               Click="FillAll_Click" />
+                </StackPanel>
 
-            <!-- Color picker + Apply (right) -->
-            <StackPanel Grid.Column="2"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center">
-                <controls:ColorPickerControl x:Name="_colorPicker"
-                                             Margin="0,0,12,0"
-                                             SelectedColor="White"
-                                             ColorChangedDelayed="_colorPicker_ColorChangedDelayed" />
-                <ui:Button x:Name="_applyBtn"
-                           Appearance="Primary"
-                           Content="Apply"
-                           Click="Apply_Click" />
-            </StackPanel>
-        </Grid>
+                <!-- Color picker + Apply (right) -->
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <controls:ColorPickerControl x:Name="_colorPicker"
+                                                 Margin="0,0,12,0"
+                                                 SelectedColor="White"
+                                                 ColorChangedDelayed="_colorPicker_ColorChangedDelayed" />
+                    <ui:Button x:Name="_applyBtn"
+                               Appearance="Primary"
+                               Content="Apply"
+                               Click="Apply_Click" />
+                </StackPanel>
+            </Grid>
+        </ui:Card>
 
         <!-- 3. Overlays/Dialogs sit outside the ScrollViewer to freeze the entire UI if needed -->
         <Border x:Name="overlayAdaptiveWarning" Panel.ZIndex="10" Visibility="Collapsed" Background="Black" Opacity="0.4"/>

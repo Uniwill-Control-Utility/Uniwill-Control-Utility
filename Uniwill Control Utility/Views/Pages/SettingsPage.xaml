@@ -72,192 +72,445 @@
                 <StackPanel Grid.Row="1" Margin="16,16,16,18">
 
                     <!-- Application behaviour -->
-                    <ui:Card Margin="0,0,0,8">
+                    <ui:CardExpander Margin="0,0,0,8"
+                                     IsExpanded="True">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE713;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Application behaviour" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Startup, language, and automation preferences."
+                                               TextWrapping="Wrap" />
+                            </StackPanel>
+                        </ui:CardExpander.Header>
+
                         <StackPanel>
-                            <TextBlock FontSize="17"
-                                       FontWeight="Medium"
-                                       Text="Application behaviour" />
-
-                            <TextBlock Margin="0,10,0,5"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Text="Language" />
-
-                            <ComboBox x:Name="cbxLanguage"
-                                      Width="220"
-                                      HorizontalAlignment="Left"
-                                      DisplayMemberPath="DisplayName"
-                                      SelectionChanged="cbxLanguage_SelectionChanged" />
-
-                            <CheckBox x:Name="cbStartBoot"
-                                      Margin="0,10,0,0"
-                                      Click="cbStartBoot_Click"
-                                      Content="Start on system boot" />
-
-                            <CheckBox x:Name="cbStartMini"
-                                      Margin="0,4,0,0"
-                                      Click="cbStartMini_Click"
-                                      Content="Start minimised" />
-
-                            <CheckBox x:Name="cbMinimizeClose"
-                                      Margin="0,4,0,0"
-                                      Click="cbMinimizeClose_Click"
-                                      Content="Minimise instead of closing" />
-
-                            <CheckBox x:Name="cbApplyStart"
-                                      Margin="0,4,0,0"
-                                      Click="cbApplyStart_Click"
-                                      Content="Reapply settings on start" />
-
-                            <Grid Margin="0,4,0,0">
+                            <!-- Row: Language -->
+                            <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-
-                                <CheckBox x:Name="cbAutoReapply"
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Language" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Select the display language for the application." />
+                                </StackPanel>
+                                <ComboBox x:Name="cbxLanguage"
+                                          Grid.Column="1"
+                                          Width="220"
+                                          HorizontalAlignment="Right"
                                           VerticalAlignment="Center"
-                                          Click="cbAutoReapply_Click"
-                                          Content="Automatically reapply every" />
-
-                                <ui:NumberBox x:Name="nudAutoReapply"
-                                              Grid.Column="1"
-                                              Width="128"
-                                              Margin="10,0,0,0"
-                                              Minimum="1"
-                                              Maximum="90"
-                                              MaxDecimalPlaces="0"
-                                              TextChanged="nudAutoReapply_TextChanged"
-                                              ValueChanged="nudAutoReapply_ValueChanged" />
-
-                                <TextBlock Grid.Column="2"
-                                           Margin="8,0,0,0"
-                                           VerticalAlignment="Center"
-                                           Text="seconds" />
+                                          DisplayMemberPath="DisplayName"
+                                          SelectionChanged="cbxLanguage_SelectionChanged"
+                                          MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown" />
                             </Grid>
 
-                            <CheckBox x:Name="cbAutoCheck"
-                                      Margin="0,4,0,0"
-                                      Click="cbAutoCheck_Click"
-                                      Content="Check for updates automatically" />
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                            <CheckBox x:Name="cbAdaptive"
-                                      Margin="0,4,0,0"
-                                      Click="cbAdaptive_Click"
-                                      Content="Start Adaptive Mode automatically" />
+                            <!-- Row: Start on system boot -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Start on system boot" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Launch the application automatically when Windows starts." />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbStartBoot"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbStartBoot_Checked"
+                                                 Unchecked="cbStartBoot_Unchecked" />
+                            </Grid>
 
-                            <CheckBox x:Name="cbTrack"
-                                      Margin="0,4,0,0"
-                                      Click="cbTrack_Click"
-                                      Content="Track games" />
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Start minimised -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Start minimised" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Open to the system tray instead of the main window." />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbStartMini"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbStartMini_Checked"
+                                                 Unchecked="cbStartMini_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Minimise instead of closing -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Minimise instead of closing" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Keep the application running in the system tray when closed." />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbMinimizeClose"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbMinimizeClose_Checked"
+                                                 Unchecked="cbMinimizeClose_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Reapply settings on start -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Reapply settings on start" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Apply the last active preset when the application launches." />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbApplyStart"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbApplyStart_Checked"
+                                                 Unchecked="cbApplyStart_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Automatically reapply every N seconds -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Automatically reapply (in seconds)" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Periodically reapply the active preset at a fixed interval." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <ui:NumberBox x:Name="nudAutoReapply"
+                                                  Width="128"
+                                                  Minimum="1"
+                                                  Maximum="90"
+                                                  MaxDecimalPlaces="0"
+                                                  TextChanged="nudAutoReapply_TextChanged"
+                                                  ValueChanged="nudAutoReapply_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border x:Name="AutoCheckDivider"
+                                    Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Row: Check for updates automatically (hidden) -->
+                            <Grid x:Name="AutoCheckRow" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Check for updates automatically" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Automatically check GitHub for new releases on startup." />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbAutoCheck"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbAutoCheck_Checked"
+                                                 Unchecked="cbAutoCheck_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Start Adaptive Mode automatically -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Start Adaptive Mode automatically" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Enable Adaptive Mode tuning on application launch." />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbAdaptive"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbAdaptive_Checked"
+                                                 Unchecked="cbAdaptive_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Track games -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Track games" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Automatically detect running games and switch profiles." />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbTrack"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbTrack_Checked"
+                                                 Unchecked="cbTrack_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Disable Flydigi cooler functionality -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Disable Flydigi cooler functionality" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Disconnect the Flydigi cooler and hide all related UI elements. (App restart required)" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbHideFlydigi"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbHideFlydigi_Checked"
+                                                 Unchecked="cbHideFlydigi_Unchecked" />
+                            </Grid>
                         </StackPanel>
-                    </ui:Card>
+                    </ui:CardExpander>
 
                     <!-- Preset backup -->
-                    <ui:Card Margin="0,0,0,8">
+                    <ui:CardExpander Margin="0,0,0,8"
+                                     IsExpanded="False">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7AA;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Preset backup" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Back up or import custom and adaptive mode presets."
+                                               TextWrapping="Wrap" />
+                            </StackPanel>
+                        </ui:CardExpander.Header>
 
                         <StackPanel>
-                            <TextBlock FontSize="17"
-                                       FontWeight="Medium"
-                                       Text="Preset backup" />
+                            <!-- Row: Backup / Import -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Preset files" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Existing presets with the same name will be replaced during import." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <ui:Button x:Name="btnBackupPresets"
+                                               Width="190"
+                                               Click="btnBackupPresets_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Margin="0,0,8,0"
+                                                           FontSize="22"
+                                                           Symbol="ArrowDownload20" />
+                                            <TextBlock VerticalAlignment="Center"
+                                                       Text="Back up presets" />
+                                        </StackPanel>
+                                    </ui:Button>
 
-                            <TextBlock Margin="0,5,0,0"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Text="Back up or import custom and adaptive mode presets."
-                                       TextWrapping="Wrap" />
-
-                            <TextBlock Margin="0,3,0,0"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Text="Existing presets with the same name will be replaced during import."
-                                       TextWrapping="Wrap" />
-
-                            <StackPanel Margin="0,14,0,0"
-                                        Orientation="Horizontal">
-                                <ui:Button x:Name="btnBackupPresets"
-                                           Width="190"
-                                           Click="btnBackupPresets_Click">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Margin="0,0,8,0"
-                                                       FontSize="22"
-                                                       Symbol="ArrowDownload20" />
-                                        <TextBlock VerticalAlignment="Center"
-                                                   Text="Back up presets" />
-                                    </StackPanel>
-                                </ui:Button>
-
-                                <ui:Button x:Name="btnImportPresets"
-                                           Width="190"
-                                           Margin="9,0,0,0"
-                                           Appearance="Primary"
-                                           Click="btnImportPresets_Click">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Margin="0,0,8,0"
-                                                       FontSize="22"
-                                                       Symbol="ArrowUpload20" />
-                                        <TextBlock VerticalAlignment="Center"
-                                                   Text="Import presets" />
-                                    </StackPanel>
-                                </ui:Button>
-                            </StackPanel>
+                                    <ui:Button x:Name="btnImportPresets"
+                                               Width="190"
+                                               Margin="9,0,0,0"
+                                               Appearance="Primary"
+                                               Click="btnImportPresets_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon Margin="0,0,8,0"
+                                                           FontSize="22"
+                                                           Symbol="ArrowUpload20" />
+                                            <TextBlock VerticalAlignment="Center"
+                                                       Text="Import presets" />
+                                        </StackPanel>
+                                    </ui:Button>
+                                </StackPanel>
+                            </Grid>
 
                             <ui:InfoBar x:Name="PresetBackupStatus"
                                         Margin="0,10,0,0"
                                         IsClosable="True"
                                         IsOpen="False" />
                         </StackPanel>
-                    </ui:Card>
+                    </ui:CardExpander>
 
                     <!-- Diagnostics -->
-                    <ui:Card Margin="0,0,0,8">
+                    <ui:CardExpander Margin="0,0,0,8"
+                                     IsExpanded="False">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9D9;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Diagnostics" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Logging level, stress testing, and troubleshooting tools."
+                                               TextWrapping="Wrap" />
+                            </StackPanel>
+                        </ui:CardExpander.Header>
 
                         <StackPanel>
-                            <TextBlock FontSize="17"
-                                       FontWeight="Medium"
-                                       Text="Diagnostics" />
-
-                            <TextBlock Margin="0,10,0,5"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Text="Diagnostic logging" />
-
-                            <ComboBox x:Name="cbxLogLevel"
-                                      Width="220"
-                                      HorizontalAlignment="Left"
-                                      SelectionChanged="cbxLogLevel_SelectionChanged">
-
-                                <ComboBoxItem>Off</ComboBoxItem>
-                                <ComboBoxItem>Error only</ComboBoxItem>
-                                <ComboBoxItem>Info</ComboBoxItem>
-                                <ComboBoxItem>Debug</ComboBoxItem>
-                            </ComboBox>
-
-                            <ui:Button x:Name="btnStressTest"
-                                       Width="190"
-                                       Margin="0,14,0,0"
-                                       HorizontalAlignment="Left"
-                                       Appearance="Caution"
-                                       Click="btnStressTest_Click">
-
-                                <StackPanel Orientation="Horizontal">
-                                    <ui:SymbolIcon Symbol="Fire20"
-                                                   FontSize="22"
-                                                   Margin="0,0,8,0" />
-
-                                    <TextBlock VerticalAlignment="Center"
-                                               Text="Start Stress Test" />
+                            <!-- Row: Log level -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Diagnostic logging" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Control the verbosity of diagnostic log output." />
                                 </StackPanel>
-                            </ui:Button>
+                                <ComboBox x:Name="cbxLogLevel"
+                                          Grid.Column="1"
+                                          Width="220"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          SelectionChanged="cbxLogLevel_SelectionChanged"
+                                          MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown">
+                                    <ComboBoxItem Content="Off" />
+                                    <ComboBoxItem Content="Error only" />
+                                    <ComboBoxItem Content="Info" />
+                                    <ComboBoxItem Content="Debug" />
+                                </ComboBox>
+                            </Grid>
+
+                            <!-- Row: Stress test (hidden) -->
+                            <Grid Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Stress test" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Run a CPU stress test to validate cooling." />
+                                </StackPanel>
+                                <ui:Button x:Name="btnStressTest"
+                                           Grid.Column="1"
+                                           Width="190"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           Appearance="Caution"
+                                           Click="btnStressTest_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="Fire20"
+                                                       FontSize="22"
+                                                       Margin="0,0,8,0" />
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Text="Start Stress Test" />
+                                    </StackPanel>
+                                </ui:Button>
+                            </Grid>
 
                             <ui:InfoBar Margin="0,10,0,0"
                                         IsOpen="True"
                                         IsClosable="False"
                                         Severity="Warning"
                                         Title="High CPU load"
-                                        Message="The stress test places extreme load on the CPU. Ensure cooling is adequate and proceed at your own risk." />
+                                        Message="The stress test places extreme load on the CPU. Ensure cooling is adequate and proceed at your own risk."
+                                        Visibility="Collapsed" />
                         </StackPanel>
-                    </ui:Card>
+                    </ui:CardExpander>
 
                     <!-- About Uniwill Control Utility -->
-                    <ui:Card Margin="0,0,0,8">
+                    <ui:Card Margin="0,0,0,8" Visibility="Collapsed">
                         <StackPanel>
                             <TextBlock FontSize="17"
                                        FontWeight="Medium"
@@ -266,7 +519,8 @@
                             <TextBlock x:Name="tbAppVerion"
                                        Margin="0,7,0,12" />
 
-                            <StackPanel Orientation="Horizontal">
+                            <StackPanel Orientation="Horizontal"
+                                       Visibility="Collapsed">
                                 <ui:Button x:Name="btnCheck"
                                            Width="178"
                                            Click="btnCheck_Click">
@@ -322,186 +576,517 @@
                     <ui:CardExpander x:Name="sdWindows"
                                      Margin="0,12,0,0"
                                      IsEnabled="True"
-                                     IsExpanded="False"
-                                     Icon="{ui:SymbolIcon Desktop20}">
+                                     IsExpanded="False">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7F8;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
-                            <TextBlock FontSize="14"
-                                       FontWeight="Medium"
-                                       Text="Device Information" />
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="laptop Information" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="System name, manufacturer, and model." />
+                            </StackPanel>
                         </ui:CardExpander.Header>
 
-                        <Grid Margin="24,0,0,0"
-                              HorizontalAlignment="Stretch">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="112" />
-                                <ColumnDefinition Width="12" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
+                        <StackPanel>
+                            <!-- Name -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Name" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Computer name on the network." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbDeviceName"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </Grid>
 
-                            <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="DemiBold" Text="Name" />
-                            <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Producer" />
-                            <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Model" />
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                            <TextBlock x:Name="tbDeviceName"
-                                       Grid.Row="0"
-                                       Grid.Column="2"
-                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                       TextWrapping="Wrap" />
-                            <TextBlock x:Name="tbDeviceProducer"
-                                       Grid.Row="1"
-                                       Grid.Column="2"
-                                       Margin="0,8,0,0"
-                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                       TextWrapping="Wrap" />
-                            <TextBlock x:Name="tbDeviceModel"
-                                       Grid.Row="2"
-                                       Grid.Column="2"
-                                       Margin="0,8,0,0"
-                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                       TextWrapping="Wrap" />
-                        </Grid>
+                            <!-- Producer -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Producer" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Hardware manufacturer." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbDeviceProducer"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Model -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Model" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Device model identifier." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbDeviceModel"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </Grid>
+                        </StackPanel>
                     </ui:CardExpander>
 
                     <ui:CardExpander x:Name="sdCPU"
                                      Margin="0,8,0,0"
                                      IsEnabled="True"
-                                     IsExpanded="False"
-                                     Icon="{ui:SymbolIcon DeveloperBoard20}">
+                                     IsExpanded="False">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEEA1;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
-                            <TextBlock FontSize="14"
-                                       FontWeight="Medium"
-                                       Text="Processor Information" />
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Processor Information" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="CPU specifications and capabilities." />
+                            </StackPanel>
                         </ui:CardExpander.Header>
 
-                        <Grid Margin="24,0,0,0"
-                              HorizontalAlignment="Stretch">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="112" />
-                                <ColumnDefinition Width="12" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
+                        <StackPanel>
+                            <!-- Processor -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Processor" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Processor name." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbProcessor"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </Grid>
 
-                            <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="DemiBold" Text="Processor" />
-                            <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Producer" />
-                            <TextBlock x:Name="tbCode" Grid.Row="2" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Codename" TextWrapping="Wrap" />
-                            <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Caption" />
-                            <TextBlock Grid.Row="4" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Cores" />
-                            <TextBlock Grid.Row="5" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Threads" />
-                            <TextBlock Grid.Row="6" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Base Clock" />
-                            <TextBlock Grid.Row="7" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="L1 Cache" />
-                            <TextBlock Grid.Row="8" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="L2 Cache" />
-                            <TextBlock Grid.Row="9" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="L3 Cache" />
-                            <TextBlock Grid.Row="10" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Instructions" />
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                            <TextBlock x:Name="tbProcessor" Grid.Row="0" Grid.Column="2" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Name="tbProducer" Grid.Row="1" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Name="tbCodename" Grid.Row="2" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Name="tbCaption" Grid.Row="3" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Name="tbCores" Grid.Row="4" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Name="tbThreads" Grid.Row="5" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Name="tbBaseClock" Grid.Row="6" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Name="tbL1Cache" Grid.Row="7" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Name="tbL2Cache" Grid.Row="8" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Name="tbL3Cache" Grid.Row="9" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Name="tbInstructions" Grid.Row="10" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                        </Grid>
+                            <!-- Producer -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Producer" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="CPU manufacturer." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbProducer"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border x:Name="CodenameDivider"
+                                    Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Codename -->
+                            <Grid x:Name="CodenameRow">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Codename" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Processor codename." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbCodename"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Caption -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Description" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Processor description." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbCaption"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Cores -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Cores" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Physical core count." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbCores"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Threads -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Threads" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Logical processor count." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbThreads"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Base Clock -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Base Clock" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Maximum base clock speed." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbBaseClock"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- L1 Cache -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="L1 Cache" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Level 1 cache size." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbL1Cache"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- L2 Cache -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="L2 Cache" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Level 2 cache size." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbL2Cache"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- L3 Cache -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="L3 Cache" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Level 3 cache size." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbL3Cache"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Instructions -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Instructions" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Supported instruction sets." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbInstructions"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </Grid>
+                        </StackPanel>
                     </ui:CardExpander>
 
                     <ui:CardExpander x:Name="sdRAM"
                                      Margin="0,8,0,0"
                                      IsEnabled="True"
-                                     IsExpanded="False"
-                                     Icon="{ui:SymbolIcon Ram20}">
+                                     IsExpanded="False">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEEA0;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
-                            <TextBlock FontSize="14"
-                                       FontWeight="Medium"
-                                       Text="Memory Information" />
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Memory Information" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="RAM capacity, speed, and module details." />
+                            </StackPanel>
                         </ui:CardExpander.Header>
 
                         <StackPanel>
-                            <Grid Margin="24,0,0,0"
-                                  HorizontalAlignment="Stretch">
+                            <!-- Memory -->
+                            <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="112" />
-                                    <ColumnDefinition Width="12" />
                                     <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Memory" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Total capacity, type, and speed." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbRAM"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </Grid>
 
-                                <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="DemiBold" Text="Memory" />
-                                <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Producer" />
-                                <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Model" />
-                                <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Width" />
-                                <TextBlock Grid.Row="4" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Modules" />
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                                <TextBlock x:Name="tbRAM" Grid.Row="0" Grid.Column="2" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                                <TextBlock x:Name="tbRAMProducer" Grid.Row="1" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                                <TextBlock x:Name="tbRAMModel" Grid.Row="2" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                                <TextBlock x:Name="tbWidth" Grid.Row="3" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                                <TextBlock x:Name="tbSlots" Grid.Row="4" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                            <!-- Producer -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Producer" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Memory module manufacturer." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbRAMProducer"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Model -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Model" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Module part number." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbRAMModel"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Width -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Width" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Total memory bus width." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbWidth"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Modules -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Modules" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Installed module count and width per module." />
+                                </StackPanel>
+                                <TextBlock x:Name="tbSlots"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                             </Grid>
                         </StackPanel>
-                    </ui:CardExpander>
-
-                    <ui:CardExpander x:Name="sdBattery"
-                                     Margin="0,8,0,0"
-                                     IsEnabled="True"
-                                     IsExpanded="False"
-                                     Icon="{ui:SymbolIcon Battery920}">
-                        <ui:CardExpander.Header>
-                            <TextBlock FontSize="14"
-                                       FontWeight="Medium"
-                                       Text="Battery Information" />
-                        </ui:CardExpander.Header>
-
-                        <Grid Margin="24,0,0,0"
-                              HorizontalAlignment="Stretch">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="112" />
-                                <ColumnDefinition Width="12" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="DemiBold" Text="Health" />
-                            <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Cycles" />
-                            <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Capacity" />
-                            <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,8,0,0" FontWeight="DemiBold" Text="Charge Rate" />
-
-                            <TextBlock x:Name="tbHealth" Grid.Row="0" Grid.Column="2" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Name="tbCycle" Grid.Row="1" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Name="tbCapcity" Grid.Row="2" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                            <TextBlock x:Name="tbChargeRate" Grid.Row="3" Grid.Column="2" Margin="0,8,0,0" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
-                        </Grid>
                     </ui:CardExpander>
 
                 </StackPanel>

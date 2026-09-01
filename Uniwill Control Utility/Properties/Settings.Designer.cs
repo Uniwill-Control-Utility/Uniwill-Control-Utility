@@ -1126,5 +1126,17 @@ namespace Uniwill_Control_Utility.Properties {
                 this["LightBarSpeed"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool HideFlydigi {
+            get {
+                return ((bool)(this["HideFlydigi"]));
+            }
+            set {
+                this["HideFlydigi"] = value;
+            }
+        }
     }
 }

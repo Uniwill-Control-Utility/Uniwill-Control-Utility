@@ -57,12 +57,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbStartMini.IsChecked = Settings.Default.StartMini;
             cbMinimizeClose.IsChecked = Settings.Default.MinimizeClose;
             cbApplyStart.IsChecked = Settings.Default.ApplyOnStart;
-            cbAutoReapply.IsChecked = Settings.Default.AutoReapply;
             nudAutoReapply.Value = Settings.Default.AutoReapplyTime;
             nudAutoReapply.Text = Convert.ToString(Settings.Default.AutoReapplyTime);
             cbAutoCheck.IsChecked = Settings.Default.UpdateCheck;
             cbAdaptive.IsChecked = Settings.Default.isStartAdpative;
             cbTrack.IsChecked = Settings.Default.isTrack;
+            cbHideFlydigi.IsChecked = Settings.Default.HideFlydigi;
 
             cbxLogLevel.SelectedIndex = Settings.Default.DiagnosticLogLevel;
 
@@ -99,9 +99,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     foreach (ManagementObject queryObj in searcher.Get())
                     {
-                        _cpuName = queryObj["Name"].ToString();
-                        _cpuDescription = queryObj["Description"].ToString();
-                        _cpuManufacturer = queryObj["Manufacturer"].ToString();
+                        _cpuName = queryObj["Name"].ToString().Trim();
+                        _cpuDescription = queryObj["Description"].ToString().Trim();
+                        _cpuManufacturer = queryObj["Manufacturer"].ToString().Trim();
                         _cpuCores = Convert.ToInt32(queryObj["NumberOfCores"]);
                         _cpuLogicalProcessors = Convert.ToInt32(queryObj["NumberOfLogicalProcessors"]);
                         _cpuL2Size = Convert.ToDouble(queryObj["L2CacheSize"]) / 1024;
@@ -141,8 +141,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             else
             {
-                tbCode.Visibility = Visibility.Collapsed;
-                tbCodename.Visibility = Visibility.Collapsed;
+                CodenameRow.Visibility = Visibility.Collapsed;
+                CodenameDivider.Visibility = Visibility.Collapsed;
             }
 
             tbProducer.Text = _cpuManufacturer;
@@ -216,100 +216,152 @@ namespace Uniwill_Control_Utility.Views.Pages
             sdRAM.Visibility = Visibility.Visible;
         }
 
-        private void getBatteryInfo()
-        {
-            try
-            {
-                tbHealth.Text = $"{(GetSystemInfo.GetBatteryHealth() * 100).ToString("0.##")}%";
-                tbCycle.Text = $"{GetSystemInfo.GetBatteryCycle()}";
-                tbCapcity.Text = LocalizationService.Format("Full Charge: {0} mAh | Design: {1} mAh",
-                    GetSystemInfo.ReadFullChargeCapacity(), GetSystemInfo.ReadDesignCapacity());
-
-                tbChargeRate.Text = $"{(GetSystemInfo.GetBatteryRate() / 1000).ToString("0.##")}W";
-
-                DispatcherTimer bat = new DispatcherTimer();
-                bat.Interval = TimeSpan.FromSeconds(2);
-                bat.Tick += Bat_Tick;
-                bat.Start();
-            }
-            catch
-            {
-                sdBattery.Visibility = Visibility.Collapsed;
-            }
-        }
-
-        private async void Bat_Tick(object sender, EventArgs e)
-        {
-            decimal batRate = 0;
-            await System.Threading.Tasks.Task.Run(() => batRate = GetSystemInfo.GetBatteryRate() / 1000);
-            tbChargeRate.Text = $"{batRate.ToString("0.##")}W";
-        }
-
         #endregion
 
-        private void cbStartBoot_Click(object sender, System.Windows.RoutedEventArgs e)
+        #region Toggle handlers
+
+        private void cbStartBoot_Checked(object sender, RoutedEventArgs e)
+        {
+            // Create the scheduled task
+            using (TaskService ts = new TaskService())
+            {
+                if (!ts.RootFolder.AllTasks.Any(t => t.Name == "UCU"))
+                {
+                    TaskDefinition td = ts.NewTask();
+                    td.Principal.RunLevel = TaskRunLevel.Highest;
+                    td.RegistrationInfo.Description = "Start UCU";
+                    td.Settings.DisallowStartIfOnBatteries = false;
+                    td.Settings.StopIfGoingOnBatteries = false;
+                    td.Settings.DisallowStartOnRemoteAppSession = false;
+
+                    td.Triggers.Add(new LogonTrigger());
+
+                    string path = System.Reflection.Assembly.GetEntryAssembly().Location;
+                    path = path.Replace("Uniwill Control Utility.dll", "Uniwill Control Utility.exe");
+
+                    td.Actions.Add(path);
+
+                    ts.RootFolder.RegisterTaskDefinition(@"UCU", td);
+                }
+            }
+
+            Settings.Default.StartOnBoot = true;
+            Settings.Default.Save();
+        }
+
+        private void cbStartBoot_Unchecked(object sender, RoutedEventArgs e)
         {
             using (TaskService ts = new TaskService())
             {
                 if (ts.RootFolder.AllTasks.Any(t => t.Name == "UCU"))
                 {
-                    // Remove the task we just created
                     ts.RootFolder.DeleteTask("UCU");
                 }
             }
 
-            if (cbStartBoot.IsChecked == true)
+            Settings.Default.StartOnBoot = false;
+            Settings.Default.Save();
+        }
+
+        private void cbStartMini_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.StartMini = true;
+            Settings.Default.Save();
+        }
+
+        private void cbStartMini_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.StartMini = false;
+            Settings.Default.Save();
+        }
+
+        private void cbMinimizeClose_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.MinimizeClose = true;
+            Settings.Default.Save();
+        }
+
+        private void cbMinimizeClose_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.MinimizeClose = false;
+            Settings.Default.Save();
+        }
+
+        private void cbApplyStart_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.ApplyOnStart = true;
+            Settings.Default.Save();
+        }
+
+        private void cbApplyStart_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.ApplyOnStart = false;
+            Settings.Default.Save();
+        }
+
+        private void cbAutoCheck_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.UpdateCheck = true;
+            Settings.Default.Save();
+        }
+
+        private void cbAutoCheck_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.UpdateCheck = false;
+            Settings.Default.Save();
+        }
+
+        private void cbAdaptive_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.isStartAdpative = true;
+            Settings.Default.Save();
+        }
+
+        private void cbAdaptive_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.isStartAdpative = false;
+            Settings.Default.Save();
+        }
+
+        private void cbTrack_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.isTrack = true;
+            Settings.Default.Save();
+        }
+
+        private void cbTrack_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.isTrack = false;
+            Settings.Default.Save();
+        }
+
+        private void cbHideFlydigi_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.HideFlydigi = true;
+            Settings.Default.Save();
+
+            // Disconnect the Flydigi cooler if connected (fire-and-forget to avoid UI freeze)
+            System.Threading.Tasks.Task.Run(() =>
             {
-                // Get the service on the local machine
-                using (TaskService ts = new TaskService())
+                try
                 {
-                    if (!ts.RootFolder.AllTasks.Any(t => t.Name == "UCU"))
-                    {
-                        // Create a new task definition and assign properties
-                        TaskDefinition td = ts.NewTask();
-                        td.Principal.RunLevel = TaskRunLevel.Highest;
-                        td.RegistrationInfo.Description = "Start UCU";
-                        td.Settings.DisallowStartIfOnBatteries = false;
-                        td.Settings.StopIfGoingOnBatteries = false;
-                        td.Settings.DisallowStartOnRemoteAppSession = false;
+                    var coolerService = App.GetService<FlydigiCoolerService>();
+                    coolerService?.DisconnectAsync();
 
-                        // Create a trigger that will fire the task at this time every other day
-                        td.Triggers.Add(new LogonTrigger());
-
-                        string path = System.Reflection.Assembly.GetEntryAssembly().Location;
-                        path = path.Replace("Uniwill Control Utility.dll", "Uniwill Control Utility.exe");
-
-                        // Create an action that will launch Notepad whenever the trigger fires
-                        td.Actions.Add(path);
-
-                        // Register the task in the root folder
-                        ts.RootFolder.RegisterTaskDefinition(@"UCU", td);
-                    }
+                    var bs1Service = App.GetService<Bs1Service>();
+                    bs1Service?.DisconnectAsync().Wait();
                 }
-            }
-
-            Settings.Default.StartOnBoot = (bool)cbStartBoot.IsChecked;
-            Settings.Default.Save();
+                catch { /* ignore disconnect errors */ }
+            });
         }
 
-        private void cbStartMini_Click(object sender, System.Windows.RoutedEventArgs e)
+        private void cbHideFlydigi_Unchecked(object sender, RoutedEventArgs e)
         {
-            Settings.Default.StartMini = (bool)cbStartMini.IsChecked;
+            Settings.Default.HideFlydigi = false;
             Settings.Default.Save();
         }
 
-        private void cbMinimizeClose_Click(object sender, System.Windows.RoutedEventArgs e)
-        {
-            Settings.Default.MinimizeClose = (bool)cbMinimizeClose.IsChecked;
-            Settings.Default.Save();
-        }
-
-        private void cbAutoReapply_Click(object sender, System.Windows.RoutedEventArgs e)
-        {
-            Settings.Default.AutoReapply = (bool)cbAutoReapply.IsChecked;
-            Settings.Default.AutoReapplyTime = (int)nudAutoReapply.Value;
-            Settings.Default.Save();
-        }
+        #endregion
 
         private void nudAutoReapply_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
@@ -317,10 +369,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.Save();
         }
 
-        private void cbApplyStart_Click(object sender, System.Windows.RoutedEventArgs e)
+        private void nudAutoReapply_ValueChanged(object sender, RoutedEventArgs e)
         {
-            Settings.Default.ApplyOnStart = (bool)cbApplyStart.IsChecked;
-            Settings.Default.Save();
+            if (nudAutoReapply != null && nudAutoReapply.Value != null)
+            {
+                Settings.Default.AutoReapplyTime = (int)nudAutoReapply.Value;
+                Settings.Default.Save();
+            }
         }
 
         private async void btnCheck_Click(object sender, System.Windows.RoutedEventArgs e)
@@ -397,12 +452,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private void cbAutoCheck_Click(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.UpdateCheck = (bool)cbAutoCheck.IsChecked;
-            Settings.Default.Save();
-        }
-
         private void StackPanel_Loaded(object sender, RoutedEventArgs e)
         {
 
@@ -419,11 +468,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             sdCPU.Visibility = Visibility.Collapsed;
             sdRAM.Visibility = Visibility.Collapsed;
 
-            if (SystemInformation.PowerStatus.BatteryChargeStatus == BatteryChargeStatus.NoSystemBattery)
-            {
-                sdBattery.Visibility = Visibility.Collapsed;
-            }
-
             // Offload all heavy WMI queries and processing to a background thread
             await System.Threading.Tasks.Task.Run(() =>
             {
@@ -438,11 +482,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 applyDeviceInfo();
                 applyCPUInfo();
                 applyRAMInfo();
-
-                if (SystemInformation.PowerStatus.BatteryChargeStatus != BatteryChargeStatus.NoSystemBattery)
-                {
-                    getBatteryInfo();
-                }
             });
         }
 
@@ -457,18 +496,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 process.Dispose();
                 process = null;
             }
-        }
-
-        private void cbAdaptive_Click(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.isStartAdpative = (bool)cbAdaptive.IsChecked;
-            Settings.Default.Save();
-        }
-
-        private void cbTrack_Click(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.isTrack = (bool)cbTrack.IsChecked;
-            Settings.Default.Save();
         }
 
         private void cbxLogLevel_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -495,13 +522,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             LocalizationService.SetCulture(language.CultureName);
         }
 
-        private void nudAutoReapply_ValueChanged(object sender, RoutedEventArgs e)
+        private void ComboBoxInCardExpander_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            if (nudAutoReapply != null && nudAutoReapply.Value != null)
-            {
-                Settings.Default.AutoReapplyTime = (int)nudAutoReapply.Value;
-                Settings.Default.Save();
-            }
+            // Prevent CardExpander from collapsing when clicking inside a ComboBox
+            e.Handled = true;
         }
 
         private async void btnBackupPresets_Click(object sender, RoutedEventArgs e)

@@ -230,8 +230,7 @@
                     <!-- RGB Effect -->
                     <ui:CardExpander x:Name="RgbCardExpander"
                                      Margin="0,0,0,8"
-                                     IsExpanded="True"
-                                     Loaded="RgbCardExpander_Loaded">
+                                     IsExpanded="True">
                         <ui:CardExpander.Icon>
                                 <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardExpander.Icon>
@@ -251,7 +250,7 @@
                                 <ComboBox x:Name="cbxRgbMode"
                                           Grid.Column="1"
                                           Width="160"
-                                          Margin="24,0,12,0"
+                                          Margin="24,0,14,0"
                                           HorizontalAlignment="Right"
                                           VerticalAlignment="Center"
                                           SelectionChanged="cbxRgbMode_SelectionChanged"

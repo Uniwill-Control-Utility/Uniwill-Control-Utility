@@ -14,7 +14,6 @@
       UseLayoutRounding="True"
       ScrollViewer.CanContentScroll="False"
       mc:Ignorable="d"
-      d:Background="{DynamicResource MicaBackgroundFillColorBaseBrush}"
       >
 
     <!-- Root Grid spans full window space -->
@@ -79,7 +78,8 @@
                     </Grid>
 
                     <!-- Device status row: Hydro UI & Flydigi Cooler -->
-                    <Grid Margin="0,0,0,8">
+                    <Grid x:Name="_deviceRow"
+                          Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="8" />

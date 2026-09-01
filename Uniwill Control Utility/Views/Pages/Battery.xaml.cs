@@ -107,8 +107,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Settings.Default.Save();
                 Debug.WriteLine($"[Battery] Applied charging limit: {mode switch { 0 => "100%", 1 => "80%", 2 => "60%", _ => "unknown" }} (mode {mode})");
 
-                // Re-read EC state to confirm
-                RefreshAll();
+                // Delay refresh to let the EC process the change
+                var delayTimer = new DispatcherTimer(TimeSpan.FromSeconds(2), DispatcherPriority.Normal, (s, e) =>
+                {
+                    RefreshAll();
+                    ((DispatcherTimer)s!).Stop();
+                }, Dispatcher);
             }
             catch (Exception ex)
             {
@@ -118,6 +122,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void OnRefreshTimerTick(object? sender, EventArgs e)
         {
+            // Skip polling when the app is minimized.
+            if (Application.Current.MainWindow?.WindowState == WindowState.Minimized)
+                return;
+
             RefreshAll();
         }
 

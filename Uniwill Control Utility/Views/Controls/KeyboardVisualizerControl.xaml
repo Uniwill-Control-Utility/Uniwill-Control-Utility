@@ -4,7 +4,8 @@
              Background="Transparent"
              SnapsToDevicePixels="True"
              UseLayoutRounding="True">
-    <Border Background="#181818"
+    <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
             CornerRadius="4"
             Padding="12,0,0,10">
         <Viewbox Stretch="Uniform"

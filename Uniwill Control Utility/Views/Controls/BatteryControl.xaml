@@ -14,33 +14,33 @@
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="16" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="16" />
                 <ColumnDefinition Width="70" />
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0" Grid.ColumnSpan="5"
+            <TextBlock Grid.Row="0" Grid.Column="0"
                        Margin="0,0,0,16"
                        FontSize="18"
                        FontWeight="Medium"
-                       Text="Battery" 
+                       Text="Battery"
                        Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
 
             <Label Grid.Row="1" Grid.Column="0"
                    VerticalContentAlignment="Center"
-                   Content="Charge"
+                   Content="Health"
                    Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-            <ProgressBar x:Name="_batteryBar"
-                         Grid.Row="1" Grid.Column="2"
+            <ProgressBar x:Name="_batteryHealthBar"
+                         Grid.Row="1" Grid.Column="1"
+                         Margin="16,0,16,0"
                          Minimum="0" Maximum="100" Value="0" />
-            <Label x:Name="_batteryPercentLabel"
-                   Grid.Row="1" Grid.Column="4"
+            <Label x:Name="_batteryHealthLabel"
+                   Grid.Row="1" Grid.Column="2"
                    HorizontalContentAlignment="Right"
                    VerticalContentAlignment="Center"
                    Content="--"
@@ -48,14 +48,34 @@
 
             <Label Grid.Row="2" Grid.Column="0"
                    VerticalContentAlignment="Center"
-                   Content="Power"
+                   Content="Charge Limit"
                    Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-            <Label x:Name="_batteryStatusLabel"
+            <ProgressBar x:Name="_batteryChargeLimitBar"
+                         Grid.Row="2" Grid.Column="1"
+                         Margin="16,0,16,0"
+                         Minimum="0" Maximum="100" Value="0" />
+            <Label x:Name="_batteryChargeLimitLabel"
                    Grid.Row="2" Grid.Column="2"
-                   Grid.ColumnSpan="2"
+                   HorizontalContentAlignment="Right"
                    VerticalContentAlignment="Center"
                    Content="--"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+            <Label Grid.Row="3" 
+                   Grid.Column="0"
+                   VerticalContentAlignment="Center"
+                   Content="Temperature"
+                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+            <ProgressBar x:Name="_batteryTempBar"
+                 Grid.Row="3" Grid.Column="1"
+                 Margin="16,0,16,0"
+                 Minimum="0" Maximum="100" Value="0" />
+            <Label x:Name="_batteryTempLabel"
+                   Grid.Row="3" Grid.Column="2"
+                   HorizontalContentAlignment="Right"
+                   VerticalContentAlignment="Center"
+                   Content="--"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />    
         </Grid>
     </Border>
 </UserControl>

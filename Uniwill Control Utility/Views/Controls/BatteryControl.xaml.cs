@@ -13,25 +13,56 @@ namespace Uniwill_Control_Utility.Views.Controls
 
         public void UpdateMetrics(HardwareMetricsSnapshot snapshot)
         {
-            if (snapshot.HasBattery)
+            if (!snapshot.HasBattery)
             {
-                this.Visibility = Visibility.Visible;
-                _batteryBar.Value = snapshot.BatteryPercent;
-                _batteryPercentLabel.Content = $"{snapshot.BatteryPercent}%";
+                this.Visibility = Visibility.Collapsed;
+                return;
+            }
 
-                string status;
-                if (snapshot.IsBatteryFullyCharged)
-                    status = "Fully charged";
-                else if (snapshot.IsBatteryCharging)
-                    status = $"Charging ({snapshot.BatteryPowerWatts:F1}W)";
-                else
-                    status = $"Discharging ({snapshot.BatteryPowerWatts:F1}W)";
+            this.Visibility = Visibility.Visible;
 
-                _batteryStatusLabel.Content = status;
+            // Health
+            if (snapshot.BatteryHealthPercent > 0)
+            {
+                _batteryHealthBar.Value = snapshot.BatteryHealthPercent;
+                _batteryHealthLabel.Content = $"{snapshot.BatteryHealthPercent}%";
             }
             else
             {
-                this.Visibility = Visibility.Collapsed;
+                _batteryHealthBar.Value = 0;
+                _batteryHealthLabel.Content = "--";
+            }
+
+            // Temperature
+            if (snapshot.BatteryTemperatureC >= 0)
+            {
+                _batteryTempBar.Value = snapshot.BatteryTemperatureC;
+                _batteryTempLabel.Content = $"{snapshot.BatteryTemperatureC}\u00B0C";
+            }
+            else
+            {
+                _batteryTempBar.Value = 0;
+                _batteryTempLabel.Content = "--";
+            }
+
+            // Charge limit
+            int chargeLimitValue = snapshot.BatteryChargeLimit switch
+            {
+                0 => 100,
+                1 => 80,
+                2 => 60,
+                _ => -1
+            };
+
+            if (chargeLimitValue >= 0)
+            {
+                _batteryChargeLimitBar.Value = chargeLimitValue;
+                _batteryChargeLimitLabel.Content = $"{chargeLimitValue}%";
+            }
+            else
+            {
+                _batteryChargeLimitBar.Value = 0;
+                _batteryChargeLimitLabel.Content = "--";
             }
         }
     }

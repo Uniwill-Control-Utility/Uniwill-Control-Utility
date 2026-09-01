@@ -24,6 +24,30 @@ namespace Uniwill_Control_Utility.Views.Controls
                 _memoryBar.Value = 0;
                 _memoryLabel.Content = "--";
             }
+
+            // DIMM #1 temperature
+            if (snapshot.MemoryTemperature0 > 0)
+            {
+                _memoryTemp1Bar.Value = snapshot.MemoryTemperature0;
+                _memoryTemp1Label.Content = $"{snapshot.MemoryTemperature0}\u00B0C";
+            }
+            else
+            {
+                _memoryTemp1Bar.Value = 0;
+                _memoryTemp1Label.Content = "--";
+            }
+
+            // DIMM #2 temperature
+            if (snapshot.MemoryTemperature1 > 0)
+            {
+                _memoryTemp2Bar.Value = snapshot.MemoryTemperature1;
+                _memoryTemp2Label.Content = $"{snapshot.MemoryTemperature1}\u00B0C";
+            }
+            else
+            {
+                _memoryTemp2Bar.Value = 0;
+                _memoryTemp2Label.Content = "--";
+            }
         }
     }
 }

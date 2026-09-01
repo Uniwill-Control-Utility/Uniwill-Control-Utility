@@ -18,23 +18,7 @@
       UseLayoutRounding="True"
       helpers:MouseWheelScrollBehavior.IsEnabled="True">
 
-    <Page.Resources>
-        <Style TargetType="{x:Type CheckBox}"
-               BasedOn="{StaticResource DefaultCheckBoxStyle}">
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Style.Triggers>
-                <Trigger Property="Content" Value="{x:Null}">
-                    <Setter Property="Width" Value="20" />
-                    <Setter Property="Height" Value="20" />
-                    <Setter Property="MinWidth" Value="20" />
-                    <Setter Property="MinHeight" Value="20" />
-                    <Setter Property="Padding" Value="0" />
-                    <Setter Property="HorizontalAlignment" Value="Center" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-    </Page.Resources>
-
+  
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
@@ -43,7 +27,6 @@
 
         <!-- Row 0: Scrollable content -->
         <ScrollViewer Grid.Row="0"
-                      x:Name="mainScroll"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       CanContentScroll="False"
@@ -52,12 +35,6 @@
             <ScrollViewer.Style>
                 <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource {x:Type ScrollViewer}}">
                     <Setter Property="Padding" Value="0" />
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding ComputedVerticalScrollBarVisibility, RelativeSource={RelativeSource Self}}"
-                                     Value="Visible">
-                            <Setter Property="Padding" Value="0,0,8,0" />
-                        </DataTrigger>
-                    </Style.Triggers>
                 </Style>
             </ScrollViewer.Style>
 
@@ -84,30 +61,70 @@
                 <!-- Row 1: Content cards -->
                 <StackPanel x:Name="mainCon" Grid.Row="1" Margin="16,16,16,18">
                     <!-- Overlay behaviour -->
-                    <ui:Card Margin="0,0,0,8"
-                             RenderOptions.EdgeMode="Aliased"
-                             SnapsToDevicePixels="True">
-                        <StackPanel>
-                            <StackPanel VerticalAlignment="Center">
-                                <ui:TextBlock FontTypography="Body" 
-                                              Text="Overlay behaviour"/>
+                    <ui:CardExpander Margin="0,0,0,8"
+                                     IsExpanded="True">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF156;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Overlay behaviour" />
                                 <ui:TextBlock Margin="0,2,0,0"
-                                              FontTypography="Caption"
-                                              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                              Text="Control when the overlay appears and configure global shortcuts."/>
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Control when the overlay appears and configure global shortcuts." />
                             </StackPanel>
-                            <Border Height="1" Margin="-14,12,-14,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                            <CheckBox x:Name="EnabledCheckBox"
-                                      Content="Enable the game overlay and global shortcuts" />
-
-                            <CheckBox x:Name="StartupCheckBox"
-                                      Margin="0,8,0,0"
-                                      Content="Show the overlay when UXTU starts" />
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <!-- Enable overlay -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Enable overlay" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Enable the game overlay and global shortcuts." />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="EnabledCheckBox"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off" />
+                            </Grid>
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-14,12,-14,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                            <!-- Show or hide overlay -->
+                            <!-- Show on startup -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Show on startup" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Show the overlay when UXTU starts." />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="StartupCheckBox"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Show or hide overlay hotkey -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -131,9 +148,10 @@
                             </Grid>
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-14,12,-14,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                            <!-- Show or hide contents -->
+                            <!-- Show or hide contents hotkey -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -156,13 +174,15 @@
                                          VerticalContentAlignment="Center" />
                             </Grid>
                         </StackPanel>
-                    </ui:Card>
+                    </ui:CardExpander>
 
                     <!-- Visible information -->
-                    <ui:Card Margin="0,0,0,8"
-                             RenderOptions.EdgeMode="Aliased"
-                             SnapsToDevicePixels="True">
-                        <StackPanel>
+                    <ui:CardExpander Margin="0,0,0,8"
+                                     IsExpanded="True">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF167;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
                             <StackPanel>
                                 <ui:TextBlock FontTypography="Body" Text="Visible information" />
                                 <ui:TextBlock Margin="0,2,0,0"
@@ -170,39 +190,142 @@
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                Text="Choose which sensor tiles appear in the overlay." />
                             </StackPanel>
-                            <Border Height="1" Margin="-14,12,-14,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                            <UniformGrid Margin="0,4,0,0" Columns="2">
-                                <CheckBox x:Name="ShowFpsCheckBox"
-                                          Margin="0,4"
-                                          Content="FPS and low FPS values" />
-                                <CheckBox x:Name="ShowFrameTimesCheckBox"
-                                          Margin="0,4"
-                                          Content="Frame-time values" />
-                                <CheckBox x:Name="ShowGpuCheckBox"
-                                          Margin="0,4"
-                                          Content="GPU sensors"
-                                          ToolTip="GPU polling is completely disabled when this is off." />
-                                <CheckBox x:Name="ShowCpuCheckBox"
-                                          Margin="0,4"
-                                          Content="CPU sensors" />
-                                <CheckBox x:Name="ShowMemoryCheckBox"
-                                          Margin="0,4"
-                                          Content="Memory usage" />
-                                <CheckBox x:Name="ShowBatteryCheckBox"
-                                          Margin="0,4"
-                                          Content="Battery tile" />
-                                <CheckBox x:Name="ShowGraphsCheckBox"
-                                          Margin="0,4"
-                                          Content="Rolling graphs" />
-                            </UniformGrid>
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <!-- FPS -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="FPS and low FPS values" />
+                                <ui:ToggleSwitch x:Name="ShowFpsCheckBox"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Frame times -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Frame-time values" />
+                                <ui:ToggleSwitch x:Name="ShowFrameTimesCheckBox"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- GPU sensors -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBlock Grid.Column="0"
+                                               FontTypography="Body"
+                                               Text="GPU sensors"
+                                               ToolTip="GPU polling is completely disabled when this is off." />
+                                <ui:ToggleSwitch x:Name="ShowGpuCheckBox"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- CPU sensors -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="CPU sensors" />
+                                <ui:ToggleSwitch x:Name="ShowCpuCheckBox"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Memory usage -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Memory usage" />
+                                <ui:ToggleSwitch x:Name="ShowMemoryCheckBox"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Battery tile -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Battery tile" />
+                                <ui:ToggleSwitch x:Name="ShowBatteryCheckBox"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Rolling graphs -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Rolling graphs" />
+                                <ui:ToggleSwitch x:Name="ShowGraphsCheckBox"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off" />
+                            </Grid>
                         </StackPanel>
-                    </ui:Card>
+                    </ui:CardExpander>
 
                     <!-- Size and refresh rate -->
-                    <ui:Card Margin="0,0,0,8"
-                             RenderOptions.EdgeMode="Aliased"
-                             SnapsToDevicePixels="True">
-                        <StackPanel>
+                    <ui:CardExpander Margin="0,0,0,8"
+                                     IsExpanded="True">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF404;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
                             <StackPanel>
                                 <ui:TextBlock FontTypography="Body" Text="Size and refresh rate" />
                                 <ui:TextBlock Margin="0,2,0,0"
@@ -210,7 +333,8 @@
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                Text="Adjust the overlay scale, opacity, and polling interval." />
                             </StackPanel>
-                            <Border Height="1" Margin="-14,12,-14,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                        </ui:CardExpander.Header>
+                        <StackPanel>
                             <!-- Overlay scale -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -239,7 +363,8 @@
                             </Grid>
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-14,12,-14,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                             <!-- Panel opacity -->
                             <Grid>
@@ -269,7 +394,8 @@
                             </Grid>
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-14,12,-14,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                             <!-- Refresh interval -->
                             <Grid>
@@ -295,24 +421,35 @@
                                               MaxDecimalPlaces="0" />
                             </Grid>
                         </StackPanel>
-                    </ui:Card>
+                    </ui:CardExpander>
                 </StackPanel>
             </Grid>
         </ScrollViewer>
 
         <!-- Row 1: Bottom bar -->
-        <Grid Grid.Row="1" MaxWidth="1080" HorizontalAlignment="Stretch" Margin="16,12,36,12">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <ui:Button Width="50" Margin="0,0,8,0" ToolTip="Show overlay" Click="PreviewButton_Click">
-                    <ui:SymbolIcon Symbol="Eye20" FontSize="24" />
-                </ui:Button>
-                <ui:Button Width="50" Margin="0,0,8,0" ToolTip="Hide overlay" Click="HideButton_Click">
-                    <ui:SymbolIcon Symbol="EyeOff20" FontSize="24" />
-                </ui:Button>
-                <ui:Button Width="50" ToolTip="Save overlay settings" Click="ApplyButton_Click">
-                    <ui:SymbolIcon Symbol="Save20" FontSize="24" />
-                </ui:Button>
-            </StackPanel>
-        </Grid>
+        <ui:Card Grid.Row="1" MaxWidth="1080" HorizontalAlignment="Stretch" Margin="16,8,16,12" Padding="12,8" SnapsToDevicePixels="True">
+            <Grid>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <ui:Button Margin="0,0,8,0" Click="PreviewButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="Eye20" FontSize="24" Margin="0,0,8,0" />
+                            <TextBlock Text="Show" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ui:Button>
+                    <ui:Button Margin="0,0,8,0" Click="HideButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="EyeOff20" FontSize="24" Margin="0,0,8,0" />
+                            <TextBlock Text="Hide" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ui:Button>
+                    <ui:Button Click="ApplyButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="Save20" FontSize="24" Margin="0,0,8,0" />
+                            <TextBlock Text="Save" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ui:Button>
+                </StackPanel>
+            </Grid>
+        </ui:Card>
     </Grid>
 </Page>

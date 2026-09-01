@@ -327,19 +327,21 @@
         </ScrollViewer>
 
         <!-- Row 1: Bottom bar — Refresh button anchored right -->
-        <Grid x:Name="bottomBar" Grid.Row="1" MaxWidth="1080" HorizontalAlignment="Stretch" Margin="16,12,16,12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <ui:Button Grid.Column="1"
-                       x:Name="btnRefresh"
-                       Click="btnRefresh_Click">
-                <StackPanel Orientation="Horizontal">
-                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" Margin="0,0,12,0" />
-                    <TextBlock Text="Refresh" />
-                </StackPanel>
-            </ui:Button>
-        </Grid>
+        <ui:Card x:Name="bottomBar" Grid.Row="1" MaxWidth="1052" HorizontalAlignment="Stretch" Margin="16,8,16,12" Padding="12,8" SnapsToDevicePixels="True">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ui:Button Grid.Column="1"
+                           x:Name="btnRefresh"
+                           Click="btnRefresh_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" Margin="0,0,12,0" />
+                        <TextBlock Text="Refresh" />
+                    </StackPanel>
+                </ui:Button>
+            </Grid>
+        </ui:Card>
     </Grid>
 </Page>

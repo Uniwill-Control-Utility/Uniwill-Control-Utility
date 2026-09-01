@@ -146,7 +146,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 Log.Logger.Error(ex, "Failed to setup MagWindow");
             }
 
-             Wpf.Ui.Appearance.SystemThemeWatcher.Watch(this, WindowBackdropType.Acrylic, true);
+             Wpf.Ui.Appearance.SystemThemeWatcher.Watch(this, WindowBackdropType.Mica, true);
         }
 
         private async void ApplyOnStart()
@@ -154,9 +154,42 @@ namespace Uniwill_Control_Utility.Views.Windows
             try
             {
                 if (Settings.Default.ApplyOnStart)
+                {
+                    // If the last selected profile was Custom, apply from CustomPresetStore.
+                    if (Settings.Default.presetProfile == "Custom")
+                    {
+                        await Task.Run(() => GetBatteryStatus());
+
+                        var presets = Models.CustomPresetStore.Load();
+                        // Find the first slot with saved data (slot 0 = Profile 1 is default)
+                        int slot = 0;
+                        for (int i = 0; i < presets.Length; i++)
+                        {
+                            if (presets[i].HasChanges)
+                            {
+                                slot = i;
+                                break;
+                            }
+                        }
+
+                        var p = presets[slot];
+                        if (p.HasChanges)
+                        {
+                            // Build command string from the preset values
+                            string command = BuildCustomCommandString(p);
+                            if (!string.IsNullOrWhiteSpace(command))
+                            {
+                                await ApplyCustomOnStart(command, p);
+                                ToastNotification.ShowToastNotification("Custom Preset Applied",
+                                    $"Your Custom preset (Profile {slot + 1}) has been applied on startup!");
+                            }
+                        }
+                        return;
+                    }
+
+                    // Legacy path: CommandString from Automations / tray menu
                     if (Settings.Default.CommandString != null && Settings.Default.CommandString != "")
                     {
-
                         await Task.Run(() => GetBatteryStatus());
 
                         if (statuscode == 2 || statuscode == 6 || statuscode == 7 || statuscode == 8)
@@ -194,6 +227,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                             }
                         }
                     }
+                }
 
                 // Apply keyboard RGB settings on startup (runs on background thread)
                 Task.Run(ApplyKeyboardOnStart);
@@ -888,5 +922,70 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             Task.Run(Garbage.Garbage_Collect);
         }
+
+        #region Custom Preset Boot Apply
+
+        /// <summary>
+        /// Builds a RyzenAdj command string from a CustomPreset, mirroring Presets.buildCommandString().
+        /// </summary>
+        private string BuildCustomCommandString(Models.CustomPreset p)
+        {
+            var parts = new List<string>();
+
+            if (Family.TYPE == Family.ProcessorType.Amd_Apu)
+            {
+                int slowLimit = (int)p.CpuSustained * 1000;
+                int fastLimit = (int)p.CpuBoost * 1000;
+                parts.Add($"--slow-limit={slowLimit}");
+                parts.Add($"--fast-limit={fastLimit}");
+                parts.Add($"--tctl-temp={p.CpuTjMax}");
+                parts.Add($"--cHTC-temp={p.CpuTjMax}");
+                if (p.CpuCoAll > 0)
+                    parts.Add($"--set-coall={(byte)p.CpuCoAll}");
+            }
+            else if (Family.TYPE == Family.ProcessorType.Intel)
+            {
+                parts.Add($"--intel-pl={p.IntelPl1:F0},{p.IntelPl2:F0}");
+                if (p.IntelVolt < 0)
+                    parts.Add($"--intel-volt-cpu={p.IntelVolt:F0}");
+            }
+
+            // NVIDIA GPU clocks
+            int core = (int)p.GpuCoreOffset;
+            int mem = (int)p.GpuMemOffset;
+            int tgp = (int)p.GpuTgp;
+            int dbOffset = p.GpuDynamicBoost ? (int)p.GpuDbOffset : 0;
+            int totalWatts = tgp + dbOffset;
+            parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
+
+            return string.Join(" ", parts) + " ";
+        }
+
+        /// <summary>
+        /// Applies a Custom preset on startup: SMU commands, V-F curve, and EC writes.
+        /// </summary>
+        private async Task ApplyCustomOnStart(string command, Models.CustomPreset p)
+        {
+            await Scripts.RyzenAdj_To_UCU.TranslateAsync(command, appliedName: "Custom Preset", localizeAppliedName: false);
+
+            // Apply V-F curve offsets if the preset has them
+            if (p.VfCurveOffsets.Count > 0)
+            {
+                int tgp = (int)p.GpuTgp;
+                int dbOffset = p.GpuDynamicBoost ? (int)p.GpuDbOffset : 0;
+                Scripts.GPUs.NVIDIA.NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
+                Scripts.GPUs.NVIDIA.NvTuning.ApplyVfCurveOffsets_ClockBoostTable(p.VfCurveOffsets);
+                Scripts.GPUs.NVIDIA.NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
+            }
+
+            // Apply EC CPU power limits (AMD)
+            if (Family.TYPE == Family.ProcessorType.Amd_Apu)
+            {
+                var ec = Scripts.RyzenAdj_To_UCU.EcService;
+                ec?.ApplyCpuPowerLimits((int)p.CpuSustained, (int)p.CpuBoost);
+            }
+        }
+
+        #endregion
     }
 }

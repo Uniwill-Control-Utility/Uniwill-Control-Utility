@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
+using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Services;
 using Uniwill_Control_Utility.ViewModels;
@@ -38,10 +39,40 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool hasWatercooler = WaterCoolerHardwareDetector.IsSupportedHardware();
             _hydroUi.Visibility = hasWatercooler ? Visibility.Visible : Visibility.Collapsed;
 
+            // Apply Flydigi visibility from settings
+            ApplyFlydigiVisibility();
+
             // Pass navigation service to device controls for "Connect" buttons
             var navService = ViewModel.GetNavigationService();
             _hydroUi.SetNavigationService(navService);
             _flydigi.SetNavigationService(navService);
+        }
+
+        /// <summary>
+        /// Applies Flydigi card visibility based on the HideFlydigi setting.
+        /// </summary>
+        private void ApplyFlydigiVisibility()
+        {
+            bool hideFlydigi = Settings.Default.HideFlydigi;
+            _flydigi.Visibility = hideFlydigi ? Visibility.Collapsed : Visibility.Visible;
+
+            // Adjust layout: center Hydro UI when Flydigi is hidden
+            if (hideFlydigi)
+            {
+                ((ColumnDefinition)_deviceRow.ColumnDefinitions[1]).Width = GridLength.Auto;
+                ((ColumnDefinition)_deviceRow.ColumnDefinitions[2]).Width = GridLength.Auto;
+                _hydroUi.HorizontalAlignment = HorizontalAlignment.Center;
+                _hydroUi.MinWidth = 536;
+                _hydroUi.MaxWidth = 536;
+            }
+            else
+            {
+                ((ColumnDefinition)_deviceRow.ColumnDefinitions[1]).Width = new GridLength(8);
+                ((ColumnDefinition)_deviceRow.ColumnDefinitions[2]).Width = new GridLength(1, GridUnitType.Star);
+                _hydroUi.HorizontalAlignment = HorizontalAlignment.Stretch;
+                _hydroUi.MinWidth = 0;
+                _hydroUi.MaxWidth = double.MaxValue;
+            }
         }
 
         private void InitializeDeviceInfo()
@@ -255,7 +286,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void OnDeviceMetricsUpdated(object? sender, DeviceMetricsSnapshot snapshot)
         {
             _hydroUi.UpdateMetrics(snapshot);
-            _flydigi.UpdateMetrics(snapshot);
+
+            // Only update Flydigi metrics if not disabled
+            if (!Settings.Default.HideFlydigi)
+                _flydigi.UpdateMetrics(snapshot);
         }
     }
 }

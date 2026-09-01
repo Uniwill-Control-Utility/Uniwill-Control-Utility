@@ -1748,13 +1748,24 @@ namespace Uniwill_Control_Utility.Services
                     ChargeRateMa = chargeRateMa
                 };
 
-                DebugLog($"[Battery] ReadBatteryTelemetry: AC={(isAcPowered ? "plugged" : "unplugged")}, SoC={stateOfCharge}%, Health={healthPercent}%, Temp={temperatureC}°C, Cycles={cycleCount}, Voltage={presentVoltageMv}mV, ChargeRate={chargeRateMa}mA");
+                Debug.WriteLine($"[EC] [Battery] ReadBatteryTelemetry: AC={(isAcPowered ? "plugged" : "unplugged")}, SoC={stateOfCharge}%, Health={healthPercent}%, Temp={temperatureC}°C, Cycles={cycleCount}, Voltage={presentVoltageMv}mV, ChargeRate={chargeRateMa}mA");
                 return telemetry;
             }
             catch
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Reads only the battery temperature from the EC (Kelvin×10 at 0x4A2).
+        /// Lightweight — reads a single register pair, no full telemetry.
+        /// </summary>
+        public int ReadBatteryTemperatureC()
+        {
+            EnsureInitialized();
+            int tempKelvinX10 = ReadEcUInt16(REG_BATTERY_TEMP_LO);
+            return (int)(tempKelvinX10 / 10.0 - 273.15);
         }
 
         /// <summary>

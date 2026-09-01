@@ -9,7 +9,7 @@
       x:Name="mainWindow"
     Title="{Binding ViewModel.ApplicationTitle, Mode=OneWay}"
     Width="1080"
-    Height="800"
+    Height="817"
     MinWidth="1000"
     MinHeight="614"
     d:DataContext="{d:DesignInstance local:MainWindow, IsDesignTimeCreatable=True}"
@@ -95,7 +95,8 @@
                 <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="Transparent" />
                 <SolidColorBrush x:Key="NavigationViewBorderBrush" Color="Transparent" />
 
-                <!-- Override the frame template control properties locally -->
+                <!-- Hide the separator between main items and footer -->
+                <SolidColorBrush x:Key="LeftNavigationViewSeparatorBrush" Color="Transparent" />
                 <Thickness x:Key="NavigationViewContentGridBorderThickness">0</Thickness>
                 <Thickness x:Key="NavigationViewBorderThickness">0</Thickness>
 

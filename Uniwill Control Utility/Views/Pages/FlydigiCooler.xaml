@@ -830,14 +830,14 @@
                                             HorizontalAlignment="Right"
                                             VerticalAlignment="Center">
                                         <ui:NumberBox Name="nudAvoidanceStart"
-                                                  Width="120"
+                                                  Width="130"
                                                   Minimum="1300" Maximum="4000"
                                                   SmallChange="100" MaxDecimalPlaces="0"
                                                   Margin="0,0,4,0"
                                                   ValueChanged="nudAvoidance_ValueChanged"/>
                                         <TextBlock Text="-" VerticalAlignment="Center" Margin="4,0,4,0"/>
                                         <ui:NumberBox Name="nudAvoidanceEnd"
-                                                  Width="120"
+                                                  Width="130"
                                                   Minimum="1300" Maximum="4000"
                                                   SmallChange="100" MaxDecimalPlaces="0"
                                                   ValueChanged="nudAvoidance_ValueChanged"/>

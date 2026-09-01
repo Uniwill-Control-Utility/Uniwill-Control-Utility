@@ -90,7 +90,6 @@
                     <!-- Profile Selector Card -->
                     <ui:Card Margin="0,0,0,8"
                              Padding="8"
-                             RenderOptions.EdgeMode="Aliased"
                              SnapsToDevicePixels="True">
                         <UniformGrid Columns="4" Rows="1">
                             <Button x:Name="btnOffice" Style="{StaticResource ProfileButtonStyle}" Click="btnOffice_Click">
@@ -121,18 +120,19 @@
                     </ui:Card>
 
                     <!-- Status Card -->
-                    <ui:Card Margin="0,0,0,8" 
+                    <ui:Card Margin="16,8,0,16" 
                              Padding="15"
                              RenderOptions.EdgeMode="Aliased"
-                             SnapsToDevicePixels="True">
-                        <Grid>
+                             SnapsToDevicePixels="True"
+                             HorizontalAlignment="Center">
+                        <Grid HorizontalAlignment="Center" Margin="16,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="16" />
-                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0">
+                            <StackPanel Grid.Column="0" HorizontalAlignment="Center" Margin="24,0,0,0">
                                 <ui:TextBlock FontTypography="BodyStrong" Text="CPU Power Limits" Margin="0,0,0,8" />
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -152,21 +152,16 @@
                                     <TextBlock Grid.Row="1" Grid.Column="0" FontSize="13" Text="Boost (FPL)" Margin="0,4,0,0" />
                                     <TextBlock Grid.Row="1" Grid.Column="1" x:Name="tbPl2" FontSize="13" FontWeight="SemiBold" Text="-- W" Margin="0,4,0,0" />
 
-                                    <Grid x:Name="gridStatusTjMax" Grid.Row="2" Grid.Column="0" ColumnSpan="2">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" FontSize="13" Text="TjMax" Margin="0,4,0,0" />
-                                        <TextBlock Grid.Column="1" x:Name="tbTjMax" FontSize="13" FontWeight="SemiBold" Text="-- °C" Margin="0,4,0,0" />
-                                    </Grid>
+                                    <TextBlock x:Name="tbTjMaxLabel" Grid.Row="2" Grid.Column="0" Width="120" FontSize="13" Text="TjMax" Margin="0,4,0,0" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="tbTjMax" FontSize="13" FontWeight="SemiBold" Text="-- °C" Margin="0,4,0,0" />
 
                                     <TextBlock Grid.Row="3" Grid.Column="0" FontSize="13" Text="Curve Optimizer" Margin="0,4,0,0" />
                                     <TextBlock Grid.Row="3" Grid.Column="1" x:Name="tbCoAll" FontSize="13" FontWeight="SemiBold" Text="--" Margin="0,4,0,0" />
                                 </Grid>
                             </StackPanel>
 
-                            <StackPanel Grid.Column="2">
+                            <StackPanel Grid.Column="2" HorizontalAlignment="Center" Margin="0,0,24,0
+                                        ">
                                 <ui:TextBlock FontTypography="BodyStrong" Text="GPU Power Limits" Margin="0,0,0,8" />
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -177,16 +172,20 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
 
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Width="120" FontSize="13" Text="GPU TGP" />
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Width="120" FontSize="13" Text="GPU TGP" HorizontalAlignment="Left" />
                                     <TextBlock Grid.Row="0" Grid.Column="1" x:Name="tbGpuTgp" FontSize="13" FontWeight="SemiBold" Text="-- W" />
 
-                                    <TextBlock Grid.Row="1" Grid.Column="0" FontSize="13" Text="Dynamic Boost" Margin="0,4,0,0" />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" FontSize="13" Text="Dynamic Boost" Margin="0,4,0,0" HorizontalAlignment="Left" />
                                     <TextBlock Grid.Row="1" Grid.Column="1" x:Name="tbGpuDb" FontSize="13" FontWeight="SemiBold" Text="Off" Margin="0,4,0,0" />
 
-                                    <TextBlock Grid.Row="2" Grid.Column="0" FontSize="13" Text="Active Profile" Margin="0,4,0,0" />
-                                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="tbActiveProfile" FontSize="13" FontWeight="SemiBold" Text="None" Margin="0,4,0,0" />
+                                    <TextBlock Grid.Row="2" Grid.Column="0" FontSize="13" Text="Core Clock Offset" Margin="0,4,0,0" HorizontalAlignment="Left" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="tbCoreClock" FontSize="13" FontWeight="SemiBold" Text="-- MHz" Margin="0,4,0,0" />
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" FontSize="13" Text="Memory Clock Offset" Margin="0,4,24,0" HorizontalAlignment="Left" />
+                                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="tbMemClock" FontSize="13" FontWeight="SemiBold" Text="-- MHz" Margin="0,4,0,0" />
                                 </Grid>
                             </StackPanel>
                         </Grid>
@@ -639,23 +638,111 @@
                         </ui:CardExpander>
 
  
-                        <!-- Apply Button -->
-                        <ui:Button x:Name="btnApply"
-                                   Margin="0,12,0,0"
-                                   Height="40"
-                                   Appearance="Primary"
-                                   HorizontalAlignment="Right"
-                                   Click="btnApply_Click">
-                            <StackPanel Orientation="Horizontal">
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE73E;" FontSize="20" Margin="0,0,8,0" />
-                                <TextBlock Text="Apply Settings" />
-                            </StackPanel>
-                        </ui:Button>
                     </StackPanel>
                     <!-- end customScroll StackPanel -->
                 </StackPanel>
                 <!-- end Row 1 content StackPanel -->
             </Grid>
         </ScrollViewer>
+
+        <!-- Row 1: Bottom bar with Custom preset RadioButtons (left) and Save/Apply (right) -->
+        <ui:Card Grid.Row="1"
+              x:Name="bottomBar"
+              Visibility="Collapsed"
+              Margin="16,8,16,12"
+              Padding="12,8"
+              MaxWidth="1052"
+              >
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: 5 Custom preset RadioButtons -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:TextBlock Text="Profile: "
+                              VerticalAlignment="Center"
+                              FontSize="13"
+                              Margin="0,0,8,0"
+                              Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <RadioButton x:Name="rbProfile1"
+                             GroupName="CustomProfile"
+                             Content="1"
+                             IsChecked="True"
+                             MinWidth="50"
+                             Width="36"
+                             Margin="0,0,12,0"
+                             HorizontalContentAlignment="Center"
+                             FontSize="13"
+                             Click="rbProfile_Click" />
+                <RadioButton x:Name="rbProfile2"
+                             GroupName="CustomProfile"
+                             Content="2"
+                             MinWidth="50"
+                             Width="36"
+                             Margin="0,0,12,0"
+                             HorizontalContentAlignment="Center"
+                             FontSize="13"
+                             Click="rbProfile_Click" />
+                <RadioButton x:Name="rbProfile3"
+                             GroupName="CustomProfile"
+                             Content="3"
+                             MinWidth="50"
+                             Margin="0,0,12,0"
+                             HorizontalContentAlignment="Center"
+                             FontSize="13"
+                             Click="rbProfile_Click" />
+                <RadioButton x:Name="rbProfile4"
+                             GroupName="CustomProfile"
+                             Content="4"
+                             MinWidth="50"
+                             Margin="0,0,12,0"
+                             HorizontalContentAlignment="Center"
+                             FontSize="13"
+                             Click="rbProfile_Click" />
+                <RadioButton x:Name="rbProfile5"
+                             GroupName="CustomProfile"
+                             Content="5"
+                             MinWidth="60"
+                             Margin="0,0,12,0"
+                             HorizontalContentAlignment="Center"
+                             FontSize="13"
+                             Click="rbProfile_Click" />
+            </StackPanel>
+
+            <!-- Right: Save + Apply buttons -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <CheckBox x:Name="cbApplyOnStartup"
+                          Content="Apply on startup"
+                          Margin="0,0,12,0"
+                          VerticalAlignment="Center"
+                          FontSize="13"
+                          Click="cbApplyOnStartup_Click" />
+                <ui:Button x:Name="btnSave"
+                           Appearance="Secondary"
+                           Click="btnSave_Click"
+                           Margin="0,0,8,0"
+                           Height="36"
+                           Padding="16,0">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74E;" FontSize="16" Margin="0,0,6,0" />
+                        <TextBlock Text="Save" />
+                    </StackPanel>
+                </ui:Button>
+                <ui:Button x:Name="btnApply"
+                           Appearance="Primary"
+                           Click="btnApply_Click"
+                           Height="36"
+                           Padding="16,0">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE73E;" FontSize="16" Margin="0,0,6,0" />
+                        <TextBlock Text="Apply" />
+                    </StackPanel>
+                </ui:Button>
+            </StackPanel>
+            </Grid>
+        </ui:Card>
     </Grid>
 </Page>

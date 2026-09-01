@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui;
 
@@ -24,6 +25,10 @@ namespace Uniwill_Control_Utility.Views.Controls
 
         public void UpdateMetrics(DeviceMetricsSnapshot snapshot)
         {
+            // Skip updating if Flydigi is disabled via Settings
+            if (Settings.Default.HideFlydigi)
+                return;
+
             if (snapshot.FlydigiConnected)
             {
                 this.Visibility = Visibility.Visible;

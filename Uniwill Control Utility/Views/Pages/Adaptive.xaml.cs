@@ -453,12 +453,6 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         public static int CPUTemp, CPULoad, CPUClock, CPUPower, GPULoad, GPUClock, GPUMemClock;
 
-        private void mainScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
-        {
-            if (IsScrollBarVisible(mainScroll)) mainCon.Margin = new Thickness(0, 0, -12, 0);
-            else mainCon.Margin = new Thickness(0, 0, 0, 0);
-        }
-
         private async void adaptive_Tick(object sender, EventArgs e)
         {
             if (start == true)

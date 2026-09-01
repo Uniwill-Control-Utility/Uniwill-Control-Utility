@@ -354,6 +354,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void StatusTimer_Tick(object? sender, EventArgs e)
         {
+            // Skip polling when the app is minimized — no point reading hardware
+            // while the user isn't looking at the UI.
+            if (Application.Current.MainWindow?.WindowState == WindowState.Minimized)
+                return;
+
             try
             {
                 // Get metrics from hardware monitoring (temp, usage, power, clock)

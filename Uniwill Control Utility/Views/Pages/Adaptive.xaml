@@ -43,44 +43,31 @@
 
         <!-- Row 0: Scrollable content -->
         <ScrollViewer Grid.Row="0"
-                      x:Name="mainScroll"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       CanContentScroll="False"
                       PanningMode="VerticalOnly"
-                      IsDeferredScrollingEnabled="False"
-                      ScrollChanged="mainScroll_ScrollChanged">
+                      IsDeferredScrollingEnabled="False">
                 <ScrollViewer.Style>
                     <Style TargetType="{x:Type ScrollViewer}"
                         BasedOn="{StaticResource {x:Type ScrollViewer}}">
-
-                        <Setter Property="Padding"
-                             Value="0" />
-                        <Style.Triggers>
-                            <DataTrigger
-                                Binding="{Binding ComputedVerticalScrollBarVisibility,
-                                                RelativeSource={RelativeSource Self}}"
-                                Value="Visible">
-
-                            </DataTrigger>
-                        </Style.Triggers>
+                        <Setter Property="Padding" Value="0" />
                     </Style>
                 </ScrollViewer.Style>
 
                     <!-- Centered max-width layout container -->
-                    <Grid MaxWidth="1080" HorizontalAlignment="Stretch" Margin="16,0,24,0">
+                    <Grid MaxWidth="1080" HorizontalAlignment="Stretch">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
                         <!-- Row 0: Page title block -->
-                        <StackPanel Grid.Row="0" Margin="0,24,0,12">
+                        <StackPanel Grid.Row="0" Margin="16,24,16,12">
                             <TextBlock FontSize="26"
                                        FontWeight="Medium"
-                                       Margin="0,0,36,0"
                                        Text="Adaptive Mode" />
-                            <TextBlock Margin="0,8,36,12"
+                            <TextBlock Margin="0,8,0,12"
                                        FontSize="12"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                        Text="Per-game profile presets with automatic switching."
@@ -88,7 +75,7 @@
                         </StackPanel>
 
                         <!-- Row 1: Content cards -->
-                        <StackPanel x:Name="mainCon" Grid.Row="1" Margin="16,16,20,18">
+                        <StackPanel x:Name="mainCon" Grid.Row="1" Margin="16,16,16,18">
                             <ui:CardControl Name="sdEnabled"
                                            IsEnabled="True"
                                            Icon="{ui:SymbolIcon PresenceAvailable10}"
@@ -1096,7 +1083,6 @@ ClipToBounds="True">
                                 <StackPanel Grid.Column="0">
                                     <StackPanel Orientation="Horizontal">
                                         <ui:TextBlock FontTypography="Body" Text="Fan Control" />
-                                        <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Custom curves are saved per-game and applied automatically when this profile is active." VerticalAlignment="Bottom" />
                                     </StackPanel>
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
@@ -1686,36 +1672,38 @@ ClipToBounds="True">
                 </ScrollViewer>
 
         <!-- Row 1: Bottom bar -->
-        <Grid Grid.Row="1" MaxWidth="1080" HorizontalAlignment="Stretch" Margin="36,12,36,12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+        <ui:Card Grid.Row="1" MaxWidth="1080" HorizontalAlignment="Stretch" Margin="16,8,16,12" Padding="12,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-            <!-- Left: Games/Apps selector -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                <TextBlock Text="Games/Apps:" VerticalAlignment="Center" FontSize="13" FontWeight="Medium" Margin="2,0,12,0"/>
-                <ComboBox Width="225" Name="cbxPowerPreset" SelectionChanged="cbxPowerPreset_SelectionChanged" Height="37" Margin="0,0,9,0"/>
-                <ui:Button Height="37" Width="50" Name="btnReloadApps" ToolTip="Updates dropdown list with games/apps" Click="btnReloadApps_Click">
-                    <ui:SymbolIcon Symbol="ArrowSync20" FontSize="24"/>
-                </ui:Button>
-            </StackPanel>
+                <!-- Left: Games/Apps selector -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <TextBlock Text="Games/Apps:" VerticalAlignment="Center" FontSize="13" FontWeight="Medium" Margin="2,0,12,0"/>
+                    <ComboBox Width="225" Name="cbxPowerPreset" SelectionChanged="cbxPowerPreset_SelectionChanged" Height="37" Margin="0,0,9,0"/>
+                    <ui:Button Height="37" Width="50" Name="btnReloadApps" ToolTip="Updates dropdown list with games/apps" Click="btnReloadApps_Click">
+                        <ui:SymbolIcon Symbol="ArrowSync20" FontSize="24"/>
+                    </ui:Button>
+                </StackPanel>
 
-            <!-- Right: Controls -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
-                <TextBlock Text="Polling Rate" VerticalAlignment="Center" FontSize="13" Margin="0,0,8,0" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
-                <ui:NumberBox x:Name="nudPolling" Minimum="1" Maximum="8" Value="2" SmallChange="0.05" MaxDecimalPlaces="2" Margin="0,0,12,0"/>
-                <CheckBox Name="cbAutoSwitch" Content="Auto switch app profile" VerticalAlignment="Center" Click="cbAutoSwitch_Click" Margin="0,0,12,0" Visibility="Collapsed"/>
-                <ui:Button Width="50" Name="btnSave" ToolTip="Save current settings" Click="btnSave_Click" IsEnabled="False" Margin="0,0,8,0">
-                    <ui:SymbolIcon Symbol="Save20" FontSize="24"/>
-                </ui:Button>
-                <ui:Button Width="185" Name="btnStart" Click="btnStart_Click" IsEnabled="False">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Name="siStartIcon" Symbol="Play20" FontSize="24"/>
-                        <TextBlock Name="tbxStartText" VerticalAlignment="Center" Margin="9,0,0,0">Start Adaptive Mode</TextBlock>
-                    </StackPanel>
-                </ui:Button>
-            </StackPanel>
-        </Grid>
+                <!-- Right: Controls -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBlock Text="Polling Rate" VerticalAlignment="Center" FontSize="13" Margin="0,0,8,0" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                    <ui:NumberBox x:Name="nudPolling" Minimum="1" Maximum="8" Value="2" SmallChange="0.05" MaxDecimalPlaces="2" Margin="0,0,12,0"/>
+                    <CheckBox Name="cbAutoSwitch" Content="Auto switch app profile" VerticalAlignment="Center" Click="cbAutoSwitch_Click" Margin="0,0,12,0" Visibility="Collapsed"/>
+                    <ui:Button Width="50" Name="btnSave" ToolTip="Save current settings" Click="btnSave_Click" IsEnabled="False" Margin="0,0,8,0">
+                        <ui:SymbolIcon Symbol="Save20" FontSize="24"/>
+                    </ui:Button>
+                    <ui:Button Width="185" Name="btnStart" Click="btnStart_Click" IsEnabled="False">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Name="siStartIcon" Symbol="Play20" FontSize="24"/>
+                            <TextBlock Name="tbxStartText" VerticalAlignment="Center" Margin="9,0,0,0">Start Adaptive Mode</TextBlock>
+                        </StackPanel>
+                    </ui:Button>
+                </StackPanel>
+            </Grid>
+        </ui:Card>
     </Grid>
 </Page>

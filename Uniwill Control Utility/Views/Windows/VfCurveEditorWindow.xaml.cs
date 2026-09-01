@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Media;
-using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
@@ -12,22 +11,21 @@ namespace Uniwill_Control_Utility.Views.Windows
     /// <summary>
     /// Dedicated popup window for editing GPU V-F curves.
     /// Gives the editor full keyboard focus so Tab, arrows, etc. work without parent conflicts.
+    /// Auto-saves to the active V-F curve preset slot (managed by the Presets page).
     /// </summary>
     public partial class VfCurveEditorWindow : FluentWindow
     {
         /// <summary> Fired when the curve changes (auto-save). Allows the owner page to refresh labels. </summary>
         public event EventHandler? CurveChanged;
 
-        private VfCurvePreset[] _presets = Array.Empty<VfCurvePreset>();
-        private int _activePreset = 0;
+        private readonly int _activePresetSlot;
 
-        public VfCurveEditorWindow(Dictionary<int, int>? initialOffsets = null)
+        public VfCurveEditorWindow(Dictionary<int, int>? initialOffsets = null, int activePresetSlot = 0)
         {
             InitializeComponent();
-            _presets = VfCurvePresetStore.Load();
+            _activePresetSlot = activePresetSlot;
             _editor.CurveChanged += Editor_CurveChanged;
             _editor.LoadCurve(initialOffsets);
-            updatePresetButtons();
 
             // Focus the editor canvas so keyboard shortcuts (Ctrl+A, Ctrl+D) work immediately.
             Loaded += (_, _) => _editor.FocusCanvas();
@@ -45,36 +43,20 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void OnThemeChanged(ApplicationTheme theme, Color accent)
         {
-            updatePresetButtons();
+            // Theme changed — no preset buttons to update anymore.
         }
 
         private void Editor_CurveChanged(object? sender, EventArgs e)
         {
-            // Auto-save to active preset slot
-            if (_activePreset < _presets.Length)
+            // Auto-save V-F curve offsets to the active preset slot in CustomPresetStore.
+            var customPresets = Models.CustomPresetStore.Load();
+            if (_activePresetSlot < customPresets.Length)
             {
-                _presets[_activePreset].Offsets = _editor.GetOffsets();
-                VfCurvePresetStore.Save(_presets);
+                customPresets[_activePresetSlot].VfCurveOffsets = _editor.GetOffsets();
+                Models.CustomPresetStore.Save(customPresets);
             }
-            updatePresetButtons();
+
             CurveChanged?.Invoke(this, e);
-        }
-
-        private void btnPreset_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not Button btn || btn.Tag is not string tag) return;
-            int slot = int.Parse(tag);
-            if (_activePreset == slot) return;
-
-            // Save current preset state first
-            if (_activePreset < _presets.Length)
-                _presets[_activePreset].Offsets = _editor.GetOffsets();
-
-            _activePreset = slot;
-            var offsets = _presets[slot].HasChanges ? _presets[slot].Offsets : null;
-            _editor.LoadCurve(offsets);
-            updatePresetButtons();
-            VfCurvePresetStore.Save(_presets);
         }
 
         private void btnReset_Click(object sender, RoutedEventArgs e)
@@ -82,42 +64,17 @@ namespace Uniwill_Control_Utility.Views.Windows
             // Reset the live GPU curve to stock (zero offsets on all points).
             NvTuning.ResetVfCurveOffsets();
 
-            // Clear UI offsets and save empty preset to disk.
+            // Clear UI offsets and save empty curve to active slot.
             _editor.ResetOffsets();
-            if (_activePreset < _presets.Length)
+            var customPresets = Models.CustomPresetStore.Load();
+            if (_activePresetSlot < customPresets.Length)
             {
-                _presets[_activePreset].Offsets = new Dictionary<int, int>();
-                VfCurvePresetStore.Save(_presets);
+                customPresets[_activePresetSlot].VfCurveOffsets = new Dictionary<int, int>();
+                Models.CustomPresetStore.Save(customPresets);
             }
 
             // Notify parent page so labels refresh and slider flag resets.
             CurveChanged?.Invoke(this, EventArgs.Empty);
-            updatePresetButtons();
-        }
-
-        private void updatePresetButtons()
-        {
-            var buttons = new[] { btnPreset1, btnPreset2, btnPreset3, btnPreset4, btnPreset5 };
-            for (int i = 0; i < buttons.Length; i++)
-            {
-                var hasData = i < _presets.Length && _presets[i].HasChanges;
-                buttons[i].Background = hasData
-                    ? (Brush?)FindResource("AccentFillColorDefaultBrush")
-                    : null;
-                buttons[i].Foreground = hasData
-                    ? (Brush?)FindResource("TextOnAccentFillColorPrimaryBrush")
-                    : null;
-
-                if (i == _activePreset)
-                {
-                    buttons[i].BorderThickness = new Thickness(2);
-                    buttons[i].BorderBrush = (Brush?)FindResource("AccentFillColorDefaultBrush");
-                }
-                else
-                {
-                    buttons[i].BorderThickness = new Thickness(0);
-                }
-            }
         }
     }
 }

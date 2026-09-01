@@ -27,11 +27,13 @@ namespace Uniwill_Control_Utility.Views.Pages
         private readonly DeviceApplier? _deviceApplier;
         private string _currentProfile = "Gaming";
 
-        // V-F curve preset state
-        private VfCurvePreset[] _vfPresets = Array.Empty<VfCurvePreset>();
+        // V-F curve preset state (managed by CustomPresetStore now)
         private int _vfActivePreset = -1;
         private Views.Windows.VfCurveEditorWindow? _vfEditorWindow;
         private bool _userTouchedCoreSlider; // true when user manually changes the core clock slider
+
+        // Custom preset slot state (1-5, maps to index 0-4)
+        private int _customPresetSlot = 0;
 
         // Custom profile fan curve persistence
         private FanControlSettings? _savedCustomFanSettings;
@@ -113,10 +115,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             // shows correctly even if the editor was never opened in this session.
             detectAndActivateVfCurve();
 
-            // For Custom profile, restore saved slider values from settings.
+            // For Custom profile, restore saved slider values.
             if (_currentProfile == "Custom")
             {
                 LoadCustomValues();
+                updateRadioButtonStyles();
+                cbApplyOnStartup.IsChecked = Settings.Default.ApplyOnStart;
             }
 
             // Initialize slider defaults from stored profile values so the status card
@@ -217,7 +221,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (Family.TYPE == Family.ProcessorType.Intel)
             {
                 sdAmdCoAll.Visibility = Visibility.Collapsed;
-                gridStatusTjMax.Visibility = Visibility.Collapsed;
+                tbTjMaxLabel.Visibility = Visibility.Collapsed;
+                tbTjMax.Visibility = Visibility.Collapsed;
                 gridCustomTjMax.Visibility = Visibility.Collapsed;
                 dividerAfterTjMax.Visibility = Visibility.Collapsed;
             }
@@ -446,7 +451,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // will overwrite the sliders with the new profile's defaults.
             if (oldProfile == "Custom" && profile != "Custom")
             {
-                SaveCustomValues();
+                SaveCustomPreset(_customPresetSlot);
             }
 
             _currentProfile = profile;
@@ -461,8 +466,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             else if (profile == "Turbo") btnTurbo.Style = activeStyle;
             else if (profile == "Custom") btnCustom.Style = activeStyle;
 
-            // Show/hide custom panel
+            // Show/hide custom panel and bottom bar
             customScroll.Visibility = profile == "Custom" ? Visibility.Visible : Visibility.Collapsed;
+            bottomBar.Visibility = profile == "Custom" ? Visibility.Visible : Visibility.Collapsed;
 
             // Set profile values from SKU database (falls back to hardcoded defaults)
             var limits = GetPowerLimits();
@@ -513,11 +519,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                     _profileIntelPl2 = cpuMax;
                 }
             }
-            // Custom: restore saved slider values and update labels
+            // Custom: restore from CustomPresetStore slot and update labels
             if (profile == "Custom")
             {
-                LoadCustomValues();
+                LoadCustomPreset(_customPresetSlot);
                 updateAllLabels();
+                updateRadioButtonStyles();
             }
 
             // Update status display
@@ -615,7 +622,24 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void updateStatus(string profile)
         {
-            tbActiveProfile.Text = profile;
+            // Update GPU clock offset display from slider values
+            if (sdNvidia.Visibility == Visibility.Visible)
+            {
+                if (VfCurveActive && !_userTouchedCoreSlider)
+                {
+                    tbCoreClock.Text = "Curve";
+                }
+                else
+                {
+                    tbCoreClock.Text = $"{sdNvCore.Value:F0} MHz";
+                }
+                tbMemClock.Text = $"{sdNvMem.Value:F0} MHz";
+            }
+            else
+            {
+                tbCoreClock.Text = "-- MHz";
+                tbMemClock.Text = "-- MHz";
+            }
 
             if (Family.TYPE == Family.ProcessorType.Amd_Apu)
             {
@@ -665,14 +689,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Apply V-F curve offsets only on Custom profile.
                 // Stock profiles (Office/Gaming/Turbo) always use the slider values (0 MHz),
                 // even if a curve exists on disk from a previous Custom session.
-                DebugLog($"  V-F curve check: VfCurveActive={VfCurveActive}, _userTouchedCoreSlider={_userTouchedCoreSlider}, _vfActivePreset={_vfActivePreset}, _currentProfile={_currentProfile}");
+                DebugLog($"  V-F curve check: VfCurveActive={VfCurveActive}, _userTouchedCoreSlider={_userTouchedCoreSlider}, _customPresetSlot={_customPresetSlot}, _currentProfile={_currentProfile}");
                 if (_currentProfile == "Custom" && VfCurveActive && !_userTouchedCoreSlider)
                 {
-                    var fresh = VfCurvePresetStore.Load();
-                    int activeSlot = _vfActivePreset >= 0 ? _vfActivePreset : 0;
-                    var offsets = activeSlot < fresh.Length && fresh[activeSlot].HasChanges
-                        ? fresh[activeSlot].Offsets : new Dictionary<int, int>();
-                    DebugLog($"  V-F curve: activeSlot={activeSlot}, offsets.Count={offsets.Count}");
+                    var customPresets = Models.CustomPresetStore.Load();
+                    var offsets = _customPresetSlot >= 0 && _customPresetSlot < customPresets.Length
+                        ? customPresets[_customPresetSlot].VfCurveOffsets : new Dictionary<int, int>();
+                    DebugLog($"  V-F curve: slot={_customPresetSlot + 1}, offsets.Count={offsets.Count}");
                     if (offsets.Count > 0)
                     {
                         // Apply EC power limit BEFORE the curve write. The NVIDIA driver
@@ -830,11 +853,159 @@ namespace Uniwill_Control_Utility.Views.Pages
             DebugLog($"Custom slider values loaded: sustained={_profileSustained}W boost={_profileBoost}W tjMax={_profileTjMax}");
         }
 
+        #region Custom Preset Slot Management
+
+        /// <summary>
+        /// Saves the current slider/control values to the specified Custom preset slot.
+        /// </summary>
+        private void SaveCustomPreset(int slotIndex)
+        {
+            var presets = Models.CustomPresetStore.Load();
+            if (slotIndex < 0 || slotIndex >= presets.Length) return;
+
+            presets[slotIndex].CpuSustained = sdSustained.Value;
+            presets[slotIndex].CpuBoost = sdBoost.Value;
+            presets[slotIndex].CpuTjMax = sdTjMax.Value;
+            presets[slotIndex].CpuCoAll = sdCoAll.Value;
+            presets[slotIndex].IntelPl1 = sdIntelPl1.Value;
+            presets[slotIndex].IntelPl2 = sdIntelPl2.Value;
+            presets[slotIndex].IntelVolt = sdIntelVolt.Value;
+            presets[slotIndex].GpuTgp = sdNvPower.Value;
+            presets[slotIndex].GpuDynamicBoost = togDynamicBoost.IsChecked == true;
+            presets[slotIndex].GpuDbOffset = sdNvDbOffset.Value;
+            presets[slotIndex].GpuCoreOffset = sdNvCore.Value;
+            presets[slotIndex].GpuMemOffset = sdNvMem.Value;
+
+            // Also save V-F curve offsets from editor if active
+            if (_vfActivePreset >= 0)
+            {
+                var vfPresets = Models.VfCurvePresetStore.Load();
+                int vfSlot = _vfActivePreset < vfPresets.Length ? _vfActivePreset : 0;
+                if (vfPresets[vfSlot].HasChanges)
+                {
+                    presets[slotIndex].VfCurveOffsets = new Dictionary<int, int>(vfPresets[vfSlot].Offsets);
+                }
+            }
+
+            Models.CustomPresetStore.Save(presets);
+            DebugLog($"SaveCustomPreset: slot {slotIndex + 1} saved");
+            updateRadioButtonStyles();
+        }
+
+        /// <summary>
+        /// Loads a Custom preset from the specified slot and populates all controls.
+        /// Only applies values if the slot has changes (HasChanges returns true).
+        /// </summary>
+        private void LoadCustomPreset(int slotIndex)
+        {
+            var presets = Models.CustomPresetStore.Load();
+            if (slotIndex < 0 || slotIndex >= presets.Length) return;
+
+            var preset = presets[slotIndex];
+            bool hasData = preset.HasChanges;
+
+            if (hasData)
+            {
+                sdSustained.Value = preset.CpuSustained;
+                sdBoost.Value = preset.CpuBoost;
+                sdTjMax.Value = preset.CpuTjMax;
+                sdCoAll.Value = preset.CpuCoAll;
+                sdIntelPl1.Value = preset.IntelPl1;
+                sdIntelPl2.Value = preset.IntelPl2;
+                sdIntelVolt.Value = preset.IntelVolt;
+                sdNvPower.Value = preset.GpuTgp;
+                togDynamicBoost.IsChecked = preset.GpuDynamicBoost;
+                sdNvDbOffset.Value = preset.GpuDbOffset;
+                sdNvCore.Value = preset.GpuCoreOffset;
+                sdNvMem.Value = preset.GpuMemOffset;
+
+                // Restore stored profile values for status card
+                _profileSustained = preset.CpuSustained;
+                _profileBoost = preset.CpuBoost;
+                _profileTjMax = (int)preset.CpuTjMax;
+                _profileCoAll = (int)preset.CpuCoAll;
+                _profileIntelPl1 = preset.IntelPl1;
+                _profileIntelPl2 = preset.IntelPl2;
+                _profileGpuTgp = preset.GpuTgp;
+                _profileGpuDb = preset.GpuDynamicBoost;
+                _profileGpuDbOffset = preset.GpuDbOffset;
+
+                // Load V-F curve offsets if the preset has them
+                if (preset.VfCurveOffsets.Count > 0)
+                {
+                    _vfActivePreset = 0; // Mark curve as active
+                    _userTouchedCoreSlider = false;
+                    DebugLog($"LoadCustomPreset: slot {slotIndex + 1} loaded with V-F curve ({preset.VfCurveOffsets.Count} points)");
+                }
+                else
+                {
+                    _vfActivePreset = -1;
+                    _userTouchedCoreSlider = false;
+                }
+
+                DebugLog($"LoadCustomPreset: slot {slotIndex + 1} loaded");
+            }
+            else
+            {
+                DebugLog($"LoadCustomPreset: slot {slotIndex + 1} is empty, skipping");
+            }
+        }
+
+        /// <summary>
+        /// Updates RadioButton visual style to indicate which slots have saved presets.
+        /// </summary>
+        private void updateRadioButtonStyles()
+        {
+            var presets = Models.CustomPresetStore.Load();
+            var buttons = new RadioButton[] { rbProfile1, rbProfile2, rbProfile3, rbProfile4, rbProfile5 };
+
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                bool hasData = i < presets.Length && presets[i].HasChanges;
+                // Use bold font weight for slots with saved data
+                buttons[i].FontWeight = hasData ? System.Windows.FontWeights.Bold : System.Windows.FontWeights.Normal;
+            }
+        }
+
+        private void rbProfile_Click(object sender, RoutedEventArgs e)
+        {
+            var buttons = new RadioButton[] { rbProfile1, rbProfile2, rbProfile3, rbProfile4, rbProfile5 };
+            int newSlot = Array.IndexOf(buttons, sender as RadioButton);
+            if (newSlot < 0 || newSlot == _customPresetSlot) return;
+
+            // Save current slot before switching (in case user made unsaved changes)
+            SaveCustomPreset(_customPresetSlot);
+
+            _customPresetSlot = newSlot;
+
+            // Load the new slot's preset if it has data
+            LoadCustomPreset(newSlot);
+            updateAllLabels();
+            updateStatus("Custom");
+            updateRadioButtonStyles();
+        }
+
+        private void btnSave_Click(object sender, RoutedEventArgs e)
+        {
+            SaveCustomPreset(_customPresetSlot);
+            ToastNotification.ShowToastNotification($"Profile {_customPresetSlot + 1} Saved",
+                $"Custom preset has been saved to profile {_customPresetSlot + 1}!");
+        }
+
+        private void cbApplyOnStartup_Click(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.ApplyOnStart = cbApplyOnStartup.IsChecked == true;
+            Settings.Default.Save();
+        }
+
         private void btnApply_Click(object sender, RoutedEventArgs e)
         {
-            SaveCustomValues();
+            SaveCustomPreset(_customPresetSlot);
+            SaveCustomValues(); // Also save to Settings for backward compatibility (auto-reapply)
             _ = applyProfileAsync();
         }
+
+        #endregion
 
         private string buildCommandString()
         {
@@ -918,34 +1089,34 @@ namespace Uniwill_Control_Utility.Views.Pages
         #region V-F Curve Editor (popup window)
 
         /// <summary>
-        /// Scans preset slots on disk for any non-zero offsets and activates the first one found.
+        /// Scans Custom preset slots on disk for any non-zero V-F curve offsets and activates the first one found.
         /// Called on startup so that _vfActivePreset is set even when the curve editor
         /// was last used in a previous app session.
         /// </summary>
         private void detectAndActivateVfCurve()
         {
             if (_vfActivePreset >= 0) return; // Already active from this session.
-            var presets = VfCurvePresetStore.Load();
+            var presets = Models.CustomPresetStore.Load();
             for (int i = 0; i < presets.Length; i++)
             {
-                if (presets[i].HasChanges)
+                if (presets[i].VfCurveOffsets.Count > 0)
                 {
-                    _vfActivePreset = i;
-                    DebugLog($"V-F curve auto-detected on slot {i}");
+                    _vfActivePreset = 0;
+                    _customPresetSlot = i;
+                    DebugLog($"V-F curve auto-detected on Custom preset slot {i + 1}");
                     return;
                 }
             }
         }
 
-        /// <summary> True when a V-F curve preset has non-zero offsets applied. Reloads from file for freshness. </summary>
+        /// <summary> True when the active Custom preset slot has V-F curve offsets. </summary>
         private bool VfCurveActive
         {
             get
             {
-                if (_vfActivePreset < 0) return false;
-                var fresh = VfCurvePresetStore.Load();
-                int slot = _vfActivePreset >= 0 ? _vfActivePreset : 0;
-                return slot < fresh.Length && fresh[slot].HasChanges;
+                var presets = Models.CustomPresetStore.Load();
+                int slot = _customPresetSlot;
+                return slot >= 0 && slot < presets.Length && presets[slot].VfCurveOffsets.Count > 0;
             }
         }
 
@@ -959,21 +1130,19 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
             }
 
-            // Always reload from disk — the editor window auto-saves independently,
-            // so the in-memory copy may be stale after a previous edit session.
-            _vfPresets = VfCurvePresetStore.Load();
-
-            // Default to preset slot 0 if not yet set.
-            if (_vfActivePreset < 0) _vfActivePreset = 0;
-
-            // Load the curve editor (with active preset if one is selected)
+            // Load V-F curve offsets from the active Custom preset slot
+            var presets = Models.CustomPresetStore.Load();
             Dictionary<int, int>? offsets = null;
-            if (_vfActivePreset < _vfPresets.Length && _vfPresets[_vfActivePreset].HasChanges)
-                offsets = _vfPresets[_vfActivePreset].Offsets;
+            if (_customPresetSlot >= 0 && _customPresetSlot < presets.Length)
+            {
+                var vfOffsets = presets[_customPresetSlot].VfCurveOffsets;
+                if (vfOffsets.Count > 0)
+                    offsets = new Dictionary<int, int>(vfOffsets);
+            }
 
             // Open non-modal curve editor window — user can interact with both windows.
-            // The editor auto-saves to file, so Apply reads fresh data on each click.
-            _vfEditorWindow = new Views.Windows.VfCurveEditorWindow(offsets);
+            // The editor auto-saves to the active Custom preset slot.
+            _vfEditorWindow = new Views.Windows.VfCurveEditorWindow(offsets, _customPresetSlot);
             _vfEditorWindow.Owner = Application.Current.MainWindow;
             _vfEditorWindow.Closed += (_, _) => _vfEditorWindow = null;
             _vfEditorWindow.CurveChanged += (_, _) =>

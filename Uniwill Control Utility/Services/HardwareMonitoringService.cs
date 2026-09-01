@@ -60,12 +60,18 @@ namespace Uniwill_Control_Utility.Services
         public double SystemMemoryTotalGb { get; init; }
         public double SystemMemoryCommittedGb { get; init; }
         public double SystemMemoryPagefileTotalGb { get; init; }
+        public int MemoryTemperature0 { get; init; }
+        public int MemoryTemperature1 { get; init; }
+        public int StorageTemperatureCelsius { get; init; }
         public bool HasBattery { get; init; }
         public int BatteryPercent { get; init; }
         public bool IsBatteryCharging { get; init; }
         public bool IsBatteryFullyCharged { get; init; }
         public double BatteryPowerWatts { get; init; }
         public int BatteryTimeRemainingMinutes { get; init; }
+        public int BatteryHealthPercent { get; init; }
+        public int BatteryTemperatureC { get; init; }
+        public int BatteryChargeLimit { get; init; } // 0 = 100%, 1 = 80%, 2 = 60%
     }
 
     public interface IHardwareMonitoringService
@@ -116,6 +122,9 @@ namespace Uniwill_Control_Utility.Services
                 double gpuMemoryTotalMb = ReadFirstValue(gpu, SensorType.SmallData, "GPU Memory Total", "D3D Dedicated Memory Total");
                 var (memoryUsed, memoryTotal, memoryCommitted, pagefileTotal) = ReadPhysicalMemory();
 
+                (int memTemp0, int memTemp1) = ReadMemoryTemperatures();
+                int storageTemp = ReadStorageTemperature();
+
                 return new HardwareMetricsSnapshot
                 {
                     CpuTemperature = Round(ReadFirstValue(cpu, SensorType.Temperature, "Core Average", "CPU Package", "Core")),
@@ -132,6 +141,9 @@ namespace Uniwill_Control_Utility.Services
                     SystemMemoryTotalGb = memoryTotal,
                     SystemMemoryCommittedGb = memoryCommitted,
                     SystemMemoryPagefileTotalGb = pagefileTotal,
+                    MemoryTemperature0 = memTemp0,
+                    MemoryTemperature1 = memTemp1,
+                    StorageTemperatureCelsius = storageTemp,
                     HasBattery = powerStatus.BatteryFlag != 128 && powerStatus.BatteryLifePercent <= 100,
                     BatteryPercent = powerStatus.BatteryLifePercent <= 100 ? powerStatus.BatteryLifePercent : 0,
                     IsBatteryCharging = (powerStatus.BatteryFlag & 8) != 0,
@@ -339,6 +351,59 @@ namespace Uniwill_Control_Utility.Services
             public ulong TotalVirtual;
             public ulong AvailableVirtual;
             public ulong AvailableExtendedVirtual;
+        }
+
+        private (int temp0, int temp1) ReadMemoryTemperatures()
+        {
+            if (_computer is null)
+                return (0, 0);
+
+            // DIMMs appear as top-level hardware items with HardwareType.Memory.
+            // Each DIMM has a temperature sensor named "DIMM #N" if it's DDR4/DDR5 with a thermal sensor.
+            // We collect per-DIMM temperatures by sensor name.
+            int temp0 = 0;
+            int temp1 = 0;
+
+            foreach (IHardware hardware in _computer.Hardware)
+            {
+                if (hardware.HardwareType != HardwareType.Memory)
+                    continue;
+
+                // Check sensor name to identify which DIMM
+                foreach (ISensor sensor in hardware.Sensors)
+                {
+                    if (sensor.SensorType != SensorType.Temperature || !sensor.Value.HasValue)
+                        continue;
+
+                    if (sensor.Name.Equals("DIMM #0", StringComparison.OrdinalIgnoreCase))
+                        temp0 = Round(sensor.Value.Value);
+                    else if (sensor.Name.Equals("DIMM #1", StringComparison.OrdinalIgnoreCase))
+                        temp1 = Round(sensor.Value.Value);
+                }
+            }
+
+            return (temp0, temp1);
+        }
+
+        private int ReadStorageTemperature()
+        {
+            if (_computer is null)
+                return 0;
+
+            // Storage hardware contains individual drives (HardwareType.Storage).
+            // Each drive may have a "Temperature" sensor. We return the maximum across all drives.
+            int maxTemp = 0;
+            foreach (IHardware storage in _computer.Hardware)
+            {
+                if (storage.HardwareType != HardwareType.Storage)
+                    continue;
+
+                double temp = ReadFirstValue(storage, SensorType.Temperature, "Temperature");
+                if (temp > maxTemp)
+                    maxTemp = Round(temp);
+            }
+
+            return maxTemp;
         }
 
         private static (double usedGb, double totalGb, double committedGb, double pagefileTotalGb) ReadPhysicalMemory()
