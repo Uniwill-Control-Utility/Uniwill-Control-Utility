@@ -22,20 +22,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             PopulateComboBox(cbxDischarge);
             PopulateComboBox(cbxResume);
 
-            // Show/hide AutoOC controls based on CPU family
-            if (Family.TYPE != Family.ProcessorType.Intel)
-            {
-                ccAutoOcCpuUv.Visibility = Visibility.Visible;
-                cbCPUUV.IsChecked = Settings.Default.isAutoUvCPU;
-                ccAutoOcIgpuUv.Visibility = Visibility.Visible;
-                cbiGPUUV.IsChecked = Settings.Default.isAutoUviGPU;
-            }
-            else
-            {
-                ccAutoOcCpuUv.Visibility = Visibility.Collapsed;
-                ccAutoOcIgpuUv.Visibility = Visibility.Collapsed;
-            }
-
             // Restore saved selections
             getAcPreset(Settings.Default.acPreset);
             getDcPreset(Settings.Default.dcPreset);
@@ -228,12 +214,6 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void CheckBox_Click(object sender, RoutedEventArgs e)
         {
-            if (setup)
-            {
-                Settings.Default.isAutoUvCPU = cbCPUUV.IsChecked.Value;
-                Settings.Default.isAutoUviGPU = cbiGPUUV.IsChecked.Value;
-                Settings.Default.Save();
-            }
         }
     }
 }

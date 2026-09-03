@@ -18,34 +18,7 @@ namespace Uniwill_Control_Utility.Scripts
         public enum RyzenFamily
         {
             Unknown = -1,
-            SummitRidge,
-            PinnacleRidge,
-            RavenRidge,
-            Dali,
-            Pollock,
-            Picasso,
-            FireFlight,
-            Matisse,
-            Renoir,
-            Lucienne,
-            VanGogh,
-            Mendocino,
-            Vermeer,
-            Cezanne_Barcelo,
-            Rembrandt,
-            Raphael,
-            DragonRange,
-            PhoenixPoint,
-            PhoenixPoint2,
-            HawkPoint,
-            HawkPoint2,
-            SonomaValley,
-            GraniteRidge,
             FireRange,
-            StrixHalo,
-            StrixPoint,
-            KrackanPoint,
-            KrackanPoint2,
         }
 
         public static RyzenFamily FAM = RyzenFamily.Unknown;
@@ -125,10 +98,6 @@ namespace Uniwill_Control_Utility.Scripts
                 // Unknown Intel fallback
                 return watercoolerConnected ? 80 : 65;
             }
-
-            // --- AMD ---
-            if (TYPE == ProcessorType.Amd_Desktop_Cpu)
-                return 86;
 
             // AMD Ryzen 9 9955HX / 9955HX3D (2025 XMG Neo) - 80W air / 110W liquid
             if (name.Contains("9955HX"))
@@ -297,72 +266,11 @@ namespace Uniwill_Control_Utility.Scripts
                     Misc.DiagnosticLogger.LogError(ex, "Failed to retrieve memory timings");
                 }
 
-                //Zen1 - Zen2
-                if (CPUFamily == 23)
-                {
-                    if (CPUModel == 1) FAM = RyzenFamily.SummitRidge;
+                // Only FireRange (Zen 5, Family 26, Model 68, HX suffix) is supported.
+                if (CPUFamily == 26 && CPUModel == 68 && CPUName.Contains("HX"))
+                    FAM = RyzenFamily.FireRange;
 
-                    if (CPUModel == 8) FAM = RyzenFamily.PinnacleRidge;
-
-                    if (CPUModel == 17 || CPUModel == 18) FAM = RyzenFamily.RavenRidge;
-
-                    if (CPUModel == 24) FAM = RyzenFamily.Picasso;
-
-                    if (CPUModel == 32 && CPUName.Contains("15e") || CPUModel == 32 && CPUName.Contains("15Ce") || CPUModel == 32 && CPUName.Contains("20e")) FAM = RyzenFamily.Pollock;
-                    else if (CPUModel == 32) FAM = RyzenFamily.Dali;
-
-                    if (CPUModel == 80) FAM = RyzenFamily.FireFlight;
-
-                    if (CPUModel == 96) FAM = RyzenFamily.Renoir;
-
-                    if (CPUModel == 104) FAM = RyzenFamily.Lucienne;
-
-                    if (CPUModel == 113) FAM = RyzenFamily.Matisse;
-
-                    if (CPUModel == 144 || CPUModel == 145) FAM = RyzenFamily.VanGogh;
-
-                    if (CPUModel == 160) FAM = RyzenFamily.Mendocino;
-                }
-
-                //Zen3 - Zen4
-                if (CPUFamily == 25)
-                {
-                    if (CPUModel == 33) FAM = RyzenFamily.Vermeer;
-
-                    if (CPUModel == 63 || CPUModel == 68) FAM = RyzenFamily.Rembrandt;
-
-                    if (CPUModel == 80) FAM = RyzenFamily.Cezanne_Barcelo;
-
-                    if (CPUModel == 97 && CPUName.Contains("HX")) FAM = RyzenFamily.DragonRange;
-                    else if (CPUModel == 97) FAM = RyzenFamily.Raphael;
-
-                    if (CPUModel == 116) FAM = RyzenFamily.PhoenixPoint;
-
-                    if (CPUModel == 120) FAM = RyzenFamily.PhoenixPoint2;
-
-                    if (CPUModel == 117) FAM = RyzenFamily.HawkPoint;
-
-                    if (CPUModel == 124) FAM = RyzenFamily.HawkPoint2;
-                }
-
-                // Zen5 - Zen6
-                if (CPUFamily == 26)
-                {
-                    if (CPUModel == 68 && CPUName.Contains("HX")) FAM = RyzenFamily.FireRange;
-                    else if (CPUModel == 68) FAM = RyzenFamily.GraniteRidge;
-
-                    if (CPUModel == 96) FAM = RyzenFamily.KrackanPoint;
-
-                    if (CPUModel == 104) FAM = RyzenFamily.KrackanPoint2;
-
-                    if (CPUModel == 32 || CPUModel == 36) FAM = RyzenFamily.StrixPoint;
-
-                    if (CPUModel == 112) FAM = RyzenFamily.StrixHalo;
-                }
-
-                if (FAM == RyzenFamily.SummitRidge || FAM == RyzenFamily.PinnacleRidge || FAM == RyzenFamily.Matisse || FAM == RyzenFamily.Vermeer || FAM == RyzenFamily.Raphael || FAM == RyzenFamily.GraniteRidge) TYPE = ProcessorType.Amd_Desktop_Cpu;
-                else TYPE = ProcessorType.Amd_Apu;
-
+                TYPE = ProcessorType.Amd_Apu;
                 Addresses.setAddresses();
             }
         }

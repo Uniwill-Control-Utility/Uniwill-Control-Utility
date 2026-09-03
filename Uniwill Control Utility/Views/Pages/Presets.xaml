@@ -1,4 +1,4 @@
-<Page x:Class="Uniwill_Control_Utility.Views.Pages.Presets"
+﻿<Page x:Class="Uniwill_Control_Utility.Views.Pages.Presets"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -122,8 +122,6 @@
                     <!-- Status Card -->
                     <ui:Card Margin="16,8,0,16" 
                              Padding="15"
-                             RenderOptions.EdgeMode="Aliased"
-                             SnapsToDevicePixels="True"
                              HorizontalAlignment="Center">
                         <Grid HorizontalAlignment="Center" Margin="16,0">
                             <Grid.ColumnDefinitions>
@@ -133,7 +131,7 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0" HorizontalAlignment="Center" Margin="24,0,0,0">
-                                <ui:TextBlock FontTypography="BodyStrong" Text="CPU Power Limits" Margin="0,0,0,8" />
+                                <ui:TextBlock FontTypography="BodyStrong" Text="CPU" Margin="0,0,0,8" />
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -155,14 +153,14 @@
                                     <TextBlock x:Name="tbTjMaxLabel" Grid.Row="2" Grid.Column="0" Width="120" FontSize="13" Text="TjMax" Margin="0,4,0,0" />
                                     <TextBlock Grid.Row="2" Grid.Column="1" x:Name="tbTjMax" FontSize="13" FontWeight="SemiBold" Text="-- °C" Margin="0,4,0,0" />
 
-                                    <TextBlock Grid.Row="3" Grid.Column="0" FontSize="13" Text="Curve Optimizer" Margin="0,4,0,0" />
-                                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="tbCoAll" FontSize="13" FontWeight="SemiBold" Text="--" Margin="0,4,0,0" />
+                                    <TextBlock x:Name="tbCoLabel" Grid.Row="3" Grid.Column="0" Width="120" FontSize="13" Text="CO Offset" Margin="0,4,0,0" />
+                                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="tbCoOffset" FontSize="13" FontWeight="SemiBold" Text="-- | --" Margin="0,4,0,0" />
                                 </Grid>
                             </StackPanel>
 
                             <StackPanel Grid.Column="2" HorizontalAlignment="Center" Margin="0,0,24,0
                                         ">
-                                <ui:TextBlock FontTypography="BodyStrong" Text="GPU Power Limits" Margin="0,0,0,8" />
+                                <ui:TextBlock FontTypography="BodyStrong" Text="GPU" Margin="0,0,0,8" />
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -181,11 +179,11 @@
                                     <TextBlock Grid.Row="1" Grid.Column="0" FontSize="13" Text="Dynamic Boost" Margin="0,4,0,0" HorizontalAlignment="Left" />
                                     <TextBlock Grid.Row="1" Grid.Column="1" x:Name="tbGpuDb" FontSize="13" FontWeight="SemiBold" Text="Off" Margin="0,4,0,0" />
 
-                                    <TextBlock Grid.Row="2" Grid.Column="0" FontSize="13" Text="Core Clock Offset" Margin="0,4,0,0" HorizontalAlignment="Left" />
-                                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="tbCoreClock" FontSize="13" FontWeight="SemiBold" Text="-- MHz" Margin="0,4,0,0" />
+                                    <TextBlock Grid.Row="2" Grid.Column="0" FontSize="13" Text="Core Offset" Margin="0,4,0,0" HorizontalAlignment="Left" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="tbCoreClock" FontSize="13" FontWeight="SemiBold" Text="--" Margin="0,4,0,0" />
 
-                                    <TextBlock Grid.Row="3" Grid.Column="0" FontSize="13" Text="Memory Clock Offset" Margin="0,4,24,0" HorizontalAlignment="Left" />
-                                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="tbMemClock" FontSize="13" FontWeight="SemiBold" Text="-- MHz" Margin="0,4,0,0" />
+                                    <TextBlock Grid.Row="3" Grid.Column="0" FontSize="13" Text="Memory Offset" Margin="0,4,0,0" HorizontalAlignment="Left" />
+                                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="tbMemClock" FontSize="13" FontWeight="SemiBold" Text="--" Margin="0,4,0,0" />
                                 </Grid>
                             </StackPanel>
                         </Grid>
@@ -204,7 +202,7 @@
                             </ui:CardExpander.Icon>
                             <ui:CardExpander.Header>
                                 <StackPanel>
-                                    <ui:TextBlock FontTypography="Body" Text="CPU Power Tuning" />
+                                    <ui:TextBlock FontTypography="Body" Text="AMD CPU Power Tuning" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
@@ -221,7 +219,7 @@
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="Sustained (SPL)" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Slow Power Limit - sustained power ceiling via SMU" VerticalAlignment="Top" />
+                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Slow Power Limit - sustained power ceiling via SMU" VerticalAlignment="Center" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
@@ -238,7 +236,7 @@
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0"
                                                    Text="75 W" />
-                                        <Slider x:Name="sdSustained" Width="140" Maximum="255" Minimum="5" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
+                                        <Slider x:Name="sdSustained" Width="140" Maximum="160" Minimum="45" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <!-- Divider -->
@@ -252,7 +250,7 @@
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="Boost (FPL)" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Fast Power Limit - short burst ceiling via SMU" VerticalAlignment="Top" />
+                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Fast Power Limit - short burst ceiling via SMU" VerticalAlignment="Center" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
@@ -269,7 +267,7 @@
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0"
                                                    Text="85 W" />
-                                        <Slider x:Name="sdBoost" Width="140" Maximum="255" Minimum="5" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
+                                        <Slider x:Name="sdBoost" Width="140" Maximum="160" Minimum="45" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <!-- Divider -->
@@ -283,7 +281,7 @@
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="TjMax" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Maximum CPU temperature before thermal throttling" VerticalAlignment="Top" />
+                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Maximum CPU temperature before thermal throttling" VerticalAlignment="Center" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
@@ -295,7 +293,7 @@
                                                 HorizontalAlignment="Right"
                                                 VerticalAlignment="Center">
                                         <TextBlock x:Name="lblTjMax"
-                                                   Width="48"
+                                                   Width="42"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0"
@@ -303,37 +301,128 @@
                                         <Slider x:Name="sdTjMax" Width="140" Maximum="105" Minimum="70" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
-                                 <!-- Divider -->
-                                 <Border x:Name="dividerAfterTjMax" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                                 <!-- Curve Optimizer (AMD only) -->
-                                 <Grid x:Name="sdAmdCoAll">
-                                     <Grid.ColumnDefinitions>
-                                         <ColumnDefinition Width="*" />
-                                         <ColumnDefinition Width="Auto" />
-                                     </Grid.ColumnDefinitions>
-                                     <StackPanel Grid.Column="0">
-                                         <StackPanel Orientation="Horizontal">
-                                             <ui:TextBlock FontTypography="Body" Text="Curve Optimizer" />
-                                             <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Global voltage offset. Positive = undervolt." VerticalAlignment="Top" />
-                                         </StackPanel>
-                                         <ui:TextBlock Margin="0,2,0,0"
-                                                        FontTypography="Caption"
-                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                        Text="Global voltage offset (all cores)" />
-                                     </StackPanel>
-                                     <StackPanel Grid.Column="1"
-                                                 Orientation="Horizontal"
-                                                 HorizontalAlignment="Right"
-                                                 VerticalAlignment="Center">
-                                         <TextBlock x:Name="lblCoAll"
-                                                    Width="40"
-                                                    HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center"
-                                                    Margin="0,0,8,0"
-                                                    Text="0" />
-                                         <Slider x:Name="sdCoAll" Width="140" Maximum="0" Minimum="-50" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
-                                     </StackPanel>
-                                 </Grid>
+                                <!-- Divider -->
+                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <!-- Curve Optimizer mode selection -->
+                                <Grid x:Name="gridCustomCoUnified" Margin="0,4,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Curve Optimizer" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Unified or per-CCD offset" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center"
+                                                Margin="2,0"
+                                                >
+                                        <RadioButton x:Name="rbCoUnified"
+                                                     GroupName="CoMode"
+                                                     Content="Unified"
+                                                     IsChecked="True"
+                                                     Margin="0,0,8,0"
+                                                     HorizontalContentAlignment="Center"
+                                                     FontSize="13"
+                                                     Click="rbCoMode_Click"
+                                                     Width="90"
+                                                     MinWidth="20"/>
+                                        <RadioButton x:Name="rbCoPerCcd"
+                                                     GroupName="CoMode"
+                                                     Content="Per-CCD"
+                                                     HorizontalContentAlignment="Center"
+                                                     FontSize="13"
+                                                     Click="rbCoMode_Click"
+                                                     Width="90"
+                                                     MinWidth="20"/>
+                                    </StackPanel>
+                                </Grid>
+                                <!-- Divider -->
+                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <!-- Unified voltage offset slider -->
+                                <Grid x:Name="gridCustomCoUnifiedSlider">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:TextBlock FontTypography="Body" Text="Offset" />
+                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="~3-5 mV per 1 point" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="All-core offset (-30 to 0)" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center">
+                                        <TextBlock x:Name="lblCoUnified"
+                                                   Width="30"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,8,0"
+                                                   Text="0" />
+                                        <Slider x:Name="sdCoUnified" Width="140" Maximum="0" Minimum="-30" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
+                                    </StackPanel>
+                                </Grid>
+                                <!-- CCD 0 Voltage Offset (AMD only) -->
+                                <Grid x:Name="gridCustomCoCcd0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:TextBlock FontTypography="Body" Text="CCD 0 Offset" VerticalAlignment="Center"/>
+                                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="~3-5 mV per 1 point" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center"
+                                                Margin="0,4">
+                                        <TextBlock x:Name="lblCoCcd0"
+                                                   Width="30"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,8,0"
+                                                   Text="0" />
+                                        <Slider x:Name="sdCoCcd0" Width="140" Maximum="0" Minimum="-30" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
+                                    </StackPanel>
+                                </Grid>
+                                <!-- Divider (visible only in Per-CCD mode) -->
+                                <Border x:Name="dividerCoPerCcd" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <!-- CCD 1 Voltage Offset (AMD only) -->
+                                <Grid x:Name="gridCustomCoCcd1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:TextBlock FontTypography="Body" Text="CCD 1 Offset" VerticalAlignment="Center"/>
+                                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="~3-5 mV per 1 point" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center"
+                                                Margin="0,4">
+                                        <TextBlock x:Name="lblCoCcd1"
+                                                   Width="30"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,8,0"
+                                                   Text="0" />
+                                        <Slider x:Name="sdCoCcd1" Width="140" Maximum="0" Minimum="-30" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
+                                    </StackPanel>
+                                </Grid>
                             </StackPanel>
                         </ui:CardExpander>
 
@@ -348,7 +437,7 @@
                             </ui:CardExpander.Icon>
                             <ui:CardExpander.Header>
                                 <StackPanel>
-                                    <ui:TextBlock FontTypography="Body" Text="Intel Tuning" />
+                                    <ui:TextBlock FontTypography="Body" Text="Intel CPU Tuning" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
@@ -365,7 +454,7 @@
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="PL1" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Intel sustained power limit (MSR 0x610)" VerticalAlignment="Top" />
+                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Intel sustained power limit (MSR 0x610)" VerticalAlignment="Center" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
@@ -396,7 +485,7 @@
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="PL2" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Intel boost power limit (MSR 0x610)" VerticalAlignment="Top" />
+                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Intel boost power limit (MSR 0x610)" VerticalAlignment="Center" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
@@ -423,7 +512,7 @@
                                     <StackPanel>
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="CPU Undervolt" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="CPU voltage offset (MSR 0x150 plane 0)" VerticalAlignment="Top" />
+                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="CPU voltage offset (MSR 0x150 plane 0)" VerticalAlignment="Center" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
@@ -456,7 +545,7 @@
                             </ui:CardExpander.Icon>
                             <ui:CardExpander.Header>
                                 <StackPanel>
-                                    <ui:TextBlock FontTypography="Body" Text="GPU Tuning" />
+                                    <ui:TextBlock FontTypography="Body" Text="Nvidia GPU Tuning" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
@@ -471,14 +560,11 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
-                                        <StackPanel Orientation="Horizontal">
-                                            <ui:TextBlock FontTypography="Body" Text="GPU TGP" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="GPU Total Graphics Power (TGP)" VerticalAlignment="Top" />
-                                        </StackPanel>
+                                        <ui:TextBlock FontTypography="Body" Text="TGP" />
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Base power limit" />
+                                                       Text="Base power limit of the GPU" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1"
                                                 Orientation="Horizontal"
@@ -490,7 +576,7 @@
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0"
                                                    Text="150 W" />
-                                        <Slider x:Name="sdNvPower" Width="140" Maximum="150" Minimum="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
+                                        <Slider x:Name="sdNvPower" Width="140" Maximum="175" Minimum="50" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <!-- Divider -->
@@ -504,7 +590,7 @@
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="Dynamic Boost" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C3;" FontSize="14" Margin="6,2,0,0" ToolTip="Allow GPU to borrow power from CPU" VerticalAlignment="Top" />
+                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Allow GPU to borrow power from CPU" VerticalAlignment="Center" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
@@ -553,10 +639,7 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
-                                        <StackPanel Orientation="Horizontal">
-                                            <ui:TextBlock FontTypography="Body" Text="Curve Editor" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Per-point V-F curve editor" VerticalAlignment="Top" />
-                                        </StackPanel>
+                                        <ui:TextBlock FontTypography="Body" Text="Curve Editor" />
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"

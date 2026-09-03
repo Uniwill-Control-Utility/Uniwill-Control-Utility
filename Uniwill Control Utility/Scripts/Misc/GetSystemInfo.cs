@@ -655,63 +655,8 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             {
                 switch (Family.FAM)
                 {
-                    case RyzenFamily.SummitRidge:
-                        return "Summit Ridge";
-                    case RyzenFamily.PinnacleRidge:
-                        return "Pinnacle Ridge";
-                    case RyzenFamily.RavenRidge:
-                        return "Raven Ridge";
-                    case RyzenFamily.Dali:
-                        return "Dali";
-                    case RyzenFamily.Pollock:
-                        return "Pollock";
-                    case RyzenFamily.Picasso:
-                        return "Picasso";
-                    case RyzenFamily.FireFlight:
-                        return "Fire Flight";
-                    case RyzenFamily.Matisse:
-                        return "Matisse";
-                    case RyzenFamily.Renoir:
-                        return "Renoir";
-                    case RyzenFamily.Lucienne:
-                        return "Lucienne";
-                    case RyzenFamily.VanGogh:
-                        return "Van Gogh";
-                    case RyzenFamily.Mendocino:
-                        return "Mendocino";
-                    case RyzenFamily.Vermeer:
-                        return "Vermeer";
-                    case RyzenFamily.Cezanne_Barcelo:
-                        if (cpuName.Contains("25") || cpuName.Contains("75") || cpuName.Contains("30")) return "Barcelo";
-                        else return "Cezanne";
-                    case RyzenFamily.Rembrandt:
-                        return "Rembrandt";
-                    case RyzenFamily.Raphael:
-                        return "Raphael";
-                    case RyzenFamily.DragonRange:
-                        return "Dragon Range";
-                    case RyzenFamily.PhoenixPoint:
-                        return "Phoenix Point";
-                    case RyzenFamily.PhoenixPoint2:
-                        return "Phoenix Point 2";
-                    case RyzenFamily.HawkPoint:
-                        return "Hawk Point";
-                    case RyzenFamily.HawkPoint2:
-                        return "Hawk Point 2";
-                    case RyzenFamily.SonomaValley:
-                        return "Sonoma Valley";
-                    case RyzenFamily.GraniteRidge:
-                        return "Granite Ridge";
                     case RyzenFamily.FireRange:
                         return "Fire Range";
-                    case RyzenFamily.StrixPoint:
-                        return "Strix Point";
-                    case RyzenFamily.KrackanPoint:
-                        return "Krackan Point";
-                    case RyzenFamily.KrackanPoint2:
-                        return "Krackan Point 2";
-                    case RyzenFamily.StrixHalo:
-                        return "Strix Halo";
                     default:
                         return "";
                 }
@@ -744,14 +689,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             }
             else
             {
-                if (CPUName.Contains("7545U") && Family.FAM == RyzenFamily.PhoenixPoint2 || CPUName.Contains("Z1") && Family.FAM == RyzenFamily.PhoenixPoint2 || CPUName.Contains("7440U"))
-                {
-                    if (CPUName.Contains("7440U")) bigCores = 0;
-                    else bigCores = 2;
-                    smallCores = cores - bigCores;
-                    return $"{cores} ({bigCores} Prime Cores + {smallCores} Compact Cores)";
-                }
-                else return cores.ToString();
+                return cores.ToString();
             }
         }
 
@@ -830,7 +768,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             try
             {
                 if (TYPE != ProcessorType.Intel)
-                    if (FAM < RyzenFamily.Raphael) return false;
+                    if (FAM != RyzenFamily.FireRange) return false;
                 return NativeMethods.IsProcessorFeaturePresent(NativeMethods.PF_AVX512F_INSTRUCTIONS_AVAILABLE);
             }
             catch

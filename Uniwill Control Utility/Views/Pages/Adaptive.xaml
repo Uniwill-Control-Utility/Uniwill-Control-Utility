@@ -232,8 +232,8 @@ ClipToBounds="True">
                             </Grid>
                             <!-- Divider -->
                             <Border x:Name="AdpDividerAfterTjMax" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                            <!-- Curve Optimizer (AMD only) -->
-                            <Grid x:Name="AdpGridCoAll">
+                            <!-- Curve Optimizer mode selection (AMD only) -->
+                            <Grid x:Name="AdpGridCoMode">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -243,21 +243,117 @@ ClipToBounds="True">
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Global voltage offset (all cores)" />
+                                                   Text="Unified or per-CCD offset" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center"
+                                            Margin="2,0">
+                                    <RadioButton x:Name="AdpRbCoUnified"
+                                                 GroupName="AdpCoMode"
+                                                 Content="Unified"
+                                                 IsChecked="True"
+                                                 Margin="0,0,12,0"
+                                                 HorizontalContentAlignment="Center"
+                                                 FontSize="13"
+                                                 Click="AdpRbCoMode_Click"
+                                                 Width="90"
+                                                 MinWidth="20"/>
+                                    <RadioButton x:Name="AdpRbCoPerCcd"
+                                                 GroupName="AdpCoMode"
+                                                 Content="Per-CCD"
+                                                 HorizontalContentAlignment="Center"
+                                                 FontSize="13"
+                                                 Click="AdpRbCoMode_Click"
+                                                 Width="90"
+                                                 MinWidth="20"/>
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider (visible only in Unified mode) -->
+                            <Border x:Name="AdpDividerCoMode" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Unified voltage offset slider (AMD only) -->
+                            <Grid x:Name="AdpGridCoUnified">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="CO Offset" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="All-core offset (-30 to 0)" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
                                             HorizontalAlignment="Right"
                                             VerticalAlignment="Center">
-                                    <TextBlock x:Name="AdpLblCoAll"
-                                               Width="40"
+                                    <TextBlock x:Name="AdpLblCoUnified"
+                                               Width="24"
                                                HorizontalAlignment="Center"
                                                VerticalAlignment="Center"
                                                Margin="0,0,8,0"
                                                Text="0" />
-                                    <Slider x:Name="AdpSdCoAll" Width="140" Maximum="0" Minimum="-50" Value="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                    <Slider x:Name="AdpSdCoUnified" Width="140" Maximum="0" Minimum="-30" Value="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
+                            <!-- CCD 0 Voltage Offset (AMD only) -->
+                            <Grid x:Name="AdpGridCoCcd0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="CCD 0 Offset" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="CCD 0 voltage offset (-30 to 0)" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblCoCcd0"
+                                               Width="24"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="0" />
+                                    <Slider x:Name="AdpSdCoCcd0" Width="140" Maximum="0" Minimum="-30" Value="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider (visible only in Per-CCD mode) -->
+                            <Border x:Name="AdpDividerCoPerCcd" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- CCD 1 Voltage Offset (AMD only) -->
+                            <Grid x:Name="AdpGridCoCcd1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="CCD 1 Offset" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="CCD 1 voltage offset (-30 to 0)" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <TextBlock x:Name="AdpLblCoCcd1"
+                                               Width="24"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Text="0" />
+                                    <Slider x:Name="AdpSdCoCcd1" Width="140" Maximum="0" Minimum="-30" Value="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- Divider (visible only in Per-CCD mode, after CCD1) -->
+                            <Border x:Name="AdpDividerCoAfterCcd1" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                             <!-- Intel PL1 -->
                             <Grid x:Name="AdpGridIntelPl1">
                                 <Grid.ColumnDefinitions>

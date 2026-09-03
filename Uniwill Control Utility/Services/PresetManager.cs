@@ -171,10 +171,6 @@ namespace Uniwill_Control_Utility.Services
         public bool isSoftMinSoCClk { get; set; }
         public bool isSoftMaxSoCClk { get; set; }
 
-        public int asusPowerProfile { get; set; }
-        public bool asusGPUUlti { get; set; }
-        public bool asusiGPU { get; set; }
-
         public int displayHz { get; set; }
 
         public int ccdAffinity { get; set; }

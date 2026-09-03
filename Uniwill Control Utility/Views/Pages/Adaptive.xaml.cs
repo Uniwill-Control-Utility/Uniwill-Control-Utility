@@ -256,7 +256,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                             CpuSustained = 75,
                             CpuBoost = 85,
                             CpuTjMax = 95,
-                            CpuCo = 0,
+                            CpuCoUnified = true,
+                            CpuCoUnifiedValue = 0,
+                            CpuCoCcd0 = 0,
+                            CpuCoCcd1 = 0,
                             CpuPl1 = 45,
                             CpuPl2 = 60,
                             CpuUndervolt = 0,
@@ -613,7 +616,15 @@ namespace Uniwill_Control_Utility.Views.Pages
                         AdpSdSustained.Value = Math.Clamp(myPreset.CpuSustained, 5, 255);
                         AdpSdBoost.Value = Math.Clamp(myPreset.CpuBoost, 5, 255);
                         AdpSdTjMax.Value = Math.Clamp(myPreset.CpuTjMax, 70, 105);
-                        AdpSdCoAll.Value = Math.Clamp(myPreset.CpuCo, -50, 0);
+                        AdpRbCoUnified.IsChecked = myPreset.CpuCoUnified;
+                        AdpRbCoPerCcd.IsChecked = !myPreset.CpuCoUnified;
+                        AdpSdCoUnified.Value = Math.Clamp(myPreset.CpuCoUnifiedValue, -30, 0);
+                        AdpSdCoCcd0.Value = Math.Clamp(myPreset.CpuCoCcd0, -30, 0);
+                        AdpSdCoCcd1.Value = Math.Clamp(myPreset.CpuCoCcd1, -30, 0);
+                        updateAdpCoVisibility();
+                        AdpLblCoUnified.Text = $"{AdpSdCoUnified.Value:+0;-0;0}";
+                        AdpLblCoCcd0.Text = $"{AdpSdCoCcd0.Value:+0;-0;0}";
+                        AdpLblCoCcd1.Text = $"{AdpSdCoCcd1.Value:+0;-0;0}";
                     }
                     else if (Family.TYPE == Family.ProcessorType.Intel)
                     {
@@ -722,7 +733,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                         lastCpuSustained = 0;
                         lastCpuBoost = 0;
                         lastCpuTjMax = 0;
-                        lastCpuCo = 0;
                         lastCpuPl1 = 0;
                         lastCpuPl2 = 0;
                         lastCpuUndervolt = 0;
@@ -818,7 +828,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                     CpuSustained = (int)AdpSdSustained.Value,
                     CpuBoost = (int)AdpSdBoost.Value,
                     CpuTjMax = (int)AdpSdTjMax.Value,
-                    CpuCo = (int)AdpSdCoAll.Value,
+                    CpuCoUnified = AdpRbCoUnified.IsChecked == true,
+                    CpuCoUnifiedValue = (int)AdpSdCoUnified.Value,
+                    CpuCoCcd0 = (int)AdpSdCoCcd0.Value,
+                    CpuCoCcd1 = (int)AdpSdCoCcd1.Value,
                     CpuPl1 = (int)AdpSdIntelPl1.Value,
                     CpuPl2 = (int)AdpSdIntelPl2.Value,
                     CpuUndervolt = (int)AdpSdIntelUndervolt.Value,
@@ -1026,7 +1039,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         private int lastCpuSustained = 0;
         private int lastCpuBoost = 0;
         private int lastCpuTjMax = 0;
-        private int lastCpuCo = 0;
+        private bool lastCpuCoUnified = true;
+        private int lastCpuCoUnifiedValue = 0;
+        private int lastCpuCoCcd0 = 0;
+        private int lastCpuCoCcd1 = 0;
         private int lastCpuPl1 = 0;
         private int lastCpuPl2 = 0;
         private int lastCpuUndervolt = 0;
@@ -1319,10 +1335,18 @@ namespace Uniwill_Control_Utility.Views.Pages
                                 int sustained = (int)AdpSdSustained.Value;
                                 int boost = (int)AdpSdBoost.Value;
                                 int tjMax = (int)AdpSdTjMax.Value;
-                                int co = (int)AdpSdCoAll.Value;
+
+                                int coUnifiedValue = (int)AdpSdCoUnified.Value;
+                                int coCcd0 = (int)AdpSdCoCcd0.Value;
+                                int coCcd1 = (int)AdpSdCoCcd1.Value;
+                                bool coUnified = AdpRbCoUnified.IsChecked == true;
 
                                 if (sustained != lastCpuSustained || boost != lastCpuBoost ||
-                                    tjMax != lastCpuTjMax || co != lastCpuCo)
+                                    tjMax != lastCpuTjMax ||
+                                    coUnified != lastCpuCoUnified ||
+                                    coUnifiedValue != lastCpuCoUnifiedValue ||
+                                    coCcd0 != lastCpuCoCcd0 ||
+                                    coCcd1 != lastCpuCoCcd1)
                                 {
                                     try
                                     {
@@ -1332,8 +1356,26 @@ namespace Uniwill_Control_Utility.Views.Pages
                                         parts.Add($"--fast-limit={boost * 1000}");
                                         parts.Add($"--tctl-temp={tjMax}");
                                         parts.Add($"--cHTC-temp={tjMax}");
-                                        if (co > 0)
-                                            parts.Add($"--set-coall={(byte)co}");
+
+                                        // Curve Optimizer
+                                        if (coUnified)
+                                        {
+                                            int biased = 0x100000 - Math.Abs(coUnifiedValue);
+                                            parts.Add($"--set-coall={biased:X}");
+                                        }
+                                        else
+                                        {
+                                            int[,] ccdMap = { { 0, 1, 2, 3, 4, 5, 6, 7 }, { 8, 9, 10, 11, 12, 13, 14, 15 } };
+                                            for (int ccd = 0; ccd < 2; ccd++)
+                                            {
+                                                int offset = ccd == 0 ? coCcd0 : coCcd1;
+                                                int biased = 0x100000 - Math.Abs(offset);
+                                                for (int core = 0; core < 8; core++)
+                                                {
+                                                    parts.Add($"--set-coper={BuildCoperArg(ccd, ccdMap[ccd, core], biased):X}");
+                                                } // for core
+                                            } // for ccd
+                                        }
 
                                         string cmd = string.Join(" ", parts);
                                         _ = RyzenAdj_To_UCU.TranslateAsync(cmd);
@@ -1351,7 +1393,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                                     lastCpuSustained = sustained;
                                     lastCpuBoost = boost;
                                     lastCpuTjMax = tjMax;
-                                    lastCpuCo = co;
+                                    lastCpuCoUnified = coUnified;
+                                    lastCpuCoUnifiedValue = coUnifiedValue;
+                                    lastCpuCoCcd0 = coCcd0;
+                                    lastCpuCoCcd1 = coCcd1;
                                 }
                             }
                             else if (Family.TYPE == Family.ProcessorType.Intel)
@@ -2645,7 +2690,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Hide AMD-specific controls
                 AdpGridTjMax.Visibility = Visibility.Collapsed;
                 AdpDividerAfterTjMax.Visibility = Visibility.Collapsed;
-                AdpGridCoAll.Visibility = Visibility.Collapsed;
+                AdpGridCoMode.Visibility = Visibility.Collapsed;
+                AdpDividerCoMode.Visibility = Visibility.Collapsed;
+                AdpGridCoUnified.Visibility = Visibility.Collapsed;
+                AdpGridCoCcd0.Visibility = Visibility.Collapsed;
+                AdpDividerCoPerCcd.Visibility = Visibility.Collapsed;
+                AdpGridCoCcd1.Visibility = Visibility.Collapsed;
+                AdpDividerCoAfterCcd1.Visibility = Visibility.Collapsed;
             }
             else
             {
@@ -2655,6 +2706,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 AdpGridIntelPl2.Visibility = Visibility.Collapsed;
                 AdpDividerAfterIntelPl2.Visibility = Visibility.Collapsed;
                 AdpGridIntelUndervolt.Visibility = Visibility.Collapsed;
+
+                // Show AMD CO controls
+                AdpGridCoMode.Visibility = Visibility.Visible;
+                AdpDividerCoMode.Visibility = Visibility.Visible;
+                updateAdpCoVisibility();
             }
         }
 
@@ -2678,8 +2734,14 @@ namespace Uniwill_Control_Utility.Views.Pages
                 case "AdpSdTjMax":
                     AdpLblTjMax.Text = $"{slider.Value:F0} °C";
                     break;
-                case "AdpSdCoAll":
-                    AdpLblCoAll.Text = $"{slider.Value:F0}";
+                case "AdpSdCoUnified":
+                    AdpLblCoUnified.Text = $"{slider.Value:+0;-0;0}";
+                    break;
+                case "AdpSdCoCcd0":
+                    AdpLblCoCcd0.Text = $"{slider.Value:+0;-0;0}";
+                    break;
+                case "AdpSdCoCcd1":
+                    AdpLblCoCcd1.Text = $"{slider.Value:+0;-0;0}";
                     break;
                 case "AdpSdIntelPl1":
                     AdpLblIntelPl1.Text = $"{slider.Value:F0} W";
@@ -2718,10 +2780,36 @@ namespace Uniwill_Control_Utility.Views.Pages
                 lastCpuSustained = 0;
                 lastCpuBoost = 0;
                 lastCpuTjMax = 0;
-                lastCpuCo = 0;
+                lastCpuCoUnified = true;
+                lastCpuCoUnifiedValue = 0;
+                lastCpuCoCcd0 = 0;
+                lastCpuCoCcd1 = 0;
                 lastCpuPl1 = 0;
                 lastCpuPl2 = 0;
                 lastCpuUndervolt = 0;
+            }
+        }
+
+        private void AdpRbCoMode_Click(object sender, RoutedEventArgs e) => updateAdpCoVisibility();
+
+        private void updateAdpCoVisibility()
+        {
+            bool unified = AdpRbCoUnified.IsChecked == true;
+            if (unified)
+            {
+                AdpDividerCoPerCcd.Visibility = Visibility.Collapsed;
+                AdpGridCoUnified.Visibility = Visibility.Visible;
+                AdpGridCoCcd0.Visibility = Visibility.Collapsed;
+                AdpGridCoCcd1.Visibility = Visibility.Collapsed;
+                AdpDividerCoAfterCcd1.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                AdpDividerCoPerCcd.Visibility = Visibility.Visible;
+                AdpGridCoUnified.Visibility = Visibility.Collapsed;
+                AdpGridCoCcd0.Visibility = Visibility.Visible;
+                AdpGridCoCcd1.Visibility = Visibility.Visible;
+                AdpDividerCoAfterCcd1.Visibility = Visibility.Visible;
             }
         }
 
@@ -3050,5 +3138,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         #endregion
+
+        private static uint BuildCoperArg(int ccd, int core, int offset20)
+        {
+            return ((uint)((ccd << 8) | core) << 20) | (uint)offset20;
+        }
     }
 }

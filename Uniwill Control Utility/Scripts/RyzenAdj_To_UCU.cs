@@ -11,7 +11,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using Uniwill_Control_Utility.Scripts.ASUS;
 using Uniwill_Control_Utility.Scripts.GPUs.AMD;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Uniwill_Control_Utility.Scripts.Intel_Backend;
@@ -83,10 +82,6 @@ namespace Uniwill_Control_Utility.Scripts
                             else if (ryzenAdjCommandString.Contains("Win-CPU"))
                             {
                                 WindowsProcessorPower.Apply(ryzenAdjCommandValueString);
-                            }
-                            else if (ryzenAdjCommandString.Contains("ASUS"))
-                            {
-                                AsusWmi(ryzenAdjCommandString, ryzenAdjCommandValueString);
                             }
                             else if (ryzenAdjCommandString.Contains("Refresh-Rate"))
                             {
@@ -168,13 +163,11 @@ namespace Uniwill_Control_Utility.Scripts
                             }
                             else
                             {
-                                if (ryzenAdjCommandString == "apu-skin-temp" && !SupportsApuSkinTemperatureLimit())
-                                {
-                                    DiagnosticLogger.LogDebug($"APU skin temperature limit is not supported on {Family.FAM}.");
-                                    continue;
-                                }
-
-                                uint ryzenAdjCommandValue = Convert.ToUInt32(ryzenAdjCommandValueString);
+                                // Parse as int first so negative CO values (e.g. -15) don't throw
+                                // OverflowException from Convert.ToUInt32(). The cast to uint
+                                // produces the correct two's complement encoding (e.g. -15 -> 0xFFFFFFF1).
+                                int ryzenAdjCommandValueSigned = Convert.ToInt32(ryzenAdjCommandValueString);
+                                uint ryzenAdjCommandValue = (uint)ryzenAdjCommandValueSigned;
 
                                 if (ryzenAdjCommand.Contains("skin")) ryzenAdjCommandValue *= 256;
 
@@ -182,10 +175,10 @@ namespace Uniwill_Control_Utility.Scripts
                                 if (ryzenAdjCommand.Contains("coper") && Settings.Default.isAutoUvCPU == true && isAutoOC == false) continue;
                                 if (ryzenAdjCommand.Contains("cogfx") && Settings.Default.isAutoUviGPU == true && isAutoOC == false) continue;
 
+                                DiagnosticLogger.LogInfo($"SMU sending: {ryzenAdjCommandString} = 0x{ryzenAdjCommandValue:X} ({ryzenAdjCommandValue})");
+
                                 if (ryzenAdjCommandValue <= 0 && !ryzenAdjCommandString.Contains("co")) SMUCommands.applySettings(ryzenAdjCommandString, 0x0);
                                 else SMUCommands.applySettings(ryzenAdjCommandString, ryzenAdjCommandValue);
-
-                                DiagnosticLogger.LogDebug($"SMU applied: {ryzenAdjCommandString}=0x{ryzenAdjCommandValue:X}");
 
                                 // CRITICAL: 50ms delay between SMU commands. The SMU firmware
                                 // needs time to process each command. Without this delay,
@@ -211,19 +204,7 @@ namespace Uniwill_Control_Utility.Scripts
             }
         }
 
-        private static bool SupportsApuSkinTemperatureLimit() =>
-            Family.FAM is Family.RyzenFamily.Renoir
-                or Family.RyzenFamily.Lucienne
-                or Family.RyzenFamily.Cezanne_Barcelo
-                or Family.RyzenFamily.VanGogh
-                or Family.RyzenFamily.Rembrandt
-                or Family.RyzenFamily.Mendocino
-                or Family.RyzenFamily.PhoenixPoint
-                or Family.RyzenFamily.PhoenixPoint2
-                or Family.RyzenFamily.HawkPoint
-                or Family.RyzenFamily.HawkPoint2;
-
-        private static void ADLX(string command, string value)
+private static void ADLX(string command, string value)
         {
             try
             {
@@ -353,88 +334,6 @@ namespace Uniwill_Control_Utility.Scripts
             return result.ToArray();
         }
 
-        static bool isMessageBoxOpen = false, isUpdatingUltiMode = false;
-        private static async void AsusWmi(string command, string value)
-        {
-            try
-            {
-                DiagnosticLogger.LogDebug($"AsusWmi: {command}={value}");
-                uint id = 0;
-                int mode = 0;
-                if (command == "ASUS-Power")
-                {
-                    if (App.product.Contains("ROG") || App.product.Contains("TUF")) id = ASUSWmi.PerformanceMode;
-                    else id = ASUSWmi.VivoBookMode;
-
-                    mode = (int)ASUSWmi.AsusMode.Balanced;
-                    if(value == "1") mode = (int)ASUSWmi.AsusMode.Silent;
-                    else if (value == "2") mode = (int)ASUSWmi.AsusMode.Balanced;
-                    else if (value == "3") mode = (int)ASUSWmi.AsusMode.Turbo;
-                    if (App.wmi.DeviceGet(id) != mode) App.wmi.DeviceSet(id, mode, "PowerMode");
-                }
-                if(command == "ASUS-Eco")
-                {
-                    if(value.ToLower() == "true") App.wmi.SetGPUEco(1);
-                    else App.wmi.SetGPUEco(0);
-                }
-                if (command == "ASUS-MUX")
-                {
-                    if (!isMessageBoxOpen && !isUpdatingUltiMode)
-                    {
-                        if (App.product.Contains("ROG") || App.product.Contains("TUF")) id = ASUSWmi.GPUMux;
-                        else id = ASUSWmi.GPUMuxVivo;
-
-                        int mux = App.wmi.DeviceGet(id);
-                        if (mux > 0 && value.ToLower() == "true")
-                        {
-                            isMessageBoxOpen = true;
-
-                            var messageBox = new Wpf.Ui.Controls.MessageBox();
-
-                            messageBox.Title = LocalizationService.Get("GPU Ultimate Mode");
-                            messageBox.Content = LocalizationService.Get("Switching the GPU to Ultimate Mode requires a restart to take effect!");
-                            messageBox.PrimaryButtonText = LocalizationService.Get("Restart");
-                            messageBox.CloseButtonText = LocalizationService.Get("Cancel");
-
-                            if (await messageBox.ShowDialogAsync() == Wpf.Ui.Controls.MessageBoxResult.Primary)
-                                RestartWithMuxMode(id, 0);
-                            else
-                                isMessageBoxOpen = false;
-
-
-                        }
-                        else if (mux < 1 && mux > -1 && value.ToLower() == "false")
-                        {
-                            isMessageBoxOpen = true;
-
-                            var messageBox = new Wpf.Ui.Controls.MessageBox();
-
-                            messageBox.Title = LocalizationService.Get("GPU Ultimate Mode");
-                            messageBox.Content = LocalizationService.Get("Disabling GPU Ultimate Mode requires a restart to take effect!");
-                            messageBox.PrimaryButtonText = LocalizationService.Get("Restart");
-                            messageBox.CloseButtonText = LocalizationService.Get("Cancel");
-
-                            if (await messageBox.ShowDialogAsync() == Wpf.Ui.Controls.MessageBoxResult.Primary)
-                                RestartWithMuxMode(id, 1);
-                            else
-                                isMessageBoxOpen = false;
-                        }
-                    }
-                }
-            } 
-            catch (Exception ex)
-            {
-                DiagnosticLogger.LogError(ex, "Failed to apply ASUS WMI settings");
-            }
-        }
-
-        private static void RestartWithMuxMode(uint id, int mode)
-        {
-            App.wmi.DeviceSet(id, mode, "MUX");
-            isMessageBoxOpen = false;
-            isUpdatingUltiMode = true;
-            Process.Start("shutdown", "/r /t 1");
-        }
 
     }
 }

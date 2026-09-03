@@ -16,6 +16,7 @@ using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Scripts.AMD_Backend;
 using Uniwill_Control_Utility.Scripts.GPUs.AMD;
 using Uniwill_Control_Utility.Scripts.Intel_Backend;
+using Uniwill_Control_Utility.Scripts.Misc;
 using Windows.Storage;
 using static RyzenSmu.RyzenSMU;
 
@@ -32,14 +33,8 @@ namespace RyzenSmu
             RyzenSmu.Smu.SMU_OFFSET_ADDR = 0xB8;
             RyzenSmu.Smu.SMU_OFFSET_DATA = 0xBC;
 
-            if (Family.FAM == Family.RyzenFamily.SummitRidge || Family.FAM == Family.RyzenFamily.PinnacleRidge) Socket_AM4_V1();
-            if (Family.FAM == Family.RyzenFamily.RavenRidge || Family.FAM == Family.RyzenFamily.Picasso || Family.FAM == Family.RyzenFamily.Dali || Family.FAM == Family.RyzenFamily.Pollock || Family.FAM == Family.RyzenFamily.FireFlight) Socket_FT5_FP5_AM4();
-            if (Family.FAM == Family.RyzenFamily.Matisse || Family.FAM == Family.RyzenFamily.Vermeer) Socket_AM4_V2();
-            if (Family.FAM == Family.RyzenFamily.Renoir || Family.FAM == Family.RyzenFamily.Lucienne || Family.FAM == Family.RyzenFamily.Cezanne_Barcelo) Socket_FP6_AM4();
-            if (Family.FAM == Family.RyzenFamily.VanGogh) Socket_FF3();
-            if (Family.FAM == Family.RyzenFamily.Mendocino || Family.FAM == Family.RyzenFamily.Rembrandt || Family.FAM == Family.RyzenFamily.PhoenixPoint || Family.FAM == Family.RyzenFamily.PhoenixPoint2 || Family.FAM == Family.RyzenFamily.HawkPoint || Family.FAM == Family.RyzenFamily.HawkPoint2 || Family.FAM == Family.RyzenFamily.StrixPoint || Family.FAM == Family.RyzenFamily.KrackanPoint || Family.FAM == Family.RyzenFamily.KrackanPoint2 || Family.FAM == Family.RyzenFamily.StrixHalo) Socket_FT6_FP7_FP8();
-            if (Family.FAM == Family.RyzenFamily.Raphael || Family.FAM == Family.RyzenFamily.DragonRange || Family.FAM == Family.RyzenFamily.GraniteRidge || Family.FAM == Family.RyzenFamily.FireRange) Socket_AM5_V1();
-
+            // Only FireRange (Socket AM5) is supported.
+            if (Family.FAM == Family.RyzenFamily.FireRange) Socket_AM5_V1();
         }
 
         private static void Socket_FT5_FP5_AM4()
@@ -116,8 +111,6 @@ namespace RyzenSmu
                 ("min-vcn",true, 0x4d),
                 ("max-lclk",true, 0x4e),
                 ("min-lclk",true, 0x4f),
-                ("set-coper",false, 0x58),
-                ("set-coall",false, 0x59),
                 ("set-cogfx",false, 0x59),
                 ("setcpu-freqto-ramstate",true , 0x2f),
                 ("stopcpu-freqto-ramstate",true , 0x30),
@@ -202,11 +195,6 @@ namespace RyzenSmu
                 ("pbo-scalar",false , 0x3f),
                 ("get-pbo-scalar",false , 0x0f),
                 ("set-cogfx",false , 0x53),
-                ("set-coper",true , 0x54),
-                ("set-coper",false , 0x52),
-                ("set-coall",true , 0x55),
-                ("set-coall",false , 0xB1),
-                ("get-coper-options",false , 0xC3),
                 ("get-cogfx-options",false , 0xC6),
                 ("get-sustained-power-and-thm-limit",true , 0x5b),
                 ("get-pbo-fused-power-limit",false , 0x11),
@@ -220,7 +208,13 @@ namespace RyzenSmu
 
         private static void Socket_FT6_FP7_FP8()
         {
-            if(Family.FAM == Family.RyzenFamily.StrixPoint || Family.FAM == Family.RyzenFamily.KrackanPoint || Family.FAM == Family.RyzenFamily.KrackanPoint2 || Family.FAM == Family.RyzenFamily.StrixHalo)
+            // No supported family uses this socket. Method kept for compile compatibility.
+            return;
+        }
+
+        private static void Socket_FT6_FP7_FP8_Original()
+        {
+            if(true)
             {
                 RyzenSmu.Smu.MP1_ADDR_MSG = 0x3b10928;
                 RyzenSmu.Smu.MP1_ADDR_RSP = 0x3b10978;
@@ -291,11 +285,6 @@ namespace RyzenSmu
                 ("pbo-scalar", false, 0x3e),
                 ("get-pbo-scalar", false, 0x0f),
                 ("set-cogfx", false, 0xb7),
-                ("set-coper", true, 0x4b),
-                ("set-coper", false, 0x53),
-                ("set-coall", true, 0x4c),
-                ("set-coall", false, 0x5d),
-                ("get-coper-options", false, 0xE1),
                 ("get-sustained-power-and-thm-limit", true, 0x5f),
                 ("get-pbo-fused-power-limit", false, 0x11),
                 ("get-pbo-fused-slow-limit", false, 0x12),
@@ -341,9 +330,6 @@ namespace RyzenSmu
                 ("gfx-clk",false , 0x1c),
                 ("power-saving",true , 0x12),
                 ("max-performance",true , 0x11),
-                ("set-coall",true , 0x4c),
-                ("set-coall",false , 0x5d),
-                ("set-coper",true , 0x4b),
                 ("set-cogfx",false , 0xb7),
                 ("get-sustained-power-and-thm-limit",true , 0x54),
                 ("skin-temp-limit",true , 0x4a),
@@ -413,10 +399,6 @@ namespace RyzenSmu
                 ("per-core-oc-clk",false , 0x5d),
                 ("oc-volt", true, 0x28),
                 ("oc-volt", false, 0x61),
-                ("set-coall", true, 0x36),
-                ("set-coall", false, 0xb),
-                ("set-coper", true, 0x35),
-                ("set-coper", false, 0x0a),
                 ("enable-oc",true , 0x24),
                 ("enable-oc",false , 0x5a),
                 ("disable-oc",true , 0x25),
@@ -463,8 +445,6 @@ namespace RyzenSmu
                 ("oc-clk", false, 0x5f),
                 ("per-core-oc-clk",false , 0x60),
                 ("oc-volt", false, 0x61),
-                ("set-coall", false, 0x7),
-                ("set-coper", false, 0x6),
                 ("enable-oc",false , 0x5d),
                 ("disable-oc",false , 0x5e),
                 ("slow-limit",false , 0xcb),
@@ -474,9 +454,11 @@ namespace RyzenSmu
                 ("vrmmax-current",false , 0x58),
                 ("cHTC-temp",false , 0x59),
                 ("get-pbo-scalar",false , 0x6d),
-                ("set-cogfx",false , 0xA7),
+                ("set-coall",false , 0x07),
                 ("set-coall",true , 0x36),
+                ("set-coper",false , 0x06),
                 ("set-coper",true , 0x35),
+                ("set-cogfx",false , 0xA7),
                 ("set-boost-limit-frequency",true , 0x2b),
                 ("set-vddoff-vid",true , 0x4b),
                 ("set-fll-btc-enable",true , 0x37),
@@ -554,11 +536,7 @@ namespace RyzenSmu
                     ? RyzenAccess.SendMp1(address, ref args)
                     : RyzenAccess.SendRsmu(address, ref args);
 
-                // Log which path failed (MP1 vs RSMU) for debugging power limits
-                if (lastStatus != Status.OK)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[SMU] {commandName} via {(isMp1 ? "MP1" : "RSMU")} 0x{address:X} arg=0x{originalArguments[0]:X} -> {lastStatus}");
-                }
+                DiagnosticLogger.LogInfo($"SMU {commandName} via {(isMp1 ? "MP1" : "RSMU")} 0x{address:X} arg=0x{originalArguments[0]:X} -> {(int)lastStatus} ({lastStatus})");
 
                 if (lastStatus == Status.OK)
                     return;
@@ -598,7 +576,12 @@ namespace RyzenSmu
                 pawnIo = AMDPawnIo.LoadModuleFromFile(modulePath);
 
                 if (!pawnIo.IsLoaded)
+                {
+                    DiagnosticLogger.LogInfo("SMU PawnIO failed to load from: " + modulePath);
                     return false;
+                }
+
+                DiagnosticLogger.LogInfo($"SMU PawnIO loaded. MP1=0x{MP1_ADDR_MSG:X}/0x{MP1_ADDR_RSP:X}/0x{MP1_ADDR_ARG:X}, RSMU=0x{PSMU_ADDR_MSG:X}/0x{PSMU_ADDR_RSP:X}/0x{PSMU_ADDR_ARG:X}");
 
                 ryzenSMU = new RyzenSMU(pawnIo);
                 ryzenSMU.Open();

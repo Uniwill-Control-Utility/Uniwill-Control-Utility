@@ -190,61 +190,6 @@
                     </ui:CardControl.Header>
                 </ui:CardControl>
 
-                <!-- AutoOC: Adaptive CPU Undervolt -->
-                <ui:CardControl x:Name="ccAutoOcCpuUv"
-                                Margin="0,0,0,8">
-                    <ui:CardControl.Icon>
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BA;" FontSize="20" Margin="4,0,6,0" />
-                    </ui:CardControl.Icon>
-                    <ui:CardControl.Header>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
-                                <ui:TextBlock FontTypography="Body" Text="AutoOC: Adaptive CPU Undervolt" />
-                                <ui:TextBlock Margin="0,2,0,0"
-                                           FontTypography="Caption"
-                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                           Text="Dynamically optimises CPU voltage with built-in stability protection. Initial tuning may temporarily cause instability or crashes."
-                                           TextWrapping="Wrap" />
-                            </StackPanel>
-                            <CheckBox x:Name="cbCPUUV"
-                                      Grid.Column="1"
-                                      VerticalAlignment="Center"
-                                      Click="CheckBox_Click" />
-                        </Grid>
-                    </ui:CardControl.Header>
-                </ui:CardControl>
-
-                <!-- AutoOC: Adaptive iGPU Undervolt -->
-                <ui:CardControl x:Name="ccAutoOcIgpuUv"
-                                Margin="0,0,0,8">
-                    <ui:CardControl.Icon>
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BA;" FontSize="20" Margin="4,0,6,0" />
-                    </ui:CardControl.Icon>
-                    <ui:CardControl.Header>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
-                                <ui:TextBlock FontTypography="Body" Text="AutoOC: Adaptive iGPU Undervolt" />
-                                <ui:TextBlock Margin="0,2,0,0"
-                                           FontTypography="Caption"
-                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                           Text="Dynamically optimises iGPU voltage with built-in stability protection. Initial tuning may temporarily cause instability or crashes."
-                                           TextWrapping="Wrap" />
-                            </StackPanel>
-                            <CheckBox x:Name="cbiGPUUV"
-                                      Grid.Column="1"
-                                      VerticalAlignment="Center"
-                                      Click="CheckBox_Click" />
-                        </Grid>
-                    </ui:CardControl.Header>
-                </ui:CardControl>
                 </StackPanel>
             </Grid>
         </ScrollViewer>

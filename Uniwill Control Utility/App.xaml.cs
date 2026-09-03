@@ -25,7 +25,6 @@ using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
 //using Uniwill_Control_Utility.Scripts.AMD_Backend;
-using Uniwill_Control_Utility.Scripts.ASUS;
 using Uniwill_Control_Utility.Scripts.Intel_Backend;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
@@ -46,8 +45,6 @@ namespace Uniwill_Control_Utility
         // https://docs.microsoft.com/dotnet/core/extensions/logging
         private static IHost _host;
 
-        public static ASUSWmi wmi;
-        public static XgMobileConnectionService xgMobileConnectionService;
         private static ILogger<App>? _logger;
         //public static Mem_Timings memTimings = new Mem_Timings();
 
@@ -160,29 +157,6 @@ namespace Uniwill_Control_Utility
 
                         // Page resolver service
                         services.AddSingleton<INavigationViewPageProvider, PageService>();
-
-                        try
-                        {
-                            Settings.Default.isASUS = false;
-                            Settings.Default.Save();
-
-                            if (product.Contains("ROG") || product.Contains("TUF") || product.Contains("Ally") ||
-                                product.Contains("Flow") || product.ToLower().Contains("vivobook") ||
-                                product.ToLower().Contains("zenbook"))
-                            {
-                                wmi = new ASUSWmi();
-
-                                services.AddSingleton(wmi);
-                                services.AddSingleton<XgMobileConnectionService>();
-
-                                Settings.Default.isASUS = true;
-                                Settings.Default.Save();
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.Logger.Error(ex, "Failed to setup ASUS WMI services");
-                        }
 
                         // Theme manipulation
                         services.AddSingleton<IThemeService, ThemeService>();
@@ -339,8 +313,7 @@ namespace Uniwill_Control_Utility
                     Log.Warning(ex, "SkuResolver.Initialize() failed — falling back to generic limits");
                 }
 
-                string path = System.Reflection.Assembly.GetEntryAssembly().Location;
-                path = path.Replace("Uniwill Control Utility.dll", null);
+                string path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location)!;
 
                 if (firstBoot || Settings.Default.Path != path)
                 {

@@ -183,12 +183,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                     }
                 }
 
-                if (_ramWidth > 128 && Family.FAM == Family.RyzenFamily.StrixHalo)
-                    if (_ramWidth > 256) _ramWidth = 256;
-                    else if (_ramWidth > 64 && Family.FAM == Family.RyzenFamily.Mendocino) _ramWidth = 64;
-                    else if (_ramWidth > 128 && Family.FAM < Family.RyzenFamily.FireRange && Family.TYPE != Family.ProcessorType.Intel)
-                        _ramWidth = 128;
-
                 _ramCapacity = _ramCapacity / 1024 / 1024 / 1024;
             }
             catch { }

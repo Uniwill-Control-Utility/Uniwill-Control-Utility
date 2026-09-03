@@ -214,8 +214,33 @@ namespace Uniwill_Control_Utility.Services
                 parts.Add($"--tctl-temp={tjMax}");
                 parts.Add($"--cHTC-temp={tjMax}");
 
-                if (Settings.Default.customCoAll > 0)
-                    parts.Add($"--set-coall={(byte)Settings.Default.customCoAll}");
+                // Curve Optimizer — unified mode uses set-coall, per-CCD uses set-coper.
+                bool coUnified = Settings.Default.customCoUnified;
+                if (coUnified)
+                {
+                    int coValue = (int)Settings.Default.customCoUnifiedValue;
+                    uint coEncoded = coValue < 0
+                        ? (uint)(0x100000 - Math.Abs(coValue))
+                        : (uint)coValue;
+                    parts.Add($"--set-coall={coEncoded}");
+                }
+                else
+                {
+                    // Per-CCD mode: use set-coper for each core.
+                    // Encoding (Renoir+/AM5): ((ccd << 8) | core_in_ccd) << 20 | offset20
+                    // offset20: 20-bit biased — negative = 0x100000 - |offset|
+                    int coCcd0 = (int)Settings.Default.customCoCcd0;
+                    int coCcd1 = (int)Settings.Default.customCoCcd1;
+                    for (int ccd = 0; ccd < 2; ccd++)
+                    {
+                        int offset = ccd == 0 ? coCcd0 : coCcd1;
+                        for (int core = 0; core < 8; core++)
+                        {
+                            uint encoded = BuildCoperArg(ccd, core, offset);
+                            parts.Add($"--set-coper={encoded}");
+                        }
+                    }
+                }
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
@@ -235,6 +260,21 @@ namespace Uniwill_Control_Utility.Services
                 int mem = (int)Settings.Default.customNvMem;
                 parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
             }
+        }
+
+        /// <summary>
+        /// Encodes a per-core Curve Optimizer argument (Renoir+/AM5 format).
+        /// Layout: ((ccd << 8) | core) << 20 | offset20
+        /// offset20: 20-bit biased — negative = 0x100000 - |offset|
+        /// </summary>
+        private static uint BuildCoperArg(int ccd, int core, int offset)
+        {
+            int magnitude = Math.Min(Math.Abs(offset), 0xFFFFF);
+            uint encoded20 = offset < 0
+                ? (uint)((0x100000 - magnitude) & 0xFFFFF)
+                : (uint)(magnitude & 0xFFFFF);
+            uint prefix = (uint)(((ccd << 8) | (core & 7)) << 20);
+            return prefix | encoded20;
         }
 
         /// <summary>

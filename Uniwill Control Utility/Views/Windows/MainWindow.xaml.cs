@@ -369,54 +369,13 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         InstabilityMonitor monitor = null;
 
-        AdaptiveUndervoltController cpuController = null;
         AdaptiveUndervoltController iGpuController = null;
 
-        int lastCPUUVOffset = 0;
         int lastiGPUUVOffset = 0;
         private async void Misc_Tick(object sender, EventArgs e)
         {
             try
             {
-                if(Settings.Default.isAutoUvCPU == true)
-                {
-
-                    if(monitor == null) monitor = new InstabilityMonitor();
-
-                    if (cpuController == null) cpuController = new AdaptiveUndervoltController(
-                        monitor,
-                        minOffset: -50,
-                        stepSize: 1,
-                        stableThreshold: 8,
-                        cooldownThreshold: 4,
-                        isIgpu: false
-                    );
-
-                    var newOffset = cpuController.UpdateOffset();
-                    var commandValues = "";
-
-                    if (Family.FAM < Family.RyzenFamily.Renoir) commandValues = $"--set-coper={(0 << 20) | (newOffset & 0xFFFF)} ";
-                    else
-                    {
-                        if (newOffset >= 0) commandValues = commandValues + $"--set-coall={newOffset} ";
-                        if (newOffset < 0) commandValues = commandValues + $"--set-coall={Convert.ToUInt32(0x100000 - (uint)(-1 * (int)newOffset))} ";
-                    }
-
-                    if (lastCPUUVOffset != newOffset)
-                    {
-                        await RyzenAdj_To_UCU.TranslateAsync(commandValues, false, true);
-                        lastCPUUVOffset = newOffset;
-                    }
-
-                    cpuController.RecordAppliedOffset(newOffset);
-                }
-                else if (Settings.Default.isAutoUvCPU == false && cpuController != null)
-                {
-                    cpuController.Dispose();
-                    cpuController = null;
-                }
-
-
                 if (Settings.Default.isAutoUviGPU == true)
                 {
                     if (monitor == null) monitor = new InstabilityMonitor();
@@ -940,8 +899,6 @@ namespace Uniwill_Control_Utility.Views.Windows
                 parts.Add($"--fast-limit={fastLimit}");
                 parts.Add($"--tctl-temp={p.CpuTjMax}");
                 parts.Add($"--cHTC-temp={p.CpuTjMax}");
-                if (p.CpuCoAll > 0)
-                    parts.Add($"--set-coall={(byte)p.CpuCoAll}");
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {

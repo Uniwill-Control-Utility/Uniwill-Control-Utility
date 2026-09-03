@@ -32,7 +32,16 @@
     <Setting Name="customTjMax" Type="System.Double" Scope="User">
       <Value Profile="(Default)">95</Value>
     </Setting>
-    <Setting Name="customCoAll" Type="System.Double" Scope="User">
+    <Setting Name="customCoCcd0" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="customCoCcd1" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="customCoUnified" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="customCoUnifiedValue" Type="System.Double" Scope="User">
       <Value Profile="(Default)">0</Value>
     </Setting>
     <Setting Name="customIntelPl1" Type="System.Double" Scope="User">
@@ -106,9 +115,6 @@
     </Setting>
     <Setting Name="polling" Type="System.Double" Scope="User">
       <Value Profile="(Default)">2</Value>
-    </Setting>
-    <Setting Name="isASUS" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="MagpieHotkey" Type="System.String" Scope="User">
       <Value Profile="(Default)">Alt+F</Value>

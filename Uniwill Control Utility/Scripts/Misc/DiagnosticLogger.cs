@@ -2,6 +2,7 @@ using Serilog;
 using Serilog.Core;
 using Serilog.Events;
 using System;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace Uniwill_Control_Utility.Scripts.Misc
@@ -13,6 +14,9 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         private static void Fire(string line)
         {
+            // Always write to VS Debug Output window (both Debug and Release).
+            Debug.WriteLine(line);
+            Trace.WriteLine(line);
             OnMessage?.Invoke(line);
         }
 

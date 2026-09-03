@@ -69,7 +69,10 @@ namespace Uniwill_Control_Utility.Services
         public int CpuSustained { get; set; } = 75;    // 5-255W (SPL)
         public int CpuBoost { get; set; } = 85;        // 5-255W (FPL)
         public int CpuTjMax { get; set; } = 95;        // 70-105°C (AMD only)
-        public int CpuCo { get; set; } = 0;            // -50 to 0 (AMD only, Curve Optimizer)
+        public bool CpuCoUnified { get; set; } = true; // true = unified, false = per-CCD
+        public int CpuCoUnifiedValue { get; set; } = 0; // unified offset (-30 to 0)
+        public int CpuCoCcd0 { get; set; } = 0;        // CCD 0 offset (-30 to 0)
+        public int CpuCoCcd1 { get; set; } = 0;        // CCD 1 offset (-30 to 0)
         // Intel MSR
         public int CpuPl1 { get; set; } = 45;          // 5-400W (Intel only)
         public int CpuPl2 { get; set; } = 60;          // 5-400W (Intel only)

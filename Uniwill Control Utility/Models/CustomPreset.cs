@@ -22,8 +22,17 @@ namespace Uniwill_Control_Utility.Models
         /// <summary> CPU TjMax in degrees Celsius </summary>
         public double CpuTjMax { get; set; } = 95;
 
-        /// <summary> CPU Curve Optimizer (AMD) </summary>
-        public double CpuCoAll { get; set; } = 0;
+        /// <summary> CPU Curve Optimizer offset for CCD0 (signed, -30 to +30) </summary>
+        public double CpuCoCcd0 { get; set; } = 0;
+
+        /// <summary> CPU Curve Optimizer offset for CCD1 (signed, -30 to +30) </summary>
+        public double CpuCoCcd1 { get; set; } = 0;
+
+        /// <summary> Unified CO mode (true = single offset, false = per-CCD) </summary>
+        public bool CpuCoUnified { get; set; } = false;
+
+        /// <summary> Unified CO offset value (signed, -30 to 0) </summary>
+        public double CpuCoUnifiedValue { get; set; } = 0;
 
         /// <summary> Intel PL1 in watts </summary>
         public double IntelPl1 { get; set; } = 45;
@@ -53,6 +62,7 @@ namespace Uniwill_Control_Utility.Models
         public Dictionary<int, int> VfCurveOffsets { get; set; } = new();
 
         public bool HasChanges => CpuSustained > 0 || CpuBoost > 0 || CpuTjMax > 0 ||
+            CpuCoCcd0 != 0 || CpuCoCcd1 != 0 ||
             IntelPl1 > 0 || IntelPl2 > 0 || GpuTgp > 0 || VfCurveOffsets.Any(p => p.Value != 0);
     }
 

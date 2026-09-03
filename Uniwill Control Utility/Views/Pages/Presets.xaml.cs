@@ -48,7 +48,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         private double _profileSustained = 75;
         private double _profileBoost = 85;
         private int _profileTjMax = 95;
-        private int _profileCoAll = 0;
+        private int _profileCoCcd0 = 0;
+        private int _profileCoCcd1 = 0;
+        private bool _profileCoUnified = false;
+        private int _profileCoUnifiedValue = 0;
         private double _profileGpuTgp = 150;
         private bool _profileGpuDb = false;
         private double _profileGpuDbOffset = 0;
@@ -101,7 +104,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 line.Contains("[Presets.") ||
                 line.Contains("[Translate") ||
                 line.Contains("[WinPower]") ||
-                line.Contains("[VfCurveEditor."))
+                line.Contains("[VfCurveEditor.") ||
+                line.Contains("SMU ") ||
+                line.Contains("[PresetProfileApplier]"))
             {
                 DebugLog(line);
             }
@@ -128,7 +133,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             sdSustained.Value = _profileSustained;
             sdBoost.Value = _profileBoost;
             sdTjMax.Value = _profileTjMax;
-            sdCoAll.Value = 0;
 
             sdNvPower.Value = _profileGpuTgp;
             togDynamicBoost.IsChecked = _profileGpuDb;
@@ -179,6 +183,27 @@ namespace Uniwill_Control_Utility.Views.Pages
             updateAllLabels();
         }
 
+        private void rbCoMode_Click(object sender, RoutedEventArgs e) => updateCoVisibility();
+
+        private void updateCoVisibility()
+        {
+            bool unified = rbCoUnified.IsChecked == true;
+            if (unified)
+            {
+                dividerCoPerCcd.Visibility = Visibility.Collapsed;
+                gridCustomCoUnifiedSlider.Visibility = Visibility.Visible;
+                gridCustomCoCcd0.Visibility = Visibility.Collapsed;
+                gridCustomCoCcd1.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                dividerCoPerCcd.Visibility = Visibility.Visible;
+                gridCustomCoUnifiedSlider.Visibility = Visibility.Collapsed;
+                gridCustomCoCcd0.Visibility = Visibility.Visible;
+                gridCustomCoCcd1.Visibility = Visibility.Visible;
+            }
+        }
+
         private void togDynamicBoost_Checked(object sender, RoutedEventArgs e)
         {
             spNvDbOffset.Visibility = Visibility.Visible;
@@ -201,12 +226,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             lblBoost.Text = $"{sdBoost.Value:F0} W";
             lblTjMax.Text = $"{sdTjMax.Value:F0} °C";
 
-            lblCoAll.Text = $"{sdCoAll.Value:F0}";
-
             lblIntelPl1.Text = $"{sdIntelPl1.Value:F0} W";
             lblIntelPl2.Text = $"{sdIntelPl2.Value:F0} W";
             lblIntelVolt.Text = $"{sdIntelVolt.Value:F0} mV";
- 
+
+            lblCoCcd0.Text = $"{sdCoCcd0.Value:+0;-0;0}";
+            lblCoCcd1.Text = $"{sdCoCcd1.Value:+0;-0;0}";
+            lblCoUnified.Text = $"{sdCoUnified.Value:+0;-0;0}";
+
             lblNvPower.Text = $"{sdNvPower.Value:F0} W";
             lblNvDbOffset.Text = $"{sdNvDbOffset.Value:F0} W";
             // Show "Curve" only if curve is active AND user hasn't touched the slider.
@@ -220,11 +247,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Hide AMD-specific controls on Intel
             if (Family.TYPE == Family.ProcessorType.Intel)
             {
-                sdAmdCoAll.Visibility = Visibility.Collapsed;
                 tbTjMaxLabel.Visibility = Visibility.Collapsed;
                 tbTjMax.Visibility = Visibility.Collapsed;
                 gridCustomTjMax.Visibility = Visibility.Collapsed;
-                dividerAfterTjMax.Visibility = Visibility.Collapsed;
+                gridCustomCoUnified.Visibility = Visibility.Collapsed;
+                gridCustomCoUnifiedSlider.Visibility = Visibility.Collapsed;
+                gridCustomCoCcd0.Visibility = Visibility.Collapsed;
+                gridCustomCoCcd1.Visibility = Visibility.Collapsed;
             }
             // Hide Intel-specific controls on AMD
             else
@@ -316,11 +345,29 @@ namespace Uniwill_Control_Utility.Views.Pages
                 sdIntelPl2.Maximum = pl.CpuPl2Boost;
             }
 
-            // GPU TGP slider â€” limit to the GPU's baseline TGP
-            sdNvPower.Maximum = pl.GpuTgpBaseline;
+            // GPU TGP slider — set per-GPU min/max range
+            SetGpuSliderLimits(pl.GpuTgpBaseline);
 
-            // Dynamic Boost offset â€” max is the DB max from SKU config
+            // Dynamic Boost offset — max is the DB max from SKU config
             sdNvDbOffset.Maximum = pl.DynamicBoostMax;
+        }
+
+        private void SetGpuSliderLimits(int fallbackMax)
+        {
+            string gpuName = NvTuning.GetGpuName() ?? string.Empty;
+            (int min, int max) = gpuName.ToLowerInvariant() switch
+            {
+                var n when n.Contains("rtx 5090") => (95, 150),
+                var n when n.Contains("rtx 5080") => (80, 150),
+                var n when n.Contains("rtx 5070") => (60, 115),
+                _ => (50, fallbackMax)
+            };
+            sdNvPower.Minimum = min;
+            sdNvPower.Maximum = max;
+
+            // Clamp current value to new range
+            if (sdNvPower.Value < min) sdNvPower.Value = min;
+            if (sdNvPower.Value > max) sdNvPower.Value = max;
         }
 
         private void setProfileTooltips()
@@ -481,11 +528,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (skuProfile != null)
                 {
                     setProfileValues(skuProfile.CpuPl1, skuProfile.CpuPl2, 95,
-                        skuProfile.GpuTgp, skuProfile.DynamicBoost, skuProfile.DynamicBoostOffset, 0);
+                        skuProfile.GpuTgp, skuProfile.DynamicBoost, skuProfile.DynamicBoostOffset);
                 }
                 else
                 {
-                    setProfileValues(45, 45, 95, 95, false, 0, 0);
+                    setProfileValues(45, 45, 95, 95, false, 0);
                 }
                 _profileIntelPl1 = skuProfile?.CpuPl1 ?? 25;
                 _profileIntelPl2 = skuProfile?.CpuPl2 ?? 35;
@@ -495,11 +542,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (skuProfile != null)
                 {
                     setProfileValues(skuProfile.CpuPl1, skuProfile.CpuPl2, 95,
-                        skuProfile.GpuTgp, skuProfile.DynamicBoost, skuProfile.DynamicBoostOffset, 0);
+                        skuProfile.GpuTgp, skuProfile.DynamicBoost, skuProfile.DynamicBoostOffset);
                 }
                 else
                 {
-                    setProfileValues(75, 85, 95, 150, false, 0, 0);
+                    setProfileValues(75, 85, 95, 150, false, 0);
                 }
                 _profileIntelPl1 = skuProfile?.CpuPl1 ?? 45;
                 _profileIntelPl2 = skuProfile?.CpuPl2 ?? 60;
@@ -511,7 +558,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     int gpuTgp = skuProfile?.GpuTgp ?? 150;
                     bool db = skuProfile?.DynamicBoost ?? true;
                     int dbOffset = skuProfile?.DynamicBoostOffset ?? 25;
-                    setProfileValues(cpuMax, cpuMax, 95, gpuTgp, db, dbOffset, 0);
+                    setProfileValues(cpuMax, cpuMax, 95, gpuTgp, db, dbOffset);
                 }
                 else
                 {
@@ -588,16 +635,17 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         private void setProfileValues(int sustained, int boost, int tjMax, int gpuTgp,
-            bool gpuDb, int gpuDbOffset, int coAll)
+            bool gpuDb, int gpuDbOffset, int coCcd0 = 0, int coCcd1 = 0)
         {
             // Store values for status card (independent of slider UI state)
             _profileSustained = sustained;
             _profileBoost = boost;
             _profileTjMax = tjMax;
+            _profileCoCcd0 = coCcd0;
+            _profileCoCcd1 = coCcd1;
             _profileGpuTgp = gpuTgp;
             _profileGpuDb = gpuDb;
             _profileGpuDbOffset = gpuDbOffset;
-            _profileCoAll = coAll;
 
             // SMU values
             sdSustained.Value = sustained;
@@ -605,7 +653,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             sdTjMax.Value = tjMax;
 
             // Curve Optimizer
-            sdCoAll.Value = coAll;
+            sdCoCcd0.Value = coCcd0;
+            sdCoCcd1.Value = coCcd1;
 
             // GPU
             sdNvPower.Value = gpuTgp;
@@ -625,20 +674,22 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Update GPU clock offset display from slider values
             if (sdNvidia.Visibility == Visibility.Visible)
             {
+                string coreText;
                 if (VfCurveActive && !_userTouchedCoreSlider)
                 {
-                    tbCoreClock.Text = "Curve";
+                    coreText = "Curve";
                 }
                 else
                 {
-                    tbCoreClock.Text = $"{sdNvCore.Value:F0} MHz";
+                    coreText = $"{sdNvCore.Value:F0}";
                 }
-                tbMemClock.Text = $"{sdNvMem.Value:F0} MHz";
+                tbCoreClock.Text = coreText;
+                tbMemClock.Text = $"{sdNvMem.Value:F0}";
             }
             else
             {
-                tbCoreClock.Text = "-- MHz";
-                tbMemClock.Text = "-- MHz";
+                tbCoreClock.Text = "--";
+                tbMemClock.Text = "--";
             }
 
             if (Family.TYPE == Family.ProcessorType.Amd_Apu)
@@ -646,7 +697,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tbPl1.Text = $"{_profileSustained:F0} W";
                 tbPl2.Text = $"{_profileBoost:F0} W";
                 tbTjMax.Text = $"{_profileTjMax} \u00B0C";
-                tbCoAll.Text = $"{_profileCoAll:+0;-0;0}";
+                tbCoOffset.Text = $"{_profileCoCcd0:+0;-0;0} | {_profileCoCcd1:+0;-0;0}";
                 tbGpuTgp.Text = $"{_profileGpuTgp:F0} W";
                 tbGpuDb.Text = _profileGpuDb ? $"+{_profileGpuDbOffset:F0} W" : "Off";
             }
@@ -655,7 +706,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tbPl1.Text = $"{_profileIntelPl1:F0} W";
                 tbPl2.Text = $"{_profileIntelPl2:F0} W";
                 tbTjMax.Text = $"{_profileTjMax} \u00B0C";
-                tbCoAll.Text = "--";
+                tbCoOffset.Text = "-- | --";
                 tbGpuTgp.Text = $"{_profileGpuTgp:F0} W";
                 tbGpuDb.Text = _profileGpuDb ? $"+{_profileGpuDbOffset:F0} W" : "Off";
             }
@@ -774,7 +825,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                     _profileSustained = sdSustained.Value;
                     _profileBoost = sdBoost.Value;
                     _profileTjMax = (int)sdTjMax.Value;
-                    _profileCoAll = (int)sdCoAll.Value;
+                    _profileCoCcd0 = (int)sdCoCcd0.Value;
+                    _profileCoCcd1 = (int)sdCoCcd1.Value;
+                    _profileCoUnified = rbCoUnified.IsChecked == true;
+                    _profileCoUnifiedValue = (int)sdCoUnified.Value;
                     _profileIntelPl1 = sdIntelPl1.Value;
                     _profileIntelPl2 = sdIntelPl2.Value;
                      _profileGpuTgp = sdNvPower.Value;
@@ -811,7 +865,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.customSustained = sdSustained.Value;
             Settings.Default.customBoost = sdBoost.Value;
             Settings.Default.customTjMax = sdTjMax.Value;
-            Settings.Default.customCoAll = sdCoAll.Value;
             Settings.Default.customIntelPl1 = sdIntelPl1.Value;
             Settings.Default.customIntelPl2 = sdIntelPl2.Value;
             Settings.Default.customIntelVolt = sdIntelVolt.Value;
@@ -820,6 +873,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.customNvDbOffset = sdNvDbOffset.Value;
             Settings.Default.customNvCore = sdNvCore.Value;
             Settings.Default.customNvMem = sdNvMem.Value;
+            Settings.Default.customCoCcd0 = sdCoCcd0.Value;
+            Settings.Default.customCoCcd1 = sdCoCcd1.Value;
+            Settings.Default.customCoUnified = rbCoUnified.IsChecked == true;
+            Settings.Default.customCoUnifiedValue = sdCoUnified.Value;
             Settings.Default.Save();
             DebugLog("Custom slider values saved");
         }
@@ -829,7 +886,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             sdSustained.Value = Settings.Default.customSustained;
             sdBoost.Value = Settings.Default.customBoost;
             sdTjMax.Value = Settings.Default.customTjMax;
-            sdCoAll.Value = Settings.Default.customCoAll;
             sdIntelPl1.Value = Settings.Default.customIntelPl1;
             sdIntelPl2.Value = Settings.Default.customIntelPl2;
             sdIntelVolt.Value = Settings.Default.customIntelVolt;
@@ -838,17 +894,29 @@ namespace Uniwill_Control_Utility.Views.Pages
             sdNvDbOffset.Value = Settings.Default.customNvDbOffset;
             sdNvCore.Value = Settings.Default.customNvCore;
             sdNvMem.Value = Settings.Default.customNvMem;
+            sdCoCcd0.Value = Settings.Default.customCoCcd0;
+            sdCoCcd1.Value = Settings.Default.customCoCcd1;
+            bool coUnified = Settings.Default.customCoUnified;
+            rbCoUnified.IsChecked = coUnified;
+            rbCoPerCcd.IsChecked = !coUnified;
+            sdCoUnified.Value = Settings.Default.customCoUnifiedValue;
 
             // Restore stored profile values for status card
             _profileSustained = sdSustained.Value;
             _profileBoost = sdBoost.Value;
             _profileTjMax = (int)sdTjMax.Value;
-            _profileCoAll = (int)sdCoAll.Value;
+            _profileCoCcd0 = (int)sdCoCcd0.Value;
+            _profileCoCcd1 = (int)sdCoCcd1.Value;
+            _profileCoUnified = rbCoUnified.IsChecked == true;
+            _profileCoUnifiedValue = (int)sdCoUnified.Value;
             _profileIntelPl1 = sdIntelPl1.Value;
             _profileIntelPl2 = sdIntelPl2.Value;
             _profileGpuTgp = sdNvPower.Value;
             _profileGpuDb = togDynamicBoost.IsChecked == true;
             _profileGpuDbOffset = sdNvDbOffset.Value;
+
+            // Sync CO visibility after programmatic IsChecked change (events don't fire)
+            updateCoVisibility();
 
             DebugLog($"Custom slider values loaded: sustained={_profileSustained}W boost={_profileBoost}W tjMax={_profileTjMax}");
         }
@@ -866,7 +934,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             presets[slotIndex].CpuSustained = sdSustained.Value;
             presets[slotIndex].CpuBoost = sdBoost.Value;
             presets[slotIndex].CpuTjMax = sdTjMax.Value;
-            presets[slotIndex].CpuCoAll = sdCoAll.Value;
             presets[slotIndex].IntelPl1 = sdIntelPl1.Value;
             presets[slotIndex].IntelPl2 = sdIntelPl2.Value;
             presets[slotIndex].IntelVolt = sdIntelVolt.Value;
@@ -875,6 +942,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             presets[slotIndex].GpuDbOffset = sdNvDbOffset.Value;
             presets[slotIndex].GpuCoreOffset = sdNvCore.Value;
             presets[slotIndex].GpuMemOffset = sdNvMem.Value;
+            presets[slotIndex].CpuCoCcd0 = sdCoCcd0.Value;
+            presets[slotIndex].CpuCoCcd1 = sdCoCcd1.Value;
+            presets[slotIndex].CpuCoUnified = rbCoUnified.IsChecked == true;
+            presets[slotIndex].CpuCoUnifiedValue = sdCoUnified.Value;
 
             // Also save V-F curve offsets from editor if active
             if (_vfActivePreset >= 0)
@@ -909,7 +980,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 sdSustained.Value = preset.CpuSustained;
                 sdBoost.Value = preset.CpuBoost;
                 sdTjMax.Value = preset.CpuTjMax;
-                sdCoAll.Value = preset.CpuCoAll;
                 sdIntelPl1.Value = preset.IntelPl1;
                 sdIntelPl2.Value = preset.IntelPl2;
                 sdIntelVolt.Value = preset.IntelVolt;
@@ -918,12 +988,23 @@ namespace Uniwill_Control_Utility.Views.Pages
                 sdNvDbOffset.Value = preset.GpuDbOffset;
                 sdNvCore.Value = preset.GpuCoreOffset;
                 sdNvMem.Value = preset.GpuMemOffset;
+                sdCoCcd0.Value = preset.CpuCoCcd0;
+                sdCoCcd1.Value = preset.CpuCoCcd1;
+                rbCoUnified.IsChecked = preset.CpuCoUnified;
+                rbCoPerCcd.IsChecked = !preset.CpuCoUnified;
+                sdCoUnified.Value = preset.CpuCoUnifiedValue;
+
+                // Sync CO visibility after programmatic IsChecked change (events don't fire)
+                updateCoVisibility();
 
                 // Restore stored profile values for status card
                 _profileSustained = preset.CpuSustained;
                 _profileBoost = preset.CpuBoost;
                 _profileTjMax = (int)preset.CpuTjMax;
-                _profileCoAll = (int)preset.CpuCoAll;
+                _profileCoCcd0 = (int)preset.CpuCoCcd0;
+                _profileCoCcd1 = (int)preset.CpuCoCcd1;
+                _profileCoUnified = preset.CpuCoUnified;
+                _profileCoUnifiedValue = (int)preset.CpuCoUnifiedValue;
                 _profileIntelPl1 = preset.IntelPl1;
                 _profileIntelPl2 = preset.IntelPl2;
                 _profileGpuTgp = preset.GpuTgp;
@@ -1039,9 +1120,34 @@ namespace Uniwill_Control_Utility.Views.Pages
                 parts.Add($"--tctl-temp={tjMax}");
                 parts.Add($"--cHTC-temp={tjMax}");
 
-                // Curve Optimizer
-                if (sdCoAll.Value > 0)
-                    parts.Add($"--set-coall={(byte)sdCoAll.Value}");
+                // Curve Optimizer — unified mode uses set-coall, per-CCD uses set-coper.
+                bool coUnified = rbCoUnified.IsChecked == true;
+                if (coUnified)
+                {
+                    int coValue = (int)sdCoUnified.Value;
+                    uint coEncoded = coValue < 0
+                        ? (uint)(0x100000 - Math.Abs(coValue))
+                        : (uint)coValue;
+                    parts.Add($"--set-coall={coEncoded}");
+                }
+                else
+                {
+                    // Per-CCD mode: use set-coper for each core.
+                    // Encoding (Renoir+/AM5): ((ccd << 8) | core_in_ccd) << 20 | offset20
+                    // offset20: 20-bit biased — negative = 0x100000 - |offset|
+                    // CCD0 = cores 0-7, CCD1 = cores 8-15
+                    int coCcd0 = (int)sdCoCcd0.Value;
+                    int coCcd1 = (int)sdCoCcd1.Value;
+                    for (int ccd = 0; ccd < 2; ccd++)
+                    {
+                        int offset = ccd == 0 ? coCcd0 : coCcd1;
+                        for (int core = 0; core < 8; core++)
+                        {
+                            uint encoded = BuildCoperArg(ccd, core, offset);
+                            parts.Add($"--set-coper={encoded}");
+                        }
+                    }
+                }
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
@@ -1077,6 +1183,21 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             return string.Join(" ", parts) + " ";
+        }
+
+        /// <summary>
+        /// Encodes a per-core Curve Optimizer argument (Renoir+/AM5 format).
+        /// Layout: ((ccd << 8) | core) << 20 | offset20
+        /// offset20: 20-bit biased — negative = 0x100000 - |offset|
+        /// </summary>
+        private static uint BuildCoperArg(int ccd, int core, int offset)
+        {
+            int magnitude = Math.Min(Math.Abs(offset), 0xFFFFF);
+            uint encoded20 = offset < 0
+                ? (uint)((0x100000 - magnitude) & 0xFFFFF)
+                : (uint)(magnitude & 0xFFFFF);
+            uint prefix = (uint)(((ccd << 8) | (core & 7)) << 20);
+            return prefix | encoded20;
         }
 
         #endregion
