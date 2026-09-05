@@ -1715,6 +1715,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             // --- Pass 1: Process-based detection ---
             foreach (GameLauncherItem item in installedGames)
             {
+                if (string.IsNullOrEmpty(item.path))
+                    continue;
+
                 int i = 0;
                 do
                 {
@@ -1724,8 +1727,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                     {
                         try
                         {
-                            string executablePath = process.MainModule.FileName;
+                            var mainModule = process.MainModule;
+                            if (mainModule == null)
+                                continue;
 
+                            string executablePath = mainModule.FileName;
                             if (executablePath.Contains(item.path))
                             {
                                 bool autoSwitch = true;
@@ -1735,17 +1741,15 @@ namespace Uniwill_Control_Utility.Views.Pages
                                     autoSwitch = preset.isAutoSwitch;
                                 }
                                 if (!autoSwitch)
-                                {
                                     continue;
-                                }
 
                                 detectedGame = item.gameName;
                                 break;
                             }
                         }
-                        catch (Exception ex)
+                        catch
                         {
-                            DiagnosticLogger.LogError(ex, "Failed to check running game process");
+                            // Process.MainModule throws for elevated/protected processes — skip silently
                         }
                     }
 
