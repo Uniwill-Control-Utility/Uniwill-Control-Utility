@@ -53,7 +53,7 @@
             </ui:TitleBar.Resources>
 
             <ui:TitleBar.Icon>
-                <ui:ImageIcon Source="pack://application:,,,/Assets/applicationIcon-1024.png" 
+                <ui:ImageIcon Source="pack://application:,,,/Assets/applicationIcon-256.png" 
                       Margin="11,0,0,0" 
                       RenderOptions.BitmapScalingMode="HighQuality"/>
             </ui:TitleBar.Icon>
@@ -118,39 +118,136 @@
         <tray:NotifyIcon x:Name="niTray"
                          LeftClick="NotifyIcon_LeftClick"
                          FocusOnLeftClick="False"
-                         Icon="pack://application:,,,/Assets/applicationIcon-256.png"
+                         Icon="pack://application:,,,/Assets/applicationIcon-32.png"
                          MenuOnRightClick="True"
                          TooltipText="Uniwill Control Utility"
                          Width="48"
                          Height="48">
             <tray:NotifyIcon.Menu>
-                <ContextMenu Opened="TrayMenu_Opened">
-                    <MenuItem x:Name="miPremadePresets"
-                              Header="Premade Presets"
-                              SubmenuOpened="TrayPremadePresets_SubmenuOpened">
-                        <MenuItem x:Name="miTrayEcoPreset"
-                                  Header="Eco Preset"
-                                  Tag="eco"
+                <ContextMenu x:Name="cmTrayMenu" Opened="TrayMenu_Opened">
+                    <!-- ═══════════════════════════════════════════
+                         SECTION 1: PRESETS
+                         ═══════════════════════════════════════════ -->
+                    <MenuItem x:Name="miSectionPresets" Header="Presets">
+                        <!-- Stock profiles - shown directly -->
+                        <MenuItem x:Name="miTrayOfficePreset"
+                                  Header="Office"
+                                  Tag="Office"
                                   IsCheckable="True"
-                                  Click="TrayPremadePreset_Click" />
-                        <MenuItem x:Name="miTrayBalancedPreset"
-                                  Header="Balanced Preset"
-                                  Tag="balanced"
+                                  Click="TrayStockPreset_Click" />
+                        <MenuItem x:Name="miTrayGamingPreset"
+                                  Header="Gaming"
+                                  Tag="Gaming"
                                   IsCheckable="True"
-                                  Click="TrayPremadePreset_Click" />
-                        <MenuItem x:Name="miTrayPerformancePreset"
-                                  Header="Performance Preset"
-                                  Tag="performance"
+                                  Click="TrayStockPreset_Click" />
+                        <MenuItem x:Name="miTrayTurboPreset"
+                                  Header="Turbo"
+                                  Tag="Turbo"
                                   IsCheckable="True"
-                                  Click="TrayPremadePreset_Click" />
-                        <MenuItem x:Name="miTrayExtremePreset"
-                                  Header="Extreme Preset"
-                                  Tag="extreme"
-                                  IsCheckable="True"
-                                  Click="TrayPremadePreset_Click" />
+                                  Click="TrayStockPreset_Click" />
+                        <!-- Separator between stock and custom -->
+                        <Separator />
+                        <!-- Custom profiles (1-5, only saved ones shown) - inserted dynamically -->
                     </MenuItem>
-                    <MenuItem x:Name="miCustomPresets"
-                              Header="Custom Presets" />
+
+                    <!-- ═══════════════════════════════════════════
+                         SECTION 2: HYDRO UI
+                         ═══════════════════════════════════════════ -->
+                    <MenuItem x:Name="miSectionHydro" Header="Hydro UI">
+                        <!-- Pump Voltage -->
+                        <MenuItem x:Name="miHydroPump" Header="Pump">
+                            <MenuItem Header="Off" Tag="Off" IsCheckable="True" Click="TrayHydroPump_Click" />
+                            <MenuItem Header="7 V" Tag="V7" IsCheckable="True" Click="TrayHydroPump_Click" />
+                            <MenuItem Header="8 V" Tag="V8" IsCheckable="True" Click="TrayHydroPump_Click" />
+                            <MenuItem Header="11 V" Tag="V11" IsCheckable="True" Click="TrayHydroPump_Click" />
+                        </MenuItem>
+                        <!-- Fan Speed -->
+                        <MenuItem x:Name="miHydroFan" Header="Fan">
+                            <MenuItem Header="Off" Tag="Off" IsCheckable="True" Click="TrayHydroFan_Click" />
+                            <MenuItem Header="25%" Tag="Percent25" IsCheckable="True" Click="TrayHydroFan_Click" />
+                            <MenuItem Header="50%" Tag="Percent50" IsCheckable="True" Click="TrayHydroFan_Click" />
+                            <MenuItem Header="75%" Tag="Percent75" IsCheckable="True" Click="TrayHydroFan_Click" />
+                            <MenuItem Header="90%" Tag="Percent90" IsCheckable="True" Click="TrayHydroFan_Click" />
+                            <MenuItem Header="95%" Tag="Percent95" IsCheckable="True" Click="TrayHydroFan_Click" />
+                            <MenuItem Header="100%" Tag="Percent100" IsCheckable="True" Click="TrayHydroFan_Click" />
+                        </MenuItem>
+                        <!-- RGB -->
+                        <MenuItem x:Name="miHydroRgb" Header="RGB">
+                            <MenuItem Header="Off" Tag="Off" IsCheckable="True" Click="TrayHydroRgb_Click" />
+                            <MenuItem Header="Static" Tag="Static" IsCheckable="True" Click="TrayHydroRgb_Click" />
+                            <MenuItem Header="Breathe" Tag="Breathe" IsCheckable="True" Click="TrayHydroRgb_Click" />
+                            <MenuItem Header="Colorful" Tag="Colorful" IsCheckable="True" Click="TrayHydroRgb_Click" />
+                            <MenuItem Header="Breathe Color" Tag="BreatheColor" IsCheckable="True" Click="TrayHydroRgb_Click" />
+                        </MenuItem>
+                    </MenuItem>
+
+                    <!-- ═══════════════════════════════════════════
+                         SECTION 3: FAN CONTROL
+                         ═══════════════════════════════════════════ -->
+                    <MenuItem x:Name="miSectionFanControl" Header="Fan Control">
+                        <!-- Unified Curve toggle -->
+                        <MenuItem x:Name="miFanUnified"
+                                  Header="Unified Curve"
+                                  IsCheckable="True"
+                                  Click="TrayFanUnified_Click" />
+                        <!-- Profile (shown when Unified is ON) -->
+                        <MenuItem x:Name="miFanCurveProfile" Header="Profile">
+                            <MenuItem Header="Silent" Tag="Silent" IsCheckable="True" Click="TrayFanProfile_Click" />
+                            <MenuItem Header="Balanced" Tag="Balanced" IsCheckable="True" Click="TrayFanProfile_Click" />
+                            <MenuItem Header="Performance" Tag="Performance" IsCheckable="True" Click="TrayFanProfile_Click" />
+                            <MenuItem Header="Full Speed" Tag="FullSpeed" IsCheckable="True" Click="TrayFanProfile_Click" />
+                            <MenuItem Header="Off" Tag="Off" IsCheckable="True" Click="TrayFanProfile_Click" />
+                        </MenuItem>
+                        <!-- CPU Profile (shown when Unified is OFF) -->
+                        <MenuItem x:Name="miFanCpuProfile" Header="CPU Profile" Visibility="Collapsed">
+                            <MenuItem Header="Silent" Tag="Silent" IsCheckable="True" Click="TrayFanCpuProfile_Click" />
+                            <MenuItem Header="Balanced" Tag="Balanced" IsCheckable="True" Click="TrayFanCpuProfile_Click" />
+                            <MenuItem Header="Performance" Tag="Performance" IsCheckable="True" Click="TrayFanCpuProfile_Click" />
+                            <MenuItem Header="Full Speed" Tag="FullSpeed" IsCheckable="True" Click="TrayFanCpuProfile_Click" />
+                            <MenuItem Header="Off" Tag="Off" IsCheckable="True" Click="TrayFanCpuProfile_Click" />
+                        </MenuItem>
+                        <!-- GPU Profile (shown when Unified is OFF) -->
+                        <MenuItem x:Name="miFanGpuProfile" Header="GPU Profile" Visibility="Collapsed">
+                            <MenuItem Header="Silent" Tag="Silent" IsCheckable="True" Click="TrayFanGpuProfile_Click" />
+                            <MenuItem Header="Balanced" Tag="Balanced" IsCheckable="True" Click="TrayFanGpuProfile_Click" />
+                            <MenuItem Header="Performance" Tag="Performance" IsCheckable="True" Click="TrayFanGpuProfile_Click" />
+                            <MenuItem Header="Full Speed" Tag="FullSpeed" IsCheckable="True" Click="TrayFanGpuProfile_Click" />
+                            <MenuItem Header="Off" Tag="Off" IsCheckable="True" Click="TrayFanGpuProfile_Click" />
+                        </MenuItem>
+                    </MenuItem>
+
+                    <!-- ═══════════════════════════════════════════
+                         SECTION 4: FLYDIGI
+                         ═══════════════════════════════════════════ -->
+                    <MenuItem x:Name="miSectionFlydigi" Header="Flydigi">
+                        <!-- Fan Mode -->
+                        <MenuItem x:Name="miFlydigiFan" Header="Fan Mode">
+                            <MenuItem Header="Off" Tag="Off" IsCheckable="True" Click="TrayFlydigiFan_Click" />
+                            <!-- Gears submenu -->
+                            <MenuItem x:Name="miFlydigiGears" Header="Gears">
+                                <MenuItem Header="Quiet" Tag="Gear1" IsCheckable="True" Click="TrayFlydigiFan_Click" />
+                                <MenuItem Header="Standard" Tag="Gear2" IsCheckable="True" Click="TrayFlydigiFan_Click" />
+                                <MenuItem Header="Strong" Tag="Gear3" IsCheckable="True" Click="TrayFlydigiFan_Click" />
+                                <MenuItem Header="Overclock" Tag="Gear4" IsCheckable="True" Click="TrayFlydigiFan_Click" />
+                            </MenuItem>
+                            <!-- Auto(Curve) parent with curve profiles as children -->
+                            <MenuItem x:Name="miFlydigiAutoCurve" Header="Auto (Curve)">
+                                <MenuItem Header="Silent" Tag="Silent" IsCheckable="True" Click="TrayFlydigiCurve_Click" />
+                                <MenuItem Header="Balanced" Tag="Balanced" IsCheckable="True" Click="TrayFlydigiCurve_Click" />
+                                <MenuItem Header="Performance" Tag="Performance" IsCheckable="True" Click="TrayFlydigiCurve_Click" />
+                                <MenuItem x:Name="miFlydigiCurveCustom" Header="Custom" Tag="Custom" IsCheckable="True" Click="TrayFlydigiCurve_Click" />
+                            </MenuItem>
+                        </MenuItem>
+                        <!-- RGB -->
+                        <MenuItem x:Name="miFlydigiRgb" Header="RGB">
+                            <MenuItem Header="Off" Tag="Off" IsCheckable="True" Click="TrayFlydigiRgb_Click" />
+                            <MenuItem Header="Smart Temp" Tag="SmartTemp" IsCheckable="True" Click="TrayFlydigiRgb_Click" />
+                            <MenuItem Header="Static" Tag="Static" IsCheckable="True" Click="TrayFlydigiRgb_Click" />
+                            <MenuItem Header="Flowing" Tag="Flowing" IsCheckable="True" Click="TrayFlydigiRgb_Click" />
+                            <MenuItem Header="Breathing" Tag="Breathing" IsCheckable="True" Click="TrayFlydigiRgb_Click" />
+                        </MenuItem>
+                    </MenuItem>
+
                     <Separator />
                     <MenuItem x:Name="miClose"
                               Header="Close Application"

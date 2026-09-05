@@ -852,13 +852,17 @@
         </ScrollViewer>
 
         <!-- Dark overlay for Adaptive Mode override (covers ScrollViewer to block input) -->
-        <Border x:Name="overlayAdaptiveWarning" Grid.Row="0" Visibility="Collapsed" Background="Black" Opacity="0.4" CornerRadius="4"/>
+        <Border x:Name="overlayAdaptiveWarning" 
+                Panel.ZIndex="10" 
+                Grid.Row="0" 
+                Grid.RowSpan="2" 
+                Visibility="Collapsed" 
+                Background="{DynamicResource SmokeFillColorDefaultBrush}"
+                CornerRadius="4,0,0,0"/>
 
         <!-- Page-scoped snackbar presenter for Adaptive Mode override warning -->
         <ui:SnackbarPresenter x:Name="SnackbarPresenter"
-                              Grid.Row="0"
-                              Margin="12"
-                              HorizontalAlignment="Right"
-                              VerticalAlignment="Bottom" />
+                              Grid.Row="0" Grid.RowSpan="2"
+                              Panel.ZIndex="11" MaxWidth="1080"/>
     </Grid>
 </Page>

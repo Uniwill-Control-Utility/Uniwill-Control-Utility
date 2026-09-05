@@ -32,6 +32,9 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>Whether Adaptive Mode is currently overriding Keyboard RGB.</summary>
         public bool IsKeyboardOverridden { get; private set; }
 
+        /// <summary>Whether Adaptive Mode is currently overriding Light Bar.</summary>
+        public bool IsLightBarOverridden { get; private set; }
+
         /// <summary>The last Flydigi preset applied from Adaptive Mode (null when nothing has been applied yet).</summary>
         public FlydigiPresetAppliedEventArgs? LastAppliedFlydigiPreset { get; private set; }
 
@@ -91,6 +94,12 @@ namespace Uniwill_Control_Utility.Services
         /// page should update its UI controls to reflect the profile's values.
         /// </summary>
         public event EventHandler<KeyboardPresetAppliedEventArgs>? KeyboardPresetApplied;
+
+        /// <summary>
+        /// Raised when the Light Bar override state changes.
+        /// Args: (isOverridden)
+        /// </summary>
+        public event EventHandler<bool>? LightBarOverrideChanged;
 
         /// <summary>
         /// Saved user Flydigi settings, captured when override is enabled.
@@ -454,6 +463,34 @@ namespace Uniwill_Control_Utility.Services
                         0, 0, 0);
                 });
             }
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Light Bar Override                                                 */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>
+        /// Enables Adaptive Mode override for the Light Bar.
+        /// </summary>
+        public void EnableLightBarOverride()
+        {
+            if (IsLightBarOverridden)
+                return;
+
+            IsLightBarOverridden = true;
+            LightBarOverrideChanged?.Invoke(this, true);
+        }
+
+        /// <summary>
+        /// Disables Adaptive Mode override for the Light Bar.
+        /// </summary>
+        public void DisableLightBarOverride()
+        {
+            if (!IsLightBarOverridden)
+                return;
+
+            IsLightBarOverridden = false;
+            LightBarOverrideChanged?.Invoke(this, false);
         }
 
         /// <summary>

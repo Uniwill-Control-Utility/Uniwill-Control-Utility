@@ -24,8 +24,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Forms;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
+using MenuItem = System.Windows.Controls.MenuItem;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
@@ -56,7 +58,6 @@ namespace Uniwill_Control_Utility.Views.Windows
         public static MainWindow? Instance { get; private set; }
         private static INavigationService _navigationService;
         private bool _isTrayPresetApplying;
-        private System.Windows.Controls.MenuItem _miCustomPresets;
         public static bool IsPageSelected(Type pageType) =>
             _mainWindowNav?.SelectedItem is INavigationViewItem item && item.TargetPageType == pageType;
 
@@ -91,9 +92,6 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             // Ensure tray icon is visible
             niTray.Visibility = Visibility.Visible;
-
-            // Reference the XAML-generated custom presets menu item
-            _miCustomPresets = miCustomPresets;
         }
 
         /// <summary>Restores the window when the tray icon is left-clicked.</summary>
@@ -109,14 +107,88 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void TrayMenu_Opened(object sender, RoutedEventArgs e)
         {
+            // Sync all tray sections with current page state
+            RefreshTrayStockPresetChecks();
             PopulateTrayCustomPresets();
+            SyncTrayHydroChecks();
+            SyncTrayFlydigiChecks();
+            SyncTrayFanControlChecks();
+            SyncTrayFlydigiCurveChecks();
+            UpdateTrayFanProfileVisibility();
+
+            // Hide Flydigi section if disabled in Settings
+            miSectionFlydigi.Visibility = Settings.Default.HideFlydigi ? Visibility.Collapsed : Visibility.Visible;
+
+            // Disable/hide tray controls when Adaptive overrides are active
+            UpdateTrayAdaptiveOverrideState();
+
+            // Elevate tray menu above the auto-hiding taskbar.
+            // WPF's ContextMenu uses a Popup that doesn't inherit WS_EX_TOPMOST,
+            // so the menu can appear behind the taskbar when it auto-shows.
+            // We find the menu's HWND and call SetWindowPos with HWND_TOPMOST.
+            try
+            {
+                // Use a small delay to ensure the Popup's HWND is created
+                Dispatcher.BeginInvoke(
+                    DispatcherPriority.ContextIdle,
+                    new Action(() =>
+                    {
+                        try
+                        {
+                            var hwnd = GetContextMenuHwnd(cmTrayMenu);
+                            if (hwnd != IntPtr.Zero)
+                            {
+                                const int HWND_TOPMOST = -1;
+                                const int SWP_NOMOVE = 0x0002;
+                                const int SWP_NOSIZE = 0x0001;
+                                const int SWP_NOACTIVATE = 0x0010;
+                                NativeSetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                            }
+                        }
+                        catch { /* non-critical */ }
+                    }));
+            }
+            catch { /* non-critical */ }
         }
 
-        private async void TrayPremadePresets_SubmenuOpened(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Finds the HWND of a WPF ContextMenu by walking the visual tree for a Popup.
+        /// </summary>
+        private static IntPtr GetContextMenuHwnd(System.Windows.Controls.ContextMenu menu)
         {
-            await Task.Run(PremadePresets.SetPremadePresets);
-            this.Dispatcher.Invoke(() => RefreshTrayPremadePresetChecks());
+            if (menu == null) return IntPtr.Zero;
+
+            // The ContextMenu's Popup is created as a child of the menu in the logical tree.
+            // We use HwndSource to find the window handle.
+            var popup = menu.Template?.FindName("PART_Popup", menu) as System.Windows.Controls.Primitives.Popup;
+            if (popup == null)
+            {
+                // Fallback: try to find the Popup via the visual tree
+                for (int i = 0; i < VisualTreeHelper.GetChildrenCount(menu); i++)
+                {
+                    var child = VisualTreeHelper.GetChild(menu, i);
+                    if (child is System.Windows.Controls.Primitives.Popup p)
+                    {
+                        popup = p;
+                        break;
+                    }
+                }
+            }
+
+            if (popup != null && popup.Child != null)
+            {
+                var source = PresentationSource.FromVisual(popup.Child) as HwndSource;
+                if (source != null)
+                    return source.Handle;
+            }
+
+            // Alternative: the ContextMenu itself might have a PresentationSource
+            var source2 = PresentationSource.FromVisual(menu) as HwndSource;
+            return source2?.Handle ?? IntPtr.Zero;
         }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool NativeSetWindowPos(IntPtr hWnd, int hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
         private void SetupNavigationService(INavigationViewPageProvider pageProvider)
         {
@@ -623,123 +695,117 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         }
 
-        private async void TrayPremadePreset_Click(object? sender, RoutedEventArgs e)
+        private async void TrayStockPreset_Click(object? sender, RoutedEventArgs e)
         {
-            if (_isTrayPresetApplying || sender is not System.Windows.Controls.MenuItem menuItem)
-            {
+            if (_isTrayPresetApplying || sender is not MenuItem menuItem)
                 return;
-            }
 
-            string? presetId = menuItem.Tag?.ToString();
-
-            if (string.IsNullOrEmpty(presetId))
-            {
+            string? profileName = menuItem.Tag?.ToString();
+            if (string.IsNullOrEmpty(profileName))
                 return;
-            }
 
             _isTrayPresetApplying = true;
             try
             {
-                await Task.Run(PremadePresets.SetPremadePresets);
+                string command = PresetProfileApplier.BuildCommandString(profileName);
+                string displayName = PresetProfileApplier.DisplayName(profileName);
 
-                var selection = presetId switch
-                {
-                    "eco" => (0, PremadePresets.EcoPreset, "Eco Preset", "Eco Preset Applied!", "The eco premade power preset has been applied!"),
-                    "balanced" => (1, PremadePresets.BalPreset, "Balanced Preset", "Balanced Preset Applied!", "The balanced premade power preset has been applied!"),
-                    "performance" => (2, PremadePresets.PerformancePreset, "Performance Preset", "Performance Preset Applied!", "The performance premade power preset has been applied!"),
-                    "extreme" => (3, PremadePresets.ExtremePreset, "Extreme Preset", "Extreme Preset Applied!", "The extreme premade power preset has been applied!"),
-                    _ => (-1, string.Empty, string.Empty, string.Empty, string.Empty)
-                };
+                await PresetProfileApplier.ApplyProfileAsync(profileName, displayName);
 
-                if (selection.Item1 < 0 || string.IsNullOrWhiteSpace(selection.Item2))
-                {
-                    return;
-                }
-
-                await RyzenAdj_To_UCU.TranslateAsync(selection.Item2, appliedName: selection.Item3, localizeAppliedName: true);
-                Settings.Default.CommandString = selection.Item2;
-                Settings.Default.premadePreset = selection.Item1;
+                Settings.Default.presetProfile = profileName;
+                Settings.Default.CommandString = command;
                 Settings.Default.Save();
-                ToastNotification.ShowToastNotification(selection.Item4, selection.Item5);
+
+                ToastNotification.ShowToastNotification($"{displayName} Applied!",
+                    $"{displayName} has been applied!");
             }
             catch (Exception ex)
             {
-                DiagnosticLogger.LogError(ex, "Failed to apply a premade preset from the tray menu");
+                DiagnosticLogger.LogError(ex, "Failed to apply a stock preset from the tray menu");
             }
             finally
             {
-                RefreshTrayPremadePresetChecks();
+                RefreshTrayStockPresetChecks();
                 _isTrayPresetApplying = false;
             }
         }
 
         private void PopulateTrayCustomPresets()
         {
-            _miCustomPresets.Items.Clear();
+            // Remove any existing custom preset items from miSectionPresets
+            // (items after the Separator, which is at index 3)
+            while (miSectionPresets.Items.Count > 4)
+            {
+                miSectionPresets.Items.RemoveAt(miSectionPresets.Items.Count - 1);
+            }
             try
             {
-                var manager = CreateCustomPresetManager();
-                var names = manager.GetPresetNames()
-                    .Where(name => !string.IsNullOrWhiteSpace(name))
-                    .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)
-                    .ToArray();
+                var presets = Models.CustomPresetStore.Load();
+                int count = 0;
+                int activeSlot = Settings.Default.customPresetSlot;
+                bool isCustomActive = string.Equals(Settings.Default.presetProfile, "Custom", StringComparison.OrdinalIgnoreCase);
 
-                if (names.Length == 0)
+                for (int i = 0; i < presets.Length; i++)
                 {
-                    _miCustomPresets.Items.Add(new System.Windows.Controls.MenuItem
+                    if (presets[i].HasChanges)
                     {
-                        Header = LocalizationService.Get("No custom presets found"),
-                        IsEnabled = false
-                    });
-                    return;
+                        var item = new MenuItem
+                        {
+                            Header = $"Custom {i + 1}",
+                            Tag = i,
+                            IsCheckable = true,
+                            IsChecked = isCustomActive && i == activeSlot
+                        };
+                        item.Click += TrayCustomPreset_Click;
+                        miSectionPresets.Items.Add(item);
+                        count++;
+                    }
                 }
 
-                foreach (var name in names)
+                if (count == 0)
                 {
-                    var item = new System.Windows.Controls.MenuItem
+                    miSectionPresets.Items.Add(new MenuItem
                     {
-                        Header = name,
-                        Tag = name
-                    };
-                    item.Click += (s, ev) => TrayCustomPreset_ClickAsync(name);
-                    _miCustomPresets.Items.Add(item);
+                        Header = "No saved custom profiles",
+                        IsEnabled = false
+                    });
                 }
             }
             catch (Exception ex)
             {
                 DiagnosticLogger.LogError(ex, "Failed to populate custom presets in the tray menu");
-                _miCustomPresets.Items.Add(new System.Windows.Controls.MenuItem
+                miSectionPresets.Items.Add(new MenuItem
                 {
-                    Header = LocalizationService.Get("No custom presets found"),
+                    Header = "No saved custom profiles",
                     IsEnabled = false
                 });
             }
         }
 
-        private async void TrayCustomPreset_ClickAsync(string presetName)
+        private async void TrayCustomPreset_Click(object? sender, RoutedEventArgs e)
         {
-            if (_isTrayPresetApplying)
-            {
+            if (_isTrayPresetApplying || sender is not MenuItem menuItem)
                 return;
-            }
 
+            int slot = (int)menuItem.Tag;
             _isTrayPresetApplying = true;
             try
             {
-                var preset = CreateCustomPresetManager().GetPreset(presetName);
-                if (preset == null)
-                {
+                var presets = Models.CustomPresetStore.Load();
+                if (slot >= presets.Length)
                     return;
-                }
 
-                var command = preset.commandValue ?? string.Empty;
+                var p = presets[slot];
+                string command = BuildCustomCommandString(p);
                 if (!string.IsNullOrWhiteSpace(command))
                 {
-                    await RyzenAdj_To_UCU.TranslateAsync(command, appliedName: presetName);
-                    ToastNotification.ShowToastNotification("Preset Applied", "Your custom preset settings have been applied!");
+                    await ApplyCustomOnStart(command, p);
+                    ToastNotification.ShowToastNotification($"Custom {slot + 1} Applied!",
+                        $"Custom preset (Profile {slot + 1}) has been applied!");
                 }
 
-                Settings.Default.cstmPreset = presetName;
+                Settings.Default.presetProfile = "Custom";
+                Settings.Default.customPresetSlot = slot;
                 Settings.Default.CommandString = command;
                 Settings.Default.Save();
             }
@@ -749,22 +815,10 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
             finally
             {
-                RefreshTrayPremadePresetChecks();
+                RefreshTrayStockPresetChecks();
+                PopulateTrayCustomPresets();
                 _isTrayPresetApplying = false;
             }
-        }
-
-        private static PresetManager CreateCustomPresetManager()
-        {
-            var fileName = Family.TYPE switch
-            {
-                Family.ProcessorType.Amd_Apu => "apuPresets.json",
-                Family.ProcessorType.Amd_Desktop_Cpu => "amdDtCpuPresets.json",
-                Family.ProcessorType.Intel => "intelPresets.json",
-                _ => "apuPresets.json"
-            };
-
-            return new PresetManager(Settings.Default.Path + fileName);
         }
 
         private static async Task TranslatePresetAsync(string commands, string? configuredName)
@@ -799,13 +853,22 @@ namespace Uniwill_Control_Utility.Views.Windows
             };
         }
 
-        private void RefreshTrayPremadePresetChecks()
+        private void RefreshTrayStockPresetChecks()
         {
-            var command = Settings.Default.CommandString;
-            miTrayEcoPreset.IsChecked = !string.IsNullOrWhiteSpace(PremadePresets.EcoPreset) && string.Equals(command, PremadePresets.EcoPreset, StringComparison.Ordinal);
-            miTrayBalancedPreset.IsChecked = !string.IsNullOrWhiteSpace(PremadePresets.BalPreset) && string.Equals(command, PremadePresets.BalPreset, StringComparison.Ordinal);
-            miTrayPerformancePreset.IsChecked = !string.IsNullOrWhiteSpace(PremadePresets.PerformancePreset) && string.Equals(command, PremadePresets.PerformancePreset, StringComparison.Ordinal);
-            miTrayExtremePreset.IsChecked = !string.IsNullOrWhiteSpace(PremadePresets.ExtremePreset) && string.Equals(command, PremadePresets.ExtremePreset, StringComparison.Ordinal);
+            string? profile = Settings.Default.presetProfile;
+            miTrayOfficePreset.IsChecked = string.Equals(profile, "Office", StringComparison.OrdinalIgnoreCase);
+            miTrayGamingPreset.IsChecked = string.Equals(profile, "Gaming", StringComparison.OrdinalIgnoreCase);
+            miTrayTurboPreset.IsChecked = string.Equals(profile, "Turbo", StringComparison.OrdinalIgnoreCase);
+
+            // Clear custom preset checkmarks when a stock preset is active
+            if (!string.Equals(profile, "Custom", StringComparison.OrdinalIgnoreCase))
+            {
+                for (int i = 4; i < miSectionPresets.Items.Count; i++)
+                {
+                    if (miSectionPresets.Items[i] is MenuItem item && item.IsCheckable)
+                        item.IsChecked = false;
+                }
+            }
         }
 
         private void miClose_Click(object? sender, RoutedEventArgs e)
@@ -881,6 +944,659 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             Task.Run(Garbage.Garbage_Collect);
         }
+
+        #region Tray Menu Handlers
+
+        #region Hydro UI Tray Handlers
+
+        private async void TrayHydroPump_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem item || !string.IsNullOrEmpty(item.Tag?.ToString()) == false)
+                return;
+
+            var wc = App.GetService<WaterCoolerService>();
+            if (wc == null || !wc.IsConnected)
+            {
+                ToastNotification.ShowToastNotification("Hydro UI", "Watercooler not connected");
+                return;
+            }
+
+            var voltage = item.Tag!.ToString()! switch
+            {
+                "Off" => PumpVoltage.Off,
+                "V7" => PumpVoltage.V7,
+                "V8" => PumpVoltage.V8,
+                "V11" => PumpVoltage.V11,
+                _ => PumpVoltage.V7
+            };
+
+            // Update checkmarks
+            foreach (MenuItem mi in miHydroPump.Items)
+                mi.IsChecked = mi == item;
+
+            await wc.WritePumpModeAsync(voltage);
+            wc.SaveSettings();
+        }
+
+        private async void TrayHydroFan_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem item || !string.IsNullOrEmpty(item.Tag?.ToString()) == false)
+                return;
+
+            var wc = App.GetService<WaterCoolerService>();
+            if (wc == null || !wc.IsConnected)
+            {
+                ToastNotification.ShowToastNotification("Hydro UI", "Watercooler not connected");
+                return;
+            }
+
+            var speed = item.Tag!.ToString()! switch
+            {
+                "Off" => FanSpeed.Off,
+                "Percent25" => FanSpeed.Percent25,
+                "Percent50" => FanSpeed.Percent50,
+                "Percent75" => FanSpeed.Percent75,
+                "Percent90" => FanSpeed.Percent90,
+                "Percent95" => FanSpeed.Percent95,
+                "Percent100" => FanSpeed.Percent100,
+                _ => FanSpeed.Percent50
+            };
+
+            foreach (MenuItem mi in miHydroFan.Items)
+                mi.IsChecked = mi == item;
+
+            await wc.WriteFanModeAsync(speed);
+            wc.SaveSettings();
+        }
+
+        private async void TrayHydroRgb_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem item || !string.IsNullOrEmpty(item.Tag?.ToString()) == false)
+                return;
+
+            var wc = App.GetService<WaterCoolerService>();
+            if (wc == null || !wc.IsConnected)
+            {
+                ToastNotification.ShowToastNotification("Hydro UI", "Watercooler not connected");
+                return;
+            }
+
+            var mode = item.Tag!.ToString()! switch
+            {
+                "Off" => RgbState.Off,
+                "Static" => RgbState.Static,
+                "Breathe" => RgbState.Breathe,
+                "Colorful" => RgbState.Colorful,
+                "BreatheColor" => RgbState.BreatheColor,
+                _ => RgbState.Static
+            };
+
+            foreach (MenuItem mi in miHydroRgb.Items)
+                mi.IsChecked = mi == item;
+
+            await wc.WriteRgbModeAsync(mode);
+            wc.UpdateRgbMode(mode);
+            wc.SaveSettings();
+        }
+
+        #endregion
+
+        #region Flydigi Tray Handlers
+
+        private async void TrayFlydigiFan_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem item || string.IsNullOrEmpty(item.Tag?.ToString()))
+                return;
+
+            var fc = App.GetService<FlydigiCoolerService>();
+            if (fc == null || !fc.IsConnected)
+            {
+                ToastNotification.ShowToastNotification("Flydigi", "Cooler not connected");
+                return;
+            }
+
+            string tag = item.Tag!.ToString()!;
+
+            // Update checkmarks - clear all Fan Mode items (Gears and Auto(Curve) children)
+            foreach (MenuItem mi in miFlydigiFan.Items)
+            {
+                if (mi == miFlydigiGears)
+                {
+                    foreach (MenuItem child in mi.Items)
+                        child.IsChecked = child == item;
+                }
+                else if (mi == miFlydigiAutoCurve)
+                {
+                    foreach (MenuItem child in mi.Items)
+                        child.IsChecked = false;
+                }
+                else
+                {
+                    mi.IsChecked = mi == item;
+                }
+            }
+
+            if (tag == "Off")
+            {
+                await fc.WriteRealtimeRpmAsync(0);
+            }
+            else
+            {
+                byte gear = tag switch
+                {
+                    "Gear1" => 1,
+                    "Gear2" => 2,
+                    "Gear3" => 3,
+                    "Gear4" => 4,
+                    _ => 1
+                };
+                var settings = fc.GetSettings();
+                settings.FanMode = 1; // Gear Presets
+                settings.ManualGear = gear;
+                await fc.WriteGearAsync(gear);
+                fc.PersistSettings();
+            }
+        }
+
+        private void TrayFlydigiCurve_SubmenuOpened(object sender, RoutedEventArgs e)
+        {
+            // Show/hide Custom item based on whether a custom curve exists
+            try
+            {
+                var fc = App.GetService<FlydigiCoolerService>();
+                bool hasCustom = false;
+                if (fc != null)
+                {
+                    var settings = fc.GetSettings();
+                    hasCustom = !string.IsNullOrEmpty(settings.CustomCurveJson);
+                }
+                miFlydigiCurveCustom.Visibility = hasCustom ? Visibility.Visible : Visibility.Collapsed;
+            }
+            catch { /* non-critical */ }
+        }
+
+        private async void TrayFlydigiCurve_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem item)
+                return;
+
+            var fc = App.GetService<FlydigiCoolerService>();
+            if (fc == null || !fc.IsConnected)
+            {
+                ToastNotification.ShowToastNotification("Flydigi", "Cooler not connected");
+                return;
+            }
+
+            // Update checkmarks - clear all Auto(Curve) children
+            foreach (MenuItem mi in miFlydigiAutoCurve.Items)
+                mi.IsChecked = mi == item;
+
+            // Also clear Off and Gears checkmarks since we're switching to Auto(Curve)
+            foreach (MenuItem mi in miFlydigiFan.Items)
+            {
+                if (mi == miFlydigiAutoCurve) continue;
+                if (mi == miFlydigiGears)
+                {
+                    foreach (MenuItem child in mi.Items)
+                        child.IsChecked = false;
+                }
+                else
+                {
+                    mi.IsChecked = false;
+                }
+            }
+
+            try
+            {
+                string? tag = item.Tag?.ToString();
+                FlydigiFanCurveProfile profile;
+
+                if (tag == "Silent") profile = FlydigiFanCurveProfile.CreateSilent();
+                else if (tag == "Balanced") profile = FlydigiFanCurveProfile.CreateBalanced();
+                else if (tag == "Performance") profile = FlydigiFanCurveProfile.CreatePerformance();
+                else if (tag == "Custom")
+                {
+                    profile = FlydigiFanCurveProfile.FromJSON(fc.GetSettings().CustomCurveJson);
+                }
+                else profile = FlydigiFanCurveProfile.CreateBalanced();
+
+                // Save the selected curve profile
+                var fcSettings = fc.GetSettings();
+                fcSettings.FanMode = 2; // Auto Curve
+                fcSettings.SelectedCurveProfile = profile.Name;
+                fc.PersistSettings();
+
+                var sc = App.GetService<FlydigiSmartControl>();
+                if (sc != null && sc.IsActive)
+                {
+                    sc.ActiveProfile = profile;
+                }
+
+                ToastNotification.ShowToastNotification("Flydigi", $"Curve profile \"{profile.Name}\" applied");
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to apply Flydigi curve profile from tray");
+            }
+        }
+
+        private async void TrayFlydigiRgb_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem item || string.IsNullOrEmpty(item.Tag?.ToString()))
+                return;
+
+            var fc = App.GetService<FlydigiCoolerService>();
+            if (fc == null || !fc.IsConnected)
+            {
+                ToastNotification.ShowToastNotification("Flydigi", "Cooler not connected");
+                return;
+            }
+
+            string tag = item.Tag!.ToString()!;
+
+            foreach (MenuItem mi in miFlydigiRgb.Items)
+                mi.IsChecked = mi == item;
+
+            var settings = fc.GetSettings();
+            switch (tag)
+            {
+                case "Off":
+                    await fc.WriteRgbOffAsync();
+                    break;
+                case "SmartTemp":
+                    await fc.WriteRgbSmartTempAsync();
+                    break;
+                case "Static":
+                    await fc.WriteRgbStaticAsync(settings.R, settings.G, settings.B, settings.Brightness);
+                    break;
+                case "Flowing":
+                    await fc.WriteRgbFlowingAsync();
+                    break;
+                case "Breathing":
+                    await fc.WriteRgbBreathingAsync(settings.R, settings.G, settings.B, settings.Brightness);
+                    break;
+            }
+
+            fc.PersistSettings();
+        }
+
+        #endregion
+
+        #region Fan Control Tray Handlers
+
+        private void TrayFanUnified_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem item)
+                return;
+
+            bool enabled = item.IsChecked == true;
+            var settings = FanControlSettingsService.Load();
+            settings.UnifiedMode = enabled;
+            FanControlSettingsService.Save(settings);
+
+            // Apply the curve
+            var ec = App.GetService<UniwillECService>();
+            if (ec != null)
+            {
+                var curve = GetFanPresetCurve(settings.UnifiedPreset);
+                if (enabled)
+                {
+                    ec.ApplyFanCurve(curve, curve, EcFanCurve.CpuTemperatures, EcFanCurve.CpuTemperatures);
+                }
+                else
+                {
+                    var cpuCurve = GetFanPresetCurve(settings.CpuPreset);
+                    var gpuCurve = GetFanPresetCurve(settings.GpuPreset);
+                    ec.ApplyFanCurve(cpuCurve, gpuCurve, EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
+                }
+            }
+        }
+
+        private void TrayFanProfile_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem item || string.IsNullOrEmpty(item.Tag?.ToString()))
+                return;
+
+            string tag = item.Tag!.ToString()!;
+            string presetName = tag switch
+            {
+                "FullSpeed" => "Full Speed",
+                _ => tag
+            };
+
+            foreach (MenuItem mi in miFanCurveProfile.Items)
+                mi.IsChecked = mi.Header.ToString() == (tag == "FullSpeed" ? "Full Speed" : tag);
+
+            var settings = FanControlSettingsService.Load();
+            settings.UnifiedPreset = presetName;
+            if (!settings.UnifiedMode)
+            {
+                settings.CpuPreset = presetName;
+                settings.GpuPreset = presetName;
+            }
+            FanControlSettingsService.Save(settings);
+
+            var ec = App.GetService<UniwillECService>();
+            if (ec != null)
+            {
+                var curve = GetFanPresetCurve(presetName);
+                if (settings.UnifiedMode)
+                {
+                    ec.ApplyFanCurve(curve, curve, EcFanCurve.CpuTemperatures, EcFanCurve.CpuTemperatures);
+                }
+                else
+                {
+                    ec.ApplyFanCurve(curve, curve, EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
+                }
+            }
+        }
+
+        private void TrayFanCpuProfile_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem item || string.IsNullOrEmpty(item.Tag?.ToString()))
+                return;
+
+            string tag = item.Tag!.ToString()!;
+            string presetName = tag switch
+            {
+                "FullSpeed" => "Full Speed",
+                _ => tag
+            };
+
+            foreach (MenuItem mi in miFanCpuProfile.Items)
+                mi.IsChecked = mi.Header?.ToString() == presetName;
+
+            var settings = FanControlSettingsService.Load();
+            settings.CpuPreset = presetName;
+            FanControlSettingsService.Save(settings);
+
+            var ec = App.GetService<UniwillECService>();
+            if (ec != null)
+            {
+                var cpuCurve = GetFanPresetCurve(presetName);
+                var gpuCurve = GetFanPresetCurve(settings.GpuPreset);
+                ec.ApplyFanCurve(cpuCurve, gpuCurve, EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
+            }
+        }
+
+        private void TrayFanGpuProfile_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem item || string.IsNullOrEmpty(item.Tag?.ToString()))
+                return;
+
+            string tag = item.Tag!.ToString()!;
+            string presetName = tag switch
+            {
+                "FullSpeed" => "Full Speed",
+                _ => tag
+            };
+
+            foreach (MenuItem mi in miFanGpuProfile.Items)
+                mi.IsChecked = mi.Header?.ToString() == presetName;
+
+            var settings = FanControlSettingsService.Load();
+            settings.GpuPreset = presetName;
+            FanControlSettingsService.Save(settings);
+
+            var ec = App.GetService<UniwillECService>();
+            if (ec != null)
+            {
+                var cpuCurve = GetFanPresetCurve(settings.CpuPreset);
+                var gpuCurve = GetFanPresetCurve(presetName);
+                ec.ApplyFanCurve(cpuCurve, gpuCurve, EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
+            }
+        }
+
+        /// <summary>
+        /// Returns a built-in EC fan curve preset by name.
+        /// </summary>
+        private static EcFanCurve GetFanPresetCurve(string? name) => name switch
+        {
+            "Silent" => EcFanCurve.CreateSilent(),
+            "Balanced" => EcFanCurve.CreateBalanced(),
+            "Performance" => EcFanCurve.CreatePerformance(),
+            "Full Speed" => EcFanCurve.CreateFullSpeed(),
+            "Off" => EcFanCurve.CreateOff(),
+            _ => EcFanCurve.CreateBalanced()
+        };
+
+        #endregion
+
+        #endregion
+
+        #region Tray Sync Helpers
+
+        /// <summary>
+        /// Syncs Hydro UI tray checkmarks with persisted WaterCoolerSettings.
+        /// </summary>
+        private void SyncTrayHydroChecks()
+        {
+            try
+            {
+                var wc = App.GetService<WaterCoolerService>();
+                if (wc == null) return;
+
+                var settings = wc.GetSettings();
+
+                // Pump
+                foreach (MenuItem mi in miHydroPump.Items)
+                {
+                    mi.IsChecked = mi.Tag?.ToString() == settings.PumpVoltage;
+                }
+
+                // Fan
+                foreach (MenuItem mi in miHydroFan.Items)
+                {
+                    mi.IsChecked = mi.Tag?.ToString() == settings.FanSpeed;
+                }
+
+                // RGB
+                foreach (MenuItem mi in miHydroRgb.Items)
+                {
+                    mi.IsChecked = mi.Tag?.ToString() == settings.RgbMode;
+                }
+            }
+            catch { /* non-critical */ }
+        }
+
+        /// <summary>
+        /// Syncs Flydigi tray checkmarks with persisted Bs2ProSettings.
+        /// </summary>
+        private void SyncTrayFlydigiChecks()
+        {
+            try
+            {
+                var fc = App.GetService<FlydigiCoolerService>();
+                if (fc == null) return;
+
+                var settings = fc.GetSettings();
+
+                // Fan Mode - FanMode: 0=Manual, 1=Gear Presets, 2=Auto Curve
+                // Clear all Fan Mode items first
+                foreach (MenuItem mi in miFlydigiFan.Items)
+                {
+                    if (mi == miFlydigiGears || mi == miFlydigiAutoCurve)
+                    {
+                        foreach (MenuItem child in mi.Items)
+                            child.IsChecked = false;
+                    }
+                    else
+                    {
+                        mi.IsChecked = false;
+                    }
+                }
+
+                if (settings.FanMode == 1)
+                {
+                    // Gear Presets mode - check matching gear in Gears submenu
+                    string? gearTag = settings.ManualGear switch
+                    {
+                        1 => "Gear1",
+                        2 => "Gear2",
+                        3 => "Gear3",
+                        4 => "Gear4",
+                        _ => null
+                    };
+                    foreach (MenuItem mi in miFlydigiGears.Items)
+                    {
+                        if (mi.Tag?.ToString() == gearTag)
+                            mi.IsChecked = true;
+                    }
+                }
+                else if (settings.FanMode == 2)
+                {
+                    // Auto Curve mode - check matching curve profile
+                    string? curveName = settings.SelectedCurveProfile;
+                    foreach (MenuItem mi in miFlydigiAutoCurve.Items)
+                    {
+                        if (string.Equals(mi.Tag?.ToString(), curveName, StringComparison.OrdinalIgnoreCase))
+                            mi.IsChecked = true;
+                    }
+                }
+                else if (settings.FanMode == 0)
+                {
+                    // Manual mode - check Off if RPM is 0
+                    if (settings.ManualRpm == 0)
+                    {
+                        foreach (MenuItem mi in miFlydigiFan.Items)
+                        {
+                            if (mi == miFlydigiGears || mi == miFlydigiAutoCurve) continue;
+                            if (mi.Tag?.ToString() == "Off")
+                                mi.IsChecked = true;
+                        }
+                    }
+                }
+
+                // RGB
+                foreach (MenuItem mi in miFlydigiRgb.Items)
+                {
+                    string? tag = mi.Tag?.ToString();
+                    string? mode = settings.RgbMode;
+                    if (tag == "Off" && string.Equals(mode, "Off", StringComparison.OrdinalIgnoreCase))
+                        mi.IsChecked = true;
+                    else if (tag == "SmartTemp" && string.Equals(mode, "SmartTemp", StringComparison.OrdinalIgnoreCase))
+                        mi.IsChecked = true;
+                    else if (tag == "Static" && string.Equals(mode, "Static", StringComparison.OrdinalIgnoreCase))
+                        mi.IsChecked = true;
+                    else if (tag == "Flowing" && string.Equals(mode, "Flowing", StringComparison.OrdinalIgnoreCase))
+                        mi.IsChecked = true;
+                    else if (tag == "Breathing" && string.Equals(mode, "Breathing", StringComparison.OrdinalIgnoreCase))
+                        mi.IsChecked = true;
+                }
+            }
+            catch { /* non-critical */ }
+        }
+
+        /// <summary>
+        /// Syncs Flydigi Auto(Curve) checkmarks. Called from TrayMenu_Opened.
+        /// </summary>
+        private void SyncTrayFlydigiCurveChecks()
+        {
+            // Handled in SyncTrayFlydigiChecks now
+        }
+
+        /// <summary>
+        /// Syncs Fan Control tray checkmarks with persisted FanControlSettings.
+        /// </summary>
+        private void SyncTrayFanControlChecks()
+        {
+            try
+            {
+                var settings = FanControlSettingsService.Load();
+
+                // Unified Curve toggle
+                miFanUnified.IsChecked = settings.UnifiedMode;
+
+                if (settings.UnifiedMode)
+                {
+                    // Unified mode: show Profile, hide CPU/GPU Profile
+                    string presetName = settings.UnifiedPreset switch
+                    {
+                        "Full Speed" => "FullSpeed",
+                        _ => settings.UnifiedPreset
+                    };
+                    foreach (MenuItem mi in miFanCurveProfile.Items)
+                        mi.IsChecked = mi.Tag?.ToString() == presetName;
+                }
+                else
+                {
+                    // Separate mode: check CPU and GPU profiles
+                    string cpuPreset = settings.CpuPreset switch
+                    {
+                        "Full Speed" => "FullSpeed",
+                        _ => settings.CpuPreset
+                    };
+                    string gpuPreset = settings.GpuPreset switch
+                    {
+                        "Full Speed" => "FullSpeed",
+                        _ => settings.GpuPreset
+                    };
+                    foreach (MenuItem mi in miFanCpuProfile.Items)
+                        mi.IsChecked = mi.Tag?.ToString() == cpuPreset;
+                    foreach (MenuItem mi in miFanGpuProfile.Items)
+                        mi.IsChecked = mi.Tag?.ToString() == gpuPreset;
+                }
+            }
+            catch { /* non-critical */ }
+        }
+
+        /// <summary>
+        /// Toggles visibility of Profile vs CPU/GPU Profile based on Unified mode.
+        /// </summary>
+        private void UpdateTrayFanProfileVisibility()
+        {
+            try
+            {
+                var settings = FanControlSettingsService.Load();
+                if (settings.UnifiedMode)
+                {
+                    miFanCurveProfile.Visibility = Visibility.Visible;
+                    miFanCpuProfile.Visibility = Visibility.Collapsed;
+                    miFanGpuProfile.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    miFanCurveProfile.Visibility = Visibility.Collapsed;
+                    miFanCpuProfile.Visibility = Visibility.Visible;
+                    miFanGpuProfile.Visibility = Visibility.Visible;
+                }
+            }
+            catch { /* non-critical */ }
+        }
+
+        /// <summary>
+        /// Disables or enables tray controls based on Adaptive Mode override state.
+        /// Only applies when Adaptive Mode is actually running (isAdaptiveModeRunning = true).
+        /// </summary>
+        private void UpdateTrayAdaptiveOverrideState()
+        {
+            // Only apply override restrictions when Adaptive Mode is running
+            if (!Settings.Default.isAdaptiveModeRunning)
+            {
+                // All controls enabled when Adaptive Mode is off
+                miSectionPresets.IsEnabled = true;
+                miSectionHydro.IsEnabled = true;
+                miSectionFanControl.IsEnabled = true;
+                return;
+            }
+
+            var deviceApplier = App.GetService<DeviceApplier>();
+
+            // Presets: disable if CPU or GPU tuning override is active
+            // CPU/GPU overrides are tracked in Settings (AdaptiveCpuEnabled/AdaptiveGpuEnabled)
+            bool cpuOrGpuOverridden = Settings.Default.AdaptiveCpuEnabled || Settings.Default.AdaptiveGpuEnabled;
+            miSectionPresets.IsEnabled = !cpuOrGpuOverridden;
+
+            // Hydro UI: disable if watercooler override is active
+            bool wcOverridden = deviceApplier != null && deviceApplier.IsWatercoolerOverridden;
+            miSectionHydro.IsEnabled = !wcOverridden;
+
+            // Fan Control: disable if EC fan override is active
+            bool ecFanOverridden = deviceApplier != null && deviceApplier.IsEcFanOverridden;
+            miSectionFanControl.IsEnabled = !ecFanOverridden;
+        }
+
+        #endregion
 
         #region Custom Preset Boot Apply
 

@@ -291,8 +291,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 Title = "Adaptive Mode Override",
                 Content = "Adaptive Mode is currently controlling the EC fan curves. Controls on this page are currently disabled.",
-                Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
-                Icon = new Wpf.Ui.Controls.SymbolIcon(Wpf.Ui.Controls.SymbolRegular.Warning24),
+                Appearance = Wpf.Ui.Controls.ControlAppearance.Info,
+                Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = "\uF167", FontSize = 16, Margin = new System.Windows.Thickness(0, 0, 10, 0) },
                 IsCloseButtonEnabled = false,
                 Timeout = TimeSpan.FromHours(1),
             };
@@ -411,28 +411,28 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 case BannerState.FanOff:
                     InfoBanner.BorderBrush = new SolidColorBrush(Colors.Red) { Opacity = 0.5 };
-                    InfoBannerIcon.Glyph = "\xE7A7"; // Warning
+                    InfoBannerIcon.Glyph = "\uE7BA"; // Warning
                     InfoBannerText.Text =
                         $"Profile \"Off\" has been set for one or more fan curves. Please make sure that you are using a {coolerName} cooler to avoid temperature-induced hardware damage.";
                     break;
 
                 case BannerState.ZeroApplied:
                     InfoBanner.BorderBrush = new SolidColorBrush(Colors.Red) { Opacity = 0.5 };
-                    InfoBannerIcon.Glyph = "\xE7A7"; // Warning
+                    InfoBannerIcon.Glyph = "\uE7BA"; // Warning
                     InfoBannerText.Text =
                         $"A zero-fan setting has been applied. Please make sure that you are using a {coolerName} cooler to avoid temperature-induced hardware damage.";
                     break;
 
                 case BannerState.LowCurve:
                     InfoBanner.BorderBrush = new SolidColorBrush(Colors.Orange) { Opacity = 0.5 };
-                    InfoBannerIcon.Glyph = "\xE7A7"; // Warning
+                    InfoBannerIcon.Glyph = "\uE7BA"; // Warning
                     InfoBannerText.Text =
                         $"A custom profile has been applied with a low fan curve. Please make sure that you are using a {coolerName} cooler to avoid temperature-induced hardware damage.";
                     break;
 
                 default:
                     InfoBanner.BorderBrush = new SolidColorBrush(Colors.White) { Opacity = 0.15 };
-                    InfoBannerIcon.Glyph = "\xE946"; // Info
+                    InfoBannerIcon.Glyph = "\uE946"; // Info
                     InfoBannerText.Text =
                         "Default fan curve profiles cannot be edited, switch to Custom in order to make a personalized curve.";
                     break;

@@ -18,7 +18,9 @@ namespace Uniwill_Control_Utility.Views.Pages
     public partial class LightBar : Page
     {
         private KeyboardHidService? _hidService;
+        private DeviceApplier? _deviceApplier;
         private bool _isFirstLoad = true;
+        private Wpf.Ui.Controls.Snackbar? _adaptiveSnackbar;
 
         // Debounce timer for color/brightness HID writes
         private readonly DispatcherTimer _applyDebounce = new()
@@ -47,6 +49,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             InitializeComponent();
             InitializeDebounce();
             PopulateEffects();
+
+            // Subscribe to DeviceApplier events for override management
+            _deviceApplier = App.GetService<DeviceApplier>();
+            if (_deviceApplier != null)
+            {
+                _deviceApplier.LightBarOverrideChanged += OnLightBarOverrideChanged;
+            }
 
             // Show unavailable state initially; HID opens in background
             LightBarAvailable.Visibility = Visibility.Collapsed;
@@ -115,6 +124,13 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
+            // Re-apply override state on navigation. The override event may have fired
+            // before this page was in the visual tree, leaving stale UI state.
+            if (_deviceApplier != null && _deviceApplier.IsLightBarOverridden)
+            {
+                ApplyOverrideState(true);
+            }
+
             // Load saved settings from disk
             bool enabled = Settings.Default.LightBarEnabled;
             byte r = (byte)Settings.Default.LightBarR;
@@ -314,6 +330,57 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.LightBarEffectIndex = cbEffect.SelectedIndex;
             Settings.Default.LightBarSpeed = (int)SpeedSlider.Value;
             Settings.Default.Save();
+        }
+
+        private void OnLightBarOverrideChanged(object? sender, bool isOverridden)
+        {
+            ApplyOverrideState(isOverridden);
+        }
+
+        /// <summary>
+        /// Applies or lifts the override UI state (overlay, snackbar, control enablement).
+        /// </summary>
+        private void ApplyOverrideState(bool isOverridden)
+        {
+            overlayAdaptiveWarning.Visibility = isOverridden ? Visibility.Visible : Visibility.Collapsed;
+
+            if (isOverridden)
+            {
+                LightBarAvailable.IsEnabled = false;
+                ShowAdaptiveSnackbar();
+            }
+            else
+            {
+                LightBarAvailable.IsEnabled = true;
+                HideAdaptiveSnackbar();
+            }
+        }
+
+        private void ShowAdaptiveSnackbar()
+        {
+            if (_adaptiveSnackbar != null)
+                SnackbarPresenter.HideCurrent();
+
+            _adaptiveSnackbar = new Wpf.Ui.Controls.Snackbar(SnackbarPresenter)
+            {
+                Title = "Adaptive Mode Override",
+                Content = "Adaptive Mode is currently controlling the light bar. Controls on this page are currently disabled.",
+                Appearance = Wpf.Ui.Controls.ControlAppearance.Info,
+                Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uF167", FontSize = 16, Margin = new Thickness(0, 0, 10, 0) },
+                IsCloseButtonEnabled = false,
+                Timeout = TimeSpan.FromHours(1),
+            };
+
+            if (SnackbarPresenter.IsLoaded)
+                _adaptiveSnackbar.Show(true);
+            else
+                SnackbarPresenter.Loaded += (s, e) => _adaptiveSnackbar?.Show(true);
+        }
+
+        private void HideAdaptiveSnackbar()
+        {
+            SnackbarPresenter.HideCurrent();
+            _adaptiveSnackbar = null;
         }
     }
 }

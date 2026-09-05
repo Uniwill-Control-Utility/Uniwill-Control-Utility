@@ -239,10 +239,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void SetControlsEnabled(bool enabled)
         {
-            cbxPumpVoltage.IsEnabled = enabled;
-            cbxFanSpeed.IsEnabled = enabled;
-            cbxRgbMode.IsEnabled = enabled;
-            cbxRgbColor.IsEnabled = enabled;
+            spControls.IsEnabled = enabled;
         }
 
         #region Device Discovery & Connection
@@ -603,8 +600,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 Title = "Adaptive Mode Override",
                 Content = "Adaptive Mode is currently controlling the watercooler. Controls on this page are disabled.",
-                Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
-                Icon = new Wpf.Ui.Controls.SymbolIcon(Wpf.Ui.Controls.SymbolRegular.Warning24),
+                Appearance = Wpf.Ui.Controls.ControlAppearance.Info,
+                Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = "\uF167", FontSize = 16, Margin = new System.Windows.Thickness(0, 0, 10, 0) },
                 IsCloseButtonEnabled = false,
                 Timeout = TimeSpan.FromHours(1), // effectively infinite — dismissed on page Unloaded
             };

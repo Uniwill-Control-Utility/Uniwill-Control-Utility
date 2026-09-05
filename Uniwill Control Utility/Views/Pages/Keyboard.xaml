@@ -568,13 +568,16 @@
         </ui:Card>
 
         <!-- 3. Overlays/Dialogs sit outside the ScrollViewer to freeze the entire UI if needed -->
-        <Border x:Name="overlayAdaptiveWarning" Panel.ZIndex="10" Visibility="Collapsed" Background="Black" Opacity="0.4"/>
+        <Border x:Name="overlayAdaptiveWarning"
+                Panel.ZIndex="10" 
+                Grid.Row="0" 
+                Grid.RowSpan="2" 
+                Visibility="Collapsed" 
+                Background="{DynamicResource SmokeFillColorDefaultBrush}"
+                CornerRadius="4,0,0,0"/>
 
         <!-- Page-scoped snackbar presenter (above overlay) -->
         <ui:SnackbarPresenter x:Name="SnackbarPresenter"
-                              Panel.ZIndex="11"
-                              Margin="12"
-                              HorizontalAlignment="Right"
-                              VerticalAlignment="Bottom" />
+                              Panel.ZIndex="11" MaxWidth="1080"/>
     </Grid>
 </Page>

@@ -161,6 +161,7 @@
     </Resource>
     <Resource Include="Assets\applicationIcon-1024.png" />
     <Resource Include="Assets\applicationIcon-256.png" />
+	  <Resource Include="Assets\applicationIcon-32.png" />
     <Resource Include="Assets\Flydigi\bs1.png" />
     <Resource Include="Assets\Flydigi\bs2.png" />
     <Resource Include="Assets\Flydigi\bs2-pro.png" />

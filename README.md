@@ -59,7 +59,7 @@ AI (**Qwen 3.6 27B**) was used to:
  - Automatic performance profile application based on the charger being (un)plugged
  - Extra RGB effects/directions for the keyboard
  - Live metric overlay (WIP)
- - maybe more
+ - System tray controls for Power profile, Hydro UI, Fan and FLydigi control
 
 ## Features I tried to but wasn't able to replicate
  - MiniLED control (tried so many approaches to replicating what was done in **tuxedo-drivers** but it wouldn't play ball in Windows - **would greatly appreciate a PR from someone more knowledgeable**)

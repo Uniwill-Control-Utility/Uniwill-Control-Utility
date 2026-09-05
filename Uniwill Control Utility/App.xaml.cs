@@ -370,10 +370,11 @@ namespace Uniwill_Control_Utility
                 }
 
                 // Restore Adaptive Mode override state from previous session
+                // Only restore if Adaptive Mode was actually running when the app closed
                 try
                 {
                     var deviceApplier = _host.Services.GetService<DeviceApplier>();
-                    if (deviceApplier != null)
+                    if (deviceApplier != null && Settings.Default.isAdaptiveModeRunning)
                     {
                         if (Settings.Default.AdaptiveBs2ProEnabled)
                             deviceApplier.EnableFlydigiOverride();

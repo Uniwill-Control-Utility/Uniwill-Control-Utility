@@ -196,9 +196,9 @@
                         </ui:CardControl.Header>
                         <ComboBox x:Name="cbxPumpVoltage" MinWidth="160" SelectionChanged="cbxPumpVoltage_SelectionChanged">
                             <ComboBoxItem Content="Off"/>
-                            <ComboBoxItem Content="7V"/>
-                            <ComboBoxItem Content="8V"/>
-                            <ComboBoxItem Content="11V"/>
+                            <ComboBoxItem Content="7 V"/>
+                            <ComboBoxItem Content="8 V"/>
+                            <ComboBoxItem Content="11 V"/>
                         </ComboBox>
                     </ui:CardControl>
 
@@ -322,15 +322,12 @@
         <!-- Dark overlay to block input when Adaptive Mode override is active -->
         <Border x:Name="overlayAdaptiveWarning"
                 Visibility="Collapsed"
-                Background="Black"
-                Opacity="0.4"
-                CornerRadius="4"
+                Background="{DynamicResource SmokeFillColorDefaultBrush}"
+                CornerRadius="4,0,0,0"
                 IsHitTestVisible="True" />
 
         <!-- SnackbarPresenter for Adaptive Mode override warning -->
         <ui:SnackbarPresenter x:Name="SnackbarPresenter"
-                              Margin="12"
-                              HorizontalAlignment="Right"
-                              VerticalAlignment="Bottom" />
+                              Panel.ZIndex="11"  MaxWidth="1080"/>
     </Grid>
 </Page>

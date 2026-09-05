@@ -15,7 +15,8 @@
       UseLayoutRounding="True"
       ScrollViewer.CanContentScroll="False">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled"
                   CanContentScroll="False"
                   PanningMode="VerticalOnly"
@@ -223,6 +224,17 @@
  
                 </StackPanel>
             </StackPanel>
-        </Grid>
-    </ScrollViewer>
+
+            </Grid>
+        </ScrollViewer>
+        <!-- Dark overlay for Adaptive Mode override (outside ScrollViewer to cover whole page) -->
+        <Border x:Name="overlayAdaptiveWarning"
+                Panel.ZIndex="10"
+                Visibility="Collapsed"
+                Background="{DynamicResource SmokeFillColorDefaultBrush}"
+                CornerRadius="4,0,0,0"
+                IsHitTestVisible="True" />
+        <!-- SnackbarPresenter for Adaptive Mode override warning -->
+        <ui:SnackbarPresenter x:Name="SnackbarPresenter" Panel.ZIndex="11" MaxWidth="1080"/>
+    </Grid>
 </Page>

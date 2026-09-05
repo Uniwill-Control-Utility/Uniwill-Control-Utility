@@ -44,6 +44,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             Debug.WriteLine($"[Presets] {message}");
         }
 
+        // Adaptive Mode override snackbar
+        private Wpf.Ui.Controls.Snackbar? _adaptiveSnackbar;
+
         // Stored profile values for status card (independent of slider UI state).
         private double _profileSustained = 75;
         private double _profileBoost = 85;
@@ -79,6 +82,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 applyPowerLimits();
                 setProfileTooltips();
                 loadSavedProfile();
+
+                // Update overlay based on Adaptive Mode override state
+                UpdateAdaptiveOverlay();
             }
             catch (Exception ex)
             {
@@ -174,6 +180,57 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 updateAllLabels();
             }
+
+            // Update overlay based on Adaptive Mode override state
+            UpdateAdaptiveOverlay();
+        }
+
+        /// <summary>
+        /// Shows/hides the adaptive override overlay and snackbar on the Presets page.
+        /// Only active when Adaptive Mode is running AND CPU or GPU override is enabled.
+        /// </summary>
+        private void UpdateAdaptiveOverlay()
+        {
+            bool shouldShow = Settings.Default.isAdaptiveModeRunning
+                && (Settings.Default.AdaptiveCpuEnabled || Settings.Default.AdaptiveGpuEnabled);
+
+            if (shouldShow)
+            {
+                overlayAdaptiveWarning.Visibility = Visibility.Visible;
+                ShowAdaptiveSnackbar();
+            }
+            else
+            {
+                overlayAdaptiveWarning.Visibility = Visibility.Collapsed;
+                HideAdaptiveSnackbar();
+            }
+        }
+
+        private void ShowAdaptiveSnackbar()
+        {
+            if (_adaptiveSnackbar != null)
+                SnackbarPresenter.HideCurrent();
+
+            _adaptiveSnackbar = new Wpf.Ui.Controls.Snackbar(SnackbarPresenter)
+            {
+                Title = "Adaptive Mode Override",
+                Content = "Adaptive Mode is currently controlling CPU/GPU tuning. Controls on this page are currently disabled.",
+                Appearance = Wpf.Ui.Controls.ControlAppearance.Info,
+                Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = "\uF167", FontSize = 16, Margin = new System.Windows.Thickness(0, 0, 10, 0) },
+                IsCloseButtonEnabled = false,
+                Timeout = TimeSpan.FromHours(1),
+            };
+
+            if (SnackbarPresenter.IsLoaded)
+                _adaptiveSnackbar.Show(true);
+            else
+                SnackbarPresenter.Loaded += (s, e) => _adaptiveSnackbar?.Show(true);
+        }
+
+        private void HideAdaptiveSnackbar()
+        {
+            SnackbarPresenter.HideCurrent();
+            _adaptiveSnackbar = null;
         }
 
         private void Slider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -579,6 +636,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Save selection
             Settings.Default.presetProfile = profile;
+            if (profile == "Custom")
+            {
+                Settings.Default.customPresetSlot = _customPresetSlot;
+            }
             Settings.Default.Save();
 
             // Only apply when explicitly requested (button click), not on page load
@@ -1058,6 +1119,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             SaveCustomPreset(_customPresetSlot);
 
             _customPresetSlot = newSlot;
+            Settings.Default.customPresetSlot = newSlot;
+            Settings.Default.Save();
 
             // Load the new slot's preset if it has data
             LoadCustomPreset(newSlot);
@@ -1217,6 +1280,12 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void detectAndActivateVfCurve()
         {
             if (_vfActivePreset >= 0) return; // Already active from this session.
+
+            // Restore the last active custom preset slot from settings
+            _customPresetSlot = Settings.Default.customPresetSlot;
+            if (_customPresetSlot < 0 || _customPresetSlot >= Models.CustomPreset.MaxSlots)
+                _customPresetSlot = 0;
+
             var presets = Models.CustomPresetStore.Load();
             for (int i = 0; i < presets.Length; i++)
             {

@@ -91,7 +91,7 @@
                                          FontFamily="Segoe Fluent Icons"
                                          Glyph="&#xE946;"
                                          FontSize="16"
-                                         Margin="0,0,10,0"
+                                         Margin="6,0,20,0"
                                          VerticalAlignment="Center" />
                             <TextBlock x:Name="InfoBannerText"
                                        Grid.Column="1"
@@ -110,7 +110,7 @@
                                      Collapsed="UnifiedCard_Collapsed"
                                      Loaded="UnifiedCard_Loaded">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEA3C;" FontSize="20" />
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEA3C;" FontSize="20" Margin="4,0,6,0"/>
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -143,41 +143,42 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock FontSize="12"
-                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                           Text="Drag the sliders to set fan speed at each temperature."
-                                           TextWrapping="Wrap"
-                                           VerticalAlignment="Center" />
-                                <StackPanel Grid.Column="1"
-                                            Orientation="Horizontal"
-                                            VerticalAlignment="Center">
-                                    <TextBlock Margin="0,0,6,0"
-                                               FontSize="12"
-                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                               Text="Profile:"
-                                               VerticalAlignment="Center" />
-                                    <ComboBox x:Name="cbPreset"
-                                              Width="140"
-                                              Padding="8,4"
-                                              FontSize="12"
-                                              SelectionChanged="cbPreset_SelectionChanged">
-                                        <ComboBoxItem Content="Silent" />
-                                        <ComboBoxItem Content="Balanced" />
-                                        <ComboBoxItem Content="Performance" />
-                                        <ComboBoxItem Content="Full Speed" />
-                                        <ComboBoxItem Content="Off" />
-                                        <ComboBoxItem Content="Custom" />
-                                    </ComboBox>
-                                </StackPanel>
-                            </Grid>
-                            <controls:EcFanCurveEditor x:Name="FanCurveEditor" Margin="0,8,0,0" />
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Current Charge Limit" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+           FontTypography="Caption"
+           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+           Text="Active charging limit from the EC." />
+                                    </StackPanel>
+                                    <Grid Grid.Column="1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <ComboBox x:Name="cbPreset"
+                                                  Width="140"
+                                                  FontSize="12"
+                                                  SelectionChanged="cbPreset_SelectionChanged">
+                                            <ComboBoxItem Content="Silent" />
+                                            <ComboBoxItem Content="Balanced" />
+                                            <ComboBoxItem Content="Performance" />
+                                            <ComboBoxItem Content="Full Speed" />
+                                            <ComboBoxItem Content="Off" />
+                                            <ComboBoxItem Content="Custom" />
+                                        </ComboBox>
+                                    </Grid>
+                                </Grid>
+                                <Border Height="1" Margin="-58,12,-46,12"
+        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <controls:EcFanCurveEditor x:Name="FanCurveEditor" Margin="0,8,4,0" />
 
                             <!-- Unified temperature thresholds editor -->
                             <ui:CardExpander Margin="0,8,0,0"
                                              Header="Thermal Thresholds"
                                              IsExpanded="False">
                                 <ui:CardExpander.Icon>
-                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C3;" FontSize="16" />
+                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C3;" FontSize="16" Margin="4,0,6,0" />
                                 </ui:CardExpander.Icon>
                                 <StackPanel>
                                     <TextBlock FontSize="11"
@@ -238,15 +239,15 @@
                                                      FontFamily="Segoe Fluent Icons"
                                                      Glyph="&#xEEA1;"
                                                      FontSize="20"
-                                                     Margin="0,0,12,0"
+                                                     Margin="4,0,22,0"
                                                      VerticalAlignment="Center" />
                                                 <ui:TextBlock FontTypography="Body" 
                                                               Text="CPU"
-                                                              Grid.Column="1"/>
+                                                              Grid.Column="1"
+                                                              VerticalAlignment="Center"/>
                                                 <ComboBox x:Name="cbCpuPreset"
                                                   Grid.Column="2"
                                                   Width="120"
-                                                  Padding="8,4"
                                                   FontSize="12"
                                                   SelectionChanged="cbCpuPreset_SelectionChanged"
                                                   HorizontalAlignment="Right">
@@ -258,10 +259,11 @@
                                             <ComboBoxItem Content="Custom" />
                                         </ComboBox>
                                     </Grid>
-                                    <Separator Grid.Row="1"
-                                               Margin="0,8,0,8"
-                                               Background="{DynamicResource ControlFillColorDefaultBrush}" />
-                                    <controls:EcFanCurveEditor x:Name="CpuFanCurveEditor"
+                                            <Border Height="1" 
+                                                    Grid.Row="1"
+                                                    Margin="-14,12,-14,12"
+                                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                            <controls:EcFanCurveEditor x:Name="CpuFanCurveEditor"
                                                                Grid.Row="2" />
                                 </Grid>
                             </ui:CardControl.Header>
@@ -276,40 +278,41 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
-                                    <Grid Grid.Row="0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <ui:FontIcon Grid.Column="0"
+                                            <Grid Grid.Row="0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <ui:FontIcon Grid.Column="0"
                                                      FontFamily="Segoe Fluent Icons"
                                                      Glyph="&#xF211;"
                                                      FontSize="20"
-                                                     Margin="0,0,12,0"
+                                                     Margin="4,0,22,0"
                                                      VerticalAlignment="Center" />
-                                        <ui:TextBlock FontTypography="Body" 
+                                                <ui:TextBlock FontTypography="Body" 
                                                       Text="GPU"  
-                                                      Grid.Column="1"/>
-                                        <ComboBox x:Name="cbGpuPreset"
+                                                      Grid.Column="1"
+                                                      VerticalAlignment="Center"/>
+                                                <ComboBox x:Name="cbGpuPreset"
                                                   Grid.Column="2"
                                                   Width="120"
-                                                  Padding="8,4"
                                                   FontSize="12"
                                                   SelectionChanged="cbGpuPreset_SelectionChanged"
                                                   HorizontalAlignment="Right">
-                                            <ComboBoxItem Content="Silent" />
-                                            <ComboBoxItem Content="Balanced" />
-                                            <ComboBoxItem Content="Performance" />
-                                            <ComboBoxItem Content="Full Speed" />
-                                            <ComboBoxItem Content="Off" />
-                                            <ComboBoxItem Content="Custom" />
-                                        </ComboBox>
-                                    </Grid>
-                                    <Separator Grid.Row="1"
-                                               Margin="0,8,0,8"
-                                               Background="{DynamicResource ControlFillColorDefaultBrush}" />
-                                    <controls:EcFanCurveEditor x:Name="GpuFanCurveEditor"
+                                                    <ComboBoxItem Content="Silent" />
+                                                    <ComboBoxItem Content="Balanced" />
+                                                    <ComboBoxItem Content="Performance" />
+                                                    <ComboBoxItem Content="Full Speed" />
+                                                    <ComboBoxItem Content="Off" />
+                                                    <ComboBoxItem Content="Custom" />
+                                                </ComboBox>
+                                            </Grid>
+                                            <Border Height="1" 
+                                                    Grid.Row="1"
+                                                    Margin="-14,12,-14,12"
+                                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                            <controls:EcFanCurveEditor x:Name="GpuFanCurveEditor"
                                                                Grid.Row="2" />
                                 </Grid>
                             </ui:CardControl.Header>
@@ -318,11 +321,11 @@
                             <!-- Merged temperature thresholds editor for both CPU and GPU -->
                             <ui:CardExpander Grid.Row="1"
                                          Grid.ColumnSpan="3"
-                                         Margin="0,12,0,12"
+                                         Margin="0,8,0,8"
                                          Header="Thermal Thresholds"
                                          IsExpanded="False">
                             <ui:CardExpander.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C3;" FontSize="16" />
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C3;" FontSize="20" Margin="6,0,6,0"/>
                             </ui:CardExpander.Icon>
                             <StackPanel>
                                 <TextBlock FontSize="11"
@@ -403,10 +406,10 @@
                     </StackPanel>
 
                     <!-- Fan Turbo toggle -->
-                    <ui:CardControl Margin="0,0,0,8"
+                    <ui:CardControl Margin="0,0,0,0"
                                     Background="{DynamicResource SystemFillColorCriticalBackgroundBrush}">
                         <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xECAD;" FontSize="20" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xECAD;" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>
                         <ui:CardControl.Header>
                             <Grid>
@@ -435,7 +438,7 @@
 
                 <!-- Fallback when Uniwill EC is not available -->
                 <ui:CardControl x:Name="UniwillUnavailable"
-                                Margin="0,0,0,12"
+                                Margin="0,0,0,0"
                                 Visibility="Collapsed">
                     <ui:CardControl.Icon>
                         <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BA;" FontSize="20" />
@@ -506,13 +509,18 @@
             </Grid>
         </ui:Card>
 
-        <!-- Dark overlay for Adaptive Mode override (full-page, outside margins) -->
-        <Border x:Name="overlayAdaptiveWarning" Visibility="Collapsed" Background="Black" Opacity="0.4" CornerRadius="4"/>
+        <!-- Dark overlay for Adaptive Mode override (full-page, covers all rows) -->
+        <Border x:Name="overlayAdaptiveWarning"
+                Panel.ZIndex="10" 
+                Grid.Row="0" 
+                Grid.RowSpan="2" 
+                Visibility="Collapsed" 
+                Background="{DynamicResource SmokeFillColorDefaultBrush}"
+                CornerRadius="4,0,0,0"/>
 
-        <!-- Page-scoped snackbar presenter -->
+        <!-- Page-scoped snackbar presenter (above overlay) -->
         <ui:SnackbarPresenter x:Name="SnackbarPresenter"
-                              Margin="12"
-                              HorizontalAlignment="Right"
-                              VerticalAlignment="Bottom" />
+                              Grid.Row="0" Grid.RowSpan="2"
+                              Panel.ZIndex="11" MaxWidth="1080"/>
     </Grid>
 </Page>

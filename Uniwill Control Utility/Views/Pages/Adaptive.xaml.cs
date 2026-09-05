@@ -48,15 +48,15 @@ namespace Uniwill_Control_Utility.Views.Pages
             _ = Tablet.TabletDevices;
             setUp();
 
-            adaptiveMode.Interval = TimeSpan.FromSeconds(2);
+            adaptiveMode.Interval = TimeSpan.FromSeconds(5);
             adaptiveMode.Tick += new EventHandler(adaptive_Tick);
             adaptiveMode.Start();
 
-            sensors.Interval = TimeSpan.FromSeconds(2);
+            sensors.Interval = TimeSpan.FromSeconds(5);
             sensors.Tick += new EventHandler(sensors_Tick);
             sensors.Start();
 
-            nudPolling.Value = Settings.Default.polling;
+            nudPolling.Value = 5;
 
             cbAutoSwitch.IsChecked = Settings.Default.autoSwitch;
 
@@ -127,6 +127,17 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void UpdateFlydigiCardVisibility()
         {
+            // Hide card if Flydigi functionality is disabled in Settings
+            if (Settings.Default.HideFlydigi)
+            {
+                sdBs2Pro.Visibility = Visibility.Collapsed;
+                // Ensure override is turned off when Flydigi is disabled
+                cbxBs2ProEnabled.IsChecked = false;
+                if (start && _deviceApplier?.IsFlydigiOverridden == true)
+                    _ = _deviceApplier.DisableFlydigiOverrideAsync();
+                return;
+            }
+
             var deviceType = FlydigiHardwareDetector.ConnectedDeviceType;
 
             if (deviceType == ConnectedDeviceType.None)
@@ -202,7 +213,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 radeonGpuCount = inventory.RadeonCount;
                 nvidiaGpuCount = inventory.NvidiaCount;
 
-                tsAutoSwitch.IsChecked = true;
+                cbExcludeFromSwitching.IsChecked = false;
 
                 await Task.Run(() => Game_Manager.installedGames = Game_Manager.syncGame_Library(true));
 
@@ -251,7 +262,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                             EcFanCustomDuties = null,
                             EcFanCpuCustomDuties = null,
                             EcFanGpuCustomDuties = null,
-                            isAutoSwitch = (bool)tsAutoSwitch.IsChecked,
+                            isAutoSwitch = !(bool)cbExcludeFromSwitching.IsChecked,
                             // CPU defaults
                             CpuSustained = 75,
                             CpuBoost = 85,
@@ -382,6 +393,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         bool start = false;
         private void btnStart_Click(object sender, RoutedEventArgs e)
         {
+            // Prevent the ToggleButton from auto-toggling - we manage IsChecked ourselves
+            if (sender is System.Windows.Controls.Primitives.ToggleButton tb)
+            {
+                tb.IsChecked = start; // revert the auto-toggle
+            }
             ToggleAdaptiveMode();
         }
 
@@ -392,6 +408,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (start)
                 {
                     start = false;
+                    btnStart.IsChecked = false;
                     siStartIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Play20;
                     tbxStartText.Text = LocalizationService.Get("Start Adaptive Mode");
                     GetSensor.CloseSensor();
@@ -415,12 +432,14 @@ namespace Uniwill_Control_Utility.Views.Pages
                         _ = _deviceApplier.DisableWatercoolerOverrideAsync();
                         _deviceApplier.DisableEcFanOverride();
                         _deviceApplier.DisableKeyboardOverride();
+                        _deviceApplier.DisableLightBarOverride();
                     }
 
                 }
                 else
                 {
                     start = true;
+                    btnStart.IsChecked = true;
                     siStartIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Stop20;
                     tbxStartText.Text = LocalizationService.Get("Stop Adaptive Mode");
                     await Task.Run(() => GetSensor.OpenSensor());
@@ -437,7 +456,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     // what the user has configured in the active profile.
                     if (_deviceApplier != null)
                     {
-                        if ((bool)cbxBs2ProEnabled.IsChecked && !_deviceApplier.IsFlydigiOverridden)
+                        if (!Settings.Default.HideFlydigi && (bool)cbxBs2ProEnabled.IsChecked && !_deviceApplier.IsFlydigiOverridden)
                             _deviceApplier.EnableFlydigiOverride();
                         if ((bool)cbxWcEnabled.IsChecked && !_deviceApplier.IsWatercoolerOverridden)
                             _deviceApplier.EnableWatercoolerOverride();
@@ -445,6 +464,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                             _deviceApplier.EnableEcFanOverride();
                         if ((bool)cbxKbEnabled.IsChecked && !_deviceApplier.IsKeyboardOverridden)
                             _deviceApplier.EnableKeyboardOverride();
+                        if ((bool)cbxLbEnabled.IsChecked && sdLightBar.Visibility == Visibility.Visible && !_deviceApplier.IsLightBarOverridden)
+                            _deviceApplier.EnableLightBarOverride();
                     }
                 }
             }
@@ -456,29 +477,79 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         public static int CPUTemp, CPULoad, CPUClock, CPUPower, GPULoad, GPUClock, GPUMemClock;
 
+        /// <summary>
+        /// Restores the btnStart ToggleButton icon, text, and IsChecked state
+        /// from Settings so the button reflects the actual Adaptive Mode state.
+        /// Called from Page_Loaded when navigating back to this page.
+        /// </summary>
+        private void RestoreAdaptiveButtonState()
+        {
+            if (Settings.Default.isAdaptiveModeRunning)
+            {
+                start = true;
+                btnStart.IsChecked = true;
+                siStartIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Stop20;
+                tbxStartText.Text = LocalizationService.Get("Stop Adaptive Mode");
+            }
+            else
+            {
+                start = false;
+                btnStart.IsChecked = false;
+                siStartIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Play20;
+                tbxStartText.Text = LocalizationService.Get("Start Adaptive Mode");
+            }
+        }
+
+        /// <summary>
+        /// Applies dynamic maximum to the SPL/FPL sliders based on the resolved CPU SKU
+        /// and whether a Hydro UI watercooler is connected. Matches the Presets page behavior.
+        /// </summary>
+        private void ApplyAdpPowerLimitMax()
+        {
+            var waterCooler = App.GetService<WaterCoolerService>();
+            bool hydro = waterCooler?.IsConnected == true;
+            var limits = SkuResolver.GetPowerLimits(hydro);
+
+            if (limits == null)
+            {
+                // Fallback: use reasonable defaults based on CPU vendor
+                if (Family.TYPE == Family.ProcessorType.Amd_Apu)
+                {
+                    AdpSdSustained.Maximum = hydro ? 160 : 130;
+                    AdpSdBoost.Maximum = hydro ? 160 : 135;
+                }
+                else if (Family.TYPE == Family.ProcessorType.Intel)
+                {
+                    AdpSdSustained.Maximum = hydro ? 200 : 160;
+                    AdpSdBoost.Maximum = hydro ? 200 : 200;
+                }
+                return;
+            }
+
+            if (Family.TYPE == Family.ProcessorType.Amd_Apu)
+            {
+                AdpSdSustained.Maximum = limits.CpuPl1Sustained;
+                AdpSdBoost.Maximum = limits.CpuPl2Boost;
+            }
+            else if (Family.TYPE == Family.ProcessorType.Intel)
+            {
+                // Intel uses the same sliders for PL1/PL2
+                AdpSdSustained.Maximum = limits.CpuPl1Sustained;
+                AdpSdBoost.Maximum = limits.CpuPl2Boost;
+            }
+
+            // Clamp current values if they exceed the new maximum
+            if (AdpSdSustained.Value > AdpSdSustained.Maximum)
+                AdpSdSustained.Value = AdpSdSustained.Maximum;
+            if (AdpSdBoost.Value > AdpSdBoost.Maximum)
+                AdpSdBoost.Value = AdpSdBoost.Maximum;
+        }
+
         private async void adaptive_Tick(object sender, EventArgs e)
         {
             if (start == true)
             {
                 update();
-            }
-            if (Settings.Default.polling != nudPolling.Value)
-            {
-                Settings.Default.polling = (double)nudPolling.Value;
-                Settings.Default.Save();
-            }
-
-            if (adaptiveMode.Interval != TimeSpan.FromSeconds((double)nudPolling.Value))
-            {
-                adaptiveMode.Stop();
-                adaptiveMode.Interval = TimeSpan.FromSeconds((double)nudPolling.Value);
-                adaptiveMode.Start();
-            }
-            if (sensors.Interval != TimeSpan.FromSeconds((double)nudPolling.Value))
-            {
-                sensors.Stop();
-                sensors.Interval = TimeSpan.FromSeconds((double)nudPolling.Value);
-                sensors.Start();
             }
         }
 
@@ -512,7 +583,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 if (myPreset != null)
                 {
-                    tsAutoSwitch.IsChecked = myPreset.isAutoSwitch;
+                    cbExcludeFromSwitching.IsChecked = !myPreset.isAutoSwitch;
 
                     // Watercooler
                     cbxWcPumpVoltage.SelectedIndex = GetPumpVoltageIndex(myPreset.WcPumpVoltage);
@@ -670,7 +741,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     // checkbox edits so they aren't overwritten by the saved preset.
                     if (resetTracking)
                     {
-                        if (cbxBs2ProEnabled.IsChecked != myPreset.Bs2ProEnabled)
+                        if (!Settings.Default.HideFlydigi && cbxBs2ProEnabled.IsChecked != myPreset.Bs2ProEnabled)
                             cbxBs2ProEnabled.IsChecked = myPreset.Bs2ProEnabled;
                         if (cbxWcEnabled.IsChecked != myPreset.WcEnabled)
                             cbxWcEnabled.IsChecked = myPreset.WcEnabled;
@@ -822,7 +893,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     KbMultiColors = SerializeColors(KbMultiColorPicker.Colors),
                     KbPerKeyColors = KeyboardSettingsService.Load().PerKeyColors,
                     KbDirection = _kbDirection,
-                    isAutoSwitch = (bool)tsAutoSwitch.IsChecked,
+                    isAutoSwitch = !(bool)cbExcludeFromSwitching.IsChecked,
                     // CPU
                     CpuEnabled = (bool)cbxCpuEnabled.IsChecked,
                     CpuSustained = (int)AdpSdSustained.Value,
@@ -897,9 +968,19 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbxBs2ProEnabled_Toggled(object sender, RoutedEventArgs e)
         {
+            // Guard: don't allow enabling override when Flydigi is disabled in Settings
+            if (Settings.Default.HideFlydigi)
+            {
+                cbxBs2ProEnabled.IsChecked = false;
+                return;
+            }
+
             bool enabled = (bool)cbxBs2ProEnabled.IsChecked;
             Settings.Default.AdaptiveBs2ProEnabled = enabled;
             Settings.Default.Save();
+
+            // Only apply override when Adaptive Mode is running
+            if (!start) return;
 
             // Route through DeviceApplier so subscribed pages get the event notification
             if (enabled)
@@ -919,6 +1000,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.AdaptiveWcEnabled = enabled;
             Settings.Default.Save();
 
+            // Only apply override when Adaptive Mode is running
+            if (!start) return;
+
             // Route through DeviceApplier so subscribed pages get the event notification
             if (enabled)
             {
@@ -936,6 +1020,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void cbxEcFanEnabled_Toggled(object sender, RoutedEventArgs e)
         {
             bool enabled = (bool)cbxEcFanEnabled.IsChecked;
+
+            // Only apply override when Adaptive Mode is running
+            if (!start) return;
 
             if (enabled)
             {
@@ -1059,8 +1146,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         private byte lastLbColorG = 0;
         private byte lastLbColorB = 0;
         private int lastLbBrightness = 0;
-        private int lastLbEffect = 0;
-        private int lastLbSpeed = 0;
+        private byte lastLbEffect = 0;
+        private byte lastLbSpeed = 0;
         // V-F Curve editor window (singleton, like Presets page)
         private Views.Windows.VfCurveEditorWindow? _vfEditorWindow;
         // True when user manually changes the core clock slider — curve label is suppressed
@@ -1099,8 +1186,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                             }
                         }
 
-                        // Apply BS2 Pro settings if enabled
-                        if ((bool)cbxBs2ProEnabled.IsChecked)
+                        // Apply BS2 Pro settings if enabled (skip if Flydigi is disabled in Settings)
+                        if (!Settings.Default.HideFlydigi && (bool)cbxBs2ProEnabled.IsChecked)
                         {
                             string bs2Mode = GetBs2ProFanModeFromIndex(cbxBs2ProFanMode.SelectedIndex);
                             string bs2RgbMode = GetBs2ProRgbModeFromIndex(cbxBs2ProRgbMode.SelectedIndex);
@@ -1485,8 +1572,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                             byte lbG = AdpLbColorPicker.SelectedColor.G;
                             byte lbB = AdpLbColorPicker.SelectedColor.B;
                             int lbBrightness = (int)AdpLbBrightnessSlider.Value;
-                            int lbEffect = AdpLbEffect.SelectedIndex;
-                            int lbSpeed = (int)AdpLbSpeedSlider.Value;
+                            byte lbEffect = GetLbEffectByte(AdpLbEffect.SelectedIndex);
+                            byte lbSpeed = GetLbHidSpeed((int)AdpLbSpeedSlider.Value);
 
                             bool lbChanged = lbPower != lastLbPower ||
                                 lbR != lastLbColorR || lbG != lastLbColorG || lbB != lastLbColorB ||
@@ -1500,7 +1587,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                                     if (lbPower)
                                     {
                                         _hidService.LightBarSetColor(lbR, lbG, lbB, lbBrightness);
-                                        _hidService.LightBarSetEffect((byte)lbEffect, (byte)lbSpeed, lbBrightness);
+                                        _hidService.LightBarSetEffect(lbEffect, lbSpeed, lbBrightness);
                                     }
                                     else
                                     {
@@ -1552,6 +1639,13 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             // Recheck Flydigi card visibility on navigation (device may have connected/disconnected)
             UpdateFlydigiCardVisibility();
+
+            // Restore button state from settings so the ToggleButton reflects
+            // the actual Adaptive Mode state when navigating back to this page.
+            RestoreAdaptiveButtonState();
+
+            // Apply dynamic power limit max to SPL/FPL sliders based on CPU SKU
+            ApplyAdpPowerLimitMax();
 
             // Defer preset loading to after the first frame renders so the page
             // appears immediately and control updates happen in a second pass.
@@ -2317,6 +2411,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.AdaptiveKeyboardEnabled = enabled;
             Settings.Default.Save();
 
+            // Only apply override when Adaptive Mode is running
+            if (!start) return;
+
             if (enabled)
             {
                 _deviceApplier?.EnableKeyboardOverride();
@@ -2681,6 +2778,23 @@ namespace Uniwill_Control_Utility.Views.Pages
         #region CPU / GPU / Light Bar event handlers
 
         /// <summary>
+        /// Maps the Light Bar ComboBox index to the HID effect byte value.
+        /// Static=0x01, Breathing=0x02, Wave=0x03, Loading=0x04, Marquee=0x05, Meteor=0x06.
+        /// </summary>
+        private byte GetLbEffectByte(int selectedIndex)
+        {
+            return (byte)(selectedIndex + 1);
+        }
+
+        /// <summary>
+        /// Converts the UI speed value (0-11, slow?fast) to HID speed (0-11, fast?slow).
+        /// </summary>
+        private byte GetLbHidSpeed(int uiSpeed)
+        {
+            return (byte)(11 - uiSpeed);
+        }
+
+        /// <summary>
         /// Shows/hide AMD vs Intel CPU controls based on the detected CPU type.
         /// </summary>
         private void UpdateAdpCpuUI()
@@ -2774,6 +2888,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.AdaptiveCpuEnabled = enabled;
             Settings.Default.Save();
 
+            // Only reset tracking when Adaptive Mode is running
+            if (!start) return;
+
             // Reset tracking so the next update() tick force-applies CPU settings
             if (enabled)
             {
@@ -2819,6 +2936,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.AdaptiveGpuEnabled = enabled;
             Settings.Default.Save();
 
+            // Only reset tracking when Adaptive Mode is running
+            if (!start) return;
+
             // Reset tracking so the next update() tick force-applies GPU settings
             if (enabled)
             {
@@ -2837,9 +2957,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.AdaptiveLbEnabled = enabled;
             Settings.Default.Save();
 
-            // Reset tracking so the next update() tick force-applies Light Bar settings
+            // Only apply override when Adaptive Mode is running
+            if (!start) return;
+
             if (enabled)
             {
+                _deviceApplier?.EnableLightBarOverride();
+                // Reset tracking so the next update() tick force-applies Light Bar settings
                 lastLbPower = false;
                 lastLbColorR = 0;
                 lastLbColorG = 0;
@@ -2847,6 +2971,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 lastLbBrightness = 0;
                 lastLbEffect = 0;
                 lastLbSpeed = 0;
+            }
+            else
+            {
+                _deviceApplier?.DisableLightBarOverride();
             }
         }
 
@@ -2910,15 +3038,15 @@ namespace Uniwill_Control_Utility.Views.Pages
             byte g = AdpLbColorPicker.SelectedColor.G;
             byte b = AdpLbColorPicker.SelectedColor.B;
             int brightness = (int)AdpLbBrightnessSlider.Value;
-            int effect = AdpLbEffect.SelectedIndex;
-            int speed = (int)AdpLbSpeedSlider.Value;
+            byte effect = GetLbEffectByte(AdpLbEffect.SelectedIndex);
+            byte speed = GetLbHidSpeed((int)AdpLbSpeedSlider.Value);
 
             try
             {
                 if (isOn)
                 {
                     _hidService.LightBarTurnOn(r, g, b, brightness);
-                    _hidService.LightBarSetEffect((byte)effect, (byte)speed, brightness);
+                    _hidService.LightBarSetEffect(effect, speed, brightness);
                 }
                 else
                 {
@@ -2933,13 +3061,15 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void AdpLbColorPicker_ColorChangedDelayed(object sender, EventArgs e)
         {
-            // Will be picked up by update() loop diff tracking
+            ApplyLbOverrideImmediate();
         }
 
         private void AdpLbBrightnessSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (AdpLbBrightnessValueText != null)
                 AdpLbBrightnessValueText.Text = ((int)AdpLbBrightnessSlider.Value).ToString();
+
+            ApplyLbOverrideImmediate();
         }
 
         private void AdpLbEffect_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2950,12 +3080,59 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Show/hide speed control (hidden for Static = index 0)
             AdpSpLbSpeed.Visibility = AdpLbEffect.SelectedIndex != 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            ApplyLbOverrideImmediate();
         }
 
         private void AdpLbSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (AdpLbSpeedValueText != null)
                 AdpLbSpeedValueText.Text = ((int)AdpLbSpeedSlider.Value).ToString();
+
+            ApplyLbOverrideImmediate();
+        }
+
+        /// <summary>
+        /// Immediately applies the current Light Bar override settings to the HID device.
+        /// Resets the relevant last* tracking variables so update() doesn't re-apply.
+        /// </summary>
+        private void ApplyLbOverrideImmediate()
+        {
+            if (_hidService == null)
+                return;
+
+            if (!(AdpTsLightBarPower.IsChecked ?? true))
+                return;
+
+            var color = AdpLbColorPicker.SelectedColor;
+            int brightness = (int)AdpLbBrightnessSlider.Value;
+            byte effect = GetLbEffectByte(AdpLbEffect.SelectedIndex);
+            byte speed = GetLbHidSpeed((int)AdpLbSpeedSlider.Value);
+
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    Thread.Sleep(50);
+                    _hidService?.LightBarSetColor(color.R, color.G, color.B, brightness);
+                    _hidService?.LightBarSetEffect(effect, speed, brightness);
+
+                    // Reset tracking variables so update() doesn't duplicate the write
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        lastLbColorR = color.R;
+                        lastLbColorG = color.G;
+                        lastLbColorB = color.B;
+                        lastLbBrightness = brightness;
+                        lastLbEffect = effect;
+                        lastLbSpeed = speed;
+                    });
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLogger.LogError(ex, "Failed to apply Light Bar override settings immediately");
+                }
+            });
         }
 
         #endregion
