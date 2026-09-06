@@ -235,12 +235,7 @@ namespace Uniwill_Control_Utility.ViewModels
 
             switch (destination)
             {
-                case "premade":
-                case "custom":
                 case "adaptive":
-                case "games":
-                case "auto":
-                case "info":
                     NavigateWithinApplication(destination);
                     break;
 

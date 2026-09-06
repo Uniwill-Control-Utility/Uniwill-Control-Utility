@@ -469,19 +469,7 @@ namespace Uniwill_Control_Utility.Properties {
                 this["polling"] = value;
             }
         }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool isASUS {
-            get {
-                return ((bool)(this["isASUS"]));
-            }
-            set {
-                this["isASUS"] = value;
-            }
-        }
-        
+
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("Alt+F")]
@@ -529,31 +517,7 @@ namespace Uniwill_Control_Utility.Properties {
                 this["LoggingLevel"] = value;
             }
         }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("999")]
-        public uint FrameRateLimit {
-            get {
-                return ((uint)(this["FrameRateLimit"]));
-            }
-            set {
-                this["FrameRateLimit"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0")]
-        public uint FrameRateType {
-            get {
-                return ((uint)(this["FrameRateType"]));
-            }
-            set {
-                this["FrameRateType"] = value;
-            }
-        }
-        
+
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
@@ -673,19 +637,6 @@ namespace Uniwill_Control_Utility.Properties {
                 this["SimulateExclusiveFullscreen"] = value;
             }
         }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool ShowDebuggingOptions {
-            get {
-                return ((bool)(this["ShowDebuggingOptions"]));
-            }
-            set {
-                this["ShowDebuggingOptions"] = value;
-            }
-        }
-        
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("0")]
@@ -1021,19 +972,7 @@ namespace Uniwill_Control_Utility.Properties {
                 this["isAutoUviGPU"] = value;
             }
         }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("")]
-        public string cstmPreset {
-            get {
-                return ((string)(this["cstmPreset"]));
-            }
-            set {
-                this["cstmPreset"] = value;
-            }
-        }
-        
+
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("0")]

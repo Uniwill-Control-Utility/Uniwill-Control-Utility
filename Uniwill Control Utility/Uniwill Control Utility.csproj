@@ -57,7 +57,6 @@
     <PackageReference Include="MouseKeyHook" Version="5.7.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Octokit" Version="14.0.0" />
-    <PackageReference Include="SecretNest.SequentialScheduler" Version="1.1.0" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
@@ -73,14 +72,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="AMDFamily0F.bin" />
-    <None Remove="AMDFamily10.bin" />
-    <None Remove="AMDFamily17.bin" />
-    <None Remove="AMDReset.bin" />
     <None Remove="Assets\BuiltInScaleModels.json" />
-    <None Remove="Assets\config-DT-AM4.png" />
-    <None Remove="Assets\config-DT-AM5.png" />
-    <None Remove="Assets\config-FL1.png" />
     <None Remove="Assets\config.png" />
     <None Remove="Assets\icon.png" />
     <None Remove="Assets\Flydigi\bs1.png" />
@@ -90,23 +82,9 @@
     <None Remove="Assets\Flydigi\bs3-pro.png" />
     <None Remove="Assets\HydroUI\mk1.png" />
     <None Remove="Assets\HydroUI\mk2.png" />
-    <None Remove="Assets\Flydigi\logo.svg" />
-    <None Remove="Assets\Laptops\Framework\framework-laptop-13.png" />
-    <None Remove="Assets\Laptops\Framework\framework-laptop-16.png" />
     <None Remove="Assets\Laptops\PCSpecialist\Recoil-3-16-AMD.png" />
     <None Remove="Assets\Laptops\PCSpecialist\Recoil-3-16-Intel.png" />
     <None Remove="Assets\Laptops\XMG\Neo-25.png" />
-    <None Remove="Assets\PCC Banner.png" />
-    <None Remove="Assets\pexels-photo-8037008.jpeg" />
-    <None Remove="Fan Configs\AOKZOE_AOKZOE A1 AR07.json" />
-    <None Remove="Fan Configs\AYANEO_AYANEO 2.json" />
-    <None Remove="Fan Configs\AYANEO_GEEK.json" />
-    <None Remove="Fan Configs\GPD_1618-04.json" />
-    <None Remove="Fan Configs\GPD_1619-04.json" />
-    <None Remove="Fan Configs\ONE-NETBOOK TECHNOLOGY CO., LTD._ONE-NETBOOK_V03.json" />
-    <None Remove="Fan Configs\ONE-NETBOOK TECHNOLOGY CO., LTD._ONEXPLAYER 2 ARP23.json" />
-    <None Remove="Fan Configs\ONE-NETBOOK_ONEXPLAYER 2 ARP23.json" />
-    <None Remove="Fan Configs\ONE-NETBOOK_V03.json" />
   </ItemGroup>
 
   <ItemGroup>
@@ -123,30 +101,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="favicon.ico" />
-    <Content Include="Fan Configs\AYANEO_GEEK.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Fan Configs\GPD_1618-04.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Fan Configs\ONE-NETBOOK TECHNOLOGY CO., LTD._ONE-NETBOOK_V03.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Fan Configs\AOKZOE_AOKZOE A1 AR07.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Fan Configs\ONE-NETBOOK_V03.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Fan Configs\ONE-NETBOOK_ONEXPLAYER 2 ARP23.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Fan Configs\ONE-NETBOOK TECHNOLOGY CO., LTD._ONEXPLAYER 2 ARP23.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Fan Configs\GPD_1619-04.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
     <Content Include="SkuData\skus.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -169,29 +123,15 @@
     <Resource Include="Assets\Flydigi\bs3-pro.png" />
     <Resource Include="Assets\HydroUI\mk1.png" />
     <Resource Include="Assets\HydroUI\mk2.png" />
-    <Resource Include="Assets\Flydigi\logo.svg" />
-    <Resource Include="Assets\config-DT-AM4.png" />
-    <Resource Include="Assets\config-DT-AM5.png" />
-    <Resource Include="Assets\config-FL1.png" />
     <Resource Include="Assets\config.png" />
-    <Resource Include="Assets\Laptops\Framework\framework-laptop-13.png" />
-    <Resource Include="Assets\Laptops\Framework\framework-laptop-16.png" />
     <Resource Include="Assets\Laptops\PCSpecialist\Recoil-3-16-AMD.png" />
     <Resource Include="Assets\Laptops\PCSpecialist\Recoil-3-16-Intel.png" />
     <Resource Include="Assets\Laptops\XMG\Neo-25.png" />
-    <Resource Include="Assets\PCC Banner.png" />
-    <Resource Include="Assets\pexels-photo-8037008.jpeg" />
-    <Content Include="Fan Configs\AYANEO_AYANEO 2.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="AutoOC">
       <HintPath>..\..\AutoOC\AutoOC.dll</HintPath>
-    </Reference>
-    <Reference Include="RTSSSharedMemoryNET">
-      <HintPath>Assets\RTSS\RTSSSharedMemoryNET.dll</HintPath>
     </Reference>
   </ItemGroup>
 
@@ -239,12 +179,6 @@
     <None Update="Assets\Intel\PawnIO\IntelMSR.bin">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Assets\RTSS\RTSSHooks64.dll">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="Assets\RTSS\RTSSSharedMemoryNET.dll">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Update="Assets\Stress-Test\AVX2 Stress Test.deps.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -252,9 +186,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="Assets\Stress-Test\AVX2 Stress Test.exe">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Assets\Stress-Test\AVX2 Stress Test.pdb">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="Assets\Stress-Test\AVX2 Stress Test.runtimeconfig.json">
@@ -488,9 +419,6 @@
     <None Update="Magpie.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Magpie.pdb">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Update="MagpieRT.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -500,22 +428,13 @@
     <None Update="MagpieRT.lib">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="PerformanceMetrics.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Update="favicon.ico">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
-    <None Update="inpoutx64.lib">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Update="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
-    </None>
-    <None Update="RTSSSharedMemoryNET.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="Assets\AMD\PawnIO\RyzenSMU.bin">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -527,18 +446,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="vcruntime140_1d.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="WinRing0x64_Fan.sys">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="WinRing0x64.sys">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="WinRing0x64_Mem.sys">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="WinRing0_Mem.sys">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

@@ -143,7 +143,7 @@ namespace Uniwill_Control_Utility
                     .CreateDefaultBuilder()
                     .ConfigureAppConfiguration(c =>
                     {
-                        c.SetBasePath(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location));
+                        c.SetBasePath(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!);
                     })
                     .ConfigureLogging(logging =>
                     {
@@ -189,9 +189,6 @@ namespace Uniwill_Control_Utility
                         services.AddScoped<Views.Pages.Keyboard>();
                         services.AddScoped<Views.Pages.LightBar>();
                         services.AddScoped<Views.Pages.Battery>();
-                        services.AddScoped<Views.Pages.SystemInfo>();
-                        services.AddScoped<Views.Pages.DataPage>();
-                        services.AddScoped<ViewModels.DataViewModel>();
                         services.AddScoped<Views.Pages.SettingsPage>();
                         services.AddScoped<ViewModels.SettingsViewModel>();
                         services.AddScoped<Views.Pages.OverlaySettingsPage>();

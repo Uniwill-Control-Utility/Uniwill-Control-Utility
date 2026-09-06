@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using Wpf.Ui.Abstractions.Controls;
 
@@ -15,13 +16,15 @@ namespace Uniwill_Control_Utility.ViewModels
         [ObservableProperty]
         private Wpf.Ui.Appearance.ApplicationTheme _currentTheme = Wpf.Ui.Appearance.ApplicationTheme.Unknown;
 
-        public void OnNavigatedTo()
+        public Task OnNavigatedToAsync()
         {
-                InitializeViewModel();
+            InitializeViewModel();
+            return Task.CompletedTask;
         }
 
-        public void OnNavigatedFrom()
+        public Task OnNavigatedFromAsync()
         {
+            return Task.CompletedTask;
         }
 
         private void InitializeViewModel()
