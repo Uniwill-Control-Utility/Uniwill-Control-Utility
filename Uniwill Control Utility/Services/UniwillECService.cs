@@ -1050,7 +1050,7 @@ namespace Uniwill_Control_Utility.Services
             WriteECRegister(REG_AP_OEM_6, apOem6);
             Thread.Sleep(150);
 
-            DebugLog($"[DIAG] UniwillEC: Applied fan curves — CPU '{cpuCurve.Name}': [{string.Join(", ", cpuDuty)}] | GPU '{gpuCurve.Name}': [{string.Join(", ", gpuDuty)}]");
+            DebugLog($"[DIAG] UniwillEC: Applied fan curves - CPU '{cpuCurve.Name}': [{string.Join(", ", cpuDuty)}] | GPU '{gpuCurve.Name}': [{string.Join(", ", gpuDuty)}]");
         }
 
         /// <summary>

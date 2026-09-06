@@ -68,10 +68,5 @@ namespace Uniwill_Control_Utility.Views.Controls
                 spDisconnected.Visibility = Visibility.Visible;
             }
         }
-
-        private void OnConnectClick(object sender, RoutedEventArgs e)
-        {
-            _navigationService?.Navigate("flydigicooler");
-        }
     }
 }

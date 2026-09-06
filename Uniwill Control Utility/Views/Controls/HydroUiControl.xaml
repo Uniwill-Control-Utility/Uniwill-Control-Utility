@@ -97,10 +97,6 @@
                        Content="Disconnected"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
-                <Button x:Name="_connectBtn"
-                        Grid.Column="4"
-                        Content="Connect"
-                        Click="OnConnectClick" />
             </Grid>
         </Grid>
     </Border>

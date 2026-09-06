@@ -473,10 +473,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (_waterCoolerService?.ConnectedDeviceName != null)
             {
                 string name = _waterCoolerService.ConnectedDeviceName;
-                if (name.Contains("LCT22002", StringComparison.OrdinalIgnoreCase) ||
+                if (name.Contains("LCT22001", StringComparison.OrdinalIgnoreCase) || name.Contains("LCT22002", StringComparison.OrdinalIgnoreCase) ||
                     name.Contains("Mk2", StringComparison.OrdinalIgnoreCase))
                 {
                     imageFile = "mk2.png";
+                } else if (name.Contains("LCT21001", StringComparison.OrdinalIgnoreCase) || name.Contains("LCT21002", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Mk1", StringComparison.OrdinalIgnoreCase) )
+                {
+                    imageFile = "mk1.png";
                 }
             }
 
