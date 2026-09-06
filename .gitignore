@@ -368,3 +368,5 @@ FodyWeavers.xsd
 
 # Qwen Code
 .qwen/
+.agents/
+skills-lock.json
