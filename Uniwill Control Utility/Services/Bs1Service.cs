@@ -45,6 +45,14 @@ namespace Uniwill_Control_Utility.Services
         private Timer? _heartbeatTimer;
         private const int HeartbeatIntervalMs = 2500; // Send every 2.5s (device expects ~3s)
 
+        // Named constants for repeated magic strings
+        private const string LogPrefix = "[BS1]";
+        private const string DefaultDeviceName = "Flydigi BS1";
+        private const string SettingsFileName = "bs1_settings.json";
+        private const int ConnectRetryDelayMs = 1000;
+        private const string ModeRealtime = "Realtime";
+        private const string ModeGear = "Gear";
+
         // Settings persistence
         private Bs1Settings _settings = new();
 
@@ -95,7 +103,7 @@ namespace Uniwill_Control_Utility.Services
                     var success = await ConnectAsync(_settings.LastDeviceAddress);
                     if (success)
                     {
-                        Log($"[BS1] Auto-connect successful");
+                        Log($"{LogPrefix} Auto-connect successful");
                         return true;
                     }
                 }
@@ -111,7 +119,7 @@ namespace Uniwill_Control_Utility.Services
                 }
             }
 
-            Log("[BS1] Auto-connect failed after 3 attempts");
+            Log(LogPrefix + " Auto-connect failed after 3 attempts");
             return false;
         }
 
@@ -119,12 +127,12 @@ namespace Uniwill_Control_Utility.Services
         {
             try
             {
-                var filePath = Path.Combine(SettingsFolder, "bs1_settings.json");
+                var filePath = Path.Combine(SettingsFolder, SettingsFileName);
                 if (File.Exists(filePath))
                 {
                     var json = File.ReadAllText(filePath);
                     _settings = JsonConvert.DeserializeObject<Bs1Settings>(json) ?? new Bs1Settings();
-                    Log($"[BS1] Settings loaded: FanMode={_settings.FanMode}, Profile={_settings.SelectedCurveProfile}");
+                    Log($"{LogPrefix} Settings loaded: FanMode={_settings.FanMode}, Profile={_settings.SelectedCurveProfile}");
                 }
             }
             catch
@@ -138,10 +146,10 @@ namespace Uniwill_Control_Utility.Services
             try
             {
                 Directory.CreateDirectory(SettingsFolder);
-                var filePath = Path.Combine(SettingsFolder, "bs1_settings.json");
+                var filePath = Path.Combine(SettingsFolder, SettingsFileName);
                 var json = JsonConvert.SerializeObject(_settings, Newtonsoft.Json.Formatting.Indented);
                 File.WriteAllText(filePath, json);
-                Log($"[BS1] Settings saved: FanMode={_settings.FanMode}, Profile={_settings.SelectedCurveProfile}");
+                Log($"{LogPrefix} Settings saved: FanMode={_settings.FanMode}, Profile={_settings.SelectedCurveProfile}");
             }
             catch { /* non-critical */ }
         }
@@ -167,7 +175,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 try
                 {
-                    Log($"[BS1] Trying last known device: {_settings.LastDeviceAddress}");
+                    Log($"{LogPrefix} Trying last known device: {_settings.LastDeviceAddress}");
 
                     // The saved address may be a Windows DeviceId or a raw Bluetooth address
                     BluetoothLEDevice? lastDevice = null;
@@ -187,8 +195,8 @@ namespace Uniwill_Control_Utility.Services
 
                     if (lastDevice != null)
                     {
-                        var name = lastDevice.Name ?? "Flydigi BS1";
-                        Log($"[BS1] Last known device found: {name} ({_settings.LastDeviceAddress})");
+                        var name = lastDevice.Name ?? DefaultDeviceName;
+                        Log($"{LogPrefix} Last known device found: {name} ({_settings.LastDeviceAddress})");
                         devices.Add(new Bs1DeviceInfo
                         {
                             Address = _settings.LastDeviceAddress,
@@ -200,7 +208,7 @@ namespace Uniwill_Control_Utility.Services
                 }
                 catch (Exception ex)
                 {
-                    Log($"[BS1] Failed to connect to last known device: {ex.Message}");
+                    Log($"{LogPrefix} Failed to connect to last known device: {ex.Message}");
                 }
             }
 
@@ -210,14 +218,14 @@ namespace Uniwill_Control_Utility.Services
             {
                 try
                 {
-                    Log("[BS1] Enumerating paired BLE devices...");
+                    Log(LogPrefix + " Enumerating paired BLE devices...");
                     var selector = BluetoothLEDevice.GetDeviceSelectorFromPairingState(true);
                     var pairedDevices = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(selector);
                     foreach (var deviceInfo in pairedDevices)
                     {
                         var name = deviceInfo.Name ?? string.Empty;
 
-                        Log($"[BS1] Paired BLE device: {name} (Id={deviceInfo.Id})");
+                        Log($"{LogPrefix} Paired BLE device: {name} (Id={deviceInfo.Id})");
 
                         if (!string.IsNullOrEmpty(name) && IsBs1AdvertisingName(name))
                         {
@@ -235,20 +243,20 @@ namespace Uniwill_Control_Utility.Services
                 }
                 catch (Exception ex)
                 {
-                    Log($"[BS1] Paired device enumeration failed: {ex.Message}");
+                    Log($"{LogPrefix} Paired device enumeration failed: {ex.Message}");
                 }
 
                 // 2b. Also enumerate unpaired BLE devices
                 try
                 {
-                    Log("[BS1] Enumerating unpaired BLE devices...");
+                    Log(LogPrefix + " Enumerating unpaired BLE devices...");
                     var unpairedSelector = BluetoothLEDevice.GetDeviceSelectorFromPairingState(false);
                 var unpairedDevices = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(unpairedSelector);
                 foreach (var deviceInfo in unpairedDevices)
                 {
                     var name = deviceInfo.Name ?? string.Empty;
 
-                    Log($"[BS1] Unpaired BLE device: {name} (Id={deviceInfo.Id})");
+                    Log($"{LogPrefix} Unpaired BLE device: {name} (Id={deviceInfo.Id})");
 
                     if (!string.IsNullOrEmpty(name) && IsBs1AdvertisingName(name))
                     {
@@ -265,7 +273,7 @@ namespace Uniwill_Control_Utility.Services
             }
             catch (Exception ex)
                 {
-                    Log($"[BS1] Unpaired device enumeration failed: {ex.Message}");
+                    Log($"{LogPrefix} Unpaired device enumeration failed: {ex.Message}");
                 }
             } // end if (devices.Count == 0)
 
@@ -298,7 +306,7 @@ namespace Uniwill_Control_Utility.Services
 
                 if (nameMatch || hasFlydigiService)
                 {
-                    Log($"[BS1] BLE advertisement matched: '{name}' ({address}) RSSI={e.RawSignalStrengthInDBm}");
+                    Log($"{LogPrefix} BLE advertisement matched: '{name}' ({address}) RSSI={e.RawSignalStrengthInDBm}");
 
                     lock (devices)
                     {
@@ -307,7 +315,7 @@ namespace Uniwill_Control_Utility.Services
                             devices.Add(new Bs1DeviceInfo
                             {
                                 Address = address,
-                                Name = name ?? "Flydigi BS1",
+                                Name = name ?? DefaultDeviceName,
                                 Rssi = e.RawSignalStrengthInDBm
                             });
                         }
@@ -318,11 +326,11 @@ namespace Uniwill_Control_Utility.Services
             watcher.Start();
             // Shorten scan if we already found devices via last-known or enumeration
             int actualTimeout = devices.Count > 0 ? Math.Min(3000, timeoutMs) : timeoutMs;
-            Log($"[BS1] Starting BLE advertisement scan for {actualTimeout}ms...");
+            Log($"{LogPrefix} Starting BLE advertisement scan for {actualTimeout}ms...");
             await Task.Delay(actualTimeout);
             watcher.Stop();
 
-            Log($"[BS1] Discovery complete. Found {devices.Count} device(s).");
+            Log($"{LogPrefix} Discovery complete. Found {devices.Count} device(s).");
             return devices;
         }
 
@@ -365,7 +373,7 @@ namespace Uniwill_Control_Utility.Services
                 var completed = await Task.WhenAny(task, timeoutTask);
                 if (completed == timeoutTask)
                 {
-                    Log($"[BS1] {label} timed out after {timeout.TotalSeconds}s");
+                    Log($"{LogPrefix} {label} timed out after {timeout.TotalSeconds}s");
                     return default;
                 }
                 return await task;
@@ -390,7 +398,7 @@ namespace Uniwill_Control_Utility.Services
             // Disconnect first if already connected
             if (_device != null)
             {
-                Log("[BS1] Device handle exists before connect — forcing cleanup");
+                Log(LogPrefix + " Device handle exists before connect — forcing cleanup");
                 await DisconnectAsync();
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
@@ -401,21 +409,21 @@ namespace Uniwill_Control_Utility.Services
             {
                 try
                 {
-                    Log($"[BS1] Connect attempt {attempt}/{maxRetries}, address={deviceAddress}");
+                    Log($"{LogPrefix} Connect attempt {attempt}/{maxRetries}, address={deviceAddress}");
 
                     // Determine if this is a Windows DeviceId or a raw Bluetooth address
                     bool isDeviceId = deviceAddress.StartsWith("\\\\?\\") || deviceAddress.Contains("#");
 
                     if (isDeviceId)
                     {
-                        Log("[BS1] Address looks like a DeviceId, using FromIdAsync...");
+                        Log(LogPrefix + " Address looks like a DeviceId, using FromIdAsync...");
                         _device = await WithTimeoutAsync<BluetoothLEDevice>(
                             () => BluetoothLEDevice.FromIdAsync(deviceAddress).AsTask(),
                             TimeSpan.FromSeconds(5), "FromIdAsync");
                     }
                     else
                     {
-                        Log("[BS1] Address looks like a Bluetooth address, attempting to resolve DeviceId first...");
+                        Log(LogPrefix + " Address looks like a Bluetooth address, attempting to resolve DeviceId first...");
                         // Parse the address: handle "0x001A7DDA7113", "00:1A:7D:DA:71:13", or raw hex
                         string clean = deviceAddress.Replace(":", "").Replace("-", "");
                         if (clean.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
@@ -424,11 +432,11 @@ namespace Uniwill_Control_Utility.Services
                         ulong address;
                         if (!ulong.TryParse(clean, System.Globalization.NumberStyles.HexNumber, null, out address))
                         {
-                            Log($"[BS1] Failed to parse Bluetooth address: {deviceAddress}");
+                            Log($"{LogPrefix} Failed to parse Bluetooth address: {deviceAddress}");
                             return false;
                         }
 
-                        Log($"[BS1] Parsed Bluetooth address: 0x{address:X12}");
+                        Log($"{LogPrefix} Parsed Bluetooth address: 0x{address:X12}");
 
                         // Try to find a DeviceId by enumerating BLE devices and matching the Bluetooth address
                         string? resolvedDeviceId = null;
@@ -444,26 +452,26 @@ namespace Uniwill_Control_Utility.Services
                                     deviceId.Contains(address.ToString("X12"), StringComparison.OrdinalIgnoreCase))
                                 {
                                     resolvedDeviceId = deviceId;
-                                    Log($"[BS1] Found matching DeviceId: {resolvedDeviceId} (name: {info.Name})");
+                                    Log($"{LogPrefix} Found matching DeviceId: {resolvedDeviceId} (name: {info.Name})");
                                     break;
                                 }
                             }
                         }
                         catch (Exception ex)
                         {
-                            Log($"[BS1] DeviceId resolution failed: {ex.Message}");
+                            Log($"{LogPrefix} DeviceId resolution failed: {ex.Message}");
                         }
 
                         if (resolvedDeviceId != null)
                         {
-                            Log("[BS1] Using resolved DeviceId for connection...");
+                            Log(LogPrefix + " Using resolved DeviceId for connection...");
                             _device = await WithTimeoutAsync<BluetoothLEDevice>(
                                 () => BluetoothLEDevice.FromIdAsync(resolvedDeviceId).AsTask(),
                                 TimeSpan.FromSeconds(5), "FromIdAsync (resolved)");
                         }
                         else
                         {
-                            Log("[BS1] No DeviceId found, falling back to FromBluetoothAddressAsync...");
+                            Log(LogPrefix + " No DeviceId found, falling back to FromBluetoothAddressAsync...");
                             _device = await WithTimeoutAsync<BluetoothLEDevice>(
                                 () => BluetoothLEDevice.FromBluetoothAddressAsync(address).AsTask(),
                                 TimeSpan.FromSeconds(5), "FromBluetoothAddressAsync");
@@ -472,24 +480,24 @@ namespace Uniwill_Control_Utility.Services
 
                     if (_device == null)
                     {
-                        Log("[BS1] Connection returned null, will retry...");
-                        await Task.Delay(1000);
+                        Log(LogPrefix + " Connection returned null, will retry...");
+                        await Task.Delay(ConnectRetryDelayMs);
                         continue;
                     }
 
-                    Log($"[BS1] Device acquired: {_device.Name}, ConnectionStatus={_device.ConnectionStatus}");
+                    Log($"{LogPrefix} Device acquired: {_device.Name}, ConnectionStatus={_device.ConnectionStatus}");
 
                     // Create GattSession for explicit connection lifecycle control (with timeout)
-                    Log("[BS1] Creating GattSession...");
+                    Log(LogPrefix + " Creating GattSession...");
                     _gattSession = await WithTimeoutAsync<GattSession>(
                         () => GattSession.FromDeviceIdAsync(BluetoothDeviceId.FromId(_device.DeviceId)).AsTask(),
                         TimeSpan.FromSeconds(5), "GattSession creation");
 
                     if (_gattSession == null)
                     {
-                        Log("[BS1] GattSession creation timed out, retrying...");
+                        Log(LogPrefix + " GattSession creation timed out, retrying...");
                         await CleanupAfterFailedConnectAsync();
-                        await Task.Delay(1000);
+                        await Task.Delay(ConnectRetryDelayMs);
                         continue;
                     }
 
@@ -498,56 +506,56 @@ namespace Uniwill_Control_Utility.Services
                     _gattSession.SessionStatusChanged += OnGattSessionStatusChanged;
 
                     // Discover Flydigi BS1 GATT service (0xFFF0)
-                    Log("[BS1] Discovering GATT services...");
+                    Log(LogPrefix + " Discovering GATT services...");
                     var services = await _device.GetGattServicesForUuidAsync(Bs1ServiceUuid);
-                    Log($"[BS1] Service discovery status: {services.Status}, found {services.Services.Count} service(s)");
+                    Log($"{LogPrefix} Service discovery status: {services.Status}, found {services.Services.Count} service(s)");
 
                     // Fallback: enumerate ALL services if UUID-filtered discovery found nothing
                     if (services.Services.Count == 0)
                     {
-                        Log("[BS1] UUID-filtered discovery returned 0 services, trying GetAllServicesAsync...");
+                        Log(LogPrefix + " UUID-filtered discovery returned 0 services, trying GetAllServicesAsync...");
                         services = await _device.GetGattServicesAsync();
-                        Log($"[BS1] GetAllServicesAsync status: {services.Status}, found {services.Services.Count} service(s)");
+                        Log($"{LogPrefix} GetAllServicesAsync status: {services.Status}, found {services.Services.Count} service(s)");
 
                         foreach (var svc in services.Services)
-                            Log($"[BS1]   Service: {svc.Uuid}");
+                            Log($"{LogPrefix}   Service: {svc.Uuid}");
                     }
 
                     foreach (var deviceService in services.Services)
                     {
-                        Log($"[BS1] Found service: {deviceService.Uuid}");
+                        Log($"{LogPrefix} Found service: {deviceService.Uuid}");
 
                         // TX characteristic (write commands) - 0xFFF2
                         var txResults = await deviceService.GetCharacteristicsForUuidAsync(Bs1WriteCharUuid);
-                        Log($"[BS1] TX characteristic discovery: {txResults.Status}, found {txResults.Characteristics.Count}");
+                        Log($"{LogPrefix} TX characteristic discovery: {txResults.Status}, found {txResults.Characteristics.Count}");
 
                         // Fallback: enumerate all characteristics if UUID-filtered discovery found nothing
                         if (txResults.Characteristics.Count == 0)
                         {
                             txResults = await deviceService.GetCharacteristicsAsync();
-                            Log($"[BS1] GetAllCharacteristicsAsync for TX: {txResults.Status}, found {txResults.Characteristics.Count}");
+                            Log($"{LogPrefix} GetAllCharacteristicsAsync for TX: {txResults.Status}, found {txResults.Characteristics.Count}");
                         }
 
                         foreach (var characteristic in txResults.Characteristics)
                         {
-                            Log($"[BS1] TX characteristic properties: {characteristic.CharacteristicProperties}, UUID: {characteristic.Uuid}");
+                            Log($"{LogPrefix} TX characteristic properties: {characteristic.CharacteristicProperties}, UUID: {characteristic.Uuid}");
                             if ((characteristic.CharacteristicProperties & GattCharacteristicProperties.Write) != 0 ||
                                 (characteristic.CharacteristicProperties & GattCharacteristicProperties.WriteWithoutResponse) != 0)
                             {
                                 _txCharacteristic = characteristic;
-                                Log("[BS1] Found TX characteristic");
+                                Log(LogPrefix + " Found TX characteristic");
                                 break;
                             }
                         }
 
                         // RX characteristic (notifications) - 0xFFF1
                         var rxResults = await deviceService.GetCharacteristicsForUuidAsync(Bs1NotifyCharUuid);
-                        Log($"[BS1] RX characteristic discovery: {rxResults.Status}, found {rxResults.Characteristics.Count}");
+                        Log($"{LogPrefix} RX characteristic discovery: {rxResults.Status}, found {rxResults.Characteristics.Count}");
 
                         if (rxResults.Characteristics.Count == 0)
                         {
                             rxResults = await deviceService.GetCharacteristicsAsync();
-                            Log($"[BS1] GetAllCharacteristicsAsync for RX: {rxResults.Status}, found {rxResults.Characteristics.Count}");
+                            Log($"{LogPrefix} GetAllCharacteristicsAsync for RX: {rxResults.Status}, found {rxResults.Characteristics.Count}");
                         }
 
                         foreach (var characteristic in rxResults.Characteristics)
@@ -557,7 +565,7 @@ namespace Uniwill_Control_Utility.Services
                                 _rxCharacteristic = characteristic;
                                 var status = await _rxCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(
                                     GattClientCharacteristicConfigurationDescriptorValue.Notify);
-                                Log($"[BS1] Found RX characteristic, notify status={status}");
+                                Log($"{LogPrefix} Found RX characteristic, notify status={status}");
                                 if (status == GattCommunicationStatus.Success)
                                     _rxCharacteristic.ValueChanged += OnRxValueChanged;
                                 break;
@@ -565,7 +573,7 @@ namespace Uniwill_Control_Utility.Services
                         }
                     }
 
-                    Log($"[BS1] GATT discovery complete: TX={(_txCharacteristic != null)}, RX={(_rxCharacteristic != null)}");
+                    Log($"{LogPrefix} GATT discovery complete: TX={(_txCharacteristic != null)}, RX={(_rxCharacteristic != null)}");
 
                     if (_txCharacteristic != null)
                     {
@@ -576,13 +584,13 @@ namespace Uniwill_Control_Utility.Services
                         bool deviceResponded = await VerifyDeviceResponsiveAsync();
                         if (!deviceResponded)
                         {
-                            Log("[BS1] Device connected via BLE but not responding (device may be off)");
+                            Log(LogPrefix + " Device connected via BLE but not responding (device may be off)");
                             await CleanupAfterFailedConnectAsync();
-                            await Task.Delay(1000);
+                            await Task.Delay(ConnectRetryDelayMs);
                             continue;
                         }
 
-                        ConnectedDeviceName = _device.Name ?? "Flydigi BS1";
+                        ConnectedDeviceName = _device.Name ?? DefaultDeviceName;
 
                         // Store last connected device for auto-connect
                         _settings.LastDeviceAddress = deviceAddress;
@@ -593,25 +601,25 @@ namespace Uniwill_Control_Utility.Services
 
                         ConnectionStateChanged?.Invoke(this, true);
                         StatusChanged?.Invoke(this, $"Connected to {ConnectedDeviceName}");
-                        Log("[BS1] Connection successful!");
+                        Log(LogPrefix + " Connection successful!");
                         return true;
                     }
 
                     // Cleanup on failure - TX characteristic not found
-                    Log("[BS1] Connection failed: TX characteristic not found");
+                    Log(LogPrefix + " Connection failed: TX characteristic not found");
                     await CleanupAfterFailedConnectAsync();
                     return false;
                 }
                 catch (Exception ex)
                 {
-                    Log($"[BS1] Connect attempt {attempt} exception: {ex.GetType().Name} - {ex.Message}");
-                    Log($"[BS1] Stack trace: {ex.StackTrace}");
+                    Log($"{LogPrefix} Connect attempt {attempt} exception: {ex.GetType().Name} - {ex.Message}");
+                    Log($"{LogPrefix} Stack trace: {ex.StackTrace}");
 
                     if (attempt >= maxRetries)
                     {
                         // Last attempt - propagate the error info
                         StatusChanged?.Invoke(this, $"Connection failed: {ex.Message}");
-                        Log($"[BS1] All {maxRetries} connection attempts exhausted");
+                        Log($"{LogPrefix} All {maxRetries} connection attempts exhausted");
                     }
                     else
                     {
@@ -620,7 +628,7 @@ namespace Uniwill_Control_Utility.Services
 
                     await CleanupAfterFailedConnectAsync();
                     if (attempt < maxRetries)
-                        await Task.Delay(1000);
+                        await Task.Delay(ConnectRetryDelayMs);
                 }
             }
 
@@ -632,7 +640,7 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public async Task DisconnectAsync()
         {
-            Log("[BS1] DisconnectAsync called");
+            Log(LogPrefix + " DisconnectAsync called");
 
             // Stop heartbeat first
             StopHeartbeat();
@@ -731,7 +739,7 @@ namespace Uniwill_Control_Utility.Services
             }
             catch (Exception ex)
             {
-                Log($"[BS1] Heartbeat failed: {ex.Message}");
+                Log($"{LogPrefix} Heartbeat failed: {ex.Message}");
             }
         }
 
@@ -758,7 +766,7 @@ namespace Uniwill_Control_Utility.Services
             var payload = new[] { (byte)gear };
             await WriteFrameAsync(Bs1Frame.Build(Bs1Command.GearMode, payload));
 
-            Log($"[BS1] Gear set to {gear}");
+            Log($"{LogPrefix} Gear set to {gear}");
         }
 
         /// <summary>
@@ -796,11 +804,11 @@ namespace Uniwill_Control_Utility.Services
             {
                 TargetRpm = rpm,
                 CurrentRpm = rpm,
-                Mode = "Realtime"
+                Mode = ModeRealtime
             };
             FanDataReceived?.Invoke(this, FanRpmData.Value);
 
-            Log($"[BS1] RPM set to {rpm}");
+            Log($"{LogPrefix} RPM set to {rpm}");
         }
 
         /// <summary>
@@ -881,18 +889,18 @@ namespace Uniwill_Control_Utility.Services
                         {
                             TargetRpm = s.TargetRpm,
                             CurrentRpm = s.CurrentRpm,
-                            Mode = s.IsRealtimeMode ? "Realtime" : "Gear"
+                            Mode = s.IsRealtimeMode ? ModeRealtime : ModeGear
                         };
                         FanDataReceived?.Invoke(this, FanRpmData.Value);
 
                         StatusChanged?.Invoke(this,
-                            $"RPM: {s.CurrentRpm} (target: {s.TargetRpm}) [{(s.IsRealtimeMode ? "Realtime" : "Gear")}]");
+                            $"RPM: {s.CurrentRpm} (target: {s.TargetRpm}) [{(s.IsRealtimeMode ? ModeRealtime : ModeGear)}]");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Log($"[BS1] RX handler error: {ex.Message}");
+                Log($"{LogPrefix} RX handler error: {ex.Message}");
             }
         }
 
@@ -904,13 +912,13 @@ namespace Uniwill_Control_Utility.Services
         {
             if (args.Status == GattSessionStatus.Closed)
             {
-                Log("[BS1] GattSession closed");
+                Log(LogPrefix + " GattSession closed");
                 _sessionClosedTcs?.TrySetResult(true);
 
                 // If we weren't already disconnecting, this is an unexpected disconnect
                 if (_device != null)
                 {
-                    Log("[BS1] Unexpected device disconnect, cleaning up");
+                    Log(LogPrefix + " Unexpected device disconnect, cleaning up");
                     _ = DisconnectAsync();
                 }
             }
@@ -973,7 +981,7 @@ namespace Uniwill_Control_Utility.Services
             }
             catch (TaskCanceledException)
             {
-                Log("[BS1] No response from device during verification (device may be off)");
+                Log(LogPrefix + " No response from device during verification (device may be off)");
                 return false;
             }
             catch

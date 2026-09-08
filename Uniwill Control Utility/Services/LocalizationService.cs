@@ -306,6 +306,8 @@ namespace Uniwill_Control_Utility.Services
             }
             catch
             {
+                // Setting a translated value on a UI element property can fail for
+                // read-only or template-owned elements; skip silently.
             }
         }
 

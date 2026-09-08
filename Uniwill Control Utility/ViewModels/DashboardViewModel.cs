@@ -16,6 +16,8 @@ namespace Uniwill_Control_Utility.ViewModels
         ObservableObject,
         INavigationAware
     {
+        private const string WikiUrl = "https://github.com/jgudec/Uniwill-Control-Utility/wiki";
+
         private readonly INavigationService _navigationService;
         private readonly IHardwareMonitoringService _hardwareMonitoring;
         private readonly UniwillECService? _uniwillEc;
@@ -240,7 +242,7 @@ namespace Uniwill_Control_Utility.ViewModels
                     break;
 
                 case "help":
-                    OpenUrl("https://github.com/jgudec/Uniwill-Control-Utility/wiki");
+                    OpenUrl(WikiUrl);
                     break;
 
                 default:

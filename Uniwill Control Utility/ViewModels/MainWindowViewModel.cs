@@ -19,6 +19,8 @@ namespace Uniwill_Control_Utility.ViewModels
 {
     public partial class MainWindowViewModel : ObservableObject
     {
+        private const string ReleasesUrl = "https://github.com/jgudec/Uniwill-Control-Utility/releases";
+
         [ObservableProperty]
         private string _applicationTitle = string.Empty;
 
@@ -181,7 +183,7 @@ namespace Uniwill_Control_Utility.ViewModels
             switch (parameter)
             {
                 case "download":
-                    OpenUrl("https://github.com/jgudec/Uniwill-Control-Utility/releases");
+                    OpenUrl(ReleasesUrl);
                     break;
             }
         }

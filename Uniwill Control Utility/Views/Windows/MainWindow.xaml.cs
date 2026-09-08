@@ -951,7 +951,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private async void TrayHydroPump_Click(object? sender, RoutedEventArgs e)
         {
-            if (sender is not MenuItem item || !string.IsNullOrEmpty(item.Tag?.ToString()) == false)
+            if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
 
             var wc = App.GetService<WaterCoolerService>();
@@ -961,7 +961,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 return;
             }
 
-            var voltage = item.Tag!.ToString()! switch
+            var voltage = tag switch
             {
                 "Off" => PumpVoltage.Off,
                 "V7" => PumpVoltage.V7,
@@ -980,7 +980,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private async void TrayHydroFan_Click(object? sender, RoutedEventArgs e)
         {
-            if (sender is not MenuItem item || !string.IsNullOrEmpty(item.Tag?.ToString()) == false)
+            if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
 
             var wc = App.GetService<WaterCoolerService>();
@@ -990,7 +990,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 return;
             }
 
-            var speed = item.Tag!.ToString()! switch
+            var speed = tag switch
             {
                 "Off" => FanSpeed.Off,
                 "Percent25" => FanSpeed.Percent25,
@@ -1011,7 +1011,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private async void TrayHydroRgb_Click(object? sender, RoutedEventArgs e)
         {
-            if (sender is not MenuItem item || !string.IsNullOrEmpty(item.Tag?.ToString()) == false)
+            if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
 
             var wc = App.GetService<WaterCoolerService>();
@@ -1021,7 +1021,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 return;
             }
 
-            var mode = item.Tag!.ToString()! switch
+            var mode = tag switch
             {
                 "Off" => RgbState.Off,
                 "Static" => RgbState.Static,
@@ -1045,7 +1045,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private async void TrayFlydigiFan_Click(object? sender, RoutedEventArgs e)
         {
-            if (sender is not MenuItem item || string.IsNullOrEmpty(item.Tag?.ToString()))
+            if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
 
             var fc = App.GetService<FlydigiCoolerService>();
@@ -1054,8 +1054,6 @@ namespace Uniwill_Control_Utility.Views.Windows
                 ToastNotification.ShowToastNotification("Flydigi", "Cooler not connected");
                 return;
             }
-
-            string tag = item.Tag!.ToString()!;
 
             // Update checkmarks - clear all Fan Mode items (Gears and Auto(Curve) children)
             foreach (MenuItem mi in miFlydigiFan.Items)
@@ -1182,7 +1180,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private async void TrayFlydigiRgb_Click(object? sender, RoutedEventArgs e)
         {
-            if (sender is not MenuItem item || string.IsNullOrEmpty(item.Tag?.ToString()))
+            if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
 
             var fc = App.GetService<FlydigiCoolerService>();
@@ -1191,8 +1189,6 @@ namespace Uniwill_Control_Utility.Views.Windows
                 ToastNotification.ShowToastNotification("Flydigi", "Cooler not connected");
                 return;
             }
-
-            string tag = item.Tag!.ToString()!;
 
             foreach (MenuItem mi in miFlydigiRgb.Items)
                 mi.IsChecked = mi == item;
@@ -1254,10 +1250,9 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void TrayFanProfile_Click(object? sender, RoutedEventArgs e)
         {
-            if (sender is not MenuItem item || string.IsNullOrEmpty(item.Tag?.ToString()))
+            if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
 
-            string tag = item.Tag!.ToString()!;
             string presetName = tag switch
             {
                 "FullSpeed" => "Full Speed",
@@ -1293,10 +1288,9 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void TrayFanCpuProfile_Click(object? sender, RoutedEventArgs e)
         {
-            if (sender is not MenuItem item || string.IsNullOrEmpty(item.Tag?.ToString()))
+            if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
 
-            string tag = item.Tag!.ToString()!;
             string presetName = tag switch
             {
                 "FullSpeed" => "Full Speed",
@@ -1321,10 +1315,9 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void TrayFanGpuProfile_Click(object? sender, RoutedEventArgs e)
         {
-            if (sender is not MenuItem item || string.IsNullOrEmpty(item.Tag?.ToString()))
+            if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
 
-            string tag = item.Tag!.ToString()!;
             string presetName = tag switch
             {
                 "FullSpeed" => "Full Speed",

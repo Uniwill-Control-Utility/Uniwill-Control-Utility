@@ -24,6 +24,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 {
     public partial class SettingsPage : INavigableView<ViewModels.SettingsViewModel>
     {
+        private const string UpdateGitHubOwner = "jgudec";
+        private const string UpdateGitHubRepo = "Uniwill-Control-Utility";
+        private const string RootDrivePath = "C:\\";
+        private const string InstallerFilePath = "C:\\Uniwill.Control.Utility.msi";
+
         private readonly ILogger<SettingsPage> _logger;
         private bool _languageSelectionReady;
 
@@ -381,7 +386,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (IsInternetAvailable())
             {
-                var updateManager = new UpdateManager("jgudec", "Uniwill-Control-Utility", App.version, "C:\\");
+                var updateManager = new UpdateManager(UpdateGitHubOwner, UpdateGitHubRepo, App.version, RootDrivePath);
 
                 var isUpdateAvailable = await updateManager.IsUpdateAvailable();
 
@@ -400,7 +405,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async void btnDownload_Click(object sender, System.Windows.RoutedEventArgs e)
         {
-            var updateManager = new UpdateManager("jgudec", "Uniwill-Control-Utility", App.version, "C:\\");
+            var updateManager = new UpdateManager(UpdateGitHubOwner, UpdateGitHubRepo, App.version, RootDrivePath);
 
             var isUpdateAvailable = await updateManager.IsUpdateAvailable();
 
@@ -410,7 +415,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 await updateManager.DownloadAndInstallUpdate();
 
-                string filePath = "C:\\Uniwill.Control.Utility.msi";
+                string filePath = InstallerFilePath;
 
                 try
                 {

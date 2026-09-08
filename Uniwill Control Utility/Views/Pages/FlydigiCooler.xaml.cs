@@ -58,6 +58,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool _glowPulseDirection = true;
         private volatile bool _glowActive;
 
+        private const string Bs1ImageUri = "pack://application:,,,/Assets/Flydigi/bs1.png";
+        private const string FlydigiAssetPrefix = "pack://application:,,,/Assets/Flydigi/";
+
         public FlydigiCooler()
         {
             InitializeComponent();
@@ -107,7 +110,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Update device image based on device type
                 if (_isBs1Device)
                 {
-                    var bs1Source = new BitmapImage(new Uri("pack://application:,,,/Assets/Flydigi/bs1.png"));
+                    var bs1Source = new BitmapImage(new Uri(Bs1ImageUri));
                     imgDevice.Source = bs1Source;
                     UpdateGlowOpacityMask("bs1.png");
                 }
@@ -1588,7 +1591,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 var maskBrush = new ImageBrush
                 {
-                    ImageSource = new BitmapImage(new Uri($"pack://application:,,,/Assets/Flydigi/{imageFile}", UriKind.Absolute)),
+                    ImageSource = new BitmapImage(new Uri(FlydigiAssetPrefix + imageFile, UriKind.Absolute)),
                     Stretch = Stretch.Uniform,
                     AlignmentX = AlignmentX.Center,
                     AlignmentY = AlignmentY.Center,
@@ -1959,7 +1962,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             };
 
             var source = new BitmapImage(
-                new Uri($"pack://application:,,,/Assets/Flydigi/{imageFile}", UriKind.Absolute));
+                new Uri(FlydigiAssetPrefix + imageFile, UriKind.Absolute));
             imgDevice.Source = source;
             UpdateGlowOpacityMask(imageFile);
         }
@@ -1970,7 +1973,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void UpdateDeviceImageBs1()
         {
             var source = new BitmapImage(
-                new Uri("pack://application:,,,/Assets/Flydigi/bs1.png", UriKind.Absolute));
+                new Uri(Bs1ImageUri, UriKind.Absolute));
             imgDevice.Source = source;
             UpdateGlowOpacityMask("bs1.png");
         }

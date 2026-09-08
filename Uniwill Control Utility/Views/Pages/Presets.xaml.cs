@@ -730,7 +730,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             updateAllLabels();
         }
 
-        private void updateStatus(string profile)
+        private void updateStatus(string _profile)
         {
             // Update GPU clock offset display from slider values
             if (sdNvidia.Visibility == Visibility.Visible)

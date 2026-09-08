@@ -41,7 +41,7 @@ namespace Uniwill_Control_Utility.Scripts
         public static Task TranslateAsync(string ryzenAdjString, bool isAutoReapply = false, bool isAutoOC = false, string? appliedName = null, bool localizeAppliedName = false) =>
             Task.Run(() => TranslateCore(ryzenAdjString, isAutoReapply, isAutoOC, appliedName, localizeAppliedName));
 
-        private static void TranslateCore(string ryzenAdjString, bool isAutoReapply, bool isAutoOC, string? appliedName, bool localizeAppliedName)
+        private static void TranslateCore(string ryzenAdjString, bool _isAutoReapply, bool isAutoOC, string? appliedName, bool localizeAppliedName)
         {
             try
             {

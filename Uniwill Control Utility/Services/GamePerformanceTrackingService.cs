@@ -50,6 +50,7 @@ namespace Uniwill_Control_Utility.Services
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
+                // Expected cancellation when the service is stopping.
             }
             finally
             {

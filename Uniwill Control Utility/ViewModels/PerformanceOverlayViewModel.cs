@@ -86,8 +86,8 @@ namespace Uniwill_Control_Utility.ViewModels
         [ObservableProperty] private string _powerAxisMidText = "25";
         [ObservableProperty] private string _powerAxisMinText = "0";
 
-        public double DesignWidth => BaseDesignWidth;
-        public double DesignHeight => BaseDesignHeight;
+        public const double DesignWidth = BaseDesignWidth;
+        public const double DesignHeight = BaseDesignHeight;
         public FontFamily OverlayFontFamily { get; } = new("Cascadia Mono");
         public Brush PrimaryTextBrush { get; } = CreateBrush("#F5F7F7");
         public Brush MutedTextBrush { get; } = CreateBrush("#D2D8D9");
@@ -103,25 +103,25 @@ namespace Uniwill_Control_Utility.ViewModels
         public Brush BatteryBrush { get; } = CreateBrush("#39FF14");
         public Brush BatteryRingBackgroundBrush { get; } = CreateBrush("#7054666A");
         public Brush MemoryBarBackgroundBrush { get; } = CreateBrush("#5054666A");
-        public Thickness PanelBorderThickness => new(1);
-        public CornerRadius PanelCornerRadius => new(6);
-        public CornerRadius MemoryBarCornerRadius => new(4);
-        public double LabelFontSize => 16;
-        public double ValueFontSize => 17;
-        public double LegendFontSize => 14;
-        public double FpsFontSize => 60;
-        public double FpsUnitFontSize => 23;
-        public double HardwareLabelFontSize => 21;
-        public double GraphTitleFontSize => 16;
-        public double AxisFontSize => 13;
-        public double GraphColumnWidth => BaseGraphWidth;
-        public double GraphWidth => BaseGraphWidth;
-        public double GraphHeight => BaseGraphHeight;
-        public double GraphMidY => BaseGraphHeight / 2;
-        public double GraphGridLineThickness => 1;
-        public double GraphStrokeThickness => 1.5;
-        public double MemoryBarWidth => BaseMemoryBarWidth;
-        public double MemoryBarHeight => 8;
+        public static Thickness PanelBorderThickness { get; } = new(1);
+        public static CornerRadius PanelCornerRadius { get; } = new(6);
+        public static CornerRadius MemoryBarCornerRadius { get; } = new(4);
+        public const double LabelFontSize = 16;
+        public const double ValueFontSize = 17;
+        public const double LegendFontSize = 14;
+        public const double FpsFontSize = 60;
+        public const double FpsUnitFontSize = 23;
+        public const double HardwareLabelFontSize = 21;
+        public const double GraphTitleFontSize = 16;
+        public const double AxisFontSize = 13;
+        public const double GraphColumnWidth = BaseGraphWidth;
+        public const double GraphWidth = BaseGraphWidth;
+        public const double GraphHeight = BaseGraphHeight;
+        public const double GraphMidY = BaseGraphHeight / 2;
+        public const double GraphGridLineThickness = 1;
+        public const double GraphStrokeThickness = 1.5;
+        public const double MemoryBarWidth = BaseMemoryBarWidth;
+        public const double MemoryBarHeight = 8;
         public int ZeroPointOnePercentLowFps => PointOnePercentLowFps;
         public double ZeroPointOnePercentFrameTimeMs => PointOnePercentFrameTimeMs;
         public PointCollection ZeroPointOnePercentFrameTimePoints => PointOnePercentFrameTimePoints;
@@ -324,6 +324,8 @@ namespace Uniwill_Control_Utility.ViewModels
             }
             catch
             {
+                // Intentionally swallowed: a transient hardware/FPS read failure must not
+                // crash the overlay timer loop. The next tick will retry automatically.
             }
             finally
             {
@@ -511,7 +513,7 @@ namespace Uniwill_Control_Utility.ViewModels
 
         private static Brush CreateBrush(string colour)
         {
-            var brush = (SolidColorBrush)new BrushConverter().ConvertFromString(colour)!;
+            var brush = (Brush)new BrushConverter().ConvertFromString(colour)!;
             brush.Freeze();
             return brush;
         }

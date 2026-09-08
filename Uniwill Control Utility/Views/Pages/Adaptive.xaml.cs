@@ -163,16 +163,15 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (isBs1)
             {
                 // BS1 supports Curve (Auto) via app-localized Bs1SmartControl — keep all 3 fan modes.
-                // BS1 max RPM is 3000
-                nudBs2ProRpm.Maximum = 3000;
-                sdBs2ProRpm.Maximum = 3000;
-                if (nudBs2ProRpm.Value > 3000)
-                    nudBs2ProRpm.Value = 3000;
+                nudBs2ProRpm.Maximum = MaxRpmBs1;
+                sdBs2ProRpm.Maximum = MaxRpmBs1;
+                if (nudBs2ProRpm.Value > MaxRpmBs1)
+                    nudBs2ProRpm.Value = MaxRpmBs1;
             }
             else
             {
-                nudBs2ProRpm.Maximum = 4000;
-                sdBs2ProRpm.Maximum = 4000;
+                nudBs2ProRpm.Maximum = MaxRpmBs2;
+                sdBs2ProRpm.Maximum = MaxRpmBs2;
             }
         }
 
@@ -198,7 +197,44 @@ namespace Uniwill_Control_Utility.Views.Pages
                 spBs2ProRgbSpeed.Visibility = Visibility.Collapsed;
         }
 
-        private static AdaptivePresetManager adaptivePresetManager = new AdaptivePresetManager(Settings.Default.Path + "adaptivePresets.json");
+        // Named constants for repeated magic strings
+        private const string AdaptivePresetsFile = "adaptivePresets.json";
+
+        // BS2 Pro fan mode identifiers
+        private const string FanModeGear = "Gear";
+        private const string FanModeRpm = "Rpm";
+        private const string FanModeCurve = "Curve";
+
+        // Curve profile identifiers
+        private const string CurveProfileSilent = "Silent";
+        private const string CurveProfileBalanced = "Balanced";
+        private const string CurveProfilePerformance = "Performance";
+        private const string CurveProfileCustom = "Custom";
+
+        // BS2 Pro RGB mode identifiers
+        private const string RgbModeOff = "Off";
+        private const string RgbModeSmartTemp = "SmartTemp";
+        private const string RgbModeStatic = "Static";
+        private const string RgbModeBreathing = "Breathing";
+        private const string RgbModeFlowing = "Flowing";
+
+        // EC Fan preset identifiers
+        private const string EcFanPresetSilent = "Silent";
+        private const string EcFanPresetBalanced = "Balanced";
+        private const string EcFanPresetPerformance = "Performance";
+        private const string EcFanPresetFullSpeed = "Full Speed";
+        private const string EcFanPresetOff = "Off";
+        private const string EcFanPresetCustom = "Custom";
+
+        // Flydigi custom curve settings file
+        private const string Bs2ProSettingsFile = "bs2pro_settings.json";
+
+        // RPM clamp bounds
+        private const int MinRpm = 1300;
+        private const int MaxRpmBs1 = 3000;
+        private const int MaxRpmBs2 = 4000;
+
+        private static AdaptivePresetManager adaptivePresetManager = new AdaptivePresetManager(Settings.Default.Path + AdaptivePresetsFile);
         private static DeviceApplier? _deviceApplier;
         private static FlydigiSmartControl? _bs2ProSmartControl;
         private static FlydigiTemperatureProvider? _bs2ProTempProvider;
@@ -596,7 +632,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 cbxBs2ProFanMode.SelectedIndex = GetBs2ProFanModeIndex(preset.Bs2ProFanMode);
                 UpdateBs2ProModeUI();
                 cbxBs2ProGear.SelectedIndex = Math.Clamp(preset.Bs2ProGear - 1, 0, 3);
-                nudBs2ProRpm.Value = Math.Clamp((int)preset.Bs2ProRpm, 1300, 4000);
+                nudBs2ProRpm.Value = Math.Clamp((int)preset.Bs2ProRpm, MinRpm, MaxRpmBs2);
                 cbxBs2ProCurve.SelectedIndex = GetBs2ProCurveIndex(preset.Bs2ProCurveProfileId);
 
                 // Gap 3: Restore Flydigi custom curve points per-game
@@ -613,7 +649,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Gap 2: Restore Flydigi RGB speed per-game
                 if (sliderBs2ProRgbSpeed != null)
                     sliderBs2ProRgbSpeed.Value = preset.Bs2ProRgbSpeed;
-                int rpm = Math.Clamp((int)preset.Bs2ProRpm, 1300, 4000);
+                int rpm = Math.Clamp((int)preset.Bs2ProRpm, MinRpm, MaxRpmBs2);
                 Bs2ProRpmValueText.Text = rpm.ToString();
                 sdBs2ProRpm.Value = rpm;
             }
@@ -887,7 +923,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     Bs2ProEnabled = (bool)cbxBs2ProEnabled.IsChecked,
                     Bs2ProFanMode = GetBs2ProFanModeFromIndex(cbxBs2ProFanMode.SelectedIndex),
                     Bs2ProGear = cbxBs2ProGear.SelectedIndex + 1,
-                    Bs2ProRpm = (ushort)Math.Clamp((int)nudBs2ProRpm.Value, 1300, 4000),
+                    Bs2ProRpm = (ushort)Math.Clamp((int)nudBs2ProRpm.Value, MinRpm, MaxRpmBs2),
                     Bs2ProCurveProfileId = GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex),
                     // Gap 3: Save Flydigi custom curve points per-game
                     Bs2ProCurvePointsJson = GetBs2ProCurvePointsJson(),
@@ -900,15 +936,15 @@ namespace Uniwill_Control_Utility.Views.Pages
                     Bs2ProRgbSpeed = (byte)sliderBs2ProRgbSpeed.Value,
                     EcFanEnabled = sdEcFan.Visibility == Visibility.Visible ? (bool)cbxEcFanEnabled.IsChecked : false,
                     EcFanUnifiedMode = sdEcFan.Visibility == Visibility.Visible ? cbxEcFanMode.SelectedIndex == 0 : false,
-                    EcFanPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanPreset.SelectedIndex) : "Balanced",
-                    EcFanCpuPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanCpuPreset.SelectedIndex) : "Balanced",
-                    EcFanGpuPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanGpuPreset.SelectedIndex) : "Balanced",
+                    EcFanPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanPreset.SelectedIndex) : EcFanPresetBalanced,
+                    EcFanCpuPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanCpuPreset.SelectedIndex) : EcFanPresetBalanced,
+                    EcFanGpuPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanGpuPreset.SelectedIndex) : EcFanPresetBalanced,
                     // Gap 1: Save EC Fan custom curves per-game
-                    EcFanCustomDuties = sdEcFan.Visibility == Visibility.Visible && GetEcFanPresetFromIndex(cbxEcFanPreset.SelectedIndex) == "Custom"
+                    EcFanCustomDuties = sdEcFan.Visibility == Visibility.Visible && GetEcFanPresetFromIndex(cbxEcFanPreset.SelectedIndex) == EcFanPresetCustom
                         ? FanControlSettingsService.Load().UnifiedDuties?.ToArray() : null,
-                    EcFanCpuCustomDuties = sdEcFan.Visibility == Visibility.Visible && GetEcFanPresetFromIndex(cbxEcFanCpuPreset.SelectedIndex) == "Custom"
+                    EcFanCpuCustomDuties = sdEcFan.Visibility == Visibility.Visible && GetEcFanPresetFromIndex(cbxEcFanCpuPreset.SelectedIndex) == EcFanPresetCustom
                         ? FanControlSettingsService.Load().CpuDuties?.ToArray() : null,
-                    EcFanGpuCustomDuties = sdEcFan.Visibility == Visibility.Visible && GetEcFanPresetFromIndex(cbxEcFanGpuPreset.SelectedIndex) == "Custom"
+                    EcFanGpuCustomDuties = sdEcFan.Visibility == Visibility.Visible && GetEcFanPresetFromIndex(cbxEcFanGpuPreset.SelectedIndex) == EcFanPresetCustom
                         ? FanControlSettingsService.Load().GpuDuties?.ToArray() : null,
                     KbEnabled = (bool)cbxKbEnabled.IsChecked,
                     KbPerKeyMode = cbxKbMode.SelectedIndex == 1,
@@ -1370,9 +1406,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             string curveProfileId = GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex);
             return curveProfileId switch
             {
-                "Silent" => FlydigiFanCurveProfile.CreateSilent(),
-                "Performance" => FlydigiFanCurveProfile.CreatePerformance(),
-                "Custom" => LoadBs1CustomCurveProfile(bs1Service),
+                CurveProfileSilent => FlydigiFanCurveProfile.CreateSilent(),
+                CurveProfilePerformance => FlydigiFanCurveProfile.CreatePerformance(),
+                CurveProfileCustom => LoadBs1CustomCurveProfile(bs1Service),
                 _ => FlydigiFanCurveProfile.CreateBalanced()
             };
         }
@@ -1382,9 +1418,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             string curveProfileId = GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex);
             return curveProfileId switch
             {
-                "Silent" => FlydigiFanCurveProfile.CreateSilent(),
-                "Performance" => FlydigiFanCurveProfile.CreatePerformance(),
-                "Custom" => LoadCustomCurveProfile(flydigiService),
+                CurveProfileSilent => FlydigiFanCurveProfile.CreateSilent(),
+                CurveProfilePerformance => FlydigiFanCurveProfile.CreatePerformance(),
+                CurveProfileCustom => LoadCustomCurveProfile(flydigiService),
                 _ => FlydigiFanCurveProfile.CreateBalanced()
             };
         }
@@ -2078,9 +2114,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             return (index + 1) switch
             {
-                1 => "Gear",
-                2 => "Rpm",
-                _ => "Curve"
+                1 => FanModeGear,
+                2 => FanModeRpm,
+                _ => FanModeCurve
             };
         }
 
@@ -2088,9 +2124,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             return mode switch
             {
-                "Gear" => 0,
-                "Rpm" => 1,
-                "Curve" => 2,
+                FanModeGear => 0,
+                FanModeRpm => 1,
+                FanModeCurve => 2,
                 _ => 0
             };
         }
@@ -2099,11 +2135,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             return index switch
             {
-                0 => "Silent",
-                1 => "Balanced",
-                2 => "Performance",
-                3 => "Custom",
-                _ => "Silent"
+                0 => CurveProfileSilent,
+                1 => CurveProfileBalanced,
+                2 => CurveProfilePerformance,
+                3 => CurveProfileCustom,
+                _ => CurveProfileSilent
             };
         }
 
@@ -2111,10 +2147,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             return profileId switch
             {
-                "Silent" => 0,
-                "Balanced" => 1,
-                "Performance" => 2,
-                "Custom" => 3,
+                CurveProfileSilent => 0,
+                CurveProfileBalanced => 1,
+                CurveProfilePerformance => 2,
+                CurveProfileCustom => 3,
                 _ => 0
             };
         }
@@ -2250,7 +2286,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void btnBs2ProEditCurve_Click(object sender, RoutedEventArgs e)
         {
             // Load the current custom curve from Bs2ProSettings if it exists
-            var bs2SettingsPath = System.IO.Path.Combine(Settings.Default.Path, "bs2pro_settings.json");
+            var bs2SettingsPath = System.IO.Path.Combine(Settings.Default.Path, Bs2ProSettingsFile);
             FlydigiFanCurveProfile? seedProfile = FlydigiFanCurveProfile.CreateBalanced();
 
             if (System.IO.File.Exists(bs2SettingsPath))
@@ -2283,7 +2319,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         System.IO.File.ReadAllText(bs2SettingsPath)) ?? bs2Settings;
                 }
                 bs2Settings.CustomCurveJson = dialog.EditedProfile.ToJSON();
-                bs2Settings.SelectedCurveProfile = "Custom";
+                bs2Settings.SelectedCurveProfile = CurveProfileCustom;
                 System.IO.File.WriteAllText(bs2SettingsPath,
                     Newtonsoft.Json.JsonConvert.SerializeObject(bs2Settings, Newtonsoft.Json.Formatting.Indented));
             }
@@ -2308,12 +2344,12 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             return (index + 1) switch
             {
-                1 => "Off",
-                2 => "SmartTemp",
-                3 => "Static",
-                4 => "Breathing",
-                5 => "Flowing",
-                _ => "Static"
+                1 => RgbModeOff,
+                2 => RgbModeSmartTemp,
+                3 => RgbModeStatic,
+                4 => RgbModeBreathing,
+                5 => RgbModeFlowing,
+                _ => RgbModeStatic
             };
         }
 
@@ -2321,11 +2357,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             return mode switch
             {
-                "Off" => 0,
-                "SmartTemp" => 1,
-                "Static" => 2,
-                "Breathing" => 3,
-                "Flowing" => 4,
+                RgbModeOff => 0,
+                RgbModeSmartTemp => 1,
+                RgbModeStatic => 2,
+                RgbModeBreathing => 3,
+                RgbModeFlowing => 4,
                 _ => 2
             };
         }
@@ -2438,31 +2474,31 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private static int GetEcFanPresetIndex(string? presetName) => presetName switch
         {
-            "Silent" => 0,
-            "Performance" => 2,
-            "Full Speed" => 3,
-            "Off" => 4,
-            "Custom" => 5,
+            EcFanPresetSilent => 0,
+            EcFanPresetPerformance => 2,
+            EcFanPresetFullSpeed => 3,
+            EcFanPresetOff => 4,
+            EcFanPresetCustom => 5,
             _ => 1 // Balanced
         };
 
         private static string GetEcFanPresetFromIndex(int index) => index switch
         {
-            0 => "Silent",
-            2 => "Performance",
-            3 => "Full Speed",
-            4 => "Off",
-            5 => "Custom",
-            _ => "Balanced"
+            0 => EcFanPresetSilent,
+            2 => EcFanPresetPerformance,
+            3 => EcFanPresetFullSpeed,
+            4 => EcFanPresetOff,
+            5 => EcFanPresetCustom,
+            _ => EcFanPresetBalanced
         };
 
         private static Uniwill_Control_Utility.Models.EcFanCurve GetEcFanPresetCurve(string? name) => name switch
         {
-            "Silent" => Uniwill_Control_Utility.Models.EcFanCurve.CreateSilent(),
-            "Balanced" => Uniwill_Control_Utility.Models.EcFanCurve.CreateBalanced(),
-            "Performance" => Uniwill_Control_Utility.Models.EcFanCurve.CreatePerformance(),
-            "Full Speed" => Uniwill_Control_Utility.Models.EcFanCurve.CreateFullSpeed(),
-            "Off" => Uniwill_Control_Utility.Models.EcFanCurve.CreateOff(),
+            EcFanPresetSilent => Uniwill_Control_Utility.Models.EcFanCurve.CreateSilent(),
+            EcFanPresetBalanced => Uniwill_Control_Utility.Models.EcFanCurve.CreateBalanced(),
+            EcFanPresetPerformance => Uniwill_Control_Utility.Models.EcFanCurve.CreatePerformance(),
+            EcFanPresetFullSpeed => Uniwill_Control_Utility.Models.EcFanCurve.CreateFullSpeed(),
+            EcFanPresetOff => Uniwill_Control_Utility.Models.EcFanCurve.CreateOff(),
             _ => Uniwill_Control_Utility.Models.EcFanCurve.CreateBalanced()
         };
 
@@ -2732,26 +2768,29 @@ namespace Uniwill_Control_Utility.Views.Pages
             _ => 0
         };
 
-        private static string GetKbEffectFromIndex(int index) => index switch
+        private static string GetKbEffectFromIndex(int index)
         {
-            0 => "Static",
-            1 => "Breathing",
-            2 => "Wave",
-            3 => "Reactive",
-            4 => "Rainbow",
-            5 => "Ripple",
-            6 => "TouchRipple",
-            7 => "Marquee",
-            8 => "Raindrop",
-            9 => "Aurora",
-            10 => "TouchAurora",
-            11 => "TouchSpark",
-            12 => "Spark",
-            13 => "GamingMode",
-            14 => "GamingModeFull",
-            15 => "Music",
-            _ => "Static"
-        };
+            return index switch
+            {
+                0 => "Static",
+                1 => "Breathing",
+                2 => "Wave",
+                3 => "Reactive",
+                4 => "Rainbow",
+                5 => "Ripple",
+                6 => "TouchRipple",
+                7 => "Marquee",
+                8 => "Raindrop",
+                9 => "Aurora",
+                10 => "TouchAurora",
+                11 => "TouchSpark",
+                12 => "Spark",
+                13 => "GamingMode",
+                14 => "GamingModeFull",
+                15 => "Music",
+                _ => "Static"
+            };
+        }
 
         private void btnKbEditPerKey_Click(object sender, RoutedEventArgs e)
         {
@@ -3273,13 +3312,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 var settings = FanControlSettingsService.Load();
 
-                if (unifiedPreset == "Custom" && unifiedDuties != null)
+                if (unifiedPreset == EcFanPresetCustom && unifiedDuties != null)
                     settings.UnifiedDuties = unifiedDuties.ToArray();
 
-                if (cpuPreset == "Custom" && cpuDuties != null)
+                if (cpuPreset == EcFanPresetCustom && cpuDuties != null)
                     settings.CpuDuties = cpuDuties.ToArray();
 
-                if (gpuPreset == "Custom" && gpuDuties != null)
+                if (gpuPreset == EcFanPresetCustom && gpuDuties != null)
                     settings.GpuDuties = gpuDuties.ToArray();
 
                 FanControlSettingsService.Save(settings);
@@ -3296,7 +3335,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             try
             {
                 // Only save custom curve points when Custom is selected
-                if (GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex) != "Custom")
+                if (GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex) != CurveProfileCustom)
                     return string.Empty;
 
                 if (Bs2ProCurveEditor is not null)

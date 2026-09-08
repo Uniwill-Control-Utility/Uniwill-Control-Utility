@@ -85,6 +85,7 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
                 }
                 catch
                 {
+                    // Device close failures during deinitialization are non-fatal.
                 }
             }
         }

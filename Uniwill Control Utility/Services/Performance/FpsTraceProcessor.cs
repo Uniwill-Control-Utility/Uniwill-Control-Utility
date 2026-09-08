@@ -43,6 +43,7 @@ namespace Uniwill_Control_Utility.Services.Performance
             }
             catch
             {
+                // Win32k provider may not be available on all systems; DXGKrnl is sufficient.
             }
             _session.Source.AllEvents += OnEvent;
             _traceThread = new Thread(() => _session.Source.Process())

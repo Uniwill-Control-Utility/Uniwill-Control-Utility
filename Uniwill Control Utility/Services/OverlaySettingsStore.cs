@@ -57,6 +57,7 @@ namespace Uniwill_Control_Utility.Services
             }
             catch
             {
+                // Corrupted or unreadable settings file — fall back to defaults.
             }
 
             return new OverlayOptions();

@@ -169,6 +169,7 @@ namespace Uniwill_Control_Utility.Services.Performance
             }
             catch
             {
+                // Process query failed (access denied, process exited); fall back to N/A.
             }
 
             return "N/A";
