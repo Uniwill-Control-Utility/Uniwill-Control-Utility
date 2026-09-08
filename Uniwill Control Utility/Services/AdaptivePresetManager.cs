@@ -120,7 +120,7 @@ namespace Uniwill_Control_Utility.Services
             return _presets.Keys;
         }
 
-        public AdaptivePreset GetPreset(string presetName)
+        public AdaptivePreset? GetPreset(string presetName)
         {
             if (_presets.ContainsKey(presetName))
             {
@@ -149,7 +149,8 @@ namespace Uniwill_Control_Utility.Services
             if (File.Exists(_filePath))
             {
                 string json = File.ReadAllText(_filePath);
-                _presets = JsonConvert.DeserializeObject<Dictionary<string, AdaptivePreset>>(json);
+                _presets = JsonConvert.DeserializeObject<Dictionary<string, AdaptivePreset>>(json)
+                    ?? new Dictionary<string, AdaptivePreset>();
             }
             else
             {

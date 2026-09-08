@@ -63,7 +63,7 @@ namespace Uniwill_Control_Utility.Views.Controls
         private SolidColorBrush? _fallbackBrush;
 
         /// <summary> Resolves the current system accent brush dynamically. </summary>
-        private SolidColorBrush accentBrush =>
+        private SolidColorBrush? accentBrush =>
             Application.Current.Resources["AccentFillColorDefaultBrush"] as SolidColorBrush
             ?? _fallbackBrush;
 

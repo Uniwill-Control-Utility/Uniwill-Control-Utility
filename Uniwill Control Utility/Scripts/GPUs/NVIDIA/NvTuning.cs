@@ -77,7 +77,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
             try
             {
-                PhysicalGPU internalGpu = PhysicalGPU.GetPhysicalGPUs().FirstOrDefault();
+                PhysicalGPU? internalGpu = PhysicalGPU.GetPhysicalGPUs().FirstOrDefault();
                 if (internalGpu == null) return -1;
 
                 var coreClock = new PerformanceStates20ClockEntryV1(
@@ -388,7 +388,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         {
             try
             {
-                PhysicalGPU internalGpu = PhysicalGPU.GetPhysicalGPUs().FirstOrDefault();
+                PhysicalGPU? internalGpu = PhysicalGPU.GetPhysicalGPUs().FirstOrDefault();
                 if (internalGpu == null) return -1;
 
                 PrivateClockBoostLockV2 data = GPUApi.GetClockBoostLock(internalGpu.Handle);
@@ -466,7 +466,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 // Use the same public NVAPI path as the Core Clock Offset slider
                 // (GPUApi.SetPerformanceStates20) to apply a uniform zero offset.
                 // This is the reliable path that works on Blackwell laptops.
-                PhysicalGPU internalGpu = PhysicalGPU.GetPhysicalGPUs().FirstOrDefault();
+                PhysicalGPU? internalGpu = PhysicalGPU.GetPhysicalGPUs().FirstOrDefault();
                 if (internalGpu == null) return -1;
 
                 var coreClock = new PerformanceStates20ClockEntryV1(

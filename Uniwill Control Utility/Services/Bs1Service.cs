@@ -1000,7 +1000,7 @@ namespace Uniwill_Control_Utility.Services
                 _gattSession.SessionStatusChanged -= OnGattSessionStatusChanged;
                 var session = _gattSession;
                 _gattSession = null;
-                try { session.Dispose(); } catch { }
+                try { session.Dispose(); } catch { /* Session dispose failed; harmless */ }
                 await WaitForSessionClosedAsync(2000);
             }
             _sessionClosedTcs = null;

@@ -1325,7 +1325,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         result.Add(Color.FromRgb(r, g, b));
                     }
                 }
-                catch { }
+                catch { /* Invalid hex color entry skipped */ }
             }
             return result;
         }

@@ -35,9 +35,9 @@ namespace Uniwill_Control_Utility.Scripts
         public static ProcessorType TYPE = ProcessorType.Unknown;
 
 
-        public static string CPUName = "";
-        public static string GPUName = "";
-        public static string LaptopModel = "";
+        public static string CPUName = string.Empty;
+        public static string GPUName = string.Empty;
+        public static string LaptopModel = string.Empty;
         public static int CPUFamily = 0, CPUModel = 0, CPUStepping = 0;
 
         /// <summary>

@@ -212,90 +212,6 @@ namespace RyzenSmu
             return;
         }
 
-        private static void Socket_FT6_FP7_FP8_Original()
-        {
-            if(true)
-            {
-                RyzenSmu.Smu.MP1_ADDR_MSG = 0x3b10928;
-                RyzenSmu.Smu.MP1_ADDR_RSP = 0x3b10978;
-                RyzenSmu.Smu.MP1_ADDR_ARG = 0x3b10998;
-
-                RyzenSmu.Smu.PSMU_ADDR_MSG = 0x03B10a20;
-                RyzenSmu.Smu.PSMU_ADDR_RSP = 0x03B10a80;
-                RyzenSmu.Smu.PSMU_ADDR_ARG = 0x03B10a88;
-            }
-            else 
-            {
-                RyzenSmu.Smu.MP1_ADDR_MSG = 0x3B10528;
-                RyzenSmu.Smu.MP1_ADDR_RSP = 0x3B10578;
-                RyzenSmu.Smu.MP1_ADDR_ARG = 0x3B10998;
-
-                RyzenSmu.Smu.PSMU_ADDR_MSG = 0x03B10a20;
-                RyzenSmu.Smu.PSMU_ADDR_RSP = 0x03B10a80;
-                RyzenSmu.Smu.PSMU_ADDR_ARG = 0x03B10a88;
-            }
-
-            SMUCommands.commands = new List<(string, bool, uint)>
-            {
-                ("enable-feature",true, 0x05),
-                ("disable-feature",true, 0x07),
-                ("stapm-limit", true, 0x14),
-                ("stapm-limit", false, 0x31),
-                ("stapm-time", true, 0x18),
-                ("stapm-time", false, 0x36),
-                ("fast-limit", true, 0x15),
-                ("fast-limit", false, 0x32),
-                ("slow-limit", true, 0x16),
-                ("slow-limit", false, 0x33),
-                ("slow-time", true, 0x17),
-                ("slow-time", false, 0x35),
-                ("tctl-temp", true, 0x19),
-                ("cHTC-temp", true, 0x63),
-                ("cHTC-temp", false, 0x37),
-                ("vrm-current", true, 0x1a),
-                ("vrm-current", false, 0x38),
-                ("vrmmax-current", true, 0x1c),
-                ("vrmmax-current", false, 0x3a),
-                ("vrmsoc-current", true, 0x1b),
-                ("vrmsoc-current", false, 0x39),
-                ("vrmsocmax-current", true, 0x1d),
-                ("vrmsocmax-current", false, 0x3b),
-                ("psi0-current", true, 0x1e),
-                ("psi0-current", false, 0x3c),
-                ("psi0soc-current", true, 0x1f),
-                ("psi0soc-current", false, 0x3d),
-                ("psi3cpu_current", true, 0x20),
-                ("psi3gfx_current", true, 0x21),
-                ("prochot-deassertion-ramp", true, 0x22),
-                ("skin-temp-limit", true, 0x4a),
-                ("apu-slow-limit", true, 0x23),
-                ("apu-slow-limit", false, 0x34),
-                ("apu-skin-temp", true, 0x33),
-                ("dgpu-skin-temp", true, 0x34),
-                ("dgpu-skin-temp", false, 0x92),
-                ("max-performance", true, 0x11),
-                ("power-saving", true, 0x12),
-                ("enable-oc", false, 0x17),
-                ("disable-oc", false, 0x18),
-                ("oc-clk", false, 0x19),
-                ("per-core-oc-clk", false, 0x1a),
-                ("oc-volt", false, 0x1b),
-                ("gfx-clk", false, 0x89),
-                ("gfx-clk", false, 0x1c),
-                ("pbo-scalar", false, 0x3e),
-                ("get-pbo-scalar", false, 0x0f),
-                ("set-cogfx", false, 0xb7),
-                ("get-sustained-power-and-thm-limit", true, 0x5f),
-                ("get-pbo-fused-power-limit", false, 0x11),
-                ("get-pbo-fused-slow-limit", false, 0x12),
-                ("get-pbo-fused-fast-limit", false, 0x13),
-                ("get-pbo-fused-apu-slow-limit", false, 0x14),
-                ("get-pbo-fused-vrmtdc-limit", false, 0x15),
-                ("get-pbo-fused-vrmsoc-current", false, 0x16),
-                ("get-pbo-fused-tctl-temp", false, 0xE5)
-            };
-        }
-
         private static void Socket_FF3()
         {
             RyzenSmu.Smu.MP1_ADDR_MSG = 0x3B10528;
@@ -1023,13 +939,13 @@ namespace RyzenSmu
         private static void SafeReleaseMutex(Mutex mutex)
         {
             try { mutex.ReleaseMutex(); }
-            catch { }
+            catch { /* Mutex release failed; already released or owned by another thread */ }
         }
 
         private static void DisposeMutex(ref Mutex? mutex)
         {
             try { mutex?.Close(); }
-            catch { }
+            catch { /* Mutex dispose failed; already closed */ }
             finally { mutex = null; }
         }
 

@@ -20,10 +20,10 @@ namespace Uniwill_Control_Utility.Services
     /// </summary>
     public class WaterCoolerService : IDisposable
     {
-        private BluetoothLEDevice _device;
-        private GattSession _gattSession;
-        private GattCharacteristic _txCharacteristic;
-        private GattCharacteristic _rxCharacteristic;
+        private BluetoothLEDevice? _device;
+        private GattSession? _gattSession;
+        private GattCharacteristic? _txCharacteristic;
+        private GattCharacteristic? _rxCharacteristic;
         private readonly List<BluetoothLEAdvertisementWatcher> _watchers = new();
 
         // Track when the OS-level GATT session actually closes.
@@ -371,7 +371,7 @@ namespace Uniwill_Control_Utility.Services
             if (_rxCharacteristic != null)
             {
                 _rxCharacteristic.ValueChanged -= OnRxValueChanged;
-                try { await _rxCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue.None); } catch { }
+                try { await _rxCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue.None); } catch { /* Unsubscribe failed; continuing cleanup */ }
                 _rxCharacteristic = null;
             }
 
@@ -381,7 +381,7 @@ namespace Uniwill_Control_Utility.Services
                 _gattSession.SessionStatusChanged -= OnGattSessionStatusChanged;
                 var staleSession = _gattSession;
                 _gattSession = null;
-                try { staleSession.Dispose(); } catch { }
+                try { staleSession.Dispose(); } catch { /* Stale session dispose failed; harmless */ }
                 await WaitForSessionClosedAsync(2000);
             }
             _sessionClosedTcs = null;
@@ -808,8 +808,8 @@ namespace Uniwill_Control_Utility.Services
                 watcher.Stop();
 
             // Synchronous fallback cleanup in case async disconnect doesn't complete
-            try { _gattSession?.Dispose(); } catch { }
-            try { _device?.Dispose(); } catch { }
+            try { _gattSession?.Dispose(); } catch { /* GATT session dispose failed; harmless */ }
+            try { _device?.Dispose(); } catch { /* Device dispose failed; harmless */ }
         }
 
         /// <summary>

@@ -134,7 +134,7 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
             }
             catch
             {
-                try { CloseHandle(raw); } catch { }
+                try { CloseHandle(raw); } catch { /* Handle close failed; invalid handle */ }
                 return new AMDPawnIo(null);
             }
         }

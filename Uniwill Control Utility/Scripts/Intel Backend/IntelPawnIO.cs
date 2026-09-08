@@ -456,13 +456,13 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
         private static void SafeReleaseMutex(Mutex? mutex)
         {
             try { mutex?.ReleaseMutex(); }
-            catch { }
+            catch { /* Mutex release failed; already released or owned by another thread */ }
         }
 
         private static void DisposeMutex(ref Mutex? mutex)
         {
             try { mutex?.Close(); }
-            catch { }
+            catch { /* Mutex dispose failed; already closed */ }
             finally { mutex = null; }
         }
 

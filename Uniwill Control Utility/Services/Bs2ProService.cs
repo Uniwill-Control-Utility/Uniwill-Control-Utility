@@ -300,7 +300,7 @@ namespace Uniwill_Control_Utility.Services
                 catch
                 {
                     // Skip devices that can't be opened or read
-                    try { d.CloseDevice(); } catch { }
+                    try { d.CloseDevice(); } catch { /* Device close failed during error handling; skipping */ }
                 }
             }
 

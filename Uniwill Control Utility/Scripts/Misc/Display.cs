@@ -73,21 +73,24 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             public int dmDisplayFrequency;
         }
 
-        public static string targetDisplayName = FindLaptopScreen();
-        public static List<string> uniqueResolutions = GetSupportedResolutions(targetDisplayName);
-        public static List<int> uniqueRefreshRates = GetSupportedRefreshRates(targetDisplayName);
+        public static string? targetDisplayName = FindLaptopScreen();
+        public static List<string> uniqueResolutions = GetSupportedResolutions(targetDisplayName ?? defaultDevice);
+        public static List<int> uniqueRefreshRates = GetSupportedRefreshRates(targetDisplayName ?? defaultDevice);
 
         public static void setUpLists()
         {
-            uniqueRefreshRates = GetSupportedRefreshRates(targetDisplayName);
+            uniqueRefreshRates = GetSupportedRefreshRates(targetDisplayName ?? defaultDevice);
             uniqueRefreshRates = uniqueRefreshRates.Distinct().ToList();
             uniqueRefreshRates.Sort();
             uniqueRefreshRates.Reverse();
         }
 
-        static List<string> GetSupportedResolutions(string targetDisplayName)
+        static List<string> GetSupportedResolutions(string? targetDisplayName)
         {
             List<string> resolutions = new List<string>();
+            if (string.IsNullOrEmpty(targetDisplayName))
+                return resolutions;
+
             DISPLAY_DEVICE displayDevice = new DISPLAY_DEVICE();
             displayDevice.cb = (uint)Marshal.SizeOf(displayDevice);
 
@@ -109,9 +112,12 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             return resolutions;
         }
 
-        static List<int> GetSupportedRefreshRates(string targetDisplayName)
+        static List<int> GetSupportedRefreshRates(string? targetDisplayName)
         {
             List<int> refreshRates = new List<int>();
+            if (string.IsNullOrEmpty(targetDisplayName))
+                return refreshRates;
+
             DISPLAY_DEVICE displayDevice = new DISPLAY_DEVICE();
             displayDevice.cb = (uint)Marshal.SizeOf(displayDevice);
             int displayCount = Screen.AllScreens.Length;
@@ -143,8 +149,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             return refreshRates;
         }
 
-        public static void ChangeDisplaySettings(string targetDisplayName, int newRefreshRate)
+        public static void ChangeDisplaySettings(string? targetDisplayName, int newRefreshRate)
         {
+            if (string.IsNullOrEmpty(targetDisplayName))
+                return;
+
             DEVMODE devMode = new DEVMODE();
             devMode.dmSize = (short)Marshal.SizeOf(devMode);
 

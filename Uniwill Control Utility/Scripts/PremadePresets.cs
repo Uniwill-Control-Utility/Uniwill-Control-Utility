@@ -11,8 +11,11 @@ namespace Uniwill_Control_Utility.Scripts
 {
     internal class PremadePresets
     {
-        public static string ExtremePreset = "", PerformancePreset = "", BalPreset = "", EcoPreset = "";
-        public static Uri uri = null;
+        public static string ExtremePreset = string.Empty;
+        public static string PerformancePreset = string.Empty;
+        public static string BalPreset = string.Empty;
+        public static string EcoPreset = string.Empty;
+        public static Uri? uri;
 
         public static void SetPremadePresets()
         {

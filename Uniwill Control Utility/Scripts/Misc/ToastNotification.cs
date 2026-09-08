@@ -17,8 +17,8 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 string iconUri = "";
                 iconUri = "pack://application:,,,/Assets/applicationIcon-1024.png";
 
-                string path = System.Reflection.Assembly.GetEntryAssembly().Location;
-                path = path.Replace("Uniwill Control Utility.dll", null);
+                string path = System.Reflection.Assembly.GetEntryAssembly()!.Location;
+                path = path.Replace("Uniwill Control Utility.dll", string.Empty);
                 iconUri = path + "Assets\\icon.png";
 
                 new ToastContentBuilder()

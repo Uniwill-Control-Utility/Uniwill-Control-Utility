@@ -87,7 +87,10 @@ namespace Uniwill_Control_Utility.Models
                 if (File.Exists(FilePath))
                     File.Delete(FilePath);
             }
-            catch { }
+            catch
+            {
+                // Stock curve cache file deletion is best-effort; failure is harmless.
+            }
         }
     }
 }

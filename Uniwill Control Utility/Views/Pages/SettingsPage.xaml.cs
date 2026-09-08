@@ -185,7 +185,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 _ramCapacity = _ramCapacity / 1024 / 1024 / 1024;
             }
-            catch { }
+            catch { /* RAM info parsing failed; defaults will be used */ }
         }
 
         private void applyRAMInfo()

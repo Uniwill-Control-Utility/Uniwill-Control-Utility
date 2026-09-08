@@ -36,19 +36,19 @@ namespace Uniwill_Control_Utility.Scripts
     {
         public class GameLauncherItem
         {
-            public string gameID { get; set; }
-            public string gameName { get; set; }
-            public string appType { get; set; }
-            public string launchCommand { get; set; }
-            public string path { get; set; }
-            public string exe { get; set; }
-            public string imageLocation { get; set; } = "";
-            public string iconPath { get; set; } = "";
+            public string gameID { get; set; } = string.Empty;
+            public string gameName { get; set; } = string.Empty;
+            public string appType { get; set; } = string.Empty;
+            public string launchCommand { get; set; } = string.Empty;
+            public string path { get; set; } = string.Empty;
+            public string exe { get; set; } = string.Empty;
+            public string imageLocation { get; set; } = string.Empty;
+            public string iconPath { get; set; } = string.Empty;
         }
 
-        public static List<GameLauncherItem> installedGames = null;
+        public static List<GameLauncherItem>? installedGames;
 
-        public static List<GameLauncherItem> syncGame_Library(bool isAdaptive = false)
+        public static List<GameLauncherItem>? syncGame_Library(bool isAdaptive = false)
         {
             try
             {
@@ -395,9 +395,11 @@ namespace Uniwill_Control_Utility.Scripts
 
         public class GameLauncherItemEqualityComparer : IEqualityComparer<GameLauncherItem>
         {
-            public bool Equals(GameLauncherItem x, GameLauncherItem y)
+            public bool Equals(GameLauncherItem? x, GameLauncherItem? y)
             {
                 // Check if two GameLauncherItems are equal based on gameID, gameName, and appType.
+                if (x is null && y is null) return true;
+                if (x is null || y is null) return false;
                 return x.gameID == y.gameID && x.gameName == y.gameName && x.appType == y.appType;
             }
 

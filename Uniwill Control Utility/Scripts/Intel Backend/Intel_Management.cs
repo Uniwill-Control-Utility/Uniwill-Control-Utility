@@ -286,7 +286,7 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
                     myKey.Close();
                 }
             }
-            catch { }
+            catch { /* Registry key close failed; key may already be closed */ }
         }
 
         public static void determineCPU()

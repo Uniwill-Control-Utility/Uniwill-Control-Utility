@@ -13,7 +13,7 @@ public class UpdateManager
     private readonly string _repo;
     private readonly string _currentVersion;
     private readonly string _downloadPath;
-    public string _newVersion;
+    public string _newVersion = string.Empty;
     public UpdateManager(string owner, string repo, string currentVersion, string downloadPath)
     {
         _owner = owner;

@@ -61,11 +61,13 @@ namespace Uniwill_Control_Utility.Models
         /// <summary> V-F curve offsets: pointIndex → frequencyOffsetMHz </summary>
         public Dictionary<int, int> VfCurveOffsets { get; set; } = new();
 
-        public bool HasChanges => CpuSustained != 75 || CpuBoost != 85 || CpuTjMax != 95 ||
-            CpuCoCcd0 != 0 || CpuCoCcd1 != 0 ||
-            IntelPl1 != 45 || IntelPl2 != 60 || IntelVolt != 0 ||
-            GpuTgp != 150 || GpuDynamicBoost != false || GpuDbOffset != 0 ||
-            GpuCoreOffset != 0 || GpuMemOffset != 0 ||
+        private static bool Differs(double value, double defaultValue) => Math.Abs(value - defaultValue) > 1e-9;
+
+        public bool HasChanges => Differs(CpuSustained, 75) || Differs(CpuBoost, 85) || Differs(CpuTjMax, 95) ||
+            Differs(CpuCoCcd0, 0) || Differs(CpuCoCcd1, 0) ||
+            Differs(IntelPl1, 45) || Differs(IntelPl2, 60) || Differs(IntelVolt, 0) ||
+            Differs(GpuTgp, 150) || GpuDynamicBoost || Differs(GpuDbOffset, 0) ||
+            Differs(GpuCoreOffset, 0) || Differs(GpuMemOffset, 0) ||
             VfCurveOffsets.Any(p => p.Value != 0);
     }
 

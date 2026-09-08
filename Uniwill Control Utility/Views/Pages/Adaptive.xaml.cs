@@ -233,7 +233,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         if (names.Contains(item.gameName)) containsName = true;
                     }
 
-                    if (containsName == false)
+                    if (!containsName)
                     {
                         AdaptivePreset preset = new AdaptivePreset
                         {
@@ -547,7 +547,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async void adaptive_Tick(object sender, EventArgs e)
         {
-            if (start == true)
+            if (start)
             {
                 update();
             }
@@ -568,6 +568,266 @@ namespace Uniwill_Control_Utility.Views.Pages
             loadPreset(presetName, resetTracking: true);
         }
 
+        #region Preset load helpers
+
+        private void LoadWatercoolerToUI(AdaptivePreset preset)
+        {
+            cbxWcPumpVoltage.SelectedIndex = GetPumpVoltageIndex(preset.WcPumpVoltage);
+            cbxWcFanSpeed.SelectedIndex = GetFanSpeedIndex(preset.WcFanSpeed);
+            if (Enum.TryParse<RgbState>(preset.WcRgbMode, true, out var pvLoad))
+            {
+                cbxWcRgbMode.SelectedIndex = GetRgbModeIndex(pvLoad);
+                spWcRgbColor.Visibility = pvLoad switch
+                {
+                    RgbState.Static or RgbState.Breathe => Visibility.Visible,
+                    _ => Visibility.Collapsed
+                };
+                WcRgbColorDivider.Visibility = spWcRgbColor.Visibility;
+            }
+            if (Enum.TryParse<RgbColor>(preset.WcRgbColor, true, out var rcLoad))
+                cbxWcRgbColor.SelectedIndex = GetRgbColorIndex(rcLoad);
+        }
+
+        private void LoadBs2ProToUI(AdaptivePreset preset)
+        {
+            // Guard: CardExpander content is null until expanded
+            if (cbxBs2ProFanMode is not null)
+            {
+                cbxBs2ProFanMode.SelectedIndex = GetBs2ProFanModeIndex(preset.Bs2ProFanMode);
+                UpdateBs2ProModeUI();
+                cbxBs2ProGear.SelectedIndex = Math.Clamp(preset.Bs2ProGear - 1, 0, 3);
+                nudBs2ProRpm.Value = Math.Clamp((int)preset.Bs2ProRpm, 1300, 4000);
+                cbxBs2ProCurve.SelectedIndex = GetBs2ProCurveIndex(preset.Bs2ProCurveProfileId);
+
+                // Gap 3: Restore Flydigi custom curve points per-game
+                ApplyBs2ProCurvePoints(preset.Bs2ProCurvePointsJson);
+
+                cbxBs2ProRgbMode.SelectedIndex = GetBs2ProRgbModeIndex(preset.Bs2ProRgbMode);
+                UpdateBs2ProRgbUI();
+                nudBs2ProRgbR.Value = preset.Bs2ProRgbR;
+                nudBs2ProRgbG.Value = preset.Bs2ProRgbG;
+                nudBs2ProRgbB.Value = preset.Bs2ProRgbB;
+                Bs2ProRgbColorPicker.SelectedColor = Color.FromRgb(preset.Bs2ProRgbR, preset.Bs2ProRgbG, preset.Bs2ProRgbB);
+                sliderBs2ProBrightness.Value = preset.Bs2ProBrightness;
+                Bs2ProRgbBrightnessValueText.Text = preset.Bs2ProBrightness.ToString();
+                // Gap 2: Restore Flydigi RGB speed per-game
+                if (sliderBs2ProRgbSpeed != null)
+                    sliderBs2ProRgbSpeed.Value = preset.Bs2ProRgbSpeed;
+                int rpm = Math.Clamp((int)preset.Bs2ProRpm, 1300, 4000);
+                Bs2ProRpmValueText.Text = rpm.ToString();
+                sdBs2ProRpm.Value = rpm;
+            }
+        }
+
+        private void LoadEcFanToUI(AdaptivePreset preset)
+        {
+            if (sdEcFan.Visibility == Visibility.Visible)
+            {
+                cbxEcFanEnabled.IsChecked = preset.EcFanEnabled;
+                cbxEcFanMode.SelectedIndex = preset.EcFanUnifiedMode ? 0 : 1;
+                cbxEcFanPreset.SelectedIndex = GetEcFanPresetIndex(preset.EcFanPreset);
+                cbxEcFanCpuPreset.SelectedIndex = GetEcFanPresetIndex(preset.EcFanCpuPreset);
+                cbxEcFanGpuPreset.SelectedIndex = GetEcFanPresetIndex(preset.EcFanGpuPreset);
+                // Gap 1: Restore EC Fan custom curves per-game
+                ApplyEcFanCustomDuties(preset.EcFanPreset, preset.EcFanCustomDuties,
+                    preset.EcFanCpuPreset, preset.EcFanCpuCustomDuties,
+                    preset.EcFanGpuPreset, preset.EcFanGpuCustomDuties);
+                UpdateEcFanModeUI();
+            }
+        }
+
+        private void LoadKeyboardToUI(AdaptivePreset preset)
+        {
+            cbxKbMode.SelectedIndex = preset.KbPerKeyMode ? 1 : 0;
+            UpdateKbModeUI();
+            int brightness = Math.Clamp(preset.KbBrightness, 1, 7);
+            sdKbBrightness.Value = brightness;
+            tbKbBrightnessValue.Text = brightness.ToString();
+            cbxKbEffect.SelectedIndex = GetKbEffectIndex(preset.KbEffectMode);
+            KbColorPicker.SelectedColor = Color.FromRgb(preset.KbColorR, preset.KbColorG, preset.KbColorB);
+            KbRestColorPicker.SelectedColor = Color.FromRgb(preset.KbRestColorR, preset.KbRestColorG, preset.KbRestColorB);
+            int speed = Math.Clamp((int)preset.KbEffectSpeed, 1, 10);
+            sdKbSpeed.Value = speed;
+            tbKbSpeedValue.Text = speed.ToString();
+            _kbDirection = preset.KbDirection;
+            UpdateKbDirectionButtons();
+
+            // Restore multi-colors if saved
+            if (!string.IsNullOrEmpty(preset.KbMultiColors))
+            {
+                var colors = ParseColorString(preset.KbMultiColors);
+                if (colors.Count > 0)
+                {
+                    int count = preset.KbEffectMode == "GamingModeFull" || preset.KbEffectMode == "GamingMode" ? 4 : 7;
+                    KbMultiColorPicker.SetColors(colors, count);
+                }
+            }
+
+            // Push the preset's per-key colors to the global keyboard settings
+            // so that update() picks them up when in per-key mode. Only do this
+            // when keyboard override is active — don't overwrite the user's
+            // own per-key colors with stale preset data.
+            if (!string.IsNullOrEmpty(preset.KbPerKeyColors) && _deviceApplier?.IsKeyboardOverridden == true)
+            {
+                var kbSettings = KeyboardSettingsService.Load();
+                kbSettings.PerKeyColors = preset.KbPerKeyColors;
+                KeyboardSettingsService.Save(kbSettings);
+            }
+        }
+
+        private void LoadCpuToUI(AdaptivePreset preset)
+        {
+            if (Family.TYPE == Family.ProcessorType.Amd_Apu)
+            {
+                AdpSdSustained.Value = Math.Clamp(preset.CpuSustained, 5, 255);
+                AdpSdBoost.Value = Math.Clamp(preset.CpuBoost, 5, 255);
+                AdpSdTjMax.Value = Math.Clamp(preset.CpuTjMax, 70, 105);
+                AdpRbCoUnified.IsChecked = preset.CpuCoUnified;
+                AdpRbCoPerCcd.IsChecked = !preset.CpuCoUnified;
+                AdpSdCoUnified.Value = Math.Clamp(preset.CpuCoUnifiedValue, -30, 0);
+                AdpSdCoCcd0.Value = Math.Clamp(preset.CpuCoCcd0, -30, 0);
+                AdpSdCoCcd1.Value = Math.Clamp(preset.CpuCoCcd1, -30, 0);
+                updateAdpCoVisibility();
+                AdpLblCoUnified.Text = $"{AdpSdCoUnified.Value:+0;-0;0}";
+                AdpLblCoCcd0.Text = $"{AdpSdCoCcd0.Value:+0;-0;0}";
+                AdpLblCoCcd1.Text = $"{AdpSdCoCcd1.Value:+0;-0;0}";
+            }
+            else if (Family.TYPE == Family.ProcessorType.Intel)
+            {
+                AdpSdIntelPl1.Value = Math.Clamp(preset.CpuPl1, 5, 400);
+                AdpSdIntelPl2.Value = Math.Clamp(preset.CpuPl2, 5, 400);
+                AdpSdIntelUndervolt.Value = Math.Clamp(preset.CpuUndervolt, -150, 0);
+            }
+        }
+
+        private void LoadGpuToUI(AdaptivePreset preset)
+        {
+            if (sdGpuSettings.Visibility == Visibility.Visible)
+            {
+                AdpSdNvPower.Value = Math.Clamp(preset.GpuTgp, 0, 150);
+                AdpTogDynamicBoost.IsChecked = preset.GpuDynamicBoost;
+                AdpSdNvDbOffset.Value = Math.Clamp(preset.GpuDbOffset, 0, 25);
+                AdpSdNvCore.Value = Math.Clamp(preset.GpuCoreClock, -1000, 1000);
+                AdpSdNvMem.Value = Math.Clamp(preset.GpuMemClock, -1000, 2000);
+                // Show/hide Dynamic Boost offset based on toggle
+                AdpSpNvDbOffset.Visibility = preset.GpuDynamicBoost ? Visibility.Visible : Visibility.Collapsed;
+                // Reset user-touched flag when loading preset — start fresh
+                _adpUserTouchedCoreSlider = false;
+                // Gap 4: Track which curve this profile wants (apply deferred to update() loop)
+                _adpActiveCurveName = preset.GpuVfCurveName;
+                updateAdpCoreLabel();
+            }
+        }
+
+        private void LoadLightBarToUI(AdaptivePreset preset)
+        {
+            if (sdLightBar.Visibility == Visibility.Visible)
+            {
+                AdpTsLightBarPower.IsChecked = preset.LbPower;
+                AdpLbColorPicker.SelectedColor = Color.FromRgb(preset.LbColorR, preset.LbColorG, preset.LbColorB);
+                AdpLbBrightnessSlider.Value = Math.Clamp(preset.LbBrightness, 0, 100);
+                AdpLbBrightnessValueText.Text = Math.Clamp(preset.LbBrightness, 0, 100).ToString();
+                AdpLbEffect.SelectedIndex = Math.Clamp(preset.LbEffect, 0, 5);
+                AdpLbSpeedSlider.Value = Math.Clamp(preset.LbSpeed, 0, 11);
+                AdpLbSpeedValueText.Text = Math.Clamp(preset.LbSpeed, 0, 11).ToString();
+                // Show/hide speed control (hidden for Static)
+                AdpSpLbSpeed.Visibility = preset.LbEffect != 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        private void SyncOverridesFromPreset(AdaptivePreset preset)
+        {
+            // Apply the preset's per-profile override flags only when resetTracking
+            // is true (profile switch). When resetTracking is false (Page_Loaded,
+            // game detection without profile change), preserve the user's current
+            // checkbox edits so they aren't overwritten by the saved preset.
+            if (!Settings.Default.HideFlydigi && cbxBs2ProEnabled.IsChecked != preset.Bs2ProEnabled)
+                cbxBs2ProEnabled.IsChecked = preset.Bs2ProEnabled;
+            if (cbxWcEnabled.IsChecked != preset.WcEnabled)
+                cbxWcEnabled.IsChecked = preset.WcEnabled;
+            if (cbxKbEnabled.IsChecked != preset.KbEnabled)
+                cbxKbEnabled.IsChecked = preset.KbEnabled;
+            if (cbxCpuEnabled.IsChecked != preset.CpuEnabled)
+                cbxCpuEnabled.IsChecked = preset.CpuEnabled;
+            if (cbxGpuEnabled.IsChecked != preset.GpuEnabled)
+                cbxGpuEnabled.IsChecked = preset.GpuEnabled;
+            if (cbxLbEnabled.IsChecked != preset.LbEnabled)
+                cbxLbEnabled.IsChecked = preset.LbEnabled;
+
+            // Sync global settings to the active preset's override state so that
+            // App.xaml.cs startup restoration reads the correct values.
+            Settings.Default.AdaptiveBs2ProEnabled = preset.Bs2ProEnabled;
+            Settings.Default.AdaptiveWcEnabled = preset.WcEnabled;
+            Settings.Default.AdaptiveKeyboardEnabled = preset.KbEnabled;
+            Settings.Default.AdaptiveCpuEnabled = preset.CpuEnabled;
+            Settings.Default.AdaptiveGpuEnabled = preset.GpuEnabled;
+            Settings.Default.AdaptiveLbEnabled = preset.LbEnabled;
+            Settings.Default.Save();
+        }
+
+        private void ResetDiffTracking()
+        {
+            // Reset tracking so the next update() tick re-applies everything.
+            lastBs2ProFanModeText = "";
+            lastBs2ProGear = 0;
+            lastBs2ProRpm = 0;
+            lastBs2ProRgbMode = "";
+            lastBs2ProRgbR = 0;
+            lastBs2ProRgbG = 0;
+            lastBs2ProRgbB = 0;
+            lastBs2ProBrightness = 0;
+
+            lastWcPump = PumpVoltage.Off;
+            lastWcFan = FanSpeed.Off;
+            lastWcRgbMode = RgbState.Off;
+            lastWcRgbColor = RgbColor.Red;
+
+            lastEcFanUnifiedMode = false;
+            lastEcFanPreset = "";
+            lastEcFanCpuPreset = "";
+            lastEcFanGpuPreset = "";
+
+            lastKbPerKeyMode = false;
+            lastKbBrightness = 0;
+            lastKbEffectMode = "";
+            lastKbEffectSpeed = 0;
+            lastKbColorR = 0;
+            lastKbColorG = 0;
+            lastKbColorB = 0;
+            lastKbRestColorR = 0;
+            lastKbRestColorG = 0;
+            lastKbRestColorB = 0;
+            lastKbMultiColors = "";
+            lastKbDirection = "";
+
+            // CPU tracking
+            lastCpuSustained = 0;
+            lastCpuBoost = 0;
+            lastCpuTjMax = 0;
+            lastCpuPl1 = 0;
+            lastCpuPl2 = 0;
+            lastCpuUndervolt = 0;
+
+            // GPU tracking
+            lastGpuTgp = 0;
+            lastGpuDynamicBoost = false;
+            lastGpuDbOffset = 0;
+            lastGpuCoreClock = 0;
+            lastGpuMemClock = 0;
+            lastGpuVfCurveName = string.Empty;
+
+            // Light Bar tracking
+            lastLbPower = false;
+            lastLbColorR = 0;
+            lastLbColorG = 0;
+            lastLbColorB = 0;
+            lastLbBrightness = 0;
+            lastLbEffect = 0;
+            lastLbSpeed = 0;
+        }
+
+        #endregion
+
         /// <summary>
         /// Loads a preset into the UI controls.
         /// </summary>
@@ -579,260 +839,33 @@ namespace Uniwill_Control_Utility.Views.Pages
             try
             {
                 adaptivePresetManager = new AdaptivePresetManager(Settings.Default.Path + "adaptivePresets.json");
-                AdaptivePreset myPreset = adaptivePresetManager.GetPreset(presetName);
+                AdaptivePreset preset = adaptivePresetManager.GetPreset(presetName);
 
-                if (myPreset != null)
+                if (preset == null)
+                    return;
+
+                cbExcludeFromSwitching.IsChecked = !preset.isAutoSwitch;
+
+                LoadWatercoolerToUI(preset);
+                LoadBs2ProToUI(preset);
+                LoadEcFanToUI(preset);
+                LoadKeyboardToUI(preset);
+                LoadCpuToUI(preset);
+                LoadGpuToUI(preset);
+                LoadLightBarToUI(preset);
+
+                if (resetTracking)
                 {
-                    cbExcludeFromSwitching.IsChecked = !myPreset.isAutoSwitch;
-
-                    // Watercooler
-                    cbxWcPumpVoltage.SelectedIndex = GetPumpVoltageIndex(myPreset.WcPumpVoltage);
-                    cbxWcFanSpeed.SelectedIndex = GetFanSpeedIndex(myPreset.WcFanSpeed);
-                    if (Enum.TryParse<RgbState>(myPreset.WcRgbMode, true, out var pvLoad))
-                    {
-                        cbxWcRgbMode.SelectedIndex = GetRgbModeIndex(pvLoad);
-                        spWcRgbColor.Visibility = pvLoad switch
-                        {
-                            RgbState.Static or RgbState.Breathe => Visibility.Visible,
-                            _ => Visibility.Collapsed
-                        };
-                        WcRgbColorDivider.Visibility = spWcRgbColor.Visibility;
-                    }
-                    if (Enum.TryParse<RgbColor>(myPreset.WcRgbColor, true, out var rcLoad))
-                        cbxWcRgbColor.SelectedIndex = GetRgbColorIndex(rcLoad);
-
-                    // BS2 Pro — guard: CardExpander content is null until expanded
-                    if (cbxBs2ProFanMode is not null)
-                    {
-                        cbxBs2ProFanMode.SelectedIndex = GetBs2ProFanModeIndex(myPreset.Bs2ProFanMode);
-                        UpdateBs2ProModeUI();
-                        cbxBs2ProGear.SelectedIndex = Math.Clamp(myPreset.Bs2ProGear - 1, 0, 3);
-                        nudBs2ProRpm.Value = Math.Clamp((int)myPreset.Bs2ProRpm, 1300, 4000);
-                        cbxBs2ProCurve.SelectedIndex = GetBs2ProCurveIndex(myPreset.Bs2ProCurveProfileId);
-
-                        // Gap 3: Restore Flydigi custom curve points per-game
-                        ApplyBs2ProCurvePoints(myPreset.Bs2ProCurvePointsJson);
-
-                        cbxBs2ProRgbMode.SelectedIndex = GetBs2ProRgbModeIndex(myPreset.Bs2ProRgbMode);
-                        UpdateBs2ProRgbUI();
-                        nudBs2ProRgbR.Value = myPreset.Bs2ProRgbR;
-                        nudBs2ProRgbG.Value = myPreset.Bs2ProRgbG;
-                        nudBs2ProRgbB.Value = myPreset.Bs2ProRgbB;
-                        Bs2ProRgbColorPicker.SelectedColor = Color.FromRgb(myPreset.Bs2ProRgbR, myPreset.Bs2ProRgbG, myPreset.Bs2ProRgbB);
-                        sliderBs2ProBrightness.Value = myPreset.Bs2ProBrightness;
-                        Bs2ProRgbBrightnessValueText.Text = myPreset.Bs2ProBrightness.ToString();
-                        // Gap 2: Restore Flydigi RGB speed per-game
-                        if (sliderBs2ProRgbSpeed != null)
-                            sliderBs2ProRgbSpeed.Value = myPreset.Bs2ProRgbSpeed;
-                        int rpm = Math.Clamp((int)myPreset.Bs2ProRpm, 1300, 4000);
-                        Bs2ProRpmValueText.Text = rpm.ToString();
-                        sdBs2ProRpm.Value = rpm;
-                    }
-
-                    // EC Fan
-                    if (sdEcFan.Visibility == Visibility.Visible)
-                    {
-                        cbxEcFanEnabled.IsChecked = myPreset.EcFanEnabled;
-                        cbxEcFanMode.SelectedIndex = myPreset.EcFanUnifiedMode ? 0 : 1;
-                        cbxEcFanPreset.SelectedIndex = GetEcFanPresetIndex(myPreset.EcFanPreset);
-                        cbxEcFanCpuPreset.SelectedIndex = GetEcFanPresetIndex(myPreset.EcFanCpuPreset);
-                        cbxEcFanGpuPreset.SelectedIndex = GetEcFanPresetIndex(myPreset.EcFanGpuPreset);
-                        // Gap 1: Restore EC Fan custom curves per-game
-                        ApplyEcFanCustomDuties(myPreset.EcFanPreset, myPreset.EcFanCustomDuties,
-                            myPreset.EcFanCpuPreset, myPreset.EcFanCpuCustomDuties,
-                            myPreset.EcFanGpuPreset, myPreset.EcFanGpuCustomDuties);
-                        UpdateEcFanModeUI();
-                    }
-
-                    // Keyboard RGB
-                    cbxKbMode.SelectedIndex = myPreset.KbPerKeyMode ? 1 : 0;
-                    UpdateKbModeUI();
-                    int brightness = Math.Clamp(myPreset.KbBrightness, 1, 7);
-                    sdKbBrightness.Value = brightness;
-                    tbKbBrightnessValue.Text = brightness.ToString();
-                    cbxKbEffect.SelectedIndex = GetKbEffectIndex(myPreset.KbEffectMode);
-                    KbColorPicker.SelectedColor = Color.FromRgb(myPreset.KbColorR, myPreset.KbColorG, myPreset.KbColorB);
-                    KbRestColorPicker.SelectedColor = Color.FromRgb(myPreset.KbRestColorR, myPreset.KbRestColorG, myPreset.KbRestColorB);
-                    int speed = Math.Clamp((int)myPreset.KbEffectSpeed, 1, 10);
-                    sdKbSpeed.Value = speed;
-                    tbKbSpeedValue.Text = speed.ToString();
-                    _kbDirection = myPreset.KbDirection;
-                    UpdateKbDirectionButtons();
-
-                    // Restore multi-colors if saved
-                    if (!string.IsNullOrEmpty(myPreset.KbMultiColors))
-                    {
-                        var colors = ParseColorString(myPreset.KbMultiColors);
-                        if (colors.Count > 0)
-                        {
-                            int count = myPreset.KbEffectMode == "GamingModeFull" || myPreset.KbEffectMode == "GamingMode" ? 4 : 7;
-                            KbMultiColorPicker.SetColors(colors, count);
-                        }
-                    }
-
-                    // Push the preset's per-key colors to the global keyboard settings
-                    // so that update() picks them up when in per-key mode. Only do this
-                    // when keyboard override is active — don't overwrite the user's
-                    // own per-key colors with stale preset data.
-                    if (!string.IsNullOrEmpty(myPreset.KbPerKeyColors) && _deviceApplier?.IsKeyboardOverridden == true)
-                    {
-                        var kbSettings = KeyboardSettingsService.Load();
-                        kbSettings.PerKeyColors = myPreset.KbPerKeyColors;
-                        KeyboardSettingsService.Save(kbSettings);
-                    }
-
-                    // CPU Settings
-                    if (Family.TYPE == Family.ProcessorType.Amd_Apu)
-                    {
-                        AdpSdSustained.Value = Math.Clamp(myPreset.CpuSustained, 5, 255);
-                        AdpSdBoost.Value = Math.Clamp(myPreset.CpuBoost, 5, 255);
-                        AdpSdTjMax.Value = Math.Clamp(myPreset.CpuTjMax, 70, 105);
-                        AdpRbCoUnified.IsChecked = myPreset.CpuCoUnified;
-                        AdpRbCoPerCcd.IsChecked = !myPreset.CpuCoUnified;
-                        AdpSdCoUnified.Value = Math.Clamp(myPreset.CpuCoUnifiedValue, -30, 0);
-                        AdpSdCoCcd0.Value = Math.Clamp(myPreset.CpuCoCcd0, -30, 0);
-                        AdpSdCoCcd1.Value = Math.Clamp(myPreset.CpuCoCcd1, -30, 0);
-                        updateAdpCoVisibility();
-                        AdpLblCoUnified.Text = $"{AdpSdCoUnified.Value:+0;-0;0}";
-                        AdpLblCoCcd0.Text = $"{AdpSdCoCcd0.Value:+0;-0;0}";
-                        AdpLblCoCcd1.Text = $"{AdpSdCoCcd1.Value:+0;-0;0}";
-                    }
-                    else if (Family.TYPE == Family.ProcessorType.Intel)
-                    {
-                        AdpSdIntelPl1.Value = Math.Clamp(myPreset.CpuPl1, 5, 400);
-                        AdpSdIntelPl2.Value = Math.Clamp(myPreset.CpuPl2, 5, 400);
-                        AdpSdIntelUndervolt.Value = Math.Clamp(myPreset.CpuUndervolt, -150, 0);
-                    }
-
-                    // GPU Settings
-                    if (sdGpuSettings.Visibility == Visibility.Visible)
-                    {
-                        AdpSdNvPower.Value = Math.Clamp(myPreset.GpuTgp, 0, 150);
-                        AdpTogDynamicBoost.IsChecked = myPreset.GpuDynamicBoost;
-                        AdpSdNvDbOffset.Value = Math.Clamp(myPreset.GpuDbOffset, 0, 25);
-                        AdpSdNvCore.Value = Math.Clamp(myPreset.GpuCoreClock, -1000, 1000);
-                        AdpSdNvMem.Value = Math.Clamp(myPreset.GpuMemClock, -1000, 2000);
-                        // Show/hide Dynamic Boost offset based on toggle
-                        AdpSpNvDbOffset.Visibility = myPreset.GpuDynamicBoost ? Visibility.Visible : Visibility.Collapsed;
-                        // Reset user-touched flag when loading preset — start fresh
-                        _adpUserTouchedCoreSlider = false;
-                        // Gap 4: Track which curve this profile wants (apply deferred to update() loop)
-                        _adpActiveCurveName = myPreset.GpuVfCurveName;
-                        updateAdpCoreLabel();
-                    }
-
-                    // Light Bar Settings
-                    if (sdLightBar.Visibility == Visibility.Visible)
-                    {
-                        AdpTsLightBarPower.IsChecked = myPreset.LbPower;
-                        AdpLbColorPicker.SelectedColor = Color.FromRgb(myPreset.LbColorR, myPreset.LbColorG, myPreset.LbColorB);
-                        AdpLbBrightnessSlider.Value = Math.Clamp(myPreset.LbBrightness, 0, 100);
-                        AdpLbBrightnessValueText.Text = Math.Clamp(myPreset.LbBrightness, 0, 100).ToString();
-                        AdpLbEffect.SelectedIndex = Math.Clamp(myPreset.LbEffect, 0, 5);
-                        AdpLbSpeedSlider.Value = Math.Clamp(myPreset.LbSpeed, 0, 11);
-                        AdpLbSpeedValueText.Text = Math.Clamp(myPreset.LbSpeed, 0, 11).ToString();
-                        // Show/hide speed control (hidden for Static)
-                        AdpSpLbSpeed.Visibility = myPreset.LbEffect != 0 ? Visibility.Visible : Visibility.Collapsed;
-                    }
-
-                    // Apply the preset's per-profile override flags only when resetTracking
-                    // is true (profile switch). When resetTracking is false (Page_Loaded,
-                    // game detection without profile change), preserve the user's current
-                    // checkbox edits so they aren't overwritten by the saved preset.
-                    if (resetTracking)
-                    {
-                        if (!Settings.Default.HideFlydigi && cbxBs2ProEnabled.IsChecked != myPreset.Bs2ProEnabled)
-                            cbxBs2ProEnabled.IsChecked = myPreset.Bs2ProEnabled;
-                        if (cbxWcEnabled.IsChecked != myPreset.WcEnabled)
-                            cbxWcEnabled.IsChecked = myPreset.WcEnabled;
-                        if (cbxKbEnabled.IsChecked != myPreset.KbEnabled)
-                            cbxKbEnabled.IsChecked = myPreset.KbEnabled;
-                        if (cbxCpuEnabled.IsChecked != myPreset.CpuEnabled)
-                            cbxCpuEnabled.IsChecked = myPreset.CpuEnabled;
-                        if (cbxGpuEnabled.IsChecked != myPreset.GpuEnabled)
-                            cbxGpuEnabled.IsChecked = myPreset.GpuEnabled;
-                        if (cbxLbEnabled.IsChecked != myPreset.LbEnabled)
-                            cbxLbEnabled.IsChecked = myPreset.LbEnabled;
-
-                        // Sync global settings to the active preset's override state so that
-                        // App.xaml.cs startup restoration reads the correct values.
-                        Settings.Default.AdaptiveBs2ProEnabled = myPreset.Bs2ProEnabled;
-                        Settings.Default.AdaptiveWcEnabled = myPreset.WcEnabled;
-                        Settings.Default.AdaptiveKeyboardEnabled = myPreset.KbEnabled;
-                        Settings.Default.AdaptiveCpuEnabled = myPreset.CpuEnabled;
-                        Settings.Default.AdaptiveGpuEnabled = myPreset.GpuEnabled;
-                        Settings.Default.AdaptiveLbEnabled = myPreset.LbEnabled;
-                        Settings.Default.Save();
-                    }
-
-                    if (resetTracking)
-                    {
-                        // Reset tracking so the next update() tick re-applies everything.
-                        lastBs2ProFanModeText = "";
-                        lastBs2ProGear = 0;
-                        lastBs2ProRpm = 0;
-                        lastBs2ProRgbMode = "";
-                        lastBs2ProRgbR = 0;
-                        lastBs2ProRgbG = 0;
-                        lastBs2ProRgbB = 0;
-                        lastBs2ProBrightness = 0;
-
-                        lastWcPump = PumpVoltage.Off;
-                        lastWcFan = FanSpeed.Off;
-                        lastWcRgbMode = RgbState.Off;
-                        lastWcRgbColor = RgbColor.Red;
-
-                        lastEcFanUnifiedMode = false;
-                        lastEcFanPreset = "";
-                        lastEcFanCpuPreset = "";
-                        lastEcFanGpuPreset = "";
-
-                        lastKbPerKeyMode = false;
-                        lastKbBrightness = 0;
-                        lastKbEffectMode = "";
-                        lastKbEffectSpeed = 0;
-                        lastKbColorR = 0;
-                        lastKbColorG = 0;
-                        lastKbColorB = 0;
-                        lastKbRestColorR = 0;
-                        lastKbRestColorG = 0;
-                        lastKbRestColorB = 0;
-                        lastKbMultiColors = "";
-                        lastKbDirection = "";
-
-                        // CPU tracking
-                        lastCpuSustained = 0;
-                        lastCpuBoost = 0;
-                        lastCpuTjMax = 0;
-                        lastCpuPl1 = 0;
-                        lastCpuPl2 = 0;
-                        lastCpuUndervolt = 0;
-
-                        // GPU tracking
-                        lastGpuTgp = 0;
-                        lastGpuDynamicBoost = false;
-                        lastGpuDbOffset = 0;
-                        lastGpuCoreClock = 0;
-                        lastGpuMemClock = 0;
-                        lastGpuVfCurveName = string.Empty;
-
-                        // Light Bar tracking
-                        lastLbPower = false;
-                        lastLbColorR = 0;
-                        lastLbColorG = 0;
-                        lastLbColorB = 0;
-                        lastLbBrightness = 0;
-                        lastLbEffect = 0;
-                        lastLbSpeed = 0;
-                    }
-                    // When resetTracking is false (Page_Loaded, game detection), leave
-                    // tracking vars unchanged so update() won't re-send device commands
-                    // for values that are already applied.
-
-                    // Stop any existing smart control (curve mode) so it restarts with the new profile
-                    StopBs2ProSmartControl();
-                    StopBs1SmartControl();
+                    SyncOverridesFromPreset(preset);
+                    ResetDiffTracking();
                 }
+                // When resetTracking is false (Page_Loaded, game detection), leave
+                // tracking vars unchanged so update() won't re-send device commands
+                // for values that are already applied.
+
+                // Stop any existing smart control (curve mode) so it restarts with the new profile
+                StopBs2ProSmartControl();
+                StopBs1SmartControl();
             }
             catch (Exception ex)
             {
@@ -1057,7 +1090,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             try
             {
-                if (start == true)
+                if (start)
                 {
                     await Task.Run(() =>
                     {
@@ -1165,449 +1198,15 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             try
             {
-                if (start == true)
+                if (start)
                 {
-                    // Apply watercooler settings if enabled
-                        if ((bool)cbxWcEnabled.IsChecked)
-                        {
-                            PumpVoltage curPump = GetPumpVoltageFromIndex(cbxWcPumpVoltage.SelectedIndex);
-                            FanSpeed curFan = GetFanSpeedFromIndex(cbxWcFanSpeed.SelectedIndex);
-                            RgbState curRgbMode = GetRgbModeFromIndex(cbxWcRgbMode.SelectedIndex);
-                            RgbColor curRgbColor = GetRgbColorFromIndex(cbxWcRgbColor.SelectedIndex);
-
-                            if (curPump != lastWcPump || curFan != lastWcFan ||
-                                curRgbMode != lastWcRgbMode || curRgbColor != lastWcRgbColor)
-                            {
-                                await _deviceApplier!.ApplyWatercoolerFromPresetAsync(curPump, curFan, curRgbMode, curRgbColor);
-                                lastWcPump = curPump;
-                                lastWcFan = curFan;
-                                lastWcRgbMode = curRgbMode;
-                                lastWcRgbColor = curRgbColor;
-                            }
-                        }
-
-                        // Apply BS2 Pro settings if enabled (skip if Flydigi is disabled in Settings)
-                        if (!Settings.Default.HideFlydigi && (bool)cbxBs2ProEnabled.IsChecked)
-                        {
-                            string bs2Mode = GetBs2ProFanModeFromIndex(cbxBs2ProFanMode.SelectedIndex);
-                            string bs2RgbMode = GetBs2ProRgbModeFromIndex(cbxBs2ProRgbMode.SelectedIndex);
-                            byte bs2R = (byte)nudBs2ProRgbR.Value;
-                            byte bs2G = (byte)nudBs2ProRgbG.Value;
-                            byte bs2B = (byte)nudBs2ProRgbB.Value;
-                            byte bs2Brightness = (byte)sliderBs2ProBrightness.Value;
-                            string bs2Speed = GetRgbSpeedNameFromSlider((int)sliderBs2ProRgbSpeed.Value);
-
-                            // --- Fan control (differs by mode) ---
-                            if (bs2Mode == "Curve")
-                            {
-                                // Handle Curve mode via smart control (stateful, can't route through DeviceApplier)
-                                bool isBs1Curve = FlydigiHardwareDetector.ConnectedDeviceType == ConnectedDeviceType.BS1;
-
-                                if (isBs1Curve)
-                                {
-                                    // BS1 Curve mode via app-localized Bs1SmartControl
-                                    var bs1Service = App.GetService<Bs1Service>();
-                                    if (bs1Service?.IsConnected == true)
-                                    {
-                                        string curveProfileId = GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex);
-                                        FlydigiFanCurveProfile curveProfile = curveProfileId switch
-                                        {
-                                            "Silent" => FlydigiFanCurveProfile.CreateSilent(),
-                                            "Performance" => FlydigiFanCurveProfile.CreatePerformance(),
-                                            "Custom" => LoadBs1CustomCurveProfile(bs1Service),
-                                            _ => FlydigiFanCurveProfile.CreateBalanced()
-                                        };
-
-                                        if (_bs1SmartControl == null)
-                                        {
-                                            var tempProvider = new FlydigiTemperatureProvider();
-                                            _bs1SmartControl = new Bs1SmartControl(bs1Service, tempProvider);
-                                            _bs1SmartControl.ActiveProfile = curveProfile;
-                                            _bs1SmartControl.Settings = bs1Service.GetSettings();
-                                            _bs1SmartControl.TempSource = bs1Service.GetSettings().TempSource;
-                                            _bs1SmartControl.Start();
-                                        }
-                                        else
-                                        {
-                                            _bs1SmartControl.ActiveProfile = curveProfile;
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    // BS2+ Curve mode via FlydigiSmartControl
-                                    var flydigiService = App.GetService<FlydigiCoolerService>();
-                                    if (flydigiService?.IsConnected == true)
-                                    {
-                                        string curveProfileId = GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex);
-                                        FlydigiFanCurveProfile curveProfile = curveProfileId switch
-                                        {
-                                            "Silent" => FlydigiFanCurveProfile.CreateSilent(),
-                                            "Performance" => FlydigiFanCurveProfile.CreatePerformance(),
-                                            "Custom" => LoadCustomCurveProfile(flydigiService),
-                                            _ => FlydigiFanCurveProfile.CreateBalanced()
-                                        };
-
-                                        if (_bs2ProSmartControl == null)
-                                        {
-                                            _bs2ProTempProvider = new FlydigiTemperatureProvider();
-                                            _bs2ProSmartControl = new FlydigiSmartControl(flydigiService, _bs2ProTempProvider);
-                                            _bs2ProSmartControl.ActiveProfile = curveProfile;
-                                            _bs2ProSmartControl.Start();
-                                        }
-                                        else
-                                        {
-                                            _bs2ProSmartControl.ActiveProfile = curveProfile;
-                                        }
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                // For non-curve modes, stop smart control if active
-                                if (_bs2ProSmartControl != null)
-                                    StopBs2ProSmartControl();
-                                if (_bs1SmartControl != null)
-                                    StopBs1SmartControl();
-
-                                byte? gear = null;
-                                ushort? rpm = null;
-                                if (bs2Mode == "Gear")
-                                    gear = (byte)(cbxBs2ProGear.SelectedIndex + 1);
-                                else if (bs2Mode == "Rpm")
-                                    rpm = (ushort)Math.Clamp((int)nudBs2ProRpm.Value, 1300, (FlydigiHardwareDetector.ConnectedDeviceType == ConnectedDeviceType.BS1 ? 3000 : 4000));
-
-                                // Use DeviceApplier for fan (diff-based to avoid redundant writes)
-                                bool fanChanged = bs2Mode != lastBs2ProFanModeText ||
-                                    (bs2Mode == "Gear" && gear != lastBs2ProGear) ||
-                                    (bs2Mode == "Rpm" && rpm != lastBs2ProRpm);
-
-                                if (fanChanged)
-                                {
-                                    await _deviceApplier!.ApplyFlydigiFanAsync(bs2Mode, gear, rpm);
-                                    lastBs2ProFanModeText = bs2Mode;
-                                    lastBs2ProGear = gear ?? lastBs2ProGear;
-                                    lastBs2ProRpm = rpm ?? lastBs2ProRpm;
-                                }
-                            }
-
-                            // --- RGB control (independent of fan mode) ---
-                            bool rgbChanged = bs2RgbMode != lastBs2ProRgbMode ||
-                                bs2R != lastBs2ProRgbR || bs2G != lastBs2ProRgbG ||
-                                bs2B != lastBs2ProRgbB || bs2Brightness != lastBs2ProBrightness ||
-                                bs2Speed != lastBs2ProSpeed;
-
-                            if (rgbChanged)
-                            {
-                                await _deviceApplier!.ApplyFlydigiRgbAsync(bs2RgbMode, bs2R, bs2G, bs2B, bs2Brightness);
-
-                                // Fire preset-applied event so the Flydigi page can sync its UI.
-                                byte? fanGear = bs2Mode == "Gear" ? (byte?)(cbxBs2ProGear.SelectedIndex + 1) : null;
-                                ushort? fanRpm = bs2Mode == "Rpm" ? (ushort?)Math.Clamp((int)nudBs2ProRpm.Value, 1300, (FlydigiHardwareDetector.ConnectedDeviceType == ConnectedDeviceType.BS1 ? 3000 : 4000)) : null;
-                                _deviceApplier.RaiseFlydigiPresetApplied(bs2Mode, fanGear, fanRpm, bs2RgbMode, bs2R, bs2G, bs2B, bs2Brightness);
-
-                                lastBs2ProRgbMode = bs2RgbMode;
-                                lastBs2ProRgbR = bs2R;
-                                lastBs2ProRgbG = bs2G;
-                                lastBs2ProRgbB = bs2B;
-                                lastBs2ProBrightness = bs2Brightness;
-                                lastBs2ProSpeed = bs2Speed;
-                            }
-                        }
-
-                        // Apply EC Fan settings if enabled
-                        if ((bool)cbxEcFanEnabled.IsChecked && _deviceApplier != null)
-                        {
-                            bool unified = cbxEcFanMode.SelectedIndex == 0;
-                            string unifiedPreset = GetEcFanPresetFromIndex(cbxEcFanPreset.SelectedIndex);
-                            string cpuPreset = GetEcFanPresetFromIndex(cbxEcFanCpuPreset.SelectedIndex);
-                            string gpuPreset = GetEcFanPresetFromIndex(cbxEcFanGpuPreset.SelectedIndex);
-
-                            bool changed = unified != lastEcFanUnifiedMode ||
-                                (unified && unifiedPreset != lastEcFanPreset) ||
-                                (!unified && (cpuPreset != lastEcFanCpuPreset || gpuPreset != lastEcFanGpuPreset));
-
-                            if (changed)
-                            {
-                                if (unified)
-                                {
-                                    var cpuCurve = GetEcFanPresetCurve(unifiedPreset);
-                                    var cpuTemps = Uniwill_Control_Utility.Models.EcFanCurve.CpuTemperatures;
-
-                                    _deviceApplier.ApplyEcFanFromPreset(true, unifiedPreset,
-                                        cpuCurve.Duties.ToArray(), null, null,
-                                        cpuTemps, cpuTemps);
-
-                                    lastEcFanPreset = unifiedPreset;
-                                }
-                                else
-                                {
-                                    var cpuCurve = GetEcFanPresetCurve(cpuPreset);
-                                    var gpuCurve = GetEcFanPresetCurve(gpuPreset);
-                                    var cpuTemps = Uniwill_Control_Utility.Models.EcFanCurve.CpuTemperatures;
-                                    var gpuTemps = Uniwill_Control_Utility.Models.EcFanCurve.GpuTemperatures;
-
-                                    _deviceApplier.ApplyEcFanFromPreset(false, cpuPreset,
-                                        null, cpuCurve.Duties.ToArray(), gpuCurve.Duties.ToArray(),
-                                        cpuTemps, gpuTemps);
-
-                                    lastEcFanCpuPreset = cpuPreset;
-                                    lastEcFanGpuPreset = gpuPreset;
-                                }
-                                lastEcFanUnifiedMode = unified;
-                            }
-                        }
-
-                        // Apply Keyboard RGB settings if enabled
-                        if ((bool)cbxKbEnabled.IsChecked && _deviceApplier != null)
-                        {
-                            bool perKeyMode = cbxKbMode.SelectedIndex == 1;
-                            int brightness = (int)sdKbBrightness.Value;
-                            string effectMode = GetKbEffectFromIndex(cbxKbEffect.SelectedIndex);
-                            byte effectSpeed = (byte)(10 - Math.Clamp((int)sdKbSpeed.Value, 1, 10));
-                            byte colorR = KbColorPicker.SelectedColor.R;
-                            byte colorG = KbColorPicker.SelectedColor.G;
-                            byte colorB = KbColorPicker.SelectedColor.B;
-                            byte restColorR = KbRestColorPicker.SelectedColor.R;
-                            byte restColorG = KbRestColorPicker.SelectedColor.G;
-                            byte restColorB = KbRestColorPicker.SelectedColor.B;
-                            string multiColors = SerializeColors(KbMultiColorPicker.Colors);
-
-                            bool changed = perKeyMode != lastKbPerKeyMode ||
-                                brightness != lastKbBrightness ||
-                                effectMode != lastKbEffectMode ||
-                                effectSpeed != lastKbEffectSpeed ||
-                                _kbDirection != lastKbDirection ||
-                                colorR != lastKbColorR ||
-                                colorG != lastKbColorG ||
-                                colorB != lastKbColorB ||
-                                restColorR != lastKbRestColorR ||
-                                restColorG != lastKbRestColorG ||
-                                restColorB != lastKbRestColorB ||
-                                multiColors != lastKbMultiColors;
-
-                            if (changed)
-                            {
-                                // In per-key mode, pass the current per-key colors from settings
-                                string? perKeyColorsStr = perKeyMode
-                                    ? KeyboardSettingsService.Load().PerKeyColors
-                                    : null;
-
-                                _deviceApplier.ApplyKeyboardFromPreset(
-                                    perKeyMode, brightness, false, 0,
-                                    effectMode, effectSpeed, _kbDirection,
-                                    colorR, colorG, colorB,
-                                    multiColors, perKeyColorsStr, restColorR, restColorG, restColorB);
-
-                                lastKbPerKeyMode = perKeyMode;
-                                lastKbBrightness = brightness;
-                                lastKbEffectMode = effectMode;
-                                lastKbEffectSpeed = effectSpeed;
-                                lastKbDirection = _kbDirection;
-                                lastKbColorR = colorR;
-                                lastKbColorG = colorG;
-                                lastKbColorB = colorB;
-                                lastKbRestColorR = restColorR;
-                                lastKbRestColorG = restColorG;
-                                lastKbRestColorB = restColorB;
-                                lastKbMultiColors = multiColors;
-                            }
-                        }
-
-                        // Apply CPU settings if enabled
-                        if ((bool)cbxCpuEnabled.IsChecked)
-                        {
-                            if (Family.TYPE == Family.ProcessorType.Amd_Apu)
-                            {
-                                int sustained = (int)AdpSdSustained.Value;
-                                int boost = (int)AdpSdBoost.Value;
-                                int tjMax = (int)AdpSdTjMax.Value;
-
-                                int coUnifiedValue = (int)AdpSdCoUnified.Value;
-                                int coCcd0 = (int)AdpSdCoCcd0.Value;
-                                int coCcd1 = (int)AdpSdCoCcd1.Value;
-                                bool coUnified = AdpRbCoUnified.IsChecked == true;
-
-                                if (sustained != lastCpuSustained || boost != lastCpuBoost ||
-                                    tjMax != lastCpuTjMax ||
-                                    coUnified != lastCpuCoUnified ||
-                                    coUnifiedValue != lastCpuCoUnifiedValue ||
-                                    coCcd0 != lastCpuCoCcd0 ||
-                                    coCcd1 != lastCpuCoCcd1)
-                                {
-                                    try
-                                    {
-                                        // Build SMU command string (same format as Presets page)
-                                        var parts = new System.Collections.Generic.List<string>();
-                                        parts.Add($"--slow-limit={sustained * 1000}");
-                                        parts.Add($"--fast-limit={boost * 1000}");
-                                        parts.Add($"--tctl-temp={tjMax}");
-                                        parts.Add($"--cHTC-temp={tjMax}");
-
-                                        // Curve Optimizer
-                                        if (coUnified)
-                                        {
-                                            int biased = 0x100000 - Math.Abs(coUnifiedValue);
-                                            parts.Add($"--set-coall={biased:X}");
-                                        }
-                                        else
-                                        {
-                                            int[,] ccdMap = { { 0, 1, 2, 3, 4, 5, 6, 7 }, { 8, 9, 10, 11, 12, 13, 14, 15 } };
-                                            for (int ccd = 0; ccd < 2; ccd++)
-                                            {
-                                                int offset = ccd == 0 ? coCcd0 : coCcd1;
-                                                int biased = 0x100000 - Math.Abs(offset);
-                                                for (int core = 0; core < 8; core++)
-                                                {
-                                                    parts.Add($"--set-coper={BuildCoperArg(ccd, ccdMap[ccd, core], biased):X}");
-                                                } // for core
-                                            } // for ccd
-                                        }
-
-                                        string cmd = string.Join(" ", parts);
-                                        _ = RyzenAdj_To_UCU.TranslateAsync(cmd);
-
-                                        // Also write EC CPU power limits
-                                        var ec = RyzenAdj_To_UCU.EcService;
-                                        if (ec != null)
-                                            ec.ApplyCpuPowerLimits(sustained, boost);
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        DiagnosticLogger.LogError(ex, "Failed to apply CPU settings in Adaptive Mode");
-                                    }
-
-                                    lastCpuSustained = sustained;
-                                    lastCpuBoost = boost;
-                                    lastCpuTjMax = tjMax;
-                                    lastCpuCoUnified = coUnified;
-                                    lastCpuCoUnifiedValue = coUnifiedValue;
-                                    lastCpuCoCcd0 = coCcd0;
-                                    lastCpuCoCcd1 = coCcd1;
-                                }
-                            }
-                            else if (Family.TYPE == Family.ProcessorType.Intel)
-                            {
-                                int pl1 = (int)AdpSdIntelPl1.Value;
-                                int pl2 = (int)AdpSdIntelPl2.Value;
-                                int uv = (int)AdpSdIntelUndervolt.Value;
-
-                                if (pl1 != lastCpuPl1 || pl2 != lastCpuPl2 || uv != lastCpuUndervolt)
-                                {
-                                    try
-                                    {
-                                        // Build Intel MSR command string (same format as Presets page)
-                                        var parts = new System.Collections.Generic.List<string>();
-                                        parts.Add($"--intel-pl={pl1:F0},{pl2:F0}");
-                                        if (uv < 0)
-                                            parts.Add($"--intel-volt-cpu={uv:F0}");
-
-                                        string cmd = string.Join(" ", parts);
-                                        _ = RyzenAdj_To_UCU.TranslateAsync(cmd);
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        DiagnosticLogger.LogError(ex, "Failed to apply Intel CPU settings in Adaptive Mode");
-                                    }
-
-                                    lastCpuPl1 = pl1;
-                                    lastCpuPl2 = pl2;
-                                    lastCpuUndervolt = uv;
-                                }
-                            }
-                        }
-
-                        // Apply GPU settings if enabled
-                        if ((bool)cbxGpuEnabled.IsChecked && sdGpuSettings.Visibility == Visibility.Visible)
-                        {
-                            int tgp = (int)AdpSdNvPower.Value;
-                            bool dbEnabled = AdpTogDynamicBoost.IsChecked == true;
-                            int dbOffset = dbEnabled ? (int)AdpSdNvDbOffset.Value : 0;
-                            int memClock = (int)AdpSdNvMem.Value;
-
-                            // When a V-F curve is active and user hasn't touched the slider,
-                            // skip the core clock offset — the curve handles per-point frequency.
-                            int coreClock = (AdpVfCurveActive && !_adpUserTouchedCoreSlider) ? 0 : (int)AdpSdNvCore.Value;
-
-                            bool changed = tgp != lastGpuTgp ||
-                                dbEnabled != lastGpuDynamicBoost ||
-                                dbOffset != lastGpuDbOffset ||
-                                coreClock != lastGpuCoreClock ||
-                                memClock != lastGpuMemClock;
-
-                            if (changed)
-                            {
-                                try
-                                {
-                                    int totalWatts = tgp + dbOffset;
-                                    // Apply via the same NVIDIA command format as Presets page
-                                    string nvCmd = $"--NVIDIA-Clocks=0-{coreClock}-{memClock}-{totalWatts}-{dbOffset}";
-                                    _ = RyzenAdj_To_UCU.TranslateAsync(nvCmd);
-                                }
-                                catch (Exception ex)
-                                {
-                                    DiagnosticLogger.LogError(ex, "Failed to apply GPU settings in Adaptive Mode");
-                                }
-
-                                lastGpuTgp = tgp;
-                                lastGpuDynamicBoost = dbEnabled;
-                                lastGpuDbOffset = dbOffset;
-                                lastGpuCoreClock = coreClock;
-                                lastGpuMemClock = memClock;
-                            }
-
-                            // Apply V-F curve if it changed (only when Adaptive Mode running + GPU enabled)
-                            if (_adpActiveCurveName != lastGpuVfCurveName)
-                            {
-                                ApplyActiveVfCurveToGpu();
-                                lastGpuVfCurveName = _adpActiveCurveName;
-                            }
-                        }
-
-                        // Apply Light Bar settings if enabled
-                        if ((bool)cbxLbEnabled.IsChecked && sdLightBar.Visibility == Visibility.Visible && _hidService != null)
-                        {
-                            bool lbPower = AdpTsLightBarPower.IsChecked == true;
-                            byte lbR = AdpLbColorPicker.SelectedColor.R;
-                            byte lbG = AdpLbColorPicker.SelectedColor.G;
-                            byte lbB = AdpLbColorPicker.SelectedColor.B;
-                            int lbBrightness = (int)AdpLbBrightnessSlider.Value;
-                            byte lbEffect = GetLbEffectByte(AdpLbEffect.SelectedIndex);
-                            byte lbSpeed = GetLbHidSpeed((int)AdpLbSpeedSlider.Value);
-
-                            bool lbChanged = lbPower != lastLbPower ||
-                                lbR != lastLbColorR || lbG != lastLbColorG || lbB != lastLbColorB ||
-                                lbBrightness != lastLbBrightness ||
-                                lbEffect != lastLbEffect || lbSpeed != lastLbSpeed;
-
-                            if (lbChanged)
-                            {
-                                try
-                                {
-                                    if (lbPower)
-                                    {
-                                        _hidService.LightBarSetColor(lbR, lbG, lbB, lbBrightness);
-                                        _hidService.LightBarSetEffect(lbEffect, lbSpeed, lbBrightness);
-                                    }
-                                    else
-                                    {
-                                        _hidService.LightBarTurnOff();
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    DiagnosticLogger.LogError(ex, "Failed to apply Light Bar settings in Adaptive Mode");
-                                }
-
-                                lastLbPower = lbPower;
-                                lastLbColorR = lbR;
-                                lastLbColorG = lbG;
-                                lastLbColorB = lbB;
-                                lastLbBrightness = lbBrightness;
-                                lastLbEffect = lbEffect;
-                                lastLbSpeed = lbSpeed;
-                            }
-                        }
+                    await ApplyWatercoolerIfNeeded();
+                    await ApplyBs2ProIfNeeded();
+                    ApplyEcFanIfNeeded();
+                    ApplyKeyboardIfNeeded();
+                    ApplyCpuIfNeeded();
+                    ApplyGpuIfNeeded();
+                    ApplyLightBarIfNeeded();
                 }
             }
             catch (Exception ex)
@@ -1619,6 +1218,498 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _updateSemaphore.Release();
             }
         }
+
+        #region Adaptive update helpers
+
+        private async Task ApplyWatercoolerIfNeeded()
+        {
+            if (!(bool)cbxWcEnabled.IsChecked)
+                return;
+
+            PumpVoltage curPump = GetPumpVoltageFromIndex(cbxWcPumpVoltage.SelectedIndex);
+            FanSpeed curFan = GetFanSpeedFromIndex(cbxWcFanSpeed.SelectedIndex);
+            RgbState curRgbMode = GetRgbModeFromIndex(cbxWcRgbMode.SelectedIndex);
+            RgbColor curRgbColor = GetRgbColorFromIndex(cbxWcRgbColor.SelectedIndex);
+
+            if (curPump != lastWcPump || curFan != lastWcFan ||
+                curRgbMode != lastWcRgbMode || curRgbColor != lastWcRgbColor)
+            {
+                await _deviceApplier!.ApplyWatercoolerFromPresetAsync(curPump, curFan, curRgbMode, curRgbColor);
+                lastWcPump = curPump;
+                lastWcFan = curFan;
+                lastWcRgbMode = curRgbMode;
+                lastWcRgbColor = curRgbColor;
+            }
+        }
+
+        private async Task ApplyBs2ProIfNeeded()
+        {
+            if (Settings.Default.HideFlydigi || !(bool)cbxBs2ProEnabled.IsChecked)
+                return;
+
+            string bs2Mode = GetBs2ProFanModeFromIndex(cbxBs2ProFanMode.SelectedIndex);
+            string bs2RgbMode = GetBs2ProRgbModeFromIndex(cbxBs2ProRgbMode.SelectedIndex);
+            byte bs2R = (byte)nudBs2ProRgbR.Value;
+            byte bs2G = (byte)nudBs2ProRgbG.Value;
+            byte bs2B = (byte)nudBs2ProRgbB.Value;
+            byte bs2Brightness = (byte)sliderBs2ProBrightness.Value;
+            string bs2Speed = GetRgbSpeedNameFromSlider((int)sliderBs2ProRgbSpeed.Value);
+
+            // --- Fan control (differs by mode) ---
+            if (bs2Mode == "Curve")
+            {
+                await ApplyBs2ProCurveMode();
+            }
+            else
+            {
+                // For non-curve modes, stop smart control if active
+                if (_bs2ProSmartControl != null)
+                    StopBs2ProSmartControl();
+                if (_bs1SmartControl != null)
+                    StopBs1SmartControl();
+
+                byte? gear = null;
+                ushort? rpm = null;
+                if (bs2Mode == "Gear")
+                    gear = (byte)(cbxBs2ProGear.SelectedIndex + 1);
+                else if (bs2Mode == "Rpm")
+                    rpm = (ushort)Math.Clamp((int)nudBs2ProRpm.Value, 1300,
+                        (FlydigiHardwareDetector.ConnectedDeviceType == ConnectedDeviceType.BS1 ? 3000 : 4000));
+
+                bool fanChanged = bs2Mode != lastBs2ProFanModeText ||
+                    (bs2Mode == "Gear" && gear != lastBs2ProGear) ||
+                    (bs2Mode == "Rpm" && rpm != lastBs2ProRpm);
+
+                if (fanChanged)
+                {
+                    await _deviceApplier!.ApplyFlydigiFanAsync(bs2Mode, gear, rpm);
+                    lastBs2ProFanModeText = bs2Mode;
+                    lastBs2ProGear = gear ?? lastBs2ProGear;
+                    lastBs2ProRpm = rpm ?? lastBs2ProRpm;
+                }
+            }
+
+            // --- RGB control (independent of fan mode) ---
+            bool rgbChanged = bs2RgbMode != lastBs2ProRgbMode ||
+                bs2R != lastBs2ProRgbR || bs2G != lastBs2ProRgbG ||
+                bs2B != lastBs2ProRgbB || bs2Brightness != lastBs2ProBrightness ||
+                bs2Speed != lastBs2ProSpeed;
+
+            if (rgbChanged)
+            {
+                await _deviceApplier!.ApplyFlydigiRgbAsync(bs2RgbMode, bs2R, bs2G, bs2B, bs2Brightness);
+
+                // Fire preset-applied event so the Flydigi page can sync its UI.
+                byte? fanGear = bs2Mode == "Gear" ? (byte?)(cbxBs2ProGear.SelectedIndex + 1) : null;
+                ushort? fanRpm = bs2Mode == "Rpm"
+                    ? (ushort?)Math.Clamp((int)nudBs2ProRpm.Value, 1300,
+                        (FlydigiHardwareDetector.ConnectedDeviceType == ConnectedDeviceType.BS1 ? 3000 : 4000))
+                    : null;
+                _deviceApplier.RaiseFlydigiPresetApplied(bs2Mode, fanGear, fanRpm,
+                    bs2RgbMode, bs2R, bs2G, bs2B, bs2Brightness);
+
+                lastBs2ProRgbMode = bs2RgbMode;
+                lastBs2ProRgbR = bs2R;
+                lastBs2ProRgbG = bs2G;
+                lastBs2ProRgbB = bs2B;
+                lastBs2ProBrightness = bs2Brightness;
+                lastBs2ProSpeed = bs2Speed;
+            }
+        }
+
+        private async Task ApplyBs2ProCurveMode()
+        {
+            bool isBs1Curve = FlydigiHardwareDetector.ConnectedDeviceType == ConnectedDeviceType.BS1;
+
+            if (isBs1Curve)
+            {
+                var bs1Service = App.GetService<Bs1Service>();
+                if (bs1Service?.IsConnected != true)
+                    return;
+
+                FlydigiFanCurveProfile curveProfile = GetBs1CurveProfile(bs1Service);
+
+                if (_bs1SmartControl == null)
+                {
+                    var tempProvider = new FlydigiTemperatureProvider();
+                    _bs1SmartControl = new Bs1SmartControl(bs1Service, tempProvider);
+                    _bs1SmartControl.ActiveProfile = curveProfile;
+                    _bs1SmartControl.Settings = bs1Service.GetSettings();
+                    _bs1SmartControl.TempSource = bs1Service.GetSettings().TempSource;
+                    _bs1SmartControl.Start();
+                }
+                else
+                {
+                    _bs1SmartControl.ActiveProfile = curveProfile;
+                }
+            }
+            else
+            {
+                var flydigiService = App.GetService<FlydigiCoolerService>();
+                if (flydigiService?.IsConnected != true)
+                    return;
+
+                FlydigiFanCurveProfile curveProfile = GetBs2CurveProfile(flydigiService);
+
+                if (_bs2ProSmartControl == null)
+                {
+                    _bs2ProTempProvider = new FlydigiTemperatureProvider();
+                    _bs2ProSmartControl = new FlydigiSmartControl(flydigiService, _bs2ProTempProvider);
+                    _bs2ProSmartControl.ActiveProfile = curveProfile;
+                    _bs2ProSmartControl.Start();
+                }
+                else
+                {
+                    _bs2ProSmartControl.ActiveProfile = curveProfile;
+                }
+            }
+        }
+
+        private FlydigiFanCurveProfile GetBs1CurveProfile(Bs1Service bs1Service)
+        {
+            string curveProfileId = GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex);
+            return curveProfileId switch
+            {
+                "Silent" => FlydigiFanCurveProfile.CreateSilent(),
+                "Performance" => FlydigiFanCurveProfile.CreatePerformance(),
+                "Custom" => LoadBs1CustomCurveProfile(bs1Service),
+                _ => FlydigiFanCurveProfile.CreateBalanced()
+            };
+        }
+
+        private FlydigiFanCurveProfile GetBs2CurveProfile(FlydigiCoolerService flydigiService)
+        {
+            string curveProfileId = GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex);
+            return curveProfileId switch
+            {
+                "Silent" => FlydigiFanCurveProfile.CreateSilent(),
+                "Performance" => FlydigiFanCurveProfile.CreatePerformance(),
+                "Custom" => LoadCustomCurveProfile(flydigiService),
+                _ => FlydigiFanCurveProfile.CreateBalanced()
+            };
+        }
+
+        private void ApplyEcFanIfNeeded()
+        {
+            if (!(bool)cbxEcFanEnabled.IsChecked || _deviceApplier == null)
+                return;
+
+            bool unified = cbxEcFanMode.SelectedIndex == 0;
+            string unifiedPreset = GetEcFanPresetFromIndex(cbxEcFanPreset.SelectedIndex);
+            string cpuPreset = GetEcFanPresetFromIndex(cbxEcFanCpuPreset.SelectedIndex);
+            string gpuPreset = GetEcFanPresetFromIndex(cbxEcFanGpuPreset.SelectedIndex);
+
+            bool changed = unified != lastEcFanUnifiedMode ||
+                (unified && unifiedPreset != lastEcFanPreset) ||
+                (!unified && (cpuPreset != lastEcFanCpuPreset || gpuPreset != lastEcFanGpuPreset));
+
+            if (!changed)
+                return;
+
+            if (unified)
+            {
+                var cpuCurve = GetEcFanPresetCurve(unifiedPreset);
+                var cpuTemps = Uniwill_Control_Utility.Models.EcFanCurve.CpuTemperatures;
+
+                _deviceApplier.ApplyEcFanFromPreset(true, unifiedPreset,
+                    cpuCurve.Duties.ToArray(), null, null,
+                    cpuTemps, cpuTemps);
+
+                lastEcFanPreset = unifiedPreset;
+            }
+            else
+            {
+                var cpuCurve = GetEcFanPresetCurve(cpuPreset);
+                var gpuCurve = GetEcFanPresetCurve(gpuPreset);
+                var cpuTemps = Uniwill_Control_Utility.Models.EcFanCurve.CpuTemperatures;
+                var gpuTemps = Uniwill_Control_Utility.Models.EcFanCurve.GpuTemperatures;
+
+                _deviceApplier.ApplyEcFanFromPreset(false, cpuPreset,
+                    null, cpuCurve.Duties.ToArray(), gpuCurve.Duties.ToArray(),
+                    cpuTemps, gpuTemps);
+
+                lastEcFanCpuPreset = cpuPreset;
+                lastEcFanGpuPreset = gpuPreset;
+            }
+            lastEcFanUnifiedMode = unified;
+        }
+
+        private void ApplyKeyboardIfNeeded()
+        {
+            if (!(bool)cbxKbEnabled.IsChecked || _deviceApplier == null)
+                return;
+
+            bool perKeyMode = cbxKbMode.SelectedIndex == 1;
+            int brightness = (int)sdKbBrightness.Value;
+            string effectMode = GetKbEffectFromIndex(cbxKbEffect.SelectedIndex);
+            byte effectSpeed = (byte)(10 - Math.Clamp((int)sdKbSpeed.Value, 1, 10));
+            byte colorR = KbColorPicker.SelectedColor.R;
+            byte colorG = KbColorPicker.SelectedColor.G;
+            byte colorB = KbColorPicker.SelectedColor.B;
+            byte restColorR = KbRestColorPicker.SelectedColor.R;
+            byte restColorG = KbRestColorPicker.SelectedColor.G;
+            byte restColorB = KbRestColorPicker.SelectedColor.B;
+            string multiColors = SerializeColors(KbMultiColorPicker.Colors);
+
+            bool changed = perKeyMode != lastKbPerKeyMode ||
+                brightness != lastKbBrightness ||
+                effectMode != lastKbEffectMode ||
+                effectSpeed != lastKbEffectSpeed ||
+                _kbDirection != lastKbDirection ||
+                colorR != lastKbColorR ||
+                colorG != lastKbColorG ||
+                colorB != lastKbColorB ||
+                restColorR != lastKbRestColorR ||
+                restColorG != lastKbRestColorG ||
+                restColorB != lastKbRestColorB ||
+                multiColors != lastKbMultiColors;
+
+            if (!changed)
+                return;
+
+            // In per-key mode, pass the current per-key colors from settings
+            string? perKeyColorsStr = perKeyMode
+                ? KeyboardSettingsService.Load().PerKeyColors
+                : null;
+
+            _deviceApplier.ApplyKeyboardFromPreset(
+                perKeyMode, brightness, false, 0,
+                effectMode, effectSpeed, _kbDirection,
+                colorR, colorG, colorB,
+                multiColors, perKeyColorsStr, restColorR, restColorG, restColorB);
+
+            lastKbPerKeyMode = perKeyMode;
+            lastKbBrightness = brightness;
+            lastKbEffectMode = effectMode;
+            lastKbEffectSpeed = effectSpeed;
+            lastKbDirection = _kbDirection;
+            lastKbColorR = colorR;
+            lastKbColorG = colorG;
+            lastKbColorB = colorB;
+            lastKbRestColorR = restColorR;
+            lastKbRestColorG = restColorG;
+            lastKbRestColorB = restColorB;
+            lastKbMultiColors = multiColors;
+        }
+
+        private void ApplyCpuIfNeeded()
+        {
+            if (!(bool)cbxCpuEnabled.IsChecked)
+                return;
+
+            if (Family.TYPE == Family.ProcessorType.Amd_Apu)
+            {
+                ApplyAmdCpuIfNeeded();
+            }
+            else if (Family.TYPE == Family.ProcessorType.Intel)
+            {
+                ApplyIntelCpuIfNeeded();
+            }
+        }
+
+        private void ApplyAmdCpuIfNeeded()
+        {
+            int sustained = (int)AdpSdSustained.Value;
+            int boost = (int)AdpSdBoost.Value;
+            int tjMax = (int)AdpSdTjMax.Value;
+
+            int coUnifiedValue = (int)AdpSdCoUnified.Value;
+            int coCcd0 = (int)AdpSdCoCcd0.Value;
+            int coCcd1 = (int)AdpSdCoCcd1.Value;
+            bool coUnified = AdpRbCoUnified.IsChecked == true;
+
+            if (sustained != lastCpuSustained || boost != lastCpuBoost ||
+                tjMax != lastCpuTjMax ||
+                coUnified != lastCpuCoUnified ||
+                coUnifiedValue != lastCpuCoUnifiedValue ||
+                coCcd0 != lastCpuCoCcd0 ||
+                coCcd1 != lastCpuCoCcd1)
+            {
+                try
+                {
+                    string cmd = BuildAmdCpuCommand(sustained, boost, tjMax,
+                        coUnified, coUnifiedValue, coCcd0, coCcd1);
+                    _ = RyzenAdj_To_UCU.TranslateAsync(cmd);
+
+                    // Also write EC CPU power limits
+                    var ec = RyzenAdj_To_UCU.EcService;
+                    if (ec != null)
+                        ec.ApplyCpuPowerLimits(sustained, boost);
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLogger.LogError(ex, "Failed to apply CPU settings in Adaptive Mode");
+                }
+
+                lastCpuSustained = sustained;
+                lastCpuBoost = boost;
+                lastCpuTjMax = tjMax;
+                lastCpuCoUnified = coUnified;
+                lastCpuCoUnifiedValue = coUnifiedValue;
+                lastCpuCoCcd0 = coCcd0;
+                lastCpuCoCcd1 = coCcd1;
+            }
+        }
+
+        private string BuildAmdCpuCommand(int sustained, int boost, int tjMax,
+            bool coUnified, int coUnifiedValue, int coCcd0, int coCcd1)
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            parts.Add($"--slow-limit={sustained * 1000}");
+            parts.Add($"--fast-limit={boost * 1000}");
+            parts.Add($"--tctl-temp={tjMax}");
+            parts.Add($"--cHTC-temp={tjMax}");
+
+            if (coUnified)
+            {
+                int biased = 0x100000 - Math.Abs(coUnifiedValue);
+                parts.Add($"--set-coall={biased:X}");
+            }
+            else
+            {
+                int[,] ccdMap = { { 0, 1, 2, 3, 4, 5, 6, 7 }, { 8, 9, 10, 11, 12, 13, 14, 15 } };
+                for (int ccd = 0; ccd < 2; ccd++)
+                {
+                    int offset = ccd == 0 ? coCcd0 : coCcd1;
+                    int biased = 0x100000 - Math.Abs(offset);
+                    for (int core = 0; core < 8; core++)
+                    {
+                        parts.Add($"--set-coper={BuildCoperArg(ccd, ccdMap[ccd, core], biased):X}");
+                    }
+                }
+            }
+
+            return string.Join(" ", parts);
+        }
+
+        private void ApplyIntelCpuIfNeeded()
+        {
+            int pl1 = (int)AdpSdIntelPl1.Value;
+            int pl2 = (int)AdpSdIntelPl2.Value;
+            int uv = (int)AdpSdIntelUndervolt.Value;
+
+            if (pl1 != lastCpuPl1 || pl2 != lastCpuPl2 || uv != lastCpuUndervolt)
+            {
+                try
+                {
+                    var parts = new System.Collections.Generic.List<string>();
+                    parts.Add($"--intel-pl={pl1:F0},{pl2:F0}");
+                    if (uv < 0)
+                        parts.Add($"--intel-volt-cpu={uv:F0}");
+
+                    string cmd = string.Join(" ", parts);
+                    _ = RyzenAdj_To_UCU.TranslateAsync(cmd);
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLogger.LogError(ex, "Failed to apply Intel CPU settings in Adaptive Mode");
+                }
+
+                lastCpuPl1 = pl1;
+                lastCpuPl2 = pl2;
+                lastCpuUndervolt = uv;
+            }
+        }
+
+        private void ApplyGpuIfNeeded()
+        {
+            if (!(bool)cbxGpuEnabled.IsChecked || sdGpuSettings.Visibility != Visibility.Visible)
+                return;
+
+            int tgp = (int)AdpSdNvPower.Value;
+            bool dbEnabled = AdpTogDynamicBoost.IsChecked == true;
+            int dbOffset = dbEnabled ? (int)AdpSdNvDbOffset.Value : 0;
+            int memClock = (int)AdpSdNvMem.Value;
+
+            // When a V-F curve is active and user hasn't touched the slider,
+            // skip the core clock offset — the curve handles per-point frequency.
+            int coreClock = (AdpVfCurveActive && !_adpUserTouchedCoreSlider)
+                ? 0 : (int)AdpSdNvCore.Value;
+
+            bool changed = tgp != lastGpuTgp ||
+                dbEnabled != lastGpuDynamicBoost ||
+                dbOffset != lastGpuDbOffset ||
+                coreClock != lastGpuCoreClock ||
+                memClock != lastGpuMemClock;
+
+            if (changed)
+            {
+                try
+                {
+                    int totalWatts = tgp + dbOffset;
+                    string nvCmd = $"--NVIDIA-Clocks=0-{coreClock}-{memClock}-{totalWatts}-{dbOffset}";
+                    _ = RyzenAdj_To_UCU.TranslateAsync(nvCmd);
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLogger.LogError(ex, "Failed to apply GPU settings in Adaptive Mode");
+                }
+
+                lastGpuTgp = tgp;
+                lastGpuDynamicBoost = dbEnabled;
+                lastGpuDbOffset = dbOffset;
+                lastGpuCoreClock = coreClock;
+                lastGpuMemClock = memClock;
+            }
+
+            // Apply V-F curve if it changed (only when Adaptive Mode running + GPU enabled)
+            if (_adpActiveCurveName != lastGpuVfCurveName)
+            {
+                ApplyActiveVfCurveToGpu();
+                lastGpuVfCurveName = _adpActiveCurveName;
+            }
+        }
+
+        private void ApplyLightBarIfNeeded()
+        {
+            if (!(bool)cbxLbEnabled.IsChecked ||
+                sdLightBar.Visibility != Visibility.Visible ||
+                _hidService == null)
+                return;
+
+            bool lbPower = AdpTsLightBarPower.IsChecked == true;
+            byte lbR = AdpLbColorPicker.SelectedColor.R;
+            byte lbG = AdpLbColorPicker.SelectedColor.G;
+            byte lbB = AdpLbColorPicker.SelectedColor.B;
+            int lbBrightness = (int)AdpLbBrightnessSlider.Value;
+            byte lbEffect = GetLbEffectByte(AdpLbEffect.SelectedIndex);
+            byte lbSpeed = GetLbHidSpeed((int)AdpLbSpeedSlider.Value);
+
+            bool lbChanged = lbPower != lastLbPower ||
+                lbR != lastLbColorR || lbG != lastLbColorG || lbB != lastLbColorB ||
+                lbBrightness != lastLbBrightness ||
+                lbEffect != lastLbEffect || lbSpeed != lastLbSpeed;
+
+            if (!lbChanged)
+                return;
+
+            try
+            {
+                if (lbPower)
+                {
+                    _hidService.LightBarSetColor(lbR, lbG, lbB, lbBrightness);
+                    _hidService.LightBarSetEffect(lbEffect, lbSpeed, lbBrightness);
+                }
+                else
+                {
+                    _hidService.LightBarTurnOff();
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to apply Light Bar settings in Adaptive Mode");
+            }
+
+            lastLbPower = lbPower;
+            lastLbColorR = lbR;
+            lastLbColorG = lbG;
+            lastLbColorB = lbB;
+            lastLbBrightness = lbBrightness;
+            lastLbEffect = lbEffect;
+            lastLbSpeed = lbSpeed;
+        }
+
+        #endregion
 
         public bool IsScrollBarVisible(ScrollViewer scrollViewer)
         {
@@ -1708,22 +1799,23 @@ namespace Uniwill_Control_Utility.Views.Pages
         int gameMissingCount = 0;
         const int maxGameMisses = 2;
 
-        private void isGameRunning()
+        private bool AutoSwitchEnabled(GameLauncherItem item)
         {
-            string detectedGame = DefaultProfileName;
+            var preset = adaptivePresetManager.GetPreset(item.gameName);
+            return preset?.isAutoSwitch ?? true;
+        }
 
-            // --- Pass 1: Process-based detection ---
+        /// <summary>Pass 1: iterate games and processes to match executable paths.</summary>
+        private string? DetectGameByProcess()
+        {
             foreach (GameLauncherItem item in installedGames)
             {
                 if (string.IsNullOrEmpty(item.path))
                     continue;
 
-                int i = 0;
-                do
+                for (int attempt = 0; attempt < 2; attempt++)
                 {
-                    Process[] processes = Process.GetProcesses();
-
-                    foreach (Process process in processes)
+                    foreach (Process process in Process.GetProcesses())
                     {
                         try
                         {
@@ -1731,121 +1823,90 @@ namespace Uniwill_Control_Utility.Views.Pages
                             if (mainModule == null)
                                 continue;
 
-                            string executablePath = mainModule.FileName;
-                            if (executablePath.Contains(item.path))
-                            {
-                                bool autoSwitch = true;
-                                AdaptivePreset preset = adaptivePresetManager.GetPreset(item.gameName);
-                                if (preset != null)
-                                {
-                                    autoSwitch = preset.isAutoSwitch;
-                                }
-                                if (!autoSwitch)
-                                    continue;
-
-                                detectedGame = item.gameName;
-                                break;
-                            }
+                            if (mainModule.FileName.Contains(item.path) && AutoSwitchEnabled(item))
+                                return item.gameName;
                         }
                         catch
                         {
                             // Process.MainModule throws for elevated/protected processes — skip silently
                         }
                     }
-
-                    if (detectedGame != DefaultProfileName)
-                    {
-                        break;
-                    }
-
-                    i++;
-                } while (i < 2);
-
-                if (detectedGame != DefaultProfileName)
-                {
-                    break;
                 }
             }
+            return null;
+        }
 
-            // --- Pass 2: Window-title fallback for fullscreen/elevated games ---
-            // Some games run elevated or in a protected context after launch, so MainModule.FileName
-            // throws an exception.  Enumerate visible windows and match titles against game names.
-            if (detectedGame == DefaultProfileName)
+        /// <summary>Pass 2: EnumWindows fallback for fullscreen/elevated games.</summary>
+        private string? DetectGameByWindowTitle()
+        {
+            var matchedGameNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var classNameSb = new StringBuilder(256);
+            var titleSb = new StringBuilder(256);
+
+            EnumWindows((hWnd, lParam) =>
             {
-                var matchedGameNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var classNameSb = new StringBuilder(256);
-                var titleSb = new StringBuilder(256);
+                if (!IsWindowVisible(hWnd))
+                    return true;
 
-                EnumWindows((hWnd, lParam) =>
+                classNameSb.Clear();
+                GetClassName(hWnd, classNameSb, classNameSb.Capacity);
+                if (ExcludedWindowClasses.Contains(classNameSb.ToString()))
+                    return true;
+
+                int length = GetWindowTextLength(hWnd);
+                if (length == 0)
+                    return true;
+
+                if (length + 1 > titleSb.Capacity)
+                    titleSb.Capacity = length + 1;
+
+                titleSb.Clear();
+                GetWindowText(hWnd, titleSb, titleSb.Capacity);
+                string windowTitle = titleSb.ToString().Trim();
+
+                foreach (GameLauncherItem item in installedGames)
                 {
-                    if (!IsWindowVisible(hWnd))
-                        return true; // continue enumeration
-
-                    // Get window class to filter out non-game windows
-                    classNameSb.Clear();
-                    GetClassName(hWnd, classNameSb, classNameSb.Capacity);
-                    if (ExcludedWindowClasses.Contains(classNameSb.ToString()))
-                        return true;
-
-                    int length = GetWindowTextLength(hWnd);
-                    if (length == 0)
-                        return true;
-
-                    // Resize buffer if the title is longer than our default capacity
-                    if (length + 1 > titleSb.Capacity)
-                        titleSb.Capacity = length + 1;
-
-                    titleSb.Clear();
-                    GetWindowText(hWnd, titleSb, titleSb.Capacity);
-                    string windowTitle = titleSb.ToString().Trim();
-
-                    foreach (GameLauncherItem item in installedGames)
+                    if (windowTitle.Contains(item.gameName, StringComparison.OrdinalIgnoreCase)
+                        && AutoSwitchEnabled(item))
                     {
-                        if (windowTitle.Contains(item.gameName, StringComparison.OrdinalIgnoreCase))
-                        {
-                            bool autoSwitch = true;
-                            AdaptivePreset preset = adaptivePresetManager.GetPreset(item.gameName);
-                            if (preset != null)
-                                autoSwitch = preset.isAutoSwitch;
-
-                            if (autoSwitch)
-                                matchedGameNames.Add(item.gameName);
-                        }
+                        matchedGameNames.Add(item.gameName);
                     }
-
-                    return true; // continue enumeration
-                }, IntPtr.Zero);
-
-                if (matchedGameNames.Count > 0)
-                {
-                    // Prefer the longest match (most specific game name).
-                    detectedGame = matchedGameNames.OrderByDescending(n => n.Length).First();
                 }
-            }
 
-            // Commit detection immediately; only delay the revert.
-            if (detectedGame != DefaultProfileName)
+                return true;
+            }, IntPtr.Zero);
+
+            if (matchedGameNames.Count > 0)
+                return matchedGameNames.OrderByDescending(n => n.Length).First();
+
+            return null;
+        }
+
+        /// <summary>Commit detection: apply game preset or revert to default with delay.</summary>
+        private void CommitGameDetection(string? detected)
+        {
+            if (detected != null)
             {
-                lastConfirmedGame = detectedGame;
-                runningGameName = detectedGame;
+                lastConfirmedGame = detected;
+                runningGameName = detected;
                 gameMissingCount = 0;
             }
-            else
+            else if (lastConfirmedGame != DefaultProfileName)
             {
-                // No game detected this poll.
-                if (lastConfirmedGame != DefaultProfileName)
+                gameMissingCount++;
+                if (gameMissingCount >= maxGameMisses)
                 {
-                    // Game was previously detected but is now missing — count misses.
-                    gameMissingCount++;
-                    if (gameMissingCount >= maxGameMisses)
-                    {
-                        runningGameName = DefaultProfileName;
-                        lastConfirmedGame = DefaultProfileName;
-                        gameMissingCount = 0;
-                    }
+                    runningGameName = DefaultProfileName;
+                    lastConfirmedGame = DefaultProfileName;
+                    gameMissingCount = 0;
                 }
-                // If already at Default, nothing to do.
             }
+        }
+
+        private void isGameRunning()
+        {
+            string? detected = DetectGameByProcess() ?? DetectGameByWindowTitle();
+            CommitGameDetection(detected);
         }
 
 
@@ -2772,7 +2833,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         result.Add(Color.FromRgb(r, g, b));
                     }
                 }
-                catch { }
+                catch { /* Invalid hex color entry skipped */ }
             }
             return result;
         }
