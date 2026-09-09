@@ -13,8 +13,6 @@ using System.IO;
 using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Security.Policy;
-using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -43,7 +41,7 @@ namespace Uniwill_Control_Utility
         // https://docs.microsoft.com/dotnet/core/extensions/dependency-injection
         // https://docs.microsoft.com/dotnet/core/extensions/configuration
         // https://docs.microsoft.com/dotnet/core/extensions/logging
-        private static IHost _host;
+        private static IHost? _host;
 
         private static ILogger<App>? _logger;
         //public static Mem_Timings memTimings = new Mem_Timings();
@@ -56,11 +54,11 @@ namespace Uniwill_Control_Utility
         public static T? GetService<T>()
             where T : class
         {
-            return _host.Services.GetService(typeof(T)) as T;
+            return _host?.Services.GetService(typeof(T)) as T;
         }
 
         public static string version = "26.2.2";
-        private Mutex mutex;
+        private Mutex? mutex;
         private const string MutexName = "UniversalX86TuningUtility";
 
         public static readonly string SCALE_MODELS_JSON_PATH = ".\\ScaleModels.json";
@@ -266,8 +264,10 @@ namespace Uniwill_Control_Utility
                 }
                 catch (ConfigurationErrorsException ex)
                 {
-                    string filename = ((ConfigurationErrorsException)ex.InnerException).Filename;
-                    File.Delete(filename);
+                    if (ex.InnerException is ConfigurationErrorsException innerEx)
+                    {
+                        File.Delete(innerEx.Filename!);
+                    }
                     Settings.Default.Reload();
                 }
 
@@ -310,7 +310,8 @@ namespace Uniwill_Control_Utility
                     Log.Warning(ex, "SkuResolver.Initialize() failed - falling back to generic limits");
                 }
 
-                string path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location)!;
+                string? entryLocation = System.Reflection.Assembly.GetEntryAssembly()?.Location;
+                string path = System.IO.Path.GetDirectoryName(entryLocation)!;
 
                 if (firstBoot || Settings.Default.Path != path)
                 {
@@ -397,7 +398,7 @@ namespace Uniwill_Control_Utility
             }
         }
 
-        private async Task RunPostStartupTasksAsync()
+        private static async Task RunPostStartupTasksAsync()
         {
             try
             {
@@ -536,7 +537,7 @@ namespace Uniwill_Control_Utility
             }
         }
 
-        private bool IsVcRedistInstalled(string arch)
+        private static bool IsVcRedistInstalled(string arch)
         {
             var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
             using var key = baseKey.OpenSubKey(

@@ -70,7 +70,6 @@ namespace Uniwill_Control_Utility.Services
 
         // Fan state tracking
         private bool _realtimeMode;
-        private ushort _lastCommandedRpm;
 
         /* ------------------------------------------------------------------ */
         /*  Public events                                                      */
@@ -92,7 +91,7 @@ namespace Uniwill_Control_Utility.Services
         /*  Constructor / Settings                                             */
         /* ------------------------------------------------------------------ */
 
-        private static readonly string SettingsFolder = Path.Combine(
+        private static readonly string settingsFolder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "UCU");
 
         public Bs1Service()
@@ -139,7 +138,7 @@ namespace Uniwill_Control_Utility.Services
         {
             try
             {
-                var filePath = Path.Combine(SettingsFolder, SettingsFileName);
+                var filePath = Path.Combine(settingsFolder, SettingsFileName);
                 if (File.Exists(filePath))
                 {
                     var json = File.ReadAllText(filePath);
@@ -158,8 +157,8 @@ namespace Uniwill_Control_Utility.Services
         {
             try
             {
-                Directory.CreateDirectory(SettingsFolder);
-                var filePath = Path.Combine(SettingsFolder, SettingsFileName);
+                Directory.CreateDirectory(settingsFolder);
+                var filePath = Path.Combine(settingsFolder, SettingsFileName);
                 var json = JsonConvert.SerializeObject(_settings, Newtonsoft.Json.Formatting.Indented);
                 File.WriteAllText(filePath, json);
                 Log($"{LogPrefix} Settings saved: FanMode={_settings.FanMode}, Profile={_settings.SelectedCurveProfile}");
@@ -724,7 +723,7 @@ namespace Uniwill_Control_Utility.Services
             _txCharacteristic = null;
             _rxCharacteristic = null;
             _realtimeMode = false;
-            _lastCommandedRpm = 0;
+            ConnectedDeviceName = string.Empty;
 
             ConnectionStateChanged?.Invoke(this, false);
             StatusChanged?.Invoke(this, "Disconnected");
@@ -786,7 +785,7 @@ namespace Uniwill_Control_Utility.Services
                 _realtimeMode = false;
             }
 
-            var payload = new[] { (byte)gear };
+            var payload = new[] { gear };
             await WriteFrameAsync(Bs1Frame.Build(Bs1Command.GearMode, payload));
 
             Log($"{LogPrefix} Gear set to {gear}");
@@ -820,8 +819,6 @@ namespace Uniwill_Control_Utility.Services
 
             await WriteFrameAsync(Bs1Frame.Build(Bs1Command.RealtimeRpm, payload));
 
-            _lastCommandedRpm = rpm;
-
             // Raise fan data event
             FanRpmData = new FanRpmData
             {
@@ -851,8 +848,6 @@ namespace Uniwill_Control_Utility.Services
             // Send 0 RPM to stop the fan
             var payload = new byte[] { 0x00, 0x00 };
             await WriteFrameAsync(Bs1Frame.Build(Bs1Command.RealtimeRpm, payload));
-
-            _lastCommandedRpm = 0;
 
             FanRpmData = new FanRpmData
             {

@@ -20,7 +20,7 @@ namespace Uniwill_Control_Utility.Scripts
         [DllImport("powrprof.dll", EntryPoint = "PowerSetActiveOverlayScheme")]
         public static extern uint PowerSetActiveOverlayScheme(Guid OverlaySchemeGuid);
 
-        private static readonly Guid BalancedPowerSchemeGuid = new("00000000-0000-0000-0000-000000000000");
+        private static readonly Guid BalancedPowerSchemeGuid = Guid.Empty;
         private static readonly Guid HighPerformancePowerSchemeGuid = new("DED574B5-45A0-4F42-8737-46345C09C238");
         private static readonly Guid PowerSaverPowerSchemeGuid = new("961CC777-2547-4F9D-8174-7D86181b8A7A");
 
@@ -72,9 +72,10 @@ namespace Uniwill_Control_Utility.Scripts
                             }
                             else if (ryzenAdjCommandString.Contains("Win-Power"))
                             {
-                                if (ryzenAdjCommandValueString == WinPowerValueSaver) PowerSetActiveOverlayScheme(PowerSaverPowerSchemeGuid);
-                                else if (ryzenAdjCommandValueString == WinPowerValueBalanced) PowerSetActiveOverlayScheme(BalancedPowerSchemeGuid);
-                                else if (ryzenAdjCommandValueString == WinPowerValueHighPerformance) PowerSetActiveOverlayScheme(HighPerformancePowerSchemeGuid);
+                                // ignore return value - fire and forget system calls
+                                if (ryzenAdjCommandValueString == WinPowerValueSaver) _ = PowerSetActiveOverlayScheme(PowerSaverPowerSchemeGuid);
+                                else if (ryzenAdjCommandValueString == WinPowerValueBalanced) _ = PowerSetActiveOverlayScheme(BalancedPowerSchemeGuid);
+                                else if (ryzenAdjCommandValueString == WinPowerValueHighPerformance) _ = PowerSetActiveOverlayScheme(HighPerformancePowerSchemeGuid);
                             }
                             else if (ryzenAdjCommandString.Contains("Win-CPU"))
                             {

@@ -94,11 +94,9 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             {
                 try
                 {
-                    foreach (ManagementObject queryObj in motherboardSearcher.Get())
-                    {
-                        return GetAvailability(Convert.ToInt32(queryObj["Availability"]));
-                    }
-                    return "";
+                    var result = motherboardSearcher.Get().Cast<ManagementObject>().FirstOrDefault();
+                    if (result == null) return "";
+                    return GetAvailability(Convert.ToInt32(result[nameof(Availability)]));
                 }
                 catch (ManagementException)
                 {
@@ -113,11 +111,8 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             {
                 try
                 {
-                    foreach (ManagementObject queryObj in baseboardSearcher.Get())
-                    {
-                        return queryObj["HostingBoard"].ToString() == "True";
-                    }
-                    return false;
+                    var result = baseboardSearcher.Get().Cast<ManagementObject>().FirstOrDefault();
+                    return result != null && Convert.ToBoolean(result[nameof(HostingBoard)]);
                 }
                 catch (ManagementException)
                 {
@@ -270,11 +265,8 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             {
                 try
                 {
-                    foreach (ManagementObject queryObj in baseboardSearcher.Get())
-                    {
-                        return queryObj["Removable"].ToString() == "True";
-                    }
-                    return false;
+                    var result = baseboardSearcher.Get().Cast<ManagementObject>().FirstOrDefault();
+                    return result != null && Convert.ToBoolean(result[nameof(Removable)]);
                 }
                 catch (ManagementException)
                 {
@@ -289,11 +281,8 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             {
                 try
                 {
-                    foreach (ManagementObject queryObj in baseboardSearcher.Get())
-                    {
-                        return queryObj["Replaceable"].ToString() == "True";
-                    }
-                    return false;
+                    var result = baseboardSearcher.Get().Cast<ManagementObject>().FirstOrDefault();
+                    return result != null && Convert.ToBoolean(result[nameof(Replaceable)]);
                 }
                 catch (ManagementException)
                 {
@@ -469,14 +458,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 ObjectQuery query = new ObjectQuery("SELECT * FROM BatteryStatus");
 
                 using ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
-                foreach (ManagementObject obj in searcher.Get().Cast<ManagementObject>())
-                {
-                    decimal chargeRate = Convert.ToDecimal(obj["ChargeRate"]);
-                    decimal dischargeRate = Convert.ToDecimal(obj["DischargeRate"]);
-                    return chargeRate > 0 ? chargeRate : -dischargeRate;
-                }
-
-                return 0;
+                var result = searcher.Get().Cast<ManagementObject>().FirstOrDefault();
+                if (result == null) return 0;
+                decimal chargeRate = Convert.ToDecimal(result["ChargeRate"]);
+                decimal dischargeRate = Convert.ToDecimal(result["DischargeRate"]);
+                return chargeRate > 0 ? chargeRate : -dischargeRate;
             }
             catch (ManagementException)
             {

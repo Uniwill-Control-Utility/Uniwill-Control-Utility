@@ -8,7 +8,6 @@ using System.Management;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Forms;
 using System.Windows.Threading;
 using Microsoft.Extensions.Logging;
 using Uniwill_Control_Utility.Properties;
@@ -16,7 +15,6 @@ using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Abstractions.Controls;
-using System.Diagnostics.Eventing.Reader;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
 
@@ -88,7 +86,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             checkUpdate();
         }
-        private string GetAssemblyVersion()
+        private static string GetAssemblyVersion()
         {
             return System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? String.Empty;
         }

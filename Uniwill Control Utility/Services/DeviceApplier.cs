@@ -187,7 +187,7 @@ namespace Uniwill_Control_Utility.Services
                             2 => "Curve", // Auto Curve (no-op in applier)
                             _ => "Rpm"
                         };
-                        await ApplyFlydigiFanAsync(fanMode, saved.ManualGear > 0 ? (byte)saved.ManualGear : (byte?)null, saved.ManualRpm > 0 ? (ushort?)saved.ManualRpm : null);
+                        await ApplyFlydigiFanAsync(fanMode, saved.ManualGear > 0 ? (byte)saved.ManualGear : null, saved.ManualRpm > 0 ? (ushort?)saved.ManualRpm : null);
                         await ApplyFlydigiRgbAsync(saved.RgbMode, saved.R, saved.G, saved.B, saved.Brightness);
                     }
                     catch (Exception ex)
@@ -370,12 +370,15 @@ namespace Uniwill_Control_Utility.Services
             }
         }
 
-        private static EcFanCurve BuildCurveFromSettings(string presetName, int[] duties)
+        private static EcFanCurve BuildCurveFromSettings(string presetName, int[]? duties)
         {
             var curve = new EcFanCurve { Name = presetName };
             curve.Duties.Clear();
-            foreach (var d in duties)
-                curve.Duties.Add(Math.Clamp(d, 0, 100));
+            if (duties != null)
+            {
+                foreach (var d in duties)
+                    curve.Duties.Add(Math.Clamp(d, 0, 100));
+            }
             return curve;
         }
 
@@ -589,7 +592,7 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>
         /// Sends keyboard HID commands directly to the device.
         /// </summary>
-        private void ApplyKeyboardHid(bool perKeyMode, int brightness, KeyboardEffect effect,
+        private static void ApplyKeyboardHid(bool perKeyMode, int brightness, KeyboardEffect effect,
             byte effectSpeed, KeyboardDirection direction, byte r, byte g, byte b,
             string multiColors, string? perKeyColors,
             byte restColorR, byte restColorG, byte restColorB, bool touchReactive = false)
@@ -978,7 +981,7 @@ namespace Uniwill_Control_Utility.Services
             return copy;
         }
 
-        private void CopyFlydigiSettings(Bs2ProSettings from, Bs2ProSettings to)
+        private static void CopyFlydigiSettings(Bs2ProSettings from, Bs2ProSettings to)
         {
             to.FanMode = from.FanMode;
             to.ManualGear = from.ManualGear;
@@ -1017,7 +1020,7 @@ namespace Uniwill_Control_Utility.Services
             };
         }
 
-        private void CopyWatercoolerSettings(WaterCoolerSettings from, WaterCoolerSettings to)
+        private static void CopyWatercoolerSettings(WaterCoolerSettings from, WaterCoolerSettings to)
         {
             to.PumpVoltage = from.PumpVoltage;
             to.FanSpeed = from.FanSpeed;

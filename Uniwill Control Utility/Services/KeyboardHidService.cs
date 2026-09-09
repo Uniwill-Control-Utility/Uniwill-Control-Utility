@@ -35,7 +35,6 @@ namespace Uniwill_Control_Utility.Services
         // Zone masks (used in 0x08 brightness/mode reports)
         private const byte ZoneMaskKeyboard = 0x02;
         private const byte ZoneMaskLightBar = 0x22;
-        private const byte ZoneMaskLogo = 0x23;
 
         // HID feature report command types
         private const byte CMD_KEYBOARD_OFF = 0x09;  // Keyboard-only special off command
@@ -73,7 +72,7 @@ namespace Uniwill_Control_Utility.Services
         ///
         /// Numpad rows 1-4 use cols 15-18 (shifted -1 from row 5 which uses 16-19).
         /// </summary>
-        private static readonly Dictionary<int, (int Row, int Col)> ZoneToIteMapping = new()
+        private static readonly Dictionary<int, (int Row, int Col)> zoneToIteMapping = new()
         {
             // === ITE Row 5 (top): Esc + F1-F12 + PrtSc/Ins/Del + Home/End/PgUp/PgDn ===
             // Reference grid: X=0,36,72,...,690 → cols 0-19
@@ -272,14 +271,6 @@ namespace Uniwill_Control_Utility.Services
         #endregion
 
        #region Structs
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct HidOutputReport
-        {
-            public byte ReportId;
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 65)]
-            public byte[] Data;
-        }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct SpDeviceInterfaceData
@@ -572,7 +563,7 @@ namespace Uniwill_Control_Utility.Services
 
             lock (_lock)
             {
-                byte clampedSpeed = (byte)Math.Clamp(speed, (byte)0, ITE_MAX_SPEED);
+                byte clampedSpeed = Math.Clamp(speed, (byte)0, ITE_MAX_SPEED);
                 byte directionByte = (byte)direction;
 
                 // Turn off any cached effect/color from a previous session first.
@@ -817,7 +808,7 @@ namespace Uniwill_Control_Utility.Services
             lock (_lock)
             {
                 // Clamp speed to 0-ITE_MAX_SPEED range
-                byte clampedSpeed = (byte)Math.Clamp(speed, (byte)0, ITE_MAX_SPEED);
+                byte clampedSpeed = Math.Clamp(speed, (byte)0, ITE_MAX_SPEED);
                 byte directionByte = (byte)direction;
 
                 // For variant effects (TouchAurora, TouchSpark), the ITE
@@ -1161,7 +1152,7 @@ namespace Uniwill_Control_Utility.Services
                 foreach (var kvp in colorsDict)
                 {
                     int zoneIndex = kvp.Key;
-                    if (ZoneToIteMapping.TryGetValue(zoneIndex, out var mapping))
+                    if (zoneToIteMapping.TryGetValue(zoneIndex, out var mapping))
                     {
                         rows[mapping.Row, mapping.Col] = kvp.Value;
                     }
@@ -1207,7 +1198,7 @@ namespace Uniwill_Control_Utility.Services
                 var mappedZones = new List<string>();
                 foreach (var kvp in colorsDict)
                 {
-                    if (ZoneToIteMapping.TryGetValue(kvp.Key, out var m))
+                    if (zoneToIteMapping.TryGetValue(kvp.Key, out var m))
                         mappedZones.Add($"zone{kvp.Key}->r{m.Row},c{m.Col}");
                 }
                 DebugLog($"[KBD-HID] Per-key colors sent ({colorsDict.Count} zones, {mappedZones.Count} mapped, {ITE_NR_ROWS} rows)");
@@ -1239,7 +1230,7 @@ namespace Uniwill_Control_Utility.Services
                 byte[] buffer = new byte[FEATURE_REPORT_SIZE];
                 buffer[0] = reportId;
 
-                bool success = HidD_GetFeature(_keyboardHandle, buffer, buffer.Length);
+                bool success = HidD_GetFeature(_keyboardHandle!, buffer, buffer.Length);
                 if (success)
                 {
                     DebugLog($"[KBD-HID] ReadFeatureReport(0x{reportId:X2}) = {string.Join(", ", buffer.Select(b => $"0x{b:X2}"))}");
@@ -1392,7 +1383,7 @@ namespace Uniwill_Control_Utility.Services
                 return;
 
             int clampedBrightness = Math.Clamp(brightness, 0, 100);
-            byte clampedSpeed = (byte)Math.Clamp(speed, (byte)0, ITE_MAX_SPEED);
+            byte clampedSpeed = Math.Clamp(speed, (byte)0, ITE_MAX_SPEED);
 
             SendReportHandle(_lightBarHandle, new byte[]
             {

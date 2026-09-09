@@ -251,13 +251,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                 await Task.Run(() => Game_Manager.installedGames = Game_Manager.syncGame_Library(true));
 
                 cbxPowerPreset.Items.Add("Default");
-                foreach (GameLauncherItem item in Game_Manager.installedGames) cbxPowerPreset.Items.Add(item.gameName);
+                foreach (GameLauncherItem item in Game_Manager.installedGames ?? Enumerable.Empty<GameLauncherItem>()) cbxPowerPreset.Items.Add(item.gameName);
 
                 cbxPowerPreset.SelectedIndex = 0;
 
                 IEnumerable<string> presetNames = adaptivePresetManager.GetPresetNames();
 
-                foreach (GameLauncherItem item in Game_Manager.installedGames)
+                foreach (GameLauncherItem item in Game_Manager.installedGames ?? Enumerable.Empty<GameLauncherItem>())
                 {
                     bool containsName = false;
 
@@ -364,7 +364,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool _isUpdatingPresetSelection;
 
         // Window classes that are NOT games (browsers, notifications, taskbar, etc.)
-        private static readonly HashSet<string> ExcludedWindowClasses = new(StringComparer.OrdinalIgnoreCase)
+        private static readonly HashSet<string> _excludedWindowClasses = new(StringComparer.OrdinalIgnoreCase)
         {
             // Browsers
             "Chrome_WidgetWin_1",      // Chrome/Edge/Electron windows
@@ -580,7 +580,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (_isUpdatingPresetSelection)
                 return;
 
-            string presetName = (sender as ComboBox).SelectedItem as string;
+            string? presetName = (sender as ComboBox)?.SelectedItem as string;
+            if (presetName == null)
+                return;
             loadPreset(presetName);
         }
 
@@ -995,7 +997,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 await Task.Run(() => Game_Manager.installedGames = Game_Manager.syncGame_Library(true));
                 cbxPowerPreset.Items.Clear();
                 cbxPowerPreset.Items.Add("Default");
-                foreach (GameLauncherItem item in Game_Manager.installedGames) cbxPowerPreset.Items.Add(item.gameName);
+                foreach (GameLauncherItem item in Game_Manager.installedGames ?? Enumerable.Empty<GameLauncherItem>()) cbxPowerPreset.Items.Add(item.gameName);
                 cbxPowerPreset.SelectedIndex = 0;
             }
             catch (Exception ex)
@@ -1006,7 +1008,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void btnSave_Click(object sender, RoutedEventArgs e)
         {
-            string presetName = cbxPowerPreset.SelectedItem.ToString();
+            string presetName = cbxPowerPreset.SelectedItem?.ToString() ?? DefaultProfileName;
             savePreset(presetName);
 
             // Sync active settings so other pages can detect the change immediately
@@ -1122,7 +1124,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                         Dispatcher.Invoke(() =>
                         {
-                            selectedGameName = cbxPowerPreset.SelectedItem.ToString();
+                            selectedGameName = cbxPowerPreset.SelectedItem?.ToString() ?? string.Empty;
                         });
 
                         if (selectedGameName != runningGameName)
@@ -1570,7 +1572,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private string BuildAmdCpuCommand(int sustained, int boost, int tjMax,
+        private static string BuildAmdCpuCommand(int sustained, int boost, int tjMax,
             bool coUnified, int coUnifiedValue, int coCcd0, int coCcd1)
         {
             var parts = new System.Collections.Generic.List<string>();
@@ -1809,7 +1811,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         int gameMissingCount = 0;
         const int maxGameMisses = 2;
 
-        private bool AutoSwitchEnabled(GameLauncherItem item)
+        private static bool AutoSwitchEnabled(GameLauncherItem item)
         {
             var preset = adaptivePresetManager.GetPreset(item.gameName);
             return preset?.isAutoSwitch ?? true;
@@ -1818,7 +1820,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// <summary>Pass 1: iterate games and processes to match executable paths.</summary>
         private string? DetectGameByProcess()
         {
-            foreach (GameLauncherItem item in installedGames)
+            foreach (GameLauncherItem item in installedGames ?? Enumerable.Empty<GameLauncherItem>())
             {
                 if (string.IsNullOrEmpty(item.path))
                     continue;
@@ -1860,7 +1862,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 classNameSb.Clear();
                 GetClassName(hWnd, classNameSb, classNameSb.Capacity);
-                if (ExcludedWindowClasses.Contains(classNameSb.ToString()))
+                if (_excludedWindowClasses.Contains(classNameSb.ToString()))
                     return true;
 
                 int length = GetWindowTextLength(hWnd);
@@ -1874,7 +1876,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 GetWindowText(hWnd, titleSb, titleSb.Capacity);
                 string windowTitle = titleSb.ToString().Trim();
 
-                foreach (GameLauncherItem item in installedGames)
+                foreach (GameLauncherItem item in installedGames ?? Enumerable.Empty<GameLauncherItem>())
                 {
                     if (windowTitle.Contains(item.gameName, StringComparison.OrdinalIgnoreCase)
                         && AutoSwitchEnabled(item))
@@ -2174,10 +2176,12 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>Loads the custom curve profile from Bs2Pro settings, falling back to Balanced.</summary>
-        private static FlydigiFanCurveProfile LoadCustomCurveProfile(FlydigiCoolerService flydigiService)
+        private static FlydigiFanCurveProfile LoadCustomCurveProfile(FlydigiCoolerService? flydigiService)
         {
             try
             {
+                if (flydigiService == null)
+                    return FlydigiFanCurveProfile.CreateBalanced();
                 var bs2Settings = flydigiService.GetSettings();
                 if (!string.IsNullOrEmpty(bs2Settings.CustomCurveJson))
                 {
@@ -2831,7 +2835,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// Maps the Light Bar ComboBox index to the HID effect byte value.
         /// Static=0x01, Breathing=0x02, Wave=0x03, Loading=0x04, Marquee=0x05, Meteor=0x06.
         /// </summary>
-        private byte GetLbEffectByte(int selectedIndex)
+        private static byte GetLbEffectByte(int selectedIndex)
         {
             return (byte)(selectedIndex + 1);
         }
@@ -2839,7 +2843,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// <summary>
         /// Converts the UI speed value (0-11, slow?fast) to HID speed (0-11, fast?slow).
         /// </summary>
-        private byte GetLbHidSpeed(int uiSpeed)
+        private static byte GetLbHidSpeed(int uiSpeed)
         {
             return (byte)(11 - uiSpeed);
         }
@@ -3250,7 +3254,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>Gap 1: Restores EC Fan custom duties from per-game profile into FanControlSettings.</summary>
-        private void ApplyEcFanCustomDuties(string unifiedPreset, int[]? unifiedDuties,
+        private static void ApplyEcFanCustomDuties(string unifiedPreset, int[]? unifiedDuties,
             string cpuPreset, int[]? cpuDuties,
             string gpuPreset, int[]? gpuDuties)
         {

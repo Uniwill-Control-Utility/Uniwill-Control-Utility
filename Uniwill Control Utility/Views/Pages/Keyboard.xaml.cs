@@ -309,7 +309,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 DispatcherPriority.Loaded);
         }
 
-        private void WalkAndHideChevron(DependencyObject parent)
+        private static void WalkAndHideChevron(DependencyObject parent)
         {
             int count = VisualTreeHelper.GetChildrenCount(parent);
             for (int i = 0; i < count; i++)
@@ -365,8 +365,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                         _hidService.TurnOff();
                         Thread.Sleep(100);
 
-                        bool powerOn = (bool)Application.Current.Dispatcher.Invoke(
-                            () => tsKeyboardPower.IsChecked);
+                        bool powerOn = Application.Current.Dispatcher.Invoke(
+                            () => tsKeyboardPower.IsChecked ?? false);
 
                         if (powerOn)
                         {
@@ -374,18 +374,18 @@ namespace Uniwill_Control_Utility.Views.Pages
                                 () => BrightnessSlider.Value);
                             int brightnessPercent = (brightnessLevel * 100) / 7;
 
-                            var color = (System.Windows.Media.Color)Application.Current.Dispatcher.Invoke(
+                            var color = Application.Current.Dispatcher.Invoke(
                                 () => ColorPicker.SelectedColor);
 
-                            KeyboardEffect effect = (KeyboardEffect)Application.Current.Dispatcher.Invoke(
+                            KeyboardEffect effect = Application.Current.Dispatcher.Invoke(
                                 () => cmbEffect.SelectedItem is KeyboardEffect e ? e : KeyboardEffect.Static);
 
-                            byte speed = SliderToHidSpeed(DefaultEffectSpeed);
+                            byte speed = SliderToHidSpeed(defaultEffectSpeed);
 
                             // Combine power-on and effect into one sequence to avoid
                             // a visible flash of intermediate Static color.
-                            bool touchReactive = (bool)Application.Current.Dispatcher.Invoke(
-                                () => tsTouchReactive.IsChecked);
+                            bool touchReactive = Application.Current.Dispatcher.Invoke(
+                                () => tsTouchReactive.IsChecked ?? false);
                             _hidService.TurnOnWithEffect(
                                 color.R, color.G, color.B, brightnessPercent,
                                 effect, speed, _currentDirection, touchReactive);
@@ -539,7 +539,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         };
 
         /// <summary>Default slider speed (1-10) used when switching from per-key to effects mode.</summary>
-        private const int DefaultEffectSpeed = 5;
+        private const int defaultEffectSpeed = 5;
 
         private void CmbEffect_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -1077,14 +1077,14 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// GetLastInputInfo is a lightweight Win32 call — polling every second
         /// has negligible CPU cost and keeps the turn-off time accurate.
         /// </summary>
-        private static readonly TimeSpan IdleCheckInterval = TimeSpan.FromSeconds(1);
+        private static readonly TimeSpan idleCheckInterval = TimeSpan.FromSeconds(1);
 
         private void InitializeIdleTimer()
         {
             cmbIdleTimer.ItemsSource = s_idleTimerOptions.Select(o => o.Label).ToList();
             cmbIdleTimer.SelectedIndex = 9;
 
-            _idleCheckTimer.Interval = IdleCheckInterval;
+            _idleCheckTimer.Interval = idleCheckInterval;
 
             _idleCheckTimer.Tick += (s, e) =>
             {

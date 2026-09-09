@@ -53,59 +53,6 @@ namespace Uniwill_Control_Utility.Views.Controls
         // 16px right-edge margin so last point isn't glued to border
         private const double RightMarginPx = 16;
 
-        // WPF-UI resource key names (Fluent theme brushes)
-        private const string ResAccentFillColorDefaultBrush = "AccentFillColorDefaultBrush";
-        private const string ResControlStrongFillColorDefaultBrush = "ControlStrongFillColorDefaultBrush";
-        private const string ResTextFillColorPrimaryBrush = "TextFillColorPrimaryBrush";
-        private const string ResAccentTextFillColorPrimaryBrush = "AccentTextFillColorPrimaryBrush";
-        private const string ResTextOnAccentFillColorPrimaryBrush = "TextOnAccentFillColorPrimaryBrush";
-        private const string ResAccentFillColorPrimaryBrush = "AccentFillColorPrimaryBrush";
-        private const string ResCardBackgroundFillColorDefaultBrush = "CardBackgroundFillColorDefaultBrush";
-
-        // Drawing constants
-        private const double GridLineOpacity = 0.12;
-        private const double StockCurveOpacity = 0.125;
-        private const double SelectionHighlightOpacity = 0.25;
-        private const double CrosshairDashOpacity = 0.35;
-        private const double ExtensionLineOpacity = 0.5;
-        private const double CrosshairOpacity = 0.6;
-        private const double CrosshairLabelOpacity = 0.75;
-        private const double UnselectedPointOpacity = 0.8;
-        private const double StockCurveStrokeThickness = 1.5;
-        private const double CurveStrokeThickness = 2.0;
-        private const double PointDiameter = 8.0;
-        private const double PointRadius = 4.0;
-        private const double AxisLabelFontSize = 10.0;
-        private const double AxisLabelVerticalOffset = 5.0;
-        private const double CrosshairStrokeThickness = 1.0;
-        private const double CrosshairDashSize = 4.0;
-        private const double CrosshairLabelFontSize = 10.0;
-        private const double CrosshairLabelXOffset = 6.0;
-        private const double CrosshairLabelYOffset = 4.0;
-        private const int PointProximityThresholdPx = 6;
-        private const int GridFreqStep = 100;
-        private const int TooltipFontSize = 12;
-        private const int TooltipSecondaryFontSize = 11;
-        private const int TooltipVerticalOffset = 12;
-        private const int TooltipMinEdgeMargin = 2;
-        private const int MovementTooltipPaddingH = 6;
-        private const int MovementTooltipPaddingV = 2;
-        private const int MovementTooltipLine1FontSize = 12;
-        private const int MovementTooltipLine2FontSize = 11;
-        private const int ShiftEnterDoublePressMs = 500;
-        private const int ResizeDebounceMs = 300;
-        private const int LiveFreqTimerSeconds = 2;
-        private const int MinLayoutDimension = 10;
-        private const int YAxisLabelHeightBreakpointHigh = 680;
-        private const int YAxisLabelHeightBreakpointLow = 500;
-        private const int XAxisWidthBreakpointNarrow = 480;
-        private const int XAxisWidthBreakpointMedium = 720;
-        private const int XAxisIncrementNarrow = 100;
-        private const int XAxisIncrementMedium = 50;
-        private const int XAxisIncrementWide = 25;
-        private const int YAxisIncrementTall = 100;
-        private const int YAxisIncrementShort = 200;
-
         // Visual state
         private int? _dragIndex = null;
         private int? _dragStartIndex = null;       // Point clicked to start drag (null = no drag pending)
@@ -269,7 +216,7 @@ namespace Uniwill_Control_Utility.Views.Controls
 
             // Debug: log stock curve range and count.
             DiagnosticLogger.LogInfo($"VfCurveEditor: stock curve loaded — {_stockCurve.Count} points, voltages {stockVolts.Min()}-{stockVolts.Max()} mV");
-            DiagnosticLogger.LogInfo($"VfCurveEditor: live curve — {selected.Count} editor points, indices {selected[0].Index}-{selected.Last().Index}");
+            DiagnosticLogger.LogInfo($"VfCurveEditor: live curve — {selected.Count} editor points, indices {selected[0].Index}-{selected[^1].Index}");
 
             _allPoints.Clear();
             _editorPoints.Clear();
@@ -744,7 +691,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             }
 
             // Ensure crosshair elements exist
-            var baseBrush = accentBrush;
+            var baseBrush = accentBrush!;
             var dashBrush = new SolidColorBrush(baseBrush.Color) { Opacity = 0.35 };
 
             if (_crosshairH == null)
@@ -850,7 +797,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             {
                 _rangeHighlight = new Rectangle
                 {
-                    Fill = new SolidColorBrush(accentBrush.Color) { Opacity = 0.25 },
+                    Fill = new SolidColorBrush(accentBrush!.Color) { Opacity = 0.25 },
                     IsHitTestVisible = false
                 };
                 _canvas.Children.Insert(0, _rangeHighlight);
@@ -862,7 +809,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             EnsureSelectionVisuals();
 
             // Keep highlight brush in sync with current accent color (theme-reactive).
-            _rangeHighlight.Fill = new SolidColorBrush(accentBrush.Color) { Opacity = 0.25 };
+            _rangeHighlight.Fill = new SolidColorBrush(accentBrush!.Color) { Opacity = 0.25 };
 
             double w = _canvas.ActualWidth;
             double h = _canvas.ActualHeight;
@@ -1352,7 +1299,6 @@ namespace Uniwill_Control_Utility.Views.Controls
                         CurveChanged?.Invoke(this, EventArgs.Empty);
                         _lastShiftEnterTime = null;
                         e.Handled = true;
-                        return;
                     }
                     _lastShiftEnterTime = now;
                     DiagnosticLogger.LogInfo($"VfCurveEditor: Shift+Enter — press again within 500ms to flatten {_rangeSelection.Count} points");

@@ -65,7 +65,7 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
 
         public static AMDPawnIo LoadModuleFromResource(Assembly assembly, string resourceName)
         {
-            if (assembly == null) throw new ArgumentNullException(nameof(assembly));
+            ArgumentNullException.ThrowIfNull(assembly);
             if (string.IsNullOrWhiteSpace(resourceName))
                 throw new ArgumentException("Resource name must not be empty.", nameof(resourceName));
 
@@ -153,8 +153,7 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
         /// </summary>
         public long[] Execute(string name, long[] input, int outLength)
         {
-            if (outLength < 0)
-                throw new ArgumentOutOfRangeException(nameof(outLength));
+            ArgumentOutOfRangeException.ThrowIfNegative(outLength);
 
             input ??= Array.Empty<long>();
 
@@ -181,8 +180,7 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
         /// </summary>
         public int ExecuteHr(string name, long[] inBuffer, uint inSize, long[] outBuffer, uint outSize, out uint returnSize)
         {
-            if (name == null)
-                throw new ArgumentNullException(nameof(name));
+            ArgumentNullException.ThrowIfNull(name);
 
             inBuffer ??= Array.Empty<long>();
             outBuffer ??= Array.Empty<long>();
@@ -305,6 +303,7 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
             Execute = DeviceType | IoctlExecuteFn
         }
 
+        [Flags]
         private enum FileAccess : uint
         {
             GENERIC_READ = 0x80000000,

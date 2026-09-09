@@ -39,7 +39,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private FanControlSettings? _savedCustomFanSettings;
 
         // Diagnostic logging (visible in Visual Studio Output / debug console)
-        private void DebugLog(string message)
+        private static void DebugLog(string message)
         {
             Debug.WriteLine($"[Presets] {message}");
         }
@@ -53,8 +53,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         private int _profileTjMax = 95;
         private int _profileCoCcd0 = 0;
         private int _profileCoCcd1 = 0;
-        private bool _profileCoUnified = false;
-        private int _profileCoUnifiedValue = 0;
         private double _profileGpuTgp = 150;
         private bool _profileGpuDb = false;
         private double _profileGpuDbOffset = 0;
@@ -175,7 +173,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             // Update status from stored values (sliders may be in collapsed panel)
-            updateStatus(_currentProfile);
+            updateStatus();
 
             // Update labels if custom panel is visible
             if (customScroll.Visibility == Visibility.Visible)
@@ -636,7 +634,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             // Update status display
-            updateStatus(profile);
+            updateStatus();
 
             // Save selection
             Settings.Default.presetProfile = profile;
@@ -734,7 +732,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             updateAllLabels();
         }
 
-        private void updateStatus(string _profile)
+        private void updateStatus()
         {
             // Update GPU clock offset display from slider values
             if (sdNvidia.Visibility == Visibility.Visible)
@@ -889,8 +887,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                     _profileTjMax = (int)sdTjMax.Value;
                     _profileCoCcd0 = (int)sdCoCcd0.Value;
                     _profileCoCcd1 = (int)sdCoCcd1.Value;
-                    _profileCoUnified = rbCoUnified.IsChecked == true;
-                    _profileCoUnifiedValue = (int)sdCoUnified.Value;
                     _profileIntelPl1 = sdIntelPl1.Value;
                     _profileIntelPl2 = sdIntelPl2.Value;
                      _profileGpuTgp = sdNvPower.Value;
@@ -899,7 +895,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
 
                 // Update status after apply
-                updateStatus(_currentProfile);
+                updateStatus();
             }
             catch (Exception ex)
             {
@@ -957,8 +953,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             _profileTjMax = (int)sdTjMax.Value;
             _profileCoCcd0 = (int)sdCoCcd0.Value;
             _profileCoCcd1 = (int)sdCoCcd1.Value;
-            _profileCoUnified = rbCoUnified.IsChecked == true;
-            _profileCoUnifiedValue = (int)sdCoUnified.Value;
             _profileIntelPl1 = sdIntelPl1.Value;
             _profileIntelPl2 = sdIntelPl2.Value;
             _profileGpuTgp = sdNvPower.Value;
@@ -1053,8 +1047,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _profileTjMax = (int)preset.CpuTjMax;
                 _profileCoCcd0 = (int)preset.CpuCoCcd0;
                 _profileCoCcd1 = (int)preset.CpuCoCcd1;
-                _profileCoUnified = preset.CpuCoUnified;
-                _profileCoUnifiedValue = (int)preset.CpuCoUnifiedValue;
                 _profileIntelPl1 = preset.IntelPl1;
                 _profileIntelPl2 = preset.IntelPl2;
                 _profileGpuTgp = preset.GpuTgp;
@@ -1114,7 +1106,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Load the new slot's preset if it has data
             LoadCustomPreset(newSlot);
             updateAllLabels();
-            updateStatus("Custom");
+            updateStatus();
             updateRadioButtonStyles();
         }
 
