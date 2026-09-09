@@ -148,7 +148,7 @@ namespace Uniwill_Control_Utility.Services
         {
             if (File.Exists(_filePath))
             {
-                string json = File.ReadAllText(_filePath);
+                string json = File.ReadAllText(_filePath, Encoding.UTF8);
                 _presets = JsonConvert.DeserializeObject<Dictionary<string, AdaptivePreset>>(json)
                     ?? new Dictionary<string, AdaptivePreset>();
             }
@@ -162,7 +162,7 @@ namespace Uniwill_Control_Utility.Services
         private void SavePresets()
         {
             string json = JsonConvert.SerializeObject(_presets, Newtonsoft.Json.Formatting.Indented);
-            File.WriteAllText(_filePath, json);
+            File.WriteAllText(_filePath, json, Encoding.UTF8);
         }
     }
 }

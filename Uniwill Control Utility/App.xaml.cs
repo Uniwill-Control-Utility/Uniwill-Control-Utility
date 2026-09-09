@@ -307,7 +307,7 @@ namespace Uniwill_Control_Utility
                 }
                 catch (Exception ex)
                 {
-                    Log.Warning(ex, "SkuResolver.Initialize() failed — falling back to generic limits");
+                    Log.Warning(ex, "SkuResolver.Initialize() failed - falling back to generic limits");
                 }
 
                 string path = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location)!;

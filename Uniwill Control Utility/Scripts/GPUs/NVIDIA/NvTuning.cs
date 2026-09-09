@@ -28,6 +28,20 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         private const int RampStartMv = 725;
         private const int VfToleranceMHz = 35;
 
+        // Power limit range (watts)
+        private const int MinPowerLimitWatts = 5;
+        private const int MaxPowerLimitWatts = 175;
+        private const int DefaultPowerLimitFallbackWatts = 80;
+
+        // Undervolt curve range limits
+        private const int MinUndervoltVoltageMv = 600;
+        private const int MaxUndervoltVoltageMv = 1300;
+        private const int MinUndervoltClockMhz = 300;
+        private const int MaxUndervoltClockMhz = 4500;
+
+        // Unit conversion factors
+        private const int Kilo = 1000;
+
         public readonly record struct PowerLimitInfo(int MinWatts, int CurrentWatts, int DefaultWatts, int MaxWatts);
 
         public readonly record struct ClockInfo(
@@ -82,12 +96,12 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
                 var coreClock = new PerformanceStates20ClockEntryV1(
                     PublicClockDomain.Graphics,
-                    new PerformanceStates20ParameterDelta(core * 1000)
+                    new PerformanceStates20ParameterDelta(core * Kilo)
                 );
 
                 var memoryClock = new PerformanceStates20ClockEntryV1(
                     PublicClockDomain.Memory,
-                    new PerformanceStates20ParameterDelta(memory * 1000)
+                    new PerformanceStates20ParameterDelta(memory * Kilo)
                 );
 
                 var clocks = new[] { coreClock, memoryClock };
@@ -107,8 +121,10 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
                 return 1;
             }
-            catch
+            catch (Exception ex)
             {
+                // NvAPI may throw SEHException or AccessViolationException on driver errors.
+                DiagnosticLogger.LogInfo($"SetClocks: EXCEPTION {ex.GetType().Name}: {ex.Message}");
                 return -1;
             }
         }
@@ -117,9 +133,9 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         {
             try
             {
-                if (totalWatts < 5 || totalWatts > 175)
+                if (totalWatts < MinPowerLimitWatts || totalWatts > MaxPowerLimitWatts)
                 {
-                    DiagnosticLogger.LogInfo($"SetPowerLimit({totalWatts}W, db={dbOffset}W): out of range 5-175W, skipped");
+                    DiagnosticLogger.LogInfo($"SetPowerLimit({totalWatts}W, db={dbOffset}W): out of range {MinPowerLimitWatts}-{MaxPowerLimitWatts}W, skipped");
                     return 0;
                 }
 
@@ -144,8 +160,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 }
                 else
                 {
-                    // Fallback: assume 80W default (matches UCC fallback).
-                    ctgpOffset = Math.Clamp(totalWatts - 80, 0, 255);
+                    // Fallback: assume DefaultPowerLimitFallbackWatts default (matches UCC fallback).
+                    ctgpOffset = Math.Clamp(totalWatts - DefaultPowerLimitFallbackWatts, 0, 255);
                     DiagnosticLogger.LogInfo($"SetPowerLimit: NVML default unavailable, assuming 80W ? cTGP offset={ctgpOffset}");
                 }
 
@@ -213,10 +229,10 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 }
 
                 info = new PowerLimitInfo(
-                    (int)(minMw / 1000),
-                    (int)(currentMw / 1000),
-                    (int)(defaultMw / 1000),
-                    (int)(maxMw / 1000)
+                    (int)(minMw / Kilo),
+                    (int)(currentMw / Kilo),
+                    (int)(defaultMw / Kilo),
+                    (int)(maxMw / Kilo)
                 );
 
                 return true;
@@ -262,8 +278,10 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                // NVML P/Invoke may throw SEHException on GPU removal or driver errors.
+                DiagnosticLogger.LogInfo($"TryGetClocks: EXCEPTION {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -300,8 +318,10 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                     return true;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                // NVML P/Invoke may throw SEHException on GPU removal or driver errors.
+                DiagnosticLogger.LogInfo($"TryGetClockOffsets: EXCEPTION {ex.GetType().Name}: {ex.Message}");
             }
 
             return false;
@@ -347,8 +367,10 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                     ? name.ToString()
                     : string.Empty;
             }
-            catch
+            catch (Exception ex)
             {
+                // NVML P/Invoke may throw SEHException on GPU removal or driver errors.
+                DiagnosticLogger.LogInfo($"GetGpuName: EXCEPTION {ex.GetType().Name}: {ex.Message}");
                 return string.Empty;
             }
         }
@@ -373,8 +395,10 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
                 return result == Nvml.NVML_SUCCESS ? 1 : -1;
             }
-            catch
+            catch (Exception ex)
             {
+                // NVML P/Invoke may throw SEHException on GPU removal or driver errors.
+                DiagnosticLogger.LogInfo($"SetMaxGPUClock: EXCEPTION {ex.GetType().Name}: {ex.Message}");
                 return -1;
             }
         }
@@ -393,10 +417,12 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
                 PrivateClockBoostLockV2 data = GPUApi.GetClockBoostLock(internalGpu.Handle);
 
-                return (int)data.ClockBoostLocks[0].VoltageInMicroV / 1000;
+                return (int)data.ClockBoostLocks[0].VoltageInMicroV / Kilo;
             }
-            catch
+            catch (Exception ex)
             {
+                // NvAPI may throw SEHException or AccessViolationException on driver errors.
+                DiagnosticLogger.LogInfo($"GetMaxGPUCLock: EXCEPTION {ex.GetType().Name}: {ex.Message}");
                 return -1;
             }
         }
@@ -444,16 +470,18 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                     {
                         points.Add(new VfPoint(
                             i,
-                            (int)(voltageUv / 1000),
-                            (int)(frequencyKhz / 1000)
+                            (int)(voltageUv / Kilo),
+                            (int)(frequencyKhz / Kilo)
                         ));
                     }
                 }
 
                 return points.Count > 0;
             }
-            catch
+            catch (Exception ex)
             {
+                // NvAPI may throw SEHException or AccessViolationException on driver errors.
+                DiagnosticLogger.LogInfo($"TryGetVfCurve: EXCEPTION {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -513,8 +541,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         public static int SetUndervoltCurveFromDefault(int requestedMaxVoltageMv, int requestedMaxClockMhz)
         {
-            if (requestedMaxVoltageMv < 600 || requestedMaxVoltageMv > 1300) return 0;
-            if (requestedMaxClockMhz < 300 || requestedMaxClockMhz > 4500) return 0;
+            if (requestedMaxVoltageMv < MinUndervoltVoltageMv || requestedMaxVoltageMv > MaxUndervoltVoltageMv) return 0;
+            if (requestedMaxClockMhz < MinUndervoltClockMhz || requestedMaxClockMhz > MaxUndervoltClockMhz) return 0;
 
             try
             {
@@ -558,8 +586,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                         out int desiredFrequencyMhz
                     );
 
-                    int frequencyOffsetKhz = (desiredFrequencyMhz - point.FrequencyMHz) * 1000;
-                    int voltageOffsetUv = (desiredVoltageMv - point.VoltageMv) * 1000;
+                    int frequencyOffsetKhz = (desiredFrequencyMhz - point.FrequencyMHz) * Kilo;
+                    int voltageOffsetUv = (desiredVoltageMv - point.VoltageMv) * Kilo;
 
                     if (SetVfPointControl(point.Index, frequencyOffsetKhz, voltageOffsetUv))
                         ok++;
@@ -572,8 +600,10 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
                 return VerifyUndervoltCurve(alignedMaxVoltageMv, requestedMaxClockMhz) ? 1 : 0;
             }
-            catch
+            catch (Exception ex)
             {
+                // NvAPI may throw SEHException or AccessViolationException on driver errors.
+                DiagnosticLogger.LogInfo($"SetUndervoltCurveFromDefault: EXCEPTION {ex.GetType().Name}: {ex.Message}");
                 return -1;
             }
         }
@@ -598,8 +628,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
                 bool writeOk = SetVfPointControl(
                     pointIndex,
-                    frequencyDeltaMhz * 1000,
-                    voltageDeltaMv * 1000
+                    frequencyDeltaMhz * Kilo,
+                    voltageDeltaMv * Kilo
                 );
 
                 if (!writeOk) return false;
@@ -625,8 +655,10 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                // NvAPI may throw SEHException or AccessViolationException on driver errors.
+                DiagnosticLogger.LogInfo($"ProbeVfPointWrite: EXCEPTION {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -722,7 +754,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
             foreach (var kvp in offsetsMHz)
             {
                 if (kvp.Value == 0) { skip++; continue; }
-                bool written = SetVfPointControl(kvp.Key, kvp.Value * 1000, 0);
+                bool written = SetVfPointControl(kvp.Key, kvp.Value * Kilo, 0);
                 DiagnosticLogger.LogInfo($"  Point {kvp.Key}: offset={kvp.Value}MHz, result={written}");
                 if (written) ok++; else fail++;
             }
@@ -758,8 +790,10 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
                 return setControl(gpu, buffer) == 0;
             }
-            catch
+            catch (Exception ex)
             {
+                // NvAPI may throw SEHException or AccessViolationException on driver errors.
+                DiagnosticLogger.LogInfo($"SetVfPointControl: EXCEPTION {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -769,7 +803,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         /// with the correct PrivateClockBoostTableV1 struct layout from LTT.NvAPIWrapper.
         /// Struct: version(4) + masks(4*4) + unknown1(12*4) + gpuDeltas(80*36) + memFilled(23*4) + memDeltas(23*4) + unknown2(1529*4)
         /// Each GPUDelta: 9 uint32 fields, _FrequencyDeltaInkHz at offset 0x14 (20 bytes per entry).
-        /// Total struct size: 0x2420 (9248 bytes) — matches our existing controlSize.
+        /// Total struct size: 0x2420 (9248 bytes) - matches our existing controlSize.
         /// </summary>
         public static int ApplyVfCurveOffsets_ClockBoostTable(Dictionary<int, int> offsetsMHz)
         {
@@ -822,7 +856,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                     int deltaOffset = 0x44 + pointIndex * entryStride + freqDeltaOffset;
                     if (deltaOffset + 4 <= bufferSize)
                     {
-                        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(deltaOffset, 4), kvp.Value * 1000);
+                        BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(deltaOffset, 4), kvp.Value * Kilo);
                     }
                 }
 
@@ -898,7 +932,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                     BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(lockOffset + 4, 4), 0);  // mode
                     BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(lockOffset + 8, 4), 2);  // Frequency lock
                     BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(lockOffset + 12, 4), (uint)kvp.Key); // point index
-                    BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(lockOffset + 16, 4), (uint)(kvp.Value * 1000)); // freq delta in kHz
+                    BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(lockOffset + 16, 4), (uint)(kvp.Value * Kilo)); // freq delta in kHz
                     BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(lockOffset + 20, 4), 0);  // flag
 
                     i++;
@@ -950,7 +984,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 {
                     int offset = 0x04 + i * 4;
                     if (offset + 4 > bufferSize) break;
-                    BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(offset, 4), kvp.Value * 1000);
+                    BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(offset, 4), kvp.Value * Kilo);
                     i++;
                 }
 

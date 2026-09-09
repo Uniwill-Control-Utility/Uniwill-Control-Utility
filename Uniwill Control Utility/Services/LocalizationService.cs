@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Windows;
@@ -22,6 +23,25 @@ namespace Uniwill_Control_Utility.Services
 
     public static class LocalizationService
     {
+        private const string FallbackCultureName = "en-GB";
+        private const int MaxTrackedElements = 4096;
+
+        private const string PresetSavedPrefix = "Your preset ";
+        private const string PresetSavedSuffix = " has been saved successfully!";
+        private const string PresetSavedTemplate = "Your preset {0} has been saved successfully!";
+        private const int PresetSavedPrefixLength = 12;
+        private const int PresetSavedSuffixLength = 29;
+
+        private const string PresetDeletedSuffix = " has been deleted successfully!";
+        private const string PresetDeletedTemplate = "Your preset {0} has been deleted successfully!";
+        private const int PresetDeletedSuffixLength = 31;
+
+        private const string LaunchingPrefix = "Launching ";
+        private const string LaunchingTemplate = "Launching {0}";
+        private const int LaunchingPrefixLength = 10;
+
+        private const string FormatPlaceholder = "{0}";
+
         private static readonly IReadOnlyList<LanguageOption> Languages = new LanguageOption[]
         {
             new("en-GB", "English"),
@@ -56,7 +76,7 @@ namespace Uniwill_Control_Utility.Services
         private static bool _isInitialised;
 
         public static IReadOnlyList<LanguageOption> SupportedLanguages => Languages;
-        public static string CurrentCultureName { get; private set; } = "en-GB";
+        public static string CurrentCultureName { get; private set; } = FallbackCultureName;
         public static event EventHandler? CultureChanged;
 
         public static void Initialize(string? cultureName)
@@ -78,7 +98,7 @@ namespace Uniwill_Control_Utility.Services
             var culture = CultureInfo.GetCultureInfo(selected.CultureName);
             CultureInfo.DefaultThreadCurrentUICulture = culture;
             Thread.CurrentThread.CurrentUICulture = culture;
-            LoadCatalogue("en-GB");
+            LoadCatalogue(FallbackCultureName);
             LoadCatalogue(CurrentCultureName);
 
             if (!refreshWindows || Application.Current == null)
@@ -109,7 +129,7 @@ namespace Uniwill_Control_Utility.Services
                 return translated;
             }
 
-            if (Catalogues.TryGetValue("en-GB", out var english) && english.TryGetValue(source, out var englishText))
+            if (Catalogues.TryGetValue(FallbackCultureName, out var english) && english.TryGetValue(source, out var englishText))
             {
                 if (Catalogues.TryGetValue(CurrentCultureName, out current) && current.TryGetValue(englishText, out translated))
                 {
@@ -119,19 +139,19 @@ namespace Uniwill_Control_Utility.Services
                 return englishText;
             }
 
-            if (!source.Contains("{0}", StringComparison.Ordinal) && source.StartsWith("Your preset ", StringComparison.Ordinal) && source.EndsWith(" has been saved successfully!", StringComparison.Ordinal))
+            if (!source.Contains(FormatPlaceholder, StringComparison.Ordinal) && source.StartsWith(PresetSavedPrefix, StringComparison.Ordinal) && source.EndsWith(PresetSavedSuffix, StringComparison.Ordinal))
             {
-                return Format("Your preset {0} has been saved successfully!", source[12..^29]);
+                return Format(PresetSavedTemplate, source[PresetSavedPrefixLength..^PresetSavedSuffixLength]);
             }
 
-            if (!source.Contains("{0}", StringComparison.Ordinal) && source.StartsWith("Your preset ", StringComparison.Ordinal) && source.EndsWith(" has been deleted successfully!", StringComparison.Ordinal))
+            if (!source.Contains(FormatPlaceholder, StringComparison.Ordinal) && source.StartsWith(PresetSavedPrefix, StringComparison.Ordinal) && source.EndsWith(PresetDeletedSuffix, StringComparison.Ordinal))
             {
-                return Format("Your preset {0} has been deleted successfully!", source[12..^31]);
+                return Format(PresetDeletedTemplate, source[PresetSavedPrefixLength..^PresetDeletedSuffixLength]);
             }
 
-            if (!source.Contains("{0}", StringComparison.Ordinal) && source.StartsWith("Launching ", StringComparison.Ordinal))
+            if (!source.Contains(FormatPlaceholder, StringComparison.Ordinal) && source.StartsWith(LaunchingPrefix, StringComparison.Ordinal))
             {
-                return Format("Launching {0}", source[10..]);
+                return Format(LaunchingTemplate, source[LaunchingPrefixLength..]);
             }
 
             return source;
@@ -166,7 +186,7 @@ namespace Uniwill_Control_Utility.Services
                 TrackingMarkers.Add(element, new TrackingMarker());
                 TrackedElements.Add(new WeakReference<object>(element));
 
-                if (TrackedElements.Count > 4096)
+                if (TrackedElements.Count > MaxTrackedElements)
                 {
                     TrackedElements.RemoveAll(reference => !reference.TryGetTarget(out _));
                 }
@@ -277,8 +297,19 @@ namespace Uniwill_Control_Utility.Services
             {
                 value = property.GetValue(element) as string;
             }
+            catch (InvalidOperationException)
+            {
+                // Property getter threw (e.g., triggered a code path that failed)
+                return;
+            }
+            catch (TargetInvocationException)
+            {
+                // Underlying property getter threw an exception
+                return;
+            }
             catch
             {
+                // Unexpected error reading property value; skip this property.
                 return;
             }
 
@@ -303,6 +334,16 @@ namespace Uniwill_Control_Utility.Services
             try
             {
                 property.SetValue(element, translated);
+            }
+            catch (InvalidOperationException)
+            {
+                // Property is read-only at runtime or cannot be set
+                return;
+            }
+            catch (TargetInvocationException)
+            {
+                // Underlying property setter threw an exception
+                return;
             }
             catch
             {
@@ -352,7 +393,7 @@ namespace Uniwill_Control_Utility.Services
                 return;
             }
 
-            using var reader = new StreamReader(stream);
+            using var reader = new StreamReader(stream, Encoding.UTF8);
             Catalogues[cultureName] = JsonSerializer.Deserialize<Dictionary<string, string>>(reader.ReadToEnd()) ?? new Dictionary<string, string>(StringComparer.Ordinal);
         }
 

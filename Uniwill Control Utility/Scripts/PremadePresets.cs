@@ -1,23 +1,15 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Windows.Media.Imaging;
-using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts.Misc;
 
 namespace Uniwill_Control_Utility.Scripts
 {
     internal class PremadePresets
     {
-        private const string ConfigImageUri = "pack://application:,,,/Assets/config.png";
-
-        public static string ExtremePreset = string.Empty;
-        public static string PerformancePreset = string.Empty;
-        public static string BalPreset = string.Empty;
-        public static string EcoPreset = string.Empty;
-        public static Uri? uri;
+        public static string ExtremePreset { get; set; } = string.Empty;
+        public static string PerformancePreset { get; set; } = string.Empty;
+        public static string BalPreset { get; set; } = string.Empty;
+        public static string EcoPreset { get; set; } = string.Empty;
 
         public static void SetPremadePresets()
         {
@@ -28,8 +20,6 @@ namespace Uniwill_Control_Utility.Scripts
                     // Only FireRange (Ryzen 9955HX / 9955HX3D on Socket AM5) is supported.
                     if (Family.FAM == Family.RyzenFamily.FireRange)
                     {
-                        uri = new Uri(ConfigImageUri);
-
                         EcoPreset = "--tctl-temp=95 --cHTC-temp=95 --stapm-limit=35000 --fast-limit=45000 --stapm-time=64 --slow-limit=35000 --slow-time=128 --vrm-current=180000 --vrmmax-current=180000 --vrmsoc-current=180000 --vrmsocmax-current=180000 --vrmgfx-current=180000 --Win-Power=0 ";
                         BalPreset = "--tctl-temp=95 --cHTC-temp=95 --stapm-limit=65000 --fast-limit=75000 --stapm-time=64 --slow-limit=65000 --slow-time=128 --vrm-current=180000 --vrmmax-current=180000 --vrmsoc-current=180000 --vrmsocmax-current=180000 --vrmgfx-current=180000 --Win-Power=1 ";
                         PerformancePreset = "--tctl-temp=95 --cHTC-temp=95 --stapm-limit=100000 --fast-limit=120000 --stapm-time=64 --slow-limit=100000 --slow-time=128 --vrm-current=240000 --vrmmax-current=240000 --vrmsoc-current=240000 --vrmsocmax-current=240000 --vrmgfx-current=240000 --Win-Power=2 ";
@@ -43,13 +33,15 @@ namespace Uniwill_Control_Utility.Scripts
             }
             catch (Exception ex)
             {
+                // Broad catch is intentional: Family properties may throw during initialization
+                // (e.g., CPUID read failures, unexpected processor families). Log and continue
+                // so the app starts with empty presets rather than crashing.
                 Misc.DiagnosticLogger.LogError(ex, "Failed to set premade presets");
             }
         }
 
         private static void SetIntelPremadePresets()
         {
-            uri = new Uri(ConfigImageUri);
             var limits = GetIntelPowerLimits(Family.CPUName);
             var ecoPl1 = Math.Max(4, (int)Math.Round(limits.Pl1 * 0.55));
             var ecoPl2 = Math.Max(ecoPl1 + 2, (int)Math.Round(limits.Pl1 * 0.8));

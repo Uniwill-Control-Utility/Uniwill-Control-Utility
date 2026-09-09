@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using static System.Net.Mime.MediaTypeNames;
@@ -55,8 +56,6 @@ namespace Uniwill_Control_Utility.Scripts
                 List<GameLauncherItem> list = new List<GameLauncherItem>();
                 //gamelauncher
                 LauncherManager gameLauncher = new LauncherManager(new GameLib.Core.LauncherOptions() { QueryOnlineData = false });
-
-                GameLauncherItem extraApps = new GameLauncherItem();
 
                 foreach (var launcher in gameLauncher.GetLaunchers())
                 {
@@ -238,7 +237,11 @@ namespace Uniwill_Control_Utility.Scripts
                             }
                         }
                     }
-                    catch (Exception ex)
+                    catch (UnauthorizedAccessException)
+                    {
+                        // Drive is not accessible (e.g., removable media removed)
+                    }
+                    catch (Exception ex) when (ex is not UnauthorizedAccessException)
                     {
                         Misc.DiagnosticLogger.LogError(ex, "Failed to process game library entry");
                     }
@@ -248,36 +251,52 @@ namespace Uniwill_Control_Utility.Scripts
 
                 if (isAdaptive)
                 {
-                    extraApps = new GameLauncherItem();
-                    extraApps.gameName = "Yuzu";
-                    extraApps.path = "yuzu.exe";
+                    var extraApps = new GameLauncherItem
+                    {
+                        gameName = "Yuzu",
+                        path = "yuzu.exe",
+                    };
                     list.Add(extraApps);
 
-                    extraApps = new GameLauncherItem();
-                    extraApps.gameName = "RPCS3";
-                    extraApps.path = "rpcs3.exe";
+                    extraApps = new GameLauncherItem
+                    {
+                        gameName = "RPCS3",
+                        path = "rpcs3.exe",
+                    };
                     list.Add(extraApps);
 
-                    extraApps = new GameLauncherItem();
-                    extraApps.gameName = "Cemu";
-                    extraApps.path = "cemu.exe";
+                    extraApps = new GameLauncherItem
+                    {
+                        gameName = "Cemu",
+                        path = "cemu.exe",
+                    };
                     list.Add(extraApps);
 
-                    extraApps = new GameLauncherItem();
-                    extraApps.gameName = "Dolphin";
-                    extraApps.path = "Dolphin.exe";
+                    extraApps = new GameLauncherItem
+                    {
+                        gameName = "Dolphin",
+                        path = "Dolphin.exe",
+                    };
                     list.Add(extraApps);
 
-                    extraApps = new GameLauncherItem();
-                    extraApps.gameName = "Citra";
-                    extraApps.path = "Citra.exe";
+                    extraApps = new GameLauncherItem
+                    {
+                        gameName = "Citra",
+                        path = "Citra.exe",
+                    };
                     list.Add(extraApps);
                 }
 
                 var distinctGameLauncherItems = list.Distinct(new GameLauncherItemEqualityComparer()).ToList();
                 return distinctGameLauncherItems;
             }
-            catch (Exception ex)
+            catch (COMException ex)
+            {
+                // Windows Package Manager or GamesEnumeration COM calls can fail on restricted systems
+                Misc.DiagnosticLogger.LogError(ex, "COM error while syncing game library");
+                return null;
+            }
+            catch (Exception ex) when (ex is not COMException)
             {
                 MessageBox.Show(ex.ToString());
                 return null;
@@ -329,7 +348,6 @@ namespace Uniwill_Control_Utility.Scripts
                         case "Microsoft Store":
                             PackageManager pm = new PackageManager();
                             pm.FindPackage(gameID).GetAppListEntries().First().LaunchAsync();
-                            pm = null;
                             break;
                         default: break;
                     }

@@ -248,8 +248,14 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
                 if (displayNum > 0 && count == 0) laptopScreen = defaultDevice;
             }
-            catch (Exception ex)
+            catch (COMException)
             {
+                // Display enumeration failed, fall back to primary screen
+                laptopScreen = Screen.PrimaryScreen.DeviceName;
+            }
+            catch (Exception ex) when (ex is not COMException)
+            {
+                // Unexpected error during display detection
                 laptopScreen = Screen.PrimaryScreen.DeviceName;
             }
 

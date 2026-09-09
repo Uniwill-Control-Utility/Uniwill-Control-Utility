@@ -74,7 +74,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             Misc.Tick += Misc_Tick;
             Misc.Start();
 
-            autoReapply.Interval = TimeSpan.FromSeconds((int)Settings.Default.AutoReapplyTime);
+            autoReapply.Interval = TimeSpan.FromSeconds(Settings.Default.AutoReapplyTime);
             autoReapply.Tick += AutoReapply_Tick;
             autoReapply.Start();
 
@@ -145,10 +145,10 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 NativeSetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
                             }
                         }
-                        catch { /* non-critical */ }
+                        catch { /* Non-critical: SetWindowPos failure does not affect tray menu functionality */ }
                     }));
             }
-            catch { /* non-critical */ }
+            catch { /* Non-critical: BeginInvoke failure does not affect tray menu functionality */ }
         }
 
         /// <summary>
@@ -264,7 +264,8 @@ namespace Uniwill_Control_Utility.Views.Windows
                     {
                         await Task.Run(() => GetBatteryStatus());
 
-                        if (statuscode == 2 || statuscode == 6 || statuscode == 7 || statuscode == 8)
+                        if (statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
+                            || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery)
                         {
                             if (Settings.Default.acPreset != "None" && !string.IsNullOrEmpty(Settings.Default.acPreset))
                             {
@@ -427,7 +428,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                             result.Add(System.Windows.Media.Color.FromRgb(r, g, b));
                         }
                     }
-                    catch { /* skip invalid */ }
+                    catch { /* Skip invalid color entries - malformed hex values are ignored */ }
                 }
             }
 
@@ -448,7 +449,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             try
             {
-                if (Settings.Default.isAutoUviGPU == true)
+                if (Settings.Default.isAutoUviGPU)
                 {
                     if (monitor == null) monitor = new InstabilityMonitor();
 
@@ -475,13 +476,13 @@ namespace Uniwill_Control_Utility.Views.Windows
 
                     iGpuController.RecordAppliedOffset(newOffset);
                 }
-                else if (Settings.Default.isAutoUviGPU == false && iGpuController != null)
+                else if (!Settings.Default.isAutoUviGPU && iGpuController != null)
                 {
                     iGpuController.Dispose();
                     iGpuController = null;
                 }
 
-                if(Settings.Default.isAutoUvCPU == false && Settings.Default.isAutoUviGPU == false && monitor != null)
+                if (!Settings.Default.isAutoUvCPU && !Settings.Default.isAutoUviGPU && monitor != null)
                 {
                     monitor.Stop();
                     monitor = null;
@@ -494,6 +495,12 @@ namespace Uniwill_Control_Utility.Views.Windows
         }
 
         private static ushort statuscode;
+
+        // Win32_Battery.BatteryStatus values that indicate AC-powered state
+        private const ushort BatteryStatusAc = 2;
+        private const ushort BatteryStatusCritical = 6;
+        private const ushort BatteryStatusCharging = 7;
+        private const ushort BatteryStatusNoSystemBattery = 8;
 
         public static void GetBatteryStatus()
         {
@@ -518,19 +525,19 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             try
             {
-                if ((bool)Settings.Default.AutoReapply == true && (bool)Settings.Default.isAdaptiveModeRunning == false)
+                if (Settings.Default.AutoReapply == true && Settings.Default.isAdaptiveModeRunning == false)
                 {
-                    string commands = (string)Settings.Default.CommandString;
+                    string? commands = Settings.Default.CommandString;
                     //Check if RyzenAdjArguments is populated
                     if (commands != null && commands != "")
                     {
                         await RyzenAdj_To_UCU.TranslateAsync(commands);
                     }
 
-                    if (autoReapply.Interval != TimeSpan.FromSeconds((int)Settings.Default.AutoReapplyTime))
+                    if (autoReapply.Interval != TimeSpan.FromSeconds(Settings.Default.AutoReapplyTime))
                     {
                         autoReapply.Stop();
-                        autoReapply.Interval = TimeSpan.FromSeconds((int)Settings.Default.AutoReapplyTime);
+                        autoReapply.Interval = TimeSpan.FromSeconds(Settings.Default.AutoReapplyTime);
                         autoReapply.Start();
                     }
                 }
@@ -540,27 +547,20 @@ namespace Uniwill_Control_Utility.Views.Windows
                 DiagnosticLogger.LogError(ex, "Failed during auto-reapply tick");
             }
         }
-        private static void UpdateTimerInterval(DispatcherTimer timer, int newInterval)
-        {
-            if (timer.Interval == TimeSpan.FromSeconds(newInterval)) return;
-
-            timer.Stop();
-            timer.Interval = TimeSpan.FromSeconds(newInterval);
-            timer.Start();
-        }
 
         static string lastAppliedState = "";
         private async void HandlePowerModeChange(object sender, PowerModeChangedEventArgs e)
         {
             try
             {
-                if ((bool)Settings.Default.isAdaptiveModeRunning == false)
+                if (Settings.Default.isAdaptiveModeRunning == false)
                 {
                     if (e.Mode == PowerModes.StatusChange)
                     {
                         await Task.Run(() => GetBatteryStatus());
 
-                        if (statuscode == 2 || statuscode == 6 || statuscode == 7 || statuscode == 8)
+                        if (statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
+                            || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery)
                         {
                             if (Settings.Default.acPreset != "None" && !string.IsNullOrEmpty(Settings.Default.acPreset))
                             {
@@ -619,10 +619,10 @@ namespace Uniwill_Control_Utility.Views.Windows
                                     return;
 
                                 // If the service still thinks it's connected, the BLE link is a
-                                // zombie — force a disconnect before attempting reconnect.
+                                // zombie - force a disconnect before attempting reconnect.
                                 if (waterCoolerService.IsConnected)
                                 {
-                                    Debug.WriteLine("[WaterCooler] Resuming from sleep — disconnecting zombie BLE link");
+                                    Debug.WriteLine("[WaterCooler] Resuming from sleep - disconnecting zombie BLE link");
                                     await waterCoolerService.DisconnectAsync();
                                     await Task.Delay(500);
                                 }
@@ -784,10 +784,8 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private async void TrayCustomPreset_Click(object? sender, RoutedEventArgs e)
         {
-            if (_isTrayPresetApplying || sender is not MenuItem menuItem)
+            if (_isTrayPresetApplying || sender is not MenuItem menuItem || menuItem.Tag is not int slot)
                 return;
-
-            int slot = (int)menuItem.Tag;
             _isTrayPresetApplying = true;
             try
             {
@@ -903,7 +901,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                     Controller.SetUpMagWindow(this);
                 }));
 
-            if (Settings.Default.StartMini == true)
+            if (Settings.Default.StartMini)
             {
                 this.WindowState = WindowState.Minimized;
             }
@@ -1110,7 +1108,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 }
                 miFlydigiCurveCustom.Visibility = hasCustom ? Visibility.Visible : Visibility.Collapsed;
             }
-            catch { /* non-critical */ }
+            catch { /* Non-critical: failing to read custom curve settings only affects the tray menu Custom item visibility */ }
         }
 
         private async void TrayFlydigiCurve_Click(object? sender, RoutedEventArgs e)
@@ -1225,7 +1223,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (sender is not MenuItem item)
                 return;
 
-            bool enabled = item.IsChecked == true;
+            bool enabled = item.IsChecked is true;
             var settings = FanControlSettingsService.Load();
             settings.UnifiedMode = enabled;
             FanControlSettingsService.Save(settings);
@@ -1389,7 +1387,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                     mi.IsChecked = mi.Tag?.ToString() == settings.RgbMode;
                 }
             }
-            catch { /* non-critical */ }
+            catch { /* Non-critical: failing to sync Hydro tray checkmarks only affects visual state */ }
         }
 
         /// <summary>
@@ -1477,7 +1475,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                         mi.IsChecked = true;
                 }
             }
-            catch { /* non-critical */ }
+            catch { /* Non-critical: failing to sync Flydigi tray checkmarks only affects visual state */ }
         }
 
         /// <summary>
@@ -1530,7 +1528,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                         mi.IsChecked = mi.Tag?.ToString() == gpuPreset;
                 }
             }
-            catch { /* non-critical */ }
+            catch { /* Non-critical: failing to sync Fan Control tray checkmarks only affects visual state */ }
         }
 
         /// <summary>
@@ -1554,7 +1552,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                     miFanGpuProfile.Visibility = Visibility.Visible;
                 }
             }
-            catch { /* non-critical */ }
+            catch { /* Non-critical: failing to update tray fan profile visibility only affects visual state */ }
         }
 
         /// <summary>

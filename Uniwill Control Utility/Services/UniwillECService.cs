@@ -1698,7 +1698,7 @@ namespace Uniwill_Control_Utility.Services
         public const ushort REG_BATTERY_CHARGE_RATE_LO = 0x0434; // Charge rate (mA, LE u16)
         public const ushort REG_BATTERY_REMAINING_CAP_LO = 0x0436; // Remaining capacity (mAh, LE u16)
         public const ushort REG_BATTERY_PRESENT_VOLTAGE_LO = 0x0438; // Present voltage (mV, LE u16)
-        public const ushort REG_BATTERY_TEMP_LO = 0x04A2; // Temperature (Kelvin×10, LE u16)
+        public const ushort REG_BATTERY_TEMP_LO = 0x04A2; // Temperature (Kelvin*10, LE u16)
         public const ushort REG_BATTERY_CYCLE_COUNT_LO = 0x04A6; // Cycle count (LE u16)
 
         /// <summary>

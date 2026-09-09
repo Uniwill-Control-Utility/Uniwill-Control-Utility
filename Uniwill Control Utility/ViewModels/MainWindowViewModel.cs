@@ -1,13 +1,10 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using System;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Input;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Services;
@@ -19,8 +16,6 @@ namespace Uniwill_Control_Utility.ViewModels
 {
     public partial class MainWindowViewModel : ObservableObject
     {
-        private const string ReleasesUrl = "https://github.com/jgudec/Uniwill-Control-Utility/releases";
-
         [ObservableProperty]
         private string _applicationTitle = string.Empty;
 
@@ -34,18 +29,11 @@ namespace Uniwill_Control_Utility.ViewModels
         private ObservableCollection<MenuItem> _trayMenuItems = new();
 
         [ObservableProperty]
-        private string _downloads = "Downloads: ";
-
-        [ObservableProperty]
-        private bool _isDownloads;
-
-        [ObservableProperty]
         private bool _hasLastAppliedSettings;
 
         [ObservableProperty]
         private string _lastAppliedSettingsToolTip = string.Empty;
 
-        private ICommand? _navigateCommand;
         private readonly UniwillECService? _uniwillEc;
 
         public MainWindowViewModel(INavigationService navigationService, UniwillECService? uniwillEc = null)
@@ -56,8 +44,6 @@ namespace Uniwill_Control_Utility.ViewModels
             LocalizationService.CultureChanged += OnCultureChanged;
             LastAppliedSettingsService.Changed += OnLastAppliedSettingsChanged;
         }
-
-        public ICommand NavigateCommand => _navigateCommand ??= new RelayCommand<string>(OnNavigate);
 
         private void InitializeViewModel()
         {
@@ -109,11 +95,6 @@ namespace Uniwill_Control_Utility.ViewModels
 
             // Settings at the bottom of footer
             NavigationFooter.Add(CreateNavigationItem("Settings", "settings", SymbolRegular.Settings24, typeof(Views.Pages.SettingsPage)));
-
-            TrayMenuItems = new ObservableCollection<MenuItem>
-            {
-                new() { Header = "Home", Tag = "tray_home" }
-            };
         }
 
         private static NavigationViewItem CreateNavigationItem(string content, string tag, SymbolRegular icon, Type pageType) =>
@@ -178,16 +159,6 @@ namespace Uniwill_Control_Utility.ViewModels
             LastAppliedSettingsToolTip = string.Join(Environment.NewLine, lines);
         }
 
-        private void OnNavigate(string? parameter)
-        {
-            switch (parameter)
-            {
-                case "download":
-                    OpenUrl(ReleasesUrl);
-                    break;
-            }
-        }
-
         /// <summary>
         /// Creates the Flydigi navigation item with the logo icon.
         /// Uses a FlydigiIconElement (a Path-based IconElement) whose Fill binds to the
@@ -201,8 +172,5 @@ namespace Uniwill_Control_Utility.ViewModels
                 Icon = new FlydigiIconElement()
             };
         }
-
-        private static void OpenUrl(string url) =>
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
     }
 }

@@ -53,6 +53,8 @@ namespace Uniwill_Control_Utility.Services
         private const int ITE_LEDS_PER_ROW = 21;
         private const int ITE_OUTPUT_REPORT_SIZE = 65; // 2 header + 3*21 color bytes
         private const byte ITE_PARAM_MODE_USER = 0x33; // Custom/UserMode effect
+        private const byte ITE_MAX_SPEED = 0x0B;        // Maximum speed value (frozen)
+        private const byte ITE_MAX_PERKEY_BRIGHTNESS = 0x32; // Maximum per-key brightness (50)
         public const int MaxPerKeyZones = ITE_NR_ROWS * ITE_LEDS_PER_ROW; // 126
 
         /// <summary>
@@ -570,7 +572,7 @@ namespace Uniwill_Control_Utility.Services
 
             lock (_lock)
             {
-                byte clampedSpeed = (byte)Math.Clamp((int)speed, 0, 0x0B);
+                byte clampedSpeed = (byte)Math.Clamp(speed, (byte)0, ITE_MAX_SPEED);
                 byte directionByte = (byte)direction;
 
                 // Turn off any cached effect/color from a previous session first.
@@ -814,8 +816,8 @@ namespace Uniwill_Control_Utility.Services
 
             lock (_lock)
             {
-                // Clamp speed to 0-0x0B range
-                byte clampedSpeed = (byte)Math.Clamp((int)speed, 0, 0x0B);
+                // Clamp speed to 0-ITE_MAX_SPEED range
+                byte clampedSpeed = (byte)Math.Clamp(speed, (byte)0, ITE_MAX_SPEED);
                 byte directionByte = (byte)direction;
 
                 // For variant effects (TouchAurora, TouchSpark), the ITE
@@ -844,7 +846,7 @@ namespace Uniwill_Control_Utility.Services
                     CMD_MODE_BRIGHTNESS,     // Command
                     ZoneMaskKeyboard,        // Zone mask (keyboard)
                     (byte)effect,            // Effect mode
-                    clampedSpeed,            // Speed: 0=fastest, 0x0B=frozen
+                    clampedSpeed,            // Speed: 0=fastest, ITE_MAX_SPEED=frozen
                     (byte)_brightness,       // Current brightness
                     0x08,                    // Unknown constant
                     directionByte,           // Direction: byte[7]
@@ -993,7 +995,7 @@ namespace Uniwill_Control_Utility.Services
 
             lock (_lock)
             {
-                byte scaledBrightness = (byte)Math.Min(_brightness, 0x32);
+                byte scaledBrightness = (byte)Math.Min(_brightness, ITE_MAX_PERKEY_BRIGHTNESS);
                 SendControlReport(0x08, new byte[]
                 {
                     0x08, 0x02, ITE_PARAM_MODE_USER, 0x00,
@@ -1013,7 +1015,7 @@ namespace Uniwill_Control_Utility.Services
 
             lock (_lock)
             {
-                byte scaledBrightness = (byte)Math.Min(_brightness, 0x32);
+                byte scaledBrightness = (byte)Math.Min(_brightness, ITE_MAX_PERKEY_BRIGHTNESS);
                 SendControlReport(0x08, new byte[]
                 {
                     0x08, 0x02, ITE_PARAM_MODE_USER, 0x00,
@@ -1074,7 +1076,7 @@ namespace Uniwill_Control_Utility.Services
 
             lock (_lock)
             {
-                byte scaledBrightness = (byte)Math.Min(_brightness, 0x32);
+                byte scaledBrightness = (byte)Math.Min(_brightness, ITE_MAX_PERKEY_BRIGHTNESS);
 
                 // Linux driver ctrl_params: [08 02 33 00 brightness 00 00 00]
                 // Report ID = buf[0] = 0x08
@@ -1167,7 +1169,7 @@ namespace Uniwill_Control_Utility.Services
 
                 // Step 1: Enter UserMode (Linux driver ctrl_params)
                 // [08 02 33 00 brightness 00 00 00] via report ID 0x08
-                byte scaledBrightness = (byte)Math.Min(_brightness, 0x32);
+                byte scaledBrightness = (byte)Math.Min(_brightness, ITE_MAX_PERKEY_BRIGHTNESS);
                 SendControlReport(0x08, new byte[]
                 {
                     0x08, 0x02, ITE_PARAM_MODE_USER, 0x00,
@@ -1390,7 +1392,7 @@ namespace Uniwill_Control_Utility.Services
                 return;
 
             int clampedBrightness = Math.Clamp(brightness, 0, 100);
-            byte clampedSpeed = (byte)Math.Clamp((int)speed, 0, 0x0B);
+            byte clampedSpeed = (byte)Math.Clamp(speed, (byte)0, ITE_MAX_SPEED);
 
             SendReportHandle(_lightBarHandle, new byte[]
             {

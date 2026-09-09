@@ -10,10 +10,14 @@ namespace Uniwill_Control_Utility.Views.Pages
 {
     public partial class Battery : Page
     {
+        private const int RefreshIntervalSeconds = 5;
+        private const int ApplyDelaySeconds = 2;
+        private const int BatteryModeLimit = 2;
+
         private readonly UniwillECService? _ecService;
         private readonly DispatcherTimer _refreshTimer = new()
         {
-            Interval = TimeSpan.FromSeconds(5),
+            Interval = TimeSpan.FromSeconds(RefreshIntervalSeconds),
             IsEnabled = false
         };
         private bool _isEcAvailable;
@@ -32,8 +36,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     _isEcAvailable = _ecService.Initialize();
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Debug.WriteLine($"[Battery] Failed to initialize EC service: {ex.Message}");
                     _isEcAvailable = false;
                 }
             }
@@ -97,7 +102,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
 
             int mode = cbChargingLimit.SelectedIndex;
-            if (mode < 0 || mode > 2)
+            if (mode < 0 || mode > BatteryModeLimit)
                 return;
 
             try
@@ -108,7 +113,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Debug.WriteLine($"[Battery] Applied charging limit: {mode switch { 0 => "100%", 1 => "80%", 2 => "60%", _ => "unknown" }} (mode {mode})");
 
                 // Delay refresh to let the EC process the change
-                var delayTimer = new DispatcherTimer(TimeSpan.FromSeconds(2), DispatcherPriority.Normal, (s, e) =>
+                var delayTimer = new DispatcherTimer(TimeSpan.FromSeconds(ApplyDelaySeconds), DispatcherPriority.Normal, (s, e) =>
                 {
                     RefreshAll();
                     ((DispatcherTimer)s!).Stop();

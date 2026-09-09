@@ -29,6 +29,19 @@ namespace Uniwill_Control_Utility.Views.Pages
         private const string RootDrivePath = "C:\\";
         private const string InstallerFilePath = "C:\\Uniwill.Control.Utility.msi";
 
+        private const string WmiNamespace = @"root\CIMV2";
+        private const string WmiQueryProcessor = "SELECT * FROM Win32_Processor";
+        private const string WmiQueryPhysicalMemory = "SELECT * FROM Win32_PhysicalMemory";
+        private const string ScheduledTaskName = "UCU";
+        private const string AssemblyDllName = "Uniwill Control Utility.dll";
+        private const string AssemblyExeName = "Uniwill Control Utility.exe";
+        private const string InternetConnectivityHost = "8.8.8.8";
+        private const string PresetExtension = ".UCUpresets";
+        private const string StressTestExeRelativePath = @"Assets\Stress-Test\AVX2 Stress Test.exe";
+        private const string LegacyVersionPrefix = "3.";
+        private const string MsiExecCommand = "msiexec";
+        private const string MsiInstallFlag = "/i ";
+
         private readonly ILogger<SettingsPage> _logger;
         private bool _languageSelectionReady;
 
@@ -100,7 +113,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             try
             {
-                using (ManagementObjectSearcher searcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_Processor"))
+                using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(WmiNamespace, WmiQueryProcessor))
                 {
                     foreach (ManagementObject queryObj in searcher.Get())
                     {
@@ -131,7 +144,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             catch (ManagementException ex)
             {
-                Console.WriteLine("An error occurred while querying for WMI data: " + ex.Message);
+                _logger.LogWarning(ex, "An error occurred while querying for WMI data");
             }
         }
 
@@ -168,7 +181,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             try
             {
-                using (ManagementObjectSearcher searcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_PhysicalMemory"))
+                using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(WmiNamespace, WmiQueryPhysicalMemory))
                 {
                     foreach (ManagementObject queryObj in searcher.Get())
                     {
@@ -190,7 +203,12 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 _ramCapacity = _ramCapacity / 1024 / 1024 / 1024;
             }
-            catch { /* RAM info parsing failed; defaults will be used */ }
+            catch (Exception ex)
+                {
+                    // RAM info parsing failed; defaults will be used.
+                    // Non-critical: the page renders fine without RAM details.
+                    _logger.LogDebug(ex, "Failed to query RAM info via WMI");
+                }
         }
 
         private void applyRAMInfo()
@@ -209,7 +227,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             tbRAM.Text = $"{_ramCapacity} GB {DDRType} @ {_ramSpeed} MT/s";
             tbRAMProducer.Text = _ramProducer;
-            tbRAMModel.Text = _ramModel.Replace(" ", null!);
+            tbRAMModel.Text = _ramModel.Replace(" ", string.Empty);
             tbWidth.Text = $"{_ramWidth} bit";
             tbSlots.Text = $"{_ramSlots} * {_ramWidth / _ramSlots} bit";
             sdRAM.Visibility = Visibility.Visible;
@@ -224,7 +242,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Create the scheduled task
             using (TaskService ts = new TaskService())
             {
-                if (!ts.RootFolder.AllTasks.Any(t => t.Name == "UCU"))
+                if (!ts.RootFolder.AllTasks.Any(t => t.Name == ScheduledTaskName))
                 {
                     TaskDefinition td = ts.NewTask();
                     td.Principal.RunLevel = TaskRunLevel.Highest;
@@ -236,11 +254,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                     td.Triggers.Add(new LogonTrigger());
 
                     string path = System.Reflection.Assembly.GetEntryAssembly().Location;
-                    path = path.Replace("Uniwill Control Utility.dll", "Uniwill Control Utility.exe");
+                    path = path.Replace(AssemblyDllName, AssemblyExeName);
 
                     td.Actions.Add(path);
 
-                    ts.RootFolder.RegisterTaskDefinition(@"UCU", td);
+                    ts.RootFolder.RegisterTaskDefinition(ScheduledTaskName, td);
                 }
             }
 
@@ -252,9 +270,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             using (TaskService ts = new TaskService())
             {
-                if (ts.RootFolder.AllTasks.Any(t => t.Name == "UCU"))
+                if (ts.RootFolder.AllTasks.Any(t => t.Name == ScheduledTaskName))
                 {
-                    ts.RootFolder.DeleteTask("UCU");
+                    ts.RootFolder.DeleteTask(ScheduledTaskName);
                 }
             }
 
@@ -350,7 +368,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                     var bs1Service = App.GetService<Bs1Service>();
                     bs1Service?.DisconnectAsync().Wait();
                 }
-                catch { /* ignore disconnect errors */ }
+                catch (Exception)
+                    {
+                        // Ignore disconnect errors — this is a best-effort cleanup when hiding Flydigi.
+                        // The device may already be disconnected or unavailable.
+                    }
             });
         }
 
@@ -392,7 +414,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 if (isUpdateAvailable)
                 {
-                    if (updateManager._newVersion.StartsWith("3.")) tbDownloadMsg.Text = LocalizationService.Get("Head to the Phantom Control Centre GitHub releases page to easily download the latest build!");
+                    if (updateManager._newVersion.StartsWith(LegacyVersionPrefix)) tbDownloadMsg.Text = LocalizationService.Get("Head to the Phantom Control Centre GitHub releases page to easily download the latest build!");
                     else {
                         tbDownloadMsg.Text = LocalizationService.Get("An update for Uniwill Control Utility has been found!");
                         btnDownload.Visibility = System.Windows.Visibility.Visible;
@@ -421,8 +443,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     // show the MSI and close the main application
                     Process p = new Process();
-                    p.StartInfo.FileName = "msiexec";
-                    p.StartInfo.Arguments = $"/i {filePath}";
+                    p.StartInfo.FileName = MsiExecCommand;
+                    p.StartInfo.Arguments = MsiInstallFlag + filePath;
                     p.Start();
                     System.Windows.Application.Current.Shutdown();
                 }
@@ -441,19 +463,17 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 using (var ping = new Ping())
                 {
-                    var result = ping.Send("8.8.8.8", 2000); // ping Google DNS server
+                    var result = ping.Send(InternetConnectivityHost, 2000); // ping Google DNS server
                     return result.Status == IPStatus.Success;
                 }
             }
-            catch
+            catch (Exception)
             {
+                // Internet connectivity check failed; assume offline to avoid false-positive update checks.
+                // Suppressing the exception intentionally — transient network issues are common and
+                // a failed ping simply means "offline" from the perspective of update checking.
                 return false;
             }
-        }
-
-        private void StackPanel_Loaded(object sender, RoutedEventArgs e)
-        {
-
         }
 
         private async void UiPage_Loaded(object sender, RoutedEventArgs e)
@@ -486,10 +506,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void btnStressTest_Click(object sender, RoutedEventArgs e)
         {
-            if (File.Exists(Settings.Default.Path + @"\Assets\Stress-Test\AVX2 Stress Test.exe"))
+            var stressTestPath = Settings.Default.Path + StressTestExeRelativePath;
+            if (File.Exists(stressTestPath))
             {
                 Process process = new Process();
-                process.StartInfo.FileName = Settings.Default.Path + @"\Assets\Stress-Test\AVX2 Stress Test.exe";
+                process.StartInfo.FileName = stressTestPath;
                 process.Start();
 
                 process.Dispose();
@@ -532,9 +553,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             var dialog = new SaveFileDialog
             {
                 AddExtension = true,
-                DefaultExt = ".UCUpresets",
-                FileName = $"UCU-Presets-{DateTime.Now:yyyy-MM-dd}.UCUpresets",
-                Filter = $"{LocalizationService.Get("UCU preset backup")} (*.UCUpresets)|*.UCUpresets"
+                DefaultExt = PresetExtension,
+                FileName = $"UCU-Presets-{DateTime.Now:yyyy-MM-dd}{PresetExtension}",
+                Filter = $"{LocalizationService.Get("UCU preset backup")} (*{PresetExtension})|*{PresetExtension}"
             };
 
             if (dialog.ShowDialog() != true)
@@ -570,8 +591,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             var dialog = new OpenFileDialog
             {
                 CheckFileExists = true,
-                DefaultExt = ".UCUpresets",
-                Filter = $"{LocalizationService.Get("UCU preset backup")} (*.UCUpresets;*.json)|*.UCUpresets;*.json"
+                DefaultExt = PresetExtension,
+                Filter = $"{LocalizationService.Get("UCU preset backup")} (*{PresetExtension};*.json)|*{PresetExtension};*.json"
             };
 
             if (dialog.ShowDialog() != true)

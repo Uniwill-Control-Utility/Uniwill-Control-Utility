@@ -1,31 +1,33 @@
 using Microsoft.Toolkit.Uwp.Notifications;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Reflection;
 using Uniwill_Control_Utility.Services;
 
 namespace Uniwill_Control_Utility.Scripts.Misc
 {
-    internal class ToastNotification
+    internal static class ToastNotification
     {
+        private const string AssemblyFileName = "Uniwill Control Utility.dll";
+        private const string IconRelativePath = "Assets\\icon.png";
+
         public static void ShowToastNotification(string title = "", string body = "")
         {
             try
             {
-                string iconUri = "";
-                iconUri = "pack://application:,,,/Assets/applicationIcon-1024.png";
-
-                string path = System.Reflection.Assembly.GetEntryAssembly()!.Location;
-                path = path.Replace("Uniwill Control Utility.dll", string.Empty);
-                iconUri = path + "Assets\\icon.png";
+                var assemblyPath = Assembly.GetEntryAssembly()!.Location;
+                var basePath = assemblyPath.Replace(AssemblyFileName, string.Empty);
+                var iconUri = basePath + IconRelativePath;
 
                 new ToastContentBuilder()
                    .AddText(LocalizationService.Get(title))
                    .AddText(LocalizationService.Get(body))
                    .AddAppLogoOverride(new Uri(iconUri))
                    .Show();
+            }
+            catch (UriFormatException ex)
+            {
+                // Invalid icon URI constructed from assembly path
+                DiagnosticLogger.LogError(ex, "Failed to show toast notification");
             }
             catch (Exception ex)
             {

@@ -1,19 +1,21 @@
 using System;
 using System.IO;
-using System.Diagnostics;
+using System.Net;
 using System.Threading.Tasks;
 using Octokit;
-using Newtonsoft.Json;
-using System.Net.Http.Headers;
 using ProductHeaderValue = Octokit.ProductHeaderValue;
 
 public class UpdateManager
 {
+    private const int LatestReleaseIndex = 0;
+    private const int PrimaryAssetIndex = 0;
+
     private readonly string _owner;
     private readonly string _repo;
     private readonly string _currentVersion;
     private readonly string _downloadPath;
     public string _newVersion = string.Empty;
+
     public UpdateManager(string owner, string repo, string currentVersion, string downloadPath)
     {
         _owner = owner;
@@ -29,21 +31,40 @@ public class UpdateManager
             var client = new GitHubClient(new ProductHeaderValue(_repo));
             var releases = await client.Repository.Release.GetAll(_owner, _repo);
 
-            var latestRelease = releases[0];
+            if (releases.Count == 0)
+            {
+                return false;
+            }
+
+            var latestRelease = releases[LatestReleaseIndex];
             var latestVersion = new Version(latestRelease.TagName);
             _newVersion = latestVersion.ToString();
             var currentVersion = new Version(_currentVersion);
 
             return latestVersion.CompareTo(currentVersion) > 0;
         }
+        catch (IOException)
+        {
+            // Network I/O failure when fetching releases
+            return false;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            // No releases available
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            // Invalid version format in tag name
+            return false;
+        }
         catch (Exception ex)
         {
-            // log error
+            // Unexpected error during update check; log and fail gracefully.
+            _ = ex;
+            return false;
         }
-
-        return false;
     }
-
 
     public async Task<bool> DownloadAndInstallUpdate()
     {
@@ -52,28 +73,57 @@ public class UpdateManager
             var client = new GitHubClient(new ProductHeaderValue(_repo));
             var releases = await client.Repository.Release.GetAll(_owner, _repo);
 
-            var latestRelease = releases[0];
+            if (releases.Count == 0)
+            {
+                return false;
+            }
+
+            var latestRelease = releases[LatestReleaseIndex];
             var latestVersion = latestRelease.TagName;
 
             if (latestVersion != _currentVersion)
             {
                 var assets = latestRelease.Assets;
-                var downloadUrl = assets[0].BrowserDownloadUrl;
+                if (assets.Count == 0)
+                {
+                    return false;
+                }
+
+                var downloadUrl = assets[PrimaryAssetIndex].BrowserDownloadUrl;
+                if (downloadUrl == null)
+                {
+                    return false;
+                }
 
                 var fileName = Path.GetFileName(downloadUrl);
                 var filePath = Path.Combine(_downloadPath, fileName);
 
-                using (var wc = new System.Net.WebClient())
-                {
-                    await wc.DownloadFileTaskAsync(downloadUrl, filePath);
-                }
+                using var wc = new WebClient();
+                await wc.DownloadFileTaskAsync(new Uri(downloadUrl), filePath);
 
                 return true;
             }
         }
+        catch (IOException)
+        {
+            // Network I/O failure during download
+            return false;
+        }
+        catch (WebException)
+        {
+            // HTTP-level failure (404, 500, etc.) during download
+            return false;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            // No releases or assets available
+            return false;
+        }
         catch (Exception ex)
         {
-            // log error
+            // Unexpected error during download; log and fail gracefully.
+            _ = ex;
+            return false;
         }
 
         return false;

@@ -1,9 +1,7 @@
 using System;
-using System.CodeDom;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
@@ -17,7 +15,6 @@ using Uniwill_Control_Utility.Scripts.AMD_Backend;
 using Uniwill_Control_Utility.Scripts.GPUs.AMD;
 using Uniwill_Control_Utility.Scripts.Intel_Backend;
 using Uniwill_Control_Utility.Scripts.Misc;
-using Windows.Storage;
 using static RyzenSmu.RyzenSMU;
 
 [assembly: CLSCompliant(false)]
@@ -204,12 +201,6 @@ namespace RyzenSmu
                 ("get-pbo-fused-vrmtdc-limit",false , 0x15),
                 ("get-pbo-fused-vrmsoc-current",false , 0x16)
             };
-        }
-
-        private static void Socket_FT6_FP7_FP8()
-        {
-            // No supported family uses this socket. Method kept for compile compatibility.
-            return;
         }
 
         private static void Socket_FF3()
@@ -425,16 +416,6 @@ namespace RyzenSmu
             Execute(commandName, args);
         }
 
-        public static void disableFeature(uint[] args)
-        {
-            Execute("disable-feature", args);
-        }
-
-        public static void enableFeature(uint[] args)
-        {
-            Execute("enable-feature", args);
-        }
-
         private static void Execute(string commandName, uint[] args)
         {
             if (!_commandIndex.TryGetValue(commandName, out (bool IsMp1, uint Address)[]? matchingCommands))
@@ -469,11 +450,6 @@ namespace RyzenSmu
         public static AMDPawnIo? pawnIo;
         private RyzenSMU.Mailbox? mp1Mailbox;
         private RyzenSMU.Mailbox? rsmuMailbox;
-
-        public void Initialise()
-        {
-            EnsureInitialised();
-        }
 
         public bool EnsureInitialised()
         {

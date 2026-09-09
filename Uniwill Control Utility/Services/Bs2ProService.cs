@@ -223,7 +223,7 @@ namespace Uniwill_Control_Utility.Services
                     _settings = JsonConvert.DeserializeObject<Bs2ProSettings>(json) ?? new Bs2ProSettings();
                 }
             }
-            catch
+            catch (Exception)
             {
                 _settings = new Bs2ProSettings();
             }
@@ -297,10 +297,10 @@ namespace Uniwill_Control_Utility.Services
                         ProductId = productId
                     });
                 }
-                catch
+                catch (Exception)
                 {
                     // Skip devices that can't be opened or read
-                    try { d.CloseDevice(); } catch { /* Device close failed during error handling; skipping */ }
+                    try { d.CloseDevice(); } catch (Exception) { /* Device close failed during error handling; skipping */ }
                 }
             }
 
@@ -388,7 +388,7 @@ namespace Uniwill_Control_Utility.Services
 
                         await QueryDeviceSettingsAsync();
                     }
-                    catch
+                    catch (Exception)
                     {
                         // Non-critical: device may not respond to queries
                     }
@@ -420,7 +420,7 @@ namespace Uniwill_Control_Utility.Services
                 {
                     _device.CloseDevice();
                 }
-                catch { /* ignore close errors */ }
+                catch (Exception) { /* ignore close errors */ }
 
                 _device = null;
             }
@@ -451,7 +451,7 @@ namespace Uniwill_Control_Utility.Services
                     if (success)
                         return true;
                 }
-                catch
+                catch (Exception)
                 {
                     // Retry after backoff
                 }
@@ -493,7 +493,7 @@ namespace Uniwill_Control_Utility.Services
                         // Device was closed, exit loop
                         break;
                     }
-                    catch
+                    catch (Exception)
                     {
                         // Transient read errors — continue looping
                         Thread.Sleep(50);
@@ -508,7 +508,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 _readCts?.Cancel();
             }
-            catch { /* ignore cancellation errors */ }
+            catch (Exception) { /* ignore cancellation errors */ }
 
             // Wait for the read loop to exit before closing the device handle.
             // The read uses a 200ms timeout, so this should complete quickly.
@@ -591,40 +591,7 @@ namespace Uniwill_Control_Utility.Services
                         _lastWriteTime = DateTime.UtcNow;
                     return success;
                 }
-                catch
-                {
-                    return false;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Writes a 65-byte HID output report for RGB light strip commands.
-        /// Uses the same write throttling as control reports.
-        /// </summary>
-        private bool WriteLightReport(byte[] frame)
-        {
-            lock (_writeLock)
-            {
-                if (_device == null || !_device.IsOpen)
-                    return false;
-
-                var elapsed = (DateTime.UtcNow - _lastWriteTime).TotalMilliseconds;
-                if (elapsed < 80)
-                {
-                    Thread.Sleep((int)(80 - elapsed));
-                }
-
-                var report = Bs2ProFrame.BuildReport(frame, Bs2ProReportLength.Light);
-
-                try
-                {
-                    bool success = _device.Write(report);
-                    if (success)
-                        _lastWriteTime = DateTime.UtcNow;
-                    return success;
-                }
-                catch
+                catch (Exception)
                 {
                     return false;
                 }
@@ -651,7 +618,7 @@ namespace Uniwill_Control_Utility.Services
                         _lastWriteTime = DateTime.UtcNow;
                     return success;
                 }
-                catch
+                catch (Exception)
                 {
                     return false;
                 }
@@ -1271,7 +1238,7 @@ namespace Uniwill_Control_Utility.Services
                             {
                                 HandlePowerEvent();
                             }
-                            catch
+                            catch (Exception)
                             {
                                 // Non-critical: power event handling failure shouldn't crash the app
                             }
@@ -1284,7 +1251,7 @@ namespace Uniwill_Control_Utility.Services
                 };
                 _powerMonitorThread.Start();
             }
-            catch
+            catch (Exception)
             {
                 // Power notifications are optional; don't fail construction
             }
@@ -1296,7 +1263,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 _powerMonitorCts?.Cancel();
             }
-            catch { /* ignore */ }
+            catch (Exception) { /* ignore */ }
 
             _powerMonitorThread?.Join(2000);
 
@@ -1308,7 +1275,7 @@ namespace Uniwill_Control_Utility.Services
                     _powerNotificationHandle = nint.Zero;
                 }
             }
-            catch { /* ignore */ }
+            catch (Exception) { /* ignore */ }
 
             try
             {
@@ -1318,7 +1285,7 @@ namespace Uniwill_Control_Utility.Services
                     _powerEventHandle = nint.Zero;
                 }
             }
-            catch { /* ignore */ }
+            catch (Exception) { /* ignore */ }
 
             _powerMonitorCts?.Dispose();
             _powerMonitorCts = null;
@@ -1338,7 +1305,7 @@ namespace Uniwill_Control_Utility.Services
                         await WriteRealtimeRpmAsync(0);
                     }
                 }
-                catch { /* non-critical during suspend */ }
+                catch (Exception) { /* non-critical during suspend */ }
 
                 DisconnectAsync();
             }
@@ -1422,7 +1389,7 @@ namespace Uniwill_Control_Utility.Services
                                 }
                             }
                         }
-                        catch
+                        catch (Exception)
                         {
                             // Non-critical: monitoring failures shouldn't crash the app
                         }
@@ -1434,7 +1401,7 @@ namespace Uniwill_Control_Utility.Services
                 };
                 _deviceMonitorThread.Start();
             }
-            catch
+            catch (Exception)
             {
                 // Device monitoring is optional
             }
@@ -1478,7 +1445,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 _deviceMonitorCts?.Cancel();
             }
-            catch { /* ignore */ }
+            catch (Exception) { /* ignore */ }
 
             _deviceMonitorThread?.Join(2000);
 
@@ -1513,7 +1480,7 @@ namespace Uniwill_Control_Utility.Services
                         {
                             EvaluateTimeSchedule();
                         }
-                        catch
+                        catch (Exception)
                         {
                             // Non-critical: schedule evaluation failures shouldn't crash the app
                         }
@@ -1525,7 +1492,7 @@ namespace Uniwill_Control_Utility.Services
                 };
                 _scheduleMonitorThread.Start();
             }
-            catch
+            catch (Exception)
             {
                 // Schedule monitoring is optional
             }
@@ -1593,7 +1560,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 _scheduleMonitorCts?.Cancel();
             }
-            catch { /* ignore */ }
+            catch (Exception) { /* ignore */ }
 
             _scheduleMonitorThread?.Join(2000);
 

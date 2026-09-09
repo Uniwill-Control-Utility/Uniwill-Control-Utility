@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Management;
+using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.X86;
 using System.Text;
 using System.Windows;
@@ -20,6 +21,10 @@ namespace Uniwill_Control_Utility.Scripts
             Unknown = -1,
             FireRange,
         }
+
+        // Zen 5 (FireRange) CPUID identifiers
+        private const int Zen5Family = 26;
+        private const int Zen5FireRangeModel = 68;
 
         public static RyzenFamily FAM = RyzenFamily.Unknown;
 
@@ -196,7 +201,10 @@ namespace Uniwill_Control_Utility.Scripts
                         }
                     }
                 }
-                catch { /* WMI not available for model detection */ }
+                catch (COMException)
+                {
+                    // WMI not available for model detection
+                }
 
                 // Detect all GPUs: separate dedicated GPUs from integrated ones,
                 // then combine them as "dGPU / iGPU" for display.
@@ -244,7 +252,10 @@ namespace Uniwill_Control_Utility.Scripts
 
                     GPUName = allGpus.Count > 0 ? string.Join(" / ", allGpus) : "";
                 }
-                catch { /* WMI not available for GPU detection */ }
+                catch (COMException)
+                {
+                    // WMI not available for GPU detection
+                }
             }
             catch (Exception e)
             {
@@ -267,7 +278,7 @@ namespace Uniwill_Control_Utility.Scripts
                 }
 
                 // Only FireRange (Zen 5, Family 26, Model 68, HX suffix) is supported.
-                if (CPUFamily == 26 && CPUModel == 68 && CPUName.Contains("HX"))
+                if (CPUFamily == Zen5Family && CPUModel == Zen5FireRangeModel && CPUName.Contains("HX"))
                     FAM = RyzenFamily.FireRange;
 
                 TYPE = ProcessorType.Amd_Apu;

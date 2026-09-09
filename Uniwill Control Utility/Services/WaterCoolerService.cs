@@ -79,6 +79,7 @@ namespace Uniwill_Control_Utility.Services
             }
             catch
             {
+                // Corrupted or unreadable settings file — reset to defaults
                 _settings = new WaterCoolerSettings();
             }
         }
@@ -93,7 +94,10 @@ namespace Uniwill_Control_Utility.Services
                 var json = JsonConvert.SerializeObject(_settings, Newtonsoft.Json.Formatting.Indented);
                 File.WriteAllText(filePath, json);
             }
-            catch { /* non-critical */ }
+            catch
+            {
+                // Non-critical: failed to persist settings file
+            }
         }
 
         public WaterCoolerSettings GetSettings() => _settings;
@@ -235,7 +239,7 @@ namespace Uniwill_Control_Utility.Services
         /// Builds a human-readable device name from the BLE name and chassis brand.
         /// Examples: "XMG Oasis Mk2", "TUXEDO Aquaris Mk1", "LCT Watercooler"
         /// </summary>
-        private string ResolveDeviceName(string bleName)
+        private static string ResolveDeviceName(string bleName)
         {
             string? model = DetectModelFromBleName(bleName);
             string brand = DetectChassisBrand();
@@ -371,7 +375,11 @@ namespace Uniwill_Control_Utility.Services
             if (_rxCharacteristic != null)
             {
                 _rxCharacteristic.ValueChanged -= OnRxValueChanged;
-                try { await _rxCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue.None); } catch { /* Unsubscribe failed; continuing cleanup */ }
+                try { await _rxCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue.None); }
+                catch
+                {
+                    // Unsubscribe failed during cleanup; continue disposing remaining resources
+                }
                 _rxCharacteristic = null;
             }
 
@@ -381,7 +389,11 @@ namespace Uniwill_Control_Utility.Services
                 _gattSession.SessionStatusChanged -= OnGattSessionStatusChanged;
                 var staleSession = _gattSession;
                 _gattSession = null;
-                try { staleSession.Dispose(); } catch { /* Stale session dispose failed; harmless */ }
+                try { staleSession.Dispose(); }
+                catch
+                {
+                    // Stale session dispose failed; harmless during cleanup
+                }
                 await WaitForSessionClosedAsync(2000);
             }
             _sessionClosedTcs = null;
@@ -461,7 +473,10 @@ namespace Uniwill_Control_Utility.Services
                     if (sessionToDispose.CanMaintainConnection)
                         sessionToDispose.MaintainConnection = false;
                 }
-                catch { /* non-critical */ }
+                catch
+                {
+                    // Failed to disable MaintainConnection flag; dispose proceeds anyway
+                }
                 sessionToDispose.Dispose();
 
                 // Wait for the OS-level radio link to actually close.
@@ -498,11 +513,11 @@ namespace Uniwill_Control_Utility.Services
             byte[] frame;
             if (voltage == PumpVoltage.Off)
             {
-                frame = BuildFrame(WaterCoolerCommand.Pump, false, 0x00, 0x00, 0x00);
+                frame = BuildFrame(WaterCoolerCommand.Pump, false, WaterCoolerCommand.Disabled, WaterCoolerCommand.Disabled, WaterCoolerCommand.Disabled);
             }
             else
             {
-                frame = BuildFrame(WaterCoolerCommand.Pump, true, dutyCyclePercent, (byte)voltage, 0x00);
+                frame = BuildFrame(WaterCoolerCommand.Pump, true, dutyCyclePercent, (byte)voltage, WaterCoolerCommand.Disabled);
             }
 
             StatusChanged?.Invoke(this, $"Sending pump command: {string.Join(" ", frame.Select(b => b.ToString("X2")))}");
@@ -554,7 +569,7 @@ namespace Uniwill_Control_Utility.Services
             else
             {
                 // Expand color preset to RGB values
-                var (r, g, b) = color switch
+                (byte r, byte g, byte b) rgb = color switch
                 {
                     RgbColor.Red   => (byte.MaxValue, (byte)0, (byte)0),
                     RgbColor.Green => ((byte)0, byte.MaxValue, (byte)0),
@@ -562,6 +577,7 @@ namespace Uniwill_Control_Utility.Services
                     RgbColor.White => (byte.MaxValue, byte.MaxValue, byte.MaxValue),
                     _              => (byte.MaxValue, (byte)0, (byte)0),
                 };
+                var (r, g, b) = rgb;
 
                 frame = new byte[]
                 {
@@ -576,28 +592,6 @@ namespace Uniwill_Control_Utility.Services
             Debug.WriteLine($"[WaterCooler] RGB frame: {string.Join(" ", frame.Select(b => b.ToString("X2")))}");
             StatusChanged?.Invoke(this, $"Sending RGB command: mode={mode}, color={color}");
             return await WriteFrameAsync(frame);
-        }
-
-        /// <summary>
-        /// Sends status query command to the device.
-        /// Frame: FE 1A 01 00 00 00 00 EF
-        /// </summary>
-        public async Task<bool> QueryStatusAsync()
-        {
-            if (!IsConnected) throw new InvalidOperationException("Not connected");
-
-            return await WriteFrameAsync(BuildFrame(WaterCoolerCommand.Status, true, 0x00, 0x00, 0x00));
-        }
-
-        /// <summary>
-        /// Sends reset command to the device.
-        /// Frame: FE 19 00 01 00 00 00 EF
-        /// </summary>
-        public async Task<bool> WriteResetAsync()
-        {
-            if (!IsConnected) throw new InvalidOperationException("Not connected");
-
-            return await WriteFrameAsync(BuildFrame(WaterCoolerCommand.Reset, false, 0x01, 0x00, 0x00));
         }
 
         /// <summary>
@@ -636,7 +630,10 @@ namespace Uniwill_Control_Utility.Services
                     if (_settings.RgbEnabled && rgbMode != RgbState.Off)
                         await WriteRgbModeAsync(rgbMode, rgbColor);
                 }
-                catch { /* non-critical during auto-connect */ }
+                catch
+                {
+                    // Non-critical: failed to restore settings during auto-connect
+                }
 
                 StatusChanged?.Invoke(this, "Auto-connected successfully");
             }
@@ -678,11 +675,11 @@ namespace Uniwill_Control_Utility.Services
             {
                 WaterCoolerCommand.FrameStart,
                 command,
-                enabled ? (byte)1 : (byte)0,
+                enabled ? WaterCoolerCommand.Enabled : WaterCoolerCommand.Disabled,
                 paramA,
                 paramB,
                 paramC,
-                0x00, // padding
+                WaterCoolerCommand.Disabled, // padding
                 WaterCoolerCommand.FrameEnd
             };
         }
@@ -790,7 +787,10 @@ namespace Uniwill_Control_Utility.Services
                 await _txCharacteristic.WriteValueAsync(
                     frame.AsBuffer(), GattWriteOption.WriteWithoutResponse);
             }
-            catch { /* non-critical */ }
+            catch
+            {
+                // Non-critical: reset command failed during disconnect teardown
+            }
         }
 
         public void Dispose()
@@ -800,7 +800,11 @@ namespace Uniwill_Control_Utility.Services
             {
                 if (t.IsFaulted)
                 {
-                    try { t.Exception?.Flatten().GetBaseException(); } catch { /* non-critical */ }
+                    try { t.Exception?.Flatten().GetBaseException(); }
+                    catch
+                    {
+                        // Non-critical: failed to inspect exception during fire-and-forget disconnect
+                    }
                 }
             }, TaskContinuationOptions.OnlyOnFaulted);
 
@@ -808,8 +812,16 @@ namespace Uniwill_Control_Utility.Services
                 watcher.Stop();
 
             // Synchronous fallback cleanup in case async disconnect doesn't complete
-            try { _gattSession?.Dispose(); } catch { /* GATT session dispose failed; harmless */ }
-            try { _device?.Dispose(); } catch { /* Device dispose failed; harmless */ }
+            try { _gattSession?.Dispose(); }
+            catch
+            {
+                // GATT session dispose failed; harmless during Dispose
+            }
+            try { _device?.Dispose(); }
+            catch
+            {
+                // Device dispose failed; harmless during Dispose
+            }
         }
 
         /// <summary>

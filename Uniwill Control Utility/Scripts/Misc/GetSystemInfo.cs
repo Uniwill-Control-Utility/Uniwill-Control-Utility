@@ -1,14 +1,9 @@
-using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Management;
 using System.Runtime.Intrinsics.X86;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Media.Animation;
 using static Uniwill_Control_Utility.Scripts.Family;
 
 namespace Uniwill_Control_Utility.Scripts.Misc
@@ -60,7 +55,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     return obj["Name"].ToString();
                 }
             }
-            catch (Exception ex)
+            catch (ManagementException ex)
             {
                 DiagnosticLogger.LogError(ex, "Failed to get CPU name");
             }
@@ -84,7 +79,10 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     count++;
                 }
             }
-            catch (Exception ex) { MessageBox.Show(ex.ToString()); }
+            catch (ManagementException ex)
+            {
+                DiagnosticLogger.LogError(ex, "Failed to get GPU name");
+            }
 
             Garbage.Garbage_Collect();
             return "";
@@ -98,11 +96,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     foreach (ManagementObject queryObj in motherboardSearcher.Get())
                     {
-                        return GetAvailability(int.Parse(queryObj["Availability"].ToString()));
+                        return GetAvailability(Convert.ToInt32(queryObj["Availability"]));
                     }
                     return "";
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return "";
                 }
@@ -117,14 +115,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     foreach (ManagementObject queryObj in baseboardSearcher.Get())
                     {
-                        if (queryObj["HostingBoard"].ToString() == "True")
-                            return true;
-                        else
-                            return false;
+                        return queryObj["HostingBoard"].ToString() == "True";
                     }
                     return false;
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return false;
                 }
@@ -143,7 +138,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     }
                     return "";
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return "";
                 }
@@ -162,7 +157,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     }
                     return "";
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return "";
                 }
@@ -181,7 +176,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     }
                     return "";
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return "";
                 }
@@ -200,7 +195,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     }
                     return "";
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return "";
                 }
@@ -219,7 +214,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     }
                     return "";
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return "";
                 }
@@ -238,7 +233,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     }
                     return "";
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return "";
                 }
@@ -262,7 +257,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     }
                     return "";
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return "";
                 }
@@ -277,14 +272,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     foreach (ManagementObject queryObj in baseboardSearcher.Get())
                     {
-                        if (queryObj["Removable"].ToString() == "True")
-                            return true;
-                        else
-                            return false;
+                        return queryObj["Removable"].ToString() == "True";
                     }
                     return false;
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return false;
                 }
@@ -299,14 +291,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     foreach (ManagementObject queryObj in baseboardSearcher.Get())
                     {
-                        if (queryObj["Replaceable"].ToString() == "True")
-                            return true;
-                        else
-                            return false;
+                        return queryObj["Replaceable"].ToString() == "True";
                     }
                     return false;
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return false;
                 }
@@ -325,7 +314,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     }
                     return "";
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return "";
                 }
@@ -344,7 +333,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     }
                     return "";
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return "";
                 }
@@ -363,7 +352,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     }
                     return "";
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return "";
                 }
@@ -382,7 +371,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     }
                     return "";
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return "";
                 }
@@ -401,7 +390,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     }
                     return "";
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return "";
                 }
@@ -420,7 +409,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     }
                     return "";
                 }
-                catch (Exception e)
+                catch (ManagementException)
                 {
                     return "";
                 }
@@ -474,7 +463,6 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         public static decimal GetBatteryRate()
         {
-
             try
             {
                 ManagementScope scope = new ManagementScope("root\\WMI");
@@ -485,16 +473,12 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     decimal chargeRate = Convert.ToDecimal(obj["ChargeRate"]);
                     decimal dischargeRate = Convert.ToDecimal(obj["DischargeRate"]);
-                    if (chargeRate > 0)
-                        return chargeRate;
-                    else
-                        return -dischargeRate;
+                    return chargeRate > 0 ? chargeRate : -dischargeRate;
                 }
 
                 return 0;
-
             }
-            catch (Exception ex)
+            catch (ManagementException)
             {
                 return 0;
             }
@@ -502,7 +486,6 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         public static decimal ReadFullChargeCapacity()
         {
-
             try
             {
                 ManagementScope scope = new ManagementScope("root\\WMI");
@@ -515,11 +498,10 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 }
                 return 0;
             }
-            catch (Exception ex)
+            catch (ManagementException)
             {
                 return 0;
             }
-
         }
 
         public static decimal ReadDesignCapacity()
@@ -536,7 +518,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 }
                 return 0;
             }
-            catch (Exception ex)
+            catch (ManagementException)
             {
                 return 0;
             }
@@ -565,12 +547,10 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         public static decimal GetBatteryHealth()
         {
-            var designCap = ReadDesignCapacity();
-            var fullCap = ReadFullChargeCapacity();
+            decimal designCap = ReadDesignCapacity();
+            decimal fullCap = ReadFullChargeCapacity();
 
-            decimal health = (decimal)fullCap / (decimal)designCap;
-
-            return health;
+            return fullCap / designCap;
         }
 
         public enum CacheLevel : ushort
@@ -588,8 +568,8 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
             cacheSizes.AddRange(moc
               .Cast<ManagementObject>()
-              .Where(p => (ushort)(p.Properties["Level"].Value) == (ushort)level)
-              .Select(p => (uint)(p.Properties["MaxCacheSize"].Value)));
+              .Where(p => Convert.ToUInt16(p.Properties["Level"].Value) == (ushort)level)
+              .Select(p => Convert.ToUInt32(p.Properties["MaxCacheSize"].Value)));
 
             return cacheSizes;
         }
@@ -756,11 +736,12 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         public static bool IsEM64TSupported()
         {
-            ManagementObject mo;
-            mo = new ManagementObject("Win32_Processor.DeviceID='CPU0'");
-            ushort i = (ushort)mo["Architecture"];
+            using ManagementObject mo = new ManagementObject("Win32_Processor.DeviceID='CPU0'");
+            // Architecture: 0=x86, 1=MIPS, 2=Alpha, 3=PowerPC, 5=IA64, 6=Alpha21364, 9=x64
+            const ushort ArchitectureX64 = 9;
+            ushort architecture = Convert.ToUInt16(mo["Architecture"]);
 
-            return i == 9;
+            return architecture == ArchitectureX64;
         }
 
         private static bool CheckAVX512Support()
@@ -771,9 +752,9 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     if (FAM != RyzenFamily.FireRange) return false;
                 return NativeMethods.IsProcessorFeaturePresent(NativeMethods.PF_AVX512F_INSTRUCTIONS_AVAILABLE);
             }
-            catch
+            catch (DllNotFoundException)
             {
-                // If there's an exception during CPUID call, AVX-512 is not supported
+                // cpuid_x64.dll is not present; AVX-512 cannot be verified, assume not supported.
                 return false;
             }
         }

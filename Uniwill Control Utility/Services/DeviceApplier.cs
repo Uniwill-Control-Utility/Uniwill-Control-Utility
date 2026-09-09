@@ -671,7 +671,7 @@ namespace Uniwill_Control_Utility.Services
                 try
                 {
                     var hex = part.Trim();
-                    if (hex.StartsWith("#"))
+                    if (hex.StartsWith('#'))
                         hex = hex.Substring(1);
                     if (hex.Length == 6)
                     {

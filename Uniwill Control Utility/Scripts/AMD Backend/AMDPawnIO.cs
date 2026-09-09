@@ -1,15 +1,11 @@
 using Microsoft.Win32;
 using Microsoft.Win32.SafeHandles;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
 using Uniwill_Control_Utility.Scripts.Misc;
-using Uniwill_Control_Utility.Views.Windows;
 
 namespace Uniwill_Control_Utility.Scripts.AMD_Backend
 {
@@ -109,7 +105,7 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
                     return new AMDPawnIo(null);
                 }
                     
-                else DevicePath = OldDevicePath;
+                DevicePath = OldDevicePath;
             }
 
             try
@@ -132,9 +128,12 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
 
                 return new AMDPawnIo(new SafeFileHandle(raw, ownsHandle: true));
             }
-            catch
+            catch (Exception ex)
             {
-                try { CloseHandle(raw); } catch { /* Handle close failed; invalid handle */ }
+                // DeviceIoControl may throw on driver load failure (e.g., access denied, driver not loaded,
+                // or SEHException from the kernel driver). Log and return an unloaded instance.
+                DiagnosticLogger.LogInfo($"AMDpawnIo LoadModule: DeviceIoControl LoadBinary failed: {ex.GetType().Name}: {ex.Message}");
+                try { CloseHandle(raw); } catch { /* Handle close failed; handle is already invalid */ }
                 return new AMDPawnIo(null);
             }
         }
@@ -162,7 +161,7 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
             long[] outputs = new long[outLength];
             int hr = ExecuteHr(name, input, (uint)input.Length, outputs, (uint)outLength, out uint returned);
 
-            // If it failed, return the default-sized array (matches typical “best-effort” behaviour).
+            // If it failed, return the default-sized array (matches typical "best-effort" behaviour).
             if (hr != 0 || returned == 0)
                 return outputs;
 
@@ -257,8 +256,10 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
                 object? raw = key?.GetValue("DisplayVersion");
                 return TryParseVersion(raw, out Version? parsed) ? parsed : null;
             }
-            catch
+            catch (Exception ex)
             {
+                // Registry read may fail due to permissions, missing key, or WOW64 redirection.
+                DiagnosticLogger.LogInfo($"AMDpawnIo ReadInstalledVersion: failed: {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -275,8 +276,14 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
                 version = new Version(s);
                 return true;
             }
-            catch
+            catch (OverflowException)
             {
+                // Version constructor throws OverflowException for out-of-range components.
+                return false;
+            }
+            catch (ArgumentException)
+            {
+                // Version constructor throws ArgumentException for malformed strings.
                 return false;
             }
         }

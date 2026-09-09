@@ -128,7 +128,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         /// <summary>
         /// Schedules a debounced auto-apply of the current fan curve after 5 seconds
-        /// of slider inactivity. Each call resets the timer — the curve only applies
+        /// of slider inactivity. Each call resets the timer - the curve only applies
         /// after the user stops dragging sliders. Used only for slider edits.
         /// </summary>
         private void ScheduleAutoApply()

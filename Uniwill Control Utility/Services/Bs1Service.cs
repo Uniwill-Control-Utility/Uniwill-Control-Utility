@@ -45,13 +45,25 @@ namespace Uniwill_Control_Utility.Services
         private Timer? _heartbeatTimer;
         private const int HeartbeatIntervalMs = 2500; // Send every 2.5s (device expects ~3s)
 
-        // Named constants for repeated magic strings
+        // Named constants for repeated magic strings and numeric literals
         private const string LogPrefix = "[BS1]";
         private const string DefaultDeviceName = "Flydigi BS1";
         private const string SettingsFileName = "bs1_settings.json";
         private const int ConnectRetryDelayMs = 1000;
         private const string ModeRealtime = "Realtime";
         private const string ModeGear = "Gear";
+        private const int AutoConnectMaxAttempts = 3;
+        private const int ConnectMaxRetries = 2;
+        private const int ConnectTimeoutSeconds = 5;
+        private const int GattSessionTimeoutSeconds = 5;
+        private const int VerificationTimeoutSeconds = 3;
+        private const int SessionClosedWaitMs = 3000;
+        private const int CleanupSessionWaitMs = 2000;
+        private const int PreConnectDelayMs = 500;
+        private const int DisconnectDelayMs = 300;
+        private const int FirstHeartbeatDelaySeconds = 2;
+        private const int AdScanMinTimeoutMs = 3000;
+        private const ushort FlydigiServiceUuid16 = 0xFFF0;
 
         // Settings persistence
         private Bs1Settings _settings = new();
@@ -96,7 +108,7 @@ namespace Uniwill_Control_Utility.Services
             if (!_settings.AutoConnect || string.IsNullOrEmpty(_settings.LastDeviceAddress))
                 return false;
 
-            for (int attempt = 0; attempt < 3; attempt++)
+            for (int attempt = 0; attempt < AutoConnectMaxAttempts; attempt++)
             {
                 try
                 {
@@ -109,17 +121,17 @@ namespace Uniwill_Control_Utility.Services
                 }
                 catch
                 {
-                    // Retry after backoff
+                    // Non-critical: retry with backoff on any exception during auto-connect
                 }
 
-                if (attempt < 2)
+                if (attempt < AutoConnectMaxAttempts - 1)
                 {
-                    int delay = 1000 * (attempt + 1); // 1s, 2s
+                    int delay = ConnectRetryDelayMs * (attempt + 1); // 1s, 2s
                     await Task.Delay(delay);
                 }
             }
 
-            Log(LogPrefix + " Auto-connect failed after 3 attempts");
+            Log($"{LogPrefix} Auto-connect failed after {AutoConnectMaxAttempts} attempts");
             return false;
         }
 
@@ -137,6 +149,7 @@ namespace Uniwill_Control_Utility.Services
             }
             catch
             {
+                // Non-critical: settings file may be corrupted or unreadable; reset to defaults
                 _settings = new Bs1Settings();
             }
         }
@@ -151,7 +164,10 @@ namespace Uniwill_Control_Utility.Services
                 File.WriteAllText(filePath, json);
                 Log($"{LogPrefix} Settings saved: FanMode={_settings.FanMode}, Profile={_settings.SelectedCurveProfile}");
             }
-            catch { /* non-critical */ }
+            catch
+            {
+                // Non-critical: settings save failure is recoverable on next write
+            }
         }
 
         public Bs1Settings GetSettings() => _settings;
@@ -293,7 +309,7 @@ namespace Uniwill_Control_Utility.Services
                         // Check for 16-bit UUID 0xFFF0 (Flydigi BS1 service)
                         // The Bluetooth base UUID is 0000xxxx-0000-1000-8000-00805F9B34FB
                         ushort uuid16 = (ushort)uuid.GetHashCode();
-                        if (uuid16 == 0xFFF0)
+                        if (uuid16 == FlydigiServiceUuid16)
                         {
                             hasFlydigiService = true;
                             break;
@@ -325,7 +341,7 @@ namespace Uniwill_Control_Utility.Services
 
             watcher.Start();
             // Shorten scan if we already found devices via last-known or enumeration
-            int actualTimeout = devices.Count > 0 ? Math.Min(3000, timeoutMs) : timeoutMs;
+            int actualTimeout = devices.Count > 0 ? Math.Min(AdScanMinTimeoutMs, timeoutMs) : timeoutMs;
             Log($"{LogPrefix} Starting BLE advertisement scan for {actualTimeout}ms...");
             await Task.Delay(actualTimeout);
             watcher.Stop();
@@ -393,8 +409,6 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public async Task<bool> ConnectAsync(string deviceAddress)
         {
-            const int maxRetries = 2;
-
             // Disconnect first if already connected
             if (_device != null)
             {
@@ -402,14 +416,14 @@ namespace Uniwill_Control_Utility.Services
                 await DisconnectAsync();
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
-                await Task.Delay(500);
+                await Task.Delay(PreConnectDelayMs);
             }
 
-            for (int attempt = 1; attempt <= maxRetries; attempt++)
+            for (int attempt = 1; attempt <= ConnectMaxRetries; attempt++)
             {
                 try
                 {
-                    Log($"{LogPrefix} Connect attempt {attempt}/{maxRetries}, address={deviceAddress}");
+                    Log($"{LogPrefix} Connect attempt {attempt}/{ConnectMaxRetries}, address={deviceAddress}");
 
                     // Determine if this is a Windows DeviceId or a raw Bluetooth address
                     bool isDeviceId = deviceAddress.StartsWith("\\\\?\\") || deviceAddress.Contains("#");
@@ -419,7 +433,7 @@ namespace Uniwill_Control_Utility.Services
                         Log(LogPrefix + " Address looks like a DeviceId, using FromIdAsync...");
                         _device = await WithTimeoutAsync<BluetoothLEDevice>(
                             () => BluetoothLEDevice.FromIdAsync(deviceAddress).AsTask(),
-                            TimeSpan.FromSeconds(5), "FromIdAsync");
+                            TimeSpan.FromSeconds(ConnectTimeoutSeconds), "FromIdAsync");
                     }
                     else
                     {
@@ -467,14 +481,14 @@ namespace Uniwill_Control_Utility.Services
                             Log(LogPrefix + " Using resolved DeviceId for connection...");
                             _device = await WithTimeoutAsync<BluetoothLEDevice>(
                                 () => BluetoothLEDevice.FromIdAsync(resolvedDeviceId).AsTask(),
-                                TimeSpan.FromSeconds(5), "FromIdAsync (resolved)");
+                                TimeSpan.FromSeconds(ConnectTimeoutSeconds), "FromIdAsync (resolved)");
                         }
                         else
                         {
                             Log(LogPrefix + " No DeviceId found, falling back to FromBluetoothAddressAsync...");
                             _device = await WithTimeoutAsync<BluetoothLEDevice>(
                                 () => BluetoothLEDevice.FromBluetoothAddressAsync(address).AsTask(),
-                                TimeSpan.FromSeconds(5), "FromBluetoothAddressAsync");
+                                TimeSpan.FromSeconds(ConnectTimeoutSeconds), "FromBluetoothAddressAsync");
                         }
                     }
 
@@ -491,7 +505,7 @@ namespace Uniwill_Control_Utility.Services
                     Log(LogPrefix + " Creating GattSession...");
                     _gattSession = await WithTimeoutAsync<GattSession>(
                         () => GattSession.FromDeviceIdAsync(BluetoothDeviceId.FromId(_device.DeviceId)).AsTask(),
-                        TimeSpan.FromSeconds(5), "GattSession creation");
+                        TimeSpan.FromSeconds(GattSessionTimeoutSeconds), "GattSession creation");
 
                     if (_gattSession == null)
                     {
@@ -615,11 +629,11 @@ namespace Uniwill_Control_Utility.Services
                     Log($"{LogPrefix} Connect attempt {attempt} exception: {ex.GetType().Name} - {ex.Message}");
                     Log($"{LogPrefix} Stack trace: {ex.StackTrace}");
 
-                    if (attempt >= maxRetries)
+                    if (attempt >= ConnectMaxRetries)
                     {
                         // Last attempt - propagate the error info
                         StatusChanged?.Invoke(this, $"Connection failed: {ex.Message}");
-                        Log($"{LogPrefix} All {maxRetries} connection attempts exhausted");
+                        Log($"{LogPrefix} All {ConnectMaxRetries} connection attempts exhausted");
                     }
                     else
                     {
@@ -627,7 +641,7 @@ namespace Uniwill_Control_Utility.Services
                     }
 
                     await CleanupAfterFailedConnectAsync();
-                    if (attempt < maxRetries)
+                    if (attempt < ConnectMaxRetries)
                         await Task.Delay(ConnectRetryDelayMs);
                 }
             }
@@ -654,7 +668,10 @@ namespace Uniwill_Control_Utility.Services
                     await _rxCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(
                         GattClientCharacteristicConfigurationDescriptorValue.None);
                 }
-                catch { /* non-critical */ }
+                catch
+                {
+                    // Non-critical: disabling notifications during cleanup may fail if already disconnected
+                }
             }
 
             // Close ALL GATT services to force radio teardown
@@ -666,10 +683,13 @@ namespace Uniwill_Control_Utility.Services
                     foreach (var service in services.Services)
                         service.Dispose();
                 }
-                catch { /* non-critical */ }
+                catch
+                {
+                    // Non-critical: service disposal during cleanup is best-effort
+                }
             }
 
-            await Task.Delay(300);
+            await Task.Delay(DisconnectDelayMs);
 
             // Dispose GattSession
             if (_gattSession != null)
@@ -682,10 +702,13 @@ namespace Uniwill_Control_Utility.Services
                     if (sessionToDispose.CanMaintainConnection)
                         sessionToDispose.MaintainConnection = false;
                 }
-                catch { /* non-critical */ }
+                catch
+                {
+                    // Non-critical: session maintain-connection flag may fail during teardown
+                }
                 sessionToDispose.Dispose();
 
-                await WaitForSessionClosedAsync(3000);
+                await WaitForSessionClosedAsync(SessionClosedWaitMs);
             }
             _sessionClosedTcs = null;
 
@@ -717,7 +740,7 @@ namespace Uniwill_Control_Utility.Services
             _heartbeatTimer = new Timer(
                 _ => _ = SendHeartbeatAsync(),
                 null,
-                TimeSpan.FromSeconds(2), // First heartbeat after 2s
+                TimeSpan.FromSeconds(FirstHeartbeatDelaySeconds), // First heartbeat after 2s
                 TimeSpan.FromMilliseconds(HeartbeatIntervalMs));
         }
 
@@ -936,13 +959,14 @@ namespace Uniwill_Control_Utility.Services
             }
             catch
             {
+                // Non-critical: Task.Wait can throw OperationCanceledException on timeout or if the task faults
                 return false;
             }
         }
 
         /// <summary>
         /// Sends a heartbeat and waits for a status notification to verify the device
-        /// is actually powered on and responsive. Returns false if no response within 3s.
+        /// is actually powered on and responsive. Returns false if no response within timeout.
         /// </summary>
         private async Task<bool> VerifyDeviceResponsiveAsync()
         {
@@ -961,7 +985,7 @@ namespace Uniwill_Control_Utility.Services
                 }
                 catch
                 {
-                    // Ignore parse errors during verification
+                    // Non-critical: ignore parse errors during device verification
                 }
             }
 
@@ -975,8 +999,8 @@ namespace Uniwill_Control_Utility.Services
                 var frame = Bs1Frame.BuildHeartbeat();
                 await _txCharacteristic!.WriteValueAsync(frame.AsBuffer(), GattWriteOption.WriteWithResponse);
 
-                // Wait up to 3 seconds for a response
-                await respondedTcs.Task.WaitAsync(TimeSpan.FromSeconds(3));
+                // Wait for a response
+                await respondedTcs.Task.WaitAsync(TimeSpan.FromSeconds(VerificationTimeoutSeconds));
                 return respondedTcs.Task.Result;
             }
             catch (TaskCanceledException)
@@ -986,6 +1010,7 @@ namespace Uniwill_Control_Utility.Services
             }
             catch
             {
+                // Non-critical: any exception during verification means the device is not responsive
                 return false;
             }
             finally
@@ -1008,8 +1033,12 @@ namespace Uniwill_Control_Utility.Services
                 _gattSession.SessionStatusChanged -= OnGattSessionStatusChanged;
                 var session = _gattSession;
                 _gattSession = null;
-                try { session.Dispose(); } catch { /* Session dispose failed; harmless */ }
-                await WaitForSessionClosedAsync(2000);
+                try { session.Dispose(); }
+                catch
+                {
+                    // Non-critical: session dispose during failed connect cleanup is best-effort
+                }
+                await WaitForSessionClosedAsync(CleanupSessionWaitMs);
             }
             _sessionClosedTcs = null;
 

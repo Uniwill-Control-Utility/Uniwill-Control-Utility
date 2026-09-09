@@ -61,6 +61,29 @@ namespace Uniwill_Control_Utility.Views.Pages
         private const string Bs1ImageUri = "pack://application:,,,/Assets/Flydigi/bs1.png";
         private const string FlydigiAssetPrefix = "pack://application:,,,/Assets/Flydigi/";
 
+        // Device RPM limits
+        private const double Bs1MaxRpm = 3000;
+        private const double HidMaxRpm = 4000;
+
+        // Glow animation parameters
+        private const double GlowOpacityMin = 0.2;
+        private const double GlowOpacityMax = 0.5;
+        private const double GlowOpacityStep = 0.008;
+        private const int GlowPulseIntervalMs = 80;
+
+        // Fan mode indices (cbxFanMode)
+        private const int FanModeManual = 0;
+        private const int FanModeGear = 1;
+        private const int FanModeAuto = 2;
+
+        // RGB mode indices (cbxRgbMode)
+        private const int RgbModeOff = 0;
+        private const int RgbModeSmartTemp = 1;
+        private const int RgbModeStatic = 2;
+        private const int RgbModeRotation = 3;
+        private const int RgbModeFlowing = 4;
+        private const int RgbModeBreathing = 5;
+
         public FlydigiCooler()
         {
             InitializeComponent();
@@ -286,14 +309,14 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Hide sub-gear selector — BS1 has no sub-levels
                 spGearSubLevel.Visibility = Visibility.Collapsed;
 
-                // Adjust RPM range to BS1 max (3000)
-                sliderRpm.Maximum = 3000;
-                nudAvoidanceStart.Maximum = 3000;
-                nudAvoidanceEnd.Maximum = 3000;
+                // Adjust RPM range to BS1 max
+                sliderRpm.Maximum = Bs1MaxRpm;
+                nudAvoidanceStart.Maximum = Bs1MaxRpm;
+                nudAvoidanceEnd.Maximum = Bs1MaxRpm;
 
                 // Clamp any existing manual RPM that's out of range
-                if (sliderRpm.Value > 3000)
-                    sliderRpm.Value = 3000;
+                if (sliderRpm.Value > Bs1MaxRpm)
+                    sliderRpm.Value = Bs1MaxRpm;
             }
             else
             {
@@ -310,10 +333,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 spGearSubLevel.Visibility = Visibility.Visible;
 
-                // Restore RPM range to HID max (4000)
-                sliderRpm.Maximum = 4000;
-                nudAvoidanceStart.Maximum = 4000;
-                nudAvoidanceEnd.Maximum = 4000;
+                // Restore RPM range to HID max
+                sliderRpm.Maximum = HidMaxRpm;
+                nudAvoidanceStart.Maximum = HidMaxRpm;
+                nudAvoidanceEnd.Maximum = HidMaxRpm;
             }
         }
 
@@ -348,9 +371,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void UpdateFanModeUI()
         {
             var selectedIndex = cbxFanMode.SelectedIndex;
-            var enteringAuto = selectedIndex == 2;
-            var enteringManual = selectedIndex == 0;
-            var enteringGear = selectedIndex == 1;
+            var enteringAuto = selectedIndex == FanModeAuto;
+            var enteringManual = selectedIndex == FanModeManual;
+            var enteringGear = selectedIndex == FanModeGear;
             var wasAuto = _smartControl != null || _bs1SmartControl != null;
 
             spManual.Visibility = enteringManual ? Visibility.Visible : Visibility.Collapsed;
@@ -620,21 +643,21 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (_smartControl != null)
             {
-                try { _smartControl.Stop(); } catch { /* ignore */ }
-                try { _smartControl.Dispose(); } catch { /* ignore */ }
+                try { _smartControl.Stop(); } catch (Exception) { /* Non-critical: best-effort cleanup during teardown */ }
+                try { _smartControl.Dispose(); } catch (Exception) { /* Non-critical: best-effort cleanup during teardown */ }
                 _smartControl = null;
             }
 
             if (_bs1SmartControl != null)
             {
-                try { _bs1SmartControl.Stop(); } catch { /* ignore */ }
-                try { _bs1SmartControl.Dispose(); } catch { /* ignore */ }
+                try { _bs1SmartControl.Stop(); } catch (Exception) { /* Non-critical: best-effort cleanup during teardown */ }
+                try { _bs1SmartControl.Dispose(); } catch (Exception) { /* Non-critical: best-effort cleanup during teardown */ }
                 _bs1SmartControl = null;
             }
 
             if (_tempProvider != null)
             {
-                try { _tempProvider.Dispose(); } catch { /* ignore */ }
+                try { _tempProvider.Dispose(); } catch (Exception) { /* Non-critical: best-effort cleanup during teardown */ }
                 _tempProvider = null;
             }
         }
@@ -684,7 +707,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     ApplyAccentGlow();
 
                 // Restart auto control if we're in Auto mode and it was stopped by the override
-                if (cbxFanMode.SelectedIndex == 2 && _smartControl == null && _bs1SmartControl == null && _activeProfile != null)
+                if (cbxFanMode.SelectedIndex == FanModeAuto && _smartControl == null && _bs1SmartControl == null && _activeProfile != null)
                 {
                     if (_isBs1Device)
                         StartAutoControlBs1();
@@ -707,7 +730,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             _isSyncingFromPreset = true;
             try
             {
-                cbxFanMode.SelectedIndex = Math.Clamp(settings.FanMode, 0, 2);
+                cbxFanMode.SelectedIndex = Math.Clamp(settings.FanMode, FanModeManual, FanModeAuto);
                 sliderRpm.Value = settings.ManualRpm;
                 RpmValueText.Text = settings.ManualRpm.ToString();
                 cbxGearSubLevel.SelectedIndex = Math.Clamp(settings.ManualGear - 1, 0, 3);
@@ -725,33 +748,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 _isSyncingFromPreset = false;
             }
-        }
-
-        /// <summary>
-        /// Re-applies the Flydigi page's saved settings to the device after override is lifted.
-        /// This ensures the device reflects the page's user settings, not whatever
-        /// Adaptive Mode last commanded.
-        /// </summary>
-        private void ReapplyUserSettingsToDevice()
-        {
-            if (_coolerService == null || !_coolerService.IsConnected)
-                return;
-
-            var settings = _coolerService.GetSettings();
-
-            // Apply RGB from restored settings
-            try
-            {
-                ApplyRgbFromSettings(settings);
-            }
-            catch { /* non-critical on override-lift */ }
-
-            // Apply fan from restored settings
-            try
-            {
-                ApplyFanFromSettings(settings);
-            }
-            catch { /* non-critical on override-lift */ }
         }
 
         /// <summary>
@@ -824,15 +820,15 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 switch (settings.FanMode)
                 {
-                    case 0: // Manual RPM
+                    case FanModeManual: // Manual RPM
                         if (settings.ManualRpm > 0)
                             await _coolerService.WriteRealtimeRpmAsync(settings.ManualRpm);
                         break;
-                    case 1: // Gear
+                    case FanModeGear: // Gear
                         if (settings.ManualGear > 0)
                             await _coolerService.WriteGearAsync((byte)settings.ManualGear);
                         break;
-                    case 2: // Curve — handled by FlydigiSmartControl (restart in ApplyOverrideState)
+                    case FanModeAuto: // Curve — handled by FlydigiSmartControl (restart in ApplyOverrideState)
                         break;
                 }
             }
@@ -918,7 +914,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             nudRgbR.Value = e.R;
             nudRgbG.Value = e.G;
             nudRgbB.Value = e.B;
-            RgbColorPicker.SelectedColor = Color.FromRgb((byte)e.R, (byte)e.G, (byte)e.B);
+            RgbColorPicker.SelectedColor = Color.FromRgb(e.R, e.G, e.B);
             sliderRgbBrightness.Value = e.Brightness;
             RgbBrightnessValueText.Text = e.Brightness.ToString();
         }
@@ -1017,9 +1013,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                     var custom = FlydigiFanCurveProfile.FromJSON(customCurveJson);
                     cbxCurveProfile.Items.Add(new ComboBoxItem { Content = custom.Name, Tag = custom });
                 }
-                catch
+                catch (Exception)
                 {
-                    // Corrupted JSON — ignore and let user recreate
+                    // Non-critical: corrupted custom curve JSON — ignore and let user recreate
                 }
             }
 
@@ -1153,15 +1149,15 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 switch (modeIndex)
                 {
-                    case 0: // Off
+                    case RgbModeOff: // Off
                         await _coolerService.WriteRgbOffAsync();
                         break;
 
-                    case 1: // Smart-Temp
+                    case RgbModeSmartTemp: // Smart-Temp
                         await _coolerService.WriteRgbSmartTempAsync();
                         break;
 
-                    case 2: // Static
+                    case RgbModeStatic: // Static
                         {
                             var r = (byte)nudRgbR.Value;
                             var g = (byte)nudRgbG.Value;
@@ -1171,7 +1167,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         }
                         break;
 
-                    case 3: // Rotation (multi-color)
+                    case RgbModeRotation: // Rotation (multi-color)
                         {
                             var colors = mcRotationColors!.Colors;
                             var speed = GetRgbRotationSpeedName();
@@ -1187,7 +1183,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         }
                         break;
 
-                    case 4: // Flowing
+                    case RgbModeFlowing: // Flowing
                         {
                             var speed = GetRgbSpeedName();
                             var brightness = (byte)sliderRgbBrightness.Value;
@@ -1195,7 +1191,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         }
                         break;
 
-                    case 5: // Breathing
+                    case RgbModeBreathing: // Breathing
                         {
                             var r = (byte)nudRgbR.Value;
                             var g = (byte)nudRgbG.Value;
@@ -1227,19 +1223,19 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             var selectedIndex = cbxRgbMode.SelectedIndex;
 
-            // Off message: Off (0)
-            spRgbOff.Visibility = selectedIndex is 0 ? Visibility.Visible : Visibility.Collapsed;
+            // Off message
+            spRgbOff.Visibility = selectedIndex is RgbModeOff ? Visibility.Visible : Visibility.Collapsed;
 
-            // Smart-Temp message: Smart-Temp (1)
-            spRgbSmartTemp.Visibility = selectedIndex is 1 ? Visibility.Visible : Visibility.Collapsed;
+            // Smart-Temp message
+            spRgbSmartTemp.Visibility = selectedIndex is RgbModeSmartTemp ? Visibility.Visible : Visibility.Collapsed;
 
-            // Color picker: Static (2), Breathing (5)
-            var staticBreathVisible = selectedIndex is 2 or 5 ? Visibility.Visible : Visibility.Collapsed;
+            // Color picker: Static, Breathing
+            var staticBreathVisible = selectedIndex is RgbModeStatic or RgbModeBreathing ? Visibility.Visible : Visibility.Collapsed;
             spRgbColorPicker.Visibility = staticBreathVisible;
             RgbStaticBrightnessDivider.Visibility = staticBreathVisible;
 
-            // Multi-color row: Rotation (3) — no divider, stacks with Color
-            var rotationVisible = selectedIndex is 3 ? Visibility.Visible : Visibility.Collapsed;
+            // Multi-color row: Rotation — no divider, stacks with Color
+            var rotationVisible = selectedIndex is RgbModeRotation ? Visibility.Visible : Visibility.Collapsed;
             spRgbMultiColor.Visibility = rotationVisible;
 
             // Rotation Speed row + divider
@@ -1250,24 +1246,24 @@ namespace Uniwill_Control_Utility.Views.Pages
             RgbRotationBrightnessDivider.Visibility = rotationVisible;
             spRgbRotationBrightness.Visibility = rotationVisible;
 
-            // Flowing mode (4): Speed row + divider before it (brightness is shared)
-            var flowingVisible = selectedIndex is 4 ? Visibility.Visible : Visibility.Collapsed;
+            // Flowing mode: Speed row + divider before it (brightness is shared)
+            var flowingVisible = selectedIndex is RgbModeFlowing ? Visibility.Visible : Visibility.Collapsed;
             RgbFlowingSpeedDivider.Visibility = flowingVisible;
             spRgbSpeed.Visibility = flowingVisible;
 
-            // Shared brightness: Static (2), Breathing (5), Flowing (4)
-            var brightnessVisible = selectedIndex is 2 or 4 or 5 ? Visibility.Visible : Visibility.Collapsed;
+            // Shared brightness: Static, Breathing, Flowing
+            var brightnessVisible = selectedIndex is RgbModeStatic or RgbModeFlowing or RgbModeBreathing ? Visibility.Visible : Visibility.Collapsed;
             spRgbBrightness.Visibility = brightnessVisible;
         }
 
         private static string GetRgbModeName(int index) => index switch
         {
-            0 => "Off",
-            1 => "SmartTemp",
-            2 => "Static",
-            3 => "Rotation",
-            4 => "Flowing",
-            5 => "Breathing",
+            RgbModeOff => "Off",
+            RgbModeSmartTemp => "SmartTemp",
+            RgbModeStatic => "Static",
+            RgbModeRotation => "Rotation",
+            RgbModeFlowing => "Flowing",
+            RgbModeBreathing => "Breathing",
             _ => "Off"
         };
 
@@ -1496,7 +1492,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             _glowPulseTimer?.Dispose();
             _glowActive = true;
             _glowPulseDirection = true;
-            rectGlowOverlay.Opacity = 0.2;
+            rectGlowOverlay.Opacity = GlowOpacityMin;
             _glowPulseTimer = new System.Threading.Timer(_ =>
             {
                 if (!_glowActive)
@@ -1510,26 +1506,26 @@ namespace Uniwill_Control_Utility.Views.Pages
                         var current = rectGlowOverlay.Opacity;
                         if (_glowPulseDirection)
                         {
-                            if (current < 0.5)
-                                rectGlowOverlay.Opacity = current + 0.008;
+                            if (current < GlowOpacityMax)
+                                rectGlowOverlay.Opacity = current + GlowOpacityStep;
                             else
                                 _glowPulseDirection = false;
                         }
                         else
                         {
-                            if (current > 0.2)
-                                rectGlowOverlay.Opacity = current - 0.008;
+                            if (current > GlowOpacityMin)
+                                rectGlowOverlay.Opacity = current - GlowOpacityStep;
                             else
                                 _glowPulseDirection = true;
                         }
                     });
                 }
-                catch
+                catch (Exception)
                 {
-                    // Dispatcher shut down or element detached — stop the timer
+                    // Non-critical: dispatcher shut down or element detached — stop the timer
                     _glowActive = false;
                 }
-            }, null, 80, 80);
+            }, null, GlowPulseIntervalMs, GlowPulseIntervalMs);
         }
 
         /// <summary>Stops the glow pulse and hides the glow when disconnected.</summary>
@@ -1546,9 +1542,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                     rectGlowOverlay.Opacity = 0;
                 });
             }
-            catch
+            catch (Exception)
             {
-                // Dispatcher shut down — ignore
+                // Non-critical: dispatcher shut down during glow stop
             }
         }
 
@@ -1560,7 +1556,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 var accentColor = GetWindowsAccentColor();
                 rectGlowOverlay.Fill = new SolidColorBrush(accentColor);
             }
-            catch { /* element detached or color unavailable */ }
+            catch (Exception) { /* Non-critical: element detached or accent color unavailable */ }
         }
 
         /// <summary>Reads the Windows 10/11 accent color from the registry.</summary>
@@ -1578,7 +1574,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     return Color.FromRgb(r, g, b);
                 }
             }
-            catch { /* fall through to default */ }
+            catch (Exception) { /* Non-critical: registry read failed, fall through to default */ }
 
             // Fallback: WPF-UI default blue
             return Color.FromRgb(0, 0x7A, 0xCC);
@@ -1598,7 +1594,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 };
                 rectGlowOverlay.OpacityMask = maskBrush;
             }
-            catch { /* element detached */ }
+            catch (Exception) { /* Non-critical: element detached during glow mask update */ }
         }
 
         /* ------------------------------------------------------------------ */
@@ -1614,7 +1610,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 // Manual RPM (clamped to BS1 range)
                 double bs1Rpm = bs1Settings.ManualRpm > 0
-                    ? Math.Min((int)bs1Settings.ManualRpm, 3000)
+                    ? Math.Min(bs1Settings.ManualRpm, (ushort)Bs1MaxRpm)
                     : Bs1DefaultGearRpm.Gear0_Quiet;
                 sliderRpm.Value = bs1Rpm;
                 RpmValueText.Text = ((int)bs1Rpm).ToString();
@@ -1661,7 +1657,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 // Fan mode — must come AFTER curve profile so that _activeProfile is
                 // populated when SelectionChanged → StartAutoControlBs1() runs.
-                int bs1FanMode = Math.Clamp(bs1Settings.FanMode, 0, 2);
+                int bs1FanMode = Math.Clamp(bs1Settings.FanMode, FanModeManual, FanModeAuto);
                 System.Diagnostics.Debug.WriteLine($"[BS1 LoadSettingsToUI] FanMode from settings={bs1Settings.FanMode}, clamped={bs1FanMode}, _activeProfile={(_activeProfile?.Name ?? "null")}");
                 cbxFanMode.SelectedIndex = bs1FanMode;
 
@@ -1770,7 +1766,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             _isInitialized = true;
 
             // Fan mode
-            var fanMode = Math.Clamp(settings.FanMode, 0, 2);
+            var fanMode = Math.Clamp(settings.FanMode, FanModeManual, FanModeAuto);
             cbxFanMode.SelectedIndex = fanMode;
             UpdateFanModeUI();
 
@@ -1876,8 +1872,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                     // Stop BS1 smart control, keep temperature polling
                     if (_bs1SmartControl != null)
                     {
-                        try { _bs1SmartControl.Stop(); } catch { /* ignore */ }
-                        try { _bs1SmartControl.Dispose(); } catch { /* ignore */ }
+                        try { _bs1SmartControl.Stop(); } catch (Exception) { /* Non-critical: best-effort cleanup during disconnect */ }
+                        try { _bs1SmartControl.Dispose(); } catch (Exception) { /* Non-critical: best-effort cleanup during disconnect */ }
                         _bs1SmartControl = null;
                     }
 
@@ -1898,8 +1894,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                     // Stop HID smart control
                     if (_smartControl != null)
                     {
-                        try { _smartControl.Stop(); } catch { /* ignore */ }
-                        try { _smartControl.Dispose(); } catch { /* ignore */ }
+                        try { _smartControl.Stop(); } catch (Exception) { /* Non-critical: best-effort cleanup during disconnect */ }
+                        try { _smartControl.Dispose(); } catch (Exception) { /* Non-critical: best-effort cleanup during disconnect */ }
                         _smartControl = null;
                     }
 
@@ -2007,15 +2003,15 @@ namespace Uniwill_Control_Utility.Views.Pages
                     System.Diagnostics.Debug.WriteLine($"[BS1 ApplySavedFanSettingsOnConnect] FanMode={settings.FanMode}, _activeProfile={(_activeProfile?.Name ?? "null")}");
                     switch (settings.FanMode)
                     {
-                        case 0: // Manual RPM
+                        case FanModeManual: // Manual RPM
                             if (settings.ManualRpm > 0)
                                 await _bs1Service.WriteRpmAsync(settings.ManualRpm);
                             break;
-                        case 1: // Gear Presets
+                        case FanModeGear: // Gear Presets
                             if (settings.ManualGear > 0)
                                 await _bs1Service.WriteGearAsync((byte)settings.ManualGear);
                             break;
-                        case 2: // Auto Curve - StartAutoControl will handle this
+                        case FanModeAuto: // Auto Curve - StartAutoControl will handle this
                             StartAutoControlBs1();
                             break;
                     }
@@ -2025,22 +2021,22 @@ namespace Uniwill_Control_Utility.Views.Pages
                     var settings = _coolerService.GetSettings();
                     switch (settings.FanMode)
                     {
-                        case 0: // Manual RPM
+                        case FanModeManual: // Manual RPM
                             if (settings.ManualRpm > 0)
                                 await _coolerService.WriteRealtimeRpmAsync(settings.ManualRpm);
                             break;
-                        case 1: // Gear Presets
+                        case FanModeGear: // Gear Presets
                             if (settings.ManualGear > 0)
                                 await _coolerService.WriteGearAsync((byte)settings.ManualGear);
                             break;
-                        case 2: // Auto Curve - already handled by StartAutoControl in temperature polling
+                        case FanModeAuto: // Auto Curve - already handled by StartAutoControl in temperature polling
                             break;
                     }
                 }
             }
-            catch
+            catch (Exception)
             {
-                // Non-critical: device may not be ready yet
+                // Non-critical: device may not be ready yet on connect
             }
         }
 
@@ -2104,7 +2100,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     tbTemperature.Text = temp.HasValue ? $"{temp.Value:F1}°C" : "N/A";
                 });
             }
-            catch
+            catch (Exception)
             {
                 // Non-critical: temperature reading failures shouldn't crash the UI
                 var dispatcher = Application.Current?.Dispatcher;
@@ -2277,8 +2273,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                         btnScan.Content = "Scan";
                     });
                 }
-                catch
+                catch (Exception)
                 {
+                    // Non-critical: auto-scan failure — restore UI to idle state
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         btnScan.IsEnabled = true;

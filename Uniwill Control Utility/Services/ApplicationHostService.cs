@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
 using System.Diagnostics;
@@ -12,6 +13,8 @@ namespace Uniwill_Control_Utility.Services
 {
     public class ApplicationHostService : IHostedService
     {
+        private const string LightBarBootTag = "[LB-boot]";
+
         private readonly IServiceProvider _serviceProvider;
         private INavigationWindow? _navigationWindow;
 
@@ -37,9 +40,10 @@ namespace Uniwill_Control_Utility.Services
 
             if (!Application.Current.Windows.OfType<Views.Windows.MainWindow>().Any())
             {
-                _navigationWindow = (_serviceProvider.GetService(typeof(INavigationWindow)) as INavigationWindow)!;
-                _navigationWindow!.ShowWindow();
-                _navigationWindow!.Navigate(typeof(Views.Pages.DashboardPage));
+                var window = _serviceProvider.GetRequiredService<INavigationWindow>();
+                _navigationWindow = window;
+                window.ShowWindow();
+                window.Navigate(typeof(Views.Pages.DashboardPage));
             }
 
             await Task.CompletedTask;
@@ -62,16 +66,16 @@ namespace Uniwill_Control_Utility.Services
                     bool enabled = Settings.Default.LightBarEnabled;
                     if (!enabled)
                     {
-                        Debug.WriteLine("[LB-boot] LightBar disabled, skipping boot apply");
+                        Debug.WriteLine($"{LightBarBootTag} LightBar disabled, skipping boot apply");
                         return;
                     }
 
-                    byte r = (byte)Settings.Default.LightBarR;
-                    byte g = (byte)Settings.Default.LightBarG;
-                    byte b = (byte)Settings.Default.LightBarB;
-                    int brightness = (int)Settings.Default.LightBarBrightness;
-                    int effectIndex = (int)Settings.Default.LightBarEffectIndex;
-                    int speed = (int)Settings.Default.LightBarSpeed;
+                    byte r = Settings.Default.LightBarR;
+                    byte g = Settings.Default.LightBarG;
+                    byte b = Settings.Default.LightBarB;
+                    int brightness = Settings.Default.LightBarBrightness;
+                    int effectIndex = Settings.Default.LightBarEffectIndex;
+                    int speed = Settings.Default.LightBarSpeed;
 
                     var hid = new KeyboardHidService();
                     try
@@ -79,7 +83,7 @@ namespace Uniwill_Control_Utility.Services
                         bool opened = hid.Open();
                         if (!opened || !hid.IsLightBarAvailable)
                         {
-                            Debug.WriteLine("[LB-boot] HID light bar not available");
+                            Debug.WriteLine($"{LightBarBootTag} HID light bar not available");
                             return;
                         }
 
@@ -95,7 +99,7 @@ namespace Uniwill_Control_Utility.Services
                         hid.LightBarTurnOn(r, g, b, brightness);
                         hid.LightBarSetEffect(effect, hidSpeed, brightness);
 
-                        Debug.WriteLine($"[LB-boot] Applied: enabled={enabled}, color=({r},{g},{b}), brightness={brightness}, effect=0x{effect:X2}, hidSpeed={hidSpeed}");
+                        Debug.WriteLine($"{LightBarBootTag} Applied: enabled={enabled}, color=({r},{g},{b}), brightness={brightness}, effect=0x{effect:X2}, hidSpeed={hidSpeed}");
                     }
                     finally
                     {
@@ -104,7 +108,8 @@ namespace Uniwill_Control_Utility.Services
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[LB-boot] Apply failed: {ex.Message}");
+                    // Logged for diagnostics; boot settings are non-critical so we swallow the error
+                    Debug.WriteLine($"{LightBarBootTag} Apply failed: {ex.Message}");
                 }
             });
         }

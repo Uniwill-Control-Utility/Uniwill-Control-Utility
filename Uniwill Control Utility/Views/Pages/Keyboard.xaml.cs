@@ -315,9 +315,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             for (int i = 0; i < count; i++)
             {
                 var child = VisualTreeHelper.GetChild(parent, i);
-                if (child is Wpf.Ui.Controls.SymbolIcon)
+                if (child is Wpf.Ui.Controls.SymbolIcon symbolIcon)
                 {
-                    ((FrameworkElement)child).Visibility = Visibility.Collapsed;
+                    symbolIcon.Visibility = Visibility.Collapsed;
                     return;
                 }
                 WalkAndHideChevron(child);
@@ -380,7 +380,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                             KeyboardEffect effect = (KeyboardEffect)Application.Current.Dispatcher.Invoke(
                                 () => cmbEffect.SelectedItem is KeyboardEffect e ? e : KeyboardEffect.Static);
 
-                            byte speed = SliderToHidSpeed(5);
+                            byte speed = SliderToHidSpeed(DefaultEffectSpeed);
 
                             // Combine power-on and effect into one sequence to avoid
                             // a visible flash of intermediate Static color.
@@ -537,6 +537,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             KeyboardEffect.TouchSpark,
             KeyboardEffect.Spark,
         };
+
+        /// <summary>Default slider speed (1-10) used when switching from per-key to effects mode.</summary>
+        private const int DefaultEffectSpeed = 5;
 
         private void CmbEffect_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -951,7 +954,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 // Build color dict for HID send.
                 var colors = new Dictionary<int, (byte, byte, byte)>();
-                for (int i = 0; i < 126; i++)
+                for (int i = 0; i < KeyboardHidService.MaxPerKeyZones; i++)
                     colors[i] = (color.R, color.G, color.B);
 
                 // Save to disk first so the color data persists even if the HID
@@ -1325,7 +1328,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                         result.Add(Color.FromRgb(r, g, b));
                     }
                 }
-                catch { /* Invalid hex color entry skipped */ }
+                catch (FormatException)
+                {
+                    // Invalid hex color entry skipped
+                }
             }
             return result;
         }

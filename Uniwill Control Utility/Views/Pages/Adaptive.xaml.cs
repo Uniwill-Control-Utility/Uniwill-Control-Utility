@@ -25,7 +25,6 @@ using Uniwill_Control_Utility.Services;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using GameLib.Plugin.Steam.Model;
 using Windows.Gaming.Preview.GamesEnumeration;
-using System.Management;
 using System.ComponentModel;
 using static Uniwill_Control_Utility.Scripts.Game_Manager;
 
@@ -35,10 +34,7 @@ namespace Uniwill_Control_Utility.Views.Pages
     {
         System.Windows.Threading.DispatcherTimer adaptiveMode = new System.Windows.Threading.DispatcherTimer();
         System.Windows.Threading.DispatcherTimer sensors = new System.Windows.Threading.DispatcherTimer();
-        private static int coreCount = 0;
         private readonly GpuInventoryService gpuInventory;
-        private int radeonGpuCount;
-        private int nvidiaGpuCount;
 
         public Adaptive(GpuInventoryService gpuInventory)
         {
@@ -91,7 +87,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (uniwillEc is not null)
                 {
                     try { uniwillAvailable = uniwillEc.Initialize(); }
-                    catch { /* not available */ }
+                    catch (Exception) { /* EC not available */ }
                 }
 
                 Dispatcher.Invoke(() =>
@@ -115,7 +111,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                             sdLightBar.Visibility = Visibility.Visible;
                     });
                 }
-                catch { /* HID not available */ }
+                catch (Exception) { /* HID not available */ }
             });
         }
 
@@ -234,6 +230,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         private const int MaxRpmBs1 = 3000;
         private const int MaxRpmBs2 = 4000;
 
+        // RyzenAdj curve optimizer 20-bit bias base
+        private const int CoBiasBase = 0x100000;
+
         private static AdaptivePresetManager adaptivePresetManager = new AdaptivePresetManager(Settings.Default.Path + AdaptivePresetsFile);
         private static DeviceApplier? _deviceApplier;
         private static FlydigiSmartControl? _bs2ProSmartControl;
@@ -245,9 +244,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 // Initialize DeviceApplier for centralized device commands
                 _deviceApplier = App.GetService<DeviceApplier>();
-                GpuInventorySnapshot inventory = await gpuInventory.GetSnapshotAsync();
-                radeonGpuCount = inventory.RadeonCount;
-                nvidiaGpuCount = inventory.NvidiaCount;
+                _ = await gpuInventory.GetSnapshotAsync();
 
                 cbExcludeFromSwitching.IsChecked = false;
 
@@ -298,7 +295,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                             EcFanCustomDuties = null,
                             EcFanCpuCustomDuties = null,
                             EcFanGpuCustomDuties = null,
-                            isAutoSwitch = !(bool)cbExcludeFromSwitching.IsChecked,
+                            isAutoSwitch = !(cbExcludeFromSwitching.IsChecked ?? false),
                             // CPU defaults
                             CpuSustained = 75,
                             CpuBoost = 85,
@@ -331,8 +328,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                     }
                 }
 
-                foreach (var item in new System.Management.ManagementObjectSearcher("Select * from Win32_Processor").Get()) coreCount += int.Parse(item["NumberOfCores"].ToString());
-
                 btnStart.IsEnabled = true;
                 btnSave.IsEnabled = true;
 
@@ -343,9 +338,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 DiagnosticLogger.LogError(ex, "Failed during adaptive mode setup");
             }
         }
-
-        [DllImport("user32.dll")]
-        static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
 
         [DllImport("user32.dll", SetLastError = true)]
         static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
@@ -364,13 +356,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
 
         delegate bool WndEnumProc(IntPtr hWnd, IntPtr lParam);
-
-        [StructLayout(LayoutKind.Sequential)]
-        struct LASTINPUTINFO
-        {
-            public uint cbSize;
-            public uint dwTime;
-        }
 
         private const string DefaultProfileName = "Default";
 
@@ -492,15 +477,15 @@ namespace Uniwill_Control_Utility.Views.Pages
                     // what the user has configured in the active profile.
                     if (_deviceApplier != null)
                     {
-                        if (!Settings.Default.HideFlydigi && (bool)cbxBs2ProEnabled.IsChecked && !_deviceApplier.IsFlydigiOverridden)
+                        if (!Settings.Default.HideFlydigi && (cbxBs2ProEnabled.IsChecked ?? false) && !_deviceApplier.IsFlydigiOverridden)
                             _deviceApplier.EnableFlydigiOverride();
-                        if ((bool)cbxWcEnabled.IsChecked && !_deviceApplier.IsWatercoolerOverridden)
+                        if ((cbxWcEnabled.IsChecked ?? false) && !_deviceApplier.IsWatercoolerOverridden)
                             _deviceApplier.EnableWatercoolerOverride();
-                        if ((bool)cbxEcFanEnabled.IsChecked && !_deviceApplier.IsEcFanOverridden)
+                        if ((cbxEcFanEnabled.IsChecked ?? false) && !_deviceApplier.IsEcFanOverridden)
                             _deviceApplier.EnableEcFanOverride();
-                        if ((bool)cbxKbEnabled.IsChecked && !_deviceApplier.IsKeyboardOverridden)
+                        if ((cbxKbEnabled.IsChecked ?? false) && !_deviceApplier.IsKeyboardOverridden)
                             _deviceApplier.EnableKeyboardOverride();
-                        if ((bool)cbxLbEnabled.IsChecked && sdLightBar.Visibility == Visibility.Visible && !_deviceApplier.IsLightBarOverridden)
+                        if ((cbxLbEnabled.IsChecked ?? false) && sdLightBar.Visibility == Visibility.Visible && !_deviceApplier.IsLightBarOverridden)
                             _deviceApplier.EnableLightBarOverride();
                     }
                 }
@@ -915,12 +900,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 AdaptivePreset preset = new AdaptivePreset
                 {
-                    WcEnabled = (bool)cbxWcEnabled.IsChecked,
+                    WcEnabled = cbxWcEnabled.IsChecked ?? false,
                     WcPumpVoltage = GetPumpVoltageFromIndex(cbxWcPumpVoltage.SelectedIndex).ToString(),
                     WcFanSpeed = GetFanSpeedFromIndex(cbxWcFanSpeed.SelectedIndex).ToString(),
                     WcRgbMode = GetRgbModeFromIndex(cbxWcRgbMode.SelectedIndex).ToString(),
                     WcRgbColor = GetRgbColorFromIndex(cbxWcRgbColor.SelectedIndex).ToString(),
-                    Bs2ProEnabled = (bool)cbxBs2ProEnabled.IsChecked,
+                    Bs2ProEnabled = cbxBs2ProEnabled.IsChecked ?? false,
                     Bs2ProFanMode = GetBs2ProFanModeFromIndex(cbxBs2ProFanMode.SelectedIndex),
                     Bs2ProGear = cbxBs2ProGear.SelectedIndex + 1,
                     Bs2ProRpm = (ushort)Math.Clamp((int)nudBs2ProRpm.Value, MinRpm, MaxRpmBs2),
@@ -934,7 +919,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     Bs2ProBrightness = (byte)sliderBs2ProBrightness.Value,
                     // Gap 2: Save Flydigi RGB speed per-game
                     Bs2ProRgbSpeed = (byte)sliderBs2ProRgbSpeed.Value,
-                    EcFanEnabled = sdEcFan.Visibility == Visibility.Visible ? (bool)cbxEcFanEnabled.IsChecked : false,
+                    EcFanEnabled = sdEcFan.Visibility == Visibility.Visible ? (cbxEcFanEnabled.IsChecked ?? false) : false,
                     EcFanUnifiedMode = sdEcFan.Visibility == Visibility.Visible ? cbxEcFanMode.SelectedIndex == 0 : false,
                     EcFanPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanPreset.SelectedIndex) : EcFanPresetBalanced,
                     EcFanCpuPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanCpuPreset.SelectedIndex) : EcFanPresetBalanced,
@@ -946,7 +931,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         ? FanControlSettingsService.Load().CpuDuties?.ToArray() : null,
                     EcFanGpuCustomDuties = sdEcFan.Visibility == Visibility.Visible && GetEcFanPresetFromIndex(cbxEcFanGpuPreset.SelectedIndex) == EcFanPresetCustom
                         ? FanControlSettingsService.Load().GpuDuties?.ToArray() : null,
-                    KbEnabled = (bool)cbxKbEnabled.IsChecked,
+                    KbEnabled = cbxKbEnabled.IsChecked ?? false,
                     KbPerKeyMode = cbxKbMode.SelectedIndex == 1,
                     KbBrightness = (int)sdKbBrightness.Value,
                     KbIdleTimerEnabled = false,
@@ -962,9 +947,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                     KbMultiColors = SerializeColors(KbMultiColorPicker.Colors),
                     KbPerKeyColors = KeyboardSettingsService.Load().PerKeyColors,
                     KbDirection = _kbDirection,
-                    isAutoSwitch = !(bool)cbExcludeFromSwitching.IsChecked,
+                    isAutoSwitch = !(cbExcludeFromSwitching.IsChecked ?? false),
                     // CPU
-                    CpuEnabled = (bool)cbxCpuEnabled.IsChecked,
+                    CpuEnabled = cbxCpuEnabled.IsChecked ?? false,
                     CpuSustained = (int)AdpSdSustained.Value,
                     CpuBoost = (int)AdpSdBoost.Value,
                     CpuTjMax = (int)AdpSdTjMax.Value,
@@ -976,7 +961,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     CpuPl2 = (int)AdpSdIntelPl2.Value,
                     CpuUndervolt = (int)AdpSdIntelUndervolt.Value,
                     // GPU
-                    GpuEnabled = sdGpuSettings.Visibility == Visibility.Visible ? (bool)cbxGpuEnabled.IsChecked : false,
+                    GpuEnabled = sdGpuSettings.Visibility == Visibility.Visible ? (cbxGpuEnabled.IsChecked ?? false) : false,
                     GpuTgp = (int)AdpSdNvPower.Value,
                     GpuDynamicBoost = AdpTogDynamicBoost.IsChecked == true,
                     GpuDbOffset = (int)AdpSdNvDbOffset.Value,
@@ -985,7 +970,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     // Gap 4: Save GPU V-F curve preset name per-game
                     GpuVfCurveName = GetActiveVfCurveName(),
                     // Light Bar
-                    LbEnabled = sdLightBar.Visibility == Visibility.Visible ? (bool)cbxLbEnabled.IsChecked : false,
+                    LbEnabled = sdLightBar.Visibility == Visibility.Visible ? (cbxLbEnabled.IsChecked ?? false) : false,
                     LbPower = AdpTsLightBarPower.IsChecked == true,
                     LbColorR = AdpLbColorPicker.SelectedColor.R,
                     LbColorG = AdpLbColorPicker.SelectedColor.G,
@@ -1001,8 +986,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 DiagnosticLogger.LogError(ex, "Failed to save adaptive preset");
             }
         }
-
-        private static LASTINPUTINFO lastInput = new LASTINPUTINFO();
 
         private async void btnReloadApps_Click(object sender, RoutedEventArgs e)
         {
@@ -1027,11 +1010,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             savePreset(presetName);
 
             // Sync active settings so other pages can detect the change immediately
-            Settings.Default.AdaptiveBs2ProEnabled = (bool)cbxBs2ProEnabled.IsChecked;
-            Settings.Default.AdaptiveWcEnabled = (bool)cbxWcEnabled.IsChecked;
-            Settings.Default.AdaptiveCpuEnabled = (bool)cbxCpuEnabled.IsChecked;
-            Settings.Default.AdaptiveGpuEnabled = (bool)cbxGpuEnabled.IsChecked;
-            Settings.Default.AdaptiveLbEnabled = (bool)cbxLbEnabled.IsChecked;
+            Settings.Default.AdaptiveBs2ProEnabled = cbxBs2ProEnabled.IsChecked ?? false;
+            Settings.Default.AdaptiveWcEnabled = cbxWcEnabled.IsChecked ?? false;
+            Settings.Default.AdaptiveCpuEnabled = cbxCpuEnabled.IsChecked ?? false;
+            Settings.Default.AdaptiveGpuEnabled = cbxGpuEnabled.IsChecked ?? false;
+            Settings.Default.AdaptiveLbEnabled = cbxLbEnabled.IsChecked ?? false;
             Settings.Default.Save();
         }
 
@@ -1044,7 +1027,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
             }
 
-            bool enabled = (bool)cbxBs2ProEnabled.IsChecked;
+            bool enabled = cbxBs2ProEnabled.IsChecked ?? false;
             Settings.Default.AdaptiveBs2ProEnabled = enabled;
             Settings.Default.Save();
 
@@ -1065,7 +1048,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbxWcEnabled_Toggled(object sender, RoutedEventArgs e)
         {
-            bool enabled = (bool)cbxWcEnabled.IsChecked;
+            bool enabled = cbxWcEnabled.IsChecked ?? false;
             Settings.Default.AdaptiveWcEnabled = enabled;
             Settings.Default.Save();
 
@@ -1088,7 +1071,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbxEcFanEnabled_Toggled(object sender, RoutedEventArgs e)
         {
-            bool enabled = (bool)cbxEcFanEnabled.IsChecked;
+            bool enabled = cbxEcFanEnabled.IsChecked ?? false;
 
             // Only apply override when Adaptive Mode is running
             if (!start) return;
@@ -1259,7 +1242,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async Task ApplyWatercoolerIfNeeded()
         {
-            if (!(bool)cbxWcEnabled.IsChecked)
+            if (!(cbxWcEnabled.IsChecked ?? false))
                 return;
 
             PumpVoltage curPump = GetPumpVoltageFromIndex(cbxWcPumpVoltage.SelectedIndex);
@@ -1280,7 +1263,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async Task ApplyBs2ProIfNeeded()
         {
-            if (Settings.Default.HideFlydigi || !(bool)cbxBs2ProEnabled.IsChecked)
+            if (Settings.Default.HideFlydigi || !(cbxBs2ProEnabled.IsChecked ?? false))
                 return;
 
             string bs2Mode = GetBs2ProFanModeFromIndex(cbxBs2ProFanMode.SelectedIndex);
@@ -1309,8 +1292,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (bs2Mode == "Gear")
                     gear = (byte)(cbxBs2ProGear.SelectedIndex + 1);
                 else if (bs2Mode == "Rpm")
-                    rpm = (ushort)Math.Clamp((int)nudBs2ProRpm.Value, 1300,
-                        (FlydigiHardwareDetector.ConnectedDeviceType == ConnectedDeviceType.BS1 ? 3000 : 4000));
+                    rpm = (ushort)Math.Clamp((int)nudBs2ProRpm.Value, MinRpm,
+                        (FlydigiHardwareDetector.ConnectedDeviceType == ConnectedDeviceType.BS1 ? MaxRpmBs1 : MaxRpmBs2));
 
                 bool fanChanged = bs2Mode != lastBs2ProFanModeText ||
                     (bs2Mode == "Gear" && gear != lastBs2ProGear) ||
@@ -1338,8 +1321,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Fire preset-applied event so the Flydigi page can sync its UI.
                 byte? fanGear = bs2Mode == "Gear" ? (byte?)(cbxBs2ProGear.SelectedIndex + 1) : null;
                 ushort? fanRpm = bs2Mode == "Rpm"
-                    ? (ushort?)Math.Clamp((int)nudBs2ProRpm.Value, 1300,
-                        (FlydigiHardwareDetector.ConnectedDeviceType == ConnectedDeviceType.BS1 ? 3000 : 4000))
+                    ? (ushort?)Math.Clamp((int)nudBs2ProRpm.Value, MinRpm,
+                        (FlydigiHardwareDetector.ConnectedDeviceType == ConnectedDeviceType.BS1 ? MaxRpmBs1 : MaxRpmBs2))
                     : null;
                 _deviceApplier.RaiseFlydigiPresetApplied(bs2Mode, fanGear, fanRpm,
                     bs2RgbMode, bs2R, bs2G, bs2B, bs2Brightness);
@@ -1427,7 +1410,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void ApplyEcFanIfNeeded()
         {
-            if (!(bool)cbxEcFanEnabled.IsChecked || _deviceApplier == null)
+            if (!(cbxEcFanEnabled.IsChecked ?? false) || _deviceApplier == null)
                 return;
 
             bool unified = cbxEcFanMode.SelectedIndex == 0;
@@ -1472,7 +1455,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void ApplyKeyboardIfNeeded()
         {
-            if (!(bool)cbxKbEnabled.IsChecked || _deviceApplier == null)
+            if (!(cbxKbEnabled.IsChecked ?? false) || _deviceApplier == null)
                 return;
 
             bool perKeyMode = cbxKbMode.SelectedIndex == 1;
@@ -1530,7 +1513,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void ApplyCpuIfNeeded()
         {
-            if (!(bool)cbxCpuEnabled.IsChecked)
+            if (!(cbxCpuEnabled.IsChecked ?? false))
                 return;
 
             if (Family.TYPE == Family.ProcessorType.Amd_Apu)
@@ -1598,7 +1581,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             if (coUnified)
             {
-                int biased = 0x100000 - Math.Abs(coUnifiedValue);
+                int biased = CoBiasBase - Math.Abs(coUnifiedValue);
                 parts.Add($"--set-coall={biased:X}");
             }
             else
@@ -1607,7 +1590,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 for (int ccd = 0; ccd < 2; ccd++)
                 {
                     int offset = ccd == 0 ? coCcd0 : coCcd1;
-                    int biased = 0x100000 - Math.Abs(offset);
+                    int biased = CoBiasBase - Math.Abs(offset);
                     for (int core = 0; core < 8; core++)
                     {
                         parts.Add($"--set-coper={BuildCoperArg(ccd, ccdMap[ccd, core], biased):X}");
@@ -1649,7 +1632,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void ApplyGpuIfNeeded()
         {
-            if (!(bool)cbxGpuEnabled.IsChecked || sdGpuSettings.Visibility != Visibility.Visible)
+            if (!(cbxGpuEnabled.IsChecked ?? false) || sdGpuSettings.Visibility != Visibility.Visible)
                 return;
 
             int tgp = (int)AdpSdNvPower.Value;
@@ -1698,7 +1681,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void ApplyLightBarIfNeeded()
         {
-            if (!(bool)cbxLbEnabled.IsChecked ||
+            if (!(cbxLbEnabled.IsChecked ?? false) ||
                 sdLightBar.Visibility != Visibility.Visible ||
                 _hidService == null)
                 return;
@@ -1747,20 +1730,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         #endregion
 
-        public bool IsScrollBarVisible(ScrollViewer scrollViewer)
-        {
-            if (scrollViewer == null) throw new ArgumentNullException(nameof(scrollViewer));
-
-            return scrollViewer.ExtentHeight > scrollViewer.ViewportHeight;
-        }
-
         private void cbAutoSwitch_Click(object sender, RoutedEventArgs e)
         {
-            Settings.Default.autoSwitch = (bool)cbAutoSwitch.IsChecked;
+            Settings.Default.autoSwitch = cbAutoSwitch.IsChecked ?? false;
             Settings.Default.Save();
         }
-
-        private static LauncherManager launcherManager = new LauncherManager(new LauncherOptions() { QueryOnlineData = true });
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
@@ -1862,7 +1836,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                             if (mainModule.FileName.Contains(item.path) && AutoSwitchEnabled(item))
                                 return item.gameName;
                         }
-                        catch
+                        catch (Exception)
                         {
                             // Process.MainModule throws for elevated/protected processes — skip silently
                         }
@@ -2160,13 +2134,13 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (_bs2ProSmartControl != null)
             {
-                try { _bs2ProSmartControl.Stop(); } catch { /* ignore */ }
-                try { _bs2ProSmartControl.Dispose(); } catch { /* ignore */ }
+                try { _bs2ProSmartControl.Stop(); } catch (Exception) { /* ignore */ }
+                try { _bs2ProSmartControl.Dispose(); } catch (Exception) { /* ignore */ }
                 _bs2ProSmartControl = null;
             }
             if (_bs2ProTempProvider != null)
             {
-                try { _bs2ProTempProvider.Dispose(); } catch { /* ignore */ }
+                try { _bs2ProTempProvider.Dispose(); } catch (Exception) { /* ignore */ }
                 _bs2ProTempProvider = null;
             }
         }
@@ -2175,8 +2149,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (_bs1SmartControl != null)
             {
-                try { _bs1SmartControl.Stop(); } catch { /* ignore */ }
-                try { _bs1SmartControl.Dispose(); } catch { /* ignore */ }
+                try { _bs1SmartControl.Stop(); } catch (Exception) { /* ignore */ }
+                try { _bs1SmartControl.Dispose(); } catch (Exception) { /* ignore */ }
                 _bs1SmartControl = null;
             }
         }
@@ -2192,7 +2166,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     return FlydigiFanCurveProfile.FromJSON(bs1Settings.CustomCurveJson);
                 }
             }
-            catch
+            catch (Exception)
             {
                 // Corrupted custom curve JSON — fall back to Balanced
             }
@@ -2210,7 +2184,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     return FlydigiFanCurveProfile.FromJSON(bs2Settings.CustomCurveJson);
                 }
             }
-            catch
+            catch (Exception)
             {
                 // Corrupted custom curve JSON — fall back to Balanced
             }
@@ -2251,7 +2225,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     var flydigiService = App.GetService<FlydigiCoolerService>();
                     Bs2ProCurveEditor.SetCurve(LoadCustomCurveProfile(flydigiService));
                 }
-                catch
+                catch (Exception)
                 {
                     Bs2ProCurveEditor.SetCurve(FlydigiFanCurveProfile.CreateBalanced());
                 }
@@ -2276,7 +2250,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     var flydigiService = App.GetService<FlydigiCoolerService>();
                     Bs2ProCurveEditor.SetCurve(LoadCustomCurveProfile(flydigiService));
                 }
-                catch
+                catch (Exception)
                 {
                     Bs2ProCurveEditor.SetCurve(FlydigiFanCurveProfile.CreateBalanced());
                 }
@@ -2301,7 +2275,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         seedProfile = Uniwill_Control_Utility.Models.FlydigiFanCurveProfile.FromJSON(bs2Settings.CustomCurveJson);
                     }
                 }
-                catch { /* use default balanced */ }
+                catch (Exception) { /* use default balanced */ }
             }
 
             var dialog = new Views.Windows.FlydigiCurveEditorWindow(seedProfile);
@@ -2328,14 +2302,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 DiagnosticLogger.LogError(ex, "Failed to save custom curve from Adaptive Mode");
             }
 
-            // Update the Flydigi page's smart control if it's running
-            try
-            {
-                var flydigiPage = App.GetService<Views.Pages.FlydigiCooler>();
-                // The Flydigi page will pick up the new curve on its next smart control tick
-                // because it reads from the same settings file.
-            }
-            catch { /* Flydigi page may not be loaded */ }
+            // The Flydigi page will pick up the new curve on its next smart control tick
+            // because it reads from the same settings file.
         }
 
         // RGB helpers
@@ -2508,7 +2476,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbxKbEnabled_Toggled(object sender, RoutedEventArgs e)
         {
-            bool enabled = (bool)cbxKbEnabled.IsChecked;
+            bool enabled = cbxKbEnabled.IsChecked ?? false;
             Settings.Default.AdaptiveKeyboardEnabled = enabled;
             Settings.Default.Save();
 
@@ -2724,28 +2692,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             lastKbEffectSpeed = byte.MaxValue;
         }
 
-        private static int GetKbIdleTimerIndex(int minutes) => minutes switch
-        {
-            <= 5 => 0,
-            <= 10 => 1,
-            <= 15 => 2,
-            <= 30 => 3,
-            <= 60 => 4,
-            <= 120 => 5,
-            _ => 6
-        };
-
-        private static int GetKbIdleTimerMinutes(int index) => index switch
-        {
-            0 => 5,
-            1 => 10,
-            2 => 15,
-            3 => 30,
-            4 => 60,
-            5 => 120,
-            _ => 180
-        };
-
         private static int GetKbEffectIndex(string effectMode) => effectMode switch
         {
             "Static" => 0,
@@ -2872,7 +2818,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         result.Add(Color.FromRgb(r, g, b));
                     }
                 }
-                catch { /* Invalid hex color entry skipped */ }
+                catch (FormatException) { /* Invalid hex color entry skipped */ }
             }
             return result;
         }
@@ -2988,7 +2934,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbxCpuEnabled_Toggled(object sender, RoutedEventArgs e)
         {
-            bool enabled = (bool)cbxCpuEnabled.IsChecked;
+            bool enabled = cbxCpuEnabled.IsChecked ?? false;
             Settings.Default.AdaptiveCpuEnabled = enabled;
             Settings.Default.Save();
 
@@ -3036,7 +2982,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbxGpuEnabled_Toggled(object sender, RoutedEventArgs e)
         {
-            bool enabled = (bool)cbxGpuEnabled.IsChecked;
+            bool enabled = cbxGpuEnabled.IsChecked ?? false;
             Settings.Default.AdaptiveGpuEnabled = enabled;
             Settings.Default.Save();
 
@@ -3057,7 +3003,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbxLbEnabled_Toggled(object sender, RoutedEventArgs e)
         {
-            bool enabled = (bool)cbxLbEnabled.IsChecked;
+            bool enabled = cbxLbEnabled.IsChecked ?? false;
             Settings.Default.AdaptiveLbEnabled = enabled;
             Settings.Default.Save();
 
@@ -3126,7 +3072,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _adpUserTouchedCoreSlider = false; // User went back to curve — reclaim from slider
                 updateAdpCoreLabel();
                 // Only apply to hardware if Adaptive Mode is running AND GPU Settings is enabled
-                if (start && (bool)cbxGpuEnabled.IsChecked)
+                if (start && (cbxGpuEnabled.IsChecked ?? false))
                     ApplyActiveVfCurveToGpu();
             };
             _vfEditorWindow.Show();
@@ -3386,36 +3332,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 DiagnosticLogger.LogError(ex, "Failed to get active V-F curve name");
             }
             return string.Empty;
-        }
-
-        /// <summary>Gap 4: Applies the named V-F curve preset to the GPU hardware, or resets to stock if name is empty.</summary>
-        private static void ApplyVfCurveByName(string curveName)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(curveName))
-                {
-                    // Profile has no curve — reset GPU to stock to clear any previous game's curve
-                    NvTuning.ResetVfCurveOffsets();
-                    return;
-                }
-
-                var presets = Uniwill_Control_Utility.Models.VfCurvePresetStore.Load();
-                var target = presets.FirstOrDefault(p => p.Name == curveName);
-                if (target == null || !target.HasChanges)
-                {
-                    // Named curve not found — reset to stock
-                    NvTuning.ResetVfCurveOffsets();
-                    return;
-                }
-
-                // Apply EC power limit BEFORE the curve write (same as Presets page).
-                NvTuning.ApplyVfCurveOffsets_ClockBoostTable(target.Offsets);
-            }
-            catch (Exception ex)
-            {
-                DiagnosticLogger.LogError(ex, "Failed to apply V-F curve from preset");
-            }
         }
 
         #endregion

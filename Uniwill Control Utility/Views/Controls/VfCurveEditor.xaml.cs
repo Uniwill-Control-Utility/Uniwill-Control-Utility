@@ -53,6 +53,59 @@ namespace Uniwill_Control_Utility.Views.Controls
         // 16px right-edge margin so last point isn't glued to border
         private const double RightMarginPx = 16;
 
+        // WPF-UI resource key names (Fluent theme brushes)
+        private const string ResAccentFillColorDefaultBrush = "AccentFillColorDefaultBrush";
+        private const string ResControlStrongFillColorDefaultBrush = "ControlStrongFillColorDefaultBrush";
+        private const string ResTextFillColorPrimaryBrush = "TextFillColorPrimaryBrush";
+        private const string ResAccentTextFillColorPrimaryBrush = "AccentTextFillColorPrimaryBrush";
+        private const string ResTextOnAccentFillColorPrimaryBrush = "TextOnAccentFillColorPrimaryBrush";
+        private const string ResAccentFillColorPrimaryBrush = "AccentFillColorPrimaryBrush";
+        private const string ResCardBackgroundFillColorDefaultBrush = "CardBackgroundFillColorDefaultBrush";
+
+        // Drawing constants
+        private const double GridLineOpacity = 0.12;
+        private const double StockCurveOpacity = 0.125;
+        private const double SelectionHighlightOpacity = 0.25;
+        private const double CrosshairDashOpacity = 0.35;
+        private const double ExtensionLineOpacity = 0.5;
+        private const double CrosshairOpacity = 0.6;
+        private const double CrosshairLabelOpacity = 0.75;
+        private const double UnselectedPointOpacity = 0.8;
+        private const double StockCurveStrokeThickness = 1.5;
+        private const double CurveStrokeThickness = 2.0;
+        private const double PointDiameter = 8.0;
+        private const double PointRadius = 4.0;
+        private const double AxisLabelFontSize = 10.0;
+        private const double AxisLabelVerticalOffset = 5.0;
+        private const double CrosshairStrokeThickness = 1.0;
+        private const double CrosshairDashSize = 4.0;
+        private const double CrosshairLabelFontSize = 10.0;
+        private const double CrosshairLabelXOffset = 6.0;
+        private const double CrosshairLabelYOffset = 4.0;
+        private const int PointProximityThresholdPx = 6;
+        private const int GridFreqStep = 100;
+        private const int TooltipFontSize = 12;
+        private const int TooltipSecondaryFontSize = 11;
+        private const int TooltipVerticalOffset = 12;
+        private const int TooltipMinEdgeMargin = 2;
+        private const int MovementTooltipPaddingH = 6;
+        private const int MovementTooltipPaddingV = 2;
+        private const int MovementTooltipLine1FontSize = 12;
+        private const int MovementTooltipLine2FontSize = 11;
+        private const int ShiftEnterDoublePressMs = 500;
+        private const int ResizeDebounceMs = 300;
+        private const int LiveFreqTimerSeconds = 2;
+        private const int MinLayoutDimension = 10;
+        private const int YAxisLabelHeightBreakpointHigh = 680;
+        private const int YAxisLabelHeightBreakpointLow = 500;
+        private const int XAxisWidthBreakpointNarrow = 480;
+        private const int XAxisWidthBreakpointMedium = 720;
+        private const int XAxisIncrementNarrow = 100;
+        private const int XAxisIncrementMedium = 50;
+        private const int XAxisIncrementWide = 25;
+        private const int YAxisIncrementTall = 100;
+        private const int YAxisIncrementShort = 200;
+
         // Visual state
         private int? _dragIndex = null;
         private int? _dragStartIndex = null;       // Point clicked to start drag (null = no drag pending)

@@ -3,7 +3,6 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using System.Windows;
 using Uniwill_Control_Utility.Properties;
 
 namespace Uniwill_Control_Utility.Scripts.Intel_Backend
@@ -12,6 +11,42 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
     {
         private static readonly object objLock = new object();
         private static readonly object initializationLock = new object();
+
+        // MSR addresses
+        private const uint MsrTdp = 0x610;
+        private const uint MsrVoltageOffset = 0x150;
+        private const uint MsrClockRatio = 0x1AD;
+
+        // Power balance MSR addresses
+        private const uint MsrPowerBalanceCpu = 0x63A;
+        private const uint MsrPowerBalanceGpu = 0x642;
+
+        // Voltage plane command bases
+        private const ulong VoltageCommandCpu = 0x80000011UL;
+        private const ulong VoltageCommandGpu = 0x80000111UL;
+        private const ulong VoltageCommandCache = 0x80000211UL;
+        private const ulong VoltageCommandSa = 0x80000411UL;
+
+        // TDP MSR bit masks
+        private const uint TdpHighBase = 0x00438000u;
+        private const uint TdpLowBase = 0x00DD8000u;
+        private const uint TdpValueMask = 0xFFFu;
+
+        // Voltage offset scaling
+        private const double VoltageScaleFactor = 1.024;
+        private const int VoltageShift = 21;
+
+        // Retry / sleep delays (ms)
+        private const int MsrWriteDelayMs = 100;
+
+        // Clock ratio bounds
+        private const int MaxClockRatios = 8;
+        private const byte ClockRatioMin = 0;
+        private const byte ClockRatioMax = 255;
+
+        // Registry paths
+        private const string DriverBlockRegistryPath = @"SYSTEM\CurrentControlSet\Control\CI\Config";
+        private const string DriverBlockRegistryValue = "VulnerableDriverBlocklistEnable";
 
         public static string BaseDir = Settings.Default.Path;
 
@@ -126,10 +161,9 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
                 EnsureInitialised();
 
                 if (cpuOrGpu == 0)
-                    changePowerBalance(0x63A, value);
-
-                if (cpuOrGpu == 1)
-                    changePowerBalance(0x642, value);
+                    changePowerBalance(MsrPowerBalanceCpu, value);
+                else if (cpuOrGpu == 1)
+                    changePowerBalance(MsrPowerBalanceGpu, value);
             }
             catch (Exception ex)
             {
@@ -145,26 +179,26 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
 
                 ulong command = voltagePlane switch
                 {
-                    0 => 0x80000011UL,
-                    1 => 0x80000111UL,
-                    2 => 0x80000211UL,
-                    3 => 0x80000411UL,
+                    0 => VoltageCommandCpu,
+                    1 => VoltageCommandGpu,
+                    2 => VoltageCommandCache,
+                    3 => VoltageCommandSa,
                     _ => 0UL
                 };
 
                 if (command == 0)
                     return;
 
-                ulong data = unchecked((uint)((int)Math.Round(value * 1.024) << 21));
+                ulong data = unchecked((uint)((int)Math.Round(value * VoltageScaleFactor) << VoltageShift));
                 ulong msrValue = (command << 32) | data;
 
-                intelPawnIO!.WriteMsr(0x150, msrValue);
+                intelPawnIO!.WriteMsr(MsrVoltageOffset, msrValue);
 
-                Thread.Sleep(100);
+                Thread.Sleep(MsrWriteDelayMs);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString());
+                Misc.DiagnosticLogger.LogError(ex, "Failed to change Intel voltage offset.");
             }
         }
 
@@ -178,17 +212,17 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
                     return;
 
                 ulong value = 0;
-                int ratioCount = Math.Min(clockRatios.Length, 8);
+                int ratioCount = Math.Min(clockRatios.Length, MaxClockRatios);
                 for (int i = 0; i < ratioCount; ++i)
-                    value = (value << 8) | (byte)Math.Clamp(clockRatios[i], 0, 255);
+                    value = (value << 8) | (byte)Math.Clamp(clockRatios[i], ClockRatioMin, ClockRatioMax);
 
-                intelPawnIO!.WriteMsr(0x1AD, value);
+                intelPawnIO!.WriteMsr(MsrClockRatio, value);
 
-                Thread.Sleep(100);
+                Thread.Sleep(MsrWriteDelayMs);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString());
+                Misc.DiagnosticLogger.LogError(ex, "Failed to change Intel clock ratio offset.");
             }
         }
 
@@ -198,16 +232,17 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
             {
                 EnsureInitialised();
 
-                ulong value = intelPawnIO!.ReadMsr(0x1AD);
-                int[] intParts = new int[8];
+                ulong value = intelPawnIO!.ReadMsr(MsrClockRatio);
+                int[] intParts = new int[MaxClockRatios];
 
-                for (int i = 0; i < 8; i++)
-                    intParts[i] = (int)((value >> ((7 - i) * 8)) & 0xFF);
+                for (int i = 0; i < MaxClockRatios; i++)
+                    intParts[i] = (int)((value >> ((MaxClockRatios - 1 - i) * 8)) & 0xFF);
 
                 return intParts;
             }
             catch
             {
+                // Reading clock ratios is non-critical; return empty on failure.
                 return Array.Empty<int>();
             }
         }
@@ -232,19 +267,19 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
 
                 lock (objLock)
                 {
-                    uint high = 0x00438000u | ((uint)(pl2TDP * 8) & 0xFFFu);
-                    uint low = 0x00DD8000u | ((uint)((pl1TDP - 1) * 8) & 0xFFFu);
+                    uint high = TdpHighBase | ((uint)(pl2TDP * 8) & TdpValueMask);
+                    uint low = TdpLowBase | ((uint)((pl1TDP - 1) * 8) & TdpValueMask);
 
                     ulong value = ((ulong)high << 32) | low;
 
-                    intelPawnIO!.WriteMsr(0x610, value);
+                    intelPawnIO!.WriteMsr(MsrTdp, value);
 
-                    Thread.Sleep(100);
+                    Thread.Sleep(MsrWriteDelayMs);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString());
+                Misc.DiagnosticLogger.LogError(ex, "Failed to write Intel TDP MSR.");
             }
         }
 
@@ -269,17 +304,17 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
             try
             {
                 RegistryKey? myKey = Registry.LocalMachine.OpenSubKey(
-                    @"SYSTEM\CurrentControlSet\Control\CI\Config",
+                    DriverBlockRegistryPath,
                     true);
 
                 if (myKey != null)
                 {
-                    object? value = myKey.GetValue("VulnerableDriverBlocklistEnable");
+                    object? value = myKey.GetValue(DriverBlockRegistryValue);
 
                     if (value?.ToString() == "1")
                     {
                         myKey.SetValue(
-                            "VulnerableDriverBlocklistEnable",
+                            DriverBlockRegistryValue,
                             "0",
                             RegistryValueKind.String);
                     }

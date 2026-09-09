@@ -1,16 +1,11 @@
 using CpuAffinityUtility;
-using GameLib.Plugin.RiotGames.Model;
-using NvAPIWrapper.Display;
 using RyzenSmu;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows;
 using Uniwill_Control_Utility.Scripts.GPUs.AMD;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Uniwill_Control_Utility.Scripts.Intel_Backend;
@@ -22,14 +17,16 @@ namespace Uniwill_Control_Utility.Scripts
 {
     internal class RyzenAdj_To_UCU
     {
-        static int i = 0;
-
         [DllImport("powrprof.dll", EntryPoint = "PowerSetActiveOverlayScheme")]
         public static extern uint PowerSetActiveOverlayScheme(Guid OverlaySchemeGuid);
 
-        static string balancedPowerScheme = "00000000-0000-0000-0000-000000000000";
-        static string highPerformancePowerScheme = "DED574B5-45A0-4F42-8737-46345C09C238";
-        static string powerSaverPowerScheme = "961CC777-2547-4F9D-8174-7D86181b8A7A";
+        private static readonly Guid BalancedPowerSchemeGuid = new("00000000-0000-0000-0000-000000000000");
+        private static readonly Guid HighPerformancePowerSchemeGuid = new("DED574B5-45A0-4F42-8737-46345C09C238");
+        private static readonly Guid PowerSaverPowerSchemeGuid = new("961CC777-2547-4F9D-8174-7D86181b8A7A");
+
+        private const string WinPowerValueSaver = "0";
+        private const string WinPowerValueBalanced = "1";
+        private const string WinPowerValueHighPerformance = "2";
 
         // Optional EC service reference for --ec-* command routing.
         // Set from App.xaml.cs or MainWindowViewModel after DI resolves the service.
@@ -75,9 +72,9 @@ namespace Uniwill_Control_Utility.Scripts
                             }
                             else if (ryzenAdjCommandString.Contains("Win-Power"))
                             {
-                                if(ryzenAdjCommandValueString == "0") PowerSetActiveOverlayScheme(new Guid(powerSaverPowerScheme.ToLower()));
-                                else if (ryzenAdjCommandValueString == "1") PowerSetActiveOverlayScheme(new Guid(balancedPowerScheme.ToLower()));
-                                else if (ryzenAdjCommandValueString == "2") PowerSetActiveOverlayScheme(new Guid(highPerformancePowerScheme.ToLower()));
+                                if (ryzenAdjCommandValueString == WinPowerValueSaver) PowerSetActiveOverlayScheme(PowerSaverPowerSchemeGuid);
+                                else if (ryzenAdjCommandValueString == WinPowerValueBalanced) PowerSetActiveOverlayScheme(BalancedPowerSchemeGuid);
+                                else if (ryzenAdjCommandValueString == WinPowerValueHighPerformance) PowerSetActiveOverlayScheme(HighPerformancePowerSchemeGuid);
                             }
                             else if (ryzenAdjCommandString.Contains("Win-CPU"))
                             {
@@ -169,7 +166,7 @@ namespace Uniwill_Control_Utility.Scripts
                                 int ryzenAdjCommandValueSigned = Convert.ToInt32(ryzenAdjCommandValueString);
                                 uint ryzenAdjCommandValue = (uint)ryzenAdjCommandValueSigned;
 
-                                if (ryzenAdjCommand.Contains("skin")) ryzenAdjCommandValue *= 256;
+                                if (ryzenAdjCommand.Contains("skin")) ryzenAdjCommandValue *= 256; // millidegrees to decidegrees
 
                                 if (ryzenAdjCommand.Contains("coall") && Settings.Default.isAutoUvCPU == true && isAutoOC == false) continue;
                                 if (ryzenAdjCommand.Contains("coper") && Settings.Default.isAutoUvCPU == true && isAutoOC == false) continue;
@@ -184,7 +181,8 @@ namespace Uniwill_Control_Utility.Scripts
                                 // needs time to process each command. Without this delay,
                                 // batch commands cause the SMU to enforce a conservative
                                 // 55W default. The original UCU includes this delay.
-                                Thread.Sleep(50);
+                                const int SmuCommandDelayMs = 50;
+                                Thread.Sleep(SmuCommandDelayMs);
                             }
                         }
                         catch (Exception ex)

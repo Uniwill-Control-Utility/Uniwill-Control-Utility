@@ -88,6 +88,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             catch (Exception ex)
             {
+                // Broad catch: OnNavigatedToAsync can fail from any UI control
+                // initialization issue (missing resources, null controls, etc.).
                 _logger.LogError(ex, "Failed to navigate to Presets page");
             }
 
@@ -329,7 +331,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 catch
                 {
-                    // Fall through to NvTuning probe
+                    // Intentional broad catch: GPU inventory may fail for any reason
+                    // (driver not loaded, permissions, hardware absent). Fall through
+                    // to the NvTuning probe as a secondary detection path.
                 }
             }
             if (!hasNvidia)
@@ -838,10 +842,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                                 {
                                     var point = liveCurve.FirstOrDefault(p => p.Index == idx);
                                     int offset = offsets.GetValueOrDefault(idx, 0);
-                                    if (point != null)
-                                    {
-                                        DebugLog($"  Live check idx={idx}: freq={point.FrequencyMHz}MHz @ {point.VoltageMv}mV, offset={offset}MHz");
-                                    }
+                                    DebugLog($"  Live check idx={idx}: freq={point.FrequencyMHz}MHz @ {point.VoltageMv}mV, offset={offset}MHz");
                                 }
                             }
                         }
@@ -902,22 +903,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             catch (Exception ex)
             {
+                // Broad catch: applyProfileAsync spans SMU commands, EC writes,
+                // NVIDIA driver calls, and V-F curve operations — any layer can throw.
                 DebugLog($"applyProfile EXCEPTION: {ex.GetType().Name}: {ex.Message}");
                 _logger.LogError(ex, $"Failed to apply {_currentProfile} profile");
-            }
-        }
-
-        private void ReadBackEcValues()
-        {
-            // CPU power limits are now set via SMU + EC writes.
-            // Log the stored profile values so the user can verify what was sent.
-            if (Family.TYPE == Family.ProcessorType.Amd_Apu)
-            {
-                DebugLog($"SMU applied: slow-limit={(int)_profileSustained}W fast-limit={(int)_profileBoost}W");
-            }
-            else if (Family.TYPE == Family.ProcessorType.Intel)
-            {
-                DebugLog($"MSR applied: PL1={_profileIntelPl1}W PL2={_profileIntelPl2}W");
             }
         }
 

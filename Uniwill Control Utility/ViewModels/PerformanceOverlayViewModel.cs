@@ -513,7 +513,7 @@ namespace Uniwill_Control_Utility.ViewModels
 
         private static Brush CreateBrush(string colour)
         {
-            var brush = (Brush)new BrushConverter().ConvertFromString(colour)!;
+            Brush brush = (Brush)new BrushConverter().ConvertFromString(colour)!;
             brush.Freeze();
             return brush;
         }
