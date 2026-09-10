@@ -632,31 +632,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         public static string getBigLITTLE(int cores, double l2)
         {
-            int bigCores = 0;
-            int smallCores = 0;
-            if (TYPE == ProcessorType.Intel)
-            {
-                //if (CPUName.Contains("12th") || CPUName.Contains("13th") || CPUName.Contains("14th") || CPUName.Contains("Core") && CPUName.Contains("1000") && !CPUName.Contains("i"))
-                //{
-                //    if (l2 % 1.25 == 0) bigCores = (int)(l2 / 1.25);
-                //    else if (l2 % 2 == 0) bigCores = (int)(l2 / 2);
-
-                //    smallCores = cores - bigCores;
-
-                //    if (smallCores > 0)
-                //    {
-                //        if (CPUName.Contains("Ultra") && CPUName.Contains("100")) return $"{cores} ({bigCores} Performance Cores + {smallCores - 2} Efficiency Cores + 2 LP Efficiency Cores)";
-                //        else return $"{cores} ({bigCores} Performance Cores + {smallCores} Efficiency Cores)";
-                //    }
-                //    else return cores.ToString();
-                //}
-                //else
-                return cores.ToString();
-            }
-            else
-            {
-                return cores.ToString();
-            }
+            return cores.ToString();
         }
 
         public static string InstructionSets()
@@ -734,8 +710,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             try
             {
-                if (TYPE != ProcessorType.Intel)
-                    if (FAM != RyzenFamily.FireRange) return false;
+                if (TYPE != ProcessorType.Intel && FAM != RyzenFamily.FireRange) return false;
                 return NativeMethods.IsProcessorFeaturePresent(NativeMethods.PF_AVX512F_INSTRUCTIONS_AVAILABLE);
             }
             catch (DllNotFoundException)
