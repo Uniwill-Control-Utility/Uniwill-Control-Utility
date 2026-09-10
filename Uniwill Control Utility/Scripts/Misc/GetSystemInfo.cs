@@ -605,19 +605,19 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             string cpuName = CPUName;
             if (Family.TYPE == Family.ProcessorType.Intel)
             {
-                if (cpuName.Contains("6th")) return "Skylake";
-                if (cpuName.Contains("7th")) return "Kaby Lake";
-                if (cpuName.Contains("8th") && cpuName.Contains("G")) return "Kaby Lake";
-                else if (cpuName.Contains("8121U") || cpuName.Contains("8114Y")) return "Cannon Lake";
-                else if (cpuName.Contains("8th")) return "Coffee Lake";
-                if (cpuName.Contains("9th")) return "Coffee Lake";
-                if (cpuName.Contains("10th") && cpuName.Contains("G")) return "Ice Lake";
-                else if (cpuName.Contains("10th")) return "Comet Lake";
-                if (cpuName.Contains("11th") && cpuName.Contains("G") || cpuName.Contains("11th") && cpuName.Contains("U") || cpuName.Contains("11th") && cpuName.Contains("H") || cpuName.Contains("11th") && cpuName.Contains("KB")) return "Tiger Lake";
-                else if (cpuName.Contains("11th")) return "Rocket Lake";
-                if (cpuName.Contains("12th")) return "Alder Lake";
-                if (cpuName.Contains("13th") || cpuName.Contains("14th") || cpuName.Contains("Core") && cpuName.Contains("100") && !cpuName.Contains("th")) return "Raptor Lake";
-                if (cpuName.Contains("Core") && cpuName.Contains("Ultra") && cpuName.Contains("100")) return "Meteor Lake";
+                if (cpuName.IndexOf("6th", StringComparison.Ordinal) >= 0) return "Skylake";
+                if (cpuName.IndexOf("7th", StringComparison.Ordinal) >= 0) return "Kaby Lake";
+                if (cpuName.IndexOf("8th", StringComparison.Ordinal) >= 0 && cpuName.IndexOf("G", StringComparison.Ordinal) >= 0) return "Kaby Lake";
+                else if (cpuName.IndexOf("8121U", StringComparison.Ordinal) >= 0 || cpuName.IndexOf("8114Y", StringComparison.Ordinal) >= 0) return "Cannon Lake";
+                else if (cpuName.IndexOf("8th", StringComparison.Ordinal) >= 0) return "Coffee Lake";
+                if (cpuName.IndexOf("9th", StringComparison.Ordinal) >= 0) return "Coffee Lake";
+                if (cpuName.IndexOf("10th", StringComparison.Ordinal) >= 0 && cpuName.IndexOf("G", StringComparison.Ordinal) >= 0) return "Ice Lake";
+                else if (cpuName.IndexOf("10th", StringComparison.Ordinal) >= 0) return "Comet Lake";
+                if ((cpuName.IndexOf("11th", StringComparison.Ordinal) >= 0 && cpuName.IndexOf("G", StringComparison.Ordinal) >= 0) || (cpuName.IndexOf("11th", StringComparison.Ordinal) >= 0 && cpuName.IndexOf("U", StringComparison.Ordinal) >= 0) || (cpuName.IndexOf("11th", StringComparison.Ordinal) >= 0 && cpuName.IndexOf("H", StringComparison.Ordinal) >= 0) || (cpuName.IndexOf("11th", StringComparison.Ordinal) >= 0 && cpuName.IndexOf("KB", StringComparison.Ordinal) >= 0)) return "Tiger Lake";
+                else if (cpuName.IndexOf("11th", StringComparison.Ordinal) >= 0) return "Rocket Lake";
+                if (cpuName.IndexOf("12th", StringComparison.Ordinal) >= 0) return "Alder Lake";
+                if (cpuName.IndexOf("13th", StringComparison.Ordinal) >= 0 || cpuName.IndexOf("14th", StringComparison.Ordinal) >= 0 || (cpuName.IndexOf("Core", StringComparison.Ordinal) >= 0 && cpuName.IndexOf("100", StringComparison.Ordinal) >= 0 && cpuName.IndexOf("th", StringComparison.Ordinal) < 0)) return "Raptor Lake";
+                if (cpuName.IndexOf("Core", StringComparison.Ordinal) >= 0 && cpuName.IndexOf("Ultra", StringComparison.Ordinal) >= 0 && cpuName.IndexOf("100", StringComparison.Ordinal) >= 0) return "Meteor Lake";
             }
             else
             {
@@ -681,10 +681,8 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
                 foreach (ManagementObject queryObj in searcher.Get())
                 {
-                    int? virtualizationFirmwareEnabled = queryObj["VirtualizationFirmwareEnabled"] as int?;
-
                     // Check if virtualization is enabled
-                    if (virtualizationFirmwareEnabled == 1)
+                    if (queryObj["VirtualizationFirmwareEnabled"] is int virtualizationFirmwareEnabled && virtualizationFirmwareEnabled == 1)
                     {
                         return true;
                     }
@@ -737,7 +735,8 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         }
     }
 
-    // SonarLint-Suppress(S3217) Portability issue with unsafe code — intentional for CPUID/GetSystemInfo P/Invoke
+ #pragma warning disable S3217 // "AS" should not be used when the type is already known
+    // Portability issue with unsafe code — intentional for CPUID/GetSystemInfo P/Invoke
     public static class NativeMethods
     {
         // Import the CPUID intrinsic (Intel x86 instruction)
@@ -780,4 +779,5 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         private const ushort PROCESSOR_ARCHITECTURE_INTEL = 0;
         private const ushort PROCESSOR_ARCHITECTURE_AMD64 = 9;
     }
+#pragma warning restore S3217
 }

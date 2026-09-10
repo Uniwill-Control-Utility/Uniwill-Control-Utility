@@ -169,9 +169,9 @@ namespace Uniwill_Control_Utility.Scripts
 
                                 if (ryzenAdjCommand.Contains("skin")) ryzenAdjCommandValue *= 256; // millidegrees to decidegrees
 
-                                if (ryzenAdjCommand.Contains("coall") && Settings.Default.isAutoUvCPU == true && isAutoOC == false) continue;
-                                if (ryzenAdjCommand.Contains("coper") && Settings.Default.isAutoUvCPU == true && isAutoOC == false) continue;
-                                if (ryzenAdjCommand.Contains("cogfx") && Settings.Default.isAutoUviGPU == true && isAutoOC == false) continue;
+                                if (ryzenAdjCommand.Contains("coall") && Settings.Default.isAutoUvCPU && !isAutoOC) continue;
+                                if (ryzenAdjCommand.Contains("coper") && Settings.Default.isAutoUvCPU && !isAutoOC) continue;
+                                if (ryzenAdjCommand.Contains("cogfx") && Settings.Default.isAutoUviGPU && !isAutoOC) continue;
 
                                 DiagnosticLogger.LogInfo($"SMU sending: {ryzenAdjCommandString} = 0x{ryzenAdjCommandValue:X} ({ryzenAdjCommandValue})");
 
