@@ -12,15 +12,16 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 {
     internal class Display
     {
+#pragma warning disable SYSLIB1054 // Convert to LibraryImport — DISPLAY_DEVICE and DEVMODE structs contain [MarshalAs] string fields not supported by source-generated P/Invoke
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern bool EnumDisplayDevices([MarshalAs(UnmanagedType.LPWStr)] string? lpDevice, uint iDevNum, ref DISPLAY_DEVICE lpDisplayDevice, uint dwFlags);
 
-        [DllImport("user32.dll")]
-        public static extern bool EnumDisplayDevices(string lpDevice, uint iDevNum, ref DISPLAY_DEVICE lpDisplayDevice, uint dwFlags);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern bool EnumDisplaySettings([MarshalAs(UnmanagedType.LPWStr)] string lpszDeviceName, uint iModeNum, ref DEVMODE lpDevMode);
 
-        [DllImport("user32.dll")]
-        public static extern bool EnumDisplaySettings(string lpszDeviceName, uint iModeNum, ref DEVMODE lpDevMode);
-
-        [DllImport("user32.dll")]
-        public static extern int ChangeDisplaySettingsEx(string lpszDeviceName, ref DEVMODE lpDevMode, IntPtr hwnd, uint dwflags, IntPtr lParam);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern int ChangeDisplaySettingsEx([MarshalAs(UnmanagedType.LPWStr)] string lpszDeviceName, ref DEVMODE lpDevMode, IntPtr hwnd, uint dwflags, IntPtr lParam);
+#pragma warning restore SYSLIB1054
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
         public struct DISPLAY_DEVICE
@@ -121,30 +122,22 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             DISPLAY_DEVICE displayDevice = new DISPLAY_DEVICE();
             displayDevice.cb = (uint)Marshal.SizeOf(displayDevice);
             int displayCount = Screen.AllScreens.Length;
-            //if (App.product.Contains("aya"))
-            //{
-            //    if(App.product.Contains("flip")) refreshRates.Add(120);
-            //    refreshRates.Add(60);
-            //}
-            //else
-            //{
             for (uint deviceIndex = 0; EnumDisplayDevices(null, deviceIndex, ref displayDevice, 0); deviceIndex++)
+            {
+                if (displayDevice.DeviceName == targetDisplayName)
                 {
-                    if (displayDevice.DeviceName == targetDisplayName)
+                    DEVMODE devMode = new DEVMODE();
+                    devMode.dmSize = (short)Marshal.SizeOf(devMode);
+                    for (uint modeIndex = 0; EnumDisplaySettings(displayDevice.DeviceName, modeIndex, ref devMode); modeIndex++)
                     {
-                        DEVMODE devMode = new DEVMODE();
-                        devMode.dmSize = (short)Marshal.SizeOf(devMode);
-                        for (uint modeIndex = 0; EnumDisplaySettings(displayDevice.DeviceName, modeIndex, ref devMode); modeIndex++)
+                        if (devMode.dmDisplayFrequency > 0)
                         {
-                            if (devMode.dmDisplayFrequency > 0)
-                            {
-                                refreshRates.Add(devMode.dmDisplayFrequency);
-                            }
+                            refreshRates.Add(devMode.dmDisplayFrequency);
                         }
-                        break;
                     }
+                    break;
                 }
-            //}
+            }
 
             return refreshRates;
         }
@@ -251,12 +244,12 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             catch (COMException)
             {
                 // Display enumeration failed, fall back to primary screen
-                laptopScreen = Screen.PrimaryScreen.DeviceName;
+                laptopScreen = Screen.PrimaryScreen?.DeviceName;
             }
             catch (Exception ex) when (ex is not COMException)
             {
                 // Unexpected error during display detection
-                laptopScreen = Screen.PrimaryScreen.DeviceName;
+                laptopScreen = Screen.PrimaryScreen?.DeviceName;
             }
 
             return laptopScreen;
