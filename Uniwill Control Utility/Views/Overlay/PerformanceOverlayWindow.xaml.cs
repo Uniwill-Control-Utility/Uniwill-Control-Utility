@@ -1,6 +1,7 @@
 using Microsoft.Win32;
 using System;
 using System.ComponentModel;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -43,7 +44,7 @@ namespace Uniwill_Control_Utility.Views.Overlay
         {
             IntPtr handle = new WindowInteropHelper(this).Handle;
             int style = GetWindowLong(handle, ExtendedStyleIndex);
-            SetWindowLong(handle, ExtendedStyleIndex, style | TransparentStyle | LayeredStyle | ToolWindowStyle | NoActivateStyle);
+            _ = SetWindowLong(handle, ExtendedStyleIndex, style | TransparentStyle | LayeredStyle | ToolWindowStyle | NoActivateStyle);
 
             if (!_displaySettingsSubscribed)
             {
@@ -152,10 +153,10 @@ namespace Uniwill_Control_Utility.Views.Overlay
             return IsFinite(value) && value > 0;
         }
 
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern int GetWindowLong(IntPtr window, int index);
+        [LibraryImport("user32.dll", SetLastError = true)]
+        private static partial int GetWindowLong(IntPtr window, int index);
 
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern int SetWindowLong(IntPtr window, int index, int newStyle);
+        [LibraryImport("user32.dll", SetLastError = true)]
+        private static partial int SetWindowLong(IntPtr window, int index, int newStyle);
     }
 }
