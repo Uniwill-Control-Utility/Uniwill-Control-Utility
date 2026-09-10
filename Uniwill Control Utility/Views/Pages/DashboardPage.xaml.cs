@@ -153,7 +153,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private static string GetCleanModelName(string model)
         {
             // XMG Neo: strip "SchenkerTechnologiesGmbH " prefix
-            if (model.ToUpperInvariant().Contains("XMG"))
+            if (model.Contains("XMG", StringComparison.OrdinalIgnoreCase))
             {
                 int xmgIndex = model.IndexOf("XMG", StringComparison.OrdinalIgnoreCase);
                 if (xmgIndex > 0)
@@ -246,7 +246,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private static string FilterGpuName(string gpuName)
         {
-            var parts = gpuName.Split(new[] { " / " }, StringSplitOptions.RemoveEmptyEntries);
+            string[] separator = { " / " };
+            var parts = gpuName.Split(separator, StringSplitOptions.RemoveEmptyEntries);
             var filtered = new System.Collections.Generic.List<string>();
 
             foreach (var part in parts)
