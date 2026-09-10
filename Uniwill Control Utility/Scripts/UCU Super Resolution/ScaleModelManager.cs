@@ -102,11 +102,11 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
                 )?.AsArray().Select(model => {
                     if (model == null)
                     {
-                        throw new Exception("json ??");
+                        throw new JsonException("Invalid scale model entry.");
                     }
 
-                    JsonNode name = model["name"] ?? throw new Exception("??? name ??");
-                    JsonNode effects = model["effects"] ?? throw new Exception("??? effects ??");
+                    JsonNode name = model["name"] ?? throw new JsonException("Missing 'name' property in scale model.");
+                    JsonNode effects = model["effects"] ?? throw new JsonException("Missing 'effects' property in scale model.");
 
                     return new ScaleModel
                     {
@@ -117,7 +117,7 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
 
                 if (scaleModels == null || scaleModels.Length == 0)
                 {
-                    throw new Exception("?? json ??");
+                    throw new JsonException("No valid scale models found in JSON.");
                 }
             }
             catch
