@@ -13,7 +13,7 @@ using Uniwill_Control_Utility.Services.Performance;
 
 namespace Uniwill_Control_Utility.ViewModels
 {
-    public partial class PerformanceOverlayViewModel : ObservableObject, IDisposable
+    public sealed partial class PerformanceOverlayViewModel : ObservableObject, IDisposable
     {
         private const double BaseDesignWidth = 1090;
         private const double BaseDesignHeight = 435;
@@ -127,10 +127,32 @@ namespace Uniwill_Control_Utility.ViewModels
         public PointCollection ZeroPointOnePercentFrameTimePoints => PointOnePercentFrameTimePoints;
         public string GpuMemoryText => $"{GpuMemoryUsedGb:0.0} / {GpuMemoryTotalGb:0.0} GB";
         public string SystemMemoryText => $"{SystemMemoryUsedGb:0.0} / {SystemMemoryTotalGb:0.0} GB";
-        public string BatteryText => HasBattery ? IsBatteryCharging ? LocalizationService.Format("{0}% charging", BatteryPercent) : $"{BatteryPercent}%" : LocalizationService.Get("No battery");
+        public string BatteryText
+        {
+            get
+            {
+                if (!HasBattery)
+                    return LocalizationService.Get("No battery");
+
+                return IsBatteryCharging
+                    ? LocalizationService.Format("{0}% charging", BatteryPercent)
+                    : $"{BatteryPercent}%";
+            }
+        }
         public string BatteryTimeText => BatteryTimeRemainingMinutes > 0 ? $"{BatteryTimeRemainingMinutes / 60}h {BatteryTimeRemainingMinutes % 60:00}m" : "N/A";
         public string BatteryPercentText => HasBattery ? $"{Math.Clamp(BatteryPercent, 0, 100)}%" : "N/A";
-        public string BatteryStatusText => !HasBattery ? LocalizationService.Get("No battery") : IsBatteryCharging ? LocalizationService.Get("Charging") : LocalizationService.Get("Discharging");
+        public string BatteryStatusText
+        {
+            get
+            {
+                if (!HasBattery)
+                    return LocalizationService.Get("No battery");
+
+                return IsBatteryCharging
+                    ? LocalizationService.Get("Charging")
+                    : LocalizationService.Get("Discharging");
+            }
+        }
         public string BatteryTimeRemainingText => BatteryTimeText;
         public string BatteryPowerText => HasBattery ? $"{BatteryPowerWatts:0.0} W" : "N/A";
         public double GpuMemoryUsageBarWidth => CalculateUsageWidth(GpuMemoryUsedGb, GpuMemoryTotalGb);
@@ -530,8 +552,7 @@ namespace Uniwill_Control_Utility.ViewModels
 
         private void ThrowIfDisposed()
         {
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(PerformanceOverlayViewModel));
+            ObjectDisposedException.ThrowIf(_disposed, this);
         }
 
         public void Dispose()
