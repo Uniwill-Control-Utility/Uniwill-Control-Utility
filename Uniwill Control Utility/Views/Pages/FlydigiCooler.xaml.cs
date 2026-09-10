@@ -2190,7 +2190,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     {
                         cbxDevices.Items.Add(new ComboBoxItem
                         {
-                            Content = $"{device.ModelName} ({device.Name})",
+                            Content = $"{Bs1DeviceInfo.ModelName} ({device.Name})",
                             Tag = device
                         });
                     }
@@ -2250,7 +2250,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         var bleDevices = await _bs1Service.DiscoverDevicesAsync(5000);
                         foreach (var device in bleDevices)
                         {
-                            discoveredDevices.Add(($"{device.ModelName} ({device.Name})", (object)device));
+                            discoveredDevices.Add(($"{Bs1DeviceInfo.ModelName} ({device.Name})", (object)device));
                         }
                     }
 

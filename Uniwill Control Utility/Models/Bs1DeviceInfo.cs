@@ -17,6 +17,6 @@ namespace Uniwill_Control_Utility.Models
         public int Rssi { get; init; }
 
         /// <summary>Human-readable model name (always "BS1" for this type).</summary>
-        public string ModelName => "BS1";
+        public static string ModelName => "BS1";
     }
 }

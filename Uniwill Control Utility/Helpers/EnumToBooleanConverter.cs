@@ -4,15 +4,11 @@ using System.Windows.Data;
 
 namespace Uniwill_Control_Utility.Helpers
 {
-    internal class EnumToBooleanConverter : IValueConverter
+    internal sealed class EnumToBooleanConverter : IValueConverter
     {
-        public EnumToBooleanConverter()
-        {
-        }
-
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (parameter is not String enumString)
+            if (parameter is not string enumString)
                 throw new ArgumentException("ExceptionEnumToBooleanConverterParameterMustBeAnEnumName");
 
             if (!Enum.IsDefined(typeof(Wpf.Ui.Appearance.ApplicationTheme), value))
@@ -25,7 +21,7 @@ namespace Uniwill_Control_Utility.Helpers
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (parameter is not String enumString)
+            if (parameter is not string enumString)
                 throw new ArgumentException("ExceptionEnumToBooleanConverterParameterMustBeAnEnumName");
 
             return Enum.Parse(typeof(Wpf.Ui.Appearance.ApplicationTheme), enumString);

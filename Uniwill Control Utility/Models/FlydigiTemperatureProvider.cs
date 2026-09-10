@@ -8,7 +8,7 @@ namespace Uniwill_Control_Utility.Models
     /// IHardwareMonitoringService so the Flydigi page and Dashboard
     /// use the same sensor data.
     /// </summary>
-    public class FlydigiTemperatureProvider : IDisposable
+    public sealed class FlydigiTemperatureProvider : IDisposable
     {
         private IHardwareMonitoringService? _monitoring;
         private IDisposable? _lease;
@@ -79,6 +79,7 @@ namespace Uniwill_Control_Utility.Models
             _lease?.Dispose();
             _lease = null;
             _monitoring = null;
+            GC.SuppressFinalize(this);
         }
     }
 }

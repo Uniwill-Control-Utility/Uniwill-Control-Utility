@@ -9,7 +9,7 @@ using Uniwill_Control_Utility.Services;
 
 namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 {
-    internal class NvHwCheck
+    internal static class NvHwCheck
     {
         public static void CheckROPCount()
         {
