@@ -276,8 +276,10 @@ namespace Uniwill_Control_Utility.Services
                 yield return sensor;
 
             foreach (IHardware child in hardware.SubHardware)
-            foreach (ISensor sensor in EnumerateSensors(child))
-                yield return sensor;
+            {
+                foreach (ISensor sensor in EnumerateSensors(child))
+                    yield return sensor;
+            }
         }
 
         private static int Round(double value) => (int)Math.Round(value);
