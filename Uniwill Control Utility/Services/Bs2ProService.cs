@@ -23,9 +23,6 @@ namespace Uniwill_Control_Utility.Services
         /*  Windows power notification P/Invoke                                 */
         /* ------------------------------------------------------------------ */
 
-        private const int PBT_APMSUSPEND = 4;
-        private const int PBT_APMRESUMESUSPEND = 7;
-
         [DllImport("powrprof.dll", SetLastError = true)]
         private static extern nint PowerRegisterSuspendResumeNotification(
             int Flags,
@@ -36,7 +33,7 @@ namespace Uniwill_Control_Utility.Services
             nint lpEventAttributes,
             int bManualReset,
             int bInitialState,
-            string lpName);
+            string? lpName);
 
         [DllImport("kernel32.dll")]
         private static extern int WaitForSingleObject(
@@ -65,7 +62,7 @@ namespace Uniwill_Control_Utility.Services
 
         private CancellationTokenSource? _scheduleMonitorCts;
         private Thread? _scheduleMonitorThread;
-        private string _lastScheduledProfile;
+        private string _lastScheduledProfile = string.Empty;
         private HidDevice? _device;
         private CancellationTokenSource? _readCts;
         private Task? _readTask;
@@ -129,11 +126,11 @@ namespace Uniwill_Control_Utility.Services
             }
 
             // Fire and forget cleanup after timeout
-            _ = Task.Delay(300).ContinueWith(_ =>
+            _ = Task.Delay(300, CancellationToken.None).ContinueWith(_ =>
             {
                 lock (_queryLock)
                 {
-                    if (_pendingQueries.ContainsKey(cmd) && _pendingQueries[cmd] == tcs)
+                    if (_pendingQueries.TryGetValue(cmd, out var existing) && existing == tcs)
                     {
                         _pendingQueries.Remove(cmd);
                         tcs.TrySetResult(null);
@@ -258,7 +255,7 @@ namespace Uniwill_Control_Utility.Services
         /// Enumerates all connected Flydigi BS series devices.
         /// Opens each device briefly to read capabilities, then closes it.
         /// </summary>
-        public List<FlydigiCoolerDeviceInfo> DiscoverDevices()
+        public static List<FlydigiCoolerDeviceInfo> DiscoverDevices()
         {
             var devices = HidDevices.Enumerate(
                 Bs2ProProductId.VendorId,
@@ -384,7 +381,7 @@ namespace Uniwill_Control_Utility.Services
                         {
                             RaiseStatus("Failed to send config snapshot query");
                         }
-                        await Task.Delay(80);
+                        await Task.Delay(80, CancellationToken.None);
 
                         await QueryDeviceSettingsAsync();
                     }
@@ -459,7 +456,7 @@ namespace Uniwill_Control_Utility.Services
                 if (attempt < 2)
                 {
                     int delay = 1000 * (attempt + 1); // 1s, 2s
-                    await Task.Delay(delay);
+                    await Task.Delay(delay, CancellationToken.None);
                 }
             }
 
@@ -665,25 +662,25 @@ namespace Uniwill_Control_Utility.Services
 
             // Enable dynamic lighting (×2)
             ok &= WriteReportUnthrottled(Bs2ProFrame.Build(Bs2ProCommand.RgbEnable, Bs2ProRgbEnable.On));
-            await Task.Delay(5);
+            await Task.Delay(5, CancellationToken.None);
             ok &= WriteReportUnthrottled(Bs2ProFrame.Build(Bs2ProCommand.RgbEnable, Bs2ProRgbEnable.On));
-            await Task.Delay(5);
+            await Task.Delay(5, CancellationToken.None);
 
             // Heartbeat
             ok &= WriteReportUnthrottled(Bs2ProFrame.Build(Bs2ProCommand.RgbStatus, Bs2ProRgbHandshake.Heartbeat));
-            await Task.Delay(5);
+            await Task.Delay(5, CancellationToken.None);
             ok &= WriteReportUnthrottled(Bs2ProFrame.Build(Bs2ProCommand.RgbStatus, Bs2ProRgbHandshake.HeartbeatAck, Bs2ProRgbHandshake.AckParam));
-            await Task.Delay(5);
+            await Task.Delay(5, CancellationToken.None);
 
             // Upload init handshake (required before 0x44 mode activation)
             ok &= WriteReportUnthrottled(Bs2ProFrame.Build(Bs2ProCommand.RgbUploadInit, Bs2ProRgbUpload.Init));
-            await Task.Delay(5);
+            await Task.Delay(5, CancellationToken.None);
             ok &= WriteReportUnthrottled(Bs2ProFrame.Build(Bs2ProCommand.RgbUploadInit, Bs2ProRgbUpload.Confirm, Bs2ProRgbUpload.ConfirmParam));
-            await Task.Delay(5);
+            await Task.Delay(5, CancellationToken.None);
 
             // Activate smart-temp mode
             ok &= WriteReportUnthrottled(Bs2ProFrame.Build(Bs2ProCommand.RgbDynamicMode, Bs2ProRgbDynamicMode.SmartTemp));
-            await Task.Delay(5);
+            await Task.Delay(5, CancellationToken.None);
 
             // Commit
             ok &= WriteReportUnthrottled(Bs2ProFrame.Build(Bs2ProCommand.RgbCommit, Bs2ProRgbCommit.Apply));
@@ -723,17 +720,17 @@ namespace Uniwill_Control_Utility.Services
             // Handshake
             bool ok = true;
             ok &= WriteReportUnthrottled(Bs2ProFrame.Build(Bs2ProCommand.RgbEnable, Bs2ProRgbEnable.On));
-            await Task.Delay(5);
+            await Task.Delay(5, CancellationToken.None);
             ok &= WriteReportUnthrottled(Bs2ProFrame.Build(Bs2ProCommand.RgbEnable, Bs2ProRgbEnable.On));
-            await Task.Delay(5);
+            await Task.Delay(5, CancellationToken.None);
             ok &= WriteReportUnthrottled(Bs2ProFrame.Build(Bs2ProCommand.RgbStatus, Bs2ProRgbHandshake.Heartbeat));
-            await Task.Delay(5);
+            await Task.Delay(5, CancellationToken.None);
             ok &= WriteReportUnthrottled(Bs2ProFrame.Build(Bs2ProCommand.RgbStatus, Bs2ProRgbHandshake.HeartbeatAck, Bs2ProRgbHandshake.AckParam));
-            await Task.Delay(5);
+            await Task.Delay(5, CancellationToken.None);
             ok &= WriteReportUnthrottled(Bs2ProFrame.Build(Bs2ProCommand.RgbUploadInit, Bs2ProRgbUpload.Init));
-            await Task.Delay(5);
+            await Task.Delay(5, CancellationToken.None);
             ok &= WriteReportUnthrottled(Bs2ProFrame.Build(Bs2ProCommand.RgbUploadInit, Bs2ProRgbUpload.Confirm, Bs2ProRgbUpload.ConfirmParam));
-            await Task.Delay(5);
+            await Task.Delay(5, CancellationToken.None);
 
             if (!ok)
             {
@@ -746,7 +743,7 @@ namespace Uniwill_Control_Utility.Services
             headerPayload[0] = Bs2ProRgbFrameIndex.Header;
             Array.Copy(upload.Header, 0, headerPayload, 1, 10);
             ok &= WriteReportUnthrottled(Bs2ProFrame.Build(Bs2ProCommand.RgbFrameWrite, headerPayload), Bs2ProReportLength.Light);
-            await Task.Delay(1);
+            await Task.Delay(1, CancellationToken.None);
 
             // 30 animation frames (frame indices 1-30)
             for (int fi = 0; fi < 30; fi++)
@@ -757,7 +754,7 @@ namespace Uniwill_Control_Utility.Services
                     framePayload[1 + j] = upload.Frames[fi, j];
 
                 ok &= WriteReportUnthrottled(Bs2ProFrame.Build(Bs2ProCommand.RgbFrameWrite, framePayload), Bs2ProReportLength.Light);
-                await Task.Delay(1);
+                await Task.Delay(1, CancellationToken.None);
             }
 
             // Commit
@@ -947,7 +944,7 @@ namespace Uniwill_Control_Utility.Services
                 settings.WorkMode = workModeResponse.Value.Payload[0];
             }
 
-            await Task.Delay(80); // spacing between queries
+            await Task.Delay(80, CancellationToken.None); // spacing between queries
 
             // Query gear RPM table (0x27)
             var gearTableResponse = await SendQueryAsync(Bs2ProCommand.QueryGearTable);
@@ -1102,7 +1099,7 @@ namespace Uniwill_Control_Utility.Services
                     if (!success)
                         return false;
 
-                    await Task.Delay(50);
+                    await Task.Delay(50, CancellationToken.None);
                     _realtimeMode = true;
                 }
 
@@ -1115,7 +1112,7 @@ namespace Uniwill_Control_Utility.Services
                     return false;
                 }
 
-                await Task.Delay(50);
+                await Task.Delay(50, CancellationToken.None);
 
                 // Exit realtime mode to stop fan control session
                 success = WriteReport(Bs2ProFrame.Build(Bs2ProCommand.ExitRealtimeMode));
@@ -1136,7 +1133,7 @@ namespace Uniwill_Control_Utility.Services
                     if (!success)
                         return false;
 
-                    await Task.Delay(50);
+                    await Task.Delay(50, CancellationToken.None);
                     _realtimeMode = true;
                 }
 
@@ -1236,7 +1233,7 @@ namespace Uniwill_Control_Utility.Services
                         {
                             try
                             {
-                                HandlePowerEvent();
+                                _ = HandlePowerEvent();
                             }
                             catch (Exception)
                             {
@@ -1271,7 +1268,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 if (_powerNotificationHandle != nint.Zero)
                 {
-                    PowerUnregisterSuspendResumeNotification(0, _powerNotificationHandle);
+                    _ = PowerUnregisterSuspendResumeNotification(0, _powerNotificationHandle);
                     _powerNotificationHandle = nint.Zero;
                 }
             }
@@ -1281,7 +1278,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 if (_powerEventHandle != nint.Zero)
                 {
-                    CloseHandle(_powerEventHandle);
+                    _ = CloseHandle(_powerEventHandle);
                     _powerEventHandle = nint.Zero;
                 }
             }
@@ -1291,7 +1288,7 @@ namespace Uniwill_Control_Utility.Services
             _powerMonitorCts = null;
         }
 
-        private async void HandlePowerEvent()
+        private async Task HandlePowerEvent()
         {
             // The event fires for both suspend and resume. We determine which by
             // checking the connection state. If connected → suspend. If disconnected → resume.
@@ -1314,7 +1311,7 @@ namespace Uniwill_Control_Utility.Services
                 // System just resumed from suspend
                 _ = Task.Run(async () =>
                 {
-                    await Task.Delay(2000); // Wait for system to stabilize after resume
+                    await Task.Delay(2000, CancellationToken.None); // Wait for system to stabilize after resume
                     await TryAutoConnectAsync();
                 });
             }
@@ -1368,7 +1365,7 @@ namespace Uniwill_Control_Utility.Services
                                 {
                                     _ = Task.Run(async () =>
                                     {
-                                        await Task.Delay(500); // Brief delay for device to stabilize
+                                        await Task.Delay(500, CancellationToken.None); // Brief delay for device to stabilize
                                         await TryAutoConnectAsync();
                                     });
                                 }
@@ -1511,8 +1508,8 @@ namespace Uniwill_Control_Utility.Services
 
             foreach (var entry in _settings.TimeScheduleEntries)
             {
-                if (!TimeSpan.TryParse(entry.StartTime, out var start) ||
-                    !TimeSpan.TryParse(entry.EndTime, out var end))
+                if (!TimeSpan.TryParse(entry.StartTime, System.Globalization.CultureInfo.InvariantCulture, out var start) ||
+                    !TimeSpan.TryParse(entry.EndTime, System.Globalization.CultureInfo.InvariantCulture, out var end))
                     continue;
 
                 bool inRange;
@@ -1572,12 +1569,28 @@ namespace Uniwill_Control_Utility.Services
 
         #region IDisposable
 
+        private bool _disposed;
+
         public void Dispose()
         {
-            StopScheduleMonitor();
-            StopDeviceMonitor();
-            StopPowerNotificationMonitor();
-            DisconnectAsync();
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    StopScheduleMonitor();
+                    StopDeviceMonitor();
+                    StopPowerNotificationMonitor();
+                    DisconnectAsync();
+                }
+
+                _disposed = true;
+            }
         }
 
         #endregion

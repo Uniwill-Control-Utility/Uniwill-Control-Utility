@@ -2171,7 +2171,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Scan for HID devices (BS2+)
                 if (_coolerService != null)
                 {
-                    var hidDevices = _coolerService.DiscoverDevices();
+                    var hidDevices = FlydigiCoolerService.DiscoverDevices();
                     foreach (var device in hidDevices)
                     {
                         cbxDevices.Items.Add(new ComboBoxItem
@@ -2237,7 +2237,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     // Scan for HID devices (BS2+)
                     if (_coolerService != null)
                     {
-                        var hidDevices = _coolerService.DiscoverDevices();
+                        var hidDevices = FlydigiCoolerService.DiscoverDevices();
                         foreach (var device in hidDevices)
                         {
                             discoveredDevices.Add((device.ModelName, (object)device));
