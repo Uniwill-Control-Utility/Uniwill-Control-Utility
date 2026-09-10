@@ -113,30 +113,30 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(WmiNamespace, WmiQueryProcessor))
                 {
-                    foreach (ManagementObject queryObj in searcher.Get())
+                    foreach (ManagementBaseObject queryObj in searcher.Get())
                     {
-                        _cpuName = queryObj["Name"].ToString().Trim();
-                        _cpuDescription = queryObj["Description"].ToString().Trim();
-                        _cpuManufacturer = queryObj["Manufacturer"].ToString().Trim();
+                        _cpuName = (queryObj["Name"] as string ?? string.Empty).Trim();
+                        _cpuDescription = (queryObj["Description"] as string ?? string.Empty).Trim();
+                        _cpuManufacturer = (queryObj["Manufacturer"] as string ?? string.Empty).Trim();
                         _cpuCores = Convert.ToInt32(queryObj["NumberOfCores"]);
                         _cpuLogicalProcessors = Convert.ToInt32(queryObj["NumberOfLogicalProcessors"]);
                         _cpuL2Size = Convert.ToDouble(queryObj["L2CacheSize"]) / 1024;
                         _cpuL3Size = Convert.ToDouble(queryObj["L3CacheSize"]) / 1024;
-                        _cpuBaseClock = queryObj["MaxClockSpeed"].ToString();
+                        _cpuBaseClock = queryObj["MaxClockSpeed"] as string ?? string.Empty;
                     }
                 }
 
-                _cpuCodeName = GetSystemInfo.Codename();
+                _cpuCodeName = GetSystemInfo.Codename() ?? string.Empty;
 
-                uint sum = 0;
+                uint sum = 0u;
                 foreach (uint number in GetSystemInfo.GetCacheSizes(GetSystemInfo.CacheLevel.Level1))
                     sum += number;
-                _cpuL1Cache = sum / 1024;
+                _cpuL1Cache = (decimal)(sum / 1024u);
 
-                sum = 0;
+                sum = 0u;
                 foreach (uint number in GetSystemInfo.GetCacheSizes(GetSystemInfo.CacheLevel.Level2))
                     sum += number;
-                _cpuL2Cache = sum / 1024;
+                _cpuL2Cache = (decimal)(sum / 1024u);
 
                 _cpuInstructions = GetSystemInfo.InstructionSets();
             }
@@ -181,15 +181,18 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(WmiNamespace, WmiQueryPhysicalMemory))
                 {
-                    foreach (ManagementObject queryObj in searcher.Get())
+                    foreach (ManagementBaseObject queryObj in searcher.Get())
                     {
-                        if (_ramProducer == "") _ramProducer = queryObj["Manufacturer"].ToString();
-                        else if (!_ramProducer.Contains(queryObj["Manufacturer"].ToString()))
-                            _ramProducer = $"{_ramProducer}/{queryObj["Manufacturer"]}";
+                        string manufacturer = queryObj["Manufacturer"] as string ?? string.Empty;
+                        string partNumber = queryObj["PartNumber"] as string ?? string.Empty;
 
-                        if (_ramModel == "") _ramModel = queryObj["PartNumber"].ToString();
-                        else if (!_ramModel.Contains(queryObj["PartNumber"].ToString()))
-                            _ramModel = $"{_ramModel}/{queryObj["PartNumber"]}";
+                        if (_ramProducer == "") _ramProducer = manufacturer;
+                        else if (!_ramProducer.Contains(manufacturer))
+                            _ramProducer = $"{_ramProducer}/{manufacturer}";
+
+                        if (_ramModel == "") _ramModel = partNumber;
+                        else if (!_ramModel.Contains(partNumber))
+                            _ramModel = $"{_ramModel}/{partNumber}";
 
                         _ramCapacity = _ramCapacity + Convert.ToDouble(queryObj["Capacity"]);
                         _ramSpeed = Convert.ToInt32(queryObj["ConfiguredClockSpeed"]);
@@ -251,7 +254,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                     td.Triggers.Add(new LogonTrigger());
 
-                    string path = System.Reflection.Assembly.GetEntryAssembly().Location;
+                    string path = System.Reflection.Assembly.GetEntryAssembly()?.Location
+                        ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
                     path = path.Replace(AssemblyDllName, AssemblyExeName);
 
                     td.Actions.Add(path);
@@ -441,6 +445,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     // show the MSI and close the main application
                     Process p = new Process();
+                    p.StartInfo.UseShellExecute = false;
                     p.StartInfo.FileName = MsiExecCommand;
                     p.StartInfo.Arguments = MsiInstallFlag + filePath;
                     p.Start();
@@ -494,7 +499,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             });
 
             // Update UI on the dispatcher thread
-            this.Dispatcher.Invoke(() =>
+            await this.Dispatcher.InvokeAsync(() =>
             {
                 applyDeviceInfo();
                 applyCPUInfo();
