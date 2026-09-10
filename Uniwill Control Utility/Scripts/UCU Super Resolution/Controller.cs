@@ -32,11 +32,7 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
 
         static string AppName = "";
         static string currentAppName = "";
-        static bool Reapply = false;
         static bool canReapply = false;
-
-        private static int DOWN_COUNT = 5;
-        private static int countDownNum;
 
         private static IntPtr Handle;
         private static IntPtr prevSrcWindow = IntPtr.Zero;
@@ -81,7 +77,7 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
         static extern int GetWindowLong(IntPtr hWnd, int nIndex);
         public static void ToggleMagWindow()
         {
-            if (Settings.Default.isMagpie || magWindow.Running)
+            if (Settings.Default.isMagpie || magWindow!.Running)
             {
                 if (!scaleModelManager.IsValid() || magWindow == null)
                 {
@@ -117,7 +113,7 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
                 {
                     if (GetWindowRect(foregroundWindow, out RECT windowRect))
                     {
-                        Screen primaryScreen = Screen.PrimaryScreen;
+                        Screen primaryScreen = Screen.PrimaryScreen!;
                         int screenWidth = primaryScreen.Bounds.Width;
                         int screenHeight = primaryScreen.Bounds.Height;
 
@@ -170,14 +166,14 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
 
                 magWindow.Create(effectsJson);
 
-                prevSrcWindow = magWindow.SrcWindow;
+                prevSrcWindow = magWindow!.SrcWindow;
             }
         }
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
 
-        public static async void AutoRestore_Tick(object sender, EventArgs e)
+        public static async void AutoRestore_Tick(object _sender, EventArgs _e)
         {
             if (Settings.Default.AutoRestore && Settings.Default.isMagpie && canReapply)
             {
@@ -189,12 +185,11 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
                     GetWindowText(foregroundWindow, windowText, windowText.Capacity);
                     currentAppName = windowText.ToString();
 
-                    if (currentAppName == AppName && !magWindow.Running) ToggleMagWindow();
+                    if (currentAppName == AppName && !magWindow!.Running) ToggleMagWindow();
                 }
             }
         }
-        MainWindow mainWin = null;
-        private static IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        private static IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr _lParam, ref bool handled)
         {
             if (msg == NativeMethods.MAGPIE_WM_SHOWME)
             {
@@ -236,7 +231,7 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
                     {Combination.FromString(Settings.Default.MagpieHotkey), () => ToggleMagWindow()},
                 });
             }
-            catch (ArgumentException e)
+            catch (ArgumentException)
             {
                 return false;
             }
