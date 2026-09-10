@@ -91,18 +91,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
+                foreach (ManagementObject obj in motherboardSearcher.Get())
                 {
-                    foreach (ManagementObject obj in motherboardSearcher.Get())
-                    {
-                        return GetAvailability(Convert.ToUInt32(obj[nameof(Availability)]));
-                    }
-                    return "";
+                    return GetAvailability(Convert.ToUInt32(obj[nameof(Availability)]));
                 }
-                catch (ManagementException)
-                {
-                    return "";
-                }
+                return "";
             }
         }
 
@@ -110,18 +103,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
+                foreach (ManagementObject obj in baseboardSearcher.Get())
                 {
-                    foreach (ManagementObject obj in baseboardSearcher.Get())
-                    {
-                        return Convert.ToBoolean(obj[nameof(HostingBoard)]);
-                    }
-                    return false;
+                    return Convert.ToBoolean(obj[nameof(HostingBoard)]);
                 }
-                catch (ManagementException)
-                {
-                    return false;
-                }
+                return false;
             }
         }
 
@@ -129,20 +115,13 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
+                foreach (ManagementObject queryObj in baseboardSearcher.Get())
                 {
-                    foreach (ManagementObject queryObj in baseboardSearcher.Get())
-                    {
-                        string? value = Convert.ToString(queryObj[nameof(InstallDate)]);
-                        if (value == null) return "";
-                        return ConvertToDateTime(value);
-                    }
-                    return "";
+                    string? value = Convert.ToString(queryObj[nameof(InstallDate)]);
+                    if (value == null) return "";
+                    return ConvertToDateTime(value);
                 }
-                catch (ManagementException)
-                {
-                    return "";
-                }
+                return "";
             }
         }
 
@@ -150,18 +129,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
+                foreach (ManagementObject queryObj in baseboardSearcher.Get())
                 {
-                    foreach (ManagementObject queryObj in baseboardSearcher.Get())
-                    {
-                        return Convert.ToString(queryObj[nameof(Manufacturer)]) ?? "";
-                    }
-                    return "";
+                    return Convert.ToString(queryObj[nameof(Manufacturer)]) ?? "";
                 }
-                catch (ManagementException)
-                {
-                    return "";
-                }
+                return "";
             }
         }
 
@@ -169,18 +141,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
+                foreach (ManagementObject queryObj in baseboardSearcher.Get())
                 {
-                    foreach (ManagementObject queryObj in baseboardSearcher.Get())
-                    {
-                        return Convert.ToString(queryObj[nameof(Model)]) ?? "";
-                    }
-                    return "";
+                    return Convert.ToString(queryObj[nameof(Model)]) ?? "";
                 }
-                catch (ManagementException)
-                {
-                    return "";
-                }
+                return "";
             }
         }
 
@@ -188,18 +153,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
+                foreach (ManagementObject queryObj in baseboardSearcher.Get())
                 {
-                    foreach (ManagementObject queryObj in baseboardSearcher.Get())
-                    {
-                        return Convert.ToString(queryObj[nameof(PartNumber)]) ?? "";
-                    }
-                    return "";
+                    return Convert.ToString(queryObj[nameof(PartNumber)]) ?? "";
                 }
-                catch (ManagementException)
-                {
-                    return "";
-                }
+                return "";
             }
         }
 
@@ -207,18 +165,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
+                foreach (ManagementObject queryObj in motherboardSearcher.Get())
                 {
-                    foreach (ManagementObject queryObj in motherboardSearcher.Get())
-                    {
-                        return Convert.ToString(queryObj[nameof(PNPDeviceID)]) ?? "";
-                    }
-                    return "";
+                    return Convert.ToString(queryObj[nameof(PNPDeviceID)]) ?? "";
                 }
-                catch (ManagementException)
-                {
-                    return "";
-                }
+                return "";
             }
         }
 
@@ -226,18 +177,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
+                foreach (ManagementObject queryObj in motherboardSearcher.Get())
                 {
-                    foreach (ManagementObject queryObj in motherboardSearcher.Get())
-                    {
-                        return Convert.ToString(queryObj[nameof(PrimaryBusType)]) ?? "";
-                    }
-                    return "";
+                    return Convert.ToString(queryObj[nameof(PrimaryBusType)]) ?? "";
                 }
-                catch (ManagementException)
-                {
-                    return "";
-                }
+                return "";
             }
         }
 
@@ -245,23 +189,16 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
-                {
-                    using RegistryKey? biosKey = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\BIOS");
-                    string? productName = biosKey?.GetValue("SystemProductName")?.ToString();
-                    if (!string.IsNullOrWhiteSpace(productName))
-                        return productName;
+                using RegistryKey? biosKey = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\BIOS");
+                string? productName = biosKey?.GetValue("SystemProductName")?.ToString();
+                if (!string.IsNullOrWhiteSpace(productName))
+                    return productName;
 
-                    foreach (ManagementObject queryObj in ComputerSsystemInfo.Get())
-                    {
-                        return Convert.ToString(queryObj["Name"]) ?? "";
-                    }
-                    return "";
-                }
-                catch (ManagementException)
+                foreach (ManagementObject queryObj in ComputerSsystemInfo.Get())
                 {
-                    return "";
+                    return Convert.ToString(queryObj["Name"]) ?? "";
                 }
+                return "";
             }
         }
 
@@ -269,18 +206,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
+                foreach (ManagementObject obj in baseboardSearcher.Get())
                 {
-                    foreach (ManagementObject obj in baseboardSearcher.Get())
-                    {
-                        return Convert.ToBoolean(obj[nameof(Removable)]);
-                    }
-                    return false;
+                    return Convert.ToBoolean(obj[nameof(Removable)]);
                 }
-                catch (ManagementException)
-                {
-                    return false;
-                }
+                return false;
             }
         }
 
@@ -288,18 +218,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
+                foreach (ManagementObject obj in baseboardSearcher.Get())
                 {
-                    foreach (ManagementObject obj in baseboardSearcher.Get())
-                    {
-                        return Convert.ToBoolean(obj[nameof(Replaceable)]);
-                    }
-                    return false;
+                    return Convert.ToBoolean(obj[nameof(Replaceable)]);
                 }
-                catch (ManagementException)
-                {
-                    return false;
-                }
+                return false;
             }
         }
 
@@ -307,18 +230,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
+                foreach (ManagementObject queryObj in motherboardSearcher.Get())
                 {
-                    foreach (ManagementObject queryObj in motherboardSearcher.Get())
-                    {
-                        return Convert.ToString(queryObj[nameof(RevisionNumber)]) ?? "";
-                    }
-                    return "";
+                    return Convert.ToString(queryObj[nameof(RevisionNumber)]) ?? "";
                 }
-                catch (ManagementException)
-                {
-                    return "";
-                }
+                return "";
             }
         }
 
@@ -326,18 +242,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
+                foreach (ManagementObject queryObj in motherboardSearcher.Get())
                 {
-                    foreach (ManagementObject queryObj in motherboardSearcher.Get())
-                    {
-                        return Convert.ToString(queryObj[nameof(SecondaryBusType)]) ?? "";
-                    }
-                    return "";
+                    return Convert.ToString(queryObj[nameof(SecondaryBusType)]) ?? "";
                 }
-                catch (ManagementException)
-                {
-                    return "";
-                }
+                return "";
             }
         }
 
@@ -345,18 +254,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
+                foreach (ManagementObject queryObj in baseboardSearcher.Get())
                 {
-                    foreach (ManagementObject queryObj in baseboardSearcher.Get())
-                    {
-                        return Convert.ToString(queryObj[nameof(SerialNumber)]) ?? "";
-                    }
-                    return "";
+                    return Convert.ToString(queryObj[nameof(SerialNumber)]) ?? "";
                 }
-                catch (ManagementException)
-                {
-                    return "";
-                }
+                return "";
             }
         }
 
@@ -364,18 +266,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
+                foreach (ManagementObject querObj in baseboardSearcher.Get())
                 {
-                    foreach (ManagementObject querObj in baseboardSearcher.Get())
-                    {
-                        return Convert.ToString(querObj[nameof(Status)]) ?? "";
-                    }
-                    return "";
+                    return Convert.ToString(querObj[nameof(Status)]) ?? "";
                 }
-                catch (ManagementException)
-                {
-                    return "";
-                }
+                return "";
             }
         }
 
@@ -383,18 +278,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
+                foreach (ManagementObject queryObj in motherboardSearcher.Get())
                 {
-                    foreach (ManagementObject queryObj in motherboardSearcher.Get())
-                    {
-                        return Convert.ToString(queryObj[nameof(SystemName)]) ?? "";
-                    }
-                    return "";
+                    return Convert.ToString(queryObj[nameof(SystemName)]) ?? "";
                 }
-                catch (ManagementException)
-                {
-                    return "";
-                }
+                return "";
             }
         }
 
@@ -402,18 +290,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             get
             {
-                try
+                foreach (ManagementObject queryObj in baseboardSearcher.Get())
                 {
-                    foreach (ManagementObject queryObj in baseboardSearcher.Get())
-                    {
-                        return Convert.ToString(queryObj[nameof(Version)]) ?? "";
-                    }
-                    return "";
+                    return Convert.ToString(queryObj[nameof(Version)]) ?? "";
                 }
-                catch (ManagementException)
-                {
-                    return "";
-                }
+                return "";
             }
         }
 
@@ -464,85 +345,57 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         public static decimal GetBatteryRate()
         {
-            try
-            {
-                ManagementScope scope = new ManagementScope("root\\WMI");
-                ObjectQuery query = new ObjectQuery("SELECT * FROM BatteryStatus");
+            ManagementScope scope = new ManagementScope("root\\WMI");
+            ObjectQuery query = new ObjectQuery("SELECT * FROM BatteryStatus");
 
-                using ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
-                foreach (ManagementObject obj in searcher.Get())
-                {
-                    decimal chargeRate = Convert.ToDecimal(obj["ChargeRate"]);
-                    decimal dischargeRate = Convert.ToDecimal(obj["DischargeRate"]);
-                    return chargeRate > 0 ? chargeRate : -dischargeRate;
-                }
-                return 0;
-            }
-            catch (ManagementException)
+            using ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
+            foreach (ManagementObject obj in searcher.Get())
             {
-                return 0;
+                decimal chargeRate = Convert.ToDecimal(obj["ChargeRate"]);
+                decimal dischargeRate = Convert.ToDecimal(obj["DischargeRate"]);
+                return chargeRate > 0 ? chargeRate : -dischargeRate;
             }
+            return 0;
         }
 
         public static decimal ReadFullChargeCapacity()
         {
-            try
-            {
-                ManagementScope scope = new ManagementScope("root\\WMI");
-                ObjectQuery query = new ObjectQuery("SELECT * FROM BatteryFullChargedCapacity");
+            ManagementScope scope = new ManagementScope("root\\WMI");
+            ObjectQuery query = new ObjectQuery("SELECT * FROM BatteryFullChargedCapacity");
 
-                using ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
-                foreach (ManagementObject obj in searcher.Get())
-                {
-                    return Convert.ToDecimal(obj["FullChargedCapacity"]);
-                }
-                return 0;
-            }
-            catch (ManagementException)
+            using ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
+            foreach (ManagementObject obj in searcher.Get())
             {
-                return 0;
+                return Convert.ToDecimal(obj["FullChargedCapacity"]);
             }
+            return 0;
         }
 
         public static decimal ReadDesignCapacity()
         {
-            try
-            {
-                ManagementScope scope = new ManagementScope("root\\WMI");
-                ObjectQuery query = new ObjectQuery("SELECT * FROM BatteryStaticData");
+            ManagementScope scope = new ManagementScope("root\\WMI");
+            ObjectQuery query = new ObjectQuery("SELECT * FROM BatteryStaticData");
 
-                using ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
-                foreach (ManagementObject obj in searcher.Get())
-                {
-                    return Convert.ToDecimal(obj["DesignedCapacity"]);
-                }
-                return 0;
-            }
-            catch (ManagementException)
+            using ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
+            foreach (ManagementObject obj in searcher.Get())
             {
-                return 0;
+                return Convert.ToDecimal(obj["DesignedCapacity"]);
             }
+            return 0;
         }
 
         public static int GetBatteryCycle()
         {
-            try
-            {
-                ManagementObjectSearcher searcher =
-                    new ManagementObjectSearcher("root\\WMI",
-                    "SELECT * FROM BatteryCycleCount");
+            ManagementObjectSearcher searcher =
+                new ManagementObjectSearcher("root\\WMI",
+                "SELECT * FROM BatteryCycleCount");
 
-                foreach (ManagementObject queryObj in searcher.Get())
-                {
-
-                    return Convert.ToInt32(queryObj["CycleCount"]);
-                }
-                return 0;
-            }
-            catch (ManagementException)
+            foreach (ManagementObject queryObj in searcher.Get())
             {
-                return 0;
+
+                return Convert.ToInt32(queryObj["CycleCount"]);
             }
+            return 0;
         }
 
         public static decimal GetBatteryHealth()
@@ -678,14 +531,14 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             return list;
         }
 
-        private static string RemoveCommaSpaceFromStart(string input)
+        private static string RemoveCommaSpaceFromStart(ReadOnlySpan<char> input)
         {
-            string prefixToRemove = ", ";
-            if (input.StartsWith(prefixToRemove))
+            const string prefixToRemove = ", ";
+            if (input.StartsWith(prefixToRemove.AsSpan()))
             {
-                input = input.Remove(0, prefixToRemove.Length);
+                return input.Slice(prefixToRemove.Length).ToString();
             }
-            return input;
+            return input.ToString();
         }
 
         private static bool IsVirtualizationEnabled()
