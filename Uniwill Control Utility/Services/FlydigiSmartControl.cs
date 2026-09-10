@@ -9,7 +9,7 @@ namespace Uniwill_Control_Utility.Services
     /// Reads temperatures on a timer, applies a fan curve profile, and writes
     /// the resulting RPM to the cooler with smoothing and safety overrides.
     /// </summary>
-    public class FlydigiSmartControl : IDisposable
+    public sealed class FlydigiSmartControl : IDisposable
     {
         private readonly FlydigiCoolerService _coolerService;
         private readonly FlydigiTemperatureProvider _temperatureProvider;
@@ -107,8 +107,7 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public void Start()
         {
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(FlydigiSmartControl));
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
             Stop();
 
@@ -232,7 +231,7 @@ namespace Uniwill_Control_Utility.Services
         /// >= 90°C → 4000 RPM (full speed).
         /// >= 85°C → at least 3500 RPM.
         /// </summary>
-        private ushort ApplyCriticalTempOverride(ushort targetRpm, double temp)
+        private static ushort ApplyCriticalTempOverride(ushort targetRpm, double temp)
         {
             if (temp >= 90.0)
                 return 4000;
@@ -270,6 +269,7 @@ namespace Uniwill_Control_Utility.Services
                 Stop();
                 _disposed = true;
             }
+            GC.SuppressFinalize(this);
         }
     }
 }
