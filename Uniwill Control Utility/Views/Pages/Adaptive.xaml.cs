@@ -233,11 +233,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         // RyzenAdj curve optimizer 20-bit bias base
         private const int CoBiasBase = 0x100000;
 
-        private static AdaptivePresetManager adaptivePresetManager = new AdaptivePresetManager(Settings.Default.Path + AdaptivePresetsFile);
-        private static DeviceApplier? _deviceApplier;
-        private static FlydigiSmartControl? _bs2ProSmartControl;
-        private static FlydigiTemperatureProvider? _bs2ProTempProvider;
-        private static Bs1SmartControl? _bs1SmartControl;
+        private AdaptivePresetManager adaptivePresetManager = new AdaptivePresetManager(Settings.Default.Path + AdaptivePresetsFile);
+        private DeviceApplier? _deviceApplier;
+        private FlydigiSmartControl? _bs2ProSmartControl;
+        private FlydigiTemperatureProvider? _bs2ProTempProvider;
+        private Bs1SmartControl? _bs1SmartControl;
         private async void setUp()
         {
             try
@@ -257,10 +257,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 IEnumerable<string> presetNames = adaptivePresetManager.GetPresetNames();
 
-                foreach (GameLauncherItem item in Game_Manager.installedGames ?? Enumerable.Empty<GameLauncherItem>())
+                foreach (GameLauncherItem item in (Game_Manager.installedGames ?? Enumerable.Empty<GameLauncherItem>())
+                    .Where(item => !presetNames.Any(name => name.Contains(item.gameName))))
                 {
-                    if (presetNames.Any(names => names.Contains(item.gameName)))
-                        continue;
 
                     {
                         AdaptivePreset preset = new AdaptivePreset
@@ -326,7 +325,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 btnStart.IsEnabled = true;
                 btnSave.IsEnabled = true;
 
-                if (Settings.Default.isStartAdpative) ToggleAdaptiveMode();
+                if (Settings.Default.isStartAdpative) await ToggleAdaptiveMode();
             }
             catch (Exception ex)
             {
@@ -414,10 +413,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 tb.IsChecked = start; // revert the auto-toggle
             }
-            ToggleAdaptiveMode();
+            _ = ToggleAdaptiveMode();
         }
 
-        private async void ToggleAdaptiveMode()
+        private async Task ToggleAdaptiveMode()
         {
             try
             {
@@ -492,7 +491,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
  #pragma warning disable CS0649 // Field is never assigned to — set via XAML bindings
-        internal static int CPUTemp, CPULoad, CPUClock, CPUPower, GPULoad, GPUClock, GPUMemClock;
+        private static int CPUTemp, CPULoad, CPUClock, CPUPower, GPULoad, GPUClock, GPUMemClock;
 #pragma warning restore CS0649
 
         /// <summary>
@@ -918,8 +917,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                     Bs2ProBrightness = (byte)sliderBs2ProBrightness.Value,
                     // Gap 2: Save Flydigi RGB speed per-game
                     Bs2ProRgbSpeed = (byte)sliderBs2ProRgbSpeed.Value,
-                    EcFanEnabled = sdEcFan.Visibility == Visibility.Visible ? (cbxEcFanEnabled.IsChecked ?? false) : false,
-                    EcFanUnifiedMode = sdEcFan.Visibility == Visibility.Visible ? cbxEcFanMode.SelectedIndex == 0 : false,
+                    EcFanEnabled = sdEcFan.Visibility == Visibility.Visible && (cbxEcFanEnabled.IsChecked ?? false),
+                    EcFanUnifiedMode = sdEcFan.Visibility == Visibility.Visible && cbxEcFanMode.SelectedIndex == 0,
                     EcFanPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanPreset.SelectedIndex) : EcFanPresetBalanced,
                     EcFanCpuPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanCpuPreset.SelectedIndex) : EcFanPresetBalanced,
                     EcFanGpuPreset = sdEcFan.Visibility == Visibility.Visible ? GetEcFanPresetFromIndex(cbxEcFanGpuPreset.SelectedIndex) : EcFanPresetBalanced,
@@ -960,7 +959,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     CpuPl2 = (int)AdpSdIntelPl2.Value,
                     CpuUndervolt = (int)AdpSdIntelUndervolt.Value,
                     // GPU
-                    GpuEnabled = sdGpuSettings.Visibility == Visibility.Visible ? (cbxGpuEnabled.IsChecked ?? false) : false,
+                    GpuEnabled = sdGpuSettings.Visibility == Visibility.Visible && (cbxGpuEnabled.IsChecked ?? false),
                     GpuTgp = (int)AdpSdNvPower.Value,
                     GpuDynamicBoost = AdpTogDynamicBoost.IsChecked == true,
                     GpuDbOffset = (int)AdpSdNvDbOffset.Value,
@@ -969,7 +968,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     // Gap 4: Save GPU V-F curve preset name per-game
                     GpuVfCurveName = GetActiveVfCurveName(),
                     // Light Bar
-                    LbEnabled = sdLightBar.Visibility == Visibility.Visible ? (cbxLbEnabled.IsChecked ?? false) : false,
+                    LbEnabled = sdLightBar.Visibility == Visibility.Visible && (cbxLbEnabled.IsChecked ?? false),
                     LbPower = AdpTsLightBarPower.IsChecked == true,
                     LbColorR = AdpLbColorPicker.SelectedColor.R,
                     LbColorG = AdpLbColorPicker.SelectedColor.G,
@@ -1126,7 +1125,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                         if (selectedGameName != runningGameName)
                         {
-                            Dispatcher.Invoke(() =>
+                            await Dispatcher.InvokeAsync(() =>
                             {
                                 getRunningGame(runningGameName);
                             });
@@ -1211,7 +1210,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private async void update()
         {
             // Prevent concurrent executions from adaptive_Tick and sensors_Tick
-            if (!_updateSemaphore.Wait(0))
+            if (!await _updateSemaphore.WaitAsync(TimeSpan.Zero))
                 return;
 
             try
@@ -1808,7 +1807,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private int gameMissingCount = 0;
         private const int maxGameMisses = 2;
 
-        private static bool AutoSwitchEnabled(GameLauncherItem item)
+        private bool AutoSwitchEnabled(GameLauncherItem item)
         {
             var preset = adaptivePresetManager.GetPreset(item.gameName);
             return preset?.isAutoSwitch ?? true;
@@ -1873,13 +1872,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                 GetWindowText(hWnd, titleSb, titleSb.Capacity);
                 string windowTitle = titleSb.ToString().Trim();
 
-                foreach (GameLauncherItem item in installedGames ?? Enumerable.Empty<GameLauncherItem>())
-                {
-                    if (windowTitle.Contains(item.gameName, StringComparison.OrdinalIgnoreCase)
+                foreach (var gameName in (installedGames ?? Enumerable.Empty<GameLauncherItem>())
+                    .Where(item => windowTitle.Contains(item.gameName, StringComparison.OrdinalIgnoreCase)
                         && AutoSwitchEnabled(item))
-                    {
-                        matchedGameNames.Add(item.gameName);
-                    }
+                    .Select(item => item.gameName))
+                {
+                    matchedGameNames.Add(gameName);
                 }
 
                 return true;
@@ -2129,7 +2127,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>Stops and disposes the BS2 Pro smart control (curve mode) if active.</summary>
-        private static void StopBs2ProSmartControl()
+        private void StopBs2ProSmartControl()
         {
             if (_bs2ProSmartControl != null)
             {
@@ -2144,7 +2142,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private static void StopBs1SmartControl()
+        private void StopBs1SmartControl()
         {
             if (_bs1SmartControl != null)
             {
