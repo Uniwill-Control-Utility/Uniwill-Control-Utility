@@ -23,6 +23,7 @@ namespace Uniwill_Control_Utility.Scripts
     public static class FlydigiHardwareDetector
     {
         private const int VendorId = 0x37D7;
+        private const string DefaultModelName = "Flydigi Cooler";
         private static readonly int[] ProductIds = { 0x1001, 0x1002, 0x1003, 0x1004 };
 
         private static bool? _hasDevice;
@@ -39,7 +40,7 @@ namespace Uniwill_Control_Utility.Scripts
         /// The model name of the currently connected device (e.g., "BS1", "BS2 PRO").
         /// Set alongside ConnectedDeviceType when a device connects.
         /// </summary>
-        public static string ConnectedModelName { get; private set; } = "Flydigi Cooler";
+        public static string ConnectedModelName { get; private set; } = DefaultModelName;
 
         /// <summary>
         /// Notifies the detector that a specific device type connected or disconnected.
@@ -48,9 +49,24 @@ namespace Uniwill_Control_Utility.Scripts
         public static void SetConnectedDeviceType(ConnectedDeviceType type, string? modelName = null)
         {
             ConnectedDeviceType = type;
-            ConnectedModelName = (type == ConnectedDeviceType.None)
-                ? "Flydigi Cooler"
-                : (modelName ?? (type == ConnectedDeviceType.BS1 ? "BS1" : "Flydigi Cooler"));
+            string resolvedModelName;
+            if (type == ConnectedDeviceType.None)
+            {
+                resolvedModelName = DefaultModelName;
+            }
+            else if (modelName != null)
+            {
+                resolvedModelName = modelName;
+            }
+            else if (type == ConnectedDeviceType.BS1)
+            {
+                resolvedModelName = "BS1";
+            }
+            else
+            {
+                resolvedModelName = DefaultModelName;
+            }
+            ConnectedModelName = resolvedModelName;
             InvalidateCache();
         }
 
@@ -118,14 +134,11 @@ namespace Uniwill_Control_Utility.Scripts
                 // 1. Check paired BLE devices first (faster, works when device isn't advertising)
                 var selector = Windows.Devices.Bluetooth.BluetoothLEDevice.GetDeviceSelectorFromPairingState(true);
                 var pairedDevices = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(selector);
-                foreach (var deviceInfo in pairedDevices)
+                if (pairedDevices.Select(deviceInfo => deviceInfo.Name)
+                    .Any(name => !string.IsNullOrEmpty(name) && IsBs1AdvertisingName(name)))
                 {
-                    var name = deviceInfo.Name;
-                    if (!string.IsNullOrEmpty(name) && IsBs1AdvertisingName(name))
-                    {
-                        _hasBs1 = true;
-                        return true;
-                    }
+                    _hasBs1 = true;
+                    return true;
                 }
 
                 // 2. Fall back to BLE advertisement scan for unpaired devices
@@ -203,17 +216,17 @@ namespace Uniwill_Control_Utility.Scripts
                         0x1002 => "BS2 PRO",
                         0x1003 => "BS3",
                         0x1004 => "BS3 PRO",
-                        _ => "Flydigi Cooler"
+                        _ => DefaultModelName
                     };
                 }
                 else
                 {
-                    _cachedModelName = "Flydigi Cooler";
+                    _cachedModelName = DefaultModelName;
                 }
             }
             catch
             {
-                _cachedModelName = "Flydigi Cooler";
+                _cachedModelName = DefaultModelName;
             }
 
             return _cachedModelName;
