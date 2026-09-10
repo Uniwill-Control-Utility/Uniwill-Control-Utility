@@ -1,10 +1,5 @@
-using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
 using Uniwill_Control_Utility.Properties;
@@ -16,16 +11,16 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
     // I do not take credit for the full functionality of the code.
     //
 
-    internal class MagWindow
+    internal class MagWindow : IDisposable
     {
-        // ????????????
+        // Closed event
         public event Action? Closed;
 
         public IntPtr SrcWindow { get; private set; } = IntPtr.Zero;
 
         private readonly Thread magThread;
 
-        // ???? magThread ????
+        // Used to signal magThread
         private readonly AutoResetEvent runEvent = new(false);
 
         private enum MagWindowCmd
@@ -36,7 +31,7 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
             SetLogLevel
         }
 
-        // ??? magThread ???
+        // Passed to magThread
         private class MagWindowParams
         {
             public volatile IntPtr hwndSrc;
@@ -65,21 +60,25 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
 
         private readonly MagWindowParams magWindowParams = new();
 
-        // ??????????????
+        // Internal close event
         private event Action<string?> CloseEvent;
 
         public bool Running { get; private set; }
 
+        private const int PollIntervalMs = 1000;
+        private const int DisposePollIntervalMs = 1;
+        private const int LogArchiveAboveSize = 100000;
+        private const int LogMaxArchiveFiles = 1;
+
         public MagWindow(Window parent)
         {
-            // ?? WinRT Capturer API ??? MTA ?
-            // C# ?????? STA,???????????????
-            magThread = new Thread(() => {
+            // Use WinRT Capturer API which requires MTA
+            // C# defaults to STA, so we need a separate thread
+            magThread = new Thread(() =>
+            {
                 Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
                 string logFileName = App.LOGS_FOLDER + "Runtime.log";
-                const int logArchiveAboveSize = 100000;
-                const int logMaxArchiveFiles = 1;
 
                 static uint ResolveLogLevel(uint logLevel)
                 {
@@ -98,17 +97,17 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
                     initSuccess = NativeMethods.Initialize(
                         ResolveLogLevel(Settings.Default.LoggingLevel),
                         logFileName,
-                        logArchiveAboveSize,
-                        logMaxArchiveFiles
+                        LogArchiveAboveSize,
+                        LogMaxArchiveFiles
                     );
                 }
-                catch (DllNotFoundException e)
+                catch (DllNotFoundException)
                 {
-  
+                    // Native library not found; initSuccess remains false
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
-                    
+                    // Initialization failed for an unexpected reason; initSuccess remains false
                 }
 
                 if (!initSuccess)
@@ -119,7 +118,7 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
 
                 while (magWindowParams.cmd != MagWindowCmd.Exit)
                 {
-                    _ = runEvent.WaitOne(1000);
+                    _ = runEvent.WaitOne(PollIntervalMs);
 
                     MagWindowCmd cmd = magWindowParams.cmd;
                     magWindowParams.cmd = MagWindowCmd.None;
@@ -140,20 +139,7 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
                     }
                     else
                     {
-                        uint flags = (Settings.Default.NoCursor ? (uint)FlagMasks.NoCursor : 0) |
-                            (Settings.Default.AdjustCursorSpeed ? (uint)FlagMasks.AdjustCursorSpeed : 0) |
-                            (Settings.Default.DebugSaveEffectSources ? (uint)FlagMasks.SaveEffectSources : 0) |
-                            (Settings.Default.DisableLowLatency ? (uint)FlagMasks.DisableLowLatency : 0) |
-                            (Settings.Default.DebugBreakpointMode ? (uint)FlagMasks.BreakpointMode : 0) |
-                            (Settings.Default.DisableWindowResizing ? (uint)FlagMasks.DisableWindowResizing : 0) |
-                            (Settings.Default.DisableDirectFlip ? (uint)FlagMasks.DisableDirectFlip : 0) |
-                            (Settings.Default.Is3DMode ? (uint)FlagMasks.Is3DMode : 0) |
-                            (Settings.Default.CropTitleBarOfUWP ? (uint)FlagMasks.CropTitleBarOfUWP : 0) |
-                            (Settings.Default.DebugDisableEffectCache ? (uint)FlagMasks.DisableEffectCache : 0) |
-                            (Settings.Default.SimulateExclusiveFullscreen ? (uint)FlagMasks.SimulateExclusiveFullscreen : 0) |
-                            (Settings.Default.DebugWarningsAreErrors ? (uint)FlagMasks.WarningsAreErrors : 0) |
-                            (Settings.Default.VSync ? 0 : (uint)FlagMasks.DisableVSync) |
-                            (Settings.Default.ShowFPS ? (uint)FlagMasks.ShowFPS : 0);
+                        uint flags = BuildFlags();
 
                         bool customCropping = Settings.Default.CustomCropping;
 
@@ -181,7 +167,8 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
             magThread.IsBackground = true;
             magThread.Start();
 
-            CloseEvent += (string? errorMsgId) => {
+            CloseEvent += (string? errorMsgId) =>
+            {
                 bool noError = string.IsNullOrEmpty(errorMsgId);
 
                 if (noError && Closed != null)
@@ -193,12 +180,30 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
 
                 if (!noError)
                 {
-                    parent.Dispatcher.Invoke(new Action(() => {
+                    parent.Dispatcher.Invoke(() =>
+                    {
                         _ = NativeMethods.SetForegroundWindow(new WindowInteropHelper(parent).Handle);
-
-                    }));
+                    });
                 }
             };
+        }
+
+        private static uint BuildFlags()
+        {
+            return (Settings.Default.NoCursor ? (uint)FlagMasks.NoCursor : 0) |
+                (Settings.Default.AdjustCursorSpeed ? (uint)FlagMasks.AdjustCursorSpeed : 0) |
+                (Settings.Default.DebugSaveEffectSources ? (uint)FlagMasks.SaveEffectSources : 0) |
+                (Settings.Default.DisableLowLatency ? (uint)FlagMasks.DisableLowLatency : 0) |
+                (Settings.Default.DebugBreakpointMode ? (uint)FlagMasks.BreakpointMode : 0) |
+                (Settings.Default.DisableWindowResizing ? (uint)FlagMasks.DisableWindowResizing : 0) |
+                (Settings.Default.DisableDirectFlip ? (uint)FlagMasks.DisableDirectFlip : 0) |
+                (Settings.Default.Is3DMode ? (uint)FlagMasks.Is3DMode : 0) |
+                (Settings.Default.CropTitleBarOfUWP ? (uint)FlagMasks.CropTitleBarOfUWP : 0) |
+                (Settings.Default.DebugDisableEffectCache ? (uint)FlagMasks.DisableEffectCache : 0) |
+                (Settings.Default.SimulateExclusiveFullscreen ? (uint)FlagMasks.SimulateExclusiveFullscreen : 0) |
+                (Settings.Default.DebugWarningsAreErrors ? (uint)FlagMasks.WarningsAreErrors : 0) |
+                (Settings.Default.VSync ? 0 : (uint)FlagMasks.DisableVSync) |
+                (Settings.Default.ShowFPS ? (uint)FlagMasks.ShowFPS : 0);
         }
 
         public void Create(string effectsJson)
@@ -211,8 +216,7 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
             IntPtr hwndSrc = NativeMethods.GetForegroundWindow();
             if (!NativeMethods.IsWindow(hwndSrc)
                 || !NativeMethods.IsWindowVisible(hwndSrc)
-                || NativeMethods.GetWindowShowCmd(hwndSrc) != NativeMethods.SW_NORMAL
-            )
+                || NativeMethods.GetWindowShowCmd(hwndSrc) != NativeMethods.SW_NORMAL)
             {
                 return;
             }
@@ -263,13 +267,13 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
 
                 while (Running)
                 {
-                    Thread.Sleep(1);
+                    Thread.Sleep(DisposePollIntervalMs);
                 }
             }
             else
             {
                 _ = runEvent.Set();
-                Thread.Sleep(1);
+                Thread.Sleep(DisposePollIntervalMs);
             }
 
             runEvent.Dispose();

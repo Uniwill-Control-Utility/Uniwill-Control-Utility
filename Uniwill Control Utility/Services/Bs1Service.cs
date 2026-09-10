@@ -195,7 +195,7 @@ namespace Uniwill_Control_Utility.Services
                     // The saved address may be a Windows DeviceId or a raw Bluetooth address
                     BluetoothLEDevice? lastDevice = null;
                     bool isDeviceId = _settings.LastDeviceAddress.StartsWith("\\\\?\\") ||
-                                      _settings.LastDeviceAddress.Contains("#") ||
+                                      _settings.LastDeviceAddress.Contains('#') ||
                                       _settings.LastDeviceAddress.StartsWith("BluetoothLE");
 
                     if (isDeviceId)
@@ -373,6 +373,25 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
+        /// Discovers characteristics by UUID, falling back to enumerating all characteristics.
+        /// </summary>
+        private static async Task<IReadOnlyList<GattCharacteristic>> DiscoverCharacteristicsAsync(
+            GattDeviceService deviceService, Guid preferredUuid, string label)
+        {
+            var results = await deviceService.GetCharacteristicsForUuidAsync(preferredUuid);
+            Log($"{LogPrefix} {label} characteristic discovery: {results.Status}, found {results.Characteristics.Count}");
+
+            // Fallback: enumerate all characteristics if UUID-filtered discovery found nothing
+            if (results.Characteristics.Count == 0)
+            {
+                results = await deviceService.GetCharacteristicsAsync();
+                Log($"{LogPrefix} GetAllCharacteristicsAsync for {label}: {results.Status}, found {results.Characteristics.Count}");
+            }
+
+            return results.Characteristics;
+        }
+
+        /// <summary>
         /// Awaits a WinRT connection operation with a timeout by racing against Task.Delay.
         /// Returns default(T) if the operation times out.
         /// NOTE: The operation MUST return immediately when the device isn't responding —
@@ -425,7 +444,7 @@ namespace Uniwill_Control_Utility.Services
                     Log($"{LogPrefix} Connect attempt {attempt}/{ConnectMaxRetries}, address={deviceAddress}");
 
                     // Determine if this is a Windows DeviceId or a raw Bluetooth address
-                    bool isDeviceId = deviceAddress.StartsWith("\\\\?\\") || deviceAddress.Contains("#");
+                    bool isDeviceId = deviceAddress.StartsWith("\\\\?\\") || deviceAddress.Contains('#');
 
                     if (isDeviceId)
                     {
@@ -539,17 +558,8 @@ namespace Uniwill_Control_Utility.Services
                         Log($"{LogPrefix} Found service: {deviceService.Uuid}");
 
                         // TX characteristic (write commands) - 0xFFF2
-                        var txResults = await deviceService.GetCharacteristicsForUuidAsync(Bs1WriteCharUuid);
-                        Log($"{LogPrefix} TX characteristic discovery: {txResults.Status}, found {txResults.Characteristics.Count}");
-
-                        // Fallback: enumerate all characteristics if UUID-filtered discovery found nothing
-                        if (txResults.Characteristics.Count == 0)
-                        {
-                            txResults = await deviceService.GetCharacteristicsAsync();
-                            Log($"{LogPrefix} GetAllCharacteristicsAsync for TX: {txResults.Status}, found {txResults.Characteristics.Count}");
-                        }
-
-                        foreach (var characteristic in txResults.Characteristics)
+                        var txCharacteristics = await DiscoverCharacteristicsAsync(deviceService, Bs1WriteCharUuid, "TX");
+                        foreach (var characteristic in txCharacteristics)
                         {
                             Log($"{LogPrefix} TX characteristic properties: {characteristic.CharacteristicProperties}, UUID: {characteristic.Uuid}");
                             if ((characteristic.CharacteristicProperties & GattCharacteristicProperties.Write) != 0 ||
@@ -562,16 +572,8 @@ namespace Uniwill_Control_Utility.Services
                         }
 
                         // RX characteristic (notifications) - 0xFFF1
-                        var rxResults = await deviceService.GetCharacteristicsForUuidAsync(Bs1NotifyCharUuid);
-                        Log($"{LogPrefix} RX characteristic discovery: {rxResults.Status}, found {rxResults.Characteristics.Count}");
-
-                        if (rxResults.Characteristics.Count == 0)
-                        {
-                            rxResults = await deviceService.GetCharacteristicsAsync();
-                            Log($"{LogPrefix} GetAllCharacteristicsAsync for RX: {rxResults.Status}, found {rxResults.Characteristics.Count}");
-                        }
-
-                        foreach (var characteristic in rxResults.Characteristics)
+                        var rxCharacteristics = await DiscoverCharacteristicsAsync(deviceService, Bs1NotifyCharUuid, "RX");
+                        foreach (var characteristic in rxCharacteristics)
                         {
                             if ((characteristic.CharacteristicProperties & GattCharacteristicProperties.Notify) != 0)
                             {
@@ -937,7 +939,11 @@ namespace Uniwill_Control_Utility.Services
                 if (_device != null)
                 {
                     Log(LogPrefix + " Unexpected device disconnect, cleaning up");
-                    _ = DisconnectAsync();
+                    _ = DisconnectAsync().ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            Log($"{LogPrefix} Unexpected disconnect cleanup failed: {t.Exception?.GetBaseException().Message}");
+                    }, TaskScheduler.Default);
                 }
             }
         }
@@ -950,11 +956,17 @@ namespace Uniwill_Control_Utility.Services
 
             try
             {
-                return tcs.Task.Wait(timeoutMs);
+                await tcs.Task.WaitAsync(TimeSpan.FromMilliseconds(timeoutMs));
+                return true;
+            }
+            catch (TaskCanceledException)
+            {
+                // Timed out waiting for session to close
+                return false;
             }
             catch
             {
-                // Non-critical: Task.Wait can throw OperationCanceledException on timeout or if the task faults
+                // Non-critical: task may fault during teardown
                 return false;
             }
         }
@@ -996,7 +1008,7 @@ namespace Uniwill_Control_Utility.Services
 
                 // Wait for a response
                 await respondedTcs.Task.WaitAsync(TimeSpan.FromSeconds(VerificationTimeoutSeconds));
-                return respondedTcs.Task.Result;
+                return true;
             }
             catch (TaskCanceledException)
             {
@@ -1054,7 +1066,38 @@ namespace Uniwill_Control_Utility.Services
         public void Dispose()
         {
             StopHeartbeat();
-            _ = DisconnectAsync(); // Fire-and-forget cleanup
+
+            // Synchronously clean up resources without awaiting DisconnectAsync.
+            // Dispose must be synchronous, so we perform the same cleanup steps inline.
+            if (_rxCharacteristic != null)
+            {
+                _rxCharacteristic.ValueChanged -= OnRxValueChanged;
+                _rxCharacteristic = null;
+            }
+
+            if (_gattSession != null)
+            {
+                _gattSession.SessionStatusChanged -= OnGattSessionStatusChanged;
+                var session = _gattSession;
+                _gattSession = null;
+                try { session.Dispose(); }
+                catch { /* Non-critical: dispose during teardown is best-effort */ }
+            }
+            _sessionClosedTcs = null;
+
+            if (_device != null)
+            {
+                var device = _device;
+                _device = null;
+                device.Dispose();
+            }
+
+            _txCharacteristic = null;
+            _realtimeMode = false;
+            ConnectedDeviceName = string.Empty;
+
+            ConnectionStateChanged?.Invoke(this, false);
+            StatusChanged?.Invoke(this, "Disconnected");
         }
     }
 }
