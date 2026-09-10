@@ -99,9 +99,9 @@ namespace Uniwill_Control_Utility.Scripts
                                 {
                                     string[] limits = ryzenAdjCommandValueString.Split(',');
                                     if (limits.Length == 2)
-                                        Intel_Management.changeTDP(int.Parse(limits[0]), int.Parse(limits[1]));
+                                        IntelManagement.changeTDP(int.Parse(limits[0]), int.Parse(limits[1]));
                                     else
-                                        Intel_Management.changeTDPAll(int.Parse(ryzenAdjCommandValueString));
+                                        IntelManagement.changeTDPAll(int.Parse(ryzenAdjCommandValueString));
                                 }
                                 else if (ryzenAdjCommandValueString.Contains("-"))
                                 {
@@ -110,20 +110,20 @@ namespace Uniwill_Control_Utility.Scripts
                                         string[] stringArray = ryzenAdjCommandValueString.Split('-');
                                         int[] intArray = stringArray.Select(int.Parse).ToArray();
 
-                                        Intel_Management.changeClockRatioOffset(intArray);
+                                        IntelManagement.changeClockRatioOffset(intArray);
                                     }
                                 }
                                 else
                                 {
                                     int ryzenAdjCommandValue = Convert.ToInt32(ryzenAdjCommandValueString);
 
-                                    if (ryzenAdjCommandString == "intel-volt-cpu") Intel_Management.changeVoltageOffset(ryzenAdjCommandValue, 0);
-                                    else if (ryzenAdjCommandString == "intel-volt-gpu") Intel_Management.changeVoltageOffset(ryzenAdjCommandValue, 1);
-                                    else if (ryzenAdjCommandString == "intel-volt-cache") Intel_Management.changeVoltageOffset(ryzenAdjCommandValue, 2);
-                                    else if (ryzenAdjCommandString == "intel-volt-sa") Intel_Management.changeVoltageOffset(ryzenAdjCommandValue, 3);
-                                    else if (ryzenAdjCommandString == "intel-bal-cpu") Intel_Management.changePowerBalance(ryzenAdjCommandValue, 0);
-                                    else if (ryzenAdjCommandString == "intel-bal-gpu") Intel_Management.changePowerBalance(ryzenAdjCommandValue, 1);
-                                    else if (ryzenAdjCommandString == "intel-gpu") Intel_Management.changeGpuClock(ryzenAdjCommandValue);
+                                    if (ryzenAdjCommandString == "intel-volt-cpu") IntelManagement.changeVoltageOffset(ryzenAdjCommandValue, 0);
+                                    else if (ryzenAdjCommandString == "intel-volt-gpu") IntelManagement.changeVoltageOffset(ryzenAdjCommandValue, 1);
+                                    else if (ryzenAdjCommandString == "intel-volt-cache") IntelManagement.changeVoltageOffset(ryzenAdjCommandValue, 2);
+                                    else if (ryzenAdjCommandString == "intel-volt-sa") IntelManagement.changeVoltageOffset(ryzenAdjCommandValue, 3);
+                                    else if (ryzenAdjCommandString == "intel-bal-cpu") IntelManagement.changePowerBalance(ryzenAdjCommandValue, 0);
+                                    else if (ryzenAdjCommandString == "intel-bal-gpu") IntelManagement.changePowerBalance(ryzenAdjCommandValue, 1);
+                                    else if (ryzenAdjCommandString == "intel-gpu") IntelManagement.changeGpuClock(ryzenAdjCommandValue);
                                 }
                             }
                             else if (ryzenAdjCommandString.StartsWith("ec-"))

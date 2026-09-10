@@ -557,7 +557,7 @@ namespace Uniwill_Control_Utility
             if (Family.TYPE != Family.ProcessorType.Intel)
                 SMUCommands.RyzenAccess.Deinitialize();
             else
-                Intel_Management.Deinitialize();
+                IntelManagement.Deinitialize();
 
             // Stop the host on a background thread to avoid deadlock with Dispatcher.Invoke
             // calls from hosted services' StopAsync. The host's cancellation token ensures

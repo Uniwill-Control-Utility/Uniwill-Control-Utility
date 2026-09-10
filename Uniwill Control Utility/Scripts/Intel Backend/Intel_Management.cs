@@ -7,7 +7,7 @@ using Uniwill_Control_Utility.Properties;
 
 namespace Uniwill_Control_Utility.Scripts.Intel_Backend
 {
-    public static class Intel_Management
+    public static class IntelManagement
     {
         private static readonly object objLock = new object();
         private static readonly object initializationLock = new object();
@@ -53,8 +53,6 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
         private static IntelPawnIo? msrPawnIo;
         private static IntelPawnIo? mchbarPawnIo;
         private static IntelPawnIO? intelPawnIO;
-
-        private static string? MCHBAR;
 
         public static void Initialise()
         {
@@ -116,7 +114,6 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
                     intelPawnIO = null;
                     msrPawnIo = null;
                     mchbarPawnIo = null;
-                    MCHBAR = null;
                 }
                 catch
                 {
@@ -332,28 +329,10 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
             DetermineIntelMCHBAR();
         }
 
-        private static bool DetermineIntelMCHBAR()
+        private static void DetermineIntelMCHBAR()
         {
-            try
-            {
-                EnsureInitialised();
-
-                if (intelPawnIO == null || !intelPawnIO.HasMchbar)
-                    return false;
-
-                ulong mchbar = intelPawnIO.GetMchbarAddress();
-
-                if (mchbar == 0)
-                    return false;
-
-                MCHBAR = "0x" + mchbar.ToString("X");
-
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+            // Previously stored the MCHBAR address in a field that was never read.
+            // Kept as a no-op for callers that invoke it during startup.
         }
 
         private static void EnsureInitialised()
