@@ -20,9 +20,9 @@ namespace RyzenSmu
     {
         public static void setAddresses()
         {
-            RyzenSmu.Smu.SMU_PCI_ADDR = 0x00000000;
-            RyzenSmu.Smu.SMU_OFFSET_ADDR = 0xB8;
-            RyzenSmu.Smu.SMU_OFFSET_DATA = 0xBC;
+            RyzenSmu.Smu.SMU_PCI_ADDR = 0x00000000u;
+            RyzenSmu.Smu.SMU_OFFSET_ADDR = 0xB8u;
+            RyzenSmu.Smu.SMU_OFFSET_DATA = 0xBCu;
 
             // Only FireRange (Socket AM5) is supported.
             if (Family.FAM == Family.RyzenFamily.FireRange) Socket_AM5_V1();
@@ -30,13 +30,13 @@ namespace RyzenSmu
 
         private static void Socket_FT5_FP5_AM4()
         {
-            RyzenSmu.Smu.MP1_ADDR_MSG = 0x3B10528;
-            RyzenSmu.Smu.MP1_ADDR_RSP = 0x3B10564;
-            RyzenSmu.Smu.MP1_ADDR_ARG = 0x3B10998;
+            RyzenSmu.Smu.MP1_ADDR_MSG = 0x3B10528u;
+            RyzenSmu.Smu.MP1_ADDR_RSP = 0x3B10564u;
+            RyzenSmu.Smu.MP1_ADDR_ARG = 0x3B10998u;
 
-            RyzenSmu.Smu.PSMU_ADDR_MSG = 0x03B10A20;
-            RyzenSmu.Smu.PSMU_ADDR_RSP = 0x03B10A80;
-            RyzenSmu.Smu.PSMU_ADDR_ARG = 0x03B10A88;
+            RyzenSmu.Smu.PSMU_ADDR_MSG = 0x03B10A20u;
+            RyzenSmu.Smu.PSMU_ADDR_RSP = 0x03B10A80u;
+            RyzenSmu.Smu.PSMU_ADDR_ARG = 0x03B10A88u;
 
             SMUCommands.commands = new List<(string, bool, uint)>
             {
@@ -122,13 +122,13 @@ namespace RyzenSmu
 
         private static void Socket_FP6_AM4()
         {
-            RyzenSmu.Smu.MP1_ADDR_MSG = 0x3B10528;
-            RyzenSmu.Smu.MP1_ADDR_RSP = 0x3B10564;
-            RyzenSmu.Smu.MP1_ADDR_ARG = 0x3B10998;
+            RyzenSmu.Smu.MP1_ADDR_MSG = 0x3B10528u;
+            RyzenSmu.Smu.MP1_ADDR_RSP = 0x3B10564u;
+            RyzenSmu.Smu.MP1_ADDR_ARG = 0x3B10998u;
 
-            RyzenSmu.Smu.PSMU_ADDR_MSG = 0x03B10A20;
-            RyzenSmu.Smu.PSMU_ADDR_RSP = 0x03B10A80;
-            RyzenSmu.Smu.PSMU_ADDR_ARG = 0x03B10A88;
+            RyzenSmu.Smu.PSMU_ADDR_MSG = 0x03B10A20u;
+            RyzenSmu.Smu.PSMU_ADDR_RSP = 0x03B10A80u;
+            RyzenSmu.Smu.PSMU_ADDR_ARG = 0x03B10A88u;
 
             SMUCommands.commands = new List<(string, bool, uint)>
             {
@@ -199,13 +199,13 @@ namespace RyzenSmu
 
         private static void Socket_FF3()
         {
-            RyzenSmu.Smu.MP1_ADDR_MSG = 0x3B10528;
-            RyzenSmu.Smu.MP1_ADDR_RSP = 0x3B10578;
-            RyzenSmu.Smu.MP1_ADDR_ARG = 0x3B10998;
+            RyzenSmu.Smu.MP1_ADDR_MSG = 0x3B10528u;
+            RyzenSmu.Smu.MP1_ADDR_RSP = 0x3B10578u;
+            RyzenSmu.Smu.MP1_ADDR_ARG = 0x3B10998u;
 
-            RyzenSmu.Smu.PSMU_ADDR_MSG = 0x03B10a20;
-            RyzenSmu.Smu.PSMU_ADDR_RSP = 0x03B10a80;
-            RyzenSmu.Smu.PSMU_ADDR_ARG = 0x03B10a88;
+            RyzenSmu.Smu.PSMU_ADDR_MSG = 0x03B10a20u;
+            RyzenSmu.Smu.PSMU_ADDR_RSP = 0x03B10a80u;
+            RyzenSmu.Smu.PSMU_ADDR_ARG = 0x03B10a88u;
 
             SMUCommands.commands = new List<(string, bool, uint)>
             {
@@ -240,13 +240,13 @@ namespace RyzenSmu
 
         private static void Socket_AM4_V1()
         {
-            RyzenSmu.Smu.MP1_ADDR_MSG = 0X3B10528;
-            RyzenSmu.Smu.MP1_ADDR_RSP = 0X3B10564;
-            RyzenSmu.Smu.MP1_ADDR_ARG = 0X3B10598;
+            RyzenSmu.Smu.MP1_ADDR_MSG = 0X3B10528u;
+            RyzenSmu.Smu.MP1_ADDR_RSP = 0X3B10564u;
+            RyzenSmu.Smu.MP1_ADDR_ARG = 0X3B10598u;
 
-            RyzenSmu.Smu.PSMU_ADDR_MSG = 0x03B1051C;
-            RyzenSmu.Smu.PSMU_ADDR_RSP = 0X03B10568;
-            RyzenSmu.Smu.PSMU_ADDR_ARG = 0X03B10590;
+            RyzenSmu.Smu.PSMU_ADDR_MSG = 0x03B1051Cu;
+            RyzenSmu.Smu.PSMU_ADDR_RSP = 0X03B10568u;
+            RyzenSmu.Smu.PSMU_ADDR_ARG = 0X03B10590u;
 
             SMUCommands.commands = new List<(string, bool, uint)>
             {
@@ -273,13 +273,13 @@ namespace RyzenSmu
 
         private static void Socket_AM4_V2()
         {
-            RyzenSmu.Smu.MP1_ADDR_MSG = 0x3B10530;
-            RyzenSmu.Smu.MP1_ADDR_RSP = 0x3B1057C;
-            RyzenSmu.Smu.MP1_ADDR_ARG = 0x3B109C4;
+            RyzenSmu.Smu.MP1_ADDR_MSG = 0x3B10530u;
+            RyzenSmu.Smu.MP1_ADDR_RSP = 0x3B1057Cu;
+            RyzenSmu.Smu.MP1_ADDR_ARG = 0x3B109C4u;
 
-            RyzenSmu.Smu.PSMU_ADDR_MSG = 0x03B10524;
-            RyzenSmu.Smu.PSMU_ADDR_RSP = 0x03B10570;
-            RyzenSmu.Smu.PSMU_ADDR_ARG = 0x03B10A40;
+            RyzenSmu.Smu.PSMU_ADDR_MSG = 0x03B10524u;
+            RyzenSmu.Smu.PSMU_ADDR_RSP = 0x03B10570u;
+            RyzenSmu.Smu.PSMU_ADDR_ARG = 0x03B10A40u;
 
             SMUCommands.commands = new List<(string, bool, uint)>
             {
@@ -315,13 +315,13 @@ namespace RyzenSmu
 
         private static void Socket_AM5_V1()
         {
-            RyzenSmu.Smu.MP1_ADDR_MSG = 0x3B10530;
-            RyzenSmu.Smu.MP1_ADDR_RSP = 0x3B1057C;
-            RyzenSmu.Smu.MP1_ADDR_ARG = 0x3B109C4;
+            RyzenSmu.Smu.MP1_ADDR_MSG = 0x3B10530u;
+            RyzenSmu.Smu.MP1_ADDR_RSP = 0x3B1057Cu;
+            RyzenSmu.Smu.MP1_ADDR_ARG = 0x3B109C4u;
 
-            RyzenSmu.Smu.PSMU_ADDR_MSG = 0x03B10524;
-            RyzenSmu.Smu.PSMU_ADDR_RSP = 0x03B10570;
-            RyzenSmu.Smu.PSMU_ADDR_ARG = 0x03B10A40;
+            RyzenSmu.Smu.PSMU_ADDR_MSG = 0x03B10524u;
+            RyzenSmu.Smu.PSMU_ADDR_RSP = 0x03B10570u;
+            RyzenSmu.Smu.PSMU_ADDR_ARG = 0x03B10A40u;
 
             SMUCommands.commands = new List<(string, bool, uint)>
             {
@@ -471,8 +471,8 @@ namespace RyzenSmu
 
                 ryzenSMU = new RyzenSMU(pawnIo);
                 ryzenSMU.Open();
-                mp1Mailbox = ryzenSMU.RegisterMailbox("MP1", MP1_ADDR_MSG, MP1_ADDR_RSP, MP1_ADDR_ARG, 6);
-                rsmuMailbox = ryzenSMU.RegisterMailbox("RSMU", PSMU_ADDR_MSG, PSMU_ADDR_RSP, PSMU_ADDR_ARG, 6);
+                mp1Mailbox = ryzenSMU.RegisterMailbox("MP1", MP1_ADDR_MSG, MP1_ADDR_RSP, MP1_ADDR_ARG, 6u);
+                rsmuMailbox = ryzenSMU.RegisterMailbox("RSMU", PSMU_ADDR_MSG, PSMU_ADDR_RSP, PSMU_ADDR_ARG, 6u);
                 return true;
             }
         }
@@ -559,7 +559,7 @@ namespace RyzenSmu
         /// </summary>
         public sealed class Mailbox
         {
-            public Mailbox(string name, uint maxArgs = 6)
+            public Mailbox(string name, uint maxArgs = 6u)
             {
                 Name = string.IsNullOrWhiteSpace(name) ? "Unnamed" : name.Trim();
                 MAX_ARGS = maxArgs;
@@ -577,10 +577,10 @@ namespace RyzenSmu
             public uint SMU_ADDR_ARG { get; set; }
 
             public bool IsValid =>
-                MAX_ARGS > 0 &&
-                SMU_ADDR_MSG != 0 &&
-                SMU_ADDR_RSP != 0 &&
-                SMU_ADDR_ARG != 0;
+                MAX_ARGS > 0u &&
+                SMU_ADDR_MSG != 0u &&
+                SMU_ADDR_RSP != 0u &&
+                SMU_ADDR_ARG != 0u;
         }
 
         // Registered mailboxes by name (MP1, RSMU, etc.)
@@ -657,7 +657,7 @@ namespace RyzenSmu
             uint msgAddr,
             uint rspAddr,
             uint argAddr,
-            uint maxArgs = 6)
+            uint maxArgs = 6u)
         {
             var mailbox = new Mailbox(name, maxArgs)
             {
@@ -682,7 +682,7 @@ namespace RyzenSmu
         {
             ThrowIfDisposed();
 
-            if (mailbox == null || !mailbox.IsValid || message == 0)
+            if (mailbox == null || !mailbox.IsValid || message == 0u)
             {
                 RememberDebug(mailbox, message, Status.UNKNOWN_CMD);
                 return Status.UNKNOWN_CMD;
@@ -726,7 +726,7 @@ namespace RyzenSmu
                 return Status.FAILED;
 
             // Clear response register
-            if (!Write32(mb.SMU_ADDR_RSP, 0))
+            if (!Write32(mb.SMU_ADDR_RSP, 0u))
                 return Status.FAILED;
 
             // Write input arguments
@@ -759,11 +759,11 @@ namespace RyzenSmu
 
         private bool WaitForResponse(uint rspReg, out uint value)
         {
-            value = 0;
+            value = 0u;
 
             for (ushort i = 0; i < POLL_LIMIT; i++)
             {
-                if (Read32(rspReg, out value) && value != 0)
+                if (Read32(rspReg, out value) && value != 0u)
                     return true;
             }
 
@@ -775,7 +775,7 @@ namespace RyzenSmu
             uint[] payload = PrepareArguments(args, mb.MAX_ARGS);
 
             // Guard against overflow when calculating base + (index * 4)
-            uint maxSafe = uint.MaxValue - (mb.MAX_ARGS * 4);
+            uint maxSafe = uint.MaxValue - (mb.MAX_ARGS * 4u);
 
             for (int i = 0; i < payload.Length; i++)
             {
@@ -795,7 +795,7 @@ namespace RyzenSmu
             int count = Math.Min(args.Length, (int)mb.MAX_ARGS);
 
             // Same overflow guard as above
-            uint maxSafe = uint.MaxValue - (mb.MAX_ARGS * 4);
+            uint maxSafe = uint.MaxValue - (mb.MAX_ARGS * 4u);
 
             for (int i = 0; i < count; i++)
             {
@@ -818,12 +818,12 @@ namespace RyzenSmu
 
         private bool Read32(uint reg, out uint value)
         {
-            value = 0;
+            value = 0u;
 
             long[] inBuf = { unchecked((long)reg) };
             long[] outBuf = new long[1];
 
-            int hr = _pawnIo.ExecuteHr(IOCTL_READ_SMU_REGISTER, inBuf, 1, outBuf, 1, out _);
+            int hr = _pawnIo.ExecuteHr(IOCTL_READ_SMU_REGISTER, inBuf, 1u, outBuf, 1u, out _);
             if (hr != 0)
                 return false;
 
@@ -838,9 +838,9 @@ namespace RyzenSmu
             int hr = _pawnIo.ExecuteHr(
                 IOCTL_WRITE_SMU_REGISTER,
                 inBuf,
-                2,
+                2u,
                 Array.Empty<long>(),
-                0,
+                0u,
                 out _);
 
             return hr == 0;
