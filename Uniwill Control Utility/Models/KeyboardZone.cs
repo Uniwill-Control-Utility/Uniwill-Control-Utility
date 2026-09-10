@@ -294,9 +294,6 @@ namespace Uniwill_Control_Utility.Models
         /* ---- Base zone positions (US QWERTY labels) ---- */
         private static KeyboardZone[] BuildBaseZones()
         {
-            // Right alignment axis for Del / Bksp / Enter / RShift
-            const int RIGHT_EDGE = 578;
-
             return new KeyboardZone[]
             {
                 // ===== Row 0: Esc + F1-F12 + PrtSc/Ins/Del + Home/End/PgUp/PgDn (Y=16, H=20) =====
