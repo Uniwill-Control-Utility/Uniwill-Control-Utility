@@ -163,7 +163,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
             catch
             {
-
+                // Installer file may still be locked by the OS; safe to ignore on cleanup.
             }
         }
 
