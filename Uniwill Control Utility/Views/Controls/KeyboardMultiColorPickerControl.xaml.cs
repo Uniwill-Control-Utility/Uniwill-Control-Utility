@@ -33,9 +33,9 @@ public partial class KeyboardMultiColorPickerControl : UserControl
     };
 
     /// <summary>All selected colors in order.</summary>
-    public List<Color> Colors
+    public List<Color> GetColors()
     {
-        get => ColorChipsPanel.Children.OfType<ColorPickerControl>()
+        return ColorChipsPanel.Children.OfType<ColorPickerControl>()
             .Select(c => c.SelectedColor)
             .ToList();
     }
@@ -78,7 +78,7 @@ public partial class KeyboardMultiColorPickerControl : UserControl
     /*  Internal                                                           */
     /* ------------------------------------------------------------------ */
 
-    private ColorPickerControl AddColorInternal(Color color)
+    private void AddColorInternal(Color color)
     {
         var picker = new ColorPickerControl
         {
@@ -87,6 +87,5 @@ public partial class KeyboardMultiColorPickerControl : UserControl
         };
         picker.ColorChangedDelayed += (s, e) => ColorsChanged?.Invoke(this, EventArgs.Empty);
         ColorChipsPanel.Children.Add(picker);
-        return picker;
     }
 }

@@ -1169,7 +1169,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                     case RgbModeRotation: // Rotation (multi-color)
                         {
-                            var colors = mcRotationColors!.Colors;
+                            var colors = mcRotationColors!.GetColors();
                             var speed = GetRgbRotationSpeedName();
                             var brightness = (byte)sliderRgbRotationBrightness.Value;
                             await _coolerService.WriteRgbRotationMultiAsync(colors, speed, brightness);

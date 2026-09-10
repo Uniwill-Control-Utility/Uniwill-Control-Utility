@@ -395,22 +395,22 @@ namespace Uniwill_Control_Utility.Views.Pages
                             {
                                 var colors = effect == KeyboardEffect.Marquee
                                     ? Application.Current.Dispatcher.Invoke(
-                                        () => MultiColorPicker.Colors.AsEnumerable().Reverse().ToList())
+                                        () => MultiColorPicker.GetColors().AsEnumerable().Reverse().ToList())
                                     : Application.Current.Dispatcher.Invoke(
-                                        () => MultiColorPicker.Colors.ToList());
+                                        () => MultiColorPicker.GetColors().ToList());
                                 _hidService.SetMultiColor(colors);
                             }
                             else if (s_multiColor4Effects.Contains(effect))
                             {
                                 var colors = Application.Current.Dispatcher.Invoke(
-                                    () => MultiColorPicker.Colors.ToList());
+                                    () => MultiColorPicker.GetColors().ToList());
                                 _hidService.SetMultiColor(colors.Take(4));
                             }
                             else if (s_multiColor4Plus1Effects.Contains(effect))
                             {
                                 var colors = Application.Current.Dispatcher.Invoke(() =>
                                 {
-                                    var list = MultiColorPicker.Colors.ToList();
+                                    var list = MultiColorPicker.GetColors().ToList();
                                     var rest = GamingModeFullRestColor.SelectedColor;
                                     list.AddRange(new[] { rest });
                                     return list;
@@ -424,7 +424,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                                 // default palette clears corrupted per-key color data that
                                 // would otherwise break the effect's internal gradient.
                                 var colors = Application.Current.Dispatcher.Invoke(
-                                    () => MultiColorPicker.Colors.ToList());
+                                    () => MultiColorPicker.GetColors().ToList());
                                 _hidService.SetMultiColor(colors);
                             }
                         }
@@ -604,7 +604,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 GamingModeFullRestRow.Visibility = Visibility.Collapsed;
                 MultiColorTitle.Text = "Effect Colors";
                 MultiColorSubtitle.Text = "7 colors required for this effect. Click a swatch to edit.";
-                MultiColorPicker.SetColors(MultiColorPicker.Colors, 7);
+                MultiColorPicker.SetColors(MultiColorPicker.GetColors(), 7);
             }
             else if (s_multiColor4Effects.Contains(effect))
             {
@@ -613,7 +613,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 GamingModeFullRestRow.Visibility = Visibility.Collapsed;
                 MultiColorTitle.Text = "WASD &amp; Arrow Keys";
                 MultiColorSubtitle.Text = "4 colors for gaming keys. Click a swatch to edit.";
-                MultiColorPicker.SetColors(MultiColorPicker.Colors, 4);
+                MultiColorPicker.SetColors(MultiColorPicker.GetColors(), 4);
             }
             else if (s_multiColor4Plus1Effects.Contains(effect))
             {
@@ -622,7 +622,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 GamingModeFullRestRow.Visibility = Visibility.Visible;
                 MultiColorTitle.Text = "WASD &amp; Arrow Keys";
                 MultiColorSubtitle.Text = "4 colors for gaming keys. Click a swatch to edit.";
-                MultiColorPicker.SetColors(MultiColorPicker.Colors, 4);
+                MultiColorPicker.SetColors(MultiColorPicker.GetColors(), 4);
             }
             else
             {
@@ -850,17 +850,17 @@ namespace Uniwill_Control_Utility.Views.Pages
                     if (s_multiColor7Effects.Contains(effect))
                     {
                         var colors = effect == KeyboardEffect.Marquee
-                            ? MultiColorPicker.Colors.AsEnumerable().Reverse().ToList()
-                            : MultiColorPicker.Colors;
+                            ? MultiColorPicker.GetColors().AsEnumerable().Reverse().ToList()
+                            : MultiColorPicker.GetColors();
                         _hidService.SetMultiColor(colors);
                     }
                     else if (s_multiColor4Effects.Contains(effect))
                     {
-                        _hidService.SetMultiColor(MultiColorPicker.Colors.Take(4));
+                        _hidService.SetMultiColor(MultiColorPicker.GetColors().Take(4));
                     }
                     else if (s_multiColor4Plus1Effects.Contains(effect))
                     {
-                        var allColors = MultiColorPicker.Colors.Take(4)
+                        var allColors = MultiColorPicker.GetColors().Take(4)
                             .Concat(new[] { GamingModeFullRestColor.SelectedColor })
                             .ToList();
                         _hidService.SetMultiColor(allColors);
@@ -1291,7 +1291,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 EffectMode = (KeyboardEffect)cmbEffect.SelectedItem,
                 Speed = SliderToHidSpeed((int)SpeedSlider.Value),
                 Direction = _currentDirection,
-                MultiColors = SerializeColors(MultiColorPicker.Colors),
+                MultiColors = SerializeColors(MultiColorPicker.GetColors()),
                 IdleTimerEnabled = tsIdleTimer.IsChecked == true,
                 IdleTimerMinutes = cmbIdleTimer.SelectedIndex >= 0
                     ? s_idleTimerOptions[cmbIdleTimer.SelectedIndex].Seconds / 60

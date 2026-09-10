@@ -946,7 +946,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     KbRestColorR = KbRestColorPicker.SelectedColor.R,
                     KbRestColorG = KbRestColorPicker.SelectedColor.G,
                     KbRestColorB = KbRestColorPicker.SelectedColor.B,
-                    KbMultiColors = SerializeColors(KbMultiColorPicker.Colors),
+                    KbMultiColors = SerializeColors(KbMultiColorPicker.GetColors()),
                     KbPerKeyColors = KeyboardSettingsService.Load().PerKeyColors,
                     KbDirection = _kbDirection,
                     isAutoSwitch = !(cbExcludeFromSwitching.IsChecked ?? false),
@@ -1470,7 +1470,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             byte restColorR = KbRestColorPicker.SelectedColor.R;
             byte restColorG = KbRestColorPicker.SelectedColor.G;
             byte restColorB = KbRestColorPicker.SelectedColor.B;
-            string multiColors = SerializeColors(KbMultiColorPicker.Colors);
+            string multiColors = SerializeColors(KbMultiColorPicker.GetColors());
 
             bool changed = perKeyMode != lastKbPerKeyMode ||
                 brightness != lastKbBrightness ||
@@ -1791,7 +1791,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         existing.KbRestColorR = KbRestColorPicker.SelectedColor.R;
                         existing.KbRestColorG = KbRestColorPicker.SelectedColor.G;
                         existing.KbRestColorB = KbRestColorPicker.SelectedColor.B;
-                        existing.KbMultiColors = SerializeColors(KbMultiColorPicker.Colors);
+                        existing.KbMultiColors = SerializeColors(KbMultiColorPicker.GetColors());
                         existing.KbPerKeyMode = cbxKbMode.SelectedIndex == 1;
                         existing.KbDirection = _kbDirection;
 
@@ -2592,7 +2592,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 spKbGamingRest.Visibility = Visibility.Collapsed;
                 tbKbMultiColorTitle.Text = "Effect Colors";
                 tbKbMultiColorSubtitle.Text = "7 colors required for this effect. Click a swatch to edit.";
-                KbMultiColorPicker.SetColors(KbMultiColorPicker.Colors, 7);
+                KbMultiColorPicker.SetColors(KbMultiColorPicker.GetColors(), 7);
             }
             else if (Views.Pages.Keyboard.IsMultiColor4Effect(ParseKbEffect(effect)))
             {
@@ -2601,7 +2601,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 spKbGamingRest.Visibility = Visibility.Collapsed;
                 tbKbMultiColorTitle.Text = "WASD & Arrow Keys";
                 tbKbMultiColorSubtitle.Text = "4 colors for gaming keys. Click a swatch to edit.";
-                KbMultiColorPicker.SetColors(KbMultiColorPicker.Colors, 4);
+                KbMultiColorPicker.SetColors(KbMultiColorPicker.GetColors(), 4);
             }
             else if (Views.Pages.Keyboard.IsMultiColor4Plus1Effect(ParseKbEffect(effect)))
             {
@@ -2610,7 +2610,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 spKbGamingRest.Visibility = Visibility.Visible;
                 tbKbMultiColorTitle.Text = "WASD & Arrow Keys";
                 tbKbMultiColorSubtitle.Text = "4 colors for gaming keys. Click a swatch to edit.";
-                KbMultiColorPicker.SetColors(KbMultiColorPicker.Colors, 4);
+                KbMultiColorPicker.SetColors(KbMultiColorPicker.GetColors(), 4);
             }
             else
             {

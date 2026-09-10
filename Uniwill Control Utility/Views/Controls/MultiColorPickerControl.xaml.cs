@@ -26,9 +26,9 @@ public partial class MultiColorPickerControl : UserControl
     private bool _isDeleteMode;
 
     /// <summary>All selected colors in order.</summary>
-    public List<Color> Colors
+    public List<Color> GetColors()
     {
-        get => ColorChipsPanel.Children.OfType<ColorPickerControl>()
+        return ColorChipsPanel.Children.OfType<ColorPickerControl>()
             .Select(c => c.SelectedColor)
             .ToList();
     }
@@ -76,7 +76,7 @@ public partial class MultiColorPickerControl : UserControl
         ColorsChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private ColorPickerControl AddColorInternal(Color color)
+    private void AddColorInternal(Color color)
     {
         var picker = new ColorPickerControl
         {
@@ -91,7 +91,6 @@ public partial class MultiColorPickerControl : UserControl
             // Stay in deletion mode so user can remove more
         };
         ColorChipsPanel.Children.Add(picker);
-        return picker;
     }
 
     private void RemoveColor(ColorPickerControl picker)

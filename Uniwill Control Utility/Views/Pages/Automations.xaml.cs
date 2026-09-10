@@ -208,10 +208,16 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         #endregion
 
+        /// <summary>
+        /// Intentionally left empty; page initialization is handled in the constructor.
+        /// </summary>
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
         }
 
+        /// <summary>
+        /// Intentionally left empty; checkbox state is managed by data binding.
+        /// </summary>
         private void CheckBox_Click(object sender, RoutedEventArgs e)
         {
         }
