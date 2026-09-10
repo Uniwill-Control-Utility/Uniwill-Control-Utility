@@ -65,7 +65,8 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
                 }
                 catch
                 {
-                    // Corrupted or unreadable scale models file; fall back to built-in resource below.
+                    // Ignored: if the scale models file is corrupted or unreadable, json stays empty
+                    // and the parsing block below will set scaleModels to null (safe fallback).
                 }
             }
             else
@@ -82,7 +83,8 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
                 }
                 catch
                 {
-                    // Built-in resource unavailable; json remains empty and parsing will fall through to null.
+                    // Ignored: if the built-in resource is unavailable, json stays empty and
+                    // the parsing block below will set scaleModels to null (safe fallback).
                 }
             }
 

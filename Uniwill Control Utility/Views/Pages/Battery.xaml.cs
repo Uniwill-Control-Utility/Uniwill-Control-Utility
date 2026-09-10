@@ -112,12 +112,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Settings.Default.Save();
                 Debug.WriteLine($"[Battery] Applied charging limit: {mode switch { 0 => "100%", 1 => "80%", 2 => "60%", _ => "unknown" }} (mode {mode})");
 
-                // Delay refresh to let the EC process the change
-                _ = new DispatcherTimer(TimeSpan.FromSeconds(ApplyDelaySeconds), DispatcherPriority.Normal, (s, e) =>
+                // Delay refresh to let the EC process the change (timer auto-starts and self-stops in callback).
+                var _delayTimer = new DispatcherTimer(TimeSpan.FromSeconds(ApplyDelaySeconds), DispatcherPriority.Normal, (s, e) =>
                 {
                     RefreshAll();
                     ((DispatcherTimer)s!).Stop();
                 }, Dispatcher);
+                _ = _delayTimer; // Keep alive until callback fires
             }
             catch (Exception ex)
             {
