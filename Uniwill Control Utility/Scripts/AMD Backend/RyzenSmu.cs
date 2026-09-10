@@ -16,7 +16,7 @@ using static RyzenSmu.RyzenSMU;
 
 namespace RyzenSmu
 {
-    class Addresses
+    static class Addresses
     {
         public static void setAddresses()
         {
@@ -401,7 +401,7 @@ namespace RyzenSmu
             }
         }
 
-        public static Smu RyzenAccess = new Smu();
+        internal static Smu RyzenAccess = new Smu();
 
         public static void applySettings(string commandName, uint value)
         {
@@ -440,8 +440,8 @@ namespace RyzenSmu
     class Smu
     {
         private static readonly object initializationLock = new();
-        public static RyzenSMU? ryzenSMU;
-        public static AMDpawnIO? pawnIo;
+        internal static RyzenSMU? ryzenSMU;
+        internal static AMDpawnIO? pawnIo;
         private RyzenSMU.Mailbox? mp1Mailbox;
         private RyzenSMU.Mailbox? rsmuMailbox;
 
@@ -449,7 +449,7 @@ namespace RyzenSmu
         {
             lock (initializationLock)
             {
-                if (pawnIo?.IsLoaded == true && ryzenSMU != null)
+                if (Smu.pawnIo?.IsLoaded == true && Smu.ryzenSMU != null)
                     return true;
 
                 string modulePath = Path.Combine(
@@ -459,20 +459,20 @@ namespace RyzenSmu
                     "PawnIO",
                     "RyzenSMU.bin");
 
-                pawnIo = AMDpawnIO.LoadModuleFromFile(modulePath);
+                Smu.pawnIo = AMDpawnIO.LoadModuleFromFile(modulePath);
 
-                if (!pawnIo.IsLoaded)
+                if (!Smu.pawnIo.IsLoaded)
                 {
                     DiagnosticLogger.LogInfo("SMU PawnIO failed to load from: " + modulePath);
                     return false;
                 }
 
-                DiagnosticLogger.LogInfo($"SMU PawnIO loaded. MP1=0x{MP1_ADDR_MSG:X}/0x{MP1_ADDR_RSP:X}/0x{MP1_ADDR_ARG:X}, RSMU=0x{PSMU_ADDR_MSG:X}/0x{PSMU_ADDR_RSP:X}/0x{PSMU_ADDR_ARG:X}");
+                DiagnosticLogger.LogInfo($"SMU PawnIO loaded. MP1=0x{Smu.MP1_ADDR_MSG:X}/0x{Smu.MP1_ADDR_RSP:X}/0x{Smu.MP1_ADDR_ARG:X}, RSMU=0x{Smu.PSMU_ADDR_MSG:X}/0x{Smu.PSMU_ADDR_RSP:X}/0x{Smu.PSMU_ADDR_ARG:X}");
 
-                ryzenSMU = new RyzenSMU(pawnIo);
-                ryzenSMU.Open();
-                mp1Mailbox = ryzenSMU.RegisterMailbox("MP1", MP1_ADDR_MSG, MP1_ADDR_RSP, MP1_ADDR_ARG, 6u);
-                rsmuMailbox = ryzenSMU.RegisterMailbox("RSMU", PSMU_ADDR_MSG, PSMU_ADDR_RSP, PSMU_ADDR_ARG, 6u);
+                Smu.ryzenSMU = new RyzenSMU(Smu.pawnIo);
+                Smu.ryzenSMU.Open();
+                mp1Mailbox = Smu.ryzenSMU.RegisterMailbox("MP1", Smu.MP1_ADDR_MSG, Smu.MP1_ADDR_RSP, Smu.MP1_ADDR_ARG, 6u);
+                rsmuMailbox = Smu.ryzenSMU.RegisterMailbox("RSMU", Smu.PSMU_ADDR_MSG, Smu.PSMU_ADDR_RSP, Smu.PSMU_ADDR_ARG, 6u);
                 return true;
             }
         }
@@ -481,16 +481,16 @@ namespace RyzenSmu
         {
             lock (initializationLock)
             {
-                if (pawnIo != null && pawnIo.IsLoaded)
+                if (Smu.pawnIo != null && Smu.pawnIo.IsLoaded)
                 {
-                    ryzenSMU?.Close();
-                    pawnIo.Close();
+                    Smu.ryzenSMU?.Close();
+                    Smu.pawnIo.Close();
                 }
 
                 mp1Mailbox = null;
                 rsmuMailbox = null;
-                ryzenSMU = null;
-                pawnIo = null;
+                Smu.ryzenSMU = null;
+                Smu.pawnIo = null;
             }
         }
 
@@ -509,18 +509,18 @@ namespace RyzenSmu
 
         public Status SendMp1(uint message, ref uint[] arguments)
         {
-            if (!EnsureInitialised() || ryzenSMU == null || mp1Mailbox == null)
+            if (!EnsureInitialised() || Smu.ryzenSMU == null || mp1Mailbox == null)
                 return Status.FAILED;
 
-            return ryzenSMU.SendSmuCommand(mp1Mailbox, message, ref arguments);
+            return Smu.ryzenSMU.SendSmuCommand(mp1Mailbox, message, ref arguments);
         }
 
         public Status SendRsmu(uint message, ref uint[] arguments)
         {
-            if (!EnsureInitialised() || ryzenSMU == null || rsmuMailbox == null)
+            if (!EnsureInitialised() || Smu.ryzenSMU == null || rsmuMailbox == null)
                 return Status.FAILED;
 
-            return ryzenSMU.SendSmuCommand(rsmuMailbox, message, ref arguments);
+            return Smu.ryzenSMU.SendSmuCommand(rsmuMailbox, message, ref arguments);
         }
 
     }
@@ -748,11 +748,8 @@ namespace RyzenSmu
             Status status = unchecked((Status)rsp);
 
             // Read back arguments only on success
-            if (status == Status.OK && args != null && args.Length > 0)
-            {
-                if (!ReadArguments(mb, ref args))
-                    return Status.FAILED;
-            }
+            if (status == Status.OK && args != null && args.Length > 0 && !ReadArguments(mb, ref args))
+                return Status.FAILED;
 
             return status;
         }
@@ -928,8 +925,7 @@ namespace RyzenSmu
 
         private void ThrowIfDisposed()
         {
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(RyzenSMU));
+            ObjectDisposedException.ThrowIf(_disposed, nameof(RyzenSMU));
         }
     }
 }
