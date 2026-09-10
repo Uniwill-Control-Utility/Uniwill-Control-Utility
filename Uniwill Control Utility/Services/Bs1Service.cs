@@ -19,7 +19,7 @@ namespace Uniwill_Control_Utility.Services
     /// Communication uses a custom 5A A5 protocol on top. Unlike BS2+, the BS1 is BLE-only
     /// (no HID), requires heartbeat keepalive packets, and has no RGB support.
     /// </summary>
-    public class Bs1Service : IDisposable
+    public sealed class Bs1Service : IDisposable
     {
         // Flydigi BS1 GATT UUIDs (verified against THRM source)
         private static readonly Guid Bs1ServiceUuid = new(0x0000fff0, 0x0000, 0x1000, 0x80, 0x00, 0x00, 0x80, 0x5f, 0x9b, 0x34, 0xfb);
@@ -801,7 +801,7 @@ namespace Uniwill_Control_Utility.Services
                 return;
 
             // Clamp to BS1 range
-            rpm = (ushort)Math.Clamp(rpm, Bs1DefaultGearRpm.MinRpm, Bs1DefaultGearRpm.MaxRpm);
+            rpm = Math.Clamp(rpm, Bs1DefaultGearRpm.MinRpm, Bs1DefaultGearRpm.MaxRpm);
 
             // Enter realtime mode if not already active
             if (!_realtimeMode)

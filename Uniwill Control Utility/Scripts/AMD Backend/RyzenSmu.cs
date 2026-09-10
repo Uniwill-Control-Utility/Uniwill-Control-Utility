@@ -2,18 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
-using System.Text;
 using System.Threading;
-using System.Windows;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Scripts.AMD_Backend;
-using Uniwill_Control_Utility.Scripts.GPUs.AMD;
-using Uniwill_Control_Utility.Scripts.Intel_Backend;
 using Uniwill_Control_Utility.Scripts.Misc;
 using static RyzenSmu.RyzenSMU;
 

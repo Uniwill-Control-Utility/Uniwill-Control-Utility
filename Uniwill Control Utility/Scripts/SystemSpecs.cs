@@ -26,7 +26,7 @@ namespace Uniwill_Control_Utility.Scripts
                     "root\\CIMV2",
                     "SELECT Capacity, SMBIOSMemoryType, ConfiguredClockSpeed FROM Win32_PhysicalMemory"))
                 {
-                    foreach (ManagementObject mem in searcher.Get())
+                    foreach (ManagementBaseObject mem in searcher.Get())
                     {
                         totalBytes += Convert.ToUInt64(mem["Capacity"]);
 
@@ -67,7 +67,7 @@ namespace Uniwill_Control_Utility.Scripts
                     "root\\CIMV2",
                     "SELECT Model, Size, MediaType FROM Win32_DiskDrive"))
                 {
-                    foreach (ManagementObject disk in searcher.Get())
+                    foreach (ManagementBaseObject disk in searcher.Get())
                     {
                         string mediaType = Convert.ToString(disk["MediaType"]) ?? "";
                         if (mediaType != "Fixed hard disk media")
@@ -125,7 +125,7 @@ namespace Uniwill_Control_Utility.Scripts
                     using (var monitorSearcher = new ManagementObjectSearcher(
                         "root\\wmi", "SELECT * FROM WmiMonitorID"))
                     {
-                        foreach (ManagementObject monitor in monitorSearcher.Get())
+                        foreach (ManagementBaseObject monitor in monitorSearcher.Get())
                         {
                             if (!(bool)monitor["Active"])
                                 continue;
@@ -191,12 +191,12 @@ namespace Uniwill_Control_Utility.Scripts
                         "SELECT Name, CurrentHorizontalResolution, CurrentVerticalResolution FROM Win32_VideoController"))
                     {
                         // Collect all GPUs first
-                        var gpus = new List<ManagementObject>();
-                        foreach (ManagementObject gpu in gpuSearcher.Get())
+                        var gpus = new List<ManagementBaseObject>();
+                        foreach (ManagementBaseObject gpu in gpuSearcher.Get())
                             gpus.Add(gpu);
 
                         // First pass: find iGPU (AMD Radeon Graphics or Intel — not discrete)
-                        foreach (ManagementObject gpu in gpus)
+                        foreach (ManagementBaseObject gpu in gpus)
                         {
                             string name = Convert.ToString(gpu["Name"]) ?? "";
                             bool isIgpu = name.Contains("Radeon Graphics", StringComparison.OrdinalIgnoreCase) ||
@@ -216,7 +216,7 @@ namespace Uniwill_Control_Utility.Scripts
                         // Fallback: use first GPU with a reasonable resolution
                         if (width == 0 || height == 0)
                         {
-                            foreach (ManagementObject gpu in gpus)
+                            foreach (ManagementBaseObject gpu in gpus)
                             {
                                 string name = Convert.ToString(gpu["Name"]) ?? "";
                                 if (name.Contains("Microsoft", StringComparison.OrdinalIgnoreCase))

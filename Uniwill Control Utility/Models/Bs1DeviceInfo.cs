@@ -8,13 +8,13 @@ namespace Uniwill_Control_Utility.Models
     public class Bs1DeviceInfo
     {
         /// <summary>Windows DeviceId (e.g. "\\?\Bluetooth#...") or raw Bluetooth address (e.g. "001A7DDA7113").</summary>
-        public string Address { get; set; } = string.Empty;
+        public string Address { get; init; } = string.Empty;
 
         /// <summary>BLE advertising local name (e.g. "Flydigi BS1").</summary>
-        public string Name { get; set; } = string.Empty;
+        public string Name { get; init; } = string.Empty;
 
         /// <summary>Signal strength in dBm from the last advertisement received.</summary>
-        public int Rssi { get; set; }
+        public int Rssi { get; init; }
 
         /// <summary>Human-readable model name (always "BS1" for this type).</summary>
         public string ModelName => "BS1";

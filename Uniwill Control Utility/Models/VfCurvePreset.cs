@@ -33,6 +33,7 @@ namespace Uniwill_Control_Utility.Models
     /// </summary>
     public static class VfCurvePresetStore
     {
+        private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
         private static string? _filePath;
 
         private static string FilePath
@@ -80,10 +81,7 @@ namespace Uniwill_Control_Utility.Models
         {
             try
             {
-                var json = JsonSerializer.Serialize(presets.ToList(), new JsonSerializerOptions
-                {
-                    WriteIndented = true
-                });
+                var json = JsonSerializer.Serialize(presets.ToList(), _jsonOptions);
                 File.WriteAllText(FilePath, json);
             }
             catch

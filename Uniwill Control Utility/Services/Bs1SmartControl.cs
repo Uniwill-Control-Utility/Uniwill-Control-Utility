@@ -9,7 +9,7 @@ namespace Uniwill_Control_Utility.Services
     /// Unlike BS2+, the BS1 has no built-in temperature curve, so all curve computation
     /// happens host-side: read temperature → interpolate fan curve → send RPM via BLE.
     /// </summary>
-    public class Bs1SmartControl : IDisposable
+    public sealed class Bs1SmartControl : IDisposable
     {
         private readonly Bs1Service _bs1Service;
         private readonly FlydigiTemperatureProvider _temperatureProvider;
@@ -147,7 +147,7 @@ namespace Uniwill_Control_Utility.Services
 
             // 5. Compute target RPM from fan curve (clamped to BS1 range 1300-3000)
             ushort targetRpm = ActiveProfile.GetRpmForTemperature(filtered);
-            targetRpm = (ushort)Math.Clamp(targetRpm, Bs1DefaultGearRpm.MinRpm, Bs1DefaultGearRpm.MaxRpm);
+            targetRpm = Math.Clamp(targetRpm, Bs1DefaultGearRpm.MinRpm, Bs1DefaultGearRpm.MaxRpm);
 
             // 6. Apply speed avoidance
             if (Settings != null)

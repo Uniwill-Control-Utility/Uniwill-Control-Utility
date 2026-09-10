@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text.Json;
 
 namespace Uniwill_Control_Utility.Models
@@ -11,9 +10,9 @@ namespace Uniwill_Control_Utility.Models
     /// </summary>
     public class VfStockPoint
     {
-        public int Index { get; set; }
-        public int VoltageMv { get; set; }
-        public int FrequencyMhz { get; set; }
+        public int Index { get; init; }
+        public int VoltageMv { get; init; }
+        public int FrequencyMhz { get; init; }
     }
 
     /// <summary>

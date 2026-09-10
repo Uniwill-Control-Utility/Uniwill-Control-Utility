@@ -59,16 +59,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Adjust layout: center Hydro UI when Flydigi is hidden
             if (hideFlydigi)
             {
-                ((ColumnDefinition)_deviceRow.ColumnDefinitions[1]).Width = GridLength.Auto;
-                ((ColumnDefinition)_deviceRow.ColumnDefinitions[2]).Width = GridLength.Auto;
+                _deviceRow.ColumnDefinitions[1].Width = GridLength.Auto;
+                _deviceRow.ColumnDefinitions[2].Width = GridLength.Auto;
                 _hydroUi.HorizontalAlignment = HorizontalAlignment.Center;
                 _hydroUi.MinWidth = 536;
                 _hydroUi.MaxWidth = 536;
             }
             else
             {
-                ((ColumnDefinition)_deviceRow.ColumnDefinitions[1]).Width = new GridLength(8);
-                ((ColumnDefinition)_deviceRow.ColumnDefinitions[2]).Width = new GridLength(1, GridUnitType.Star);
+                _deviceRow.ColumnDefinitions[1].Width = new GridLength(8);
+                _deviceRow.ColumnDefinitions[2].Width = new GridLength(1, GridUnitType.Star);
                 _hydroUi.HorizontalAlignment = HorizontalAlignment.Stretch;
                 _hydroUi.MinWidth = 0;
                 _hydroUi.MaxWidth = double.MaxValue;

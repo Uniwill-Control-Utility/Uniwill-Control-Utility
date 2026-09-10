@@ -78,6 +78,11 @@ namespace Uniwill_Control_Utility.Models
     {
         private static string? _filePath;
 
+        private static readonly JsonSerializerOptions _serializeOptions = new()
+        {
+            WriteIndented = true
+        };
+
         private static string FilePath
         {
             get
@@ -123,10 +128,7 @@ namespace Uniwill_Control_Utility.Models
         {
             try
             {
-                var json = JsonSerializer.Serialize(presets.ToList(), new JsonSerializerOptions
-                {
-                    WriteIndented = true
-                });
+                var json = JsonSerializer.Serialize(presets.ToList(), _serializeOptions);
                 File.WriteAllText(FilePath, json);
             }
             catch

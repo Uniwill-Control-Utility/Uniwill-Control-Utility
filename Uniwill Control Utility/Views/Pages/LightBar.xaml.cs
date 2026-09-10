@@ -133,12 +133,12 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Load saved settings from disk
             bool enabled = Settings.Default.LightBarEnabled;
-            byte r = (byte)Settings.Default.LightBarR;
-            byte g = (byte)Settings.Default.LightBarG;
-            byte b = (byte)Settings.Default.LightBarB;
-            int brightness = (int)Settings.Default.LightBarBrightness;
-            int effectIndex = (int)Settings.Default.LightBarEffectIndex;
-            int speed = (int)Settings.Default.LightBarSpeed;
+            byte r = Settings.Default.LightBarR;
+            byte g = Settings.Default.LightBarG;
+            byte b = Settings.Default.LightBarB;
+            int brightness = Settings.Default.LightBarBrightness;
+            int effectIndex = Settings.Default.LightBarEffectIndex;
+            int speed = Settings.Default.LightBarSpeed;
 
             tsLightBarPower.IsChecked = enabled;
             ColorPicker.SelectedColor = Color.FromRgb(r, g, b);

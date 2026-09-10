@@ -146,9 +146,9 @@
                                     <StackPanel Grid.Column="0">
                                         <ui:TextBlock FontTypography="Body" Text="Current Charge Limit" />
                                         <ui:TextBlock Margin="0,2,0,0"
-           FontTypography="Caption"
-           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-           Text="Active charging limit from the EC." />
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Active charging limit from the EC." />
                                     </StackPanel>
                                     <Grid Grid.Column="1">
                                         <Grid.ColumnDefinitions>

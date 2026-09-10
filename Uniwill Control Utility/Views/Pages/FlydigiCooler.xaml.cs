@@ -392,7 +392,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             if (isCustomAuto)
             {
-                FlydigiCurveEditor.SetCurve(_activeProfile);
+                FlydigiCurveEditor.SetCurve(_activeProfile!);
             }
 
             if (enteringAuto && !wasAuto)

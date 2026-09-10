@@ -65,19 +65,19 @@ namespace Uniwill_Control_Utility.Views.Pages
             catch (Exception ex)
             {
                 Debug.WriteLine($"[Battery] Failed to read mode from EC: {ex.Message}");
-                currentMode = (int)Settings.Default.BatteryMode;
+                currentMode = Settings.Default.BatteryMode;
             }
 
             // Set combo box to match EC state
             cbChargingLimit.SelectedIndex = currentMode;
 
             // If saved setting differs from EC, apply saved setting
-            int savedMode = (int)Settings.Default.BatteryMode;
+            int savedMode = Settings.Default.BatteryMode;
             if (savedMode != currentMode)
             {
                 try
                 {
-                    _ecService.SetBatteryMode(savedMode);
+                    _ecService!.SetBatteryMode(savedMode);
                     Debug.WriteLine($"[Battery] Startup: EC mode ({currentMode}) differed from saved ({savedMode}), applied saved");
                 }
                 catch (Exception ex)
@@ -113,7 +113,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Debug.WriteLine($"[Battery] Applied charging limit: {mode switch { 0 => "100%", 1 => "80%", 2 => "60%", _ => "unknown" }} (mode {mode})");
 
                 // Delay refresh to let the EC process the change
-                var delayTimer = new DispatcherTimer(TimeSpan.FromSeconds(ApplyDelaySeconds), DispatcherPriority.Normal, (s, e) =>
+                _ = new DispatcherTimer(TimeSpan.FromSeconds(ApplyDelaySeconds), DispatcherPriority.Normal, (s, e) =>
                 {
                     RefreshAll();
                     ((DispatcherTimer)s!).Stop();

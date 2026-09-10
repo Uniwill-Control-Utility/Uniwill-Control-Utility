@@ -16,7 +16,6 @@ namespace Uniwill_Control_Utility.Services
         private const string LightBarBootTag = "[LB-boot]";
 
         private readonly IServiceProvider _serviceProvider;
-        private INavigationWindow? _navigationWindow;
 
         public ApplicationHostService(IServiceProvider serviceProvider)
         {
@@ -36,17 +35,12 @@ namespace Uniwill_Control_Utility.Services
 
         private async Task HandleActivationAsync()
         {
-            await Task.CompletedTask;
-
             if (!Application.Current.Windows.OfType<Views.Windows.MainWindow>().Any())
             {
                 var window = _serviceProvider.GetRequiredService<INavigationWindow>();
-                _navigationWindow = window;
                 window.ShowWindow();
                 window.Navigate(typeof(Views.Pages.DashboardPage));
             }
-
-            await Task.CompletedTask;
         }
 
         /// <summary>
@@ -54,7 +48,7 @@ namespace Uniwill_Control_Utility.Services
         /// reflects the user's last configuration without requiring navigation
         /// to the LightBar page.
         /// </summary>
-        private void ApplyLightBarBootSettings()
+        private static void ApplyLightBarBootSettings()
         {
             _ = Task.Run(() =>
             {

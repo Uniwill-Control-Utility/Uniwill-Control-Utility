@@ -1,9 +1,7 @@
-using Microsoft.VisualBasic.Logging;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.Json;
 using System.Threading;
@@ -40,9 +38,9 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
             {
                 scaleModelsWatcher.EnableRaisingEvents = true;
             }
-            catch (FileNotFoundException e)
+            catch (FileNotFoundException)
             {
-
+                // Scale models directory doesn't exist yet; watcher will re-try on file system events.
             }
         }
 
@@ -65,9 +63,9 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
                 {
                     json = File.ReadAllText(App.SCALE_MODELS_JSON_PATH);
                 }
-                catch (Exception e)
+                catch
                 {
-
+                    // Corrupted or unreadable scale models file; fall back to built-in resource below.
                 }
             }
             else
@@ -82,8 +80,9 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
                     }
                     File.WriteAllText(App.SCALE_MODELS_JSON_PATH, json);
                 }
-                catch (Exception e)
+                catch
                 {
+                    // Built-in resource unavailable; json remains empty and parsing will fall through to null.
                 }
             }
 
@@ -119,7 +118,7 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
                     throw new Exception("?? json ??");
                 }
             }
-            catch (Exception e)
+            catch
             {
                 scaleModels = null;
             }

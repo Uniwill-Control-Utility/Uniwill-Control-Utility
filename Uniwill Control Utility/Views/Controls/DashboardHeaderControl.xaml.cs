@@ -197,31 +197,37 @@ namespace Uniwill_Control_Utility.Views.Controls
 
         public string LaptopName
         {
+            get => LaptopNameText.Text;
             set => LaptopNameText.Text = value;
         }
 
         public string LaptopCPUName
         {
+            get => LaptopCPUNameText.Text;
             set => LaptopCPUNameText.Text = value;
         }
 
         public string LaptopGPUName
         {
+            get => LaptopGPUNameText.Text;
             set => LaptopGPUNameText.Text = value;
         }
 
         public string LaptopDisplaySpec
         {
+            get => LaptopDisplaySpecText.Text;
             set => LaptopDisplaySpecText.Text = value;
         }
 
         public string LaptopRam
         {
+            get => LaptopRamText.Text;
             set => LaptopRamText.Text = value;
         }
 
         public string LaptopStorage
         {
+            get => LaptopStorageText.Text;
             set => LaptopStorageText.Text = value;
         }
     }
