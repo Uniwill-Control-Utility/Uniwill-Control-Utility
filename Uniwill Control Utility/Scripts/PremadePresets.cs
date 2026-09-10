@@ -74,36 +74,36 @@ namespace Uniwill_Control_Utility.Scripts
             var model = match.Success ? match.Groups["model"].Value : string.Empty;
             var suffix = match.Success ? match.Groups["suffix"].Value : string.Empty;
             var generation = 0;
-            if (model.Length == 5 && int.TryParse(model[..2], out var twoDigitGeneration)) generation = twoDigitGeneration;
-            else if (model.Length == 4 && (model.StartsWith("10") || model.StartsWith("11")) && int.TryParse(model[..2], out var laterFourDigitGeneration)) generation = laterFourDigitGeneration;
-            else if (model.Length >= 4 && int.TryParse(model[..1], out var oneDigitGeneration)) generation = oneDigitGeneration;
+            if (model.Length == 5 && int.TryParse(model.AsSpan(0, 2), out var twoDigitGeneration)) generation = twoDigitGeneration;
+            else if (model.Length == 4 && (model.StartsWith("10", StringComparison.Ordinal) || model.StartsWith("11", StringComparison.Ordinal)) && int.TryParse(model.AsSpan(0, 2), out var laterFourDigitGeneration)) generation = laterFourDigitGeneration;
+            else if (model.Length >= 4 && int.TryParse(model.AsSpan(0, 1), out var oneDigitGeneration)) generation = oneDigitGeneration;
 
-            if (name.Contains("ULTRA"))
+            if (name.Contains("ULTRA", StringComparison.Ordinal))
             {
-                if (suffix.StartsWith("H")) return (28, 115);
-                if (suffix.StartsWith("U")) return (15, 57);
-                if (suffix.StartsWith("V")) return (17, 37);
+                if (suffix.StartsWith("H", StringComparison.Ordinal)) return (28, 115);
+                if (suffix.StartsWith("U", StringComparison.Ordinal)) return (15, 57);
+                if (suffix.StartsWith("V", StringComparison.Ordinal)) return (17, 37);
             }
 
-            if (suffix.Contains("HX")) return (55, 157);
-            if (suffix.StartsWith("H") || suffix.Contains("HK") || suffix.Contains("HQ")) return generation >= 12 ? (45, 115) : (45, 90);
-            if (suffix.StartsWith("P")) return (28, 64);
-            if (suffix.StartsWith("Y")) return (7, 15);
-            if (suffix.StartsWith("U") || suffix.Contains("G")) return generation >= 11 ? (15, 55) : (15, 25);
-            if (suffix.StartsWith("T")) return (35, 65);
-            if (suffix.Contains("K") || suffix.Contains("X")) return generation >= 12 ? (125, 241) : (95, 119);
+            if (suffix.Contains("HX", StringComparison.Ordinal)) return (55, 157);
+            if (suffix.StartsWith("H", StringComparison.Ordinal) || suffix.Contains("HK", StringComparison.Ordinal) || suffix.Contains("HQ", StringComparison.Ordinal)) return generation >= 12 ? (45, 115) : (45, 90);
+            if (suffix.StartsWith("P", StringComparison.Ordinal)) return (28, 64);
+            if (suffix.StartsWith("Y", StringComparison.Ordinal)) return (7, 15);
+            if (suffix.StartsWith("U", StringComparison.Ordinal) || suffix.Contains("G", StringComparison.Ordinal)) return generation >= 11 ? (15, 55) : (15, 25);
+            if (suffix.StartsWith("T", StringComparison.Ordinal)) return (35, 65);
+            if (suffix.Contains("K", StringComparison.Ordinal) || suffix.Contains("X", StringComparison.Ordinal)) return generation >= 12 ? (125, 241) : (95, 119);
             if (generation >= 12)
             {
-                if (name.Contains("I3-")) return (60, 89);
-                if (name.Contains("I5-")) return (65, 117);
-                if (name.Contains("I7-")) return (65, 180);
+                if (name.Contains("I3-", StringComparison.Ordinal)) return (60, 89);
+                if (name.Contains("I5-", StringComparison.Ordinal)) return (65, 117);
+                if (name.Contains("I7-", StringComparison.Ordinal)) return (65, 180);
                 return (65, 219);
             }
 
-            if (name.Contains("I3-")) return (65, 75);
-            if (name.Contains("I5-")) return (65, 95);
-            if (name.Contains("I7-")) return (65, 125);
-            if (name.Contains("I9-")) return (65, 165);
+            if (name.Contains("I3-", StringComparison.Ordinal)) return (65, 75);
+            if (name.Contains("I5-", StringComparison.Ordinal)) return (65, 95);
+            if (name.Contains("I7-", StringComparison.Ordinal)) return (65, 125);
+            if (name.Contains("I9-", StringComparison.Ordinal)) return (65, 165);
             return (35, 65);
         }
     }
