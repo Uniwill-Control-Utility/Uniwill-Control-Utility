@@ -57,14 +57,14 @@ namespace Uniwill_Control_Utility
             return _host?.Services.GetService(typeof(T)) as T;
         }
 
-        public static string version = "26.2.2";
+        internal static string version = "26.2.2";
         private Mutex? mutex;
         private const string MutexName = "UniversalX86TuningUtility";
 
         public static readonly string SCALE_MODELS_JSON_PATH = ".\\ScaleModels.json";
         public static readonly string LOGS_FOLDER = ".\\logs\\";
 
-        public static string product = "";
+        internal static string product = "";
         public static Task DisplaySetupTask { get; private set; } = Task.CompletedTask;
 
         /// <summary>
@@ -130,7 +130,7 @@ namespace Uniwill_Control_Utility
                         {
                             Log.Logger.Error(ex, "Failed to setup display refresh rates");
                         }
-                    });
+                    }, CancellationToken.None);
                 }
                 catch (Exception ex)
                 {
@@ -321,7 +321,7 @@ namespace Uniwill_Control_Utility
 
                     try
                     {
-                        Task.Run(() => UnblockFilesInDirectory(path));
+                        Task.Run(() => UnblockFilesInDirectory(path), CancellationToken.None);
                     }
                     catch (Exception ex)
                     {
@@ -329,7 +329,7 @@ namespace Uniwill_Control_Utility
                     }
                 }
 
-                await _host.StartAsync();
+                await _host.StartAsync(CancellationToken.None);
 
                 // Auto-connect watercooler on startup if enabled
                 try
@@ -458,7 +458,7 @@ namespace Uniwill_Control_Utility
             base.OnExit(e);
         }
 
-        private void BringMainWindowToFront()
+        private static void BringMainWindowToFront()
         {
             var window = Application.Current.MainWindow;
             if (window == null) return;
@@ -565,9 +565,9 @@ namespace Uniwill_Control_Utility
             // a service tries to dispatch to the UI thread.
             _ = Task.Run(() =>
             {
-                _host.StopAsync(CancellationToken.None).Wait();
-                _host.Dispose();
-            });
+                _host?.StopAsync(CancellationToken.None).Wait();
+                _host?.Dispose();
+            }, CancellationToken.None);
         }
 
         /// <summary>
