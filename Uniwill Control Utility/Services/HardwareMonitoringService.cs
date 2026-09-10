@@ -81,7 +81,7 @@ namespace Uniwill_Control_Utility.Services
         float ReadSensor(HardwareType hardwareType, SensorType sensorType, string sensorName);
     }
 
-    public sealed class HardwareMonitoringService : IHardwareMonitoringService, IDisposable
+    public sealed partial class HardwareMonitoringService : IHardwareMonitoringService, IDisposable
     {
         private readonly object _sync = new();
         private readonly Dictionary<long, HardwareMonitoringCategory> _leases = new();
@@ -284,8 +284,7 @@ namespace Uniwill_Control_Utility.Services
 
         private void ThrowIfDisposed()
         {
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(HardwareMonitoringService));
+            ObjectDisposedException.ThrowIf(_disposed, this);
         }
 
         public void Dispose()
@@ -322,11 +321,11 @@ namespace Uniwill_Control_Utility.Services
             public void Dispose() { }
         }
 
-        [DllImport("kernel32.dll")]
-        private static extern bool GetSystemPowerStatus(out SystemPowerStatus status);
+        [LibraryImport("kernel32.dll")]
+        private static partial int GetSystemPowerStatus(out SystemPowerStatus status);
 
-        [DllImport("kernel32.dll")]
-        private static extern void GlobalMemoryStatusEx(ref MemoryStatusEx buffer);
+        [LibraryImport("kernel32.dll")]
+        private static partial void GlobalMemoryStatusEx(ref MemoryStatusEx buffer);
 
         [StructLayout(LayoutKind.Sequential)]
         private struct SystemPowerStatus
@@ -406,10 +405,10 @@ namespace Uniwill_Control_Utility.Services
             return maxTemp;
         }
 
-        private static (double usedGb, double totalGb, double committedGb, double pagefileTotalGb) ReadPhysicalMemory()
+        private static unsafe (double usedGb, double totalGb, double committedGb, double pagefileTotalGb) ReadPhysicalMemory()
         {
             const double gib = 1024d * 1024 * 1024;
-            var mem = new MemoryStatusEx { Length = (uint)Marshal.SizeOf<MemoryStatusEx>() };
+            var mem = new MemoryStatusEx { Length = (uint)sizeof(MemoryStatusEx) };
             GlobalMemoryStatusEx(ref mem);
 
             double total = mem.TotalPhysical / gib;
