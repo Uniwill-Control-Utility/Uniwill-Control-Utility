@@ -29,12 +29,11 @@ namespace Uniwill_Control_Utility.Services.Performance
         FpsMetricsSnapshot Latest { get; }
     }
 
-    public sealed class FpsMonitoringService : IFpsMonitoringService, IDisposable
+    public sealed partial class FpsMonitoringService : IFpsMonitoringService, IDisposable
     {
         private readonly object _sync = new();
         private FpsTraceProcessor? _processor;
         private CancellationTokenSource? _cancellation;
-        private Task? _samplingTask;
         private int _leaseCount;
         private FpsMetricsSnapshot _latest = FpsMetricsSnapshot.Empty;
         private int _cachedApiPid;
@@ -63,7 +62,7 @@ namespace Uniwill_Control_Utility.Services.Performance
                 _processor = new FpsTraceProcessor();
                 _processor.Start();
                 _cancellation = new CancellationTokenSource();
-                _samplingTask = Task.Run(() => SampleAsync(_cancellation.Token));
+                Task.Run(() => SampleAsync(_cancellation.Token));
             }
             catch (Exception ex)
             {
@@ -85,7 +84,7 @@ namespace Uniwill_Control_Utility.Services.Performance
 
                 processor.TargetProcessId = processId;
                 FrameStatistics statistics = processor.GetStatistics(processId);
-                if (statistics.Fps <= 0 || !TryGetProcessDetailsCached(processId, out string name, out string path))
+                if (statistics.Fps == 0 || !TryGetProcessDetailsCached(processId, out string name, out string path))
                 {
                     Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
                     continue;
@@ -206,7 +205,6 @@ namespace Uniwill_Control_Utility.Services.Performance
                 _processor = null;
                 _cancellation?.Dispose();
                 _cancellation = null;
-                _samplingTask = null;
                 _latest = FpsMetricsSnapshot.Empty;
                 _cachedApiPid = 0;
                 _cachedApi = "N/A";
@@ -237,14 +235,14 @@ namespace Uniwill_Control_Utility.Services.Performance
             IntPtr window = GetForegroundWindow();
             if (window == IntPtr.Zero)
                 return 0;
-            GetWindowThreadProcessId(window, out uint processId);
+            _ = GetWindowThreadProcessId(window, out uint processId);
             return unchecked((int)processId);
         }
 
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow();
+        [LibraryImport("user32.dll")]
+        private static partial IntPtr GetForegroundWindow();
 
-        [DllImport("user32.dll")]
-        private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+        [LibraryImport("user32.dll")]
+        private static partial uint GetWindowThreadProcessId(IntPtr window, out uint processId);
     }
 }
