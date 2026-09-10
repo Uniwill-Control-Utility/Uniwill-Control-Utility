@@ -26,7 +26,8 @@ namespace Uniwill_Control_Utility.Scripts
         private const int Zen5Family = 26;
         private const int Zen5FireRangeModel = 68;
 
-        internal static RyzenFamily FAM = RyzenFamily.Unknown;
+        private static RyzenFamily _fam = RyzenFamily.Unknown;
+        internal static RyzenFamily FAM => _fam;
 
         public enum ProcessorType
         {
@@ -37,14 +38,33 @@ namespace Uniwill_Control_Utility.Scripts
             Intel,
         }
 
-        internal static ProcessorType TYPE = ProcessorType.Unknown;
+        private static ProcessorType _type = ProcessorType.Unknown;
+        internal static ProcessorType TYPE => _type;
 
 
-        internal static string CPUName = string.Empty;
-        internal static string GPUName = string.Empty;
-        internal static string LaptopModel = string.Empty;
-        internal static int CPUFamily = 0;
-        internal static int CPUModel = 0;
+        private static string _cpuName = string.Empty;
+        internal static string CPUName
+        {
+            get => _cpuName;
+            private set => _cpuName = value;
+        }
+
+        private static string _gpuName = string.Empty;
+        internal static string GPUName
+        {
+            get => _gpuName;
+            private set => _gpuName = value;
+        }
+
+        private static string _laptopModel = string.Empty;
+        internal static string LaptopModel
+        {
+            get => _laptopModel;
+            private set => _laptopModel = value;
+        }
+
+        private static int CPUFamily;
+        private static int CPUModel;
 
         /// <summary>
         /// Returns a recommended PL1 power limit (in watts) based on the detected CPU
@@ -94,11 +114,11 @@ namespace Uniwill_Control_Utility.Scripts
                     return watercoolerConnected ? 130 : 100;
 
                 // Generic H series (performance mobile)
-                if (name.Contains("H ", StringComparison.Ordinal) || name.EndsWith("H", StringComparison.Ordinal))
+                if (name.Contains("H ", StringComparison.Ordinal) || name.EndsWith('H'))
                     return 45;
 
                 // Generic U series (ultralow)
-                if (name.Contains("U ", StringComparison.Ordinal) || name.EndsWith("U", StringComparison.Ordinal))
+                if (name.Contains("U ", StringComparison.Ordinal) || name.EndsWith('U'))
                     return 15;
 
                 // Unknown Intel fallback
@@ -146,7 +166,7 @@ namespace Uniwill_Control_Utility.Scripts
                 return 40;
 
             // Generic AMD U series
-            if (name.Contains("U ", StringComparison.Ordinal) || name.EndsWith("U", StringComparison.Ordinal))
+            if (name.Contains("U ", StringComparison.Ordinal) || name.EndsWith('U'))
                 return 15;
 
             // Unknown AMD mobile fallback
@@ -171,7 +191,9 @@ namespace Uniwill_Control_Utility.Scripts
                 CPUModel = int.Parse(words[modelIndex]);
 
                 ManagementObjectSearcher mos = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_Processor");
+#pragma warning disable S3217 // Loops should be type-safe
                 foreach (ManagementObject mo in mos.Get())
+#pragma warning restore S3217
                 {
                    CPUName = mo["Name"]?.ToString()?.Trim() ?? "";
                 }
@@ -213,7 +235,9 @@ namespace Uniwill_Control_Utility.Scripts
                     List<string> integratedGpus = new List<string>();
 
                     ManagementObjectSearcher gpuSearcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_VideoController");
+#pragma warning disable S3217 // Loops should be type-safe
                     foreach (ManagementObject gpu in gpuSearcher.Get())
+#pragma warning restore S3217
                     {
                         string gpuName = gpu["Name"]?.ToString()?.Trim() ?? "";
                         if (string.IsNullOrEmpty(gpuName) || gpuName.Contains("Microsoft", StringComparison.OrdinalIgnoreCase))
@@ -263,7 +287,7 @@ namespace Uniwill_Control_Utility.Scripts
 
             if (CPUName.Contains("Intel", StringComparison.Ordinal))
             {
-                TYPE = ProcessorType.Intel;
+                _type = ProcessorType.Intel;
             }
             else
             {
@@ -278,9 +302,9 @@ namespace Uniwill_Control_Utility.Scripts
 
                 // Only FireRange (Zen 5, Family 26, Model 68, HX suffix) is supported.
                 if (CPUFamily == Zen5Family && CPUModel == Zen5FireRangeModel && CPUName.Contains("HX", StringComparison.Ordinal))
-                    FAM = RyzenFamily.FireRange;
+                    _fam = RyzenFamily.FireRange;
 
-                TYPE = ProcessorType.Amd_Apu;
+                _type = ProcessorType.Amd_Apu;
                 Addresses.setAddresses();
             }
         }

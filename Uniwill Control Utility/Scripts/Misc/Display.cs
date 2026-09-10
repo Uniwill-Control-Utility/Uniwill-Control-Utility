@@ -74,16 +74,16 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             public int dmDisplayFrequency;
         }
 
-        public static string? targetDisplayName = FindLaptopScreen();
-        public static List<string> uniqueResolutions = GetSupportedResolutions(targetDisplayName ?? defaultDevice);
-        public static List<int> uniqueRefreshRates = GetSupportedRefreshRates(targetDisplayName ?? defaultDevice);
+        internal static string? TargetDisplayName = FindLaptopScreen();
+        internal static List<string> UniqueResolutions = GetSupportedResolutions(TargetDisplayName ?? DefaultDevice);
+        internal static List<int> UniqueRefreshRates = GetSupportedRefreshRates(TargetDisplayName ?? DefaultDevice);
 
-        public static void setUpLists()
+        public static void SetUpLists()
         {
-            uniqueRefreshRates = GetSupportedRefreshRates(targetDisplayName ?? defaultDevice);
-            uniqueRefreshRates = uniqueRefreshRates.Distinct().ToList();
-            uniqueRefreshRates.Sort();
-            uniqueRefreshRates.Reverse();
+            UniqueRefreshRates = GetSupportedRefreshRates(TargetDisplayName ?? DefaultDevice);
+            UniqueRefreshRates = UniqueRefreshRates.Distinct().ToList();
+            UniqueRefreshRates.Sort();
+            UniqueRefreshRates.Reverse();
         }
 
         static List<string> GetSupportedResolutions(string? targetDisplayName)
@@ -150,13 +150,13 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             DEVMODE devMode = new DEVMODE();
             devMode.dmSize = (short)Marshal.SizeOf(devMode);
 
-            if (EnumDisplaySettings(targetDisplayName, ENUM_CURRENT_SETTINGS, ref devMode))
+            if (EnumDisplaySettings(targetDisplayName, EnumCurrentSettings, ref devMode))
             {
-                devMode.dmFields = (int)(DisplaySettingsFlags.DM_PELSWIDTH | DisplaySettingsFlags.DM_PELSHEIGHT | DisplaySettingsFlags.DM_DISPLAYFREQUENCY);
+                devMode.dmFields = (int)(DisplaySettingsFlags.DmPelsWidth | DisplaySettingsFlags.DmPelsHeight | DisplaySettingsFlags.DmDisplayFrequency);
 
                 devMode.dmDisplayFrequency = newRefreshRate;
 
-                int result = ChangeDisplaySettingsEx(targetDisplayName, ref devMode, IntPtr.Zero, (uint)ChangeDisplaySettingsFlags.CDS_UPDATEREGISTRY, IntPtr.Zero);
+                int result = ChangeDisplaySettingsEx(targetDisplayName, ref devMode, IntPtr.Zero, (uint)ChangeDisplaySettingsFlags.CdsUpdateRegistry, IntPtr.Zero);
 
                 if (result == DISP_CHANGE_SUCCESSFUL)
                 {
@@ -175,10 +175,10 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         public static void ApplySettings(int newHz)
         {
-            targetDisplayName = FindLaptopScreen();
+            TargetDisplayName = FindLaptopScreen();
             if (newHz > 0)
             {
-                Display.ChangeDisplaySettings(Display.targetDisplayName, newHz);
+                Display.ChangeDisplaySettings(Display.TargetDisplayName, newHz);
             }
             else
             {
@@ -187,29 +187,29 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         }
 
         const int DISP_CHANGE_SUCCESSFUL = 0;
-        public const uint ENUM_CURRENT_SETTINGS = 0xFFFFFFFF;
+        internal const uint EnumCurrentSettings = 0xFFFFFFFF;
 
-        [Flags()]
-        public enum DisplaySettingsFlags : int
+        [Flags]
+        internal enum DisplaySettingsFlags
         {
-            DM_PELSWIDTH = 0x00080000,
-            DM_PELSHEIGHT = 0x00100000,
-            DM_DISPLAYFREQUENCY = 0x00400000
+            DmPelsWidth = 0x00080000,
+            DmPelsHeight = 0x00100000,
+            DmDisplayFrequency = 0x00400000
         }
 
-        [Flags()]
-        public enum ChangeDisplaySettingsFlags : uint
+        [Flags]
+        internal enum ChangeDisplaySettingsFlags
         {
-            CDS_UPDATEREGISTRY = 0x00000001,
-            CDS_TEST = 0x00000002,
-            CDS_FULLSCREEN = 0x00000004,
-            CDS_GLOBAL = 0x00000008,
-            CDS_SET_PRIMARY = 0x00000010,
-            CDS_RESET = 0x40000000,
-            CDS_NORESET = 0x10000000
+            CdsUpdateRegistry = 0x00000001,
+            CdsTest = 0x00000002,
+            CdsFullscreen = 0x00000004,
+            CdsGlobal = 0x00000008,
+            CdsSetPrimary = 0x00000010,
+            CdsReset = 0x40000000,
+            CdsNoReset = 0x10000000
         }
 
-        public const string defaultDevice = @"\\.\DISPLAY1";
+        internal const string DefaultDevice = @"\\.\DISPLAY1";
 
         public static string? FindLaptopScreen(bool log = false)
         {
@@ -239,7 +239,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     count++;
                 }
 
-                if (displayNum > 0 && count == 0) laptopScreen = defaultDevice;
+                if (displayNum > 0 && count == 0) laptopScreen = DefaultDevice;
             }
             catch (COMException)
             {
