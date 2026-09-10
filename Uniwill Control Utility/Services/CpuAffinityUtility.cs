@@ -11,7 +11,7 @@ namespace CpuAffinityUtility
     /// Mode 0 = all CCDs, 1 = primary CCD, 2 = secondary CCD.
     /// Will be updated for big.LITTLE APUs/CPUs in the future.
     /// </summary>
-    public static class CpuAffinityManager
+    public static partial class CpuAffinityManager
     {
         private static readonly object _syncRoot = new();
 
@@ -95,6 +95,8 @@ namespace CpuAffinityUtility
         }
 
         private const uint ALL_GROUPS = 0xFFFF;
-        [DllImport("kernel32.dll")] public static extern uint GetActiveProcessorCount(uint groupNumber);
+
+        [LibraryImport("kernel32.dll")]
+        private static partial uint GetActiveProcessorCount(uint groupNumber);
     }
 }
