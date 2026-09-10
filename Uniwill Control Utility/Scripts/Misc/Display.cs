@@ -14,17 +14,17 @@ namespace Uniwill_Control_Utility.Scripts.Misc
     {
 #pragma warning disable SYSLIB1054 // Convert to LibraryImport — DISPLAY_DEVICE and DEVMODE structs contain [MarshalAs] string fields not supported by source-generated P/Invoke
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        public static extern bool EnumDisplayDevices([MarshalAs(UnmanagedType.LPWStr)] string? lpDevice, uint iDevNum, ref DISPLAY_DEVICE lpDisplayDevice, uint dwFlags);
+        internal static extern bool EnumDisplayDevices([MarshalAs(UnmanagedType.LPWStr)] string? lpDevice, uint iDevNum, ref DISPLAY_DEVICE lpDisplayDevice, uint dwFlags);
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        public static extern bool EnumDisplaySettings([MarshalAs(UnmanagedType.LPWStr)] string lpszDeviceName, uint iModeNum, ref DEVMODE lpDevMode);
+        internal static extern bool EnumDisplaySettings([MarshalAs(UnmanagedType.LPWStr)] string lpszDeviceName, uint iModeNum, ref DEVMODE lpDevMode);
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        public static extern int ChangeDisplaySettingsEx([MarshalAs(UnmanagedType.LPWStr)] string lpszDeviceName, ref DEVMODE lpDevMode, IntPtr hwnd, uint dwflags, IntPtr lParam);
+        internal static extern int ChangeDisplaySettingsEx([MarshalAs(UnmanagedType.LPWStr)] string lpszDeviceName, ref DEVMODE lpDevMode, IntPtr hwnd, uint dwflags, IntPtr lParam);
 #pragma warning restore SYSLIB1054
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
-        public struct DISPLAY_DEVICE
+        internal struct DISPLAY_DEVICE
         {
             public uint cb;
             [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
@@ -39,7 +39,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct DEVMODE
+        internal struct DEVMODE
         {
             private const int CCHDEVICENAME = 32;
             private const int CCHFORMNAME = 32;
@@ -186,7 +186,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             }
         }
 
-        const int DISP_CHANGE_SUCCESSFUL = 0;
+        const int DispChangeSuccessful = 0;
         internal const uint EnumCurrentSettings = 0xFFFFFFFF;
 
         [Flags]
