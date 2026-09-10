@@ -14,91 +14,92 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         #region enums
 
-        public enum QUERY_DEVICE_CONFIG_FLAGS : uint
+        public enum QueryDeviceConfig
         {
-            QDC_ALL_PATHS = 0x00000001,
-            QDC_ONLY_ACTIVE_PATHS = 0x00000002,
-            QDC_DATABASE_CURRENT = 0x00000004
+            AllPaths = 0x00000001,
+            OnlyActivePaths = 0x00000002,
+            DatabaseCurrent = 0x00000004
         }
 
-        public enum DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY : uint
+        public enum DisplayConfigOutputTechnology : uint
         {
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_OTHER = 0xFFFFFFFF,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_HD15 = 0,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_SVIDEO = 1,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_COMPOSITE_VIDEO = 2,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_COMPONENT_VIDEO = 3,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DVI = 4,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_HDMI = 5,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_LVDS = 6,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_D_JPN = 8,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_SDI = 9,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EXTERNAL = 10,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EMBEDDED = 11,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_UDI_EXTERNAL = 12,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_UDI_EMBEDDED = 13,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_SDTVDONGLE = 14,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_MIRACAST = 15,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INTERNAL = 0x80000000,
-            DISPLAYCONFIG_OUTPUT_TECHNOLOGY_FORCE_UINT32 = 0xFFFFFFFF
+            Other = 0xFFFFFFFF,
+            Hd15 = 0,
+            Svideo = 1,
+            CompositeVideo = 2,
+            ComponentVideo = 3,
+            Dvi = 4,
+            Hdmi = 5,
+            Lvds = 6,
+            DJpn = 8,
+            Sdi = 9,
+            DisplayportExternal = 10,
+            DisplayportEmbedded = 11,
+            UdiExternal = 12,
+            UdiEmbedded = 13,
+            Sdtdongle = 14,
+            Miracast = 15,
+            Internal = 0x80000000
+            // NOTE: ForceUint32 removed — it had the same value as Other (CA1069).
+            // Use 0xFFFFFFFF explicitly when a sentinel is needed.
         }
 
-        public enum DISPLAYCONFIG_SCANLINE_ORDERING : uint
+        public enum DisplayConfigScanlineOrdering : uint
         {
-            DISPLAYCONFIG_SCANLINE_ORDERING_UNSPECIFIED = 0,
-            DISPLAYCONFIG_SCANLINE_ORDERING_PROGRESSIVE = 1,
-            DISPLAYCONFIG_SCANLINE_ORDERING_INTERLACED = 2,
-            DISPLAYCONFIG_SCANLINE_ORDERING_INTERLACED_UPPERFIELDFIRST = DISPLAYCONFIG_SCANLINE_ORDERING_INTERLACED,
-            DISPLAYCONFIG_SCANLINE_ORDERING_INTERLACED_LOWERFIELDFIRST = 3,
-            DISPLAYCONFIG_SCANLINE_ORDERING_FORCE_UINT32 = 0xFFFFFFFF
+            Unspecified = 0,
+            Progressive = 1,
+            Interlaced = 2,
+            InterlacedUpperFieldFirst = Interlaced,
+            InterlacedLowerFieldFirst = 3,
+            ForceUint32 = 0xFFFFFFFF
         }
 
-        public enum DISPLAYCONFIG_ROTATION : uint
+        public enum DisplayConfigRotation : uint
         {
-            DISPLAYCONFIG_ROTATION_IDENTITY = 1,
-            DISPLAYCONFIG_ROTATION_ROTATE90 = 2,
-            DISPLAYCONFIG_ROTATION_ROTATE180 = 3,
-            DISPLAYCONFIG_ROTATION_ROTATE270 = 4,
-            DISPLAYCONFIG_ROTATION_FORCE_UINT32 = 0xFFFFFFFF
+            Identity = 1,
+            Rotate90 = 2,
+            Rotate180 = 3,
+            Rotate270 = 4,
+            ForceUint32 = 0xFFFFFFFF
         }
 
-        public enum DISPLAYCONFIG_SCALING : uint
+        public enum DisplayConfigScaling : uint
         {
-            DISPLAYCONFIG_SCALING_IDENTITY = 1,
-            DISPLAYCONFIG_SCALING_CENTERED = 2,
-            DISPLAYCONFIG_SCALING_STRETCHED = 3,
-            DISPLAYCONFIG_SCALING_ASPECTRATIOCENTEREDMAX = 4,
-            DISPLAYCONFIG_SCALING_CUSTOM = 5,
-            DISPLAYCONFIG_SCALING_PREFERRED = 128,
-            DISPLAYCONFIG_SCALING_FORCE_UINT32 = 0xFFFFFFFF
+            Identity = 1,
+            Centered = 2,
+            Stretched = 3,
+            AspectRatioCenteredMax = 4,
+            Custom = 5,
+            Preferred = 128,
+            ForceUint32 = 0xFFFFFFFF
         }
 
-        public enum DISPLAYCONFIG_PIXELFORMAT : uint
+        public enum DisplayConfigPixelformat : uint
         {
-            DISPLAYCONFIG_PIXELFORMAT_8BPP = 1,
-            DISPLAYCONFIG_PIXELFORMAT_16BPP = 2,
-            DISPLAYCONFIG_PIXELFORMAT_24BPP = 3,
-            DISPLAYCONFIG_PIXELFORMAT_32BPP = 4,
-            DISPLAYCONFIG_PIXELFORMAT_NONGDI = 5,
-            DISPLAYCONFIG_PIXELFORMAT_FORCE_UINT32 = 0xffffffff
+            Bpp8 = 1,
+            Bpp16 = 2,
+            Bpp24 = 3,
+            Bpp32 = 4,
+            NonGdi = 5,
+            ForceUint32 = 0xffffffff
         }
 
-        public enum DISPLAYCONFIG_MODE_INFO_TYPE : uint
+        public enum DisplayConfigModeInfoType : uint
         {
-            DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE = 1,
-            DISPLAYCONFIG_MODE_INFO_TYPE_TARGET = 2,
-            DISPLAYCONFIG_MODE_INFO_TYPE_FORCE_UINT32 = 0xFFFFFFFF
+            Source = 1,
+            Target = 2,
+            ForceUint32 = 0xFFFFFFFF
         }
 
-        public enum DISPLAYCONFIG_DEVICE_INFO_TYPE : uint
+        public enum DisplayConfigDeviceInfoType : uint
         {
-            DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME = 1,
-            DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME = 2,
-            DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_PREFERRED_MODE = 3,
-            DISPLAYCONFIG_DEVICE_INFO_GET_ADAPTER_NAME = 4,
-            DISPLAYCONFIG_DEVICE_INFO_SET_TARGET_PERSISTENCE = 5,
-            DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_BASE_TYPE = 6,
-            DISPLAYCONFIG_DEVICE_INFO_FORCE_UINT32 = 0xFFFFFFFF
+            GetSourceName = 1,
+            GetTargetName = 2,
+            GetTargetPreferredMode = 3,
+            GetAdapterName = 4,
+            SetTargetPersistence = 5,
+            GetTargetBaseType = 6,
+            ForceUint32 = 0xFFFFFFFF
         }
 
         #endregion
@@ -106,132 +107,132 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         #region structs
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct LUID
+        public struct Luid
         {
             public uint LowPart;
             public int HighPart;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct DISPLAYCONFIG_PATH_SOURCE_INFO
+        public struct DisplayConfigPathSourceInfo
         {
-            public LUID adapterId;
+            public Luid adapterId;
             public uint id;
             public uint modeInfoIdx;
             public uint statusFlags;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct DISPLAYCONFIG_PATH_TARGET_INFO
+        public struct DisplayConfigPathTargetInfo
         {
-            public LUID adapterId;
+            public Luid adapterId;
             public uint id;
             public uint modeInfoIdx;
-            private DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY outputTechnology;
-            private DISPLAYCONFIG_ROTATION rotation;
-            private DISPLAYCONFIG_SCALING scaling;
-            private DISPLAYCONFIG_RATIONAL refreshRate;
-            private DISPLAYCONFIG_SCANLINE_ORDERING scanLineOrdering;
+            private DisplayConfigOutputTechnology outputTechnology;
+            private DisplayConfigRotation rotation;
+            private DisplayConfigScaling scaling;
+            private DisplayConfigRational refreshRate;
+            private DisplayConfigScanlineOrdering scanLineOrdering;
             public bool targetAvailable;
             public uint statusFlags;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct DISPLAYCONFIG_RATIONAL
+        public struct DisplayConfigRational
         {
             public uint Numerator;
             public uint Denominator;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct DISPLAYCONFIG_PATH_INFO
+        public struct DisplayConfigPathInfo
         {
-            public DISPLAYCONFIG_PATH_SOURCE_INFO sourceInfo;
-            public DISPLAYCONFIG_PATH_TARGET_INFO targetInfo;
+            public DisplayConfigPathSourceInfo sourceInfo;
+            public DisplayConfigPathTargetInfo targetInfo;
             public uint flags;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct DISPLAYCONFIG_2DREGION
+        public struct DisplayConfig2dRegion
         {
             public uint cx;
             public uint cy;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct DISPLAYCONFIG_VIDEO_SIGNAL_INFO
+        public struct DisplayConfigVideoSignalInfo
         {
             public ulong pixelRate;
-            public DISPLAYCONFIG_RATIONAL hSyncFreq;
-            public DISPLAYCONFIG_RATIONAL vSyncFreq;
-            public DISPLAYCONFIG_2DREGION activeSize;
-            public DISPLAYCONFIG_2DREGION totalSize;
+            public DisplayConfigRational hSyncFreq;
+            public DisplayConfigRational vSyncFreq;
+            public DisplayConfig2dRegion activeSize;
+            public DisplayConfig2dRegion totalSize;
             public uint videoStandard;
-            public DISPLAYCONFIG_SCANLINE_ORDERING scanLineOrdering;
+            public DisplayConfigScanlineOrdering scanLineOrdering;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct DISPLAYCONFIG_TARGET_MODE
+        public struct DisplayConfigTargetMode
         {
-            public DISPLAYCONFIG_VIDEO_SIGNAL_INFO targetVideoSignalInfo;
+            public DisplayConfigVideoSignalInfo targetVideoSignalInfo;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct POINTL
+        public struct Pointl
         {
             private int x;
             private int y;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct DISPLAYCONFIG_SOURCE_MODE
+        public struct DisplayConfigSourceMode
         {
             public uint width;
             public uint height;
-            public DISPLAYCONFIG_PIXELFORMAT pixelFormat;
-            public POINTL position;
+            public DisplayConfigPixelformat pixelFormat;
+            public Pointl position;
         }
 
         [StructLayout(LayoutKind.Explicit)]
-        public struct DISPLAYCONFIG_MODE_INFO_UNION
+        public struct DisplayConfigModeInfoUnion
         {
             [FieldOffset(0)]
-            public DISPLAYCONFIG_TARGET_MODE targetMode;
+            public DisplayConfigTargetMode targetMode;
 
             [FieldOffset(0)]
-            public DISPLAYCONFIG_SOURCE_MODE sourceMode;
+            public DisplayConfigSourceMode sourceMode;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct DISPLAYCONFIG_MODE_INFO
+        public struct DisplayConfigModeInfo
         {
-            public DISPLAYCONFIG_MODE_INFO_TYPE infoType;
+            public DisplayConfigModeInfoType infoType;
             public uint id;
-            public LUID adapterId;
-            public DISPLAYCONFIG_MODE_INFO_UNION modeInfo;
+            public Luid adapterId;
+            public DisplayConfigModeInfoUnion modeInfo;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct DISPLAYCONFIG_TARGET_DEVICE_NAME_FLAGS
+        public struct DisplayConfigTargetDeviceNameFlags
         {
             public uint value;
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct DISPLAYCONFIG_DEVICE_INFO_HEADER
+        public struct DisplayConfigDeviceInfoHeader
         {
-            public DISPLAYCONFIG_DEVICE_INFO_TYPE type;
+            public DisplayConfigDeviceInfoType type;
             public uint size;
-            public LUID adapterId;
+            public Luid adapterId;
             public uint id;
         }
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        public struct DISPLAYCONFIG_TARGET_DEVICE_NAME
+        public struct DisplayConfigTargetDeviceName
         {
-            public DISPLAYCONFIG_DEVICE_INFO_HEADER header;
-            public DISPLAYCONFIG_TARGET_DEVICE_NAME_FLAGS flags;
-            public DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY outputTechnology;
+            public DisplayConfigDeviceInfoHeader header;
+            public DisplayConfigTargetDeviceNameFlags flags;
+            public DisplayConfigOutputTechnology outputTechnology;
             public ushort edidManufactureId;
             public ushort edidProductCodeId;
             public uint connectorInstance;
@@ -245,35 +246,39 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         #endregion
 
+#pragma warning disable SYSLIB1054 // LibraryImport not compatible with structs using [MarshalAs] on string fields
+
         #region DLL-Imports
 
         [DllImport("user32.dll")]
         public static extern int GetDisplayConfigBufferSizes(
-            QUERY_DEVICE_CONFIG_FLAGS flags, out uint numPathArrayElements, out uint numModeInfoArrayElements);
+            QueryDeviceConfig flags, out uint numPathArrayElements, out uint numModeInfoArrayElements);
 
         [DllImport("user32.dll")]
         public static extern int QueryDisplayConfig(
-            QUERY_DEVICE_CONFIG_FLAGS flags,
-            ref uint numPathArrayElements, [Out] DISPLAYCONFIG_PATH_INFO[] PathInfoArray,
-            ref uint numModeInfoArrayElements, [Out] DISPLAYCONFIG_MODE_INFO[] ModeInfoArray,
+            QueryDeviceConfig flags,
+            ref uint numPathArrayElements, [Out] DisplayConfigPathInfo[] PathInfoArray,
+            ref uint numModeInfoArrayElements, [Out] DisplayConfigModeInfo[] ModeInfoArray,
             nint currentTopologyId
             );
 
         [DllImport("user32.dll")]
-        public static extern int DisplayConfigGetDeviceInfo(ref DISPLAYCONFIG_TARGET_DEVICE_NAME deviceName);
+        public static extern int DisplayConfigGetDeviceInfo(ref DisplayConfigTargetDeviceName deviceName);
 
         #endregion
 
-        private static DISPLAYCONFIG_TARGET_DEVICE_NAME DeviceName(LUID adapterId, uint targetId)
+#pragma warning restore SYSLIB1054
+
+        private static DisplayConfigTargetDeviceName DeviceName(Luid adapterId, uint targetId)
         {
-            var deviceName = new DISPLAYCONFIG_TARGET_DEVICE_NAME
+            var deviceName = new DisplayConfigTargetDeviceName
             {
                 header =
                 {
-                    size = (uint)Marshal.SizeOf(typeof (DISPLAYCONFIG_TARGET_DEVICE_NAME)),
+                    size = (uint)Marshal.SizeOf<DisplayConfigTargetDeviceName>(),
                     adapterId = adapterId,
                     id = targetId,
-                    type = DISPLAYCONFIG_DEVICE_INFO_TYPE.DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME
+                    type = DisplayConfigDeviceInfoType.GetTargetName
                 }
             };
             var error = DisplayConfigGetDeviceInfo(ref deviceName);
@@ -283,22 +288,22 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             return deviceName;
         }
 
-        public static IEnumerable<DISPLAYCONFIG_TARGET_DEVICE_NAME> GetAllDevices()
+        public static IEnumerable<DisplayConfigTargetDeviceName> GetAllDevices()
         {
             uint pathCount, modeCount;
-            var error = GetDisplayConfigBufferSizes(QUERY_DEVICE_CONFIG_FLAGS.QDC_ONLY_ACTIVE_PATHS, out pathCount, out modeCount);
+            var error = GetDisplayConfigBufferSizes(QueryDeviceConfig.OnlyActivePaths, out pathCount, out modeCount);
             if (error != ERROR_SUCCESS)
                 throw new Win32Exception(error);
 
-            var displayPaths = new DISPLAYCONFIG_PATH_INFO[pathCount];
-            var displayModes = new DISPLAYCONFIG_MODE_INFO[modeCount];
-            error = QueryDisplayConfig(QUERY_DEVICE_CONFIG_FLAGS.QDC_ONLY_ACTIVE_PATHS,
+            var displayPaths = new DisplayConfigPathInfo[pathCount];
+            var displayModes = new DisplayConfigModeInfo[modeCount];
+            error = QueryDisplayConfig(QueryDeviceConfig.OnlyActivePaths,
                 ref pathCount, displayPaths, ref modeCount, displayModes, nint.Zero);
             if (error != ERROR_SUCCESS)
                 throw new Win32Exception(error);
 
             for (var i = 0; i < modeCount; i++)
-                if (displayModes[i].infoType == DISPLAYCONFIG_MODE_INFO_TYPE.DISPLAYCONFIG_MODE_INFO_TYPE_TARGET)
+                if (displayModes[i].infoType == DisplayConfigModeInfoType.Target)
                     yield return DeviceName(displayModes[i].adapterId, displayModes[i].id);
         }
     }

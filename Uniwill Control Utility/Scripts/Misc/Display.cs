@@ -223,8 +223,8 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
                 foreach (var device in devices)
                 {
-                    if (device.outputTechnology == DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY.DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INTERNAL ||
-                        device.outputTechnology == DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY.DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EMBEDDED)
+                    if (device.outputTechnology == DisplayConfigOutputTechnology.Internal ||
+                        device.outputTechnology == DisplayConfigOutputTechnology.DisplayportEmbedded)
                     {
                         displayNum = count;
                     }
