@@ -441,7 +441,7 @@ namespace RyzenSmu
     {
         private static readonly object initializationLock = new();
         public static RyzenSMU? ryzenSMU;
-        public static AMDPawnIo? pawnIo;
+        public static AMDpawnIO? pawnIo;
         private RyzenSMU.Mailbox? mp1Mailbox;
         private RyzenSMU.Mailbox? rsmuMailbox;
 
@@ -459,7 +459,7 @@ namespace RyzenSmu
                     "PawnIO",
                     "RyzenSMU.bin");
 
-                pawnIo = AMDPawnIo.LoadModuleFromFile(modulePath);
+                pawnIo = AMDpawnIO.LoadModuleFromFile(modulePath);
 
                 if (!pawnIo.IsLoaded)
                 {
@@ -541,7 +541,7 @@ namespace RyzenSmu
         private const string ISA_MUTEX_NAME = "Global\\Access_ISABUS.HTP.Method";
         private const string PCI_MUTEX_NAME = "Global\\Access_PCI";
 
-        private readonly AMDPawnIo _pawnIo;
+        private readonly AMDpawnIO _pawnIo;
 
         // Mutex handles owned by this instance
         private Mutex? _isaMutex;
@@ -592,7 +592,7 @@ namespace RyzenSmu
         public uint LastCommand { get; private set; }
         public Status LastStatus { get; private set; } = Status.FAILED;
 
-        public RyzenSMU(AMDPawnIo pawnIo)
+        public RyzenSMU(AMDpawnIO pawnIo)
         {
             _pawnIo = pawnIo ?? throw new ArgumentNullException(nameof(pawnIo));
         }
