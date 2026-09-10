@@ -26,7 +26,7 @@ namespace Uniwill_Control_Utility.Scripts
         private const int Zen5Family = 26;
         private const int Zen5FireRangeModel = 68;
 
-        public static RyzenFamily FAM = RyzenFamily.Unknown;
+        internal static RyzenFamily FAM = RyzenFamily.Unknown;
 
         public enum ProcessorType
         {
@@ -37,13 +37,14 @@ namespace Uniwill_Control_Utility.Scripts
             Intel,
         }
 
-        public static ProcessorType TYPE = ProcessorType.Unknown;
+        internal static ProcessorType TYPE = ProcessorType.Unknown;
 
 
-        public static string CPUName = string.Empty;
-        public static string GPUName = string.Empty;
-        public static string LaptopModel = string.Empty;
-        public static int CPUFamily = 0, CPUModel = 0, CPUStepping = 0;
+        internal static string CPUName = string.Empty;
+        internal static string GPUName = string.Empty;
+        internal static string LaptopModel = string.Empty;
+        internal static int CPUFamily = 0;
+        internal static int CPUModel = 0;
 
         /// <summary>
         /// Returns a recommended PL1 power limit (in watts) based on the detected CPU
@@ -93,11 +94,11 @@ namespace Uniwill_Control_Utility.Scripts
                     return watercoolerConnected ? 130 : 100;
 
                 // Generic H series (performance mobile)
-                if (name.Contains("H ") || name.EndsWith("H"))
+                if (name.Contains("H ", StringComparison.Ordinal) || name.EndsWith("H", StringComparison.Ordinal))
                     return 45;
 
                 // Generic U series (ultralow)
-                if (name.Contains("U ") || name.EndsWith("U"))
+                if (name.Contains("U ", StringComparison.Ordinal) || name.EndsWith("U", StringComparison.Ordinal))
                     return 15;
 
                 // Unknown Intel fallback
@@ -145,7 +146,7 @@ namespace Uniwill_Control_Utility.Scripts
                 return 40;
 
             // Generic AMD U series
-            if (name.Contains("U ") || name.EndsWith("U"))
+            if (name.Contains("U ", StringComparison.Ordinal) || name.EndsWith("U", StringComparison.Ordinal))
                 return 15;
 
             // Unknown AMD mobile fallback
@@ -161,15 +162,13 @@ namespace Uniwill_Control_Utility.Scripts
                 // Split the string into individual words
                 string[] words = processorIdentifier.Split(' ');
 
-                // Find the indices of the words "Family", "Model", and "Stepping"
+                // Find the indices of the words "Family" and "Model"
                 int familyIndex = Array.IndexOf(words, "Family") + 1;
                 int modelIndex = Array.IndexOf(words, "Model") + 1;
-                int steppingIndex = Array.IndexOf(words, "Stepping") + 1;
 
-                // Extract the family, model, and stepping values from the corresponding words
+                // Extract the family and model values from the corresponding words
                 CPUFamily = int.Parse(words[familyIndex]);
                 CPUModel = int.Parse(words[modelIndex]);
-                CPUStepping = int.Parse(words[steppingIndex].TrimEnd(','));
 
                 ManagementObjectSearcher mos = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_Processor");
                 foreach (ManagementObject mo in mos.Get())
@@ -262,7 +261,7 @@ namespace Uniwill_Control_Utility.Scripts
                 Debug.WriteLine("Error: " + e.Message);
             }
 
-            if (CPUName.Contains("Intel"))
+            if (CPUName.Contains("Intel", StringComparison.Ordinal))
             {
                 TYPE = ProcessorType.Intel;
             }
@@ -278,7 +277,7 @@ namespace Uniwill_Control_Utility.Scripts
                 }
 
                 // Only FireRange (Zen 5, Family 26, Model 68, HX suffix) is supported.
-                if (CPUFamily == Zen5Family && CPUModel == Zen5FireRangeModel && CPUName.Contains("HX"))
+                if (CPUFamily == Zen5Family && CPUModel == Zen5FireRangeModel && CPUName.Contains("HX", StringComparison.Ordinal))
                     FAM = RyzenFamily.FireRange;
 
                 TYPE = ProcessorType.Amd_Apu;
