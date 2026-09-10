@@ -112,7 +112,7 @@ namespace Uniwill_Control_Utility.Views.Controls
         {
             base.OnInitialized(e);
 
-            _liveFreqTimer = new DispatcherTimer(TimeSpan.FromSeconds(2), DispatcherPriority.Background, (s, e) =>
+            _liveFreqTimer = new DispatcherTimer(TimeSpan.FromSeconds(2), DispatcherPriority.Background, (s, _) =>
             {
                 if (!NvTuning.TryGetClocks(out var clocks)) return;
                 UpdateCrosshair(clocks.CurrentCoreMHz);
@@ -154,7 +154,7 @@ namespace Uniwill_Control_Utility.Views.Controls
                 }
             };
 
-            Unloaded += (s, e) =>
+            Unloaded += (s, _) =>
             {
                 _liveFreqTimer?.Stop();
                 ApplicationThemeManager.Changed -= OnThemeChanged;
@@ -215,7 +215,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             int[] stockVolts = _stockCurve!.Keys.OrderBy(v => v).ToArray();
 
             // Debug: log stock curve range and count.
-            DiagnosticLogger.LogInfo($"VfCurveEditor: stock curve loaded — {_stockCurve.Count} points, voltages {stockVolts.Min()}-{stockVolts.Max()} mV");
+            DiagnosticLogger.LogInfo($"VfCurveEditor: stock curve loaded — {_stockCurve!.Count} points, voltages {stockVolts.Min()}-{stockVolts.Max()} mV");
             DiagnosticLogger.LogInfo($"VfCurveEditor: live curve — {selected.Count} editor points, indices {selected[0].Index}-{selected[^1].Index}");
 
             _allPoints.Clear();
@@ -348,17 +348,18 @@ namespace Uniwill_Control_Utility.Views.Controls
             double w = _canvas.ActualWidth;
 
             // Defer one-shot if layout dimensions aren't available yet (control just became Visible).
+            if ((h < 10 || w < 10) && !_labelsBuilt)
+            {
+                _labelsBuilt = true;
+                Dispatcher.InvokeAsync(() =>
+                {
+                    _labelsBuilt = false;
+                    BuildAxisLabels();
+                }, DispatcherPriority.Loaded);
+            }
+
             if (h < 10 || w < 10)
             {
-                if (!_labelsBuilt)
-                {
-                    _labelsBuilt = true;
-                    Dispatcher.InvokeAsync(() =>
-                    {
-                        _labelsBuilt = false;
-                        BuildAxisLabels();
-                    }, DispatcherPriority.Loaded);
-                }
                 return;
             }
 
@@ -447,7 +448,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             if (_editorPoints.Count < 2) return;
 
             var defaultColor = Application.Current.Resources["ControlStrongFillColorDefaultBrush"] as SolidColorBrush
-                ?? _fallbackBrush;
+                ?? _fallbackBrush ?? new SolidColorBrush(Colors.Gray);
             var selectedIndices = new HashSet<int>();
             if (_selectedPoint.HasValue)
                 selectedIndices.Add(_selectedPoint.Value);
@@ -616,7 +617,7 @@ namespace Uniwill_Control_Utility.Views.Controls
                 {
                     Width = 8,
                     Height = 8,
-                    Fill = isSelected ? (Brush?)accentBrush : defaultColor,
+                    Fill = isSelected ? (Brush?)(accentBrush ?? defaultColor) : defaultColor,
                     Opacity = isSelected ? 1.0 : 0.8,
                     Tag = i
                 };
@@ -634,12 +635,9 @@ namespace Uniwill_Control_Utility.Views.Controls
             }
 
             // Re-add selection highlight at the bottom so it doesn't block mouse events on dots
-            if (hadSelection)
+            if (hadSelection && _rangeHighlight != null && _rangeHighlight.Visibility == Visibility.Visible)
             {
-                if (_rangeHighlight != null && _rangeHighlight.Visibility == Visibility.Visible)
-                {
-                    _canvas.Children.Insert(0, _rangeHighlight);
-                }
+                _canvas.Children.Insert(0, _rangeHighlight);
             }
 
             // Re-add tooltip placement anchor on top
@@ -716,7 +714,7 @@ namespace Uniwill_Control_Utility.Views.Controls
                 {
                     FontSize = 10,
                     FontWeight = FontWeights.SemiBold,
-                    Foreground = new SolidColorBrush((FindResource("AccentTextFillColorPrimaryBrush") as SolidColorBrush ?? Brushes.Gray).Color) { Opacity = 0.75 },
+                    Foreground = new SolidColorBrush((FindResource("AccentTextFillColorPrimaryBrush") is SolidColorBrush sb ? sb : Brushes.Gray).Color) { Opacity = 0.75 },
                     TextDecorations = TextDecorations.Underline
                 };
                 _canvas.Children.Add(_crosshairV);
@@ -728,7 +726,7 @@ namespace Uniwill_Control_Utility.Views.Controls
                 // Update brushes on each call so theme changes are reflected live.
                 _crosshairH.Stroke = dashBrush;
                 _crosshairV.Stroke = dashBrush;
-                _crosshairLabel.Foreground = new SolidColorBrush((FindResource("AccentTextFillColorPrimaryBrush") as SolidColorBrush ?? Brushes.Gray).Color) { Opacity = 0.75 };
+                _crosshairLabel.Foreground = new SolidColorBrush((FindResource("AccentTextFillColorPrimaryBrush") is SolidColorBrush sb2 ? sb2 : Brushes.Gray).Color) { Opacity = 0.75 };
             }
 
             // Horizontal line at current frequency

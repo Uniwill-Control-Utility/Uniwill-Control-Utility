@@ -80,18 +80,18 @@ namespace Uniwill_Control_Utility.Scripts
 
             if (name.Contains("ULTRA", StringComparison.Ordinal))
             {
-                if (suffix.StartsWith("H", StringComparison.Ordinal)) return (28, 115);
-                if (suffix.StartsWith("U", StringComparison.Ordinal)) return (15, 57);
-                if (suffix.StartsWith("V", StringComparison.Ordinal)) return (17, 37);
+                if (suffix.AsSpan().StartsWith('H')) return (28, 115);
+                if (suffix.AsSpan().StartsWith('U')) return (15, 57);
+                if (suffix.AsSpan().StartsWith('V')) return (17, 37);
             }
 
             if (suffix.Contains("HX", StringComparison.Ordinal)) return (55, 157);
-            if (suffix.StartsWith("H", StringComparison.Ordinal) || suffix.Contains("HK", StringComparison.Ordinal) || suffix.Contains("HQ", StringComparison.Ordinal)) return generation >= 12 ? (45, 115) : (45, 90);
-            if (suffix.StartsWith("P", StringComparison.Ordinal)) return (28, 64);
-            if (suffix.StartsWith("Y", StringComparison.Ordinal)) return (7, 15);
-            if (suffix.StartsWith("U", StringComparison.Ordinal) || suffix.Contains("G", StringComparison.Ordinal)) return generation >= 11 ? (15, 55) : (15, 25);
-            if (suffix.StartsWith("T", StringComparison.Ordinal)) return (35, 65);
-            if (suffix.Contains("K", StringComparison.Ordinal) || suffix.Contains("X", StringComparison.Ordinal)) return generation >= 12 ? (125, 241) : (95, 119);
+            if (suffix.AsSpan().StartsWith('H') || suffix.Contains("HK", StringComparison.Ordinal) || suffix.Contains("HQ", StringComparison.Ordinal)) return generation >= 12 ? (45, 115) : (45, 90);
+            if (suffix.AsSpan().StartsWith('P')) return (28, 64);
+            if (suffix.AsSpan().StartsWith('Y')) return (7, 15);
+            if (suffix.AsSpan().StartsWith('U') || suffix.AsSpan().Contains('G')) return generation >= 11 ? (15, 55) : (15, 25);
+            if (suffix.AsSpan().StartsWith('T')) return (35, 65);
+            if (suffix.AsSpan().Contains('K') || suffix.AsSpan().Contains('X')) return generation >= 12 ? (125, 241) : (95, 119);
             if (generation >= 12)
             {
                 if (name.Contains("I3-", StringComparison.Ordinal)) return (60, 89);
