@@ -52,7 +52,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 ManagementObjectCollection collection = searcher.Get();
                 foreach (ManagementObject obj in collection)
                 {
-                    return obj["Name"].ToString();
+                    return Convert.ToString(obj["Name"]) ?? "";
                 }
             }
             catch (ManagementException ex)
@@ -74,7 +74,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                     if (count == i)
                     {
                         Garbage.Garbage_Collect();
-                        return obj["Name"].ToString();
+                        return Convert.ToString(obj["Name"]) ?? "";
                     }
                     count++;
                 }
@@ -96,7 +96,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     var result = motherboardSearcher.Get().Cast<ManagementObject>().FirstOrDefault();
                     if (result == null) return "";
-                    return GetAvailability(Convert.ToInt32(result[nameof(Availability)]));
+                    return GetAvailability(Convert.ToUInt32(result[nameof(Availability)]));
                 }
                 catch (ManagementException)
                 {
@@ -129,7 +129,9 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     foreach (ManagementObject queryObj in baseboardSearcher.Get())
                     {
-                        return ConvertToDateTime(queryObj["InstallDate"].ToString());
+                        string? value = Convert.ToString(queryObj[nameof(InstallDate)]);
+                        if (value == null) return "";
+                        return ConvertToDateTime(value);
                     }
                     return "";
                 }
@@ -148,7 +150,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     foreach (ManagementObject queryObj in baseboardSearcher.Get())
                     {
-                        return queryObj["Manufacturer"].ToString();
+                        return Convert.ToString(queryObj[nameof(Manufacturer)]) ?? "";
                     }
                     return "";
                 }
@@ -167,7 +169,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     foreach (ManagementObject queryObj in baseboardSearcher.Get())
                     {
-                        return Convert.ToString(queryObj["Model"]);
+                        return Convert.ToString(queryObj[nameof(Model)]) ?? "";
                     }
                     return "";
                 }
@@ -186,7 +188,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     foreach (ManagementObject queryObj in baseboardSearcher.Get())
                     {
-                        return queryObj["PartNumber"].ToString();
+                        return Convert.ToString(queryObj[nameof(PartNumber)]) ?? "";
                     }
                     return "";
                 }
@@ -205,7 +207,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     foreach (ManagementObject queryObj in motherboardSearcher.Get())
                     {
-                        return queryObj["PNPDeviceID"].ToString();
+                        return Convert.ToString(queryObj[nameof(PNPDeviceID)]) ?? "";
                     }
                     return "";
                 }
@@ -224,7 +226,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     foreach (ManagementObject queryObj in motherboardSearcher.Get())
                     {
-                        return queryObj["PrimaryBusType"].ToString();
+                        return Convert.ToString(queryObj[nameof(PrimaryBusType)]) ?? "";
                     }
                     return "";
                 }
@@ -248,7 +250,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
                     foreach (ManagementObject queryObj in ComputerSsystemInfo.Get())
                     {
-                        return queryObj["Name"].ToString();
+                        return Convert.ToString(queryObj["Name"]) ?? "";
                     }
                     return "";
                 }
@@ -299,7 +301,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     foreach (ManagementObject queryObj in motherboardSearcher.Get())
                     {
-                        return queryObj["RevisionNumber"].ToString();
+                        return Convert.ToString(queryObj[nameof(RevisionNumber)]) ?? "";
                     }
                     return "";
                 }
@@ -318,7 +320,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     foreach (ManagementObject queryObj in motherboardSearcher.Get())
                     {
-                        return queryObj["SecondaryBusType"].ToString();
+                        return Convert.ToString(queryObj[nameof(SecondaryBusType)]) ?? "";
                     }
                     return "";
                 }
@@ -337,7 +339,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     foreach (ManagementObject queryObj in baseboardSearcher.Get())
                     {
-                        return queryObj["SerialNumber"].ToString();
+                        return Convert.ToString(queryObj[nameof(SerialNumber)]) ?? "";
                     }
                     return "";
                 }
@@ -356,7 +358,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     foreach (ManagementObject querObj in baseboardSearcher.Get())
                     {
-                        return querObj["Status"].ToString();
+                        return Convert.ToString(querObj[nameof(Status)]) ?? "";
                     }
                     return "";
                 }
@@ -375,7 +377,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     foreach (ManagementObject queryObj in motherboardSearcher.Get())
                     {
-                        return queryObj["SystemName"].ToString();
+                        return Convert.ToString(queryObj[nameof(SystemName)]) ?? "";
                     }
                     return "";
                 }
@@ -394,7 +396,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 {
                     foreach (ManagementObject queryObj in baseboardSearcher.Get())
                     {
-                        return queryObj["Version"].ToString();
+                        return Convert.ToString(queryObj[nameof(Version)]) ?? "";
                     }
                     return "";
                 }
@@ -405,27 +407,27 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             }
         }
 
-        private static string GetAvailability(int availability)
+        private static string GetAvailability(uint availability)
         {
             switch (availability)
             {
-                case 1: return "Other";
-                case 2: return "Unknown";
-                case 3: return "Running or Full Power";
-                case 4: return "Warning";
-                case 5: return "In Test";
-                case 6: return "Not Applicable";
-                case 7: return "Power Off";
-                case 8: return "Off Line";
-                case 9: return "Off Duty";
-                case 10: return "Degraded";
-                case 11: return "Not Installed";
-                case 12: return "Install Error";
-                case 13: return "Power Save - Unknown";
-                case 14: return "Power Save - Low Power Mode";
-                case 15: return "Power Save - Standby";
-                case 16: return "Power Cycle";
-                case 17: return "Power Save - Warning";
+                case 1u: return "Other";
+                case 2u: return "Unknown";
+                case 3u: return "Running or Full Power";
+                case 4u: return "Warning";
+                case 5u: return "In Test";
+                case 6u: return "Not Applicable";
+                case 7u: return "Power Off";
+                case 8u: return "Off Line";
+                case 9u: return "Off Duty";
+                case 10u: return "Degraded";
+                case 11u: return "Not Installed";
+                case 12u: return "Install Error";
+                case 13u: return "Power Save - Unknown";
+                case 14u: return "Power Save - Low Power Mode";
+                case 15u: return "Power Save - Standby";
+                case 16u: return "Power Cycle";
+                case 17u: return "Power Save - Warning";
                 default: return "Unknown";
             }
         }
@@ -525,7 +527,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 }
                 return 0;
             }
-            catch (ManagementException e)
+            catch (ManagementException)
             {
                 return 0;
             }
@@ -564,7 +566,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             using (var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion"))
             {
-                return key?.GetValue("EditionID")?.ToString();
+                return key?.GetValue("EditionID")?.ToString() ?? "";
             }
         }
 
@@ -572,7 +574,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             using (var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion"))
             {
-                return key?.GetValue("CurrentVersion")?.ToString();
+                return key?.GetValue("CurrentVersion")?.ToString() ?? "";
             }
         }
 
@@ -580,7 +582,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             using (var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion"))
             {
-                string installDateValue = key?.GetValue("InstallDate")?.ToString();
+                string? installDateValue = key?.GetValue("InstallDate")?.ToString();
                 if (installDateValue != null && long.TryParse(installDateValue, out long installDateTicks))
                 {
                     return DateTime.FromFileTime(installDateTicks);
@@ -594,7 +596,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             using (var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion"))
             {
-                return key?.GetValue("ProductName")?.ToString();
+                return key?.GetValue("ProductName")?.ToString() ?? "";
             }
         }
 
@@ -735,6 +737,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         }
     }
 
+    // SonarLint-Suppress(S3217) Portability issue with unsafe code — intentional for CPUID/GetSystemInfo P/Invoke
     public static class NativeMethods
     {
         // Import the CPUID intrinsic (Intel x86 instruction)
