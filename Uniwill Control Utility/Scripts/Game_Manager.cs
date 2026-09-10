@@ -1,34 +1,15 @@
-using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
-using static System.Net.Mime.MediaTypeNames;
+using System.Threading;
+using System.Windows;
 using GameLib;
 using GameLib.Core;
-using System.Windows;
-using System.Threading;
-using System.Xml.Linq;
-using Windows.Management.Deployment;
 using Windows.ApplicationModel;
-using Windows.ApplicationModel.Core;
-using System.Drawing.Drawing2D;
-using Windows.System;
-using System.Windows.Documents;
-using System.Reflection;
-using Windows.Gaming.Preview.GamesEnumeration;
-using static Uniwill_Control_Utility.Scripts.Game_Manager;
-using GameLib.Plugin.RiotGames.Model;
-using System.Linq.Expressions;
-using System.Drawing;
-using System.Windows.Interop;
-using System.Windows.Media.Imaging;
-using Image = System.Drawing.Image;
-using Uniwill_Control_Utility.Views.Pages;
+using Windows.Management.Deployment;
 using Uniwill_Control_Utility.Scripts.Intel_Backend;
 
 namespace Uniwill_Control_Utility.Scripts
@@ -64,61 +45,53 @@ namespace Uniwill_Control_Utility.Scripts
                         case "Steam":
                             foreach (var game in launcher.Games)
                             {
-                                if (!game.Name.Contains("Steamworks") && !game.Name.Contains("SteamVR") && !game.Name.Contains("Google Earth") && !game.Name.Contains("Wallpaper Engine") && !game.Name.Contains("tModLoader") && !game.Name.Contains("- Original Soundtrack"));
+                                if (!game.Name.Contains("Steamworks") && !game.Name.Contains("SteamVR") && !game.Name.Contains("Google Earth") && !game.Name.Contains("Wallpaper Engine") && !game.Name.Contains("tModLoader") && !game.Name.Contains("- Original Soundtrack") && game.Id != "228980")
                                 {
-                                    if (game.Id != "228980")
+                                    GameLauncherItem launcherItem = new GameLauncherItem();
+                                    launcherItem.gameName = game.Name;
+                                    launcherItem.gameID = game.Id;
+                                    launcherItem.launchCommand = $"{launcher.Name}-{game.LaunchString}-{game.Id}-{game.Name}";
+
+                                    if (game.Executables.Count() == 1)
                                     {
-                                        GameLauncherItem launcherItem = new GameLauncherItem();
-                                        launcherItem.gameName = game.Name;
-                                        launcherItem.gameID = game.Id;
-                                        launcherItem.launchCommand = $"{launcher.Name}-{game.LaunchString}-{game.Id}-{game.Name}";
-                                        //launcherItem.iconPath = game.ExecutableIcon;
-
-                                        if (game.Executables.Count() == 1)
+                                        launcherItem.path = game.InstallDir;
+                                        launcherItem.exe = Path.GetFileNameWithoutExtension(game.Executables.First());
+                                    }
+                                    else
+                                    {
+                                        string[] array = launcherItem.gameName.Split(' ');
+                                        foreach (string exe in game.Executables)
                                         {
-                                            launcherItem.path = game.InstallDir;
-                                            launcherItem.exe = Path.GetFileNameWithoutExtension(game.Executables.First());
-                                        }
-                                        else
-                                        {
-
-                                            string[] array = launcherItem.gameName.Split(' ');
-                                            foreach (string exe in game.Executables)
+                                            string exeName = Path.GetFileNameWithoutExtension(exe);
+                                            if (game.Name.Contains("Call of duty", StringComparison.OrdinalIgnoreCase) && exeName.Contains("cod", StringComparison.OrdinalIgnoreCase))
                                             {
-
-                                                string exeName = Path.GetFileNameWithoutExtension(exe);
-                                                if (game.Name.Contains("Call of duty", StringComparison.OrdinalIgnoreCase))
+                                                launcherItem.path = game.InstallDir;
+                                                launcherItem.exe = exeName;
+                                                break;
+                                            }
+                                            foreach (string arr in array)
+                                            {
+                                                if (exeName.Contains(arr, StringComparison.OrdinalIgnoreCase))
                                                 {
-                                                    if (exeName.Contains("cod", StringComparison.OrdinalIgnoreCase))
-                                                    {
-                                                        launcherItem.path = game.InstallDir;
-                                                        launcherItem.exe = exeName;
-                                                        break;
-                                                    }
+                                                    launcherItem.path = game.InstallDir;
+                                                    launcherItem.exe = exeName;
+                                                    break;
                                                 }
-                                                foreach (string arr in array)
-                                                {
-                                                    if (exeName.Contains(arr, StringComparison.OrdinalIgnoreCase))
-                                                    {
-                                                        launcherItem.path = game.InstallDir;
-                                                        launcherItem.exe = exeName;
-                                                        break;
-                                                    }
-                                                }
-                                                if (launcherItem.path != null) { break; }
+                                            }
+                                            if (launcherItem.path is not null)
+                                            {
+                                                break;
                                             }
                                         }
-                                        if (launcherItem.path == "" || launcherItem.exe == "")
-                                        {
-                                            launcherItem.path = Path.GetFileNameWithoutExtension(game.Executables.Last());
-                                            launcherItem.exe = Path.GetFileNameWithoutExtension(game.Executables.Last());
-                                        }
-
-
-                                        launcherItem.appType = launcher.Name;
-                                        list.Add(launcherItem);
+                                    }
+                                    if (launcherItem.path == "" || launcherItem.exe == "")
+                                    {
+                                        launcherItem.path = Path.GetFileNameWithoutExtension(game.Executables.Last());
+                                        launcherItem.exe = Path.GetFileNameWithoutExtension(game.Executables.Last());
                                     }
 
+                                    launcherItem.appType = launcher.Name;
+                                    list.Add(launcherItem);
                                 }
                             }
                             break;
@@ -129,7 +102,6 @@ namespace Uniwill_Control_Utility.Scripts
                                 launcherItem.gameName = game.Name;
                                 launcherItem.gameID = game.Id;
                                 launcherItem.launchCommand = $"{launcher.Name}-{game.LaunchString}-{game.Id}-{game.Name}";
-                                //launcherItem.iconPath = game.ExecutableIcon;
                                 switch (game.Name)
                                 {
                                     case "Call of Duty Black Ops Cold War":
@@ -146,8 +118,6 @@ namespace Uniwill_Control_Utility.Scripts
                                 launcherItem.appType = launcher.Name;
                                 list.Add(launcherItem);
 
-
-
                             }
                             break;
                         case "Epic Games":
@@ -158,7 +128,6 @@ namespace Uniwill_Control_Utility.Scripts
                                 launcherItem.gameID = game.Id;
                                 launcherItem.launchCommand = $"{launcher.Name}-{game.LaunchString}-{game.Id}-{game.Name}";
                                 launcherItem.path = game.InstallDir;
-                                //launcherItem.iconPath = game.ExecutableIcon;
                                 launcherItem.exe = Path.GetFileNameWithoutExtension(launcherItem.path);
                                 launcherItem.appType = launcher.Name;
                                 list.Add(launcherItem);
@@ -176,7 +145,6 @@ namespace Uniwill_Control_Utility.Scripts
                                 launcherItem.path = game.InstallDir;
                                 launcherItem.exe = Path.GetFileNameWithoutExtension(launcherItem.path);
                                 launcherItem.appType = launcher.Name;
-                                //launcherItem.iconPath = game.ExecutableIcon;
                                 list.Add(launcherItem);
                             }
                             break;
@@ -213,22 +181,16 @@ namespace Uniwill_Control_Utility.Scripts
                                         string install = package.InstalledLocation.Path;
                                         string sig = package.SignatureKind.ToString();
 
-                                        if (install.Contains("WindowsApps") && sig == "Store" && package.IsFramework == false)
+                                        if (install.Contains("WindowsApps") && sig == "Store" && package.IsFramework == false && strings.Contains(package.DisplayName))
                                         {
-                                            if (strings.Contains(package.DisplayName))
-                                            {
-                                                GameLauncherItem launcherItem = new GameLauncherItem();
-                                                launcherItem.gameName = package.DisplayName;
-                                                launcherItem.gameID = package.Id.FullName;
-                                                launcherItem.launchCommand = $"Microsoft Store-{package.Id.FullName}-{package.DisplayName}";
-                                                launcherItem.path = package.InstalledPath;
-                                                //launcherItem.exe = Path.GetFileNameWithoutExtension(launcherItem.path);
-                                                launcherItem.appType = "Microsoft Store";
-                                                launcherItem.imageLocation = package.Logo.AbsolutePath;
-                                                list.Add(launcherItem);
-
-                                            }
-
+                                            GameLauncherItem launcherItem = new GameLauncherItem();
+                                            launcherItem.gameName = package.DisplayName;
+                                            launcherItem.gameID = package.Id.FullName;
+                                            launcherItem.launchCommand = $"Microsoft Store-{package.Id.FullName}-{package.DisplayName}";
+                                            launcherItem.path = package.InstalledPath;
+                                            launcherItem.appType = "Microsoft Store";
+                                            launcherItem.imageLocation = package.Logo.AbsolutePath;
+                                            list.Add(launcherItem);
                                         }
 
                                     }
@@ -239,7 +201,7 @@ namespace Uniwill_Control_Utility.Scripts
                     }
                     catch (UnauthorizedAccessException)
                     {
-                        // Drive is not accessible (e.g., removable media removed)
+                        // Skip inaccessible drives
                     }
                     catch (Exception ex) when (ex is not UnauthorizedAccessException)
                     {
@@ -305,56 +267,42 @@ namespace Uniwill_Control_Utility.Scripts
 
         public static void LaunchApp(string gameID, string appType, string launchcommand, string appLocation)
         {
-            if (appType == "Exe")
+            if (appType == "Exe" && File.Exists(appLocation))
             {
-                if (File.Exists(appLocation))
-                {
-                    RunGame(appLocation);
-                }
-
+                RunGame(appLocation);
             }
-            else
+            else if (gameID != "")
             {
-                if (gameID != "")
+                switch (appType)
                 {
-                    switch (appType)
-                    {
-                        case "Epic Games":
-                            RunLaunchString(launchcommand);
-                            break;
-                        case "Steam":
-                            RunLaunchString(launchcommand);
-                            break;
-                        case "Battle.net":
-                            string battlenetfile = Path.Combine(Environment.GetEnvironmentVariable("ProgramFiles(x86)"), "Battle.net\\Battle.net.exe");
-                            if (BattleNetRunning())
-                            {
-                                Run_CLI.RunCommand(" --exec=\"launch " + gameID.ToUpper() + "\"", false, battlenetfile, 3000, true);
-                            }
-                            else
-                            {
-
-                                RunGame(battlenetfile);
-                                Thread.Sleep(15000);
-                                Run_CLI.RunCommand(" --exec=\"launch " + gameID.ToUpper() + "\"", false, battlenetfile, 3000, true);
-
-                            }
-
-                            break;
-                        case "GOG Galaxy":
-                            Run_CLI.RunCommand(" /command=runGame /gameId=" + gameID, false, Path.Combine(Environment.GetEnvironmentVariable("ProgramFiles(x86)"), "GOG Galaxy", "GalaxyClient.exe"));
-
-                            break;
-                        case "Microsoft Store":
-                            PackageManager pm = new PackageManager();
-                            pm.FindPackage(gameID).GetAppListEntries().First().LaunchAsync();
-                            break;
-                        default: break;
-                    }
+                    case "Epic Games":
+                    case "Steam":
+                        RunLaunchString(launchcommand);
+                        break;
+                    case "Battle.net":
+                        string pf86 = Environment.GetEnvironmentVariable("ProgramFiles(x86)") ?? "C:\\Program Files (x86)";
+                        string battlenetfile = Path.Combine(pf86, "Battle.net\\Battle.net.exe");
+                        if (BattleNetRunning())
+                        {
+                            Run_CLI.RunCommand(" --exec=\"launch " + gameID.ToUpper() + "\"", false, battlenetfile, 3000, true);
+                        }
+                        else
+                        {
+                            RunGame(battlenetfile);
+                            Thread.Sleep(15000);
+                            Run_CLI.RunCommand(" --exec=\"launch " + gameID.ToUpper() + "\"", false, battlenetfile, 3000, true);
+                        }
+                        break;
+                    case "GOG Galaxy":
+                        string pfGog = Environment.GetEnvironmentVariable("ProgramFiles(x86)") ?? "C:\\Program Files (x86)";
+                        Run_CLI.RunCommand(" /command=runGame /gameId=" + gameID, false, Path.Combine(pfGog, "GOG Galaxy", "GalaxyClient.exe"));
+                        break;
+                    case "Microsoft Store":
+                        PackageManager pm = new PackageManager();
+                        _ = pm.FindPackage(gameID).GetAppListEntries().First().LaunchAsync();
+                        break;
                 }
-
             }
-
         }
 
         private static void RunGame(string command)
@@ -363,7 +311,6 @@ namespace Uniwill_Control_Utility.Scripts
             {
                 if (File.Exists(command))
                 {
-
                     Process.Start(new ProcessStartInfo()
                     {
                         UseShellExecute = true,
@@ -378,10 +325,8 @@ namespace Uniwill_Control_Utility.Scripts
             }
         }
 
-
         public static void RunLaunchString(string command)
         {
-
             try
             {
                 ProcessStartInfo psi = new ProcessStartInfo()
@@ -390,7 +335,6 @@ namespace Uniwill_Control_Utility.Scripts
                     FileName = command
                 };
                 System.Diagnostics.Process.Start(psi);
-
             }
             catch (Exception ex)
             {
@@ -400,15 +344,7 @@ namespace Uniwill_Control_Utility.Scripts
 
         public static bool BattleNetRunning()
         {
-            Process[] pname = Process.GetProcessesByName("Battle.net.exe");
-            if (pname.Length != 0)
-            {
-                return true;
-            }
-            else
-            {
-                return false;
-            }
+            return Process.GetProcessesByName("Battle.net.exe").Length > 0;
         }
 
         public class GameLauncherItemEqualityComparer : IEqualityComparer<GameLauncherItem>
