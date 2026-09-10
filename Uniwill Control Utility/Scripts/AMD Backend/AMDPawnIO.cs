@@ -14,7 +14,7 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
     /// https://github.com/irusanov/ZenStates-Core/tree/master/PawnIo
     /// 
     /// </summary>
-    public sealed class AMDPawnIo
+    public sealed partial class AMDpawnIO
     {
         private const int FunctionNameBytes = 32;
 
@@ -34,7 +34,7 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
 
         private static readonly Version? _installedVersion = ReadInstalledVersion();
 
-        private AMDPawnIo(SafeFileHandle? deviceHandle)
+        private AMDpawnIO(SafeFileHandle? deviceHandle)
         {
             _device = deviceHandle;
         }
@@ -51,7 +51,7 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
         // --------------------------------------------------------------------
         // Module loading
         // --------------------------------------------------------------------
-        public static AMDPawnIo LoadModuleFromFile(string filePath)
+        public static AMDpawnIO LoadModuleFromFile(string filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath))
                 throw new ArgumentException("File path must not be empty.", nameof(filePath));
@@ -63,7 +63,7 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
             return LoadModule(moduleBytes);
         }
 
-        public static AMDPawnIo LoadModuleFromResource(Assembly assembly, string resourceName)
+        public static AMDpawnIO LoadModuleFromResource(Assembly assembly, string resourceName)
         {
             ArgumentNullException.ThrowIfNull(assembly);
             if (string.IsNullOrWhiteSpace(resourceName))
@@ -71,13 +71,13 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
 
             using Stream? stream = assembly.GetManifestResourceStream(resourceName);
             if (stream == null)
-                return new AMDPawnIo(null);
+                return new AMDpawnIO(null);
 
             byte[] moduleBytes = ReadAllBytes(stream);
             return LoadModule(moduleBytes);
         }
 
-        private static AMDPawnIo LoadModule(byte[] moduleBytes)
+        private static AMDpawnIO LoadModule(byte[] moduleBytes)
         {
             IntPtr raw = CreateFile(
                 DevicePath,
@@ -102,7 +102,7 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
 
                 if (raw == IntPtr.Zero || raw.ToInt64() == -1)
                 {
-                    return new AMDPawnIo(null);
+                    return new AMDpawnIO(null);
                 }
                     
                 DevicePath = OldDevicePath;
@@ -123,18 +123,18 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
                 if (!ok)
                 {
                     CloseHandle(raw);
-                    return new AMDPawnIo(null);
+                    return new AMDpawnIO(null);
                 }
 
-                return new AMDPawnIo(new SafeFileHandle(raw, ownsHandle: true));
+                return new AMDpawnIO(new SafeFileHandle(raw, ownsHandle: true));
             }
             catch (Exception ex)
             {
                 // DeviceIoControl may throw on driver load failure (e.g., access denied, driver not loaded,
                 // or SEHException from the kernel driver). Log and return an unloaded instance.
-                DiagnosticLogger.LogInfo($"AMDpawnIo LoadModule: DeviceIoControl LoadBinary failed: {ex.GetType().Name}: {ex.Message}");
+                DiagnosticLogger.LogInfo($"AMDpawnIO LoadModule: DeviceIoControl LoadBinary failed: {ex.GetType().Name}: {ex.Message}");
                 try { CloseHandle(raw); } catch { /* Handle close failed; handle is already invalid */ }
-                return new AMDPawnIo(null);
+                return new AMDpawnIO(null);
             }
         }
 
@@ -257,7 +257,7 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
             catch (Exception ex)
             {
                 // Registry read may fail due to permissions, missing key, or WOW64 redirection.
-                DiagnosticLogger.LogInfo($"AMDpawnIo ReadInstalledVersion: failed: {ex.GetType().Name}: {ex.Message}");
+                DiagnosticLogger.LogInfo($"AMDpawnIO ReadInstalledVersion: failed: {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -315,31 +315,33 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
             OPEN_EXISTING = 3
         }
 
-        [DllImport("kernel32.dll", CallingConvention = CallingConvention.Winapi)]
-        private static extern bool DeviceIoControl(
+        [LibraryImport("kernel32.dll")]
+        [return: MarshalAs(UnmanagedType.I4)]
+        private static partial bool DeviceIoControl(
             SafeFileHandle device,
             ControlCode ioControlCode,
-            [In] byte[] inBuffer,
+            [In] byte[]? inBuffer,
             uint inBufferSize,
-            [Out] byte[] outBuffer,
+            [In, Out] byte[]? outBuffer,
             uint nOutBufferSize,
             out uint bytesReturned,
             IntPtr overlapped);
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool DeviceIoControl(
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.I4)]
+        private static partial bool DeviceIoControl(
             IntPtr hDevice,
             ControlCode dwIoControlCode,
-            byte[] lpInBuffer,
+            [In, Out] byte[]? lpInBuffer,
             uint nInBufferSize,
-            byte[]? lpOutBuffer,
+            [In, Out] byte[]? lpOutBuffer,
             uint nOutBufferSize,
             out uint lpBytesReturned,
             IntPtr lpOverlapped);
 
-        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        private static extern IntPtr CreateFile(
-            string lpFileName,
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        private static partial IntPtr CreateFile(
+            [MarshalAs(UnmanagedType.LPWStr)] string lpFileName,
             FileAccess dwDesiredAccess,
             uint dwShareMode,
             IntPtr lpSecurityAttributes,
@@ -347,7 +349,8 @@ namespace Uniwill_Control_Utility.Scripts.AMD_Backend
             uint dwFlagsAndAttributes,
             IntPtr hTemplateFile);
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool CloseHandle(IntPtr hObject);
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.I4)]
+        private static partial bool CloseHandle(IntPtr hObject);
     }
 }
