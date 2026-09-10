@@ -11,7 +11,7 @@ using Uniwill_Control_Utility.Views.Windows;
 
 namespace Uniwill_Control_Utility.Scripts.Intel_Backend
 {
-    public sealed class IntelPawnIo : IDisposable
+    public partial class IntelPawnIo : IDisposable
     {
         private const int FunctionNameBytes = 32;
 
@@ -128,8 +128,7 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
             uint outSize,
             out uint returnSize)
         {
-            if (name == null)
-                throw new ArgumentNullException(nameof(name));
+            ArgumentNullException.ThrowIfNull(name);
 
             inBuffer ??= Array.Empty<long>();
             outBuffer ??= Array.Empty<long>();
@@ -221,6 +220,7 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
             Execute = DeviceType | IoctlExecuteFn
         }
 
+        [Flags]
         private enum FileAccess : uint
         {
             GENERIC_READ = 0x80000000,
@@ -232,31 +232,33 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
             OPEN_EXISTING = 3
         }
 
-        [DllImport("kernel32.dll", CallingConvention = CallingConvention.Winapi, SetLastError = true)]
-        private static extern bool DeviceIoControl(
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.I4)]
+        private static partial bool DeviceIoControl(
             SafeFileHandle device,
             ControlCode ioControlCode,
-            [In] byte[] inBuffer,
+            [In] byte[]? inBuffer,
             uint inBufferSize,
-            [Out] byte[] outBuffer,
+            byte[]? outBuffer,
             uint nOutBufferSize,
             out uint bytesReturned,
             IntPtr overlapped);
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool DeviceIoControl(
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.I4)]
+        private static partial bool DeviceIoControl(
             IntPtr hDevice,
             ControlCode dwIoControlCode,
-            byte[] lpInBuffer,
+            byte[]? lpInBuffer,
             uint nInBufferSize,
             byte[]? lpOutBuffer,
             uint nOutBufferSize,
             out uint lpBytesReturned,
             IntPtr lpOverlapped);
 
-        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        private static extern IntPtr CreateFile(
-            string lpFileName,
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        private static partial IntPtr CreateFile(
+            [MarshalAs(UnmanagedType.LPWStr)] string lpFileName,
             FileAccess dwDesiredAccess,
             uint dwShareMode,
             IntPtr lpSecurityAttributes,
@@ -264,8 +266,9 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
             uint dwFlagsAndAttributes,
             IntPtr hTemplateFile);
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool CloseHandle(IntPtr hObject);
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.I4)]
+        private static partial bool CloseHandle(IntPtr hObject);
     }
 
     internal sealed class IntelPawnIO : IDisposable
@@ -468,8 +471,7 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
 
         private void ThrowIfDisposed()
         {
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(IntelPawnIO));
+            ObjectDisposedException.ThrowIf(_disposed, this);
         }
     }
 }
