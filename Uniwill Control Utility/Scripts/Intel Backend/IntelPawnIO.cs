@@ -239,7 +239,7 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
             ControlCode ioControlCode,
             [In] byte[]? inBuffer,
             uint inBufferSize,
-            byte[]? outBuffer,
+            [Out] byte[]? outBuffer,
             uint nOutBufferSize,
             out uint bytesReturned,
             IntPtr overlapped);
@@ -249,9 +249,9 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
         private static partial bool DeviceIoControl(
             IntPtr hDevice,
             ControlCode dwIoControlCode,
-            byte[]? lpInBuffer,
+            [In] byte[]? lpInBuffer,
             uint nInBufferSize,
-            byte[]? lpOutBuffer,
+            [Out] byte[]? lpOutBuffer,
             uint nOutBufferSize,
             out uint lpBytesReturned,
             IntPtr lpOverlapped);
