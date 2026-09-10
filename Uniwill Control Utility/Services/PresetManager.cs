@@ -200,13 +200,12 @@ namespace Uniwill_Control_Utility.Services
 
     public class PresetManager
     {
-        private string _filePath;
-        private Dictionary<string, Preset> _presets;
+        private readonly string _filePath;
+        private Dictionary<string, Preset> _presets = new Dictionary<string, Preset>();
 
         public PresetManager(string filePath)
         {
             _filePath = filePath;
-            _presets = new Dictionary<string, Preset>();
             LoadPresets();
         }
 
@@ -215,16 +214,9 @@ namespace Uniwill_Control_Utility.Services
             return _presets.Keys;
         }
 
-        public Preset GetPreset(string presetName)
+        public Preset? GetPreset(string presetName)
         {
-            if (_presets.ContainsKey(presetName))
-            {
-                return _presets[presetName];
-            }
-            else
-            {
-                return null;
-            }
+            return _presets.TryGetValue(presetName, out var preset) ? preset : null;
         }
 
         public void SavePreset(string name, Preset preset)
@@ -244,11 +236,11 @@ namespace Uniwill_Control_Utility.Services
             if (File.Exists(_filePath))
             {
                 string json = File.ReadAllText(_filePath);
-                _presets = JsonConvert.DeserializeObject<Dictionary<string, Preset>>(json);
-            }
-            else
-            {
-                _presets = new Dictionary<string, Preset>();
+                var deserialized = JsonConvert.DeserializeObject<Dictionary<string, Preset>>(json);
+                if (deserialized is not null)
+                {
+                    _presets = deserialized;
+                }
             }
         }
 

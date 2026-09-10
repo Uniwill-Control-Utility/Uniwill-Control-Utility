@@ -158,7 +158,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
                 int result = ChangeDisplaySettingsEx(targetDisplayName, ref devMode, IntPtr.Zero, (uint)ChangeDisplaySettingsFlags.CdsUpdateRegistry, IntPtr.Zero);
 
-                if (result == DISP_CHANGE_SUCCESSFUL)
+                if (result == DispChangeSuccessful)
                 {
                     Console.WriteLine("\nDisplay settings changed successfully.");
                 }
