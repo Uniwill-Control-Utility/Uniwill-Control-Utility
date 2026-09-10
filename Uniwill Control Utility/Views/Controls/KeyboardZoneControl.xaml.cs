@@ -64,7 +64,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             // SizeChanged will fire when dimensions become valid.
             if (w <= 0 || h <= 0)
             {
-                SizeChangedEventHandler handler = null;
+                SizeChangedEventHandler? handler = null;
                 handler = (s, e) =>
                 {
                     if (_button.ActualWidth > 0 && _button.ActualHeight > 0)
@@ -122,8 +122,7 @@ namespace Uniwill_Control_Utility.Views.Controls
 
         private static void OnZoneBrushChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (d is KeyboardZoneControl control)
-                control.UpdateLabelForeground();
+            // Label foreground is handled by the XAML template.
         }
 
         public Brush ZoneBrush
@@ -182,12 +181,6 @@ namespace Uniwill_Control_Utility.Views.Controls
         private void _button_Click(object sender, RoutedEventArgs e)
         {
             Click?.Invoke(this, e);
-        }
-
-        private void UpdateLabelForeground()
-        {
-            // Label foreground adjustment is handled by the XAML template.
-            // The TextBlock uses a fixed white foreground which works on most colors.
         }
     }
 }

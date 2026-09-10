@@ -512,7 +512,7 @@ namespace Uniwill_Control_Utility
 
             if (isUpdateAvailable)
             {
-                if (updateManager._newVersion.StartsWith("3."))
+                if (updateManager.NewVersion.StartsWith("3."))
                     ToastNotification.ShowToastNotification("Phantom Control Centre Now Available!",
                         $"Head to the Phantom Control Centre GitHub releases page to easily download the latest build!");
                 else

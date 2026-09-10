@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using System.Net;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Octokit;
 using ProductHeaderValue = Octokit.ProductHeaderValue;
@@ -14,7 +14,7 @@ public class UpdateManager
     private readonly string _repo;
     private readonly string _currentVersion;
     private readonly string _downloadPath;
-    public string _newVersion = string.Empty;
+    public string NewVersion { get; set; } = string.Empty;
 
     public UpdateManager(string owner, string repo, string currentVersion, string downloadPath)
     {
@@ -38,7 +38,7 @@ public class UpdateManager
 
             var latestRelease = releases[LatestReleaseIndex];
             var latestVersion = new Version(latestRelease.TagName);
-            _newVersion = latestVersion.ToString();
+            NewVersion = latestVersion.ToString();
             var currentVersion = new Version(_currentVersion);
 
             return latestVersion.CompareTo(currentVersion) > 0;
@@ -98,8 +98,11 @@ public class UpdateManager
                 var fileName = Path.GetFileName(downloadUrl);
                 var filePath = Path.Combine(_downloadPath, fileName);
 
-                using var wc = new WebClient();
-                await wc.DownloadFileTaskAsync(new Uri(downloadUrl), filePath);
+                using var httpClient = new HttpClient();
+                using var response = await httpClient.GetAsync(downloadUrl, System.Threading.CancellationToken.None);
+                response.EnsureSuccessStatusCode();
+                await using var fileStream = File.Create(filePath);
+                await response.Content.CopyToAsync(fileStream, System.Threading.CancellationToken.None);
 
                 return true;
             }
@@ -109,7 +112,7 @@ public class UpdateManager
             // Network I/O failure during download
             return false;
         }
-        catch (WebException)
+        catch (HttpRequestException)
         {
             // HTTP-level failure (404, 500, etc.) during download
             return false;

@@ -416,7 +416,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 if (isUpdateAvailable)
                 {
-                    if (updateManager._newVersion.StartsWith(LegacyVersionPrefix)) tbDownloadMsg.Text = LocalizationService.Get("Head to the Phantom Control Centre GitHub releases page to easily download the latest build!");
+                    if (updateManager.NewVersion.StartsWith(LegacyVersionPrefix)) tbDownloadMsg.Text = LocalizationService.Get("Head to the Phantom Control Centre GitHub releases page to easily download the latest build!");
                     else {
                         tbDownloadMsg.Text = LocalizationService.Get("An update for Uniwill Control Utility has been found!");
                         btnDownload.Visibility = System.Windows.Visibility.Visible;
