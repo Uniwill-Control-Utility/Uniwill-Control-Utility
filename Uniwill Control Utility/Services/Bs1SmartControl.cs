@@ -102,8 +102,7 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public void Start()
         {
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(Bs1SmartControl));
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
             Stop();
 
@@ -218,7 +217,7 @@ namespace Uniwill_Control_Utility.Services
         /// >= 90°C → 3000 RPM (BS1 max speed).
         /// >= 85°C → at least 2500 RPM.
         /// </summary>
-        private ushort ApplyCriticalTempOverride(ushort targetRpm, double temp)
+        private static ushort ApplyCriticalTempOverride(ushort targetRpm, double temp)
         {
             if (temp >= 90.0)
                 return Bs1DefaultGearRpm.MaxRpm; // 3000

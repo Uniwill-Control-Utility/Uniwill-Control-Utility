@@ -34,16 +34,9 @@ namespace Uniwill_Control_Utility.Services
             return _presets.Keys;
         }
 
-        public GameData GetPreset(string presetName)
+        public GameData? GetPreset(string presetName)
         {
-            if (_presets.ContainsKey(presetName))
-            {
-                return _presets[presetName];
-            }
-            else
-            {
-                return null;
-            }
+            return _presets.TryGetValue(presetName, out var preset) ? preset : null;
         }
 
         public void SavePreset(string name, GameData preset)
@@ -63,11 +56,11 @@ namespace Uniwill_Control_Utility.Services
             if (File.Exists(_filePath))
             {
                 string json = File.ReadAllText(_filePath);
-                _presets = JsonConvert.DeserializeObject<Dictionary<string, GameData>>(json);
-            }
-            else
-            {
-                _presets = new Dictionary<string, GameData>();
+                var loaded = JsonConvert.DeserializeObject<Dictionary<string, GameData>>(json);
+                if (loaded != null)
+                {
+                    _presets = loaded;
+                }
             }
         }
 

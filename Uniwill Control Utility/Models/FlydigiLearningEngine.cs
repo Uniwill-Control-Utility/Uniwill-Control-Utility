@@ -111,13 +111,13 @@ namespace Uniwill_Control_Utility.Models
             if (delta > 0)
             {
                 // Running hot — update heat offset
-                double alpha = GetAlpha(gearIndex, true);
+                double alpha = GetAlpha(true);
                 UpdateOffset(HeatOffsets, gearIndex, delta, alpha);
             }
             else
             {
                 // Running cool — update cool offset with absolute delta
-                double alpha = GetAlpha(gearIndex, false);
+                double alpha = GetAlpha(false);
                 UpdateOffset(CoolOffsets, gearIndex, Math.Abs(delta), alpha);
             }
         }
@@ -164,7 +164,7 @@ namespace Uniwill_Control_Utility.Models
             return (DateTime.UtcNow - since).TotalSeconds >= StableThresholdSeconds;
         }
 
-        private double GetAlpha(int gearIndex, bool isHeat)
+        private double GetAlpha(bool isHeat)
         {
             double alpha = LearnRate;
 
@@ -176,7 +176,7 @@ namespace Uniwill_Control_Utility.Models
             return alpha;
         }
 
-        private void UpdateOffset(Dictionary<int, double> dictionary, int gearIndex, double delta, double alpha)
+        private static void UpdateOffset(Dictionary<int, double> dictionary, int gearIndex, double delta, double alpha)
         {
             if (dictionary.TryGetValue(gearIndex, out double current))
             {
