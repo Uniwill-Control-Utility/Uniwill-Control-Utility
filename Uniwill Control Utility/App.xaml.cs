@@ -22,7 +22,6 @@ using System.Windows.Threading;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
-//using Uniwill_Control_Utility.Scripts.AMD_Backend;
 using Uniwill_Control_Utility.Scripts.Intel_Backend;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
@@ -44,7 +43,6 @@ namespace Uniwill_Control_Utility
         private static IHost? _host;
 
         private static ILogger<App>? _logger;
-        //public static Mem_Timings memTimings = new Mem_Timings();
 
         /// <summary>
         /// Gets registered service.
@@ -61,11 +59,12 @@ namespace Uniwill_Control_Utility
         private Mutex? mutex;
         private const string MutexName = "UniversalX86TuningUtility";
 
-        public static readonly string SCALE_MODELS_JSON_PATH = ".\\ScaleModels.json";
-        public static readonly string LOGS_FOLDER = ".\\logs\\";
+        internal static readonly string SCALE_MODELS_JSON_PATH = ".\\ScaleModels.json";
+        internal static readonly string LOGS_FOLDER = ".\\logs\\";
 
         internal static string product = "";
         public static Task DisplaySetupTask { get; private set; } = Task.CompletedTask;
+        private static readonly object _displaySetupTaskLock = new();
 
         /// <summary>
         /// Occurs when the application is loading.
@@ -120,17 +119,21 @@ namespace Uniwill_Control_Utility
                 try
                 {
                     product = GetSystemInfo.Product;
-                    DisplaySetupTask = Task.Run(() =>
+                    var displayTask = Task.Run(() =>
                     {
                         try
                         {
-                            Display.setUpLists();
+                            Display.SetUpLists();
                         }
                         catch (Exception ex)
                         {
                             Log.Logger.Error(ex, "Failed to setup display refresh rates");
                         }
-                    }, CancellationToken.None);
+                    });
+                    lock (_displaySetupTaskLock)
+                    {
+                        DisplaySetupTask = displayTask;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -321,7 +324,7 @@ namespace Uniwill_Control_Utility
 
                     try
                     {
-                        Task.Run(() => UnblockFilesInDirectory(path), CancellationToken.None);
+                        _ = Task.Run(() => UnblockFilesInDirectory(path));
                     }
                     catch (Exception ex)
                     {
@@ -389,7 +392,7 @@ namespace Uniwill_Control_Utility
                     _logger?.LogError(ex, "Failed to restore Adaptive Mode override state");
                 }
 
-                _ = RunPostStartupTasksAsync();
+                SafeFireAndForget(RunPostStartupTasksAsync());
             }
             catch (Exception ex)
             {
@@ -406,7 +409,7 @@ namespace Uniwill_Control_Utility
 
                 if (isInternetAvailable && Settings.Default.UpdateCheck)
                 {
-                    CheckForUpdate();
+                    SafeFireAndForget(CheckForUpdate());
                 }
 
                 if (isInternetAvailable && PawnIoDetectionService.ShouldOpenInstaller())
@@ -448,14 +451,6 @@ namespace Uniwill_Control_Utility
                     Application.Current.Dispatcher.Invoke(BringMainWindowToFront);
                 }
             });
-        }
-
-        protected override void OnExit(ExitEventArgs e)
-        {
-            _showListenerCts?.Cancel();
-            _showEvent?.Dispose();
-            mutex?.Dispose();
-            base.OnExit(e);
         }
 
         private static void BringMainWindowToFront()
@@ -504,7 +499,7 @@ namespace Uniwill_Control_Utility
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
-        public static async void CheckForUpdate()
+        public static async Task CheckForUpdate()
         {
             var updateManager = new UpdateManager("jgudec", "Uniwill-Control-Utility", App.version, "C:\\");
 
@@ -554,6 +549,10 @@ namespace Uniwill_Control_Utility
         /// </summary>
         private void OnExit(object sender, ExitEventArgs e)
         {
+            _showListenerCts?.Cancel();
+            _showEvent?.Dispose();
+            mutex?.Dispose();
+
             if (Family.TYPE != Family.ProcessorType.Intel)
                 SMUCommands.RyzenAccess.Deinitialize();
             else
@@ -563,11 +562,17 @@ namespace Uniwill_Control_Utility
             // calls from hosted services' StopAsync. The host's cancellation token ensures
             // background work stops. We don't block-wait because that would deadlock if
             // a service tries to dispatch to the UI thread.
-            _ = Task.Run(() =>
+            _ = Task.Run(async () =>
             {
-                _host?.StopAsync(CancellationToken.None).Wait();
-                _host?.Dispose();
-            }, CancellationToken.None);
+                try
+                {
+                    await App._host?.StopAsync(CancellationToken.None)!;
+                }
+                finally
+                {
+                    App._host?.Dispose();
+                }
+            });
         }
 
         /// <summary>
@@ -576,7 +581,7 @@ namespace Uniwill_Control_Utility
         private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
         {
             // For more info see https://docs.microsoft.com/en-us/dotnet/api/system.windows.application.dispatcherunhandledexception?view=windowsdesktop-6.0
-            _logger?.LogCritical(e.Exception, "Unhandled dispatcher exception");
+            App._logger?.LogCritical(e.Exception, "Unhandled dispatcher exception");
 
             MessageBox.Show(
                 $"An unexpected error occurred:\n\n{e.Exception.Message}\n\nDetails:\n{e.Exception}",
@@ -613,6 +618,13 @@ namespace Uniwill_Control_Utility
                     // UI thread is dead, can't show dialog
                 }
             }
+        }
+
+        private static void SafeFireAndForget(Task task)
+        {
+            if (task.IsCompleted)
+                return;
+            task.ContinueWith(t => t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
         }
 
         static void UnblockFilesInDirectory(string directoryPath)
