@@ -517,7 +517,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 process.Start();
 
                 process.Dispose();
-                process = null;
             }
         }
 

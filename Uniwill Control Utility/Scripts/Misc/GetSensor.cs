@@ -4,7 +4,7 @@ using Uniwill_Control_Utility.Services;
 
 namespace Uniwill_Control_Utility.Scripts.Misc
 {
-    internal class GetSensor
+    internal static class GetSensor
     {
         private static readonly object Sync = new();
         private static IDisposable? _lease;

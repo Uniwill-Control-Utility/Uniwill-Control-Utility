@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace Uniwill_Control_Utility.Scripts.Misc
 {
-    class Garbage
+    internal static class Garbage
     {
         private const long CollectionThreshold = 512L * 1024L * 1024L;
 

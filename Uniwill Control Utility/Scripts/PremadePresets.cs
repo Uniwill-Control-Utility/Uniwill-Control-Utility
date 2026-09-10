@@ -4,7 +4,7 @@ using Uniwill_Control_Utility.Scripts.Misc;
 
 namespace Uniwill_Control_Utility.Scripts
 {
-    internal class PremadePresets
+    internal static class PremadePresets
     {
         public static string ExtremePreset { get; set; } = string.Empty;
         public static string PerformancePreset { get; set; } = string.Empty;
