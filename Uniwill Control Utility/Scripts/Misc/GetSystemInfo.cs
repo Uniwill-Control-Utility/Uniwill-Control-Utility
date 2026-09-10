@@ -1,7 +1,6 @@
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Management;
 using System.Runtime.Intrinsics.X86;
 using static Uniwill_Control_Utility.Scripts.Family;
@@ -94,9 +93,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             {
                 try
                 {
-                    var result = motherboardSearcher.Get().Cast<ManagementObject>().FirstOrDefault();
-                    if (result == null) return "";
-                    return GetAvailability(Convert.ToUInt32(result[nameof(Availability)]));
+                    foreach (ManagementObject obj in motherboardSearcher.Get())
+                    {
+                        return GetAvailability(Convert.ToUInt32(obj[nameof(Availability)]));
+                    }
+                    return "";
                 }
                 catch (ManagementException)
                 {
@@ -111,8 +112,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             {
                 try
                 {
-                    var result = baseboardSearcher.Get().Cast<ManagementObject>().FirstOrDefault();
-                    return result != null && Convert.ToBoolean(result[nameof(HostingBoard)]);
+                    foreach (ManagementObject obj in baseboardSearcher.Get())
+                    {
+                        return Convert.ToBoolean(obj[nameof(HostingBoard)]);
+                    }
+                    return false;
                 }
                 catch (ManagementException)
                 {
@@ -267,8 +271,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             {
                 try
                 {
-                    var result = baseboardSearcher.Get().Cast<ManagementObject>().FirstOrDefault();
-                    return result != null && Convert.ToBoolean(result[nameof(Removable)]);
+                    foreach (ManagementObject obj in baseboardSearcher.Get())
+                    {
+                        return Convert.ToBoolean(obj[nameof(Removable)]);
+                    }
+                    return false;
                 }
                 catch (ManagementException)
                 {
@@ -283,8 +290,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             {
                 try
                 {
-                    var result = baseboardSearcher.Get().Cast<ManagementObject>().FirstOrDefault();
-                    return result != null && Convert.ToBoolean(result[nameof(Replaceable)]);
+                    foreach (ManagementObject obj in baseboardSearcher.Get())
+                    {
+                        return Convert.ToBoolean(obj[nameof(Replaceable)]);
+                    }
+                    return false;
                 }
                 catch (ManagementException)
                 {
@@ -435,12 +445,12 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         private static string ConvertToDateTime(string unconvertedTime)
         {
             string convertedTime = "";
-            int year = int.Parse(unconvertedTime.Substring(0, 4));
-            int month = int.Parse(unconvertedTime.Substring(4, 2));
-            int date = int.Parse(unconvertedTime.Substring(6, 2));
-            int hours = int.Parse(unconvertedTime.Substring(8, 2));
-            int minutes = int.Parse(unconvertedTime.Substring(10, 2));
-            int seconds = int.Parse(unconvertedTime.Substring(12, 2));
+            int year = int.Parse(unconvertedTime.AsSpan(0, 4));
+            int month = int.Parse(unconvertedTime.AsSpan(4, 2));
+            int date = int.Parse(unconvertedTime.AsSpan(6, 2));
+            int hours = int.Parse(unconvertedTime.AsSpan(8, 2));
+            int minutes = int.Parse(unconvertedTime.AsSpan(10, 2));
+            int seconds = int.Parse(unconvertedTime.AsSpan(12, 2));
             string meridian = "AM";
             if (hours > 12)
             {
@@ -460,11 +470,13 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 ObjectQuery query = new ObjectQuery("SELECT * FROM BatteryStatus");
 
                 using ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
-                var result = searcher.Get().Cast<ManagementObject>().FirstOrDefault();
-                if (result == null) return 0;
-                decimal chargeRate = Convert.ToDecimal(result["ChargeRate"]);
-                decimal dischargeRate = Convert.ToDecimal(result["DischargeRate"]);
-                return chargeRate > 0 ? chargeRate : -dischargeRate;
+                foreach (ManagementObject obj in searcher.Get())
+                {
+                    decimal chargeRate = Convert.ToDecimal(obj["ChargeRate"]);
+                    decimal dischargeRate = Convert.ToDecimal(obj["DischargeRate"]);
+                    return chargeRate > 0 ? chargeRate : -dischargeRate;
+                }
+                return 0;
             }
             catch (ManagementException)
             {
@@ -480,7 +492,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 ObjectQuery query = new ObjectQuery("SELECT * FROM BatteryFullChargedCapacity");
 
                 using ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
-                foreach (ManagementObject obj in searcher.Get().Cast<ManagementObject>())
+                foreach (ManagementObject obj in searcher.Get())
                 {
                     return Convert.ToDecimal(obj["FullChargedCapacity"]);
                 }
@@ -500,7 +512,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 ObjectQuery query = new ObjectQuery("SELECT * FROM BatteryStaticData");
 
                 using ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
-                foreach (ManagementObject obj in searcher.Get().Cast<ManagementObject>())
+                foreach (ManagementObject obj in searcher.Get())
                 {
                     return Convert.ToDecimal(obj["DesignedCapacity"]);
                 }
@@ -554,10 +566,13 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             ManagementObjectCollection moc = mc.GetInstances();
             List<uint> cacheSizes = new List<uint>(moc.Count);
 
-            cacheSizes.AddRange(moc
-              .Cast<ManagementObject>()
-              .Where(p => Convert.ToUInt16(p.Properties["Level"].Value) == (ushort)level)
-              .Select(p => Convert.ToUInt32(p.Properties["MaxCacheSize"].Value)));
+            foreach (ManagementObject obj in moc)
+            {
+                if (Convert.ToUInt16(obj.Properties["Level"].Value) == (ushort)level)
+                {
+                    cacheSizes.Add(Convert.ToUInt32(obj.Properties["MaxCacheSize"].Value));
+                }
+            }
 
             return cacheSizes;
         }
