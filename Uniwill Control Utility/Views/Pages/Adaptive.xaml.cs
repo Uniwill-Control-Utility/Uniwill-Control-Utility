@@ -32,8 +32,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 {
     public partial class Adaptive : Page
     {
-        System.Windows.Threading.DispatcherTimer adaptiveMode = new System.Windows.Threading.DispatcherTimer();
-        System.Windows.Threading.DispatcherTimer sensors = new System.Windows.Threading.DispatcherTimer();
+        private readonly System.Windows.Threading.DispatcherTimer adaptiveMode = new System.Windows.Threading.DispatcherTimer();
+        private readonly System.Windows.Threading.DispatcherTimer sensors = new System.Windows.Threading.DispatcherTimer();
         private readonly GpuInventoryService gpuInventory;
 
         public Adaptive(GpuInventoryService gpuInventory)
@@ -259,14 +259,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 foreach (GameLauncherItem item in Game_Manager.installedGames ?? Enumerable.Empty<GameLauncherItem>())
                 {
-                    bool containsName = false;
+                    if (presetNames.Any(names => names.Contains(item.gameName)))
+                        continue;
 
-                    foreach (string names in presetNames)
-                    {
-                        if (names.Contains(item.gameName)) containsName = true;
-                    }
-
-                    if (!containsName)
                     {
                         AdaptivePreset preset = new AdaptivePreset
                         {
@@ -411,7 +406,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             "ForegroundStaging"          // Foreground staging
         };
 
-        bool start = false;
+        private bool start = false;
         private void btnStart_Click(object sender, RoutedEventArgs e)
         {
             // Prevent the ToggleButton from auto-toggling - we manage IsChecked ourselves
@@ -496,7 +491,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        public static int CPUTemp, CPULoad, CPUClock, CPUPower, GPULoad, GPUClock, GPUMemClock;
+ #pragma warning disable CS0649 // Field is never assigned to — set via XAML bindings
+        internal static int CPUTemp, CPULoad, CPUClock, CPUPower, GPULoad, GPUClock, GPUMemClock;
+#pragma warning restore CS0649
 
         /// <summary>
         /// Restores the btnStart ToggleButton icon, text, and IsChecked state
@@ -566,7 +563,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 AdpSdBoost.Value = AdpSdBoost.Maximum;
         }
 
-        private async void adaptive_Tick(object sender, EventArgs e)
+        private async void adaptive_Tick(object? sender, EventArgs e)
         {
             if (start)
             {
@@ -862,9 +859,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             try
             {
                 adaptivePresetManager = new AdaptivePresetManager(Settings.Default.Path + "adaptivePresets.json");
-                AdaptivePreset preset = adaptivePresetManager.GetPreset(presetName);
+                AdaptivePreset? preset = adaptivePresetManager.GetPreset(presetName);
 
-                if (preset == null)
+                if (preset is null)
                     return;
 
                 cbExcludeFromSwitching.IsChecked = !preset.isAutoSwitch;
@@ -910,14 +907,14 @@ namespace Uniwill_Control_Utility.Views.Pages
                     Bs2ProEnabled = cbxBs2ProEnabled.IsChecked ?? false,
                     Bs2ProFanMode = GetBs2ProFanModeFromIndex(cbxBs2ProFanMode.SelectedIndex),
                     Bs2ProGear = cbxBs2ProGear.SelectedIndex + 1,
-                    Bs2ProRpm = (ushort)Math.Clamp((int)nudBs2ProRpm.Value, MinRpm, MaxRpmBs2),
+                    Bs2ProRpm = (ushort)Math.Clamp((int)(nudBs2ProRpm.Value ?? 0), MinRpm, MaxRpmBs2),
                     Bs2ProCurveProfileId = GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex),
                     // Gap 3: Save Flydigi custom curve points per-game
                     Bs2ProCurvePointsJson = GetBs2ProCurvePointsJson(),
                     Bs2ProRgbMode = GetBs2ProRgbModeFromIndex(cbxBs2ProRgbMode.SelectedIndex),
-                    Bs2ProRgbR = (byte)nudBs2ProRgbR.Value,
-                    Bs2ProRgbG = (byte)nudBs2ProRgbG.Value,
-                    Bs2ProRgbB = (byte)nudBs2ProRgbB.Value,
+                    Bs2ProRgbR = (byte)(nudBs2ProRgbR.Value ?? 0),
+                    Bs2ProRgbG = (byte)(nudBs2ProRgbG.Value ?? 0),
+                    Bs2ProRgbB = (byte)(nudBs2ProRgbB.Value ?? 0),
                     Bs2ProBrightness = (byte)sliderBs2ProBrightness.Value,
                     // Gap 2: Save Flydigi RGB speed per-game
                     Bs2ProRgbSpeed = (byte)sliderBs2ProRgbSpeed.Value,
@@ -1107,7 +1104,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             spEcFanSplit.Visibility = unified ? Visibility.Collapsed : Visibility.Visible;
         }
 
-        private async void sensors_Tick(object sender, EventArgs e)
+        private async void sensors_Tick(object? sender, EventArgs e)
         {
             try
             {
@@ -1144,19 +1141,19 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        PumpVoltage lastWcPump = PumpVoltage.Off;
-        FanSpeed lastWcFan = FanSpeed.Off;
-        RgbState lastWcRgbMode = RgbState.Off;
-        RgbColor lastWcRgbColor = RgbColor.Red;
-        string lastBs2ProFanModeText = "";
-        byte? lastBs2ProGear = 0;
-        ushort? lastBs2ProRpm = 0;
-        string lastBs2ProRgbMode = "";
-        byte lastBs2ProRgbR = 0;
-        byte lastBs2ProRgbG = 0;
-        byte lastBs2ProRgbB = 0;
-        byte lastBs2ProBrightness = 0;
-        string lastBs2ProSpeed = "Medium";
+        private PumpVoltage lastWcPump = PumpVoltage.Off;
+        private FanSpeed lastWcFan = FanSpeed.Off;
+        private RgbState lastWcRgbMode = RgbState.Off;
+        private RgbColor lastWcRgbColor = RgbColor.Red;
+        private string lastBs2ProFanModeText = "";
+        private byte? lastBs2ProGear = 0;
+        private ushort? lastBs2ProRpm = 0;
+        private string lastBs2ProRgbMode = "";
+        private byte lastBs2ProRgbR = 0;
+        private byte lastBs2ProRgbG = 0;
+        private byte lastBs2ProRgbB = 0;
+        private byte lastBs2ProBrightness = 0;
+        private string lastBs2ProSpeed = "Medium";
         // EC Fan diff-tracking
         private bool lastEcFanUnifiedMode = false;
         private string lastEcFanPreset = "";
@@ -1270,9 +1267,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             string bs2Mode = GetBs2ProFanModeFromIndex(cbxBs2ProFanMode.SelectedIndex);
             string bs2RgbMode = GetBs2ProRgbModeFromIndex(cbxBs2ProRgbMode.SelectedIndex);
-            byte bs2R = (byte)nudBs2ProRgbR.Value;
-            byte bs2G = (byte)nudBs2ProRgbG.Value;
-            byte bs2B = (byte)nudBs2ProRgbB.Value;
+            byte bs2R = (byte)(nudBs2ProRgbR.Value ?? 0);
+            byte bs2G = (byte)(nudBs2ProRgbG.Value ?? 0);
+            byte bs2B = (byte)(nudBs2ProRgbB.Value ?? 0);
             byte bs2Brightness = (byte)sliderBs2ProBrightness.Value;
             string bs2Speed = GetRgbSpeedNameFromSlider((int)sliderBs2ProRgbSpeed.Value);
 
@@ -1294,7 +1291,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (bs2Mode == "Gear")
                     gear = (byte)(cbxBs2ProGear.SelectedIndex + 1);
                 else if (bs2Mode == "Rpm")
-                    rpm = (ushort)Math.Clamp((int)nudBs2ProRpm.Value, MinRpm,
+                    rpm = (ushort)Math.Clamp((int)(nudBs2ProRpm.Value ?? 0), MinRpm,
                         (FlydigiHardwareDetector.ConnectedDeviceType == ConnectedDeviceType.BS1 ? MaxRpmBs1 : MaxRpmBs2));
 
                 bool fanChanged = bs2Mode != lastBs2ProFanModeText ||
@@ -1323,7 +1320,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Fire preset-applied event so the Flydigi page can sync its UI.
                 byte? fanGear = bs2Mode == "Gear" ? (byte?)(cbxBs2ProGear.SelectedIndex + 1) : null;
                 ushort? fanRpm = bs2Mode == "Rpm"
-                    ? (ushort?)Math.Clamp((int)nudBs2ProRpm.Value, MinRpm,
+                    ? (ushort?)Math.Clamp((int)(nudBs2ProRpm.Value ?? 0), MinRpm,
                         (FlydigiHardwareDetector.ConnectedDeviceType == ConnectedDeviceType.BS1 ? MaxRpmBs1 : MaxRpmBs2))
                     : null;
                 _deviceApplier.RaiseFlydigiPresetApplied(bs2Mode, fanGear, fanRpm,
@@ -1806,10 +1803,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
 
-        string runningGameName = DefaultProfileName;
-        string lastConfirmedGame = DefaultProfileName;
-        int gameMissingCount = 0;
-        const int maxGameMisses = 2;
+        private string runningGameName = DefaultProfileName;
+        private string lastConfirmedGame = DefaultProfileName;
+        private int gameMissingCount = 0;
+        private const int maxGameMisses = 2;
 
         private static bool AutoSwitchEnabled(GameLauncherItem item)
         {
