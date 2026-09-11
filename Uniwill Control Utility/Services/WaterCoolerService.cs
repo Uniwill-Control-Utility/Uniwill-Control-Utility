@@ -18,7 +18,7 @@ namespace Uniwill_Control_Utility.Services
     /// BLE communication layer for LCT laptop water coolers (LCT21001/LCT22002).
     /// Uses Nordic nRF52 UART GATT profile.
     /// </summary>
-    public class WaterCoolerService : IDisposable
+    public sealed class WaterCoolerService : IDisposable
     {
         private BluetoothLEDevice? _device;
         private GattSession? _gattSession;
@@ -206,7 +206,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 using var searcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_ComputerSystem");
 
-                foreach (ManagementObject obj in searcher.Get())
+                foreach (ManagementBaseObject obj in searcher.Get())
                 {
                     var manufacturer = obj["Manufacturer"]?.ToString() ?? "";
                     var model = obj["Model"]?.ToString() ?? "";
@@ -276,9 +276,6 @@ namespace Uniwill_Control_Utility.Services
             {
                 Debug.WriteLine("[WaterCooler] Device handle exists before connect — forcing cleanup first");
                 await DisconnectAsync();
-                // Force GC to collect any orphaned COM wrappers that Windows BLE may be holding
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
                 await Task.Delay(500);
             }
 
@@ -647,6 +644,9 @@ namespace Uniwill_Control_Utility.Services
 
         private async Task<bool> WriteFrameAsync(byte[] frame)
         {
+            if (_txCharacteristic == null)
+                return false;
+
             try
             {
                 // Use WriteWithResponse for reliable delivery.
@@ -694,7 +694,6 @@ namespace Uniwill_Control_Utility.Services
                 return;
 
             byte command = data[1];
-            bool enabled = data[2] == 1;
 
             // Extract payload (between enable byte and checksum)
             int payloadStart = 3;
@@ -822,6 +821,8 @@ namespace Uniwill_Control_Utility.Services
             {
                 // Device dispose failed; harmless during Dispose
             }
+
+            GC.SuppressFinalize(this);
         }
 
         /// <summary>
