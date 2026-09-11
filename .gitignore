@@ -370,3 +370,6 @@ FodyWeavers.xsd
 .qwen/
 .agents/
 skills-lock.json
+
+# SonarQube
+.sonarqube/
