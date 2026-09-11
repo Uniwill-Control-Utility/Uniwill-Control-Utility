@@ -388,7 +388,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void nudAutoReapply_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
-            Settings.Default.AutoReapplyTime = (int)nudAutoReapply.Value;
+            if (nudAutoReapply.Value is double value)
+                Settings.Default.AutoReapplyTime = (int)value;
             Settings.Default.Save();
         }
 
@@ -403,10 +404,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async void btnCheck_Click(object sender, System.Windows.RoutedEventArgs e)
         {
-            checkUpdate(true);
+            await checkUpdate(true);
         }
 
-        private async void checkUpdate(bool isUserCheck = false)
+        private async System.Threading.Tasks.Task checkUpdate(bool isUserCheck = false)
         {
             if (IsInternetAvailable())
             {
