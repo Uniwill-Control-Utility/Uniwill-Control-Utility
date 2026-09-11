@@ -491,8 +491,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
  #pragma warning disable CS0649 // Field is never assigned to — set via XAML bindings
+ #pragma warning disable CS0169 // Field is never used — read by XAML bindings
         private static int CPUTemp, CPULoad, CPUClock, CPUPower, GPULoad, GPUClock, GPUMemClock;
 #pragma warning restore CS0649
+#pragma warning restore CS0169
 
         /// <summary>
         /// Restores the btnStart ToggleButton icon, text, and IsChecked state
@@ -1251,7 +1253,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (curPump != lastWcPump || curFan != lastWcFan ||
                 curRgbMode != lastWcRgbMode || curRgbColor != lastWcRgbColor)
             {
-                await _deviceApplier!.ApplyWatercoolerFromPresetAsync(curPump, curFan, curRgbMode, curRgbColor);
+                await _deviceApplier.ApplyWatercoolerFromPresetAsync(curPump, curFan, curRgbMode, curRgbColor);
                 lastWcPump = curPump;
                 lastWcFan = curFan;
                 lastWcRgbMode = curRgbMode;
@@ -1299,7 +1301,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 if (fanChanged)
                 {
-                    await _deviceApplier!.ApplyFlydigiFanAsync(bs2Mode, gear, rpm);
+                    await _deviceApplier.ApplyFlydigiFanAsync(bs2Mode, gear, rpm);
                     lastBs2ProFanModeText = bs2Mode;
                     lastBs2ProGear = gear ?? lastBs2ProGear;
                     lastBs2ProRpm = rpm ?? lastBs2ProRpm;
@@ -1314,7 +1316,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             if (rgbChanged)
             {
-                await _deviceApplier!.ApplyFlydigiRgbAsync(bs2RgbMode, bs2R, bs2G, bs2B, bs2Brightness);
+                await _deviceApplier.ApplyFlydigiRgbAsync(bs2RgbMode, bs2R, bs2G, bs2B, bs2Brightness);
 
                 // Fire preset-applied event so the Flydigi page can sync its UI.
                 byte? fanGear = bs2Mode == "Gear" ? (byte?)(cbxBs2ProGear.SelectedIndex + 1) : null;
@@ -1857,7 +1859,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     return true;
 
                 classNameSb.Clear();
-                GetClassName(hWnd, classNameSb, classNameSb.Capacity);
+                _ = GetClassName(hWnd, classNameSb, classNameSb.Capacity);
                 if (_excludedWindowClasses.Contains(classNameSb.ToString()))
                     return true;
 
@@ -1869,7 +1871,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     titleSb.Capacity = length + 1;
 
                 titleSb.Clear();
-                GetWindowText(hWnd, titleSb, titleSb.Capacity);
+                _ = GetWindowText(hWnd, titleSb, titleSb.Capacity);
                 string windowTitle = titleSb.ToString().Trim();
 
                 foreach (var gameName in (installedGames ?? Enumerable.Empty<GameLauncherItem>())
@@ -2551,7 +2553,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (spKbColor == null || spKbMultiColor == null || spKbGamingRest == null || spKbSpeed == null)
                 return;
 
-            if (cbxKbEffect.SelectedItem is not ComboBoxItem item)
+            if (cbxKbEffect.SelectedItem is not ComboBoxItem)
             {
                 sepKbColor.Visibility = Visibility.Collapsed;
                 spKbColor.Visibility = Visibility.Collapsed;
@@ -2807,7 +2809,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 try
                 {
                     var hex = part.Trim();
-                    if (hex.StartsWith("#"))
+                    if (hex.StartsWith('#'))
                         hex = hex.Substring(1);
                     if (hex.Length == 6)
                     {
