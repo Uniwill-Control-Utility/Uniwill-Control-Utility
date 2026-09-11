@@ -28,7 +28,7 @@ namespace Uniwill_Control_Utility.Scripts
             public string iconPath { get; set; } = string.Empty;
         }
 
-        public static List<GameLauncherItem>? installedGames;
+        internal static List<GameLauncherItem>? installedGames;
 
         public static List<GameLauncherItem>? syncGame_Library(bool isAdaptive = false)
         {
@@ -299,7 +299,7 @@ namespace Uniwill_Control_Utility.Scripts
                         break;
                     case "Microsoft Store":
                         PackageManager pm = new PackageManager();
-                        _ = pm.FindPackage(gameID).GetAppListEntries().First().LaunchAsync();
+                        _ = pm.FindPackage(gameID).GetAppListEntries()[0].LaunchAsync();
                         break;
                 }
             }

@@ -177,7 +177,12 @@ namespace Uniwill_Control_Utility.Scripts
         {
             try
             {
-                string processorIdentifier = System.Environment.GetEnvironmentVariable("PROCESSOR_IDENTIFIER");
+                string? processorIdentifier = System.Environment.GetEnvironmentVariable("PROCESSOR_IDENTIFIER");
+
+                if (string.IsNullOrEmpty(processorIdentifier))
+                {
+                    return;
+                }
 
                 // Split the string into individual words
                 string[] words = processorIdentifier.Split(' ');
@@ -202,7 +207,9 @@ namespace Uniwill_Control_Utility.Scripts
                 try
                 {
                     ManagementObjectSearcher modelSearcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT Model, Manufacturer FROM Win32_ComputerSystem");
+#pragma warning disable S3217 // Loops should be type-safe
                     foreach (ManagementObject mo in modelSearcher.Get())
+#pragma warning restore S3217
                     {
                         string model = mo["Model"]?.ToString()?.Trim() ?? "";
                         string manufacturer = mo["Manufacturer"]?.ToString()?.Trim() ?? "";
@@ -246,16 +253,13 @@ namespace Uniwill_Control_Utility.Scripts
                         bool isDedicated = false;
 
                         // NVIDIA GPUs are always dedicated
+                        // NVIDIA and AMD RX/Pro GPUs are dedicated; Intel and AMD non-RX are integrated
                         if (gpuName.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase) ||
                             gpuName.Contains("GeForce", StringComparison.OrdinalIgnoreCase) ||
                             gpuName.Contains("Quadro", StringComparison.OrdinalIgnoreCase) ||
-                            gpuName.Contains("RTX", StringComparison.OrdinalIgnoreCase))
-                        {
-                            isDedicated = true;
-                        }
-                        // AMD: dedicated if it contains "RX" (Radeon RX series) or "Radeon Pro"
-                        else if (gpuName.Contains("Radeon RX", StringComparison.OrdinalIgnoreCase) ||
-                                 gpuName.Contains("Radeon Pro", StringComparison.OrdinalIgnoreCase))
+                            gpuName.Contains("RTX", StringComparison.OrdinalIgnoreCase) ||
+                            gpuName.Contains("Radeon RX", StringComparison.OrdinalIgnoreCase) ||
+                            gpuName.Contains("Radeon Pro", StringComparison.OrdinalIgnoreCase))
                         {
                             isDedicated = true;
                         }
@@ -291,14 +295,7 @@ namespace Uniwill_Control_Utility.Scripts
             }
             else
             {
-                try
-                {
-                    //App.memTimings = Mem_Timings.RetrieveTimings();
-                }
-                catch (Exception ex)
-                {
-                    Misc.DiagnosticLogger.LogError(ex, "Failed to retrieve memory timings");
-                }
+                // Memory timings retrieval not implemented
 
                 // Only FireRange (Zen 5, Family 26, Model 68, HX suffix) is supported.
                 if (CPUFamily == Zen5Family && CPUModel == Zen5FireRangeModel && CPUName.Contains("HX", StringComparison.Ordinal))
