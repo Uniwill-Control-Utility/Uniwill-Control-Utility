@@ -127,7 +127,7 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
                     int windowStyle = GetWindowLong(foregroundWindow, GWL_STYLE);
 
                     StringBuilder windowText = new StringBuilder(WindowTitleBufferSize);
-                    GetWindowText(foregroundWindow, windowText, windowText.Capacity);
+                    _ = GetWindowText(foregroundWindow, windowText, windowText.Capacity);
 
                     AppName = windowText.ToString();
 
@@ -161,7 +161,7 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
 
             magWindow.Create(effectsJson);
 
-            prevSrcWindow = magWindow!.SrcWindow;
+            prevSrcWindow = magWindow.SrcWindow;
         }
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
@@ -176,7 +176,7 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
                 if (foregroundWindow != IntPtr.Zero)
                 {
                     StringBuilder windowText = new StringBuilder(WindowTitleBufferSize);
-                    GetWindowText(foregroundWindow, windowText, windowText.Capacity);
+                    _ = GetWindowText(foregroundWindow, windowText, windowText.Capacity);
                     currentAppName = windowText.ToString();
 
                     if (currentAppName == AppName && !magWindow!.Running)
