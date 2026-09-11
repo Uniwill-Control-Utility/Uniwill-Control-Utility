@@ -149,7 +149,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private int GetPumpVoltageIndex(PumpVoltage voltage) => voltage switch
+        private static int GetPumpVoltageIndex(PumpVoltage voltage) => voltage switch
         {
             PumpVoltage.Off => 0,
             PumpVoltage.V7 => 1,
@@ -158,7 +158,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             _ => 0
         };
 
-        private int GetFanSpeedIndex(FanSpeed speed) => speed switch
+        private static int GetFanSpeedIndex(FanSpeed speed) => speed switch
         {
             FanSpeed.Off => 0,
             FanSpeed.Percent25 => 1,
@@ -170,7 +170,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             _ => 0
         };
 
-        private int GetRgbModeIndex(RgbState mode) => mode switch
+        private static int GetRgbModeIndex(RgbState mode) => mode switch
         {
             RgbState.Off => 0,
             RgbState.Static => 1,
@@ -180,7 +180,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             _ => 0
         };
 
-        private int GetRgbColorIndex(RgbColor color) => color switch
+        private static int GetRgbColorIndex(RgbColor color) => color switch
         {
             RgbColor.Red => 0,
             RgbColor.Green => 1,

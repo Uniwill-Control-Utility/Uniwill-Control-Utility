@@ -38,7 +38,7 @@ namespace Uniwill_Control_Utility.Services
         private static void Log(string message)
         {
             Debug.WriteLine(message);
-            Trace.WriteLine(message);
+            Trace.WriteLineIf(true, message);
         }
 
         // Heartbeat timer to keep the BLE connection alive.
@@ -290,7 +290,7 @@ namespace Uniwill_Control_Utility.Services
                 {
                     Log($"{LogPrefix} Unpaired device enumeration failed: {ex.Message}");
                 }
-            } // end if (devices.Count == 0)
+            }
 
             // 3. Scan for BLE advertisements (finds unpaired devices)
             var watcher = new BluetoothLEAdvertisementWatcher();
@@ -399,7 +399,7 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private static async Task<T?> WithTimeoutAsync<T>(Func<Task<T>> operation, TimeSpan timeout, string label)
         {
-            var timeoutCts = new CancellationTokenSource(timeout);
+            using var timeoutCts = new CancellationTokenSource(timeout);
             try
             {
                 var task = operation();
@@ -414,7 +414,7 @@ namespace Uniwill_Control_Utility.Services
             }
             finally
             {
-                timeoutCts.Cancel();
+                await timeoutCts.CancelAsync();
             }
         }
 
@@ -432,8 +432,6 @@ namespace Uniwill_Control_Utility.Services
             {
                 Log(LogPrefix + " Device handle exists before connect — forcing cleanup");
                 await DisconnectAsync();
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
                 await Task.Delay(PreConnectDelayMs);
             }
 
