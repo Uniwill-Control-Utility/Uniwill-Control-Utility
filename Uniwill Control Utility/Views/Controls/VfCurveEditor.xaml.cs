@@ -215,7 +215,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             int[] stockVolts = _stockCurve!.Keys.OrderBy(v => v).ToArray();
 
             // Debug: log stock curve range and count.
-            DiagnosticLogger.LogInfo($"VfCurveEditor: stock curve loaded — {_stockCurve!.Count} points, voltages {stockVolts.Min()}-{stockVolts.Max()} mV");
+            DiagnosticLogger.LogInfo($"VfCurveEditor: stock curve loaded — {_stockCurve.Count} points, voltages {stockVolts.Min()}-{stockVolts.Max()} mV");
             DiagnosticLogger.LogInfo($"VfCurveEditor: live curve — {selected.Count} editor points, indices {selected[0].Index}-{selected[^1].Index}");
 
             _allPoints.Clear();
@@ -1569,7 +1569,7 @@ namespace Uniwill_Control_Utility.Views.Controls
         /*  Data model                                                        */
         /* ------------------------------------------------------------------ */
 
-        private class VfEditorPoint
+        private sealed class VfEditorPoint
         {
             public int Index;              // GPU V-F point index (for applying offsets)
             public int DisplayVoltageMv;   // Display voltage: XAxisMin + position * 5
@@ -1583,7 +1583,7 @@ namespace Uniwill_Control_Utility.Views.Controls
         /*  Tooltip                                                           */
         /* ------------------------------------------------------------------ */
 
-        private class InfoTooltip : ToolTip
+        private sealed class InfoTooltip : ToolTip
         {
             private readonly TextBlock _line1 = new() { FontWeight = FontWeights.Medium };
             private readonly TextBlock _line2 = new() { FontSize = 11 };
