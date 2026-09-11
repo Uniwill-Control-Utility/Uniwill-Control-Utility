@@ -504,11 +504,7 @@ namespace Uniwill_Control_Utility.Services
 
         private void ThrowIfDisposed()
         {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(
-                    nameof(OverlayManagerService));
-            }
+            ObjectDisposedException.ThrowIf(_disposed, nameof(OverlayManagerService));
         }
 
         public void Dispose()

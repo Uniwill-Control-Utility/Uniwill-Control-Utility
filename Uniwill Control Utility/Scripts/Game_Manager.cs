@@ -28,7 +28,18 @@ namespace Uniwill_Control_Utility.Scripts
             public string iconPath { get; set; } = string.Empty;
         }
 
-        internal static List<GameLauncherItem>? installedGames;
+        private static List<GameLauncherItem>? _installedGames;
+        internal static List<GameLauncherItem>? InstalledGames
+        {
+            get => _installedGames;
+            set => _installedGames = value;
+        }
+        // Keep backward compatibility reference
+        internal static List<GameLauncherItem>? installedGames
+        {
+            get => _installedGames;
+            set => _installedGames = value;
+        }
 
         public static List<GameLauncherItem>? syncGame_Library(bool isAdaptive = false)
         {
@@ -69,14 +80,10 @@ namespace Uniwill_Control_Utility.Scripts
                                                 launcherItem.exe = exeName;
                                                 break;
                                             }
-                                            foreach (string arr in array)
+                                            if (array.Any(arr => exeName.Contains(arr, StringComparison.OrdinalIgnoreCase)))
                                             {
-                                                if (exeName.Contains(arr, StringComparison.OrdinalIgnoreCase))
-                                                {
-                                                    launcherItem.path = game.InstallDir;
-                                                    launcherItem.exe = exeName;
-                                                    break;
-                                                }
+                                                launcherItem.path = game.InstallDir;
+                                                launcherItem.exe = exeName;
                                             }
                                             if (launcherItem.path is not null)
                                             {
