@@ -15,7 +15,7 @@ using Settings = Uniwill_Control_Utility.Properties.Settings;
 
 namespace Uniwill_Control_Utility.Scripts
 {
-    internal class RyzenAdj_To_UCU
+    internal static class RyzenAdj_To_UCU
     {
         [DllImport("powrprof.dll", EntryPoint = "PowerSetActiveOverlayScheme")]
         public static extern uint PowerSetActiveOverlayScheme(Guid OverlaySchemeGuid);
@@ -38,7 +38,9 @@ namespace Uniwill_Control_Utility.Scripts
         public static Task TranslateAsync(string ryzenAdjString, bool isAutoReapply = false, bool isAutoOC = false, string? appliedName = null, bool localizeAppliedName = false) =>
             Task.Run(() => TranslateCore(ryzenAdjString, isAutoReapply, isAutoOC, appliedName, localizeAppliedName));
 
+        #pragma warning disable S1172 // Unused parameters
         private static void TranslateCore(string ryzenAdjString, bool _isAutoReapply, bool isAutoOC, string? appliedName, bool localizeAppliedName)
+        #pragma warning restore S1172
         {
             try
             {
@@ -103,7 +105,7 @@ namespace Uniwill_Control_Utility.Scripts
                                     else
                                         IntelManagement.changeTDPAll(int.Parse(ryzenAdjCommandValueString));
                                 }
-                                else if (ryzenAdjCommandValueString.Contains("-"))
+                                else if (ryzenAdjCommandValueString.Contains('-'))
                                 {
                                     if (ryzenAdjCommandString == "intel-ratio")
                                     {
@@ -210,16 +212,16 @@ private static void ADLX(string command, string value)
                 DiagnosticLogger.LogDebug($"ADLX: {command}={value}");
                 string[] variables = value.Split('-');
 
-                if (command == "ADLX-Lag") ADLXBackend.SetAntiLag(int.Parse(variables[0]), bool.Parse(variables[1]));
-                if (command == "ADLX-Boost") ADLXBackend.SetBoost(int.Parse(variables[0]), bool.Parse(variables[1]), int.Parse(variables[2]));
+                if (command == "ADLX-Lag") _ = ADLXBackend.SetAntiLag(int.Parse(variables[0]), bool.Parse(variables[1]));
+                if (command == "ADLX-Boost") _ = ADLXBackend.SetBoost(int.Parse(variables[0]), bool.Parse(variables[1]), int.Parse(variables[2]));
                 if (command == "ADLX-RSR")
                 {
-                    ADLXBackend.SetRSR(bool.Parse(variables[0]));
-                    ADLXBackend.SetRSRSharpness(int.Parse(variables[1]));
+                    _ = ADLXBackend.SetRSR(bool.Parse(variables[0]));
+                    _ = ADLXBackend.SetRSRSharpness(int.Parse(variables[1]));
                 }
-                if (command == "ADLX-Chill") ADLXBackend.SetChill(int.Parse(variables[0]), bool.Parse(variables[1]), int.Parse(variables[2]), int.Parse(variables[3]));
-                if (command == "ADLX-Sync") ADLXBackend.SetEnhancedSync(int.Parse(variables[0]), bool.Parse(variables[1]));
-                if (command == "ADLX-ImageSharp") ADLXBackend.SetImageSharpning(int.Parse(variables[0]), bool.Parse(variables[1]), int.Parse(variables[2]));
+                if (command == "ADLX-Chill") _ = ADLXBackend.SetChill(int.Parse(variables[0]), bool.Parse(variables[1]), int.Parse(variables[2]), int.Parse(variables[3]));
+                if (command == "ADLX-Sync") _ = ADLXBackend.SetEnhancedSync(int.Parse(variables[0]), bool.Parse(variables[1]));
+                if (command == "ADLX-ImageSharp") _ = ADLXBackend.SetImageSharpning(int.Parse(variables[0]), bool.Parse(variables[1]), int.Parse(variables[2]));
             }
             catch (Exception ex)
             {
@@ -313,6 +315,7 @@ private static void ADLX(string command, string value)
             string[] parts = normalized.Split('-');
 
             var result = new System.Collections.Generic.List<string>();
+#pragma warning disable S127 // Loops should not modify iteration conditions
             for (int i = 0; i < parts.Length; i++)
             {
                 if (parts[i] == "\u0000")
@@ -329,6 +332,7 @@ private static void ADLX(string command, string value)
                     result.Add(parts[i]);
                 }
             }
+#pragma warning restore S127
 
             return result.ToArray();
         }
