@@ -11,7 +11,7 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
     // I do not take credit for the full functionality of the code.
     //
 
-    internal class MagWindow : IDisposable
+    internal sealed class MagWindow : IDisposable
     {
         // Closed event
         public event Action? Closed;
@@ -32,7 +32,7 @@ namespace Uniwill_Control_Utility.Scripts.UCU_Super_Resolution
         }
 
         // Passed to magThread
-        private class MagWindowParams
+        private sealed class MagWindowParams
         {
             public volatile IntPtr hwndSrc;
             public volatile string effectsJson = "";

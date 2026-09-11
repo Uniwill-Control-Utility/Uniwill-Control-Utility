@@ -48,7 +48,9 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
         private const string DriverBlockRegistryPath = @"SYSTEM\CurrentControlSet\Control\CI\Config";
         private const string DriverBlockRegistryValue = "VulnerableDriverBlocklistEnable";
 
-        public static string BaseDir = Settings.Default.Path;
+        private static string _baseDir = Settings.Default.Path;
+
+        public static string BaseDir => _baseDir;
 
         private static IntelPawnIo? msrPawnIo;
         private static IntelPawnIo? mchbarPawnIo;

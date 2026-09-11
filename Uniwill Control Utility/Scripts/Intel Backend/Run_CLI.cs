@@ -22,7 +22,6 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
                 if (readOutput) { startInfo.RedirectStandardOutput = true; } else { startInfo.RedirectStandardOutput = false; }
 
                 startInfo.FileName = processName;
-                //startInfo.Arguments = "/c " + arguments;
                 startInfo.Arguments = arguments;
                 startInfo.CreateNoWindow = true;
                 if (runasadmin) { startInfo.Verb = "runas"; }
@@ -36,8 +35,6 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
                 process.WaitForExit(waitExit);
                 if (readOutput)
                 {
-                    //int Errorlevel = process.ExitCode;
-
                     string output = process.StandardOutput.ReadToEnd();
                     process.Close();
                     return output;
