@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Uniwill_Control_Utility.Scripts.GPUs.AMD
 {
-    internal partial class ADLXBackend
+    internal static partial class ADLXBackend
     {
         public const string PerfMetrics = @"ADLX_PerformanceMetrics.dll";
         public const string GraphSettings = @"ADLX_3DSettings.dll";

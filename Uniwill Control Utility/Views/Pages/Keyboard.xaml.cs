@@ -643,12 +643,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool showDirection = effect == KeyboardEffect.Wave;
             DirectionSeparator.Visibility = showDirection ? Visibility.Visible : Visibility.Collapsed;
             DirectionRow.Visibility = showDirection ? Visibility.Visible : Visibility.Collapsed;
-
-            // Show color separator if any control row below Type is visible.
-            bool anyControlVisible = ColorRow.Visibility == Visibility.Visible
-                || MultiColorRow.Visibility == Visibility.Visible
-                || SpeedRow.Visibility == Visibility.Visible
-                || TouchReactiveRow.Visibility == Visibility.Visible;
         }
 
         private void TsTouchReactive_Toggled(object sender, RoutedEventArgs e)
@@ -1058,7 +1052,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private static int GetIdleMilliseconds()
         {
-            var lii = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf(typeof(LASTINPUTINFO)) };
+            var lii = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
             if (GetLastInputInfo(ref lii))
                 return Environment.TickCount - (int)lii.dwTime;
             return int.MaxValue;
@@ -1318,7 +1312,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 try
                 {
                     var hex = part.Trim();
-                    if (hex.StartsWith("#"))
+                    if (hex.StartsWith('#'))
                         hex = hex.Substring(1);
                     if (hex.Length == 6)
                     {

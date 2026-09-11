@@ -84,7 +84,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             tbAppVerion.Text = $"Uniwill Control Utility - {GetAssemblyVersion()}";
 
-            checkUpdate();
+            _ = checkUpdate();
         }
         private static string GetAssemblyVersion()
         {
