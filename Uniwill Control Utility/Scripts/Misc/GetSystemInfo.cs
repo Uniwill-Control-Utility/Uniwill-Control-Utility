@@ -5,6 +5,9 @@ using System.Management;
 using System.Runtime.Intrinsics.X86;
 using static Uniwill_Control_Utility.Scripts.Family;
 
+#pragma warning disable S1751 // Elements should be separated by a comma and a line break — WMI loops return on first result
+#pragma warning disable S3217 // Ternary/assignment should be simplified — WMI enumeration pattern
+
 namespace Uniwill_Control_Utility.Scripts.Misc
 {
     internal class GetSystemInfo
@@ -602,6 +605,8 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             }
         }
     }
+#pragma warning restore S1751
+#pragma warning restore S3217
 
  #pragma warning disable S3217 // "AS" should not be used when the type is already known
     // Portability issue with unsafe code — intentional for CPUID/GetSystemInfo P/Invoke
