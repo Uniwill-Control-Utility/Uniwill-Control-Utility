@@ -733,6 +733,7 @@ namespace Uniwill_Control_Utility.Services
         /*  Heartbeat                                                          */
         /* ------------------------------------------------------------------ */
 
+ #pragma warning disable S1854 // Useless assignment
         private void StartHeartbeat()
         {
             StopHeartbeat();
@@ -742,6 +743,7 @@ namespace Uniwill_Control_Utility.Services
                 TimeSpan.FromSeconds(FirstHeartbeatDelaySeconds), // First heartbeat after 2s
                 TimeSpan.FromMilliseconds(HeartbeatIntervalMs));
         }
+#pragma warning restore S1854
 
         private void StopHeartbeat()
         {
@@ -1002,7 +1004,9 @@ namespace Uniwill_Control_Utility.Services
 
                 // Send heartbeat to provoke a status response
                 var frame = Bs1Frame.BuildHeartbeat();
+#pragma warning disable S8969 // Remove unnecessary null-forgiving operator (compiler disagrees)
                 await _txCharacteristic!.WriteValueAsync(frame.AsBuffer(), GattWriteOption.WriteWithResponse);
+#pragma warning restore S8969
 
                 // Wait for a response
                 await respondedTcs.Task.WaitAsync(TimeSpan.FromSeconds(VerificationTimeoutSeconds));

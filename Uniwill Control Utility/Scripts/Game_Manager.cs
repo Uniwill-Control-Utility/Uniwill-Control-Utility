@@ -181,7 +181,7 @@ namespace Uniwill_Control_Utility.Scripts
                                         string install = package.InstalledLocation.Path;
                                         string sig = package.SignatureKind.ToString();
 
-                                        if (install.Contains("WindowsApps") && sig == "Store" && package.IsFramework == false && strings.Contains(package.DisplayName))
+                                        if (install.Contains("WindowsApps") && sig == "Store" && !package.IsFramework && strings.Contains(package.DisplayName))
                                         {
                                             GameLauncherItem launcherItem = new GameLauncherItem();
                                             launcherItem.gameName = package.DisplayName;

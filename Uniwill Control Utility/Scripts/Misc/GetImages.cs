@@ -13,7 +13,7 @@ using System.Windows.Shapes;
 
 namespace Uniwill_Control_Utility.Scripts.Misc
 {
-    class GetImages
+    static class GetImages
     {
         public static async Task<string> GetIconImageUrl(string gameName)
         {
@@ -52,7 +52,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                                 })
                                 .ToList(); // Store the tasks in a list
 
-                            while (iconTasks.Any())
+                            while (iconTasks.Count > 0)
                             {
                                 var completedTask = await Task.WhenAny(iconTasks);
                                 iconTasks.Remove(completedTask); // Remove the completed task after awaiting it
@@ -115,7 +115,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                                 })
                                 .ToList(); // Store the tasks in a list
 
-                            while (iconTasks.Any())
+                            while (iconTasks.Count > 0)
                             {
                                 var completedTask = await Task.WhenAny(iconTasks);
                                 iconTasks.Remove(completedTask); // Remove the completed task after awaiting it
@@ -145,7 +145,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             string illegalChars = new string(System.IO.Path.GetInvalidFileNameChars()) + new string(System.IO.Path.GetInvalidPathChars());
             string pattern = "[" + Regex.Escape(illegalChars) + "]";
-            return Regex.Replace(input, pattern, "_");
+            return Regex.Replace(input, pattern, "_", RegexOptions.None, TimeSpan.FromSeconds(1));
         }
 
 
