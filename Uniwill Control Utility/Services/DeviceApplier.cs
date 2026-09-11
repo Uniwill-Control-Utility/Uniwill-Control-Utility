@@ -691,15 +691,9 @@ namespace Uniwill_Control_Utility.Services
 
         private static void ApplyFallbackMultiColor(KeyboardHidService hid, KeyboardEffect effect, byte r, byte g, byte b)
         {
-            if (s_multiColor7Effects.Contains(effect))
-            {
-                hid.SetMultiColor(new[] { Color.FromRgb(r, g, b) });
-            }
-            else if (s_multiColor4Effects.Contains(effect))
-            {
-                hid.SetMultiColor(new[] { Color.FromRgb(r, g, b) });
-            }
-            else if (s_multiColor4Plus1Effects.Contains(effect))
+            if (s_multiColor7Effects.Contains(effect)
+                || s_multiColor4Effects.Contains(effect)
+                || s_multiColor4Plus1Effects.Contains(effect))
             {
                 hid.SetMultiColor(new[] { Color.FromRgb(r, g, b) });
             }
@@ -749,11 +743,8 @@ namespace Uniwill_Control_Utility.Services
         public async Task ApplyFlydigiFanAsync(string fanMode, byte? gear = null, ushort? rpm = null)
         {
             // Try BS2+ first, then BS1
-            bool applied = false;
-
             if (_flydigiService.IsConnected)
             {
-                applied = true;
                 try
                 {
                     switch (fanMode)
@@ -780,7 +771,6 @@ namespace Uniwill_Control_Utility.Services
             // Also apply to BS1 if connected
             if (_bs1Service?.IsConnected == true)
             {
-                applied = true;
                 try
                 {
                     ushort? clampedRpm = rpm.HasValue ? (ushort?)Math.Clamp(rpm.Value, Bs1DefaultGearRpm.MinRpm, Bs1DefaultGearRpm.MaxRpm) : null;
@@ -806,9 +796,6 @@ namespace Uniwill_Control_Utility.Services
                 }
             }
 
-            // Neither connected — no-op
-            if (!applied)
-                return;
         }
 
         /// <summary>
