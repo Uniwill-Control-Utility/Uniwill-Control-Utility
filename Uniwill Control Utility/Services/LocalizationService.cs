@@ -42,7 +42,7 @@ namespace Uniwill_Control_Utility.Services
 
         private const string FormatPlaceholder = "{0}";
 
-        private static readonly IReadOnlyList<LanguageOption> Languages = new LanguageOption[]
+        private static readonly LanguageOption[] Languages = new LanguageOption[]
         {
             new("en-GB", "English"),
             new("cy-GB", "Cymraeg"),
@@ -75,7 +75,7 @@ namespace Uniwill_Control_Utility.Services
         private static readonly string[] StringProperties = { "Text", "Content", "Header", "Title", "Message", "ToolTip", "PlaceholderText" };
         private static bool _isInitialised;
 
-        public static IReadOnlyList<LanguageOption> SupportedLanguages => Languages;
+        public static LanguageOption[] SupportedLanguages => Languages;
         public static string CurrentCultureName { get; private set; } = FallbackCultureName;
         public static event EventHandler? CultureChanged;
 
@@ -338,12 +338,10 @@ namespace Uniwill_Control_Utility.Services
             catch (InvalidOperationException)
             {
                 // Property is read-only at runtime or cannot be set
-                return;
             }
             catch (TargetInvocationException)
             {
                 // Underlying property setter threw an exception
-                return;
             }
             catch
             {
@@ -410,12 +408,10 @@ namespace Uniwill_Control_Utility.Services
 
                     if (Catalogues.TryGetValue("en-GB", out var english))
                     {
-                        foreach (var englishEntry in english)
+                        var match = english.FirstOrDefault(pair => string.Equals(pair.Value, entry.Key, StringComparison.Ordinal));
+                        if (match.Value != null)
                         {
-                            if (string.Equals(englishEntry.Value, entry.Key, StringComparison.Ordinal))
-                            {
-                                return englishEntry.Key;
-                            }
+                            return match.Key;
                         }
                     }
 
