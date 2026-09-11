@@ -19,7 +19,7 @@ namespace Uniwill_Control_Utility.Services
 
     public class GameDataManager
     {
-        private string _filePath;
+        private readonly string _filePath;
         private Dictionary<string, GameData> _presets;
 
         public GameDataManager(string filePath)

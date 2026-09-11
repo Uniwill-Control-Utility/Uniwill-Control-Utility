@@ -105,7 +105,7 @@ namespace Uniwill_Control_Utility.Services
 
     public class AdaptivePresetManager
     {
-        private string _filePath;
+        private readonly string _filePath;
         private Dictionary<string, AdaptivePreset> _presets;
 
         public AdaptivePresetManager(string filePath)

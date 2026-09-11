@@ -306,7 +306,7 @@ namespace Uniwill_Control_Utility.Views.Controls
         /*  Tooltip                                                            */
         /* ------------------------------------------------------------------ */
 
-        private class InfoTooltip : ToolTip
+        private sealed class InfoTooltip : ToolTip
         {
             private readonly TextBlock _tempLabel = new()
             {
