@@ -74,16 +74,21 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             public int dmDisplayFrequency;
         }
 
-        internal static string? TargetDisplayName = FindLaptopScreen();
-        internal static List<string> UniqueResolutions = GetSupportedResolutions(TargetDisplayName ?? DefaultDevice);
-        internal static List<int> UniqueRefreshRates = GetSupportedRefreshRates(TargetDisplayName ?? DefaultDevice);
+        private static string? _targetDisplayName = FindLaptopScreen();
+        internal static string? TargetDisplayName => _targetDisplayName;
+
+        private static List<string> _uniqueResolutions = GetSupportedResolutions(_targetDisplayName ?? DefaultDevice);
+        internal static List<string> UniqueResolutions => _uniqueResolutions;
+
+        private static List<int> _uniqueRefreshRates = GetSupportedRefreshRates(_targetDisplayName ?? DefaultDevice);
+        internal static List<int> UniqueRefreshRates => _uniqueRefreshRates;
 
         public static void SetUpLists()
         {
-            UniqueRefreshRates = GetSupportedRefreshRates(TargetDisplayName ?? DefaultDevice);
-            UniqueRefreshRates = UniqueRefreshRates.Distinct().ToList();
-            UniqueRefreshRates.Sort();
-            UniqueRefreshRates.Reverse();
+            _uniqueRefreshRates = GetSupportedRefreshRates(_targetDisplayName ?? DefaultDevice)
+                .Distinct()
+                .OrderByDescending(x => x)
+                .ToList();
         }
 
         static List<string> GetSupportedResolutions(string? targetDisplayName)
@@ -121,7 +126,6 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
             DISPLAY_DEVICE displayDevice = new DISPLAY_DEVICE();
             displayDevice.cb = (uint)Marshal.SizeOf(displayDevice);
-            int displayCount = Screen.AllScreens.Length;
             for (uint deviceIndex = 0; EnumDisplayDevices(null, deviceIndex, ref displayDevice, 0); deviceIndex++)
             {
                 if (displayDevice.DeviceName == targetDisplayName)
@@ -175,10 +179,10 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         public static void ApplySettings(int newHz)
         {
-            TargetDisplayName = FindLaptopScreen();
+            _targetDisplayName = FindLaptopScreen();
             if (newHz > 0)
             {
-                Display.ChangeDisplaySettings(Display.TargetDisplayName, newHz);
+                Display.ChangeDisplaySettings(_targetDisplayName, newHz);
             }
             else
             {
