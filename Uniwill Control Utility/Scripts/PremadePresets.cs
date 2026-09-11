@@ -70,7 +70,7 @@ namespace Uniwill_Control_Utility.Scripts
         private static (int Pl1, int Pl2) GetIntelPowerLimits(string processorName)
         {
             var name = processorName.ToUpperInvariant();
-            var match = Regex.Match(name, @"(?:I[3579]-|ULTRA\s+[3579]\s+)(?<model>\d{3,5})(?<suffix>[A-Z0-9]*)");
+            var match = Regex.Match(name, @"(?:I[3579]-|ULTRA\s+[3579]\s+)(?<model>\d{3,5})(?<suffix>[A-Z0-9]*)", RegexOptions.None, TimeSpan.FromSeconds(1));
             var model = match.Success ? match.Groups["model"].Value : string.Empty;
             var suffix = match.Success ? match.Groups["suffix"].Value : string.Empty;
             var generation = 0;

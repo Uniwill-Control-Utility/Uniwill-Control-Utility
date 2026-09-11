@@ -401,7 +401,7 @@ namespace RyzenSmu
             }
         }
 
-        internal static Smu RyzenAccess = new Smu();
+        internal static readonly Smu RyzenAccess = new();
 
         public static void applySettings(string commandName, uint value)
         {

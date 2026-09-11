@@ -307,7 +307,7 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>
         /// Returns whether any Flydigi BS series device is currently available.
         /// </summary>
-        public bool IsDeviceAvailable()
+        public static bool IsDeviceAvailable()
         {
             return DiscoverDevices().Count > 0;
         }

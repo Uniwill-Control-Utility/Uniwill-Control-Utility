@@ -33,7 +33,7 @@ namespace Uniwill_Control_Utility.ViewModels
             AppVersion = $"Uniwill Control Utility - {GetAssemblyVersion()}";
         }
 
-        private string GetAssemblyVersion()
+        private static string GetAssemblyVersion()
         {
             return System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? String.Empty;
         }

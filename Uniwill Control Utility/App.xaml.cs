@@ -55,7 +55,7 @@ namespace Uniwill_Control_Utility
             return _host?.Services.GetService(typeof(T)) as T;
         }
 
-        internal static string version = "26.2.2";
+        internal static readonly string version = "26.2.2";
         private Mutex? mutex;
         private const string MutexName = "UniversalX86TuningUtility";
 
@@ -350,7 +350,7 @@ namespace Uniwill_Control_Utility
                 try
                 {
                     var flydigiCoolerService = _host.Services.GetService<FlydigiCoolerService>();
-                    if (flydigiCoolerService != null && flydigiCoolerService.IsDeviceAvailable())
+                    if (flydigiCoolerService != null && FlydigiCoolerService.IsDeviceAvailable())
                         await flydigiCoolerService.TryAutoConnectAsync();
                 }
                 catch (Exception ex)
@@ -648,7 +648,7 @@ namespace Uniwill_Control_Utility
                 {
                     process.StartInfo = processInfo;
                     process.Start();
-                    string output = process.StandardOutput.ReadToEnd();
+                    process.StandardOutput.ReadToEnd();
                     process.WaitForExit();
                 }
                 finally

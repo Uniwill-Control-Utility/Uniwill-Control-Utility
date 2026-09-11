@@ -15,7 +15,7 @@ namespace Uniwill_Control_Utility.Views.Controls;
 /// </summary>
 public partial class ColorPickerControl : UserControl
 {
-    private static readonly Regex HexRegex = new("^#(?:[0-9A-Fa-f]{3}){2}$");
+    private static readonly Regex HexRegex = new("^#(?:[0-9A-Fa-f]{3}){2}$", RegexOptions.None, TimeSpan.FromSeconds(1));
 
     private bool _isEditing;
 
