@@ -1380,40 +1380,63 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void tsAvoidance_Checked(object sender, RoutedEventArgs e)
         {
-            if (_coolerService == null) return;
+            ushort startRpm = (ushort)(nudAvoidanceStart.Value ?? 2000);
+            ushort endRpm = (ushort)(nudAvoidanceEnd.Value ?? 2500);
 
-            var settings = _coolerService.GetSettings();
-            settings.AvoidanceEnabled = true;
-            if (nudAvoidanceStart.Value.HasValue)
-                settings.AvoidanceStartRpm = (ushort)nudAvoidanceStart.Value.Value;
-            if (nudAvoidanceEnd.Value.HasValue)
-                settings.AvoidanceEndRpm = (ushort)nudAvoidanceEnd.Value.Value;
-            _coolerService.PersistSettings();
+            // Update BS2+ service and smart control
+            if (_coolerService != null)
+            {
+                var settings = _coolerService.GetSettings();
+                settings.AvoidanceEnabled = true;
+                settings.AvoidanceStartRpm = startRpm;
+                settings.AvoidanceEndRpm = endRpm;
+                _coolerService.PersistSettings();
+                if (_smartControl != null)
+                    _smartControl.Settings = settings;
+            }
+
+            // Update BS1 service and smart control
+            if (_bs1Service != null)
+            {
+                var bs1Settings = _bs1Service.GetSettings();
+                bs1Settings.AvoidanceEnabled = true;
+                bs1Settings.AvoidanceStartRpm = startRpm;
+                bs1Settings.AvoidanceEndRpm = endRpm;
+                _bs1Service.PersistSettings();
+                if (_bs1SmartControl != null)
+                    _bs1SmartControl.Settings = bs1Settings;
+            }
 
             // Show Avoidance Range row + divider
             AvoidanceRangeDivider.Visibility = Visibility.Visible;
             AvoidanceRangeRow.Visibility = Visibility.Visible;
-
-            // Update smart control settings if active
-            if (_smartControl != null)
-                _smartControl.Settings = settings;
         }
 
         private void tsAvoidance_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (_coolerService == null) return;
+            // Update BS2+ service and smart control
+            if (_coolerService != null)
+            {
+                var settings = _coolerService.GetSettings();
+                settings.AvoidanceEnabled = false;
+                _coolerService.PersistSettings();
+                if (_smartControl != null)
+                    _smartControl.Settings = settings;
+            }
 
-            var settings = _coolerService.GetSettings();
-            settings.AvoidanceEnabled = false;
-            _coolerService.PersistSettings();
+            // Update BS1 service and smart control
+            if (_bs1Service != null)
+            {
+                var bs1Settings = _bs1Service.GetSettings();
+                bs1Settings.AvoidanceEnabled = false;
+                _bs1Service.PersistSettings();
+                if (_bs1SmartControl != null)
+                    _bs1SmartControl.Settings = bs1Settings;
+            }
 
             // Hide Avoidance Range row + divider
             AvoidanceRangeDivider.Visibility = Visibility.Collapsed;
             AvoidanceRangeRow.Visibility = Visibility.Collapsed;
-
-            // Update smart control settings if active
-            if (_smartControl != null)
-                _smartControl.Settings = settings;
         }
 
         private void cbxTempSource_SelectionChanged(object sender, EventArgs e)
@@ -1439,14 +1462,31 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void nudAvoidance_ValueChanged(object? sender, RoutedEventArgs e)
         {
-            if (_coolerService == null) return;
+            // Update BS2+ service and smart control
+            if (_coolerService != null)
+            {
+                var settings = _coolerService.GetSettings();
+                if (nudAvoidanceStart.Value.HasValue)
+                    settings.AvoidanceStartRpm = (ushort)nudAvoidanceStart.Value.Value;
+                if (nudAvoidanceEnd.Value.HasValue)
+                    settings.AvoidanceEndRpm = (ushort)nudAvoidanceEnd.Value.Value;
+                _coolerService.PersistSettings();
+                if (_smartControl != null)
+                    _smartControl.Settings = settings;
+            }
 
-            var settings = _coolerService.GetSettings();
-            if (nudAvoidanceStart.Value.HasValue)
-                settings.AvoidanceStartRpm = (ushort)nudAvoidanceStart.Value.Value;
-            if (nudAvoidanceEnd.Value.HasValue)
-                settings.AvoidanceEndRpm = (ushort)nudAvoidanceEnd.Value.Value;
-            _coolerService.PersistSettings();
+            // Update BS1 service and smart control
+            if (_bs1Service != null)
+            {
+                var bs1Settings = _bs1Service.GetSettings();
+                if (nudAvoidanceStart.Value.HasValue)
+                    bs1Settings.AvoidanceStartRpm = (ushort)nudAvoidanceStart.Value.Value;
+                if (nudAvoidanceEnd.Value.HasValue)
+                    bs1Settings.AvoidanceEndRpm = (ushort)nudAvoidanceEnd.Value.Value;
+                _bs1Service.PersistSettings();
+                if (_bs1SmartControl != null)
+                    _bs1SmartControl.Settings = bs1Settings;
+            }
         }
 
         /* ------------------------------------------------------------------ */
@@ -2054,7 +2094,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                             if (settings.ManualGear > 0)
                                 await _coolerService.WriteGearAsync((byte)settings.ManualGear);
                             break;
-                        case FanModeAuto: // Auto Curve - already handled by StartAutoControl in temperature polling
+                        case FanModeAuto: // Auto Curve - start smart control on connect
+                            StartAutoControl();
                             break;
                     }
                 }

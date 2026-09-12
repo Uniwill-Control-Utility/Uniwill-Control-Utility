@@ -65,6 +65,7 @@ namespace Uniwill_Control_Utility.Services
 
         private const int CmNotifyFilterTypeDeviceInterface = 0;
         private const int CmNotifyActionInterfaceArrival = 0;
+        private const int CmNotifyActionInterfaceRemoval = 1;
         private const int CmNotifyEventSymbolicLinkOffset = 24;
 
         // CM_NOTIFY_FILTER struct (sized for device-interface notifications)
@@ -699,7 +700,7 @@ namespace Uniwill_Control_Utility.Services
             _readTask = Task.Run(() =>
             {
                 int consecutiveErrors = 0;
-                const int maxConsecutiveErrors = 20; // Match THRM: 20 consecutive errors = disconnect
+                const int maxConsecutiveErrors = 10; // 10 errors × 200ms = ~2s detection
 
                 while (!token.IsCancellationRequested && _device != null && _device.IsOpen)
                 {
@@ -709,13 +710,22 @@ namespace Uniwill_Control_Utility.Services
 
                         if (data.Status == HidDeviceData.ReadStatus.Success)
                         {
-                            OnInputReport(data.Data);
-                            consecutiveErrors = 0; // Reset error counter on successful read
+                            if (data.Data != null && data.Data.Length > 0)
+                            {
+                                OnInputReport(data.Data);
+                            }
+                            // Success with empty data = timeout (normal idle behavior).
+                            // Success with data = actual report. Either way, reset errors.
+                            consecutiveErrors = 0;
                         }
                         else
                         {
-                            // Timeout or non-success read — don't count as error (normal idle behavior)
-                            consecutiveErrors = 0;
+                            // Error status (device removed, handle invalid, etc.) — count as error.
+                            consecutiveErrors++;
+                            if (consecutiveErrors >= maxConsecutiveErrors)
+                            {
+                                break;
+                            }
                         }
                     }
                     catch (ObjectDisposedException)
@@ -1628,11 +1638,23 @@ namespace Uniwill_Control_Utility.Services
 
         private void HidArrivalCallback(nint context, uint notificationType, nint eventData, uint eventDataSize)
         {
-            if (notificationType != CmNotifyActionInterfaceArrival || eventData == nint.Zero)
-                return;
-
             try
             {
+                // Handle removal: instantly disconnect if a Flydigi HID interface disappears
+                if (notificationType == CmNotifyActionInterfaceRemoval)
+                {
+                    if (IsConnected)
+                    {
+                        System.Diagnostics.Debug.WriteLine("[FlydigiCoolerService] Flydigi HID device removed");
+                        DisconnectAsync();
+                    }
+                    return;
+                }
+
+                // Handle arrival
+                if (notificationType != CmNotifyActionInterfaceArrival || eventData == nint.Zero)
+                    return;
+
                 // Extract the symbolic link path from the event data (offset 24, UTF-16)
                 if (eventDataSize <= CmNotifyEventSymbolicLinkOffset)
                     return;
@@ -1652,14 +1674,28 @@ namespace Uniwill_Control_Utility.Services
                         System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Flydigi HID device arrived: {path}");
                         FlydigiHardwareDetector.InvalidateCache();
 
-                        // Auto-connect if not already connected and user didn't explicitly disconnect
+                        // Auto-connect if not already connected and user didn't explicitly disconnect.
+                        // Use the device path from the event data (fresh path from Windows),
+                        // not the saved LastDevicePath which may be stale after a reconnect.
                         if (!IsConnected && !_userDisconnected && _settings.AutoConnect)
                         {
-                            // Run async — callbacks must return quickly
+                            // Run async — callbacks must return quickly.
+                            // Retry with increasing delay because the HID device may not be
+                            // fully ready when the arrival notification fires (BLE-HID devices
+                            // need time for Windows to finish enumerating the interface).
                             _ = Task.Run(async () =>
                             {
-                                await Task.Delay(500, CancellationToken.None); // Brief delay for device to stabilize
-                                await TryAutoConnectAsync();
+                                for (int attempt = 0; attempt < 4; attempt++)
+                                {
+                                    await Task.Delay(500 * (attempt + 1), CancellationToken.None); // 0.5s, 1s, 1.5s, 2s
+                                    if (IsConnected) return; // Another path may have connected already
+                                    bool ok = await ConnectAsync(path);
+                                    if (ok)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Auto-connected via HID arrival: {path}");
+                                        return;
+                                    }
+                                }
                             });
                         }
                         return;
@@ -1710,11 +1746,20 @@ namespace Uniwill_Control_Utility.Services
 
                                 if (!_userDisconnected && _settings.AutoConnect && !IsConnected)
                                 {
-                                    _ = Task.Run(async () =>
+                                    // Discover fresh devices to get the current device path
+                                    // (the saved LastDevicePath may be stale after a reconnect)
+                                    var freshDevices = DiscoverDevices();
+                                    if (freshDevices.Count > 0)
                                     {
-                                        await Task.Delay(500, CancellationToken.None); // Brief delay for device to stabilize
-                                        await TryAutoConnectAsync();
-                                    });
+                                        var freshPath = freshDevices[0].DevicePath;
+                                        _ = Task.Run(async () =>
+                                        {
+                                            await Task.Delay(500, CancellationToken.None);
+                                            bool ok = await ConnectAsync(freshPath);
+                                            if (ok)
+                                                System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Auto-connected via device monitor: {freshPath}");
+                                        });
+                                    }
                                 }
                             }
                             else if (!currentlyDetected && _lastDeviceDetected)
