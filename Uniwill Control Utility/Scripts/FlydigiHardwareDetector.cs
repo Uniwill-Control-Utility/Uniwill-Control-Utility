@@ -185,13 +185,21 @@ namespace Uniwill_Control_Utility.Scripts
 
         /// <summary>
         /// Checks if a BLE advertising name matches a known Flydigi BS1 device.
+        /// BS1 advertises as "Flydigi BS1" (or similar). BS2/BS3 Pro advertise with their
+        /// own model names (e.g. "FlyDigi BS2PRO", "FlyDigi BS3PRO") over BLE even though
+        /// they are HID devices - we must exclude them so they don't appear as BS1 candidates.
         /// </summary>
         private static bool IsBs1AdvertisingName(string name)
         {
             string lower = name.ToLowerInvariant();
-            return lower.Contains("flydigi") ||
-                   lower.Contains("bs1") ||
-                   lower.Contains("cooling pad");
+
+            // Exclude known BS2+ model names - these are HID devices, not BS1
+            if (lower.Contains("bs2") || lower.Contains("bs3"))
+                return false;
+
+            // Match BS1: require "bs1" in name, or "flydigi" + "cooling pad" (without bs2/bs3)
+            return lower.Contains("bs1") ||
+                   (lower.Contains("flydigi") && lower.Contains("cooling pad"));
         }
 
         /// <summary>

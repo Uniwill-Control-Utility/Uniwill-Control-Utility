@@ -64,6 +64,8 @@ namespace Uniwill_Control_Utility.Services
         private const int FirstHeartbeatDelaySeconds = 2;
         private const int AdScanMinTimeoutMs = 3000;
         private const ushort FlydigiServiceUuid16 = 0xFFF0;
+        /// <summary>RSSI threshold (dBm) for proximity filtering. Devices weaker than this are excluded. -70 dBm ≈ within a few meters.</summary>
+        private const int RssiProximityThreshold = -70;
 
         // Settings persistence
         private Bs1Settings _settings = new();
@@ -179,125 +181,54 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// Discovers Flydigi BS1 devices via BLE advertising and paired device enumeration.
+        /// Only returns devices that are actively advertising nearby (verified by RSSI).
+        /// Paired devices that are not advertising are excluded (likely not in proximity).
         /// </summary>
         public async Task<List<Bs1DeviceInfo>> DiscoverDevicesAsync(int timeoutMs = 10000)
         {
             var devices = new List<Bs1DeviceInfo>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            // 1. Try to reconnect to the last known device (if address is saved)
-            if (!string.IsNullOrEmpty(_settings.LastDeviceAddress))
+            // Collect a map of paired device names/ids so we can resolve DeviceId from advertisement address
+            var pairedDeviceMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            try
             {
-                try
-                {
-                    Log($"{LogPrefix} Trying last known device: {_settings.LastDeviceAddress}");
-
-                    // The saved address may be a Windows DeviceId or a raw Bluetooth address
-                    BluetoothLEDevice? lastDevice = null;
-                    bool isDeviceId = _settings.LastDeviceAddress.StartsWith("\\\\?\\") ||
-                                      _settings.LastDeviceAddress.Contains('#') ||
-                                      _settings.LastDeviceAddress.StartsWith("BluetoothLE");
-
-                    if (isDeviceId)
-                    {
-                        lastDevice = await BluetoothLEDevice.FromIdAsync(_settings.LastDeviceAddress).AsTask();
-                    }
-                    else
-                    {
-                        lastDevice = await BluetoothLEDevice.FromBluetoothAddressAsync(
-                            ParseBluetoothAddress(_settings.LastDeviceAddress)).AsTask();
-                    }
-
-                    if (lastDevice != null)
-                    {
-                        var name = lastDevice.Name ?? DefaultDeviceName;
-                        Log($"{LogPrefix} Last known device found: {name} ({_settings.LastDeviceAddress})");
-                        devices.Add(new Bs1DeviceInfo
-                        {
-                            Address = _settings.LastDeviceAddress,
-                            Name = name,
-                            Rssi = 0
-                        });
-                        seen.Add(_settings.LastDeviceAddress);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log($"{LogPrefix} Failed to connect to last known device: {ex.Message}");
-                }
-            }
-
-            // 2. Enumerate paired/unpaired BLE devices (may find devices that aren't actively advertising)
-            // Skip if we already found the last known device — enumeration can take 20-40 seconds
-            if (devices.Count == 0)
-            {
-                try
-                {
-                    Log(LogPrefix + " Enumerating paired BLE devices...");
-                    var selector = BluetoothLEDevice.GetDeviceSelectorFromPairingState(true);
-                    var pairedDevices = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(selector);
-                    foreach (var deviceInfo in pairedDevices)
-                    {
-                        var name = deviceInfo.Name ?? string.Empty;
-
-                        Log($"{LogPrefix} Paired BLE device: {name} (Id={deviceInfo.Id})");
-
-                        if (!string.IsNullOrEmpty(name) && IsBs1AdvertisingName(name))
-                        {
-                            // Store the DeviceId for FromIdAsync connection
-                            var bs1Info = new Bs1DeviceInfo
-                            {
-                                Address = deviceInfo.Id,
-                                Name = name,
-                                Rssi = 0
-                            };
-                            devices.Add(bs1Info);
-                            seen.Add(deviceInfo.Id);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log($"{LogPrefix} Paired device enumeration failed: {ex.Message}");
-                }
-
-                // 2b. Also enumerate unpaired BLE devices
-                try
-                {
-                    Log(LogPrefix + " Enumerating unpaired BLE devices...");
-                    var unpairedSelector = BluetoothLEDevice.GetDeviceSelectorFromPairingState(false);
-                var unpairedDevices = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(unpairedSelector);
-                foreach (var deviceInfo in unpairedDevices)
+                Log(LogPrefix + " Enumerating paired BLE devices for address resolution...");
+                var selector = BluetoothLEDevice.GetDeviceSelectorFromPairingState(true);
+                var pairedDevices = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(selector);
+                foreach (var deviceInfo in pairedDevices)
                 {
                     var name = deviceInfo.Name ?? string.Empty;
-
-                    Log($"{LogPrefix} Unpaired BLE device: {name} (Id={deviceInfo.Id})");
-
-                    if (!string.IsNullOrEmpty(name) && IsBs1AdvertisingName(name))
+                    if (!string.IsNullOrEmpty(name))
                     {
-                        var bs1Info = new Bs1DeviceInfo
+                        // Store by name for later lookup from advertisement scan
+                        if (!pairedDeviceMap.ContainsKey(name))
+                            pairedDeviceMap[name] = deviceInfo.Id;
+
+                        // Also try to extract a Bluetooth address-like key from the DeviceId
+                        // DeviceId format: "\\?\Bluetooth#LE#...#..." - extract address if possible
+                        var idParts = deviceInfo.Id.Split('#');
+                        if (idParts.Length >= 3)
                         {
-                            Address = deviceInfo.Id,
-                            Name = name,
-                            Rssi = 0
-                        };
-                        devices.Add(bs1Info);
-                        seen.Add(deviceInfo.Id);
+                            var addressPart = idParts[2];
+                            if (!pairedDeviceMap.ContainsKey(addressPart))
+                                pairedDeviceMap[addressPart] = deviceInfo.Id;
+                        }
                     }
                 }
             }
             catch (Exception ex)
-                {
-                    Log($"{LogPrefix} Unpaired device enumeration failed: {ex.Message}");
-                }
+            {
+                Log($"{LogPrefix} Paired device enumeration failed: {ex.Message}");
             }
 
-            // 3. Scan for BLE advertisements (finds unpaired devices)
+            // Scan for BLE advertisements - primary discovery method with RSSI proximity filter
             var watcher = new BluetoothLEAdvertisementWatcher();
             watcher.Received += (s, e) =>
             {
                 var name = e.Advertisement.LocalName;
                 var address = e.BluetoothAddress.ToString();
+                var rssi = e.RawSignalStrengthInDBm;
 
                 // Check for Flydigi service UUID (0xFFF0) in advertising data
                 bool hasFlydigiService = false;
@@ -321,17 +252,34 @@ namespace Uniwill_Control_Utility.Services
 
                 if (nameMatch || hasFlydigiService)
                 {
-                    Log($"{LogPrefix} BLE advertisement matched: '{name}' ({address}) RSSI={e.RawSignalStrengthInDBm}");
+                    // Filter by RSSI to ensure the device is physically nearby.
+                    // Devices beyond ~-70 dBm are typically more than a few meters away
+                    // or out of range. A value of 0 means RSSI is unavailable.
+                    if (rssi != 0 && rssi < RssiProximityThreshold)
+                    {
+                        Log($"{LogPrefix} BLE advertisement '{name}' ({address}) RSSI={rssi} - filtered out (too far, threshold {RssiProximityThreshold} dBm)");
+                        return;
+                    }
+
+                    Log($"{LogPrefix} BLE advertisement matched: '{name}' ({address}) RSSI={rssi}");
 
                     lock (devices)
                     {
                         if (seen.Add(address))
                         {
+                            // If this is a paired device, use the DeviceId for reliable connection
+                            string resolvedAddress = address;
+                            if (!string.IsNullOrEmpty(name) && pairedDeviceMap.TryGetValue(name, out var deviceId))
+                            {
+                                resolvedAddress = deviceId;
+                                seen.Add(deviceId);
+                            }
+
                             devices.Add(new Bs1DeviceInfo
                             {
-                                Address = address,
+                                Address = resolvedAddress,
                                 Name = name ?? DefaultDeviceName,
-                                Rssi = e.RawSignalStrengthInDBm
+                                Rssi = rssi
                             });
                         }
                     }
@@ -339,11 +287,53 @@ namespace Uniwill_Control_Utility.Services
             };
 
             watcher.Start();
-            // Shorten scan if we already found devices via last-known or enumeration
-            int actualTimeout = devices.Count > 0 ? Math.Min(AdScanMinTimeoutMs, timeoutMs) : timeoutMs;
-            Log($"{LogPrefix} Starting BLE advertisement scan for {actualTimeout}ms...");
-            await Task.Delay(actualTimeout);
+            Log($"{LogPrefix} Starting BLE advertisement scan for {timeoutMs}ms...");
+            await Task.Delay(timeoutMs);
             watcher.Stop();
+
+            // If no devices found via advertisement scan, fall back to trying the last known device
+            if (devices.Count == 0 && !string.IsNullOrEmpty(_settings.LastDeviceAddress))
+            {
+                try
+                {
+                    Log($"{LogPrefix} No devices found via scan. Trying last known device: {_settings.LastDeviceAddress}");
+
+                    BluetoothLEDevice? lastDevice = null;
+                    bool isDeviceId = _settings.LastDeviceAddress.StartsWith("\\\\?\\") ||
+                                      _settings.LastDeviceAddress.Contains('#') ||
+                                      _settings.LastDeviceAddress.StartsWith("BluetoothLE");
+
+                    if (isDeviceId)
+                    {
+                        lastDevice = await BluetoothLEDevice.FromIdAsync(_settings.LastDeviceAddress).AsTask();
+                    }
+                    else
+                    {
+                        lastDevice = await BluetoothLEDevice.FromBluetoothAddressAsync(
+                            ParseBluetoothAddress(_settings.LastDeviceAddress)).AsTask();
+                    }
+
+                    if (lastDevice != null)
+                    {
+                        var name = lastDevice.Name ?? DefaultDeviceName;
+                        // Only include if the name still matches a BS1 device
+                        if (IsBs1AdvertisingName(name))
+                        {
+                            Log($"{LogPrefix} Last known device found: {name} ({_settings.LastDeviceAddress})");
+                            devices.Add(new Bs1DeviceInfo
+                            {
+                                Address = _settings.LastDeviceAddress,
+                                Name = name,
+                                Rssi = 0
+                            });
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"{LogPrefix} Failed to connect to last known device: {ex.Message}");
+                }
+            }
 
             Log($"{LogPrefix} Discovery complete. Found {devices.Count} device(s).");
             return devices;
@@ -363,13 +353,21 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// Checks if a BLE advertising name matches a known Flydigi BS1 device.
+        /// BS1 advertises as "Flydigi BS1" (or similar). BS2/BS3 Pro advertise with their
+        /// own model names (e.g. "FlyDigi BS2PRO", "FlyDigi BS3PRO") over BLE even though
+        /// they are HID devices - we must exclude them so they don't appear as BS1 candidates.
         /// </summary>
         private static bool IsBs1AdvertisingName(string name)
         {
             string lower = name.ToLowerInvariant();
-            return lower.Contains("flydigi") ||
-                   lower.Contains("bs1") ||
-                   lower.Contains("cooling pad");
+
+            // Exclude known BS2+ model names - these are HID devices, not BS1
+            if (lower.Contains("bs2") || lower.Contains("bs3"))
+                return false;
+
+            // Match BS1: require "bs1" in name, or "flydigi" + "cooling pad" (without bs2/bs3)
+            return lower.Contains("bs1") ||
+                   (lower.Contains("flydigi") && lower.Contains("cooling pad"));
         }
 
         /// <summary>

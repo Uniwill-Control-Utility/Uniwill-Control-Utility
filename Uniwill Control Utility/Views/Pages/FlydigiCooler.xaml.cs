@@ -1790,8 +1790,23 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Determine device type from the event sender (which service fired this event)
                 _isBs1Device = isBs1Sender;
 
-                // Notify hardware detector FIRST so UpdatePageTitle reads the correct model name
-                string model = _isBs1Device ? "BS1" : FlydigiHardwareDetector.GetDetectedModelName();
+                // Notify hardware detector FIRST so UpdatePageTitle reads the correct model name.
+                // For HID devices, prefer the ConnectedDeviceInfo from the service (which reads
+                // the ProductId from the actual connected device) rather than the cached detector,
+                // which may return a stale or wrong model when multiple devices are paired.
+                string model;
+                if (_isBs1Device)
+                {
+                    model = "BS1";
+                }
+                else if (_coolerService?.ConnectedDeviceInfo?.ModelName is { } hidModel)
+                {
+                    model = hidModel;
+                }
+                else
+                {
+                    model = FlydigiHardwareDetector.GetDetectedModelName();
+                }
                 FlydigiHardwareDetector.SetConnectedDeviceType(
                     _isBs1Device ? ConnectedDeviceType.BS1 : ConnectedDeviceType.Hid, model);
 
@@ -1877,7 +1892,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                         _bs1SmartControl = null;
                     }
 
-                    string model = FlydigiHardwareDetector.GetDetectedModelName();
+                    // Use the ConnectedDeviceInfo from the service for accurate model name
+                    string model = _coolerService?.ConnectedDeviceInfo?.ModelName
+                        ?? FlydigiHardwareDetector.GetDetectedModelName();
                     FlydigiHardwareDetector.SetConnectedDeviceType(ConnectedDeviceType.Hid, model);
                     ApplyDeviceTypeUI(); // Restore HID UI (RGB, etc.)
 
