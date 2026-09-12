@@ -20,9 +20,10 @@ namespace Uniwill_Control_Utility.Views.Pages
     /// Provides fan speed, gear presets, auto curve control, RGB, and device settings
     /// for Flydigi BS series cooling pads.
     /// </summary>
-    public partial class FlydigiCooler : Page
+    public partial class FlydigiCooler : Page, IDisposable
     {
         private bool _isInitialized;
+        private bool _disposed;
         private FlydigiCoolerService? _coolerService;
         private Bs1Service? _bs1Service;
         private DeviceApplier? _deviceApplier;
@@ -1454,17 +1455,21 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void OnConnectionStateChanged(object? sender, bool connected)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            try
             {
-                bool isBs1Sender = sender == _bs1Service;
-                UpdateConnectionUI(connected, isBs1Sender);
-                // Apply initial settings on first connect (from the Connect button, not page navigation)
-                if (connected && !_hasAppliedInitialSettings)
+                Application.Current.Dispatcher.Invoke(() =>
                 {
-                    ApplyRgbAsync();
-                    _hasAppliedInitialSettings = true;
-                }
-            });
+                    bool isBs1Sender = sender == _bs1Service;
+                    UpdateConnectionUI(connected, isBs1Sender);
+                    // Apply initial settings on first connect (from the Connect button, not page navigation)
+                    if (connected && !_hasAppliedInitialSettings)
+                    {
+                        ApplyRgbAsync();
+                        _hasAppliedInitialSettings = true;
+                    }
+                });
+            }
+            catch { /* Dispatcher shutting down during app exit - safe to ignore */ }
         }
 
         private void OnStatusChanged(object? sender, string message)
@@ -1474,12 +1479,16 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void OnFanDataReceived(object? sender, FanRpmData data)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            try
             {
-                // Only show RPM data when actually connected
-                if (spConnectedState.Visibility == Visibility.Visible)
-                    tbCurrentRpm.Text = $"{data.CurrentRpm} RPM";
-            });
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    // Only show RPM data when actually connected
+                    if (spConnectedState.Visibility == Visibility.Visible)
+                        tbCurrentRpm.Text = $"{data.CurrentRpm} RPM";
+                });
+            }
+            catch { /* Dispatcher shutting down during app exit - safe to ignore */ }
         }
 
         /* ------------------------------------------------------------------ */
@@ -1823,6 +1832,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 spConnectedState.Visibility = Visibility.Visible;
                 spDisconnectedState.Visibility = Visibility.Collapsed;
+                InfoBarConnection.IsOpen = false;
                 btnScan.IsEnabled = false;
                 SetControlsEnabled(true);
 
@@ -1938,6 +1948,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 spConnectedState.Visibility = Visibility.Collapsed;
                 spDisconnectedState.Visibility = Visibility.Visible;
+                InfoBarConnection.IsOpen = true;
                 tbCurrentRpm.Text = "--";
                 tbTemperature.Text = "--";
                 SetControlsEnabled(false);
@@ -1953,9 +1964,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _isBs1Device = false;
 
                 UpdatePageTitle();
-
-                // Auto-scan once after disconnect so the user can immediately reconnect
-                RunAutoScanAsync();
             }
         }
 
@@ -2090,7 +2098,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (checkDispatcher != null)
             {
                 bool isConnected = false;
-                checkDispatcher.Invoke(() => isConnected = (spConnectedState.Visibility == Visibility.Visible));
+                try
+                {
+                    checkDispatcher.Invoke(() => isConnected = (spConnectedState.Visibility == Visibility.Visible));
+                }
+                catch { /* Dispatcher shutting down during app exit */ return; }
+
                 if (!isConnected)
                     return;
             }
@@ -2112,17 +2125,24 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (dispatcher == null)
                     return;
 
-                dispatcher.Invoke(() =>
+                try
                 {
-                    tbTemperature.Text = temp.HasValue ? $"{temp.Value:F1}°C" : "N/A";
-                });
+                    dispatcher.Invoke(() =>
+                    {
+                        tbTemperature.Text = temp.HasValue ? $"{temp.Value:F1}°C" : "N/A";
+                    });
+                }
+                catch { /* Dispatcher shutting down during app exit - safe to ignore */ }
             }
             catch (Exception)
             {
                 // Non-critical: temperature reading failures shouldn't crash the UI
                 var dispatcher = Application.Current?.Dispatcher;
                 if (dispatcher != null)
-                    dispatcher.Invoke(() => tbTemperature.Text = "N/A");
+                {
+                    try { dispatcher.Invoke(() => tbTemperature.Text = "N/A"); }
+                    catch { /* Dispatcher shutting down during app exit */ }
+                }
             }
         }
 
@@ -2185,10 +2205,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 cbxDevices.Items.Clear();
 
-                // Scan for HID devices (BS2+)
+                // Scan for HID devices (BS2+) — uses BLE ad scan fallback if HID enum finds nothing
                 if (_coolerService != null)
                 {
-                    var hidDevices = FlydigiCoolerService.DiscoverDevices();
+                    var hidDevices = await FlydigiCoolerService.DiscoverDevicesAsync();
                     foreach (var device in hidDevices)
                     {
                         cbxDevices.Items.Add(new ComboBoxItem
@@ -2219,7 +2239,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 else
                 {
-                    MessageBox.Show("No Flydigi devices found.\nMake sure the cooling pad is connected (USB for BS2+, BLE for BS1).",
+                    MessageBox.Show("No Flydigi devices found.\n\n" +
+                        "Make sure the device is powered on.\n" +
+                        "BS1: ensure Bluetooth is enabled.\n" +
+                        "BS2/BS3: connect the device in Windows Bluetooth Settings first.",
                         "No Devices", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
@@ -2234,8 +2257,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>
-        /// Runs a background scan for HID and BLE devices, populating the device combobox
-        /// with proper Tag objects so Connect can resolve the correct device.
+        /// Runs a fast background discovery for HID and BLE devices.
+        /// Uses instant HID enumeration for BS2+ and paired-device lookup for BS1
+        /// (no slow BLE advertisement scan).  If exactly one device is found,
+        /// connects automatically; otherwise populates the combobox for the user.
         /// </summary>
         private void RunAutoScanAsync()
         {
@@ -2251,7 +2276,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     List<(string Content, object Tag)> discoveredDevices = new();
 
-                    // Scan for HID devices (BS2+)
+                    // 1. HID enumeration (BS2+) — instant, finds connected devices
                     if (_coolerService != null)
                     {
                         var hidDevices = FlydigiCoolerService.DiscoverDevices();
@@ -2261,11 +2286,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                         }
                     }
 
-                    // Scan for BLE devices (BS1)
+                    // 2. BS1 fast path — try last-known address, then paired-device enumeration
                     if (_bs1Service != null)
                     {
-                        var bleDevices = await _bs1Service.DiscoverDevicesAsync(5000);
-                        foreach (var device in bleDevices)
+                        var bs1Devices = await TryDiscoverBs1FastAsync();
+                        foreach (var device in bs1Devices)
                         {
                             discoveredDevices.Add(($"{Bs1DeviceInfo.ModelName} ({device.Name})", (object)device));
                         }
@@ -2274,20 +2299,53 @@ namespace Uniwill_Control_Utility.Views.Pages
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         cbxDevices.Items.Clear();
-                        foreach (var dev in discoveredDevices)
+
+                        if (discoveredDevices.Count == 1)
                         {
+                            // Auto-connect to the single discovered device
                             cbxDevices.Items.Add(new ComboBoxItem
                             {
-                                Content = dev.Content,
-                                Tag = dev.Tag
+                                Content = discoveredDevices[0].Content,
+                                Tag = discoveredDevices[0].Tag
                             });
-                        }
-
-                        if (cbxDevices.Items.Count > 0)
                             cbxDevices.SelectedIndex = 0;
+                            btnScan.IsEnabled = true;
+                            btnScan.Content = "Scan";
 
-                        btnScan.IsEnabled = true;
-                        btnScan.Content = "Scan";
+                            // If already connected (e.g., auto-connect from previous session),
+                            // just update the UI instead of trying to connect again.
+                            bool alreadyConnected = (_coolerService?.IsConnected == true) ||
+                                                    (_bs1Service?.IsConnected == true);
+                            if (alreadyConnected)
+                            {
+                                bool bs1Connected = _bs1Service?.IsConnected == true;
+                                _isBs1Device = bs1Connected;
+                                UpdateConnectionUI(true, bs1Connected);
+                            }
+                            else
+                            {
+                                _ = Task.Run(() => ConnectToDeviceAsync());
+                            }
+                        }
+                        else if (discoveredDevices.Count > 1)
+                        {
+                            foreach (var dev in discoveredDevices)
+                            {
+                                cbxDevices.Items.Add(new ComboBoxItem
+                                {
+                                    Content = dev.Content,
+                                    Tag = dev.Tag
+                                });
+                            }
+                            cbxDevices.SelectedIndex = 0;
+                            btnScan.IsEnabled = true;
+                            btnScan.Content = "Scan";
+                        }
+                        else
+                        {
+                            btnScan.IsEnabled = true;
+                            btnScan.Content = "Scan";
+                        }
                     });
                 }
                 catch (Exception)
@@ -2298,6 +2356,130 @@ namespace Uniwill_Control_Utility.Views.Pages
                         btnScan.IsEnabled = true;
                         btnScan.Content = "Scan";
                     });
+                }
+            });
+        }
+
+        /// <summary>
+        /// Fast BS1 discovery without BLE advertisement scanning.
+        /// Tries last-known address first, then enumerates paired BLE devices.
+        /// </summary>
+        private async Task<List<Bs1DeviceInfo>> TryDiscoverBs1FastAsync()
+        {
+            var devices = new List<Bs1DeviceInfo>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // 1. Try last-known device address (instant)
+            var bs1Settings = _bs1Service!.GetSettings();
+            if (!string.IsNullOrEmpty(bs1Settings.LastDeviceAddress))
+            {
+                try
+                {
+                    var bleDevice = await TryGetBluetoothLEDeviceAsync(bs1Settings.LastDeviceAddress);
+                    if (bleDevice != null)
+                    {
+                        var name = bleDevice.Name ?? Bs1DeviceInfo.ModelName;
+                        if (IsBs1AdvertisingName(name))
+                        {
+                            if (seen.Add(bs1Settings.LastDeviceAddress))
+                            {
+                                devices.Add(new Bs1DeviceInfo
+                                {
+                                    Address = bs1Settings.LastDeviceAddress,
+                                    Name = name,
+                                    Rssi = 0
+                                });
+                            }
+                        }
+                        bleDevice.Dispose();
+                    }
+                }
+                catch { /* Last-known device unavailable */ }
+            }
+
+            // 2. Enumerate paired BLE devices and filter for BS1 names (fast, no ad scan)
+            try
+            {
+                var selector = global::Windows.Devices.Bluetooth.BluetoothLEDevice.GetDeviceSelectorFromPairingState(true);
+                var pairedDevices = await global::Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(selector);
+                foreach (var info in pairedDevices)
+                {
+                    var name = info.Name ?? string.Empty;
+                    if (!string.IsNullOrEmpty(name) && IsBs1AdvertisingName(name))
+                    {
+                        if (seen.Add(info.Id))
+                        {
+                            devices.Add(new Bs1DeviceInfo
+                            {
+                                Address = info.Id,
+                                Name = name,
+                                Rssi = 0
+                            });
+                        }
+                    }
+                }
+            }
+            catch { /* Paired device enumeration failed — non-critical */ }
+
+            return devices;
+        }
+
+        /// <summary>
+        /// Resolves a saved BS1 address (either DeviceId or Bluetooth address) to a BluetoothLEDevice.
+        /// </summary>
+        private static async Task<global::Windows.Devices.Bluetooth.BluetoothLEDevice?> TryGetBluetoothLEDeviceAsync(string address)
+        {
+            bool isDeviceId = address.StartsWith("\\\\?\\") || address.Contains('#');
+
+            if (isDeviceId)
+            {
+                return await global::Windows.Devices.Bluetooth.BluetoothLEDevice.FromIdAsync(address).AsTask();
+            }
+            else
+            {
+                string clean = address.Replace(":", "").Replace("-", "");
+                if (clean.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                    clean = clean.Substring(2);
+
+                if (ulong.TryParse(clean, System.Globalization.NumberStyles.HexNumber, null, out ulong btAddress))
+                {
+                    return await global::Windows.Devices.Bluetooth.BluetoothLEDevice.FromBluetoothAddressAsync(btAddress).AsTask();
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Checks if a BLE advertising name matches a known Flydigi BS1 device.
+        /// </summary>
+        private static bool IsBs1AdvertisingName(string name)
+        {
+            string lower = name.ToLowerInvariant();
+            if (lower.Contains("bs2") || lower.Contains("bs3"))
+                return false;
+            return lower.Contains("bs1") ||
+                   (lower.Contains("flydigi") && lower.Contains("cooling pad"));
+        }
+
+        /// <summary>
+        /// Connects to the device selected in the combobox (used for auto-connect after discovery).
+        /// Runs silently without blocking the UI or showing "Connecting..." states.
+        /// </summary>
+        private async Task ConnectToDeviceAsync()
+        {
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                if (cbxDevices.SelectedItem is not ComboBoxItem selectedItem)
+                    return;
+
+                if (selectedItem.Tag is FlydigiCoolerDeviceInfo hidInfo && _coolerService != null && !_coolerService.IsConnected)
+                {
+                    _ = _coolerService.ConnectAsync(hidInfo.DevicePath);
+                }
+                else if (selectedItem.Tag is Bs1DeviceInfo bleInfo && _bs1Service != null && !_bs1Service.IsConnected)
+                {
+                    _ = _bs1Service.ConnectAsync(bleInfo.Address);
                 }
             });
         }
@@ -2386,15 +2568,37 @@ namespace Uniwill_Control_Utility.Views.Pages
             try
             {
                 if (_isBs1Device && _bs1Service != null)
-                    await _bs1Service.DisconnectAsync();
+                    await _bs1Service.DisconnectByUser();
                 else if (_coolerService != null)
-                    _coolerService.DisconnectAsync();
+                    _coolerService.DisconnectByUser();
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Disconnection error: {ex.Message}", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  IDisposable                                                        */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>
+        /// Stops all background timers so they don't fire <c>Dispatcher.Invoke</c> calls
+        /// on a dying dispatcher during app shutdown. Safe to call multiple times.
+        /// </summary>
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+            StopTemperaturePolling();
+            StopGlowPulse();
+            _rpmApplyTimer?.Dispose();
+            _rpmApplyTimer = null;
+            _rgbApplyTimer?.Dispose();
+            _rgbApplyTimer = null;
         }
     }
 }

@@ -69,6 +69,17 @@
                 <!-- Row 1: Content cards (16px side margin, 16px top) -->
                 <StackPanel Grid.Row="1" Margin="16,16,16,18">
 
+                    <!-- Connection info bar (hidden once connected) -->
+                    <ui:InfoBar x:Name="InfoBarConnection"
+                                Margin="0,0,0,16"
+                                IsOpen="True"
+                                IsClosable="False"
+                                Severity="Informational"
+                                VerticalAlignment="Stretch"
+                                VerticalContentAlignment="Stretch"
+                                Message="Uniwill Control Utility connects to the BS1 automatically while BS2/BS3 models must first be connected to via Bluetooth in Windows Settings." 
+                                />
+
                 <!-- Device Status  -->
                     <Grid Margin="0,0,0,24">
                         <Grid.ColumnDefinitions>
@@ -99,7 +110,7 @@
                                         <BlurEffect Radius="60"/>
                                     </Rectangle.Effect>
                                     <Rectangle.OpacityMask>
-                                        <ImageBrush ImageSource="pack://application:,,,/Assets/Flydigi/bs2-pro.png"
+                                        <ImageBrush ImageSource="pack://application:,,,/Assets/Flydigi/bs3-pro.png"
                                                     Stretch="Fill"
                                                     />
                                     </Rectangle.OpacityMask>
@@ -109,7 +120,7 @@
                                         Width="320"
                                         Height="140"
                                         Stretch="Uniform"
-                                        Source="pack://application:,,,/Assets/Flydigi/bs2-pro.png"
+                                        Source="pack://application:,,,/Assets/Flydigi/bs3-pro.png"
                                         RenderOptions.BitmapScalingMode="HighQuality"/>
                             </Grid>
                             <Grid>

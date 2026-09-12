@@ -10,6 +10,7 @@ using Uniwill_Control_Utility.Models;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.Advertisement;
 using Windows.Devices.Bluetooth.GenericAttributeProfile;
+using Windows.Devices.Enumeration;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -44,6 +45,10 @@ namespace Uniwill_Control_Utility.Services
         // Heartbeat timer to keep the BLE connection alive.
         private Timer? _heartbeatTimer;
         private const int HeartbeatIntervalMs = 2500; // Send every 2.5s (device expects ~3s)
+
+        // OS-level connection monitoring via DeviceWatcher
+        private DeviceWatcher? _deviceWatcher;
+        private bool _deviceWatcherEnumerationCompleted;
 
         // Named constants for repeated magic strings and numeric literals
         private const string LogPrefix = "[BS1]";
@@ -89,6 +94,9 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>Human-readable name of the connected cooler (e.g. "Flydigi BS1").</summary>
         public string ConnectedDeviceName { get; private set; } = string.Empty;
 
+        /// <summary>Set when user explicitly clicks Disconnect. Prevents auto-reconnect.</summary>
+        private bool _userDisconnected;
+
         /* ------------------------------------------------------------------ */
         /*  Constructor / Settings                                             */
         /* ------------------------------------------------------------------ */
@@ -99,6 +107,15 @@ namespace Uniwill_Control_Utility.Services
         public Bs1Service()
         {
             LoadSettings();
+            StartOsLevelMonitor();
+
+            // Auto-connect on app startup (like THRM does 1 second after launch).
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1000, CancellationToken.None);
+                if (_settings.AutoConnect && !_userDisconnected)
+                    await TryAutoConnectAsync();
+            });
         }
 
         /// <summary>
@@ -425,6 +442,8 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public async Task<bool> ConnectAsync(string deviceAddress)
         {
+            _userDisconnected = false; // User is connecting — clear the disconnect flag
+
             // Disconnect first if already connected
             if (_device != null)
             {
@@ -656,6 +675,15 @@ namespace Uniwill_Control_Utility.Services
             // Stop heartbeat first
             StopHeartbeat();
 
+            // Tell the device to exit realtime mode so it reverts to its default/manual
+            // fan state instead of staying locked in software-controlled mode after
+            // the app closes. Send this before tearing down the connection.
+            try
+            {
+                await WriteFrameAsync(Bs1Frame.Build(Bs1Command.ExitRealtimeMode));
+            }
+            catch { /* Non-critical: exit command may fail if already disconnected */ }
+
             // Unsubscribe from RX notifications
             if (_rxCharacteristic != null)
             {
@@ -725,6 +753,16 @@ namespace Uniwill_Control_Utility.Services
 
             ConnectionStateChanged?.Invoke(this, false);
             StatusChanged?.Invoke(this, "Disconnected");
+        }
+
+        /// <summary>
+        /// Disconnects and marks the session as user-disconnected.
+        /// Prevents all auto-reconnect logic until the user clicks Connect again.
+        /// </summary>
+        public async Task DisconnectByUser()
+        {
+            _userDisconnected = true;
+            await DisconnectAsync();
         }
 
         /* ------------------------------------------------------------------ */
@@ -1060,15 +1098,184 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /* ------------------------------------------------------------------ */
+        /*  OS-Level Connection Monitor (DeviceWatcher)                        */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>
+        /// Starts a DeviceWatcher that monitors for BS1 device connection/disconnection
+        /// at the Windows OS level. Fires ConnectionStateChanged events instantly when
+        /// the user connects/disconnects the device via Windows Bluetooth Settings.
+        /// </summary>
+        private void StartOsLevelMonitor()
+        {
+            try
+            {
+                // Watch all paired BLE devices and filter for BS1 in the handlers.
+                // Using the general paired selector ensures we catch devices even if
+                // the name differs slightly from "Flydigi BS1".
+                string selector = BluetoothLEDevice.GetDeviceSelectorFromPairingState(true);
+
+                // Request the IsConnected property so we can track connection state changes
+                string[] requestedProperties = { "System.Devices.Aep.IsConnected" };
+
+                _deviceWatcher = DeviceInformation.CreateWatcher(
+                    selector,
+                    requestedProperties,
+                    DeviceInformationKind.AssociationEndpoint);
+
+                _deviceWatcher.Added += OnDeviceWatcherAdded;
+                _deviceWatcher.Updated += OnDeviceWatcherUpdated;
+                _deviceWatcher.Removed += OnDeviceWatcherRemoved;
+                _deviceWatcher.EnumerationCompleted += OnDeviceWatcherEnumerationCompleted;
+                _deviceWatcher.Start();
+
+                Log(LogPrefix + " OS-level device monitor started");
+            }
+            catch (Exception ex)
+            {
+                Log($"{LogPrefix} Failed to start OS-level device monitor: {ex.Message}");
+            }
+        }
+
+        private void StopOsLevelMonitor()
+        {
+            if (_deviceWatcher != null)
+            {
+                try
+                {
+                    _deviceWatcher.Added -= OnDeviceWatcherAdded;
+                    _deviceWatcher.Updated -= OnDeviceWatcherUpdated;
+                    _deviceWatcher.Removed -= OnDeviceWatcherRemoved;
+                    _deviceWatcher.EnumerationCompleted -= OnDeviceWatcherEnumerationCompleted;
+                    _deviceWatcher.Stop();
+                }
+                catch { /* Non-critical: cleanup during teardown */ }
+                _deviceWatcher = null;
+            }
+        }
+
+        private void OnDeviceWatcherAdded(object? sender, DeviceInformation e)
+        {
+            // Ignore events during initial enumeration — those are already-known devices,
+            // not newly connected ones.
+            if (!_deviceWatcherEnumerationCompleted)
+                return;
+
+            // Only react to BS1 devices — ignore other paired BLE devices
+            if (!string.IsNullOrEmpty(e.Name) && IsBs1DeviceName(e.Name))
+            {
+                Log($"{LogPrefix} DeviceWatcher: Added {e.Name} (Id={e.Id})");
+                // A BS1 device appeared (e.g., user connected it via Windows Settings).
+                // Check if we're not already connected and should auto-connect.
+                if (_device == null && !_userDisconnected && _settings.AutoConnect)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(500, CancellationToken.None); // Brief delay for device to stabilize
+                        bool ok = await ConnectAsync(e.Id);
+                        if (ok)
+                            Log($"{LogPrefix} Auto-connected to {e.Name} via OS monitor");
+                    });
+                }
+            }
+        }
+
+        private void OnDeviceWatcherEnumerationCompleted(object? sender, object e)
+        {
+            _deviceWatcherEnumerationCompleted = true;
+            Log(LogPrefix + " DeviceWatcher enumeration completed — now monitoring for changes");
+        }
+
+        private void OnDeviceWatcherUpdated(object? sender, DeviceInformationUpdate e)
+        {
+            // Check if the IsConnected property changed
+            if (e.Properties?.TryGetValue("System.Devices.Aep.IsConnected", out var value) == true &&
+                value is bool isConnected)
+            {
+                // Check if this is our connected device by DeviceId
+                bool isOurDevice = _device != null && e.Id == _device.DeviceId;
+
+                if (isOurDevice)
+                {
+                    Log($"{LogPrefix} DeviceWatcher: connection state changed to {isConnected}");
+
+                    // If the device disconnected at the OS level (e.g., user disconnected via Windows Settings)
+                    // and we have an active connection, clean up.
+                    if (!isConnected)
+                    {
+                        Log(LogPrefix + " OS-level disconnect detected, cleaning up");
+                        _ = DisconnectAsync();
+                    }
+                }
+                else if (isConnected && _device == null && !_userDisconnected && _settings.AutoConnect
+                    && !string.IsNullOrEmpty(_settings.LastDeviceAddress))
+                {
+                    // A BLE device connected at the OS level. Check if it matches our last-known BS1 device.
+                    // DeviceInformationUpdate doesn't carry the device name, so we match by checking
+                    // if the DeviceId contains the last-known address.
+                    if (e.Id.Contains(_settings.LastDeviceAddress, StringComparison.OrdinalIgnoreCase) ||
+                        _settings.LastDeviceAddress.Contains(e.Id, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Log($"{LogPrefix} DeviceWatcher: last-known BS1 device connected at OS level, attempting auto-connect");
+                        _ = Task.Run(async () =>
+                        {
+                            await Task.Delay(500, CancellationToken.None);
+                            bool ok = await ConnectAsync(e.Id);
+                            if (ok)
+                                Log($"{LogPrefix} Auto-connected via OS monitor Updated event");
+                        });
+                    }
+                }
+            }
+        }
+
+        private void OnDeviceWatcherRemoved(object? sender, DeviceInformationUpdate e)
+        {
+            // Only react to our connected device being removed
+            if (_device != null && e.Id == _device.DeviceId)
+            {
+                Log($"{LogPrefix} DeviceWatcher: Removed {e.Id}");
+                // Device completely gone (unpaired or out of range). Clean up if connected.
+                _ = DisconnectAsync();
+            }
+        }
+
+        /// <summary>
+        /// Checks if a device name matches a known Flydigi BS1 device.
+        /// </summary>
+        private bool IsBs1DeviceName(string name)
+        {
+            string lower = name.ToLowerInvariant();
+            // Exclude BS2+ models
+            if (lower.Contains("bs2") || lower.Contains("bs3"))
+                return false;
+            return lower.Contains("bs1") ||
+                   (lower.Contains("flydigi") && lower.Contains("cooling pad"));
+        }
+
+        /* ------------------------------------------------------------------ */
         /*  IDisposable                                                        */
         /* ------------------------------------------------------------------ */
 
         public void Dispose()
         {
             StopHeartbeat();
+            StopOsLevelMonitor();
 
             // Synchronously clean up resources without awaiting DisconnectAsync.
             // Dispose must be synchronous, so we perform the same cleanup steps inline.
+            // Fire-and-forget the exit realtime mode command so the device reverts to
+            // its default/manual fan state. Safe to ignore — the characteristic may
+            // already be null if we were never connected.
+            byte[]? exitFrame = null;
+            try { exitFrame = Bs1Frame.Build(Bs1Command.ExitRealtimeMode); } catch { /* non-critical */ }
+
+            if (_txCharacteristic != null && exitFrame != null)
+            {
+                var tx = _txCharacteristic;
+                _ = tx.WriteValueAsync(exitFrame.AsBuffer(), GattWriteOption.WriteWithoutResponse).AsTask();
+            }
+
             if (_rxCharacteristic != null)
             {
                 _rxCharacteristic.ValueChanged -= OnRxValueChanged;

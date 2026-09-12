@@ -199,7 +199,8 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<WaterCoolerService>();
 
                         // Flydigi BS2 Pro cooling pad page and service
-                        services.AddScoped<Views.Pages.FlydigiCooler>();
+                        // Singleton so the host disposes it on shutdown (stops background timers).
+                        services.AddSingleton<Views.Pages.FlydigiCooler>();
                         services.AddSingleton<FlydigiCoolerService>();
 
                         // Flydigi BS1 (BLE-only) cooling pad service
@@ -557,6 +558,40 @@ namespace Uniwill_Control_Utility
                 SMUCommands.RyzenAccess.Deinitialize();
             else
                 IntelManagement.Deinitialize();
+
+            // Disconnect Flydigi cooler services explicitly before the host disposes.
+            // Without this, the BLE/HID connections remain held by the device after
+            // the process exits, requiring the user to manually disconnect via Windows
+            // Bluetooth settings. The host disposal below is fire-and-forget and may
+            // not complete before the process terminates.
+            //
+            // Order matters: stop the page's timers first, then disconnect the services.
+            // This prevents timer callbacks from firing Dispatcher.Invoke on a dying
+            // dispatcher while the services are still tearing down.
+            try
+            {
+                var page = App._host?.Services.GetService<Views.Pages.FlydigiCooler>();
+                page?.Dispose();
+            }
+            catch { /* Non-critical: dispose during teardown is best-effort */ }
+
+            try
+            {
+                var coolerService = App._host?.Services.GetService<FlydigiCoolerService>();
+                coolerService?.DisconnectAsync();
+            }
+            catch { /* Non-critical: disconnect during teardown is best-effort */ }
+
+            try
+            {
+                var bs1Service = App._host?.Services.GetService<Bs1Service>();
+
+                // Bs1Service.Dispose performs synchronous cleanup (no async disconnect).
+                // We call it here to ensure the BLE GATT session and device are released
+                // before the process exits. Disposing an already-disconnected service is safe.
+                bs1Service?.Dispose();
+            }
+            catch { /* Non-critical: dispose during teardown is best-effort */ }
 
             // Stop the host on a background thread to avoid deadlock with Dispatcher.Invoke
             // calls from hosted services' StopAsync. The host's cancellation token ensures

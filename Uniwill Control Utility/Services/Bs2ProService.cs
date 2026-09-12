@@ -43,6 +43,64 @@ namespace Uniwill_Control_Utility.Services
         private const int WAIT_OBJECT_0 = 0;
         private const int INFINITE = -1;
 
+        /* ------------------------------------------------------------------ */
+        /*  HID interface arrival notification (cfgmgr32.dll)                    */
+        /* ------------------------------------------------------------------ */
+
+        // THRM uses CM_Register_Notification for instant HID device arrival detection.
+        // This replaces the slow 5-second polling device monitor.
+        [DllImport("cfgmgr32.dll", SetLastError = true)]
+        private static extern int CM_Register_Notification(
+            ref CmNotifyFilter filter,
+            nint context,
+            CmNotifyCallback callback,
+            out nint handle);
+
+        [DllImport("cfgmgr32.dll", SetLastError = true)]
+        private static extern int CM_UnregisterNotification(nint handle);
+
+        // GUID_DEVINTERFACE_HID = {4d1e55b2-f16f-11cf-88cb-001111000030}
+        private static readonly Guid HidDeviceInterfaceGuid = new(
+            0x4d1e55b2, 0xf16f, 0x11cf, 0x88, 0xcb, 0x00, 0x11, 0x11, 0x00, 0x00, 0x30);
+
+        private const int CmNotifyFilterTypeDeviceInterface = 0;
+        private const int CmNotifyActionInterfaceArrival = 0;
+        private const int CmNotifyEventSymbolicLinkOffset = 24;
+
+        // CM_NOTIFY_FILTER struct (sized for device-interface notifications)
+        [StructLayout(LayoutKind.Sequential)]
+        private struct CmNotifyFilter
+        {
+            public uint cbSize;
+            public uint Flags;
+            public uint FilterType;
+            public uint Reserved;
+            public Guid ClassGuid;
+            // Union tail padded to max device ID length (200 chars * 2 bytes)
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 400 - 16)] // 400 total minus header size
+            public byte[] UnionTail;
+        }
+
+        // Callback delegate for CM_NOTIFY_CALLBACK
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate void CmNotifyCallback(
+            nint context,
+            uint notificationType,
+            nint eventData,
+            uint eventDataSize);
+
+        private nint _hidArrivalHandle = nint.Zero;
+        private CmNotifyCallback? _hidArrivalCallback; // Keep alive to prevent GC
+
+        // Flydigi vendor/product identifiers to match
+        private static readonly string[] FlydigiHidIdentifiers =
+        {
+            "vid_37d7&pid_1001", // BS2
+            "vid_37d7&pid_1002", // BS2 PRO
+            "vid_37d7&pid_1003", // BS3
+            "vid_37d7&pid_1004", // BS3 PRO
+        };
+
         private nint _powerEventHandle = nint.Zero;
         private nint _powerNotificationHandle = nint.Zero;
         private CancellationTokenSource? _powerMonitorCts;
@@ -55,6 +113,14 @@ namespace Uniwill_Control_Utility.Services
         private CancellationTokenSource? _deviceMonitorCts;
         private Thread? _deviceMonitorThread;
         private bool _lastDeviceDetected;
+
+        /// <summary>
+        /// Set to true when the user explicitly clicks Disconnect.
+        /// Prevents all auto-reconnect logic (startup, HID arrival, device monitor)
+        /// from reconnecting until the user clicks Connect again.
+        /// Reset to false on Connect.
+        /// </summary>
+        private bool _userDisconnected;
 
         /* ------------------------------------------------------------------ */
         /*  Time-based curve schedule monitor                                  */
@@ -199,8 +265,18 @@ namespace Uniwill_Control_Utility.Services
         {
             LoadSettings();
             StartPowerNotificationMonitor();
+            StartHidArrivalNotification();
             StartDeviceMonitor();
             StartTimeScheduleMonitor();
+
+            // Auto-connect on app startup (like THRM does 1 second after launch).
+            // Only connects if AutoConnect is enabled in settings.
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1000, CancellationToken.None); // Brief delay for system to stabilize
+                if (_settings.AutoConnect)
+                    await TryAutoConnectAsync();
+            });
         }
 
         #region Settings Persistence
@@ -312,6 +388,124 @@ namespace Uniwill_Control_Utility.Services
             return DiscoverDevices().Count > 0;
         }
 
+        /// <summary>
+        /// Discovers Flydigi BS series devices, using BLE advertisement scanning as a
+        /// fallback when HID enumeration finds nothing (e.g., device is nearby but not
+        /// yet paired or the HID driver hasn't bound).
+        /// </summary>
+        public static async Task<List<FlydigiCoolerDeviceInfo>> DiscoverDevicesAsync(int timeoutMs = 8000)
+        {
+            // 1. Try HID enumeration first (fastest path for already-connected devices)
+            var devices = DiscoverDevices();
+            if (devices.Count > 0)
+                return devices;
+
+            // 2. BLE advertisement scan: look for BS2+ advertising names, then try to
+            //    pair (which triggers Windows HID driver binding), then retry HID enum.
+            try
+            {
+                var watcher = new Windows.Devices.Bluetooth.Advertisement.BluetoothLEAdvertisementWatcher();
+                var matchedDevices = new System.Collections.Concurrent.ConcurrentBag<Windows.Devices.Enumeration.DeviceInformation>();
+
+                watcher.Received += async (s, e) =>
+                {
+                    var name = e.Advertisement.LocalName;
+                    if (!string.IsNullOrEmpty(name) && IsBsPlusAdvertisingName(name))
+                    {
+                        // Try to resolve to a DeviceInformation so we can pair
+                        try
+                        {
+                            var bleDevice = await Windows.Devices.Bluetooth.BluetoothLEDevice
+                                .FromBluetoothAddressAsync(e.BluetoothAddress).AsTask();
+                            if (bleDevice != null && !string.IsNullOrEmpty(bleDevice.DeviceId))
+                            {
+                                var info = await Windows.Devices.Enumeration.DeviceInformation
+                                    .CreateFromIdAsync(bleDevice.DeviceId).AsTask();
+                                if (info != null)
+                                    matchedDevices.Add(info);
+                                bleDevice.Dispose();
+                            }
+                        }
+                        catch { /* Non-critical: resolution failure during scan */ }
+                    }
+                };
+
+                watcher.Start();
+                await Task.Delay(timeoutMs);
+                watcher.Stop();
+
+                // Also try enumerating all known BLE devices (paired and unpaired) for matches
+                try
+                {
+                    var selector = Windows.Devices.Bluetooth.BluetoothLEDevice.GetDeviceSelector();
+                    var allDevices = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(selector);
+                    foreach (var info in allDevices)
+                    {
+                        if (!string.IsNullOrEmpty(info.Name) && IsBsPlusAdvertisingName(info.Name))
+                        {
+                            // Check if not already in matchedDevices by DeviceId
+                            bool alreadyMatched = matchedDevices.Any(m => m.Id == info.Id);
+                            if (!alreadyMatched)
+                                matchedDevices.Add(info);
+                        }
+                    }
+                }
+                catch { /* Non-critical: enumeration failure */ }
+
+                foreach (var info in matchedDevices.DistinctBy(d => d.Id))
+                {
+                    try
+                    {
+                        // If already paired, just wait for HID binding
+                        if (info.Pairing.IsPaired)
+                        {
+                            await Task.Delay(500);
+                        }
+                        else
+                        {
+                            // Attempt to pair — this triggers Windows HID driver binding
+                            var pairResult = await info.Pairing.PairAsync().AsTask();
+                            if (pairResult.Status != Windows.Devices.Enumeration.DevicePairingResultStatus.Paired &&
+                                pairResult.Status != Windows.Devices.Enumeration.DevicePairingResultStatus.AlreadyPaired)
+                            {
+                                continue; /* Pairing failed, skip this device */
+                            }
+                            await Task.Delay(1500);
+                        }
+
+                        // Retry HID enumeration after pairing
+                        devices = DiscoverDevices();
+                        if (devices.Count > 0)
+                            return devices;
+                    }
+                    catch
+                    {
+                        // Non-critical: individual pairing failures during discovery
+                    }
+                }
+            }
+            catch
+            {
+                // BLE not available or permission denied — fall through to empty result
+            }
+
+            return devices;
+        }
+
+        /// <summary>
+        /// Returns true if the advertising name matches a known Flydigi BS2+ device.
+        /// These devices advertise as e.g. "FlyDigi BS2PRO", "FlyDigi BS3PRO".
+        /// </summary>
+        private static bool IsBsPlusAdvertisingName(string name)
+        {
+            string lower = name.ToLowerInvariant();
+            // Exclude BS1 (BLE-only, non-HID) — we only want BS2+ HID devices here.
+            if (lower.Contains("bs1"))
+                return false;
+
+            return lower.Contains("bs2") || lower.Contains("bs3");
+        }
+
         #endregion
 
         #region Connection Management
@@ -322,6 +516,7 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public async Task<bool> ConnectAsync(string devicePath)
         {
+            ClearUserDisconnected();
             var devices = HidDevices.Enumerate(Bs2ProProductId.VendorId, Bs2ProProductId.AllProductIds);
             var target = devices.FirstOrDefault(d => d.DevicePath == devicePath);
 
@@ -415,6 +610,16 @@ namespace Uniwill_Control_Utility.Services
             {
                 try
                 {
+                    // Tell the device to exit realtime mode so it reverts to its default/manual
+                    // fan state instead of staying locked in software-controlled mode after
+                    // the app closes. This is a best-effort write — if the device is already
+                    // unreachable the write will fail silently.
+                    WriteReport(Bs2ProFrame.Build(Bs2ProCommand.ExitRealtimeMode));
+                }
+                catch { /* Non-critical: exit command may fail if device is already gone */ }
+
+                try
+                {
                     _device.CloseDevice();
                 }
                 catch (Exception) { /* ignore close errors */ }
@@ -432,12 +637,31 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
+        /// Disconnects from the device and marks the session as user-disconnected.
+        /// This prevents all auto-reconnect logic (startup, HID arrival, device monitor)
+        /// from reconnecting until the user explicitly clicks Connect again.
+        /// </summary>
+        public void DisconnectByUser()
+        {
+            _userDisconnected = true;
+            DisconnectAsync();
+        }
+
+        /// <summary>
+        /// Clears the user-disconnected flag. Called when the user clicks Connect.
+        /// </summary>
+        private void ClearUserDisconnected()
+        {
+            _userDisconnected = false;
+        }
+
+        /// <summary>
         /// Attempts to reconnect to the last-known device path.
         /// Uses exponential backoff retry (up to 3 attempts).
         /// </summary>
         public async Task<bool> TryAutoConnectAsync()
         {
-            if (!_settings.AutoConnect || string.IsNullOrEmpty(_settings.LastDevicePath))
+            if (!_settings.AutoConnect || string.IsNullOrEmpty(_settings.LastDevicePath) || _userDisconnected)
                 return false;
 
             for (int attempt = 0; attempt < 3; attempt++)
@@ -474,6 +698,9 @@ namespace Uniwill_Control_Utility.Services
 
             _readTask = Task.Run(() =>
             {
+                int consecutiveErrors = 0;
+                const int maxConsecutiveErrors = 20; // Match THRM: 20 consecutive errors = disconnect
+
                 while (!token.IsCancellationRequested && _device != null && _device.IsOpen)
                 {
                     try
@@ -483,6 +710,12 @@ namespace Uniwill_Control_Utility.Services
                         if (data.Status == HidDeviceData.ReadStatus.Success)
                         {
                             OnInputReport(data.Data);
+                            consecutiveErrors = 0; // Reset error counter on successful read
+                        }
+                        else
+                        {
+                            // Timeout or non-success read — don't count as error (normal idle behavior)
+                            consecutiveErrors = 0;
                         }
                     }
                     catch (ObjectDisposedException)
@@ -492,9 +725,23 @@ namespace Uniwill_Control_Utility.Services
                     }
                     catch (Exception)
                     {
-                        // Transient read errors — continue looping
+                        consecutiveErrors++;
+                        if (consecutiveErrors >= maxConsecutiveErrors)
+                        {
+                            // Device likely disconnected (e.g., user disconnected via Windows Settings)
+                            // Break out and let the cleanup below handle it.
+                            break;
+                        }
                         Thread.Sleep(50);
                     }
+                }
+
+                // If the read loop exited unexpectedly (not from StopReadLoop cancellation
+                // and not from ObjectDisposedException), the device was disconnected at the OS level.
+                // Clean up and fire disconnect event so the UI updates instantly.
+                if (!token.IsCancellationRequested && consecutiveErrors >= maxConsecutiveErrors)
+                {
+                    DisconnectAsync();
                 }
             }, token);
         }
@@ -1327,6 +1574,103 @@ namespace Uniwill_Control_Utility.Services
 
         #endregion
 
+        #region HID Interface Arrival Notification (CM_Register_Notification)
+
+        /// <summary>
+        /// Registers for instant HID device interface arrival notifications.
+        /// Uses cfgmgr32.dll CM_Register_Notification (same approach as THRM).
+        /// Fires immediately when a Flydigi HID device appears (e.g., after Bluetooth pairing).
+        /// </summary>
+        private void StartHidArrivalNotification()
+        {
+            try
+            {
+                var filter = new CmNotifyFilter
+                {
+                    cbSize = (uint)Marshal.SizeOf(typeof(CmNotifyFilter)),
+                    FilterType = (uint)CmNotifyFilterTypeDeviceInterface,
+                    ClassGuid = HidDeviceInterfaceGuid,
+                    UnionTail = new byte[384] // 400 - 16 header bytes
+                };
+
+                _hidArrivalCallback = HidArrivalCallback;
+                int result = CM_Register_Notification(ref filter, nint.Zero, _hidArrivalCallback, out _hidArrivalHandle);
+
+                if (result == 0) // CR_SUCCESS
+                {
+                    System.Diagnostics.Debug.WriteLine("[FlydigiCoolerService] HID arrival notification registered");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] HID arrival notification failed: {result}");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-critical: fall back to the polling device monitor
+                System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] HID arrival notification error: {ex.Message}");
+            }
+        }
+
+        private void StopHidArrivalNotification()
+        {
+            if (_hidArrivalHandle != nint.Zero)
+            {
+                try
+                {
+                    CM_UnregisterNotification(_hidArrivalHandle);
+                }
+                catch { /* Non-critical: cleanup during teardown */ }
+                _hidArrivalHandle = nint.Zero;
+            }
+            _hidArrivalCallback = null;
+        }
+
+        private void HidArrivalCallback(nint context, uint notificationType, nint eventData, uint eventDataSize)
+        {
+            if (notificationType != CmNotifyActionInterfaceArrival || eventData == nint.Zero)
+                return;
+
+            try
+            {
+                // Extract the symbolic link path from the event data (offset 24, UTF-16)
+                if (eventDataSize <= CmNotifyEventSymbolicLinkOffset)
+                    return;
+
+                int length = (int)(eventDataSize - CmNotifyEventSymbolicLinkOffset) / 2;
+                string path = Marshal.PtrToStringUni(eventData + CmNotifyEventSymbolicLinkOffset, length) ?? string.Empty;
+
+                if (string.IsNullOrEmpty(path))
+                    return;
+
+                // Check if this is a Flydigi device
+                string lowerPath = path.ToLowerInvariant();
+                foreach (var identifier in FlydigiHidIdentifiers)
+                {
+                    if (lowerPath.Contains(identifier))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Flydigi HID device arrived: {path}");
+                        FlydigiHardwareDetector.InvalidateCache();
+
+                        // Auto-connect if not already connected and user didn't explicitly disconnect
+                        if (!IsConnected && !_userDisconnected && _settings.AutoConnect)
+                        {
+                            // Run async — callbacks must return quickly
+                            _ = Task.Run(async () =>
+                            {
+                                await Task.Delay(500, CancellationToken.None); // Brief delay for device to stabilize
+                                await TryAutoConnectAsync();
+                            });
+                        }
+                        return;
+                    }
+                }
+            }
+            catch { /* Non-critical: callback errors shouldn't crash the app */ }
+        }
+
+        #endregion
+
         #region Device Plug/Unplug Monitor
 
         private void StartDeviceMonitor()
@@ -1353,7 +1697,10 @@ namespace Uniwill_Control_Utility.Services
 
                         try
                         {
-                            bool currentlyDetected = IsDeviceAvailable();
+                            // Skip polling when already connected — DiscoverDevices() tries to
+                            // open the HID handle which conflicts with our own open handle,
+                            // causing a false "device unplugged" detection and a connect/disconnect loop.
+                            bool currentlyDetected = IsConnected || IsDeviceAvailable();
 
                             if (currentlyDetected && !_lastDeviceDetected)
                             {
@@ -1361,7 +1708,7 @@ namespace Uniwill_Control_Utility.Services
                                 _lastDeviceDetected = true;
                                 FlydigiHardwareDetector.InvalidateCache();
 
-                                if (_settings.AutoConnect && !IsConnected)
+                                if (!_userDisconnected && _settings.AutoConnect && !IsConnected)
                                 {
                                     _ = Task.Run(async () =>
                                     {
@@ -1584,6 +1931,7 @@ namespace Uniwill_Control_Utility.Services
                 if (disposing)
                 {
                     StopScheduleMonitor();
+                    StopHidArrivalNotification();
                     StopDeviceMonitor();
                     StopPowerNotificationMonitor();
                     DisconnectAsync();
