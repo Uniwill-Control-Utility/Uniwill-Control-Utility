@@ -9,6 +9,7 @@ namespace Uniwill_Control_Utility.Services
     {
         private readonly object _sync = new();
         private readonly string _settingsPath;
+        private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
         private OverlayOptions _current;
 
         public OverlaySettingsStore()
@@ -42,7 +43,7 @@ namespace Uniwill_Control_Utility.Services
             lock (_sync)
             {
                 string temporaryPath = _settingsPath + ".tmp";
-                File.WriteAllText(temporaryPath, JsonSerializer.Serialize(validated, new JsonSerializerOptions { WriteIndented = true }));
+                File.WriteAllText(temporaryPath, JsonSerializer.Serialize(validated, _jsonOptions));
                 File.Move(temporaryPath, _settingsPath, true);
                 _current = validated;
             }

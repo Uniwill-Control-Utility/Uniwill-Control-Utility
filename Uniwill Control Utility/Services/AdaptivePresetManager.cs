@@ -122,14 +122,7 @@ namespace Uniwill_Control_Utility.Services
 
         public AdaptivePreset? GetPreset(string presetName)
         {
-            if (_presets.ContainsKey(presetName))
-            {
-                return _presets[presetName];
-            }
-            else
-            {
-                return null;
-            }
+            return _presets.TryGetValue(presetName, out var preset) ? preset : null;
         }
 
         public void SavePreset(string name, AdaptivePreset preset)

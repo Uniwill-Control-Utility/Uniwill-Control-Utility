@@ -102,7 +102,7 @@ namespace Uniwill_Control_Utility.Services
         public int softMaxVCNClk { get; set; }
         public int softMinSoCClk { get; set; }
         public int softMaxSoCClk { get; set; }
-        public string commandValue { get; set; }
+        public string commandValue { get; set; } = string.Empty;
 
         public bool isApuTemp { get; set; }
         public bool isApuSkinTemp { get; set; }

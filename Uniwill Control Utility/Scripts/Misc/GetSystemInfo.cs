@@ -478,13 +478,13 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             {
                 if (cpuName.Contains("6th", StringComparison.Ordinal)) return "Skylake";
                 if (cpuName.Contains("7th", StringComparison.Ordinal)) return "Kaby Lake";
-                if (cpuName.Contains("8th", StringComparison.Ordinal) && cpuName.Contains("G", StringComparison.Ordinal)) return "Kaby Lake";
+                if (cpuName.Contains("8th", StringComparison.Ordinal) && cpuName.Contains('G')) return "Kaby Lake";
                 else if (cpuName.Contains("8121U", StringComparison.Ordinal) || cpuName.Contains("8114Y", StringComparison.Ordinal)) return "Cannon Lake";
                 else if (cpuName.Contains("8th", StringComparison.Ordinal)) return "Coffee Lake";
                 if (cpuName.Contains("9th", StringComparison.Ordinal)) return "Coffee Lake";
-                if (cpuName.Contains("10th", StringComparison.Ordinal) && cpuName.Contains("G", StringComparison.Ordinal)) return "Ice Lake";
+                if (cpuName.Contains("10th", StringComparison.Ordinal) && cpuName.Contains('G')) return "Ice Lake";
                 else if (cpuName.Contains("10th", StringComparison.Ordinal)) return "Comet Lake";
-                if ((cpuName.Contains("11th", StringComparison.Ordinal) && cpuName.Contains("G", StringComparison.Ordinal)) || (cpuName.Contains("11th", StringComparison.Ordinal) && cpuName.Contains("U", StringComparison.Ordinal)) || (cpuName.Contains("11th", StringComparison.Ordinal) && cpuName.Contains("H", StringComparison.Ordinal)) || (cpuName.Contains("11th", StringComparison.Ordinal) && cpuName.Contains("KB", StringComparison.Ordinal))) return "Tiger Lake";
+                if ((cpuName.Contains("11th", StringComparison.Ordinal) && cpuName.Contains('G')) || (cpuName.Contains("11th", StringComparison.Ordinal) && cpuName.Contains('U')) || (cpuName.Contains("11th", StringComparison.Ordinal) && cpuName.Contains('H')) || (cpuName.Contains("11th", StringComparison.Ordinal) && cpuName.Contains("KB", StringComparison.Ordinal))) return "Tiger Lake";
                 else if (cpuName.Contains("11th", StringComparison.Ordinal)) return "Rocket Lake";
                 if (cpuName.Contains("12th", StringComparison.Ordinal)) return "Alder Lake";
                 if (cpuName.Contains("13th", StringComparison.Ordinal) || cpuName.Contains("14th", StringComparison.Ordinal) || (cpuName.Contains("Core", StringComparison.Ordinal) && cpuName.Contains("100", StringComparison.Ordinal) && !cpuName.Contains("th", StringComparison.Ordinal))) return "Raptor Lake";

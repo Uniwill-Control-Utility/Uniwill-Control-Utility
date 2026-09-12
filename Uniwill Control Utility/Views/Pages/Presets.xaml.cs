@@ -792,7 +792,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 DebugLog($"applyProfile: {_currentProfile} profile");
                 DebugLog($"  command = {command}");
-                _logger.LogInformation($"Applying {_currentProfile} profile: {command}");
+                _logger.LogInformation("Applying {CurrentProfile} profile: {Command}", _currentProfile, command);
 
                 // TranslateAsync() runs SMU commands on a background thread via Task.Run().
                 // We must await it before writing EC registers, otherwise the EC writes
@@ -902,7 +902,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Broad catch: applyProfileAsync spans SMU commands, EC writes,
                 // NVIDIA driver calls, and V-F curve operations — any layer can throw.
                 DebugLog($"applyProfile EXCEPTION: {ex.GetType().Name}: {ex.Message}");
-                _logger.LogError(ex, $"Failed to apply {_currentProfile} profile");
+                _logger.LogError(ex, "Failed to apply {CurrentProfile} profile", _currentProfile);
             }
         }
 

@@ -1258,8 +1258,7 @@ namespace Uniwill_Control_Utility.Services
         {
             if (!IsAvailable)
                 throw new InvalidOperationException("Keyboard HID controller is not available. This feature requires an ITE HID lighting controller (vid_048d).");
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(KeyboardHidService));
+            ObjectDisposedException.ThrowIf(_disposed, this);
         }
 
         #endregion

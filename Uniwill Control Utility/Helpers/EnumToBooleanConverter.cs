@@ -14,7 +14,7 @@ namespace Uniwill_Control_Utility.Helpers
             if (!Enum.IsDefined(typeof(Wpf.Ui.Appearance.ApplicationTheme), value))
                 throw new ArgumentException("ExceptionEnumToBooleanConverterValueMustBeAnEnum");
 
-            var enumValue = Enum.Parse(typeof(Wpf.Ui.Appearance.ApplicationTheme), enumString);
+            var enumValue = Enum.Parse<Wpf.Ui.Appearance.ApplicationTheme>(enumString);
 
             return enumValue.Equals(value);
         }
@@ -24,7 +24,7 @@ namespace Uniwill_Control_Utility.Helpers
             if (parameter is not string enumString)
                 throw new ArgumentException("ExceptionEnumToBooleanConverterParameterMustBeAnEnumName");
 
-            return Enum.Parse(typeof(Wpf.Ui.Appearance.ApplicationTheme), enumString);
+            return Enum.Parse<Wpf.Ui.Appearance.ApplicationTheme>(enumString);
         }
     }
 }
