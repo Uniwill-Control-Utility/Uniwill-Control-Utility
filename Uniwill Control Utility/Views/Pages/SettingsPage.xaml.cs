@@ -31,8 +31,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         private const string WmiQueryProcessor = "SELECT * FROM Win32_Processor";
         private const string WmiQueryPhysicalMemory = "SELECT * FROM Win32_PhysicalMemory";
         private const string ScheduledTaskName = "UCU";
-        private const string AssemblyDllName = "Uniwill Control Utility.dll";
-        private const string AssemblyExeName = "Uniwill Control Utility.exe";
         private const string InternetConnectivityHost = "8.8.8.8";
         private const string PresetExtension = ".UCUpresets";
         private const string StressTestExeRelativePath = @"Assets\Stress-Test\AVX2 Stress Test.exe";
@@ -256,7 +254,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                     string path = System.Reflection.Assembly.GetEntryAssembly()?.Location
                         ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
-                    path = path.Replace(AssemblyDllName, AssemblyExeName);
+                    path = Path.ChangeExtension(path, ".exe");
 
                     td.Actions.Add(path);
 
