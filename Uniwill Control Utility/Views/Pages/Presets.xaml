@@ -302,6 +302,32 @@
                                     </StackPanel>
                                 </Grid>
                                 <!-- Divider -->
+                                <Border x:Name="dividerBeforeCo" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <!-- Curve Optimizer toggle -->
+                                <Grid x:Name="gridCustomCoToggle">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Curve Optimizer" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Disable if you manage CO offsets in BIOS" />
+                                    </StackPanel>
+                                    <ui:ToggleSwitch x:Name="togCoEnabled"
+                                                     Grid.Column="1"
+                                                     LabelPosition="Left"
+                                                     OnContent="On"
+                                                     OffContent="Off"
+                                                     IsChecked="True"
+                                                     Checked="togCoEnabled_Toggled"
+                                                     Unchecked="togCoEnabled_Toggled" />
+                                </Grid>
+                                <!-- CO controls container (hidden when toggle is OFF) -->
+                                <StackPanel x:Name="coControlsPanel">
+                                <!-- Divider -->
                                 <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                                 <!-- Curve Optimizer mode selection -->
                                 <Grid x:Name="gridCustomCoUnified" Margin="0,4,0,4">
@@ -310,7 +336,7 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body" Text="Curve Optimizer" />
+                                        <ui:TextBlock FontTypography="Body" Text="Mode" />
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
@@ -423,6 +449,7 @@
                                         <Slider x:Name="sdCoCcd1" Width="140" Maximum="0" Minimum="-30" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
+                                </StackPanel>
                             </StackPanel>
                         </ui:CardExpander>
 

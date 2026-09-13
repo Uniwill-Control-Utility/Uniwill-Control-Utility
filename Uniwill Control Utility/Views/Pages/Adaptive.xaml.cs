@@ -357,6 +357,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         // when getRunningGame already called it directly with resetTracking: false.
         private bool _isUpdatingPresetSelection;
 
+        // Curve Optimizer enabled state for Adaptive page
+        private bool _adpCoEnabled = false;
+
         // Window classes that are NOT games (browsers, notifications, taskbar, etc.)
         private static readonly HashSet<string> _excludedWindowClasses = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -522,6 +525,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// <summary>
         /// Applies dynamic maximum to the SPL/FPL sliders based on the resolved CPU SKU
         /// and whether a Hydro UI watercooler is connected. Matches the Presets page behavior.
+        /// Also applies GPU TGP slider max based on GPU model and power boost setting.
         /// </summary>
         private void ApplyAdpPowerLimitMax()
         {
@@ -562,6 +566,22 @@ namespace Uniwill_Control_Utility.Views.Pages
                 AdpSdSustained.Value = AdpSdSustained.Maximum;
             if (AdpSdBoost.Value > AdpSdBoost.Maximum)
                 AdpSdBoost.Value = AdpSdBoost.Maximum;
+
+            // GPU TGP slider — set per-GPU max range (matches Presets page)
+            if (sdGpuSettings.Visibility == Visibility.Visible)
+            {
+                string gpuName = NvTuning.GetGpuName()?.ToLowerInvariant() ?? string.Empty;
+                int gpuMax = gpuName switch
+                {
+                    var n when n.Contains("rtx 5090") => Settings.Default.EnableGpuPowerBoost ? 225 : 150,
+                    var n when n.Contains("rtx 5080") => Settings.Default.EnableGpuPowerBoost ? 225 : 150,
+                    var n when n.Contains("rtx 5070") => 115,
+                    _ => limits.GpuTgpBaseline
+                };
+                AdpSdNvPower.Maximum = gpuMax;
+                if (AdpSdNvPower.Value > gpuMax)
+                    AdpSdNvPower.Value = gpuMax;
+            }
         }
 
         private async void adaptive_Tick(object? sender, EventArgs e)
@@ -725,7 +745,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (sdGpuSettings.Visibility == Visibility.Visible)
             {
-                AdpSdNvPower.Value = Math.Clamp(preset.GpuTgp, 0, 150);
+                AdpSdNvPower.Value = Math.Clamp(preset.GpuTgp, 0, NvTuning.MaxPowerLimitWatts);
                 AdpTogDynamicBoost.IsChecked = preset.GpuDynamicBoost;
                 AdpSdNvDbOffset.Value = Math.Clamp(preset.GpuDbOffset, 0, 25);
                 AdpSdNvCore.Value = Math.Clamp(preset.GpuCoreClock, -1000, 1000);
@@ -1547,7 +1567,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 try
                 {
                     string cmd = BuildAmdCpuCommand(sustained, boost, tjMax,
-                        coUnified, coUnifiedValue, coCcd0, coCcd1);
+                        _adpCoEnabled, coUnified, coUnifiedValue, coCcd0, coCcd1);
                     _ = RyzenAdj_To_UCU.TranslateAsync(cmd);
 
                     // Also write EC CPU power limits
@@ -1571,7 +1591,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         private static string BuildAmdCpuCommand(int sustained, int boost, int tjMax,
-            bool coUnified, int coUnifiedValue, int coCcd0, int coCcd1)
+            bool coEnabled, bool coUnified, int coUnifiedValue, int coCcd0, int coCcd1)
         {
             var parts = new System.Collections.Generic.List<string>();
             parts.Add($"--slow-limit={sustained * 1000}");
@@ -1579,21 +1599,24 @@ namespace Uniwill_Control_Utility.Views.Pages
             parts.Add($"--tctl-temp={tjMax}");
             parts.Add($"--cHTC-temp={tjMax}");
 
-            if (coUnified)
+            if (coEnabled)
             {
-                int biased = CoBiasBase - Math.Abs(coUnifiedValue);
-                parts.Add($"--set-coall={biased:X}");
-            }
-            else
-            {
-                int[,] ccdMap = { { 0, 1, 2, 3, 4, 5, 6, 7 }, { 8, 9, 10, 11, 12, 13, 14, 15 } };
-                for (int ccd = 0; ccd < 2; ccd++)
+                if (coUnified)
                 {
-                    int offset = ccd == 0 ? coCcd0 : coCcd1;
-                    int biased = CoBiasBase - Math.Abs(offset);
-                    for (int core = 0; core < 8; core++)
+                    int biased = CoBiasBase - Math.Abs(coUnifiedValue);
+                    parts.Add($"--set-coall={biased:X}");
+                }
+                else
+                {
+                    int[,] ccdMap = { { 0, 1, 2, 3, 4, 5, 6, 7 }, { 8, 9, 10, 11, 12, 13, 14, 15 } };
+                    for (int ccd = 0; ccd < 2; ccd++)
                     {
-                        parts.Add($"--set-coper={BuildCoperArg(ccd, ccdMap[ccd, core], biased):X}");
+                        int offset = ccd == 0 ? coCcd0 : coCcd1;
+                        int biased = CoBiasBase - Math.Abs(offset);
+                        for (int core = 0; core < 8; core++)
+                        {
+                            parts.Add($"--set-coper={BuildCoperArg(ccd, ccdMap[ccd, core], biased):X}");
+                        }
                     }
                 }
             }
@@ -2855,13 +2878,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Hide AMD-specific controls
                 AdpGridTjMax.Visibility = Visibility.Collapsed;
                 AdpDividerAfterTjMax.Visibility = Visibility.Collapsed;
-                AdpGridCoMode.Visibility = Visibility.Collapsed;
-                AdpDividerCoMode.Visibility = Visibility.Collapsed;
-                AdpGridCoUnified.Visibility = Visibility.Collapsed;
-                AdpGridCoCcd0.Visibility = Visibility.Collapsed;
-                AdpDividerCoPerCcd.Visibility = Visibility.Collapsed;
-                AdpGridCoCcd1.Visibility = Visibility.Collapsed;
-                AdpDividerCoAfterCcd1.Visibility = Visibility.Collapsed;
+                AdpGridCoToggle.Visibility = Visibility.Collapsed;
+                AdpCoControlsPanel.Visibility = Visibility.Collapsed;
             }
             else
             {
@@ -2872,9 +2890,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 AdpDividerAfterIntelPl2.Visibility = Visibility.Collapsed;
                 AdpGridIntelUndervolt.Visibility = Visibility.Collapsed;
 
-                // Show AMD CO controls
-                AdpGridCoMode.Visibility = Visibility.Visible;
-                AdpDividerCoMode.Visibility = Visibility.Visible;
+                // Show AMD CO toggle; panel visibility follows the toggle state
+                AdpGridCoToggle.Visibility = Visibility.Visible;
+                AdpCoControlsPanel.Visibility = _adpCoEnabled ? Visibility.Visible : Visibility.Collapsed;
                 updateAdpCoVisibility();
             }
         }
@@ -2959,6 +2977,12 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         private void AdpRbCoMode_Click(object sender, RoutedEventArgs e) => updateAdpCoVisibility();
+
+        private void AdpTogCoEnabled_Toggled(object? sender, RoutedEventArgs e)
+        {
+            _adpCoEnabled = AdpTogCoEnabled.IsChecked == true;
+            AdpCoControlsPanel.Visibility = _adpCoEnabled ? Visibility.Visible : Visibility.Collapsed;
+        }
 
         private void updateAdpCoVisibility()
         {

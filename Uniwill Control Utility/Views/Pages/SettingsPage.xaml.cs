@@ -76,11 +76,19 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbAutoCheck.IsChecked = Settings.Default.UpdateCheck;
             cbAdaptive.IsChecked = Settings.Default.isStartAdpative;
             cbTrack.IsChecked = Settings.Default.isTrack;
+            cbGpuPowerBoost.IsChecked = Settings.Default.EnableGpuPowerBoost;
             cbHideFlydigi.IsChecked = Settings.Default.HideFlydigi;
 
             cbxLogLevel.SelectedIndex = Settings.Default.DiagnosticLogLevel;
 
             tbAppVerion.Text = $"Uniwill Control Utility - {GetAssemblyVersion()}";
+
+            // Show GPU Power Boost toggle only for RTX 5080/5090
+            if (Scripts.GPUs.NVIDIA.NvTuning.IsBlackwellHighEnd())
+            {
+                GpuPowerBoostRow.Visibility = Visibility.Visible;
+                GpuPowerBoostDivider.Visibility = Visibility.Visible;
+            }
 
             _ = checkUpdate();
         }
@@ -349,6 +357,18 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void cbTrack_Unchecked(object sender, RoutedEventArgs e)
         {
             Settings.Default.isTrack = false;
+            Settings.Default.Save();
+        }
+
+        private void cbGpuPowerBoost_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.EnableGpuPowerBoost = true;
+            Settings.Default.Save();
+        }
+
+        private void cbGpuPowerBoost_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.EnableGpuPowerBoost = false;
             Settings.Default.Save();
         }
 

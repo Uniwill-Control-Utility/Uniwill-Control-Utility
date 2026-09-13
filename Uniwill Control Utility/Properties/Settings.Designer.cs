@@ -218,6 +218,15 @@ namespace Uniwill_Control_Utility.Properties {
             set { this["customCoUnifiedValue"] = value; }
         }
         
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool customCoEnabled {
+            get { return ((bool)(this["customCoEnabled"])); }
+            set { this["customCoEnabled"] = value; }
+        }
+
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("150")]
@@ -1115,6 +1124,14 @@ namespace Uniwill_Control_Utility.Properties {
             set {
                 this["HideFlydigi"] = value;
             }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool EnableGpuPowerBoost {
+            get { return ((bool)(this["EnableGpuPowerBoost"])); }
+            set { this["EnableGpuPowerBoost"] = value; }
         }
     }
 }

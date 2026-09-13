@@ -327,6 +327,34 @@
                                                  Unchecked="cbTrack_Unchecked" />
                             </Grid>
 
+                             <!-- Divider -->
+                            <Border x:Name="GpuPowerBoostDivider"
+                                    Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Row: GPU Power Boost (RTX 5080/5090 only) -->
+                            <Grid x:Name="GpuPowerBoostRow" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="GPU Power Boost" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Allow GPU TGP up to 225W. Only enable if your cooling solution can sustain it." />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbGpuPowerBoost"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbGpuPowerBoost_Checked"
+                                                 Unchecked="cbGpuPowerBoost_Unchecked" />
+                            </Grid>
+
                             <!-- Divider -->
                             <Border Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />

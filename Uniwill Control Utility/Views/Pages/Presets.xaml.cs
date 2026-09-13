@@ -58,6 +58,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         private double _profileGpuDbOffset = 0;
         private double _profileIntelPl1 = 45;
         private double _profileIntelPl2 = 60;
+
+        // Curve Optimizer enabled (true by default — app manages CO).
+        // When false, CO controls are hidden and the app skips CO SMU commands.
+        private bool _coEnabled = true;
  
         public Presets(ILogger<Presets> logger, GpuInventoryService? gpuInventory = null, WaterCoolerService? waterCooler = null, DeviceApplier? deviceApplier = null)
         {
@@ -242,6 +246,15 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void rbCoMode_Click(object sender, RoutedEventArgs e) => updateCoVisibility();
 
+        private void togCoEnabled_Toggled(object sender, RoutedEventArgs e)
+        {
+            _coEnabled = togCoEnabled.IsChecked == true;
+            bool visible = _coEnabled;
+            // coControlsPanel may be null if the CPU CardExpander hasn't expanded yet
+            coControlsPanel?.SetValue(VisibilityProperty, visible ? Visibility.Visible : Visibility.Collapsed);
+            updateStatus();
+        }
+
         private void updateCoVisibility()
         {
             bool unified = rbCoUnified.IsChecked == true;
@@ -307,6 +320,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tbTjMaxLabel.Visibility = Visibility.Collapsed;
                 tbTjMax.Visibility = Visibility.Collapsed;
                 gridCustomTjMax.Visibility = Visibility.Collapsed;
+                gridCustomCoToggle.Visibility = Visibility.Collapsed;
+                coControlsPanel?.SetValue(VisibilityProperty, Visibility.Collapsed);
                 gridCustomCoUnified.Visibility = Visibility.Collapsed;
                 gridCustomCoUnifiedSlider.Visibility = Visibility.Collapsed;
                 gridCustomCoCcd0.Visibility = Visibility.Collapsed;
@@ -414,10 +429,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void SetGpuSliderLimits(int fallbackMax)
         {
             string gpuName = NvTuning.GetGpuName() ?? string.Empty;
+            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
             (int min, int max) = gpuName.ToLowerInvariant() switch
             {
-                var n when n.Contains("rtx 5090") => (95, 150),
-                var n when n.Contains("rtx 5080") => (80, 150),
+                var n when n.Contains("rtx 5090") => (95, boostEnabled ? 225 : 150),
+                var n when n.Contains("rtx 5080") => (80, boostEnabled ? 225 : 150),
                 var n when n.Contains("rtx 5070") => (60, 115),
                 _ => (50, fallbackMax)
             };
@@ -734,6 +750,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void updateStatus()
         {
+            // Guard: UI may not be ready yet (e.g., called from OnNavigatedToAsync before layout)
+            if (sdNvidia == null || tbPl1 == null)
+                return;
+
             // Update GPU clock offset display from slider values
             if (sdNvidia.Visibility == Visibility.Visible)
             {
@@ -760,7 +780,22 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tbPl1.Text = $"{_profileSustained:F0} W";
                 tbPl2.Text = $"{_profileBoost:F0} W";
                 tbTjMax.Text = $"{_profileTjMax} \u00B0C";
-                tbCoOffset.Text = $"{_profileCoCcd0:+0;-0;0} | {_profileCoCcd1:+0;-0;0}";
+                if (_coEnabled)
+                {
+                    bool coUnified = rbCoUnified.IsChecked == true;
+                    if (coUnified)
+                    {
+                        tbCoOffset.Text = $"{(int)sdCoUnified.Value:+0;-0;0}";
+                    }
+                    else
+                    {
+                        tbCoOffset.Text = $"{_profileCoCcd0:+0;-0;0} | {_profileCoCcd1:+0;-0;0}";
+                    }
+                }
+                else
+                {
+                    tbCoOffset.Text = "BIOS-level";
+                }
                 tbGpuTgp.Text = $"{_profileGpuTgp:F0} W";
                 tbGpuDb.Text = _profileGpuDb ? $"+{_profileGpuDbOffset:F0} W" : "Off";
             }
@@ -923,6 +958,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.customCoCcd1 = sdCoCcd1.Value;
             Settings.Default.customCoUnified = rbCoUnified.IsChecked == true;
             Settings.Default.customCoUnifiedValue = sdCoUnified.Value;
+            Settings.Default.customCoEnabled = _coEnabled;
             Settings.Default.Save();
             DebugLog("Custom slider values saved");
         }
@@ -946,6 +982,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             rbCoUnified.IsChecked = coUnified;
             rbCoPerCcd.IsChecked = !coUnified;
             sdCoUnified.Value = Settings.Default.customCoUnifiedValue;
+            _coEnabled = Settings.Default.customCoEnabled;
+            togCoEnabled.IsChecked = _coEnabled;
+            bool coVisible = _coEnabled;
+            coControlsPanel?.SetValue(VisibilityProperty, coVisible ? Visibility.Visible : Visibility.Collapsed);
 
             // Restore stored profile values for status card
             _profileSustained = sdSustained.Value;
@@ -1165,30 +1205,34 @@ namespace Uniwill_Control_Utility.Views.Pages
                 parts.Add($"--cHTC-temp={tjMax}");
 
                 // Curve Optimizer — unified mode uses set-coall, per-CCD uses set-coper.
-                bool coUnified = rbCoUnified.IsChecked == true;
-                if (coUnified)
+                // Skip entirely if the user disabled Curve Optimizer (BIOS-managed CO).
+                if (_coEnabled)
                 {
-                    int coValue = (int)sdCoUnified.Value;
-                    uint coEncoded = coValue < 0
-                        ? (uint)(0x100000 - Math.Abs(coValue))
-                        : (uint)coValue;
-                    parts.Add($"--set-coall={coEncoded}");
-                }
-                else
-                {
-                    // Per-CCD mode: use set-coper for each core.
-                    // Encoding (Renoir+/AM5): ((ccd << 8) | core_in_ccd) << 20 | offset20
-                    // offset20: 20-bit biased — negative = 0x100000 - |offset|
-                    // CCD0 = cores 0-7, CCD1 = cores 8-15
-                    int coCcd0 = (int)sdCoCcd0.Value;
-                    int coCcd1 = (int)sdCoCcd1.Value;
-                    for (int ccd = 0; ccd < 2; ccd++)
+                    bool coUnified = rbCoUnified.IsChecked == true;
+                    if (coUnified)
                     {
-                        int offset = ccd == 0 ? coCcd0 : coCcd1;
-                        for (int core = 0; core < 8; core++)
+                        int coValue = (int)sdCoUnified.Value;
+                        uint coEncoded = coValue < 0
+                            ? (uint)(0x100000 - Math.Abs(coValue))
+                            : (uint)coValue;
+                        parts.Add($"--set-coall={coEncoded}");
+                    }
+                    else
+                    {
+                        // Per-CCD mode: use set-coper for each core.
+                        // Encoding (Renoir+/AM5): ((ccd << 8) | core_in_ccd) << 20 | offset20
+                        // offset20: 20-bit biased — negative = 0x100000 - |offset|
+                        // CCD0 = cores 0-7, CCD1 = cores 8-15
+                        int coCcd0 = (int)sdCoCcd0.Value;
+                        int coCcd1 = (int)sdCoCcd1.Value;
+                        for (int ccd = 0; ccd < 2; ccd++)
                         {
-                            uint encoded = BuildCoperArg(ccd, core, offset);
-                            parts.Add($"--set-coper={encoded}");
+                            int offset = ccd == 0 ? coCcd0 : coCcd1;
+                            for (int core = 0; core < 8; core++)
+                            {
+                                uint encoded = BuildCoperArg(ccd, core, offset);
+                                parts.Add($"--set-coper={encoded}");
+                            }
                         }
                     }
                 }

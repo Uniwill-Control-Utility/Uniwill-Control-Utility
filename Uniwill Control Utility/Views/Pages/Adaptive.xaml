@@ -199,6 +199,37 @@
                             </Grid>
                             <!-- Divider -->
                             <Border x:Name="AdpDividerAfterTjMax" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Curve Optimizer toggle (AMD only) -->
+                            <Grid x:Name="AdpGridCoToggle">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Curve Optimizer" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Disable to keep BIOS-level CO settings" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <ui:ToggleSwitch x:Name="AdpTogCoEnabled"
+                                                     Margin="0,0,0,0"
+                                                     LabelPosition="Left"
+                                                     OnContent="On"
+                                                     OffContent="Off"
+                                                     ToolTip="Enable Curve Optimizer controls"
+                                                     Checked="AdpTogCoEnabled_Toggled"
+                                                     Unchecked="AdpTogCoEnabled_Toggled" />
+                                </StackPanel>
+                            </Grid>
+                            <!-- CO controls panel (hidden when CO toggle is OFF) -->
+                            <StackPanel x:Name="AdpCoControlsPanel" Visibility="Collapsed">
+                            <!-- Divider -->
+                            <Border x:Name="AdpDividerBeforeCoControls" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                             <!-- Curve Optimizer mode selection (AMD only) -->
                             <Grid x:Name="AdpGridCoMode">
                                 <Grid.ColumnDefinitions>
@@ -206,7 +237,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Curve Optimizer" />
+                                    <ui:TextBlock FontTypography="Body" Text="CO Mode" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
@@ -321,6 +352,7 @@
                             </Grid>
                             <!-- Divider (visible only in Per-CCD mode, after CCD1) -->
                             <Border x:Name="AdpDividerCoAfterCcd1" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            </StackPanel>
                             <!-- Intel PL1 -->
                             <Grid x:Name="AdpGridIntelPl1">
                                 <Grid.ColumnDefinitions>
@@ -470,7 +502,7 @@
                                                VerticalAlignment="Center"
                                                Margin="0,0,8,0"
                                                Text="150 W" />
-                                    <Slider x:Name="AdpSdNvPower" Width="140" Maximum="150" Minimum="0" Value="150" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                    <Slider x:Name="AdpSdNvPower" Width="140" Maximum="225" Minimum="0" Value="150" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
                             <!-- Divider -->

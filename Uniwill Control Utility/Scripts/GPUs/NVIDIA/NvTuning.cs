@@ -30,8 +30,28 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         // Power limit range (watts)
         private const int MinPowerLimitWatts = 5;
-        private const int MaxPowerLimitWatts = 175;
+        private const int MaxPowerLimitWattsDefault = 175;
+        private const int MaxPowerLimitWattsBoost = 225;
         private const int DefaultPowerLimitFallbackWatts = 80;
+
+        /// <summary>
+        /// Returns the effective maximum power limit based on the user's power boost setting.
+        /// RTX 5080/5090 with boost enabled: 225W. Otherwise: 175W.
+        /// </summary>
+        public static int MaxPowerLimitWatts =>
+            IsBlackwellHighEnd() && Properties.Settings.Default.EnableGpuPowerBoost
+                ? MaxPowerLimitWattsBoost
+                : MaxPowerLimitWattsDefault;
+
+        /// <summary>
+        /// Returns true if the detected GPU is an RTX 5080 or 5090 Laptop GPU.
+        /// Used to gate features (e.g., GPU power boost toggle visibility) to Blackwell flagship GPUs only.
+        /// </summary>
+        public static bool IsBlackwellHighEnd()
+        {
+            string gpuName = GetGpuName()?.ToLowerInvariant() ?? string.Empty;
+            return gpuName.Contains("rtx 5090") || gpuName.Contains("rtx 5080");
+        }
 
         // Undervolt curve range limits
         private const int MinUndervoltVoltageMv = 600;
