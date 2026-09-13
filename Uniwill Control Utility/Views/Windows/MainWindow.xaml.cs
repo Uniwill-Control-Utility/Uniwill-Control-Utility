@@ -311,6 +311,143 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
         }
 
+        /// <summary>Re-applies keyboard RGB after system resume (HID device loses state after hibernate).</summary>
+        private void ApplyKeyboardOnResume()
+        {
+            try
+            {
+                var hidService = new KeyboardHidService();
+                if (!hidService.Open())
+                {
+                    hidService.Dispose();
+                    return;
+                }
+
+                var settings = KeyboardSettingsService.Load();
+
+                if (settings.PowerOn)
+                {
+                    if (settings.PerKeyMode)
+                    {
+                        int brightnessPercent = (settings.Brightness * 100) / 7;
+                        hidService.TurnOn(settings.ColorR, settings.ColorG, settings.ColorB, brightnessPercent);
+                        hidService.SetEffect(Uniwill_Control_Utility.Models.KeyboardEffect.Static);
+                        var colors = settings.GetPerKeyColors();
+                        hidService.SendAllPerKeyColorsFromDict(colors);
+                        System.Diagnostics.Debug.WriteLine("[KBD] Resume apply: per-key mode");
+                    }
+                    else
+                    {
+                        int brightnessPercent = (settings.Brightness * 100) / 7;
+                        byte speed = (byte)Math.Clamp((int)settings.Speed, 0, 11);
+                        if (settings.Direction != KeyboardDirection.LeftRight)
+                        {
+                            System.Threading.Thread.Sleep(500);
+                        }
+                        hidService.TurnOnWithEffect(settings.ColorR, settings.ColorG, settings.ColorB,
+                            brightnessPercent, settings.EffectMode, speed, settings.Direction);
+
+                        if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor7Effect(settings.EffectMode))
+                        {
+                            var colors = ParseKeyboardColorString(settings.MultiColors, 7);
+                            if (colors.Count > 0)
+                            {
+                                if (settings.EffectMode == Uniwill_Control_Utility.Models.KeyboardEffect.Marquee)
+                                    colors = colors.AsEnumerable().Reverse().ToList();
+                                hidService.SetMultiColor(colors);
+                            }
+                        }
+                        else if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor4Effect(settings.EffectMode))
+                        {
+                            var colors = ParseKeyboardColorString(settings.MultiColors, 4);
+                            if (colors.Count > 0)
+                                hidService.SetMultiColor(colors);
+                        }
+                        else if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor4Plus1Effect(settings.EffectMode))
+                        {
+                            var colors = ParseKeyboardColorString(settings.MultiColors, 4);
+                            if (colors.Count > 0)
+                                hidService.SetMultiColor(colors);
+                        }
+
+                        System.Diagnostics.Debug.WriteLine($"[KBD] Resume apply: effect {settings.EffectMode}");
+                    }
+                }
+                else
+                {
+                    hidService.TurnOff();
+                }
+
+                hidService.Dispose();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[KBD] Resume apply failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>Re-applies light bar settings after system resume (HID device loses state after hibernate).</summary>
+        private void ApplyLightBarOnResume()
+        {
+            try
+            {
+                var hidService = new KeyboardHidService();
+                if (!hidService.Open())
+                {
+                    hidService.Dispose();
+                    return;
+                }
+
+                // Only apply if the device has a light bar zone
+                if (!hidService.IsLightBarAvailable)
+                {
+                    hidService.Dispose();
+                    return;
+                }
+
+                bool enabled = Settings.Default.LightBarEnabled;
+                byte r = Settings.Default.LightBarR;
+                byte g = Settings.Default.LightBarG;
+                byte b = Settings.Default.LightBarB;
+                int brightness = Settings.Default.LightBarBrightness;
+                int effectIndex = Settings.Default.LightBarEffectIndex;
+                int speed = Settings.Default.LightBarSpeed;
+
+                if (enabled)
+                {
+                    // Light bar effects mapping (same as LightBar page's Effects array)
+                    byte effect = effectIndex switch
+                    {
+                        0 => 0x01, // Static
+                        1 => 0x02, // Breathing
+                        2 => 0x03, // Wave
+                        3 => 0x04, // Loading
+                        4 => 0x05, // Marquee
+                        5 => 0x06, // Meteor
+                        _ => 0x01
+                    };
+                    // Light bar speed is inverted: UI 0-11 (slow?fast), HID 0-11 (fast?slow)
+                    byte hidSpeed = (byte)(11 - Math.Clamp(speed, 0, 11));
+
+                    System.Threading.Thread.Sleep(200);
+                    hidService.LightBarTurnOn(r, g, b, brightness);
+                    hidService.LightBarSetEffect(effect, hidSpeed, brightness);
+                    System.Diagnostics.Debug.WriteLine($"[LB] Resume apply: enabled, color=({r},{g},{b}), brightness={brightness}, effect=0x{effect:X2}");
+                }
+                else
+                {
+                    hidService.LightBarTurnOff();
+                    System.Diagnostics.Debug.WriteLine("[LB] Resume apply: disabled");
+                }
+
+                hidService.Dispose();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LB] Resume apply failed: {ex.Message}");
+            }
+        }
+
         /// <summary>Applies persisted keyboard RGB settings at app startup.</summary>
         private void ApplyKeyboardOnStart()
         {
@@ -604,37 +741,111 @@ namespace Uniwill_Control_Utility.Views.Windows
                             lastAppliedState = "resume";
                         }
 
-                        // Auto-reconnect Hydro UI watercooler after resume.
-                        // The BLE radio link is torn down during sleep/hibernation, but the
-                        // WaterCoolerService may still hold a zombie device handle.
+                        // Re-apply settings that are lost after hibernate/sleep:
+                        // - Keyboard RGB (HID device loses state)
+                        // - Light Bar (HID device loses state)
+                        // - Battery charge limit (EC may revert)
+                        // - Fan Control EC duties (EC may revert)
                         _ = Task.Run(async () =>
                         {
                             try
                             {
-                                // Give the BLE radio a moment to reinitialize after resume
+                                // Give the system a moment to reinitialize after resume
                                 await Task.Delay(1500);
 
-                                var waterCoolerService = App.GetService<WaterCoolerService>();
-                                if (waterCoolerService == null)
-                                    return;
-
-                                // If the service still thinks it's connected, the BLE link is a
-                                // zombie - force a disconnect before attempting reconnect.
-                                if (waterCoolerService.IsConnected)
+                                // Re-apply Keyboard RGB
+                                try
                                 {
-                                    Debug.WriteLine("[WaterCooler] Resuming from sleep - disconnecting zombie BLE link");
-                                    await waterCoolerService.DisconnectAsync();
-                                    await Task.Delay(500);
+                                    ApplyKeyboardOnResume();
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"[Resume] Keyboard re-apply failed: {ex.Message}");
                                 }
 
-                                // Attempt auto-reconnect if the user has it enabled
-                                bool connected = await waterCoolerService.TryAutoConnectAsync();
-                                if (connected)
-                                    Debug.WriteLine("[WaterCooler] Auto-reconnected after system resume");
+                                // Re-apply Light Bar
+                                try
+                                {
+                                    ApplyLightBarOnResume();
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"[Resume] Light Bar re-apply failed: {ex.Message}");
+                                }
+
+                                // Re-apply Battery charge limit
+                                try
+                                {
+                                    var ecService = App.GetService<UniwillECService>();
+                                    if (ecService != null && ecService.Initialize())
+                                    {
+                                        int savedMode = Settings.Default.BatteryMode;
+                                        int currentMode = ecService.GetBatteryMode();
+                                        if (savedMode != currentMode)
+                                        {
+                                            ecService.SetBatteryMode(savedMode);
+                                            Debug.WriteLine($"[Resume] Battery mode reverted from {currentMode} to saved {savedMode}");
+                                        }
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"[Resume] Battery re-apply failed: {ex.Message}");
+                                }
+
+                                // Re-apply Fan Control EC duties
+                                try
+                                {
+                                    var ecService = App.GetService<UniwillECService>();
+                                    if (ecService != null)
+                                    {
+                                        var fanSettings = FanControlSettingsService.Load();
+                                        EcFanCurve cpuCurve;
+                                        EcFanCurve gpuCurve;
+
+                                        if (fanSettings.UnifiedMode)
+                                        {
+                                            cpuCurve = GetFanPresetCurve(fanSettings.UnifiedPreset);
+                                            gpuCurve = cpuCurve;
+                                        }
+                                        else
+                                        {
+                                            cpuCurve = GetFanPresetCurve(fanSettings.CpuPreset);
+                                            gpuCurve = GetFanPresetCurve(fanSettings.GpuPreset);
+                                        }
+
+                                        ecService.ApplyFanCurve(cpuCurve, gpuCurve,
+                                            fanSettings.CpuTempThresholds ?? EcFanCurve.CpuTemperatures,
+                                            fanSettings.GpuTempThresholds ?? EcFanCurve.GpuTemperatures);
+                                        Debug.WriteLine("[Resume] Fan Control EC duties re-applied");
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"[Resume] Fan Control re-apply failed: {ex.Message}");
+                                }
+
+                                // Auto-reconnect Hydro UI watercooler.
+                                var waterCoolerService = App.GetService<WaterCoolerService>();
+                                if (waterCoolerService != null)
+                                {
+                                    // If the service still thinks it's connected, the BLE link is a
+                                    // zombie - force a disconnect before attempting reconnect.
+                                    if (waterCoolerService.IsConnected)
+                                    {
+                                        Debug.WriteLine("[WaterCooler] Resuming from sleep - disconnecting zombie BLE link");
+                                        await waterCoolerService.DisconnectAsync();
+                                        await Task.Delay(500);
+                                    }
+
+                                    bool connected = await waterCoolerService.TryAutoConnectAsync();
+                                    if (connected)
+                                        Debug.WriteLine("[WaterCooler] Auto-reconnected after system resume");
+                                }
                             }
                             catch (Exception ex)
                             {
-                                Debug.WriteLine($"[WaterCooler] Auto-reconnect after resume failed: {ex.Message}");
+                                Debug.WriteLine($"[Resume] Auto-reapply failed: {ex.Message}");
                             }
                         });
                     }

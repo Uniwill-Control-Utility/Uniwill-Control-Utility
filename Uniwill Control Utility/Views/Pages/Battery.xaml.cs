@@ -13,6 +13,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         private const int RefreshIntervalSeconds = 5;
         private const int ApplyDelaySeconds = 2;
         private const int BatteryModeLimit = 2;
+        // After a user change, skip syncing the combo box from EC for this many
+        // milliseconds to avoid reading back the stale value before the EC commits.
+        private const int ApplyGraceMs = 10000; // 10 seconds
 
         private readonly UniwillECService? _ecService;
         private readonly DispatcherTimer _refreshTimer = new()
@@ -22,6 +25,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         };
         private bool _isEcAvailable;
         private bool _isLoaded;
+        private DateTime _lastUserApplyTime = DateTime.MinValue;
 
         public Battery()
         {
@@ -78,6 +82,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 try
                 {
                     _ecService!.SetBatteryMode(savedMode);
+                    _lastUserApplyTime = DateTime.UtcNow;
                     Debug.WriteLine($"[Battery] Startup: EC mode ({currentMode}) differed from saved ({savedMode}), applied saved");
                 }
                 catch (Exception ex)
@@ -110,6 +115,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _ecService!.SetBatteryMode(mode);
                 Settings.Default.BatteryMode = mode;
                 Settings.Default.Save();
+                _lastUserApplyTime = DateTime.UtcNow;
                 Debug.WriteLine($"[Battery] Applied charging limit: {mode switch { 0 => "100%", 1 => "80%", 2 => "60%", _ => "unknown" }} (mode {mode})");
 
                 // Delay refresh to let the EC process the change (timer auto-starts and self-stops in callback).
@@ -147,15 +153,27 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (_ecService is null) return;
 
-            // Re-read charge limit from EC
+            // Re-read charge limit from EC. Skip syncing the combo box if the user
+            // recently changed the setting — the EC may not have committed yet.
+            bool withinGrace = (DateTime.UtcNow - _lastUserApplyTime).TotalMilliseconds < ApplyGraceMs;
+
             try
             {
                 int ecMode = _ecService.GetBatteryMode();
                 Application.Current.Dispatcher.Invoke(() =>
                 {
-                    // Sync combo box to EC state
-                    cbChargingLimit.SelectedIndex = ecMode;
-                    tbChargeLimit.Text = $"{ecMode switch { 0 => "100", 1 => "80", 2 => "60", _ => "--" }}%";
+                    if (withinGrace)
+                    {
+                        // Only update the display text, keep the combo box at the user's selection
+                        tbChargeLimit.Text = $"{cbChargingLimit.SelectedIndex switch { 0 => "100", 1 => "80", 2 => "60", _ => "--" }}%";
+                        Debug.WriteLine($"[Battery] RefreshAll: skipping combo box sync (within {ApplyGraceMs}ms grace, EC reports mode {ecMode})");
+                    }
+                    else
+                    {
+                        // Sync combo box to EC state
+                        cbChargingLimit.SelectedIndex = ecMode;
+                        tbChargeLimit.Text = $"{ecMode switch { 0 => "100", 1 => "80", 2 => "60", _ => "--" }}%";
+                    }
                 });
             }
             catch (Exception ex)

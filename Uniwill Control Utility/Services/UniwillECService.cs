@@ -1666,11 +1666,13 @@ namespace Uniwill_Control_Utility.Services
         {
             EnsureInitialized();
             byte val = ReadECRegister(REG_BATTERY_MODE);
-            // Extract mode from known raw values: 0x08?0, 0x18?1, 0x28?2
-            int mode = Array.IndexOf(BatteryModeValues, val);
+            // Mask to bits 3-5 (the battery mode field). The EC may have other
+            // flags in the same register, so an exact-byte match is unreliable.
+            byte masked = (byte)(val & 0x38);
+            int mode = Array.IndexOf(BatteryModeValues, masked);
             if (mode < 0)
                 mode = 0; // Default to High Capacity if value unrecognized
-            DebugLog($"[Battery] GetBatteryMode: raw=0x{val:X2}, mode={mode}");
+            DebugLog($"[Battery] GetBatteryMode: raw=0x{val:X2}, masked=0x{masked:X2}, mode={mode}");
             return mode;
         }
 
