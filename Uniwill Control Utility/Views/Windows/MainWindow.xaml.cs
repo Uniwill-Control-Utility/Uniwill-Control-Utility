@@ -363,13 +363,6 @@ namespace Uniwill_Control_Utility.Views.Windows
                             if (colors.Count > 0)
                                 hidService.SetMultiColor(colors);
                         }
-                        else if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor4Plus1Effect(settings.EffectMode))
-                        {
-                            var colors = ParseKeyboardColorString(settings.MultiColors, 4);
-                            if (colors.Count > 0)
-                                hidService.SetMultiColor(colors);
-                        }
-
                         System.Diagnostics.Debug.WriteLine($"[KBD] Resume apply: effect {settings.EffectMode}");
                     }
                 }
@@ -511,13 +504,6 @@ namespace Uniwill_Control_Utility.Views.Windows
                             if (colors.Count > 0)
                                 hidService.SetMultiColor(colors);
                         }
-                        else if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor4Plus1Effect(settings.EffectMode))
-                        {
-                            var colors = ParseKeyboardColorString(settings.MultiColors, 4);
-                            if (colors.Count > 0)
-                                hidService.SetMultiColor(colors);
-                        }
-
                         System.Diagnostics.Debug.WriteLine($"[KBD] Startup apply: effect {settings.EffectMode}");
                     }
                 }

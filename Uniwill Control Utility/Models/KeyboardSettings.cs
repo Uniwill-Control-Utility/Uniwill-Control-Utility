@@ -200,9 +200,6 @@ namespace Uniwill_Control_Utility.Models
 
         /// <summary>Only WASD and arrow keys lit, rest dark (XCC: "Gaming Mode").</summary>
         GamingMode = 0x15,
-
-        /// <summary>Gaming mode WASD/arrows + static color on rest.</summary>
-        GamingModeFull = 0x20,
     }
 
     /// <summary>

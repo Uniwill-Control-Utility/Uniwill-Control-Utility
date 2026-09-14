@@ -462,8 +462,7 @@ namespace Uniwill_Control_Utility.Services
                 _ = Task.Run(() =>
                 {
                     ApplyKeyboardHid(s.PerKeyMode, s.Brightness, s.EffectMode, s.Speed,
-                        s.Direction, s.ColorR, s.ColorG, s.ColorB, s.MultiColors, s.PerKeyColors,
-                        0, 0, 0);
+                        s.Direction, s.ColorR, s.ColorG, s.ColorB, s.MultiColors, s.PerKeyColors);
                 });
             }
         }
@@ -512,10 +511,7 @@ namespace Uniwill_Control_Utility.Services
             byte colorG,
             byte colorB,
             string multiColors,
-            string? perKeyColors,
-            byte restColorR,
-            byte restColorG,
-            byte restColorB)
+            string? perKeyColors)
         {
             try
             {
@@ -545,8 +541,7 @@ namespace Uniwill_Control_Utility.Services
                 var args = new KeyboardPresetAppliedEventArgs(
                     perKeyMode, brightness, idleTimerEnabled, idleTimerMinutes,
                     effectMode, effectSpeed, settings.Direction,
-                    colorR, colorG, colorB, multiColors, perKeyColors,
-                    restColorR, restColorG, restColorB);
+                    colorR, colorG, colorB, multiColors, perKeyColors);
                 LastAppliedKeyboardPreset = args;
                 KeyboardPresetApplied?.Invoke(this, args);
 
@@ -559,8 +554,7 @@ namespace Uniwill_Control_Utility.Services
                     System.Threading.Thread.Sleep(500);
                 bool touchReactive = effectMode == "Reactive";
                 ApplyKeyboardHid(perKeyMode, brightness, settings.EffectMode, effectSpeed,
-                    settings.Direction, colorR, colorG, colorB, multiColors, perKeyColors,
-                    restColorR, restColorG, restColorB, touchReactive);
+                    settings.Direction, colorR, colorG, colorB, multiColors, perKeyColors, touchReactive);
             }
             catch (Exception ex)
             {
@@ -583,19 +577,12 @@ namespace Uniwill_Control_Utility.Services
             KeyboardEffect.GamingMode,
         };
 
-        // Effects that need 4+1 multi-color slots
-        private static readonly HashSet<KeyboardEffect> s_multiColor4Plus1Effects = new()
-        {
-            KeyboardEffect.GamingModeFull,
-        };
-
         /// <summary>
         /// Sends keyboard HID commands directly to the device.
         /// </summary>
         private static void ApplyKeyboardHid(bool perKeyMode, int brightness, KeyboardEffect effect,
             byte effectSpeed, KeyboardDirection direction, byte r, byte g, byte b,
-            string multiColors, string? perKeyColors,
-            byte restColorR, byte restColorG, byte restColorB, bool touchReactive = false)
+            string multiColors, string? perKeyColors, bool touchReactive = false)
         {
             var hid = new KeyboardHidService();
             try
@@ -637,12 +624,6 @@ namespace Uniwill_Control_Utility.Services
                             else if (s_multiColor4Effects.Contains(effect))
                             {
                                 hid.SetMultiColor(multiColorList.Take(4).ToList());
-                            }
-                            else if (s_multiColor4Plus1Effects.Contains(effect))
-                            {
-                                var allColors = multiColorList.Take(4).ToList();
-                                allColors.Add(Color.FromRgb(restColorR, restColorG, restColorB));
-                                hid.SetMultiColor(allColors);
                             }
                         }
                         else
@@ -692,8 +673,7 @@ namespace Uniwill_Control_Utility.Services
         private static void ApplyFallbackMultiColor(KeyboardHidService hid, KeyboardEffect effect, byte r, byte g, byte b)
         {
             if (s_multiColor7Effects.Contains(effect)
-                || s_multiColor4Effects.Contains(effect)
-                || s_multiColor4Plus1Effects.Contains(effect))
+                || s_multiColor4Effects.Contains(effect))
             {
                 hid.SetMultiColor(new[] { Color.FromRgb(r, g, b) });
             }
@@ -716,7 +696,6 @@ namespace Uniwill_Control_Utility.Services
             "TouchSpark" => KeyboardEffect.TouchSpark,
             "Spark" => KeyboardEffect.Spark,
             "GamingMode" => KeyboardEffect.GamingMode,
-            "GamingModeFull" => KeyboardEffect.GamingModeFull,
             "Music" => KeyboardEffect.Static,
             _ => KeyboardEffect.Static,
         };
@@ -1090,9 +1069,6 @@ namespace Uniwill_Control_Utility.Services
         public byte ColorR { get; }
         public byte ColorG { get; }
         public byte ColorB { get; }
-        public byte RestColorR { get; }
-        public byte RestColorG { get; }
-        public byte RestColorB { get; }
         public string MultiColors { get; }
         public string? PerKeyColors { get; }
 
@@ -1100,8 +1076,7 @@ namespace Uniwill_Control_Utility.Services
             bool perKeyMode, int brightness, bool idleTimerEnabled, int idleTimerMinutes,
             string effectMode, byte effectSpeed, KeyboardDirection direction,
             byte colorR, byte colorG, byte colorB,
-            string multiColors, string? perKeyColors,
-            byte restColorR, byte restColorG, byte restColorB)
+            string multiColors, string? perKeyColors)
         {
             PerKeyMode = perKeyMode;
             Brightness = brightness;
@@ -1113,9 +1088,6 @@ namespace Uniwill_Control_Utility.Services
             ColorR = colorR;
             ColorG = colorG;
             ColorB = colorB;
-            RestColorR = restColorR;
-            RestColorG = restColorG;
-            RestColorB = restColorB;
             MultiColors = multiColors;
             PerKeyColors = perKeyColors;
         }

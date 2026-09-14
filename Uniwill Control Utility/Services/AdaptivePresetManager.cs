@@ -57,9 +57,6 @@ namespace Uniwill_Control_Utility.Services
         public byte KbColorR { get; set; } = 0;
         public byte KbColorG { get; set; } = 255;
         public byte KbColorB { get; set; } = 255;
-        public byte KbRestColorR { get; set; } = 255;
-        public byte KbRestColorG { get; set; } = 255;
-        public byte KbRestColorB { get; set; } = 255;
         public string KbMultiColors { get; set; } = "";
         public string? KbPerKeyColors { get; set; }
 

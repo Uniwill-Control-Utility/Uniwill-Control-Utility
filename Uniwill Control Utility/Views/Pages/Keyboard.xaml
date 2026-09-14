@@ -319,30 +319,6 @@
                                                           ColorsChanged="MultiColorPicker_ColorsChanged" />
                                     </Grid>
 
-                                    <!-- Rest color picker for GamingModeFull -->
-                                    <Grid x:Name="GamingModeFullRestRow"
-                                      Visibility="Collapsed"
-                                      Margin="0,12,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0">
-                                            <ui:TextBlock FontTypography="Body"
-                                                Text="Rest of Keyboard" />
-                                            <ui:TextBlock Margin="0,2,0,0"
-                                               FontTypography="Caption"
-                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Color for non-WASD/arrow keys." />
-                                        </StackPanel>
-                                        <controls:ColorPickerControl x:Name="GamingModeFullRestColor"
-                                             Grid.Column="1"
-                                             HorizontalAlignment="Right"
-                                             VerticalAlignment="Center"
-                                             SelectedColor="White"
-                                             ColorChangedDelayed="GamingModeFullRestColor_ColorChangedDelayed" />
-                                    </Grid>
-
                                     <!-- Full-width divider matching CardExpander's header/content separator -->
                                     <Border x:Name="SpeedSeparator" Height="1" Margin="-58,12,-46,12"
                                         Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />

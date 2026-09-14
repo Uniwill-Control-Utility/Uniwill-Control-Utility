@@ -406,17 +406,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                                     () => MultiColorPicker.GetColors().ToList());
                                 _hidService.SetMultiColor(colors.Take(4));
                             }
-                            else if (s_multiColor4Plus1Effects.Contains(effect))
-                            {
-                                var colors = Application.Current.Dispatcher.Invoke(() =>
-                                {
-                                    var list = MultiColorPicker.GetColors().ToList();
-                                    var rest = GamingModeFullRestColor.SelectedColor;
-                                    list.AddRange(new[] { rest });
-                                    return list;
-                                });
-                                _hidService.SetMultiColor(colors);
-                            }
                             else
                             {
                                 // Rainbow and other non-multi-color effects still need the
@@ -505,14 +494,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             KeyboardEffect.GamingMode,
         };
 
-        internal static readonly HashSet<KeyboardEffect> s_multiColor4Plus1Effects = new()
-        {
-            KeyboardEffect.GamingModeFull,
-        };
-
         internal static bool IsMultiColor7Effect(KeyboardEffect effect) => s_multiColor7Effects.Contains(effect);
         internal static bool IsMultiColor4Effect(KeyboardEffect effect) => s_multiColor4Effects.Contains(effect);
-        internal static bool IsMultiColor4Plus1Effect(KeyboardEffect effect) => s_multiColor4Plus1Effects.Contains(effect);
 
         /// <summary>Effects that support a touch-reactive variant (Random, Ripple, Aurora, Spark).</summary>
         private static readonly HashSet<KeyboardEffect> s_touchReactiveEffects = new()
@@ -571,7 +554,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 BrightnessSeparator.Visibility = Visibility.Collapsed;
                 ColorRow.Visibility = Visibility.Collapsed;
                 MultiColorRow.Visibility = Visibility.Collapsed;
-                GamingModeFullRestRow.Visibility = Visibility.Collapsed;
                 SpeedSeparator.Visibility = Visibility.Collapsed;
                 SpeedRow.Visibility = Visibility.Collapsed;
                 DirectionSeparator.Visibility = Visibility.Collapsed;
@@ -586,7 +568,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 BrightnessSeparator.Visibility = Visibility.Collapsed;
                 ColorRow.Visibility = Visibility.Collapsed;
                 MultiColorRow.Visibility = Visibility.Collapsed;
-                GamingModeFullRestRow.Visibility = Visibility.Collapsed;
                 SpeedSeparator.Visibility = Visibility.Collapsed;
                 SpeedRow.Visibility = Visibility.Collapsed;
                 DirectionSeparator.Visibility = Visibility.Collapsed;
@@ -601,7 +582,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 ColorRow.Visibility = Visibility.Collapsed;
                 MultiColorRow.Visibility = Visibility.Visible;
-                GamingModeFullRestRow.Visibility = Visibility.Collapsed;
                 MultiColorTitle.Text = "Effect Colors";
                 MultiColorSubtitle.Text = "7 colors required for this effect. Click a swatch to edit.";
                 MultiColorPicker.SetColors(MultiColorPicker.GetColors(), 7);
@@ -610,17 +590,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 ColorRow.Visibility = Visibility.Collapsed;
                 MultiColorRow.Visibility = Visibility.Visible;
-                GamingModeFullRestRow.Visibility = Visibility.Collapsed;
-                MultiColorTitle.Text = "WASD &amp; Arrow Keys";
-                MultiColorSubtitle.Text = "4 colors for gaming keys. Click a swatch to edit.";
-                MultiColorPicker.SetColors(MultiColorPicker.GetColors(), 4);
-            }
-            else if (s_multiColor4Plus1Effects.Contains(effect))
-            {
-                ColorRow.Visibility = Visibility.Collapsed;
-                MultiColorRow.Visibility = Visibility.Visible;
-                GamingModeFullRestRow.Visibility = Visibility.Visible;
-                MultiColorTitle.Text = "WASD &amp; Arrow Keys";
+                MultiColorTitle.Text = "WASD & Arrow Keys";
                 MultiColorSubtitle.Text = "4 colors for gaming keys. Click a swatch to edit.";
                 MultiColorPicker.SetColors(MultiColorPicker.GetColors(), 4);
             }
@@ -629,7 +599,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Single-color effects (Static, etc.)
                 ColorRow.Visibility = Visibility.Visible;
                 MultiColorRow.Visibility = Visibility.Collapsed;
-                GamingModeFullRestRow.Visibility = Visibility.Collapsed;
             }
 
             bool showSpeed = s_animatedEffects.Contains(effect);
@@ -731,13 +700,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             _pendingApply = true;
         }
 
-        private void GamingModeFullRestColor_ColorChangedDelayed(object sender, EventArgs e)
-        {
-            if (_isFirstLoad) return;
-            SaveSettings();
-            _pendingApply = true;
-        }
-
         private void MultiColorPicker_ColorsChanged(object sender, EventArgs e)
         {
             if (_isFirstLoad) return;
@@ -826,19 +788,28 @@ namespace Uniwill_Control_Utility.Views.Pages
                 int brightnessPercent = (brightnessLevel * 100) / 7;
                 byte speed = SliderToHidSpeed((int)SpeedSlider.Value);
 
-               if (powerOn)
+                if (powerOn)
                 {
                     var color = ColorPicker.SelectedColor;
                     KeyboardEffect effect = cmbEffect.SelectedItem is KeyboardEffect e ? e
                         : KeyboardSettingsService.Load().EffectMode;
 
-                    // Use fast apply to minimize visible flash. TurnOnWithEffect
-                    // combines power-on and effect into one sequence so the
-                    // firmware never shows an intermediate static color.
-                    bool touchReactive = tsTouchReactive.IsChecked == true;
-                    _hidService.TurnOnWithEffect(
-                        color.R, color.G, color.B, brightnessPercent,
-                        effect, speed, _currentDirection, touchReactive);
+                    if (effect == KeyboardEffect.Static)
+                    {
+                        // Static: use SetColor to update color and brightness without
+                        // the off/reset/on cycle that TurnOnWithEffect causes (visible blackout).
+                        _hidService.SetColor(color.R, color.G, color.B, brightnessPercent);
+                    }
+                    else
+                    {
+                        // For animated and multi-color effects, use TurnOnWithEffect only
+                        // when switching effects. For brightness/color changes on the same
+                        // effect, use incremental updates to avoid the off/reset blackout.
+                        bool touchReactive = tsTouchReactive.IsChecked == true;
+                        _hidService.TurnOnWithEffect(
+                            color.R, color.G, color.B, brightnessPercent,
+                            effect, speed, _currentDirection, touchReactive);
+                    }
 
                     // Multi-color palette (after effect is set).
                     if (s_multiColor7Effects.Contains(effect))
@@ -851,13 +822,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                     else if (s_multiColor4Effects.Contains(effect))
                     {
                         _hidService.SetMultiColor(MultiColorPicker.GetColors().Take(4));
-                    }
-                    else if (s_multiColor4Plus1Effects.Contains(effect))
-                    {
-                        var allColors = MultiColorPicker.GetColors().Take(4)
-                            .Concat(new[] { GamingModeFullRestColor.SelectedColor })
-                            .ToList();
-                        _hidService.SetMultiColor(allColors);
                     }
                 }
                 else
@@ -1203,7 +1167,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 var colors = ParseColorString(settings.MultiColors);
                 if (colors.Count > 0)
-                    MultiColorPicker.SetColors(colors, 7);
+                {
+                    int count = settings.EffectMode == KeyboardEffect.GamingMode ? 4 : 7;
+                    MultiColorPicker.SetColors(colors, count);
+                }
             }
 
             tsIdleTimer.IsChecked = settings.IdleTimerEnabled;
@@ -1257,6 +1224,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Sync picker brush so hover/selection overlays use the right color.
             _visualizer.SetPickerBrush(new SolidColorBrush(_colorPicker.SelectedColor));
+
+            // Update effect UI (visibility of multi-color rows, speed, direction, etc.)
+            // based on the loaded effect.
+            UpdateEffectUi();
 
             // Mark as initialized so that SelectionChanged handlers triggered by
             // PopulateEffects (which runs before this) don't fire after we're done.
@@ -1488,13 +1459,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                     if (colors.Count > 0)
                     {
                         // Determine swatch count from effect mode name
-                        int count = e.EffectMode == "GamingModeFull" || e.EffectMode == "GamingMode" ? 4 : 7;
+                        int count = e.EffectMode == "GamingMode" ? 4 : 7;
                         MultiColorPicker.SetColors(colors, count);
                     }
                 }
-
-                // Rest color for GamingModeFull
-                GamingModeFullRestColor.SelectedColor = Color.FromRgb(e.RestColorR, e.RestColorG, e.RestColorB);
 
                 // Speed
                 SpeedSlider.Value = HidSpeedToSlider(e.EffectSpeed);
@@ -1565,7 +1533,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             cmbEffect.IsEnabled = enabled;
             ColorPicker.IsEnabled = enabled;
             MultiColorPicker.IsEnabled = enabled;
-            GamingModeFullRestColor.IsEnabled = enabled;
             SpeedSlider.IsEnabled = enabled;
             _visualizer.IsEnabled = enabled;
             _selectAllBtn.IsEnabled = enabled;
