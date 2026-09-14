@@ -221,10 +221,10 @@ namespace Uniwill_Control_Utility.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool customCoEnabled {
-            get { return ((bool)(this["customCoEnabled"])); }
-            set { this["customCoEnabled"] = value; }
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool DisableCpuVoltageControl {
+            get { return ((bool)(this["DisableCpuVoltageControl"])); }
+            set { this["DisableCpuVoltageControl"] = value; }
         }
 
         [global::System.Configuration.UserScopedSettingAttribute()]

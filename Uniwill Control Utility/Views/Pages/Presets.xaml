@@ -144,10 +144,10 @@
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
 
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Width="120" FontSize="13" Text="Sustained (SPL)" />
+                                    <TextBlock x:Name="tbPl1Label" Grid.Row="0" Grid.Column="0" Width="120" FontSize="13" Text="Sustained (SPL)" />
                                     <TextBlock Grid.Row="0" Grid.Column="1" x:Name="tbPl1" FontSize="13" FontWeight="SemiBold" Text="-- W" />
 
-                                    <TextBlock Grid.Row="1" Grid.Column="0" FontSize="13" Text="Boost (FPL)" Margin="0,4,0,0" />
+                                    <TextBlock x:Name="tbPl2Label" Grid.Row="1" Grid.Column="0" FontSize="13" Text="Boost (FPL)" Margin="0,4,0,0" />
                                     <TextBlock Grid.Row="1" Grid.Column="1" x:Name="tbPl2" FontSize="13" FontWeight="SemiBold" Text="-- W" Margin="0,4,0,0" />
 
                                     <TextBlock x:Name="tbTjMaxLabel" Grid.Row="2" Grid.Column="0" Width="120" FontSize="13" Text="TjMax" Margin="0,4,0,0" />
@@ -301,31 +301,7 @@
                                         <Slider x:Name="sdTjMax" Width="140" Maximum="105" Minimum="70" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
-                                <!-- Divider -->
-                                <Border x:Name="dividerBeforeCo" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                                <!-- Curve Optimizer toggle -->
-                                <Grid x:Name="gridCustomCoToggle">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body" Text="Curve Optimizer" />
-                                        <ui:TextBlock Margin="0,2,0,0"
-                                                       FontTypography="Caption"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Disable if you manage CO offsets in BIOS" />
-                                    </StackPanel>
-                                    <ui:ToggleSwitch x:Name="togCoEnabled"
-                                                     Grid.Column="1"
-                                                     LabelPosition="Left"
-                                                     OnContent="On"
-                                                     OffContent="Off"
-                                                     IsChecked="True"
-                                                     Checked="togCoEnabled_Toggled"
-                                                     Unchecked="togCoEnabled_Toggled" />
-                                </Grid>
-                                <!-- CO controls container (hidden when toggle is OFF) -->
+                                <!-- CO controls container (hidden when DisableCpuVoltageControl is ON) -->
                                 <StackPanel x:Name="coControlsPanel">
                                 <!-- Divider -->
                                 <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
@@ -384,7 +360,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="All-core offset (-30 to 0)" />
+                                                       Text="All-core offset (-50 to 0)" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1"
                                                 Orientation="Horizontal"
@@ -396,7 +372,7 @@
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0"
                                                    Text="0" />
-                                        <Slider x:Name="sdCoUnified" Width="140" Maximum="0" Minimum="-30" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
+                                        <Slider x:Name="sdCoUnified" Width="140" Maximum="0" Minimum="-50" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <!-- CCD 0 Voltage Offset (AMD only) -->
@@ -420,7 +396,7 @@
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0"
                                                    Text="0" />
-                                        <Slider x:Name="sdCoCcd0" Width="140" Maximum="0" Minimum="-30" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
+                                        <Slider x:Name="sdCoCcd0" Width="140" Maximum="0" Minimum="-50" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <!-- Divider (visible only in Per-CCD mode) -->
@@ -446,7 +422,7 @@
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0"
                                                    Text="0" />
-                                        <Slider x:Name="sdCoCcd1" Width="140" Maximum="0" Minimum="-30" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
+                                        <Slider x:Name="sdCoCcd1" Width="140" Maximum="0" Minimum="-50" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 </StackPanel>
@@ -498,7 +474,7 @@
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0"
                                                    Text="45 W" />
-                                        <Slider x:Name="sdIntelPl1" Width="140" Maximum="400" Minimum="5" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
+                                        <Slider x:Name="sdIntelPl1" Width="140" Maximum="200" Minimum="10" Value="45" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <!-- Divider -->
@@ -529,16 +505,22 @@
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0"
                                                    Text="60 W" />
-                                        <Slider x:Name="sdIntelPl2" Width="140" Maximum="400" Minimum="5" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
+                                        <Slider x:Name="sdIntelPl2" Width="140" Maximum="200" Minimum="10" Value="60" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
+                                <!-- Intel Undervolt controls container (hidden when DisableCpuVoltageControl is ON) -->
+                                <StackPanel x:Name="intelVoltControlsPanel">
                                 <!-- Divider -->
                                 <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                                 <!-- Intel Undervolt CPU -->
-                                <StackPanel>
-                                    <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
-                                            <ui:TextBlock FontTypography="Body" Text="CPU Undervolt" />
+                                            <ui:TextBlock FontTypography="Body" Text="Offset" />
                                             <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="CPU voltage offset (MSR 0x150 plane 0)" VerticalAlignment="Center" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
@@ -546,7 +528,7 @@
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                        Text="Voltage offset" />
                                     </StackPanel>
-                                    <StackPanel
+                                    <StackPanel Grid.Column="1"
                                                 Orientation="Horizontal"
                                                 HorizontalAlignment="Right"
                                                 VerticalAlignment="Center">
@@ -556,8 +538,9 @@
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0"
                                                    Text="0 mV" />
-                                        <Slider x:Name="sdIntelVolt" Width="140" Maximum="0" Minimum="-150" TickFrequency="10" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
+                                        <Slider x:Name="sdIntelVolt" Width="140" Maximum="0" Minimum="-100" Value="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
+                                </Grid>
                                 </StackPanel>
                             </StackPanel>
                         </ui:CardExpander>

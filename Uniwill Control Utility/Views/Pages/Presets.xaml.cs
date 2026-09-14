@@ -59,10 +59,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         private double _profileIntelPl1 = 45;
         private double _profileIntelPl2 = 60;
 
-        // Curve Optimizer enabled (true by default — app manages CO).
-        // When false, CO controls are hidden and the app skips CO SMU commands.
-        private bool _coEnabled = true;
- 
+        // Voltage control is enabled when DisableCpuVoltageControl setting is False.
+        // When the setting is True, voltage controls (CO for AMD, undervolt for Intel)
+        // are hidden and the app skips voltage-related SMU/MSR commands.
+        private bool CpuVoltageEnabled => !Settings.Default.DisableCpuVoltageControl;
+
         public Presets(ILogger<Presets> logger, GpuInventoryService? gpuInventory = null, WaterCoolerService? waterCooler = null, DeviceApplier? deviceApplier = null)
         {
             _logger = logger;
@@ -246,15 +247,6 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void rbCoMode_Click(object sender, RoutedEventArgs e) => updateCoVisibility();
 
-        private void togCoEnabled_Toggled(object sender, RoutedEventArgs e)
-        {
-            _coEnabled = togCoEnabled.IsChecked == true;
-            bool visible = _coEnabled;
-            // coControlsPanel may be null if the CPU CardExpander hasn't expanded yet
-            coControlsPanel?.SetValue(VisibilityProperty, visible ? Visibility.Visible : Visibility.Collapsed);
-            updateStatus();
-        }
-
         private void updateCoVisibility()
         {
             bool unified = rbCoUnified.IsChecked == true;
@@ -317,21 +309,25 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Hide AMD-specific controls on Intel
             if (Family.TYPE == Family.ProcessorType.Intel)
             {
+                sdCpuPower.Visibility = Visibility.Collapsed;
+
+                // Status card: switch labels to Intel-appropriate names
+                tbPl1Label.Text = "PL1";
+                tbPl2Label.Text = "PL2";
                 tbTjMaxLabel.Visibility = Visibility.Collapsed;
                 tbTjMax.Visibility = Visibility.Collapsed;
-                gridCustomTjMax.Visibility = Visibility.Collapsed;
-                gridCustomCoToggle.Visibility = Visibility.Collapsed;
-                coControlsPanel?.SetValue(VisibilityProperty, Visibility.Collapsed);
-                gridCustomCoUnified.Visibility = Visibility.Collapsed;
-                gridCustomCoUnifiedSlider.Visibility = Visibility.Collapsed;
-                gridCustomCoCcd0.Visibility = Visibility.Collapsed;
-                gridCustomCoCcd1.Visibility = Visibility.Collapsed;
+                tbCoLabel.Text = "Voltage Offset";
             }
             // Hide Intel-specific controls on AMD
             else
             {
                 sdIntelTuning.Visibility = Visibility.Collapsed;
             }
+
+            // Apply voltage control visibility from global setting
+            bool voltageEnabled = CpuVoltageEnabled;
+            coControlsPanel?.SetValue(VisibilityProperty, voltageEnabled ? Visibility.Visible : Visibility.Collapsed);
+            intelVoltControlsPanel?.SetValue(VisibilityProperty, voltageEnabled ? Visibility.Visible : Visibility.Collapsed);
 
             // NVIDIA visibility â€” check GPU inventory or fall back to NvTuning probe
             bool hasNvidia = false;
@@ -609,8 +605,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     setProfileValues(45, 45, 95, 95, false, 0);
                 }
-                _profileIntelPl1 = skuProfile?.CpuPl1 ?? 25;
-                _profileIntelPl2 = skuProfile?.CpuPl2 ?? 35;
+                int intelPl1 = skuProfile?.CpuPl1 ?? 25;
+                int intelPl2 = skuProfile?.CpuPl2 ?? 35;
+                _profileIntelPl1 = intelPl1;
+                _profileIntelPl2 = intelPl2;
+                sdIntelPl1.Value = intelPl1;
+                sdIntelPl2.Value = intelPl2;
             }
             else if (profile == "Gaming")
             {
@@ -623,8 +623,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     setProfileValues(75, 85, 95, 150, false, 0);
                 }
-                _profileIntelPl1 = skuProfile?.CpuPl1 ?? 45;
-                _profileIntelPl2 = skuProfile?.CpuPl2 ?? 60;
+                int intelPl1 = skuProfile?.CpuPl1 ?? 45;
+                int intelPl2 = skuProfile?.CpuPl2 ?? 60;
+                _profileIntelPl1 = intelPl1;
+                _profileIntelPl2 = intelPl2;
+                sdIntelPl1.Value = intelPl1;
+                sdIntelPl2.Value = intelPl2;
             }
             else if (profile == "Turbo")
             {
@@ -639,6 +643,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     _profileIntelPl1 = cpuMax;
                     _profileIntelPl2 = cpuMax;
+                    sdIntelPl1.Value = cpuMax;
+                    sdIntelPl2.Value = cpuMax;
                 }
             }
             // Custom: restore from CustomPresetStore slot and update labels
@@ -780,7 +786,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tbPl1.Text = $"{_profileSustained:F0} W";
                 tbPl2.Text = $"{_profileBoost:F0} W";
                 tbTjMax.Text = $"{_profileTjMax} \u00B0C";
-                if (_coEnabled)
+                if (CpuVoltageEnabled)
                 {
                     bool coUnified = rbCoUnified.IsChecked == true;
                     if (coUnified)
@@ -803,8 +809,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 tbPl1.Text = $"{_profileIntelPl1:F0} W";
                 tbPl2.Text = $"{_profileIntelPl2:F0} W";
-                tbTjMax.Text = $"{_profileTjMax} \u00B0C";
-                tbCoOffset.Text = "-- | --";
+                if (CpuVoltageEnabled)
+                    tbCoOffset.Text = $"{sdIntelVolt.Value:+0;-0;0} mV";
+                else
+                    tbCoOffset.Text = "BIOS-level";
                 tbGpuTgp.Text = $"{_profileGpuTgp:F0} W";
                 tbGpuDb.Text = _profileGpuDb ? $"+{_profileGpuDbOffset:F0} W" : "Off";
             }
@@ -958,7 +966,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.customCoCcd1 = sdCoCcd1.Value;
             Settings.Default.customCoUnified = rbCoUnified.IsChecked == true;
             Settings.Default.customCoUnifiedValue = sdCoUnified.Value;
-            Settings.Default.customCoEnabled = _coEnabled;
             Settings.Default.Save();
             DebugLog("Custom slider values saved");
         }
@@ -982,10 +989,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             rbCoUnified.IsChecked = coUnified;
             rbCoPerCcd.IsChecked = !coUnified;
             sdCoUnified.Value = Settings.Default.customCoUnifiedValue;
-            _coEnabled = Settings.Default.customCoEnabled;
-            togCoEnabled.IsChecked = _coEnabled;
-            bool coVisible = _coEnabled;
-            coControlsPanel?.SetValue(VisibilityProperty, coVisible ? Visibility.Visible : Visibility.Collapsed);
+
+            // Apply voltage control visibility from global setting
+            bool voltageEnabled = CpuVoltageEnabled;
+            coControlsPanel?.SetValue(VisibilityProperty, voltageEnabled ? Visibility.Visible : Visibility.Collapsed);
+            intelVoltControlsPanel?.SetValue(VisibilityProperty, voltageEnabled ? Visibility.Visible : Visibility.Collapsed);
 
             // Restore stored profile values for status card
             _profileSustained = sdSustained.Value;
@@ -1205,8 +1213,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 parts.Add($"--cHTC-temp={tjMax}");
 
                 // Curve Optimizer — unified mode uses set-coall, per-CCD uses set-coper.
-                // Skip entirely if the user disabled Curve Optimizer (BIOS-managed CO).
-                if (_coEnabled)
+                // Skip entirely if the user disabled CPU voltage control (BIOS-managed).
+                if (CpuVoltageEnabled)
                 {
                     bool coUnified = rbCoUnified.IsChecked == true;
                     if (coUnified)
@@ -1241,7 +1249,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 // Intel MSR commands
                 parts.Add($"--intel-pl={sdIntelPl1.Value:F0},{sdIntelPl2.Value:F0}");
-                if (sdIntelVolt.Value < 0)
+                if (CpuVoltageEnabled && sdIntelVolt.Value < 0)
                     parts.Add($"--intel-volt-cpu={sdIntelVolt.Value:F0}");
             }
 

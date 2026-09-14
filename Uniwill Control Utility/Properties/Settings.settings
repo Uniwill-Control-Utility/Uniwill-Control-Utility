@@ -44,8 +44,8 @@
     <Setting Name="customCoUnifiedValue" Type="System.Double" Scope="User">
       <Value Profile="(Default)">0</Value>
     </Setting>
-    <Setting Name="customCoEnabled" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">True</Value>
+    <Setting Name="DisableCpuVoltageControl" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="customIntelPl1" Type="System.Double" Scope="User">
       <Value Profile="(Default)">45</Value>

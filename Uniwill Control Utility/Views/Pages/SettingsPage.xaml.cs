@@ -78,6 +78,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbTrack.IsChecked = Settings.Default.isTrack;
             cbGpuPowerBoost.IsChecked = Settings.Default.EnableGpuPowerBoost;
             cbHideFlydigi.IsChecked = Settings.Default.HideFlydigi;
+            cbDisableCpuVoltageControl.IsChecked = Settings.Default.DisableCpuVoltageControl;
 
             cbxLogLevel.SelectedIndex = Settings.Default.DiagnosticLogLevel;
 
@@ -399,6 +400,18 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void cbHideFlydigi_Unchecked(object sender, RoutedEventArgs e)
         {
             Settings.Default.HideFlydigi = false;
+            Settings.Default.Save();
+        }
+
+        private void cbDisableCpuVoltageControl_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.DisableCpuVoltageControl = true;
+            Settings.Default.Save();
+        }
+
+        private void cbDisableCpuVoltageControl_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.DisableCpuVoltageControl = false;
             Settings.Default.Save();
         }
 

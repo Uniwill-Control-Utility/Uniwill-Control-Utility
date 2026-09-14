@@ -380,6 +380,33 @@
                                                  Checked="cbHideFlydigi_Checked"
                                                  Unchecked="cbHideFlydigi_Unchecked" />
                             </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Disable CPU voltage control -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Disable CPU voltage control" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="For those who perform voltage control via BIOS (or for cases where it's locked down on the BIOS level)"
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbDisableCpuVoltageControl"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbDisableCpuVoltageControl_Checked"
+                                                 Unchecked="cbDisableCpuVoltageControl_Unchecked" />
+                            </Grid>
                         </StackPanel>
                     </ui:CardExpander>
 
