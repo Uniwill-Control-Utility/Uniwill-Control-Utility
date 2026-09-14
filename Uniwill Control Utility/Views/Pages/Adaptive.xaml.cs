@@ -357,8 +357,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         // when getRunningGame already called it directly with resetTracking: false.
         private bool _isUpdatingPresetSelection;
 
-        // Curve Optimizer enabled state for Adaptive page
-        private bool _adpCoEnabled = false;
+        // Voltage control is enabled when DisableCpuVoltageControl setting is False.
+        private bool AdpCpuVoltageEnabled => !Settings.Default.DisableCpuVoltageControl;
 
         // Window classes that are NOT games (browsers, notifications, taskbar, etc.)
         private static readonly HashSet<string> _excludedWindowClasses = new(StringComparer.OrdinalIgnoreCase)
@@ -685,12 +685,15 @@ namespace Uniwill_Control_Utility.Views.Pages
             sdKbBrightness.Value = brightness;
             tbKbBrightnessValue.Text = brightness.ToString();
             cbxKbEffect.SelectedIndex = GetKbEffectIndex(preset.KbEffectMode);
+            // Explicitly update effect UI after setting the index — the SelectionChanged
+            // event may not fire if the index already matches, leaving controls hidden.
+            UpdateKbEffectUi();
             KbColorPicker.SelectedColor = Color.FromRgb(preset.KbColorR, preset.KbColorG, preset.KbColorB);
-            KbRestColorPicker.SelectedColor = Color.FromRgb(preset.KbRestColorR, preset.KbRestColorG, preset.KbRestColorB);
             int speed = Math.Clamp((int)preset.KbEffectSpeed, 1, 10);
             sdKbSpeed.Value = speed;
             tbKbSpeedValue.Text = speed.ToString();
             _kbDirection = preset.KbDirection;
+            _kbPerKeyColors = preset.KbPerKeyColors ?? "";
             UpdateKbDirectionButtons();
 
             // Restore multi-colors if saved
@@ -699,20 +702,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 var colors = ParseColorString(preset.KbMultiColors);
                 if (colors.Count > 0)
                 {
-                    int count = preset.KbEffectMode == "GamingModeFull" || preset.KbEffectMode == "GamingMode" ? 4 : 7;
+                    int count = preset.KbEffectMode == "GamingMode" ? 4 : 7;
                     KbMultiColorPicker.SetColors(colors, count);
                 }
-            }
-
-            // Push the preset's per-key colors to the global keyboard settings
-            // so that update() picks them up when in per-key mode. Only do this
-            // when keyboard override is active — don't overwrite the user's
-            // own per-key colors with stale preset data.
-            if (!string.IsNullOrEmpty(preset.KbPerKeyColors) && _deviceApplier?.IsKeyboardOverridden == true)
-            {
-                var kbSettings = KeyboardSettingsService.Load();
-                kbSettings.PerKeyColors = preset.KbPerKeyColors;
-                KeyboardSettingsService.Save(kbSettings);
             }
         }
 
@@ -835,9 +827,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             lastKbColorR = 0;
             lastKbColorG = 0;
             lastKbColorB = 0;
-            lastKbRestColorR = 0;
-            lastKbRestColorG = 0;
-            lastKbRestColorB = 0;
             lastKbMultiColors = "";
             lastKbDirection = "";
 
@@ -961,11 +950,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                     KbColorR = KbColorPicker.SelectedColor.R,
                     KbColorG = KbColorPicker.SelectedColor.G,
                     KbColorB = KbColorPicker.SelectedColor.B,
-                    KbRestColorR = KbRestColorPicker.SelectedColor.R,
-                    KbRestColorG = KbRestColorPicker.SelectedColor.G,
-                    KbRestColorB = KbRestColorPicker.SelectedColor.B,
                     KbMultiColors = SerializeColors(KbMultiColorPicker.GetColors()),
-                    KbPerKeyColors = KeyboardSettingsService.Load().PerKeyColors,
+                    KbPerKeyColors = _kbPerKeyColors,
                     KbDirection = _kbDirection,
                     isAutoSwitch = !(cbExcludeFromSwitching.IsChecked ?? false),
                     // CPU
@@ -1188,11 +1174,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         private byte lastKbColorR = 0;
         private byte lastKbColorG = 0;
         private byte lastKbColorB = 0;
-        private byte lastKbRestColorR = 0;
-        private byte lastKbRestColorG = 0;
-        private byte lastKbRestColorB = 0;
         private string lastKbMultiColors = "";
         private string _kbDirection = "LeftRight";
+        private string _kbPerKeyColors = "";
         private string lastKbDirection = "";
         // CPU diff-tracking
         private int lastCpuSustained = 0;
@@ -1485,9 +1469,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             byte colorR = KbColorPicker.SelectedColor.R;
             byte colorG = KbColorPicker.SelectedColor.G;
             byte colorB = KbColorPicker.SelectedColor.B;
-            byte restColorR = KbRestColorPicker.SelectedColor.R;
-            byte restColorG = KbRestColorPicker.SelectedColor.G;
-            byte restColorB = KbRestColorPicker.SelectedColor.B;
             string multiColors = SerializeColors(KbMultiColorPicker.GetColors());
 
             bool changed = perKeyMode != lastKbPerKeyMode ||
@@ -1498,24 +1479,22 @@ namespace Uniwill_Control_Utility.Views.Pages
                 colorR != lastKbColorR ||
                 colorG != lastKbColorG ||
                 colorB != lastKbColorB ||
-                restColorR != lastKbRestColorR ||
-                restColorG != lastKbRestColorG ||
-                restColorB != lastKbRestColorB ||
                 multiColors != lastKbMultiColors;
 
             if (!changed)
                 return;
 
-            // In per-key mode, pass the current per-key colors from settings
+            // In per-key mode, pass the current per-key colors from the field
+            // (set by LoadKeyboardToUI or btnKbEditPerKey_Click)
             string? perKeyColorsStr = perKeyMode
-                ? KeyboardSettingsService.Load().PerKeyColors
+                ? _kbPerKeyColors
                 : null;
 
             _deviceApplier.ApplyKeyboardFromPreset(
                 perKeyMode, brightness, false, 0,
                 effectMode, effectSpeed, _kbDirection,
                 colorR, colorG, colorB,
-                multiColors, perKeyColorsStr, restColorR, restColorG, restColorB);
+                multiColors, perKeyColorsStr);
 
             lastKbPerKeyMode = perKeyMode;
             lastKbBrightness = brightness;
@@ -1525,9 +1504,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             lastKbColorR = colorR;
             lastKbColorG = colorG;
             lastKbColorB = colorB;
-            lastKbRestColorR = restColorR;
-            lastKbRestColorG = restColorG;
-            lastKbRestColorB = restColorB;
             lastKbMultiColors = multiColors;
         }
 
@@ -1567,7 +1543,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 try
                 {
                     string cmd = BuildAmdCpuCommand(sustained, boost, tjMax,
-                        _adpCoEnabled, coUnified, coUnifiedValue, coCcd0, coCcd1);
+                        AdpCpuVoltageEnabled, coUnified, coUnifiedValue, coCcd0, coCcd1);
                     _ = RyzenAdj_To_UCU.TranslateAsync(cmd);
 
                     // Also write EC CPU power limits
@@ -1636,7 +1612,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     var parts = new System.Collections.Generic.List<string>();
                     parts.Add($"--intel-pl={pl1:F0},{pl2:F0}");
-                    if (uv < 0)
+                    if (AdpCpuVoltageEnabled && uv < 0)
                         parts.Add($"--intel-volt-cpu={uv:F0}");
 
                     string cmd = string.Join(" ", parts);
@@ -1764,6 +1740,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Recheck Flydigi card visibility on navigation (device may have connected/disconnected)
             UpdateFlydigiCardVisibility();
 
+            // Refresh CPU voltage control visibility so setting changes from Settings page take effect
+            UpdateAdpCpuUI();
+
             // Restore button state from settings so the ToggleButton reflects
             // the actual Adaptive Mode state when navigating back to this page.
             RestoreAdaptiveButtonState();
@@ -1781,10 +1760,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                     // Don't reset tracking on navigation — just load the preset UI values
                     loadPreset(presetName, resetTracking: false);
                     // Ensure Keyboard RGB effect controls visibility matches the mode selector.
-                    // Needed because loadPreset skips UI updates when myPreset is null
+                    // Needed because loadPreset skips UI updates when preset is null
                     // (first-time load with no saved presets).
                     UpdateKbModeUI();
-                }, DispatcherPriority.Loaded);
+                }, DispatcherPriority.Render);
             }
         }
 
@@ -1809,9 +1788,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                         existing.KbColorR = KbColorPicker.SelectedColor.R;
                         existing.KbColorG = KbColorPicker.SelectedColor.G;
                         existing.KbColorB = KbColorPicker.SelectedColor.B;
-                        existing.KbRestColorR = KbRestColorPicker.SelectedColor.R;
-                        existing.KbRestColorG = KbRestColorPicker.SelectedColor.G;
-                        existing.KbRestColorB = KbRestColorPicker.SelectedColor.B;
                         existing.KbMultiColors = SerializeColors(KbMultiColorPicker.GetColors());
                         existing.KbPerKeyMode = cbxKbMode.SelectedIndex == 1;
                         existing.KbDirection = _kbDirection;
@@ -2526,6 +2502,15 @@ namespace Uniwill_Control_Utility.Views.Pages
             UpdateKbModeUI();
         }
 
+        private void sdKeyboard_Expanded(object sender, RoutedEventArgs e)
+        {
+            // When the card is expanded, ensure the effect controls match the
+            // current mode selection. This fixes the issue where spKbEffectControls
+            // stays Collapsed on first expand because Page_Loaded's deferred call
+            // may have run before the ComboBox items were measured.
+            UpdateKbModeUI();
+        }
+
         private void cbxKbEffect_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             UpdateKbEffectUi();
@@ -2561,6 +2546,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool showEffects = !perKey;
             spKbEffectControls.Visibility = showEffects ? Visibility.Visible : Visibility.Collapsed;
             spKbPerKeyNote.Visibility = perKey ? Visibility.Visible : Visibility.Collapsed;
+            sepKbPerKey.Visibility = perKey ? Visibility.Visible : Visibility.Collapsed;
 
             if (!perKey)
                 UpdateKbEffectUi();
@@ -2573,7 +2559,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void UpdateKbEffectUi()
         {
             // Guard against calls before XAML fields are loaded (e.g. constructor, Page_Loaded).
-            if (spKbColor == null || spKbMultiColor == null || spKbGamingRest == null || spKbSpeed == null)
+            if (spKbColor == null || spKbMultiColor == null || spKbSpeed == null)
                 return;
 
             if (cbxKbEffect.SelectedItem is not ComboBoxItem)
@@ -2581,7 +2567,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 sepKbColor.Visibility = Visibility.Collapsed;
                 spKbColor.Visibility = Visibility.Collapsed;
                 spKbMultiColor.Visibility = Visibility.Collapsed;
-                spKbGamingRest.Visibility = Visibility.Collapsed;
                 sepKbSpeed.Visibility = Visibility.Collapsed;
                 spKbSpeed.Visibility = Visibility.Collapsed;
                 sepKbDirection.Visibility = Visibility.Collapsed;
@@ -2597,7 +2582,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 sepKbColor.Visibility = Visibility.Collapsed;
                 spKbColor.Visibility = Visibility.Collapsed;
                 spKbMultiColor.Visibility = Visibility.Collapsed;
-                spKbGamingRest.Visibility = Visibility.Collapsed;
                 sepKbSpeed.Visibility = Visibility.Collapsed;
                 spKbSpeed.Visibility = Visibility.Collapsed;
                 sepKbDirection.Visibility = Visibility.Collapsed;
@@ -2609,7 +2593,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 spKbColor.Visibility = Visibility.Collapsed;
                 spKbMultiColor.Visibility = Visibility.Visible;
-                spKbGamingRest.Visibility = Visibility.Collapsed;
                 tbKbMultiColorTitle.Text = "Effect Colors";
                 tbKbMultiColorSubtitle.Text = "7 colors required for this effect. Click a swatch to edit.";
                 KbMultiColorPicker.SetColors(KbMultiColorPicker.GetColors(), 7);
@@ -2618,16 +2601,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 spKbColor.Visibility = Visibility.Collapsed;
                 spKbMultiColor.Visibility = Visibility.Visible;
-                spKbGamingRest.Visibility = Visibility.Collapsed;
-                tbKbMultiColorTitle.Text = "WASD & Arrow Keys";
-                tbKbMultiColorSubtitle.Text = "4 colors for gaming keys. Click a swatch to edit.";
-                KbMultiColorPicker.SetColors(KbMultiColorPicker.GetColors(), 4);
-            }
-            else if (Views.Pages.Keyboard.IsMultiColor4Plus1Effect(ParseKbEffect(effect)))
-            {
-                spKbColor.Visibility = Visibility.Collapsed;
-                spKbMultiColor.Visibility = Visibility.Visible;
-                spKbGamingRest.Visibility = Visibility.Visible;
                 tbKbMultiColorTitle.Text = "WASD & Arrow Keys";
                 tbKbMultiColorSubtitle.Text = "4 colors for gaming keys. Click a swatch to edit.";
                 KbMultiColorPicker.SetColors(KbMultiColorPicker.GetColors(), 4);
@@ -2637,15 +2610,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Single-color effects (Static, Rainbow, etc.)
                 spKbColor.Visibility = Visibility.Visible;
                 spKbMultiColor.Visibility = Visibility.Collapsed;
-                spKbGamingRest.Visibility = Visibility.Collapsed;
             }
 
-            // Speed: animated effects only (not Static, Rainbow, GamingMode, GamingModeFull)
+            // Speed: animated effects only (not Static, Rainbow, GamingMode)
             bool showSpeed = ParseKbEffect(effect) is KeyboardEffect effectEnum
                 && effectEnum != KeyboardEffect.Static
                 && effectEnum != KeyboardEffect.Rainbow
-                && effectEnum != KeyboardEffect.GamingMode
-                && effectEnum != KeyboardEffect.GamingModeFull;
+                && effectEnum != KeyboardEffect.GamingMode;
             sepKbSpeed.Visibility = showSpeed ? Visibility.Visible : Visibility.Collapsed;
             spKbSpeed.Visibility = showSpeed ? Visibility.Visible : Visibility.Collapsed;
             // Direction: Wave effect only (other effects use different byte flags to be probed later)
@@ -2653,10 +2624,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             sepKbDirection.Visibility = showDirection ? Visibility.Visible : Visibility.Collapsed;
             grKbDirection.Visibility = showDirection ? Visibility.Visible : Visibility.Collapsed;
 
-            // sepKbColor: show if any color control (Color, MultiColor, GamingRest) is visible.
+            // sepKbColor: show if any color control (Color, MultiColor) is visible.
             bool anyColorVisible = spKbColor.Visibility == Visibility.Visible
-                || spKbMultiColor.Visibility == Visibility.Visible
-                || spKbGamingRest.Visibility == Visibility.Visible;
+                || spKbMultiColor.Visibility == Visibility.Visible;
             sepKbColor.Visibility = anyColorVisible ? Visibility.Visible : Visibility.Collapsed;
 
             UpdateKbDirectionButtons();
@@ -2670,11 +2640,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void KbColorPicker_ColorChangedDelayed(object sender, EventArgs e)
         {
             // Color changed — will be picked up by update() loop's diff tracking
-        }
-
-        private void KbRestColorPicker_ColorChangedDelayed(object sender, EventArgs e)
-        {
-            // Rest color changed — will be picked up by update() loop's diff tracking
         }
 
         /// <summary>
@@ -2697,7 +2662,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             "TouchSpark" => KeyboardEffect.TouchSpark,
             "Spark" => KeyboardEffect.Spark,
             "GamingMode" => KeyboardEffect.GamingMode,
-            "GamingModeFull" => KeyboardEffect.GamingModeFull,
             "Music" => KeyboardEffect.Static,
             _ => KeyboardEffect.Static,
         };
@@ -2733,8 +2697,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             "TouchSpark" => 11,
             "Spark" => 12,
             "GamingMode" => 13,
-            "GamingModeFull" => 14,
-            "Music" => 15,
             _ => 0
         };
 
@@ -2756,63 +2718,83 @@ namespace Uniwill_Control_Utility.Views.Pages
                 11 => "TouchSpark",
                 12 => "Spark",
                 13 => "GamingMode",
-                14 => "GamingModeFull",
-                15 => "Music",
                 _ => "Static"
             };
         }
 
         private void btnKbEditPerKey_Click(object sender, RoutedEventArgs e)
         {
-            // Load current settings from KeyboardSettingsService (the source of truth)
-            var settings = KeyboardSettingsService.Load();
-
-            var dialog = new Views.Windows.KeyboardPerKeyDialog(settings);
-            if (dialog.ShowDialog() == true && dialog.Applied && dialog.ResultColors != null)
+            // Load per-key colors: from field (which holds preset state or
+            // a previous dialog edit), falling back to global keyboard settings.
+            Dictionary<int, (byte R, byte G, byte B)> initialColors = new();
+            if (!string.IsNullOrEmpty(_kbPerKeyColors))
             {
-                // Save the updated settings
-                KeyboardSettingsService.Save(settings);
+                initialColors = ParsePerKeyColors(_kbPerKeyColors);
+            }
+            else
+            {
+                var kbSettings = KeyboardSettingsService.Load();
+                initialColors = kbSettings.GetPerKeyColors();
+            }
 
-                // Apply to device if override is active
-                if (_deviceApplier != null && _deviceApplier.IsKeyboardOverridden)
+            var dialog = new Views.Windows.KeyboardPerKeyDialog(initialColors);
+            dialog.ShowDialog();
+
+            // Always persist the colors back to the field so that:
+            // 1) re-opening the dialog shows the edits made this session
+            // 2) Page_Unloaded saves them (it reads from this field, not from the preset)
+            if (dialog.ResultColors != null)
+            {
+                var sb = new System.Text.StringBuilder();
+                var colors = dialog.ResultColors;
+                for (int i = 0; i < 126; i++)
                 {
-                    // Re-apply the current preset with the new per-key colors
-                    bool perKeyMode = cbxKbMode.SelectedIndex == 1;
-                    int brightness = (int)sdKbBrightness.Value;
-                    string effectMode = GetKbEffectFromIndex(cbxKbEffect.SelectedIndex);
-                    byte effectSpeed = (byte)(10 - Math.Clamp((int)sdKbSpeed.Value, 1, 10));
-                    byte colorR = KbColorPicker.SelectedColor.R;
-                    byte colorG = KbColorPicker.SelectedColor.G;
-                    byte colorB = KbColorPicker.SelectedColor.B;
+                    if (i > 0) sb.Append('|');
+                    (byte R, byte G, byte B) c = colors.TryGetValue(i, out var val) ? val : ((byte)0, (byte)0, (byte)0);
+                    sb.Append($"{c.R},{c.G},{c.B}");
+                }
+                _kbPerKeyColors = sb.ToString();
 
-                    // Serialize per-key colors to string
-                    var sb = new System.Text.StringBuilder();
-                    var colors = dialog.ResultColors;
-                    for (int i = 0; i < 126; i++)
-                    {
-                        if (i > 0) sb.Append('|');
-                        (byte R, byte G, byte B) c = colors.TryGetValue(i, out var val) ? val : ((byte)0, (byte)0, (byte)0);
-                        sb.Append($"{c.R},{c.G},{c.B}");
-                    }
-                    string perKeyColorsStr = sb.ToString();
+                // Apply to device only when Adaptive Mode keyboard override is active
+                // and the user confirmed with OK.
+                if (dialog.Applied && _deviceApplier != null && _deviceApplier.IsKeyboardOverridden)
+                {
+                    int brightness = (int)sdKbBrightness.Value;
 
                     _deviceApplier.ApplyKeyboardFromPreset(
-                        perKeyMode, brightness, false, 0,
-                        effectMode, effectSpeed, _kbDirection,
-                        colorR, colorG, colorB, "", perKeyColorsStr,
-                        KbRestColorPicker.SelectedColor.R, KbRestColorPicker.SelectedColor.G, KbRestColorPicker.SelectedColor.B);
+                        true, brightness, false, 0,
+                        "Static", (byte)5, _kbDirection,
+                        0, 0, 0, "", _kbPerKeyColors);
 
                     // Update tracking
-                    lastKbPerKeyMode = perKeyMode;
+                    lastKbPerKeyMode = true;
                     lastKbBrightness = brightness;
-                    lastKbEffectMode = effectMode;
-                    lastKbEffectSpeed = effectSpeed;
+                    lastKbEffectMode = "Static";
+                    lastKbEffectSpeed = 5;
                     lastKbDirection = _kbDirection;
-                    lastKbColorR = colorR;
-                    lastKbColorG = colorG;
-                    lastKbColorB = colorB;
+                    lastKbColorR = 0;
+                    lastKbColorG = 0;
+                    lastKbColorB = 0;
                 }
             }
+        }
+
+        private static Dictionary<int, (byte R, byte G, byte B)> ParsePerKeyColors(string data)
+        {
+            var result = new Dictionary<int, (byte R, byte G, byte B)>();
+            var entries = data.Split('|', StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < Math.Min(entries.Length, 126); i++)
+            {
+                var parts = entries[i].Split(',');
+                if (parts.Length >= 3 &&
+                    byte.TryParse(parts[0], out var r) &&
+                    byte.TryParse(parts[1], out var g) &&
+                    byte.TryParse(parts[2], out var b))
+                {
+                    result[i] = (r, g, b);
+                }
+            }
+            return result;
         }
 
         #endregion
@@ -2873,13 +2855,21 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void UpdateAdpCpuUI()
         {
+            // Apply voltage control visibility from global setting
+            bool voltageEnabled = AdpCpuVoltageEnabled;
+
             if (Family.TYPE == Family.ProcessorType.Intel)
             {
                 // Hide AMD-specific controls
+                AdpGridSustained.Visibility = Visibility.Collapsed;
+                AdpDividerAfterSustained.Visibility = Visibility.Collapsed;
+                AdpGridBoost.Visibility = Visibility.Collapsed;
+                AdpDividerAfterBoost.Visibility = Visibility.Collapsed;
                 AdpGridTjMax.Visibility = Visibility.Collapsed;
-                AdpDividerAfterTjMax.Visibility = Visibility.Collapsed;
-                AdpGridCoToggle.Visibility = Visibility.Collapsed;
                 AdpCoControlsPanel.Visibility = Visibility.Collapsed;
+                // Intel undervolt visibility gated by voltage control setting
+                AdpGridIntelUndervolt.Visibility = voltageEnabled ? Visibility.Visible : Visibility.Collapsed;
+                AdpDividerAfterIntelPl2.Visibility = voltageEnabled ? Visibility.Visible : Visibility.Collapsed;
             }
             else
             {
@@ -2890,9 +2880,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 AdpDividerAfterIntelPl2.Visibility = Visibility.Collapsed;
                 AdpGridIntelUndervolt.Visibility = Visibility.Collapsed;
 
-                // Show AMD CO toggle; panel visibility follows the toggle state
-                AdpGridCoToggle.Visibility = Visibility.Visible;
-                AdpCoControlsPanel.Visibility = _adpCoEnabled ? Visibility.Visible : Visibility.Collapsed;
+                // AMD CO panel visibility gated by voltage control setting.
+                AdpCoControlsPanel.Visibility = voltageEnabled ? Visibility.Visible : Visibility.Collapsed;
                 updateAdpCoVisibility();
             }
         }
@@ -2977,12 +2966,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         private void AdpRbCoMode_Click(object sender, RoutedEventArgs e) => updateAdpCoVisibility();
-
-        private void AdpTogCoEnabled_Toggled(object? sender, RoutedEventArgs e)
-        {
-            _adpCoEnabled = AdpTogCoEnabled.IsChecked == true;
-            AdpCoControlsPanel.Visibility = _adpCoEnabled ? Visibility.Visible : Visibility.Collapsed;
-        }
 
         private void updateAdpCoVisibility()
         {

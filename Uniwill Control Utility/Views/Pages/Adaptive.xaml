@@ -115,8 +115,8 @@
                             </Grid>
                         </ui:CardExpander.Header>
                         <StackPanel>
-                            <!-- Sustained Power Limit (SPL) -->
-                            <Grid>
+                            <!-- Sustained Power Limit (SPL) - AMD only -->
+                            <Grid x:Name="AdpGridSustained">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -142,9 +142,9 @@
                                 </StackPanel>
                             </Grid>
                             <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                            <!-- Boost Power Limit (FPL) -->
-                            <Grid>
+                            <Border x:Name="AdpDividerAfterSustained" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Boost Power Limit (FPL) - AMD only -->
+                            <Grid x:Name="AdpGridBoost">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -170,7 +170,7 @@
                                 </StackPanel>
                             </Grid>
                             <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <Border x:Name="AdpDividerAfterBoost" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                             <!-- TjMax (AMD only) -->
                             <Grid x:Name="AdpGridTjMax">
                                 <Grid.ColumnDefinitions>
@@ -197,36 +197,7 @@
                                     <Slider x:Name="AdpSdTjMax" Width="140" Maximum="105" Minimum="70" Value="95" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
-                            <!-- Divider -->
-                            <Border x:Name="AdpDividerAfterTjMax" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                            <!-- Curve Optimizer toggle (AMD only) -->
-                            <Grid x:Name="AdpGridCoToggle">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Curve Optimizer" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Disable to keep BIOS-level CO settings" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1"
-                                            Orientation="Horizontal"
-                                            HorizontalAlignment="Right"
-                                            VerticalAlignment="Center">
-                                    <ui:ToggleSwitch x:Name="AdpTogCoEnabled"
-                                                     Margin="0,0,0,0"
-                                                     LabelPosition="Left"
-                                                     OnContent="On"
-                                                     OffContent="Off"
-                                                     ToolTip="Enable Curve Optimizer controls"
-                                                     Checked="AdpTogCoEnabled_Toggled"
-                                                     Unchecked="AdpTogCoEnabled_Toggled" />
-                                </StackPanel>
-                            </Grid>
-                            <!-- CO controls panel (hidden when CO toggle is OFF) -->
+                            <!-- CO controls panel (hidden when DisableCpuVoltageControl is ON) -->
                             <StackPanel x:Name="AdpCoControlsPanel" Visibility="Collapsed">
                             <!-- Divider -->
                             <Border x:Name="AdpDividerBeforeCoControls" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
@@ -281,7 +252,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="All-core offset (-30 to 0)" />
+                                                   Text="All-core offset (-50 to 0)" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -293,7 +264,7 @@
                                                VerticalAlignment="Center"
                                                Margin="0,0,8,0"
                                                Text="0" />
-                                    <Slider x:Name="AdpSdCoUnified" Width="140" Maximum="0" Minimum="-30" Value="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                    <Slider x:Name="AdpSdCoUnified" Width="140" Maximum="0" Minimum="-50" Value="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
                             <!-- CCD 0 Voltage Offset (AMD only) -->
@@ -307,7 +278,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="CCD 0 voltage offset (-30 to 0)" />
+                                                   Text="CCD 0 voltage offset (-50 to 0)" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -319,7 +290,7 @@
                                                VerticalAlignment="Center"
                                                Margin="0,0,8,0"
                                                Text="0" />
-                                    <Slider x:Name="AdpSdCoCcd0" Width="140" Maximum="0" Minimum="-30" Value="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                    <Slider x:Name="AdpSdCoCcd0" Width="140" Maximum="0" Minimum="-50" Value="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
                             <!-- Divider (visible only in Per-CCD mode) -->
@@ -335,7 +306,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="CCD 1 voltage offset (-30 to 0)" />
+                                                   Text="CCD 1 voltage offset (-50 to 0)" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -347,7 +318,7 @@
                                                VerticalAlignment="Center"
                                                Margin="0,0,8,0"
                                                Text="0" />
-                                    <Slider x:Name="AdpSdCoCcd1" Width="140" Maximum="0" Minimum="-30" Value="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                    <Slider x:Name="AdpSdCoCcd1" Width="140" Maximum="0" Minimum="-50" Value="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
                             <!-- Divider (visible only in Per-CCD mode, after CCD1) -->
@@ -376,7 +347,7 @@
                                                VerticalAlignment="Center"
                                                Margin="0,0,8,0"
                                                Text="45 W" />
-                                    <Slider x:Name="AdpSdIntelPl1" Width="140" Maximum="400" Minimum="5" Value="45" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                    <Slider x:Name="AdpSdIntelPl1" Width="140" Maximum="200" Minimum="5" Value="45" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
                             <!-- Divider -->
@@ -404,7 +375,7 @@
                                                VerticalAlignment="Center"
                                                Margin="0,0,8,0"
                                                Text="60 W" />
-                                    <Slider x:Name="AdpSdIntelPl2" Width="140" Maximum="400" Minimum="5" Value="60" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                    <Slider x:Name="AdpSdIntelPl2" Width="140" Maximum="200" Minimum="5" Value="60" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
                             <!-- Divider -->
@@ -432,7 +403,7 @@
                                                VerticalAlignment="Center"
                                                Margin="0,0,8,0"
                                                Text="0 mV" />
-                                    <Slider x:Name="AdpSdIntelUndervolt" Width="140" Maximum="0" Minimum="-150" Value="0" TickFrequency="10" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                    <Slider x:Name="AdpSdIntelUndervolt" Width="140" Maximum="0" Minimum="-100" Value="0" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
                         </StackPanel>
@@ -643,7 +614,7 @@
                                                VerticalAlignment="Center"
                                                Margin="0,0,8,0"
                                                Text="0 MHz" />
-                                    <Slider x:Name="AdpSdNvMem" Width="140" Maximum="2000" Minimum="-1000" Value="0" TickFrequency="50" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                    <Slider x:Name="AdpSdNvMem" Width="140" Maximum="2000" Minimum="-1000" Value="0" TickFrequency="50" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
                         </StackPanel>
@@ -1311,7 +1282,8 @@
                     <ui:CardExpander Name="sdKeyboard"
                         IsEnabled="True"
                         IsExpanded="False"
-                        Margin="0,0,0,8">
+                        Margin="0,0,0,8"
+                        Expanded="sdKeyboard_Expanded">
                         <ui:CardExpander.Icon>
                             <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE92E;" FontSize="20" Margin="6,0,8,0" />
                         </ui:CardExpander.Icon>
@@ -1393,8 +1365,6 @@
                                         <ComboBoxItem>Touch Spark</ComboBoxItem>
                                         <ComboBoxItem>Spark</ComboBoxItem>
                                         <ComboBoxItem>Gaming Mode</ComboBoxItem>
-                                        <ComboBoxItem>Gaming Mode Full</ComboBoxItem>
-                                        <ComboBoxItem>Music</ComboBoxItem>
                                     </ComboBox>
                                 </Grid>
 
@@ -1421,7 +1391,7 @@
                                                                      ColorChangedDelayed="KbColorPicker_ColorChangedDelayed" />
                                 </Grid>
 
-                                <!-- Multi-color picker (visible for multi-color effects) â€” shares sepKbColor -->
+                                <!-- Multi-color picker (visible for multi-color effects) — shares sepKbColor -->
                                 <Grid Name="spKbMultiColor" Visibility="Collapsed">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -1436,29 +1406,6 @@
                                     </StackPanel>
                                     <controls:KeyboardMultiColorPickerControl x:Name="KbMultiColorPicker" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" ColorsChanged="KbMultiColorPicker_ColorsChanged"/>
                                 </Grid>
-
-                                <!-- Rest color for GamingModeFull â€” shares sepKbColor -->
-                                <Grid Name="spKbGamingRest" Visibility="Collapsed">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body" Text="Rest of Keyboard" />
-                                        <ui:TextBlock Margin="0,2,0,0"
-                                                       FontTypography="Caption"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Color for non-WASD/arrow keys." />
-                                    </StackPanel>
-                                    <controls:ColorPickerControl x:Name="KbRestColorPicker" Grid.Column="1"
-                                                                     HorizontalAlignment="Right"
-                                                                     VerticalAlignment="Center"
-                                                                     SelectedColor="White"
-                                                                     ColorChangedDelayed="KbRestColorPicker_ColorChangedDelayed" />
-                                </Grid>
-
-                                <!-- Divider before GamingRest -->
-                                <Border Name="sepKbGamingRest" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
 
                                 <!-- Divider before Direction -->
                                 <Border Name="sepKbDirection" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
@@ -1479,57 +1426,35 @@
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <ui:Button x:Name="btnKbDirLeftRight" Width="40" Height="36" Margin="0,0,4,0"
                                                    Appearance="Transparent" Click="KbDirectionButton_Click" Tag="LeftRight">
-                                            <TextBlock Text="â†’" FontSize="18" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="→" FontSize="18" HorizontalAlignment="Center"/>
                                         </ui:Button>
                                         <ui:Button x:Name="btnKbDirRightLeft" Width="40" Height="36" Margin="0,0,4,0"
                                                    Appearance="Transparent" Click="KbDirectionButton_Click" Tag="RightLeft">
-                                            <TextBlock Text="â†" FontSize="18" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="←" FontSize="18" HorizontalAlignment="Center"/>
                                         </ui:Button>
                                         <ui:Button x:Name="btnKbDirDownUp" Width="40" Height="36" Margin="0,0,4,0"
                                                    Appearance="Transparent" Click="KbDirectionButton_Click" Tag="DownUp">
-                                            <TextBlock Text="â†‘" FontSize="18" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="↑" FontSize="18" HorizontalAlignment="Center"/>
                                         </ui:Button>
                                         <ui:Button x:Name="btnKbDirUpDown" Width="40" Height="36" Margin="0,0,4,0"
                                                    Appearance="Transparent" Click="KbDirectionButton_Click" Tag="UpDown">
-                                            <TextBlock Text="â†“" FontSize="18" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="↓" FontSize="18" HorizontalAlignment="Center"/>
                                         </ui:Button>
                                         <ui:Button x:Name="btnKbDiagBRTL" Width="40" Height="36" Margin="0,0,4,0"
                                                    Appearance="Transparent" Click="KbDirectionButton_Click" Tag="DiagonalBottomRightToTopLeft">
-                                            <TextBlock Text="â†–" FontSize="18" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="↖" FontSize="18" HorizontalAlignment="Center"/>
                                         </ui:Button>
                                         <ui:Button x:Name="btnKbDiagBLTR" Width="40" Height="36" Margin="0,0,0,0"
                                                    Appearance="Transparent" Click="KbDirectionButton_Click" Tag="DiagonalBottomLeftToTopRight">
-                                            <TextBlock Text="â†—" FontSize="18" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="↗" FontSize="18" HorizontalAlignment="Center"/>
                                         </ui:Button>
-                                    </StackPanel>
-                                </Grid>
-
-                                <!-- Divider before Brightness -->
-                                <Border Name="sepKbBrightness" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                                <!-- Brightness -->
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body" Text="Brightness" />
-                                        <ui:TextBlock Margin="0,2,0,0"
-                                                       FontTypography="Caption"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Backlight brightness level 1-7." />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <TextBlock Name="tbKbBrightnessValue" Width="30" HorizontalAlignment="Center" Margin="0,0,8,0" Text="5" />
-                                        <Slider Name="sdKbBrightness" Width="140" Maximum="7" Minimum="1" TickFrequency="1" TickPlacement="Both" IsSnapToTickEnabled="True" Value="5" IsMoveToPointEnabled="False" ValueChanged="sdKbBrightness_ValueChanged"/>
                                     </StackPanel>
                                 </Grid>
 
                                 <!-- Divider before Speed -->
                                 <Border Name="sepKbSpeed" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
 
-                                <!-- Speed (hidden for Static, Rainbow, GamingMode, GamingModeFull) -->
+                                <!-- Speed (hidden for Static, Rainbow, GamingMode) -->
                                 <Grid Name="spKbSpeed" Visibility="Collapsed">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -1549,23 +1474,54 @@
                                 </Grid>
                             </StackPanel>
 
+                            <!-- Divider before Per-Key controls -->
+                            <Border Name="sepKbPerKey" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
                             <!-- Per-Key controls (visible in Per-Key mode) -->
                             <StackPanel Name="spKbPerKeyNote" Visibility="Collapsed">
-                                <Border Padding="12" Background="{DynamicResource ControlFillColorDefaultBrush}" CornerRadius="4">
-                                    <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
                                         <ui:TextBlock FontTypography="Body" Text="Per-Key RGB Mode" />
-                                        <ui:TextBlock Margin="0,2,0,8"
-                                                       FontTypography="Caption"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Configure individual key colors for this profile."
-                                                       TextWrapping="Wrap" />
-                                        <ui:Button Name="btnKbEditPerKey"
-                                                   Appearance="Primary"
-                                                   Content="Edit Per-Key Colors"
-                                                   HorizontalAlignment="Left" />
+                                        <ui:TextBlock Margin="0,2,0,4"
+                                            FontTypography="Caption"
+                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                            Text="Configure individual key colors for this profile."
+                                            TextWrapping="Wrap" />
                                     </StackPanel>
-                                </Border>
+                                    <ui:Button Name="btnKbEditPerKey"
+                                                Grid.Column="1"
+                                            Appearance="Primary"
+                                            Content="Edit Per-Key Colors"
+                                            HorizontalAlignment="Left"
+                                            Click="btnKbEditPerKey_Click" />
+                                </Grid>
                             </StackPanel>
+
+                            <!-- Divider before Brightness (shared by both modes) -->
+                            <Border Name="sepKbBrightness" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Brightness (shared by both Effects and Per-Key modes) -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Brightness" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Backlight brightness level 1-7." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <TextBlock Name="tbKbBrightnessValue" Width="30" HorizontalAlignment="Center" Margin="0,0,8,0" Text="5" />
+                                    <Slider Name="sdKbBrightness" Width="140" Maximum="7" Minimum="1" TickFrequency="1" TickPlacement="Both" IsSnapToTickEnabled="True" Value="5" IsMoveToPointEnabled="False" ValueChanged="sdKbBrightness_ValueChanged"/>
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
                     </ui:CardExpander>
 

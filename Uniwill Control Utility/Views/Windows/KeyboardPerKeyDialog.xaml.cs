@@ -1,11 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
-using Uniwill_Control_Utility.Models;
-using Uniwill_Control_Utility.Services;
 using Uniwill_Control_Utility.Views.Controls;
 using Wpf.Ui.Controls;
 
@@ -14,26 +10,46 @@ namespace Uniwill_Control_Utility.Views.Windows
     /// <summary>
     /// Dialog for editing per-key RGB colors. Used from Adaptive Mode to let users
     /// configure per-key colors per profile without navigating to the Keyboard page.
+    /// 
+    /// This dialog works with an isolated copy of colors — it does NOT touch the
+    /// shared KeyboardSettings, does NOT write to HID, and does NOT save to disk.
+    /// The caller is responsible for persisting and applying the result.
     /// </summary>
     public partial class KeyboardPerKeyDialog : FluentWindow
     {
-        private KeyboardSettings _settings;
-
         /// <summary>
-        /// Returns true if the user clicked OK (applied changes), false for Cancel.
+        /// Returns true if the user clicked OK, false for Cancel or X.
         /// </summary>
         public bool Applied { get; private set; }
 
         /// <summary>
-        /// Returns the current per-key colors from the visualizer after OK.
+        /// Returns the current per-key colors from the visualizer.
+        /// Populated on every close (OK, Cancel, or X) so the caller can
+        /// persist the colors even when the user closes with the X button.
         /// </summary>
         public Dictionary<int, (byte R, byte G, byte B)>? ResultColors { get; private set; }
 
-        public KeyboardPerKeyDialog(KeyboardSettings settings)
+        private Dictionary<int, Color> _initialColors;
+
+        /// <summary>
+        /// Creates a new per-key RGB editor dialog with the given initial colors.
+        /// Pass null or an empty dictionary for all-black defaults.
+        /// </summary>
+        public KeyboardPerKeyDialog(Dictionary<int, (byte R, byte G, byte B)> initialColors)
         {
-            _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             InitializeComponent();
             Loaded += KeyboardPerKeyDialog_Loaded;
+
+            // Build a Color dictionary for the visualizer from the initial colors.
+            var mediaColors = new Dictionary<int, Color>();
+            if (initialColors != null)
+            {
+                foreach (var kvp in initialColors)
+                {
+                    mediaColors[kvp.Key] = Color.FromRgb(kvp.Value.R, kvp.Value.G, kvp.Value.B);
+                }
+            }
+            _initialColors = mediaColors;
         }
 
         private void KeyboardPerKeyDialog_Loaded(object sender, RoutedEventArgs e)
@@ -47,18 +63,11 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void LoadColors()
         {
-            // Ensure the visualizer is built and has been measured.
             _visualizer.RefreshLayout();
+            _visualizer.SetZoneColors(_initialColors);
 
-            var colors = _settings.GetPerKeyColors();
-            var mediaColors = new Dictionary<int, Color>();
-
-            foreach (var kvp in colors)
-            {
-                mediaColors[kvp.Key] = Color.FromRgb(kvp.Value.R, kvp.Value.G, kvp.Value.B);
-            }
-
-            _visualizer.SetZoneColors(mediaColors);
+            // Sync picker brush so hover/selection overlays use the color picker's color.
+            _visualizer.SetPickerBrush(new SolidColorBrush(_colorPicker.SelectedColor));
         }
 
         private void SelectAll_Click(object sender, RoutedEventArgs e)
@@ -76,78 +85,11 @@ namespace Uniwill_Control_Utility.Views.Windows
         private void FillAll_Click(object sender, RoutedEventArgs e)
         {
             var color = _colorPicker.SelectedColor;
-            var statuses = new[] { _fillAllBtn, _applyBtn };
 
-            foreach (var btn in statuses)
-                btn.IsEnabled = false;
-            _statusText.Text = "Applying to all keys...";
-
-            _ = Task.Run(() =>
-            {
-                try
-                {
-                    var hid = new KeyboardHidService();
-                    try
-                    {
-                        if (!hid.Open())
-                        {
-                            Application.Current.Dispatcher.Invoke(() =>
-                            {
-                                _statusText.Text = "HID controller not available.";
-                                foreach (var btn in statuses)
-                                    btn.IsEnabled = true;
-                            });
-                            return;
-                        }
-
-                        hid.SetEffect(KeyboardEffect.Static);
-
-                        for (int i = 0; i < KeyboardHidService.MaxPerKeyZones; i++)
-                        {
-                            hid.SetPerKeyColor(i, color.R, color.G, color.B);
-                        }
-
-                        // Save settings
-                        var colors = new Dictionary<int, (byte, byte, byte)>();
-                        for (int i = 0; i < KeyboardHidService.MaxPerKeyZones; i++)
-                            colors[i] = (color.R, color.G, color.B);
-                        _settings.SetPerKeyColors(colors);
-                        KeyboardSettingsService.Save(_settings);
-
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            for (int i = 0; i < KeyboardHidService.MaxPerKeyZones; i++)
-                                _visualizer.SetZoneColor(i, color);
-                            _visualizer.ClearSelection();
-                            _statusText.Text = $"All keys set to R={color.R} G={color.G} B={color.B}.";
-                            foreach (var btn in statuses)
-                                btn.IsEnabled = true;
-                        });
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            _statusText.Text = "HID controller disconnected.";
-                            foreach (var btn in statuses)
-                                btn.IsEnabled = true;
-                        });
-                    }
-                    finally
-                    {
-                        hid.Dispose();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        _statusText.Text = $"Fill All failed: {ex.Message}";
-                        foreach (var btn in statuses)
-                            btn.IsEnabled = true;
-                    });
-                }
-            });
+            for (int i = 0; i < 126; i++)
+                _visualizer.SetZoneColor(i, color);
+            _visualizer.ClearSelection();
+            _statusText.Text = $"All keys set to R={color.R} G={color.G} B={color.B}.";
         }
 
         private void Apply_Click(object sender, RoutedEventArgs e)
@@ -160,114 +102,16 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
 
             var color = _colorPicker.SelectedColor;
-            var statuses = new[] { _fillAllBtn, _applyBtn };
 
-            foreach (var btn in statuses)
-                btn.IsEnabled = false;
-            _statusText.Text = "Applying...";
-
-            _ = Task.Run(() =>
-            {
-                try
-                {
-                    var hid = new KeyboardHidService();
-                    try
-                    {
-                        if (!hid.Open())
-                        {
-                            Application.Current.Dispatcher.Invoke(() =>
-                            {
-                                _statusText.Text = "HID controller not available.";
-                                foreach (var btn in statuses)
-                                    btn.IsEnabled = true;
-                            });
-                            return;
-                        }
-
-                        // Update settings dictionary with new colors
-                        var allColors = _settings.GetPerKeyColors();
-                        foreach (int zoneIndex in selected)
-                        {
-                            allColors[zoneIndex] = (color.R, color.G, color.B);
-                        }
-
-                        // Send all colors to device
-                        hid.SendAllPerKeyColorsFromDict(allColors);
-                        _settings.SetPerKeyColors(allColors);
-                        KeyboardSettingsService.Save(_settings);
-
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            foreach (int zoneIndex in selected)
-                                _visualizer.SetZoneColor(zoneIndex, color);
-                            _visualizer.ClearSelection();
-                            _statusText.Text = $"Applied R={color.R} G={color.G} B={color.B} to {selected.Count} key{(selected.Count > 1 ? "s" : "")}.";
-                            foreach (var btn in statuses)
-                                btn.IsEnabled = true;
-                        });
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            _statusText.Text = "HID controller disconnected.";
-                            foreach (var btn in statuses)
-                                btn.IsEnabled = true;
-                        });
-                    }
-                    finally
-                    {
-                        hid.Dispose();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        _statusText.Text = $"Apply failed: {ex.Message}";
-                        foreach (var btn in statuses)
-                            btn.IsEnabled = true;
-                    });
-                }
-            });
+            foreach (int zoneIndex in selected)
+                _visualizer.SetZoneColor(zoneIndex, color);
+            _visualizer.ClearSelection();
+            _statusText.Text = $"Applied R={color.R} G={color.G} B={color.B} to {selected.Count} key{(selected.Count > 1 ? "s" : "")}.";
         }
 
         private void Ok_Click(object sender, RoutedEventArgs e)
         {
-            // Collect colors from visualizer
-            var allColors = _visualizer.GetAllColors();
-            ResultColors = new Dictionary<int, (byte, byte, byte)>();
-
-            foreach (var kvp in allColors)
-            {
-                ResultColors[kvp.Key] = (kvp.Value.R, kvp.Value.G, kvp.Value.B);
-            }
-
-            // Update the settings
-            _settings.SetPerKeyColors(ResultColors);
-            KeyboardSettingsService.Save(_settings);
-
-            // Send colors to device on background thread
-            _ = Task.Run(() =>
-            {
-                var hid = new KeyboardHidService();
-                try
-                {
-                    if (hid.Open())
-                    {
-                        hid.SendAllPerKeyColorsFromDict(ResultColors);
-                    }
-                }
-                catch
-                {
-                    // Device may not be available — settings are saved anyway
-                }
-                finally
-                {
-                    hid.Dispose();
-                }
-            });
-
+            CollectResultColors();
             Applied = true;
             DialogResult = true;
             Close();
@@ -275,10 +119,33 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void Cancel_Click(object sender, RoutedEventArgs e)
         {
+            CollectResultColors();
             Applied = false;
-            ResultColors = null;
             DialogResult = false;
             Close();
+        }
+
+        /// <summary>
+        /// Collects the current visualizer colors into ResultColors.
+        /// Called on every close so the caller can persist changes even when
+        /// the user closes with the X button instead of OK.
+        /// </summary>
+        private void CollectResultColors()
+        {
+            var allColors = _visualizer.GetAllColors();
+            ResultColors = new Dictionary<int, (byte, byte, byte)>();
+
+            foreach (var kvp in allColors)
+            {
+                ResultColors[kvp.Key] = (kvp.Value.R, kvp.Value.G, kvp.Value.B);
+            }
+        }
+
+        private void _colorPicker_ColorChanged(object sender, EventArgs e)
+        {
+            // Push the current picker color to all visualizer zones so hover and
+            // selection overlays use the right color.
+            _visualizer.SetPickerBrush(new SolidColorBrush(_colorPicker.SelectedColor));
         }
     }
 }
