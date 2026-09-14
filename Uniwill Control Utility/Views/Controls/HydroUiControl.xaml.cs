@@ -58,10 +58,9 @@ namespace Uniwill_Control_Utility.Views.Controls
             }
             else
             {
-                // Show the control but display the disconnected state
-                this.Visibility = Visibility.Visible;
-                spConnected.Visibility = Visibility.Collapsed;
-                spDisconnected.Visibility = Visibility.Visible;
+                // Hide the card entirely when not connected so the Dashboard
+                // can center the remaining card or hide the row altogether.
+                this.Visibility = Visibility.Collapsed;
             }
         }
     }

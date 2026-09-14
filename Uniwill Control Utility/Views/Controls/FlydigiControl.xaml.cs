@@ -25,9 +25,12 @@ namespace Uniwill_Control_Utility.Views.Controls
 
         public void UpdateMetrics(DeviceMetricsSnapshot snapshot)
         {
-            // Skip updating if Flydigi is disabled via Settings
+            // Hide the card if Flydigi is disabled via Settings
             if (Settings.Default.HideFlydigi)
+            {
+                this.Visibility = Visibility.Collapsed;
                 return;
+            }
 
             if (snapshot.FlydigiConnected)
             {
@@ -62,10 +65,9 @@ namespace Uniwill_Control_Utility.Views.Controls
             }
             else
             {
-                // Show the control but display the disconnected state
-                this.Visibility = Visibility.Visible;
-                spConnected.Visibility = Visibility.Collapsed;
-                spDisconnected.Visibility = Visibility.Visible;
+                // Hide the card entirely when not connected so the Dashboard
+                // can center the remaining card or hide the row altogether.
+                this.Visibility = Visibility.Collapsed;
             }
         }
     }

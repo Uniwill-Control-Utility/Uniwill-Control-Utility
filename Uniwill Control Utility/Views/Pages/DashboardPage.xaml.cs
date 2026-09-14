@@ -35,44 +35,15 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void InitializeDeviceControls()
         {
-            // Gate Hydro UI control by hardware support
-            bool hasWatercooler = WaterCoolerHardwareDetector.IsSupportedHardware();
-            _hydroUi.Visibility = hasWatercooler ? Visibility.Visible : Visibility.Collapsed;
-
-            // Apply Flydigi visibility from settings
-            ApplyFlydigiVisibility();
+            // Gate Hydro UI control by hardware support — unsupported hardware
+            // never shows, even if connected (won't be on a watercooler laptop).
+            if (!WaterCoolerHardwareDetector.IsSupportedHardware())
+                _hydroUi.Visibility = Visibility.Collapsed;
 
             // Pass navigation service to device controls for "Connect" buttons
             var navService = ViewModel.GetNavigationService();
             _hydroUi.SetNavigationService(navService);
             _flydigi.SetNavigationService(navService);
-        }
-
-        /// <summary>
-        /// Applies Flydigi card visibility based on the HideFlydigi setting.
-        /// </summary>
-        private void ApplyFlydigiVisibility()
-        {
-            bool hideFlydigi = Settings.Default.HideFlydigi;
-            _flydigi.Visibility = hideFlydigi ? Visibility.Collapsed : Visibility.Visible;
-
-            // Adjust layout: center Hydro UI when Flydigi is hidden
-            if (hideFlydigi)
-            {
-                _deviceRow.ColumnDefinitions[1].Width = GridLength.Auto;
-                _deviceRow.ColumnDefinitions[2].Width = GridLength.Auto;
-                _hydroUi.HorizontalAlignment = HorizontalAlignment.Center;
-                _hydroUi.MinWidth = 536;
-                _hydroUi.MaxWidth = 536;
-            }
-            else
-            {
-                _deviceRow.ColumnDefinitions[1].Width = new GridLength(8);
-                _deviceRow.ColumnDefinitions[2].Width = new GridLength(1, GridUnitType.Star);
-                _hydroUi.HorizontalAlignment = HorizontalAlignment.Stretch;
-                _hydroUi.MinWidth = 0;
-                _hydroUi.MaxWidth = double.MaxValue;
-            }
         }
 
         private void InitializeDeviceInfo()
@@ -286,11 +257,56 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void OnDeviceMetricsUpdated(object? sender, DeviceMetricsSnapshot snapshot)
         {
+            // Update metrics first — each control sets its own visibility based on connection state.
             _hydroUi.UpdateMetrics(snapshot);
 
-            // Only update Flydigi metrics if not disabled
+            // Only update Flydigi metrics if not disabled in Settings
             if (!Settings.Default.HideFlydigi)
                 _flydigi.UpdateMetrics(snapshot);
+
+            // Adjust layout based on which cards are visible.
+            bool hydroVisible = _hydroUi.Visibility == Visibility.Visible;
+            bool flydigiVisible = _flydigi.Visibility == Visibility.Visible;
+
+            if (!hydroVisible && !flydigiVisible)
+            {
+                // Neither card is visible — hide the entire row.
+                _deviceRow.Visibility = Visibility.Collapsed;
+            }
+            else if (hydroVisible && !flydigiVisible)
+            {
+                // Only Hydro UI — center it.
+                _deviceRow.Visibility = Visibility.Visible;
+                _deviceRow.ColumnDefinitions[1].Width = GridLength.Auto;
+                _deviceRow.ColumnDefinitions[2].Width = GridLength.Auto;
+                _hydroUi.HorizontalAlignment = HorizontalAlignment.Center;
+                _hydroUi.MinWidth = 536;
+                _hydroUi.MaxWidth = 536;
+            }
+            else if (!hydroVisible && flydigiVisible)
+            {
+                // Only Flydigi — center it.
+                _deviceRow.Visibility = Visibility.Visible;
+                _deviceRow.ColumnDefinitions[0].Width = GridLength.Auto;
+                _deviceRow.ColumnDefinitions[1].Width = GridLength.Auto;
+                _flydigi.HorizontalAlignment = HorizontalAlignment.Center;
+                _flydigi.MinWidth = 536;
+                _flydigi.MaxWidth = 536;
+            }
+            else
+            {
+                // Both visible — side by side.
+                _deviceRow.Visibility = Visibility.Visible;
+                _deviceRow.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
+                _deviceRow.ColumnDefinitions[1].Width = new GridLength(8);
+                _deviceRow.ColumnDefinitions[2].Width = new GridLength(1, GridUnitType.Star);
+                _hydroUi.HorizontalAlignment = HorizontalAlignment.Stretch;
+                _hydroUi.MinWidth = 0;
+                _hydroUi.MaxWidth = double.MaxValue;
+                _flydigi.HorizontalAlignment = HorizontalAlignment.Stretch;
+                _flydigi.MinWidth = 0;
+                _flydigi.MaxWidth = double.MaxValue;
+            }
         }
     }
 }
