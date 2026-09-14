@@ -36,6 +36,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         private readonly System.Windows.Threading.DispatcherTimer sensors = new System.Windows.Threading.DispatcherTimer();
         private readonly GpuInventoryService gpuInventory;
 
+        // Watercooler connection tracking
+        private WaterCoolerService? _waterCoolerService;
+        private bool _hydroConnected;
+
         public Adaptive(GpuInventoryService gpuInventory)
         {
             this.gpuInventory = gpuInventory;
@@ -67,7 +71,30 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbxGpuEnabled.IsChecked = Settings.Default.AdaptiveGpuEnabled;
             cbxLbEnabled.IsChecked = Settings.Default.AdaptiveLbEnabled;
 
-            sdHydroUI.Visibility = WaterCoolerHardwareDetector.IsSupportedHardware() ? Visibility.Visible : Visibility.Collapsed;
+            // Probe watercooler connection on a background thread.
+            // Hide the card initially; show it only if hardware is supported AND a cooler is connected.
+            sdHydroUI.Visibility = Visibility.Collapsed;
+            _ = Task.Run(() =>
+            {
+                if (!WaterCoolerHardwareDetector.IsSupportedHardware())
+                    return;
+
+                var waterCooler = App.GetService<WaterCoolerService>();
+                bool connected = waterCooler?.IsConnected == true;
+
+                Dispatcher.Invoke(() =>
+                {
+                    _waterCoolerService = waterCooler;
+                    _hydroConnected = connected;
+
+                    if (connected)
+                    {
+                        sdHydroUI.Visibility = Visibility.Visible;
+                        _waterCoolerService!.ConnectionStateChanged += OnWaterCoolerConnectionStateChanged;
+                    }
+                });
+            });
+
             UpdateFlydigiCardVisibility();
 
             // Show/hide AMD vs Intel CPU controls
@@ -476,7 +503,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     {
                         if (!Settings.Default.HideFlydigi && (cbxBs2ProEnabled.IsChecked ?? false) && !_deviceApplier.IsFlydigiOverridden)
                             _deviceApplier.EnableFlydigiOverride();
-                        if ((cbxWcEnabled.IsChecked ?? false) && !_deviceApplier.IsWatercoolerOverridden)
+                        if (_hydroConnected && (cbxWcEnabled.IsChecked ?? false) && !_deviceApplier.IsWatercoolerOverridden)
                             _deviceApplier.EnableWatercoolerOverride();
                         if ((cbxEcFanEnabled.IsChecked ?? false) && !_deviceApplier.IsEcFanOverridden)
                             _deviceApplier.EnableEcFanOverride();
@@ -1054,6 +1081,13 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbxWcEnabled_Toggled(object sender, RoutedEventArgs e)
         {
+            // Prevent enabling if no watercooler is connected.
+            if ((cbxWcEnabled.IsChecked ?? false) && !_hydroConnected)
+            {
+                cbxWcEnabled.IsChecked = false;
+                return;
+            }
+
             bool enabled = cbxWcEnabled.IsChecked ?? false;
             Settings.Default.AdaptiveWcEnabled = enabled;
             Settings.Default.Save();
@@ -1246,7 +1280,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async Task ApplyWatercoolerIfNeeded()
         {
-            if (!(cbxWcEnabled.IsChecked ?? false))
+            if (!_hydroConnected || !(cbxWcEnabled.IsChecked ?? false))
                 return;
 
             PumpVoltage curPump = GetPumpVoltageFromIndex(cbxWcPumpVoltage.SelectedIndex);
@@ -1949,6 +1983,36 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         #region Watercooler Helpers
+
+        /// <summary>
+        /// Handles watercooler connection/disconnection events at runtime.
+        /// Shows or hides the Hydro UI card and disables the checkbox when disconnected.
+        /// </summary>
+        private void OnWaterCoolerConnectionStateChanged(object? sender, WaterCoolerService.WatercoolerConnectionState state)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                bool wasConnected = _hydroConnected;
+                _hydroConnected = state == WaterCoolerService.WatercoolerConnectionState.Connected;
+
+                if (_hydroConnected && !wasConnected)
+                {
+                    // Cooler just connected — show the card.
+                    sdHydroUI.Visibility = Visibility.Visible;
+                }
+                else if (!_hydroConnected && wasConnected)
+                {
+                    // Cooler just disconnected — hide card, disable checkbox, stop override.
+                    sdHydroUI.Visibility = Visibility.Collapsed;
+                    cbxWcEnabled.IsChecked = false;
+                    Settings.Default.AdaptiveWcEnabled = false;
+                    Settings.Default.Save();
+
+                    if (start && _deviceApplier?.IsWatercoolerOverridden == true)
+                        _ = _deviceApplier.DisableWatercoolerOverrideAsync();
+                }
+            });
+        }
 
         private static PumpVoltage GetPumpVoltageFromIndex(int index)
         {
