@@ -67,6 +67,12 @@ namespace Uniwill_Control_Utility
         private static readonly object _displaySetupTaskLock = new();
 
         /// <summary>
+        /// True when the laptop's display panel is MiniLED.
+        /// Set once at startup so pages can decide which controls to show.
+        /// </summary>
+        internal static bool HasMiniLEDPanel { get; private set; }
+
+        /// <summary>
         /// Occurs when the application is loading.
         /// </summary>
         private async void OnStartup(object sender, StartupEventArgs e)
@@ -123,7 +129,7 @@ namespace Uniwill_Control_Utility
                     {
                         try
                         {
-                            Display.SetUpLists();
+                            Uniwill_Control_Utility.Scripts.Misc.Display.SetUpLists();
                         }
                         catch (Exception ex)
                         {
@@ -303,6 +309,17 @@ namespace Uniwill_Control_Utility
                     File.Delete("C:\\Universal.x86.Tuning.Utility.msi");
 
                 Family.setCpuFamily();
+
+                // Detect whether the laptop has a MiniLED display panel.
+                try
+                {
+                    HasMiniLEDPanel = PanelDatabase.IsMiniLED();
+                    Log.Information("Display panel: {PanelType}", HasMiniLEDPanel ? "MiniLED" : "non-MiniLED");
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Failed to detect panel type, assuming non-MiniLED");
+                }
 
                 // Resolve the current laptop SKU (XMG Neo 16 E25/A25 + GPU variant)
                 try

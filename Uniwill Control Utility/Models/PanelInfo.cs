@@ -1,3 +1,6 @@
+using System;
+using System.Text;
+
 namespace Uniwill_Control_Utility.Models
 {
     /// <summary>
@@ -29,6 +32,69 @@ namespace Uniwill_Control_Utility.Models
                 return null;
 
             return PanelsByModel.TryGetValue(model.ToUpperInvariant(), out var info) ? info : null;
+        }
+
+        /// <summary>
+        /// Detects the current panel type by querying WmiMonitorID for hardware ID and model name.
+        /// Returns true if the detected panel is MiniLED.
+        /// </summary>
+        public static bool IsMiniLED()
+        {
+            string? panelModel = null;
+            string? hardwareId = null;
+
+            try
+            {
+                using var searcher = new System.Management.ManagementObjectSearcher(
+                    "root\\wmi", "SELECT * FROM WmiMonitorID");
+
+                foreach (System.Management.ManagementBaseObject monitor in searcher.Get())
+                {
+                    if (!(bool)monitor["Active"])
+                        continue;
+
+                    // User-friendly panel model name
+                    byte[]? friendlyNameBytes = monitor["UserFriendlyName"] as byte[];
+                    int nameLen = Convert.ToInt32(monitor["UserFriendlyNameLength"]);
+                    if (friendlyNameBytes != null && nameLen > 0)
+                    {
+                        string name = System.Text.Encoding.ASCII.GetString(friendlyNameBytes)
+                            .TrimEnd('\0', '\r', '\n', ' ');
+                        if (!string.IsNullOrEmpty(name))
+                            panelModel = name;
+                    }
+
+                    // Hardware ID from InstanceName: "DISPLAY\BOE0D5A\5&..."
+                    string instanceName = Convert.ToString(monitor["InstanceName"]) ?? "";
+                    if (!string.IsNullOrEmpty(instanceName))
+                    {
+                        int bs1 = instanceName.IndexOf('\\');
+                        int bs2 = instanceName.IndexOf('\\', bs1 + 1);
+                        if (bs1 >= 0 && bs2 > bs1)
+                        {
+                            hardwareId = instanceName.Substring(bs1 + 1, bs2 - bs1 - 1);
+                        }
+                    }
+
+                    // First active monitor is the internal panel
+                    break;
+                }
+            }
+            catch
+            {
+                // WMI not available
+            }
+
+            // Try hardware ID first, then model name.
+            PanelInfo? info = null;
+
+            if (!string.IsNullOrEmpty(hardwareId))
+                info = LookupByHardwareId(hardwareId);
+
+            if (info == null && !string.IsNullOrEmpty(panelModel))
+                info = LookupByModel(panelModel);
+
+            return info?.PanelType == PanelTypeMiniLED;
         }
 
         private static readonly System.Collections.Generic.Dictionary<string, PanelInfo> PanelsByHardwareId = new()

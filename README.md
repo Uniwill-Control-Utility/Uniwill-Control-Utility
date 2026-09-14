@@ -58,6 +58,7 @@ AI (**Qwen 3.6 27B**) was used to:
  - Liquid Cooler control
  - CPU and GPU Fan Control
  - Battery control
+ - MiniLED Local Dimming control
 
 ## Features replicated from Flydigi Space Center
  - Flydigi BS1, BS2, BS2 Pro, BS3 and BS3 Pro support
@@ -72,8 +73,7 @@ AI (**Qwen 3.6 27B**) was used to:
  - Live metric overlay (WIP)
  - System tray controls for Power profile, Hydro UI, Fan and FLydigi control
 
-## Features I tried to but wasn't able to replicate
- - MiniLED control (tried so many approaches to replicating what was done in **tuxedo-drivers** but it wouldn't play ball in Windows - **would greatly appreciate a PR from someone more knowledgeable**)
+## Features that haven't bee implemented yet
  - multi-color RGB control of the Light Bar (single-color control works - **PRs are more than welcome**)
 
 
@@ -284,7 +284,7 @@ UCU builds on the work of many open-source projects and reverse-engineering effo
 - [UCC (GitHub)](https://github.com/nanomatters/ucc) by nanomatters — Reference for the LCT watercooler protocol (BLE connection lifecycle, error recovery, state management) and for the ITE 8291 keyboard HID controller protocol (HID device enumeration, ACPI interface, zone-based control commands).
 - [tuxedo-drivers (GitLab)](https://gitlab.com/tuxedocomputers/development/packages/tuxedo-drivers) by TUXEDO Computers — Authoritative reference for the ITE 8291 per-key RGB protocol. The Linux kernel driver (`src/ite_8291/ite_8291.c`) provided the exact byte layouts for UserMode entry, row announcement, and the 65-byte BGR-planar output report format. Also provided the EC register definitions (`src/uniwill_interfaces.h`) for NVIDIA GPU power control on Schenker/XMG laptops (cTGP/TPP/DB offset registers and the `0x0743` enable register).
 - [LenovoLegionToolkit (GitHub)](https://github.com/LenovoLegionToolkit/LenovoLegionToolkit) — Reference for the color picker UI pattern, fan curve editor approach, and keyboard visualizer layout. **Not** used for keyboard protocol details (Lenovo uses different hardware).
-- **MechControl.dll** (decompiled, closed-source) — Schenker/Mechrevo utility. Source for the global keyboard effects protocol (zone-based 9-byte HID feature reports).
+- **MechControl.dll fork** (decompiled, closed-source) by [Heavyfail (GitHub)](https://github.com/Heavyfail) — Schenker/Mechrevo utility. Source for the global keyboard effects protocol (zone-based 9-byte HID feature reports) and MiniLED Local Dimming control (WMI `AcpiTest_MULong` / `GetSetULong` invocation pattern).
 - **XMG Control Center / GCUService.exe** (closed-source) — Official Schenker/XMG utility. Studied for HID device communication patterns, handle acquisition, and GPU power control EC register sequences (via `GPUInfoDLL.dll` and `ACPIDriverDll.dll` binary analysis).
 
 ### Earlier Projects by the Team

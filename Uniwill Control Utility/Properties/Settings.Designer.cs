@@ -1133,5 +1133,13 @@ namespace Uniwill_Control_Utility.Properties {
             get { return ((bool)(this["EnableGpuPowerBoost"])); }
             set { this["EnableGpuPowerBoost"] = value; }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool DisplayLocalDimming {
+            get { return ((bool)(this["DisplayLocalDimming"])); }
+            set { this["DisplayLocalDimming"] = value; }
+        }
     }
 }
