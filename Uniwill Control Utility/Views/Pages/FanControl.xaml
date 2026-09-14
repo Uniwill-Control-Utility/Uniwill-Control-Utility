@@ -144,11 +144,11 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body" Text="Current Charge Limit" />
+                                        <ui:TextBlock FontTypography="Body" Text="Fan Curve Profile" />
                                         <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Active charging limit from the EC." />
+                                               Text="Choose between one of the default curves or create your own one." />
                                     </StackPanel>
                                     <Grid Grid.Column="1">
                                         <Grid.ColumnDefinitions>
