@@ -447,7 +447,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         UpdateDeviceImage();
 
                         // Reset page title
-                        tbPageTitle.Text = "LCT Watercooler Control";
+                        tbPageTitle.Text = "Hydro UI";
                         break;
 
                     case WaterCoolerService.WatercoolerConnectionState.Scanning:

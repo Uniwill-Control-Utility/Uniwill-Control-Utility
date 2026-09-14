@@ -246,7 +246,7 @@ Application preferences, diagnostics, updates, and embedded system information.
 
 ![Overlay](screenshots/overlay.png)
 
-![Auto](screenshots/auto.png)
+![Auto](screenshots/automations.png)
 
 ![Flydigi 1](screenshots/flydigi-1.png)
 

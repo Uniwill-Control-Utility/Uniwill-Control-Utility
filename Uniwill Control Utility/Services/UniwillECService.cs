@@ -1283,7 +1283,7 @@ namespace Uniwill_Control_Utility.Services
 
         #endregion
 
-        #region Power Profiles
+        #region Power Presets
 
         /// <summary>
         /// Gets the current performance mode index (0=quiet, 1=balanced, 2=performance, 3=battery_saver).

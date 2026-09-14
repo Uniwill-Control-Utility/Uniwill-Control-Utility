@@ -76,33 +76,21 @@
                <!-- Uniwill-specific controls -->
                 <StackPanel x:Name="UniwillAvailable">
                     <!-- Info banner -->
-                    <Border x:Name="InfoBanner"
-                            Margin="0,8,0,8"
-                            Padding="14,12"
-                            BorderThickness="1"
-                            BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}"
-                            CornerRadius="4">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <ui:FontIcon x:Name="InfoBannerIcon"
-                                         FontFamily="Segoe Fluent Icons"
-                                         Glyph="&#xE946;"
-                                         FontSize="16"
-                                         Margin="6,0,20,0"
-                                         VerticalAlignment="Center" />
-                            <TextBlock x:Name="InfoBannerText"
-                                       Grid.Column="1"
-                                       Text="Default fan curve profiles cannot be edited, switch to Custom in order to make a personalized curve."
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       TextWrapping="Wrap"
-                                       VerticalAlignment="Center" />
-                        </Grid>
-                    </Border>
-
-                    <!-- Unified curve toggle with expander -->
+                        <ui:InfoBar x:Name="InfoBanner"
+                                    Margin="0,8,0,8"
+                                    IsOpen="True"
+                                    IsClosable="False"
+                                    Severity="Informational"
+                                    Message="Default fan curve profiles cannot be edited, switch to Custom in order to make a personalized curve.">
+                            <ui:InfoBar.Resources>
+                                <!-- For WPF UI, target ui:SymbolIcon. For ModernWPF, target ui:FontIcon -->
+                                <Style TargetType="ui:SymbolIcon">
+                                    <Setter Property="Margin" Value="4,0,6,0" />
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </ui:InfoBar.Resources>
+                        </ui:InfoBar>
+                        <!-- Unified curve toggle with expander -->
                     <ui:CardExpander x:Name="UnifiedCard"
                                      Margin="0,0,0,8"
                                      IsExpanded="False"

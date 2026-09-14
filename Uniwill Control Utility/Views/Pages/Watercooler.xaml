@@ -56,7 +56,7 @@
                                FontWeight="Medium"
                                Margin="16,0,16,0"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                               Text="LCT Watercooler Control" />
+                               Text="Hydro UI" />
                     <TextBlock Margin="16,8,16,12"
                                FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"

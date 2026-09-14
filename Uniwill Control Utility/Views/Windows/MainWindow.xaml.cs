@@ -50,7 +50,6 @@ namespace Uniwill_Control_Utility.Views.Windows
         public ViewModels.MainWindowViewModel ViewModel { get; set; }
 
         DispatcherTimer Misc = new DispatcherTimer();
-        public DispatcherTimer autoReapply = new DispatcherTimer();
         public DispatcherTimer autoRestore = new DispatcherTimer();
 
         public static bool isMini { get; private set; }
@@ -73,10 +72,6 @@ namespace Uniwill_Control_Utility.Views.Windows
             Misc.Interval = TimeSpan.FromSeconds(1);
             Misc.Tick += Misc_Tick;
             Misc.Start();
-
-            autoReapply.Interval = TimeSpan.FromSeconds(Settings.Default.AutoReapplyTime);
-            autoReapply.Tick += AutoReapply_Tick;
-            autoReapply.Start();
 
             autoRestore.Interval = TimeSpan.FromSeconds(1);
             autoRestore.Tick += Controller.AutoRestore_Tick;
@@ -118,6 +113,9 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             // Hide Flydigi section if disabled in Settings
             miSectionFlydigi.Visibility = Settings.Default.HideFlydigi ? Visibility.Collapsed : Visibility.Visible;
+
+            // Hide Hydro UI section if no supported hardware or no cooler connected
+            UpdateHydroTrayVisibility();
 
             // Disable/hide tray controls when Adaptive overrides are active
             UpdateTrayAdaptiveOverrideState();
@@ -641,33 +639,6 @@ namespace Uniwill_Control_Utility.Views.Windows
             {
                 // Handle exceptions if necessary
                 DiagnosticLogger.LogError(ex, "Failed to get battery status");
-            }
-        }
-
-        private async void AutoReapply_Tick(object sender, EventArgs e)
-        {
-            try
-            {
-                if (Settings.Default.AutoReapply == true && Settings.Default.isAdaptiveModeRunning == false)
-                {
-                    string? commands = Settings.Default.CommandString;
-                    //Check if RyzenAdjArguments is populated
-                    if (commands != null && commands != "")
-                    {
-                        await RyzenAdj_To_UCU.TranslateAsync(commands);
-                    }
-
-                    if (autoReapply.Interval != TimeSpan.FromSeconds(Settings.Default.AutoReapplyTime))
-                    {
-                        autoReapply.Stop();
-                        autoReapply.Interval = TimeSpan.FromSeconds(Settings.Default.AutoReapplyTime);
-                        autoReapply.Start();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                DiagnosticLogger.LogError(ex, "Failed during auto-reapply tick");
             }
         }
 
@@ -1750,6 +1721,23 @@ namespace Uniwill_Control_Utility.Views.Windows
                 }
             }
             catch { /* Non-critical: failing to update tray fan profile visibility only affects visual state */ }
+        }
+
+        /// <summary>
+        /// Hides the Hydro UI tray section when no supported hardware or no cooler is connected.
+        /// </summary>
+        private void UpdateHydroTrayVisibility()
+        {
+            if (!WaterCoolerHardwareDetector.IsSupportedHardware())
+            {
+                miSectionHydro.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var wc = App.GetService<WaterCoolerService>();
+            miSectionHydro.Visibility = wc?.IsConnected == true
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         /// <summary>

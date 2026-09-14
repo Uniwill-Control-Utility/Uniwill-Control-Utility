@@ -397,9 +397,6 @@ namespace Uniwill_Control_Utility.Views.Pages
 
       #region Info Banner
 
-        private static readonly SolidColorBrush InfoBrush
-            = new(Colors.White) { Opacity = 0.15 };
-
         private void UpdateBanner()
         {
             // Check all active curve editors for risk levels
@@ -407,36 +404,47 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             string coolerName = GetCoolerName();
 
+            Wpf.Ui.Controls.InfoBarSeverity newSeverity;
+            string newMessage;
+
             switch (bannerState)
             {
                 case BannerState.FanOff:
-                    InfoBanner.BorderBrush = new SolidColorBrush(Colors.Red) { Opacity = 0.5 };
-                    InfoBannerIcon.Glyph = "\uE7BA"; // Warning
-                    InfoBannerText.Text =
-                        $"Profile \"Off\" has been set for one or more fan curves. Please make sure that you are using a {coolerName} cooler to avoid temperature-induced hardware damage.";
+                    newSeverity = Wpf.Ui.Controls.InfoBarSeverity.Error;
+                    newMessage =
+                        $"An \"Off\" fan curve has been applied. Make sure that you are using a {coolerName} cooler to avoid long-term hardware damage.";
                     break;
 
                 case BannerState.ZeroApplied:
-                    InfoBanner.BorderBrush = new SolidColorBrush(Colors.Red) { Opacity = 0.5 };
-                    InfoBannerIcon.Glyph = "\uE7BA"; // Warning
-                    InfoBannerText.Text =
-                        $"A zero-fan setting has been applied. Please make sure that you are using a {coolerName} cooler to avoid temperature-induced hardware damage.";
+                    newSeverity = Wpf.Ui.Controls.InfoBarSeverity.Error;
+                    newMessage =
+                        $"A zero-fan setting has been applied. Make sure that you are using a {coolerName} cooler to avoid long-term hardware damage.";
                     break;
 
                 case BannerState.LowCurve:
-                    InfoBanner.BorderBrush = new SolidColorBrush(Colors.Orange) { Opacity = 0.5 };
-                    InfoBannerIcon.Glyph = "\uE7BA"; // Warning
-                    InfoBannerText.Text =
-                        $"A custom profile has been applied with a low fan curve. Please make sure that you are using a {coolerName} cooler to avoid temperature-induced hardware damage.";
+                    newSeverity = Wpf.Ui.Controls.InfoBarSeverity.Warning;
+                    newMessage =
+                        $"A low fan curve has been applied. Make sure that you are using a {coolerName} cooler to avoid long-term hardware damage.";
                     break;
 
                 default:
-                    InfoBanner.BorderBrush = new SolidColorBrush(Colors.White) { Opacity = 0.15 };
-                    InfoBannerIcon.Glyph = "\uE946"; // Info
-                    InfoBannerText.Text =
+                    newSeverity = Wpf.Ui.Controls.InfoBarSeverity.Informational;
+                    newMessage =
                         "Default fan curve profiles cannot be edited, switch to Custom in order to make a personalized curve.";
                     break;
             }
+
+            // Only refresh if something actually changed — avoids unnecessary re-render.
+            if (InfoBanner.Severity == newSeverity && InfoBanner.Message == newMessage)
+                return;
+
+            // Toggle IsOpen to force the InfoBar template to re-apply and pick up
+            // the new Message. WPF UI's InfoBar doesn't always re-render the content
+            // when Severity and Message change simultaneously.
+            InfoBanner.IsOpen = false;
+            InfoBanner.Severity = newSeverity;
+            InfoBanner.Message = newMessage;
+            InfoBanner.IsOpen = true;
         }
 
         private enum BannerState

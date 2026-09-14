@@ -76,11 +76,11 @@
                                FontWeight="Medium"
                                Margin="16,0,16,0"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                               Text="Power Profiles" />
+                               Text="Power Presets" />
                     <TextBlock Margin="16,8,16,12"
                                FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                               Text="Select a power profile or customize your own settings."
+                               Text="Select one of the default power presets or create your own one."
                                TextWrapping="Wrap" />
                 </StackPanel>
 

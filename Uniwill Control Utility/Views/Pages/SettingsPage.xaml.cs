@@ -94,11 +94,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbStartMini.IsChecked = Settings.Default.StartMini;
             cbMinimizeClose.IsChecked = Settings.Default.MinimizeClose;
             cbApplyStart.IsChecked = Settings.Default.ApplyOnStart;
-            nudAutoReapply.Value = Settings.Default.AutoReapplyTime;
-            nudAutoReapply.Text = Convert.ToString(Settings.Default.AutoReapplyTime);
             cbAutoCheck.IsChecked = Settings.Default.UpdateCheck;
             cbAdaptive.IsChecked = Settings.Default.isStartAdpative;
-            cbTrack.IsChecked = Settings.Default.isTrack;
             cbGpuPowerBoost.IsChecked = Settings.Default.EnableGpuPowerBoost;
             cbHideFlydigi.IsChecked = Settings.Default.HideFlydigi;
             cbDisableCpuVoltageControl.IsChecked = Settings.Default.DisableCpuVoltageControl;
@@ -372,19 +369,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.Save();
         }
 
-        private void cbTrack_Checked(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.isTrack = true;
-            Settings.Default.Save();
-        }
-
-        private void cbTrack_Unchecked(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.isTrack = false;
-            Settings.Default.Save();
-        }
-
-        private void cbGpuPowerBoost_Checked(object sender, RoutedEventArgs e)
+       private void cbGpuPowerBoost_Checked(object sender, RoutedEventArgs e)
         {
             Settings.Default.EnableGpuPowerBoost = true;
             Settings.Default.Save();
@@ -438,23 +423,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.Save();
         }
 
-        #endregion
-
-        private void nudAutoReapply_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
-        {
-            if (nudAutoReapply.Value is double value)
-                Settings.Default.AutoReapplyTime = (int)value;
-            Settings.Default.Save();
-        }
-
-        private void nudAutoReapply_ValueChanged(object sender, RoutedEventArgs e)
-        {
-            if (nudAutoReapply != null && nudAutoReapply.Value != null)
-            {
-                Settings.Default.AutoReapplyTime = (int)nudAutoReapply.Value;
-                Settings.Default.Save();
-            }
-        }
+       #endregion
 
         private async void btnCheck_Click(object sender, System.Windows.RoutedEventArgs e)
         {

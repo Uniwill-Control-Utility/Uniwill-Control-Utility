@@ -40,6 +40,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (!WaterCoolerHardwareDetector.IsSupportedHardware())
                 _hydroUi.Visibility = Visibility.Collapsed;
 
+            // Gate Flydigi control by user setting — collapsed immediately so it
+            // doesn't flash visible before the first metrics update.
+            if (Settings.Default.HideFlydigi)
+                _flydigi.Visibility = Visibility.Collapsed;
+
             // Pass navigation service to device controls for "Connect" buttons
             var navService = ViewModel.GetNavigationService();
             _hydroUi.SetNavigationService(navService);

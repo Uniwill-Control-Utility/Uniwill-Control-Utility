@@ -180,7 +180,6 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<OverlaySettingsStore>();
                         services.AddSingleton<OverlayManagerService>();
                         services.AddHostedService(provider => provider.GetRequiredService<OverlayManagerService>());
-                        services.AddHostedService<GamePerformanceTrackingService>();
 
                         // Main window with navigation
                         services.AddScoped<INavigationWindow, Views.Windows.MainWindow>();
@@ -367,9 +366,12 @@ namespace Uniwill_Control_Utility
                 // Auto-connect Flydigi BS2 Pro cooling pad on startup if enabled
                 try
                 {
-                    var flydigiCoolerService = _host.Services.GetService<FlydigiCoolerService>();
-                    if (flydigiCoolerService != null && FlydigiCoolerService.IsDeviceAvailable())
-                        await flydigiCoolerService.TryAutoConnectAsync();
+                    if (!Settings.Default.HideFlydigi)
+                    {
+                        var flydigiCoolerService = _host.Services.GetService<FlydigiCoolerService>();
+                        if (flydigiCoolerService != null && FlydigiCoolerService.IsDeviceAvailable())
+                            await flydigiCoolerService.TryAutoConnectAsync();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -379,9 +381,12 @@ namespace Uniwill_Control_Utility
                 // Auto-connect Flydigi BS1 (BLE) cooling pad on startup if enabled
                 try
                 {
-                    var bs1Service = _host.Services.GetService<Bs1Service>();
-                    if (bs1Service != null)
-                        await bs1Service.TryAutoConnectAsync();
+                    if (!Settings.Default.HideFlydigi)
+                    {
+                        var bs1Service = _host.Services.GetService<Bs1Service>();
+                        if (bs1Service != null)
+                            await bs1Service.TryAutoConnectAsync();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -395,7 +400,7 @@ namespace Uniwill_Control_Utility
                     var deviceApplier = _host.Services.GetService<DeviceApplier>();
                     if (deviceApplier != null && Settings.Default.isAdaptiveModeRunning)
                     {
-                        if (Settings.Default.AdaptiveBs2ProEnabled)
+                        if (!Settings.Default.HideFlydigi && Settings.Default.AdaptiveBs2ProEnabled)
                             deviceApplier.EnableFlydigiOverride();
 
                         if (Settings.Default.AdaptiveWcEnabled)

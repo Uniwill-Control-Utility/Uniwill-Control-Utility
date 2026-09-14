@@ -45,26 +45,25 @@ namespace Uniwill_Control_Utility.ViewModels
             LastAppliedSettingsService.Changed += OnLastAppliedSettingsChanged;
         }
 
+        
+
         private void InitializeViewModel()
         {
             ApplicationTitle = "Uniwill Control Utility";
 
-            NavigationItems = new ObservableCollection<object>
-            {
-                CreateNavigationItem("Home", "dashboard", SymbolRegular.Home24, typeof(Views.Pages.DashboardPage))
-            };
+            NavigationItems = new ObservableCollection<object> { };
 
-            NavigationItems.Add(CreateNavigationItem("Presets", "presets", SymbolRegular.Predictions24, typeof(Views.Pages.Presets)));
-            NavigationItems.Add(CreateNavigationItem("Adaptive", "adaptive", SymbolRegular.Radar20, typeof(Views.Pages.Adaptive)));
-            
+            createNavItem("Home", "dashboard", "\uE80F", typeof(Views.Pages.DashboardPage), false);
+
+            createNavItem("Presets", "presets", "\uEF58", typeof(Views.Pages.Presets), false);
+
+            createNavItem("Adaptive", "adaptive", "\uEB44", typeof(Views.Pages.Adaptive), false);
 
 
             // Hydro UI in footer for supported watercooler hardware
             if (WaterCoolerHardwareDetector.IsSupportedHardware())
             {
-                var hydroItem = CreateNavigationItem("Hydro UI", "watercooler", SymbolRegular.Empty, typeof(Views.Pages.Watercooler));
-                hydroItem.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = "\uEB42", FontSize = 20 };
-                NavigationItems.Add(hydroItem);
+                createNavItem("Hydro UI", "watercooler", "\uEB42", typeof(Views.Pages.Watercooler), false);
             }
 
             // Flydigi cooler in footer (hidden if user has disabled it in Settings)
@@ -76,25 +75,21 @@ namespace Uniwill_Control_Utility.ViewModels
             // Fan Control, Keyboard, Light Bar, Battery, CPU Temp Limit in footer for Uniwill EC hardware (XMG / TUXEDO)
             if (_uniwillEc is not null && _uniwillEc.Initialize())
             {
-                NavigationItems.Add(CreateNavigationItem("Fan Control", "fancontrol", SymbolRegular.Gauge24, typeof(Views.Pages.FanControl)));
-                NavigationItems.Add(CreateNavigationItem("Keyboard", "keyboard", SymbolRegular.Keyboard24, typeof(Views.Pages.Keyboard)));
+                createNavItem("Fan Control", "fancontrol", "\uF42F", typeof(Views.Pages.FanControl), false);
 
-                // Light Bar (HID lighting zone)
-                var lightBarItem = CreateNavigationItem("Light Bar", "lightbar", SymbolRegular.Empty, typeof(Views.Pages.LightBar));
-                lightBarItem.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = "\uED39", FontSize = 20 };
-                NavigationItems.Add(lightBarItem);
+                createNavItem("Keyboard", "keyboard", "\uE765", typeof(Views.Pages.Keyboard), false);
 
-                // Battery (charging mode + telemetry)
-                var batteryItem = CreateNavigationItem("Battery", "battery", SymbolRegular.Empty, typeof(Views.Pages.Battery));
-                batteryItem.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = "\uEBC0", FontSize = 20 };
-                NavigationItems.Add(batteryItem);
+                createNavItem("Light Bar", "lightbar", "\uED39", typeof(Views.Pages.LightBar), false);
+
+                createNavItem("Battery", "battery", "\uEBC0", typeof(Views.Pages.Battery), false);
             }
 
-            NavigationItems.Add(CreateNavigationItem("Overlay", "overlay", SymbolRegular.DesktopPulse24, typeof(Views.Pages.OverlaySettingsPage)));
-            NavigationItems.Add(CreateNavigationItem("Auto", "auto", SymbolRegular.Transmission24, typeof(Views.Pages.Automations)));
+            createNavItem("Overlay", "overlay", "\uE81E", typeof(Views.Pages.OverlaySettingsPage), false);
+
+            createNavItem("Auto", "auto", "\uF277", typeof(Views.Pages.Automations), false);
 
             // Settings at the bottom of footer
-            NavigationFooter.Add(CreateNavigationItem("Settings", "settings", SymbolRegular.Settings24, typeof(Views.Pages.SettingsPage)));
+            createNavItem("Settings", "settings", "\uE713", typeof(Views.Pages.SettingsPage), true);
         }
 
         private static NavigationViewItem CreateNavigationItem(string content, string tag, SymbolRegular icon, Type pageType) =>
@@ -171,6 +166,20 @@ namespace Uniwill_Control_Utility.ViewModels
                 TargetPageTag = "flydigicooler",
                 Icon = new FlydigiIconElement()
             };
+        }
+
+        private void createNavItem(String title, String tag, String iconGlyph, Type pageType, Boolean isFooterItem)
+        {
+            var navItem = CreateNavigationItem(title, tag, SymbolRegular.Empty, pageType);
+            navItem.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = iconGlyph, FontSize = 20 };
+            if (isFooterItem)
+            {
+                NavigationFooter.Add(navItem);
+            }
+            else
+            {
+                NavigationItems.Add(navItem);
+            }
         }
     }
 }

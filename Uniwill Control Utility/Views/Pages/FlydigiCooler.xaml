@@ -77,10 +77,17 @@
                                 Severity="Informational"
                                 VerticalAlignment="Stretch"
                                 VerticalContentAlignment="Stretch"
-                                Message="Uniwill Control Utility connects to the BS1 automatically while BS2/BS3 models must first be connected to via Bluetooth in Windows Settings." 
-                                />
+                                Message="Uniwill Control Utility connects to the BS1 automatically while BS2/BS3 models must first be connected to via Bluetooth in Windows Settings.">
+                        <ui:InfoBar.Resources>
+                            <!-- For WPF UI, target ui:SymbolIcon. For ModernWPF, target ui:FontIcon -->
+                            <Style TargetType="ui:SymbolIcon">
+                                <Setter Property="Margin" Value="4,0,6,0" />
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                            </Style>
+                        </ui:InfoBar.Resources>
+                    </ui:InfoBar>
 
-                <!-- Device Status  -->
+                    <!-- Device Status  -->
                     <Grid Margin="0,0,0,24">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
