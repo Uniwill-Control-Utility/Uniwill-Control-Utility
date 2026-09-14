@@ -668,6 +668,27 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
+        /// Updates brightness for the currently active effect without turning off or resetting the zone.
+        /// Used for brightness slider changes to avoid the visible blackout that TurnOnWithEffect causes.
+        /// </summary>
+        public void SetBrightness(int brightness, byte effect, byte speed = 5, byte direction = 0)
+        {
+            EnsureAvailable();
+            brightness = Math.Clamp(brightness, 0, 100);
+
+            lock (_lock)
+            {
+                // Global primer
+                SendReport(new byte[] { 0x00, CMD_MODE_BRIGHTNESS, 0x00, effect, speed, (byte)brightness, 0x00, 0x00, 0x00 });
+                // Zone-specific apply
+                SendReport(new byte[] { 0x00, CMD_MODE_BRIGHTNESS, ZoneMaskKeyboard, effect, speed, (byte)brightness, 0x08, direction, 0x00 });
+
+                _brightness = brightness;
+                DebugLog($"[KBD-HID] Brightness update — brightness={brightness}, effect=0x{effect:X2}");
+            }
+        }
+
+        /// <summary>
         /// Saves the current keyboard settings to BIOS so they persist across reboots.
         /// </summary>
         public void SaveToBios(bool enabled)

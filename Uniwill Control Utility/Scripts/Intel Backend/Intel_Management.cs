@@ -142,7 +142,7 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
             try
             {
                 EnsureInitialised();
-                runIntelTDPChangeMSR(pl1, Math.Max(pl1 + 2, pl2));
+                runIntelTDPChangeMSR(pl1, pl2);
             }
             catch (Exception ex)
             {

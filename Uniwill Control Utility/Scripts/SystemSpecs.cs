@@ -78,7 +78,9 @@ namespace Uniwill_Control_Utility.Scripts
                             continue;
 
                         long sizeBytes = Convert.ToInt64(disk["Size"]);
-                        if (sizeBytes <= 0)
+                        // Skip disks smaller than 1 GB to avoid virtual disks, SD card readers,
+                        // or empty NVMe slots that report as fixed media with negligible size.
+                        if (sizeBytes < 1000L * 1000L * 1000L)
                             continue;
 
                         sizes.Add(sizeBytes);

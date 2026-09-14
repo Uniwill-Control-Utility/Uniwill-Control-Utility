@@ -256,7 +256,7 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
             out uint lpBytesReturned,
             IntPtr lpOverlapped);
 
-        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [LibraryImport("kernel32.dll", EntryPoint = "CreateFileW", SetLastError = true)]
         private static partial IntPtr CreateFile(
             [MarshalAs(UnmanagedType.LPWStr)] string lpFileName,
             FileAccess dwDesiredAccess,

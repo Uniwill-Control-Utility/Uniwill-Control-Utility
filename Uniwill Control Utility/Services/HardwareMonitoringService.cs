@@ -361,25 +361,39 @@ namespace Uniwill_Control_Utility.Services
 
             // DIMMs appear as top-level hardware items with HardwareType.Memory.
             // Each DIMM has a temperature sensor named "DIMM #N" if it's DDR4/DDR5 with a thermal sensor.
-            // We collect per-DIMM temperatures by sensor name.
+            // On some laptops (e.g., PCSpecialist Recoil 3 16), DIMMs may be at slots #0 and #2
+            // instead of #0 and #1. So we collect all DIMM temperatures and assign by order.
             int temp0 = 0;
             int temp1 = 0;
+            int index = 0;
 
             foreach (IHardware hardware in _computer.Hardware)
             {
                 if (hardware.HardwareType != HardwareType.Memory)
                     continue;
 
-                // Check sensor name to identify which DIMM
                 foreach (ISensor sensor in hardware.Sensors)
                 {
                     if (sensor.SensorType != SensorType.Temperature || !sensor.Value.HasValue)
                         continue;
 
-                    if (sensor.Name.Equals("DIMM #0", StringComparison.OrdinalIgnoreCase))
-                        temp0 = Round(sensor.Value.Value);
-                    else if (sensor.Name.Equals("DIMM #1", StringComparison.OrdinalIgnoreCase))
-                        temp1 = Round(sensor.Value.Value);
+                    // Match any "DIMM #N" sensor name
+                    string name = sensor.Name;
+                    if (!name.Equals("DIMM #0", StringComparison.OrdinalIgnoreCase) &&
+                        !name.Equals("DIMM #1", StringComparison.OrdinalIgnoreCase) &&
+                        !name.Equals("DIMM #2", StringComparison.OrdinalIgnoreCase) &&
+                        !name.Equals("DIMM #3", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    int val = Round(sensor.Value.Value);
+                    if (index == 0)
+                        temp0 = val;
+                    else if (index == 1)
+                        temp1 = val;
+
+                    index++;
                 }
             }
 

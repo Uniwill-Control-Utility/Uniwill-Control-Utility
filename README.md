@@ -19,10 +19,21 @@ Uniwill Control Utility (UCU) is a hardware tuning and monitoring application fo
 
 UCU was built on top of the foundation laid by [UXTU](https://github.com/JamesCJ60/Universal-x86-Tuning-Utility) (Universal x86 Tuning Utility), reworking/extending its capabilities with Uniwill EC integration, Flydigi cooler support, watercooler control, and a modern Fluent Design interface in order to provide a tailored software for the hardware used by the XMG Neo A25/E25 and PCSpecialist Recoil 3 16 (Intel/AMD).
 
-**There is currently a bug with the Presets page on **INTEL** variants of the laptop, avoid using it!**
+## Which hardware has this tool been tested on?
+ - **XMG Neo 16 (A25)**
+    - CPU: **AMD Ryzen 9 9955HX3D**
+    - GPU: **NVIDIA GeForce RTX 5090 Laptop**
+    - Panel: **MiniLED**
+ - **PCSpecialist Recoil 3 16 (Intel)**
+    - CPU: **Intel® Core™ Ultra 9 Processor 275HX**
+    - GPU: **NVIDIA GeForce RTX 5080 Laptop**
+    - Panel: **MiniLED**
 
-I have tested the app on my AMD Ryzen 9 9955HX3D + Nvidia RTX 5090M **XMG Neo 16 A25**, and am working on getting the power presets working on the Intel variant.
+### Testing limitations
 
+ The PCSpecialist Recoil 3 16 (Intel) has CPU voltage control disabled on the BIOS level, so CPU voltage control in the app couldn't be tested.
+
+However, CPU TDP control has been tested and confirmed to be working.
 ## How were the features achieved?
 
 A fair amount of research into other projects that have been mentioned in the Credits section.
@@ -68,7 +79,7 @@ AI (**Qwen 3.6 27B**) was used to:
 
 # App Features
 
-### Dashboard
+### **Dashboard**
 
 At-a-glance system overview showing your device's specifications and live hardware metrics.
 
@@ -77,7 +88,7 @@ At-a-glance system overview showing your device's specifications and live hardwa
 - Quick-launch device controls for Flydigi coolers and Hydro UI watercoolers (when supported)
 
 
-### Presets
+### **Presets**
 
 One-click tuning profiles and granular hardware controls for CPU, GPU, and system power management. This is a mix of XMG Control Center's and MSI Afterburner main features.
 
@@ -91,7 +102,7 @@ One-click tuning profiles and granular hardware controls for CPU, GPU, and syste
 - **Preset backup & import** — Export and restore all custom presets and adaptive mode profiles
 
 
-### Adaptive Mode
+### **Adaptive Mode**
 
 Intelligent, game-aware performance optimization that automatically adjusts settings based on the active application.
 
@@ -101,10 +112,10 @@ Intelligent, game-aware performance optimization that automatically adjusts sett
 - **Fan Control** — Custom EC fan curves per game
 - **Flydigi cooler** — Custom fan curves and RGB speed per game
 - **Keyboard RGB** — Per-game multi-color lighting profiles with auto-detection of running games
-- Automatic profile switching when games launch or close
+- **Per-game presets** — Automatic profile switching when games launch or close
 
 
-### Game Overlay
+### **Game Overlay**
 
 Click-through hardware monitoring overlay for real-time performance tracking while gaming.
 
@@ -114,18 +125,16 @@ Click-through hardware monitoring overlay for real-time performance tracking whi
 - Global keyboard shortcuts to toggle overlay visibility and sensor polling
 
 
-### Automations
+### **Automations**
 
 Set-and-forget rules that apply presets automatically when system state changes.
 
 - **Preset on Battery Charge** — Apply a preset when the system switches to AC power
 - **Preset on Battery Discharge** — Apply a preset when running on battery
 - **Preset on System Resume** — Reapply settings after sleep or hibernation
-- **AutoOC: Adaptive CPU Undervolt** — Automatically optimize CPU voltage with built-in stability protection (AMD)
-- **AutoOC: Adaptive iGPU Undervolt** — Automatic iGPU voltage optimization with stability protection (AMD)
 
 
-### Fan Control
+### **Fan Control**
 
 Full control over system fan curves with real-time temperature monitoring.
 
