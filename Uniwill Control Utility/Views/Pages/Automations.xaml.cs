@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Services;
@@ -35,7 +36,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private static void PopulateComboBox(ComboBox comboBox)
         {
             comboBox.Items.Add("None");
-            foreach (string name in PresetProfileApplier.ProfileNames)
+            foreach (string name in PresetProfileApplier.GetProfileNames())
             {
                 comboBox.Items.Add(PresetProfileApplier.DisplayName(name));
             }
@@ -128,7 +129,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         #region Helpers
 
         /// <summary>
-        /// Maps a display name ("Office Preset") back to the profile key ("Office").
+        /// Maps a display name ("Office", "Custom 3") back to the profile key ("Office", "Custom 3").
         /// Returns empty string for "None" or unrecognized values.
         /// </summary>
         private static string ResolveProfileName(string? displayName)
@@ -136,74 +137,76 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (string.IsNullOrEmpty(displayName) || displayName == "None")
                 return string.Empty;
 
+            // Check for custom preset display names first (e.g. "Custom 3") -- display name equals profile key.
+            if (PresetProfileApplier.TryParseCustomSlot(displayName) >= 0)
+            {
+                return displayName;
+            }
+
             return displayName switch
             {
-                string s when s.Contains("Office", StringComparison.OrdinalIgnoreCase) => "Office",
-                string s when s.Contains("Gaming", StringComparison.OrdinalIgnoreCase) => "Gaming",
-                string s when s.Contains("Turbo", StringComparison.OrdinalIgnoreCase) => "Turbo",
-                string s when s.Contains("Custom", StringComparison.OrdinalIgnoreCase) => "Custom",
+                string s when s.Equals("Office", StringComparison.OrdinalIgnoreCase) => "Office",
+                string s when s.Equals("Gaming", StringComparison.OrdinalIgnoreCase) => "Gaming",
+                string s when s.Equals("Turbo", StringComparison.OrdinalIgnoreCase) => "Turbo",
                 _ => string.Empty
             };
         }
 
         private void getAcPreset(string searchName)
         {
-            if (string.IsNullOrEmpty(searchName))
-            {
-                cbxCharge.SelectedIndex = 0;
-                return;
-            }
-
-            foreach (var item in cbxCharge.Items)
-            {
-                if (item.ToString() == searchName)
-                {
-                    cbxCharge.SelectedItem = item;
-                    return;
-                }
-            }
-
-            cbxCharge.SelectedIndex = 0;
+            setPresetFromSaved(cbxCharge, searchName, (val) => Settings.Default.acPreset = val);
         }
 
         private void getDcPreset(string searchName)
         {
-            if (string.IsNullOrEmpty(searchName))
-            {
-                cbxDischarge.SelectedIndex = 0;
-                return;
-            }
-
-            foreach (var item in cbxDischarge.Items)
-            {
-                if (item.ToString() == searchName)
-                {
-                    cbxDischarge.SelectedItem = item;
-                    return;
-                }
-            }
-
-            cbxDischarge.SelectedIndex = 0;
+            setPresetFromSaved(cbxDischarge, searchName, (val) => Settings.Default.dcPreset = val);
         }
 
         private void getResumePreset(string searchName)
         {
+            setPresetFromSaved(cbxResume, searchName, (val) => Settings.Default.resumePreset = val);
+        }
+
+        /// <summary>
+        /// Selects a combobox item matching the saved display name.
+        /// Falls back to resolving old display name format (e.g. "Office Preset" → "Office") and saves the corrected value.
+        /// </summary>
+        private static void setPresetFromSaved(ComboBox comboBox, string searchName, Action<string?> saveCallback)
+        {
             if (string.IsNullOrEmpty(searchName))
             {
-                cbxResume.SelectedIndex = 0;
+                comboBox.SelectedIndex = 0;
                 return;
             }
 
-            foreach (var item in cbxResume.Items)
+            // Exact match first
+            foreach (var item in comboBox.Items)
             {
                 if (item.ToString() == searchName)
                 {
-                    cbxResume.SelectedItem = item;
+                    comboBox.SelectedItem = item;
                     return;
                 }
             }
 
-            cbxResume.SelectedIndex = 0;
+            // Fallback: resolve old display name to profile key, then find new display name
+            string profileKey = ResolveProfileName(searchName);
+            if (!string.IsNullOrEmpty(profileKey))
+            {
+                string newDisplayName = PresetProfileApplier.DisplayName(profileKey);
+                foreach (var item in comboBox.Items)
+                {
+                    if (item.ToString() == newDisplayName)
+                    {
+                        comboBox.SelectedItem = item;
+                        saveCallback(newDisplayName);
+                        Settings.Default.Save();
+                        return;
+                    }
+                }
+            }
+
+            comboBox.SelectedIndex = 0;
         }
 
         #endregion

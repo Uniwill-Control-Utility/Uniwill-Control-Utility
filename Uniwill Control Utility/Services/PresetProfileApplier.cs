@@ -12,15 +12,74 @@ namespace Uniwill_Control_Utility.Services
 {
     /// <summary>
     /// Generates RyzenAdj command strings from Presets page profile names
-    /// (Office, Gaming, Turbo, Custom) for use by the Automations page
+    /// (Office, Gaming, Turbo, Custom 1..5) for use by the Automations page
     /// and MainWindow power-mode handlers.
     /// </summary>
     public static class PresetProfileApplier
     {
         /// <summary>
-        /// The profile names available from the Presets page.
+        /// The built-in profile names (always available).
         /// </summary>
-        public static readonly string[] ProfileNames = { "Office", "Gaming", "Turbo", "Custom" };
+        public static readonly string[] BuiltInProfileNames = { "Office", "Gaming", "Turbo" };
+
+        /// <summary>
+        /// Returns all available profile names: built-in profiles plus saved custom presets.
+        /// Custom presets are only included if the user has saved changes to that slot.
+        /// </summary>
+        public static string[] GetProfileNames()
+        {
+            var list = new List<string>(BuiltInProfileNames);
+
+            var customPresets = CustomPresetStore.Load();
+            for (int i = 0; i < customPresets.Length; i++)
+            {
+                if (customPresets[i].HasChanges)
+                {
+                    list.Add(CustomProfileKey(i));
+                }
+            }
+
+            return list.ToArray();
+        }
+
+        /// <summary>
+        /// Returns the profile key for a custom preset slot (0-based).
+        /// e.g. slot 0 → "Custom 1", slot 4 → "Custom 5"
+        /// </summary>
+        public static string CustomProfileKey(int slot)
+        {
+            return $"Custom {slot + 1}";
+        }
+
+        /// <summary>
+        /// Parses a custom profile key back to a 0-based slot index.
+        /// Returns -1 if the key is not a custom preset.
+        /// </summary>
+        public static int TryParseCustomSlot(string profileName)
+        {
+            if (string.IsNullOrEmpty(profileName))
+                return -1;
+
+            // Match "Custom N" where N is 1-5
+            if (profileName.Length > 7 && profileName.StartsWith("Custom ", StringComparison.OrdinalIgnoreCase))
+            {
+                string numPart = profileName.Substring(7);
+                if (int.TryParse(numPart, out int slot) && slot >= 1 && slot <= CustomPreset.MaxSlots)
+                    return slot - 1;
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// Checks if a profile name is a built-in profile.
+        /// </summary>
+        public static bool IsBuiltInProfile(string profileName)
+        {
+            return profileName.Equals("Office", StringComparison.OrdinalIgnoreCase) ||
+                   profileName.Equals("Gaming", StringComparison.OrdinalIgnoreCase) ||
+                   profileName.Equals("Turbo", StringComparison.OrdinalIgnoreCase);
+        }
 
         /// <summary>
         /// Checks if a V-F curve preset is currently active on disk.
@@ -33,7 +92,8 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// Builds a RyzenAdj command string for the given profile name.
-        /// For Custom profile, skips GPU power if a V-F curve is active
+        /// For custom presets, loads values from the saved preset slot.
+        /// Skips GPU power if a V-F curve is active on that slot
         /// (power is applied separately through SetPowerLimit around the curve).
         /// Returns empty string for "None" or unknown profiles.
         /// </summary>
@@ -43,11 +103,27 @@ namespace Uniwill_Control_Utility.Services
                 return string.Empty;
 
             var parts = new List<string>();
-            bool vfCurveActive = false;
 
-            if (profileName.Equals("Custom", StringComparison.OrdinalIgnoreCase))
+            // Check if this is a custom preset (e.g. "Custom 1", "Custom 3")
+            int customSlot = TryParseCustomSlot(profileName);
+            if (customSlot >= 0)
             {
-                vfCurveActive = HasActiveVfCurve();
+                var presets = CustomPresetStore.Load();
+                if (customSlot < presets.Length)
+                {
+                    var preset = presets[customSlot];
+                    bool vfCurveActive = preset.VfCurveOffsets.Count > 0;
+                    BuildCustomCommandFromPreset(parts, preset, skipGpuPower: vfCurveActive);
+                }
+                else
+                {
+                    return string.Empty;
+                }
+            }
+            else if (profileName.Equals("Custom", StringComparison.OrdinalIgnoreCase))
+            {
+                // Legacy "Custom" (no slot number) — use Settings values.
+                bool vfCurveActive = HasActiveVfCurve();
                 BuildCustomCommand(parts, skipGpuPower: vfCurveActive);
             }
             else
@@ -74,7 +150,16 @@ namespace Uniwill_Control_Utility.Services
             await RyzenAdj_To_UCU.TranslateAsync(command, appliedName: display, localizeAppliedName: false);
 
             // 2. V-F curve (Custom profile only, if active)
-            if (profileName.Equals("Custom", StringComparison.OrdinalIgnoreCase) && HasActiveVfCurve())
+            int customSlot = TryParseCustomSlot(profileName);
+            if (customSlot >= 0)
+            {
+                var presets = CustomPresetStore.Load();
+                if (customSlot < presets.Length && presets[customSlot].VfCurveOffsets.Count > 0)
+                {
+                    ApplyVfCurveFromPreset(presets[customSlot]);
+                }
+            }
+            else if (profileName.Equals("Custom", StringComparison.OrdinalIgnoreCase) && HasActiveVfCurve())
             {
                 ApplyVfCurve();
             }
@@ -86,7 +171,13 @@ namespace Uniwill_Control_Utility.Services
                 if (ec != null)
                 {
                     int pl1, pl2;
-                    if (profileName.Equals("Custom", StringComparison.OrdinalIgnoreCase))
+                    if (customSlot >= 0)
+                    {
+                        var presets = CustomPresetStore.Load();
+                        pl1 = customSlot < presets.Length ? (int)presets[customSlot].CpuSustained : 75;
+                        pl2 = customSlot < presets.Length ? (int)presets[customSlot].CpuBoost : 85;
+                    }
+                    else if (profileName.Equals("Custom", StringComparison.OrdinalIgnoreCase))
                     {
                         pl1 = (int)Settings.Default.customSustained;
                         pl2 = (int)Settings.Default.customBoost;
@@ -149,6 +240,82 @@ namespace Uniwill_Control_Utility.Services
 
             // Re-apply power limit AFTER in case the driver overrides the EC ceiling.
             NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
+        }
+
+        private static void ApplyVfCurveFromPreset(CustomPreset preset)
+        {
+            var offsets = preset.VfCurveOffsets;
+            if (offsets.Count == 0)
+                return;
+
+            int tgp = (int)preset.GpuTgp;
+            bool dbEnabled = preset.GpuDynamicBoost;
+            int dbOffset = dbEnabled ? (int)preset.GpuDbOffset : 0;
+
+            NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
+
+            int result = NvTuning.ApplyVfCurveOffsets_ClockBoostTable(offsets);
+            Debug.WriteLine($"[PresetProfileApplier] V-F curve applied from preset: {(result > 0 ? "OK" : "failed")}");
+
+            NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
+        }
+
+        /// <summary>
+        /// Builds RyzenAdj command parts from a CustomPreset object.
+        /// </summary>
+        private static void BuildCustomCommandFromPreset(List<string> parts, CustomPreset preset, bool skipGpuPower)
+        {
+            if (Family.TYPE == Family.ProcessorType.Amd_Apu)
+            {
+                int slowLimit = (int)preset.CpuSustained * 1000;
+                int fastLimit = (int)preset.CpuBoost * 1000;
+                int tjMax = (int)preset.CpuTjMax;
+
+                parts.Add($"--slow-limit={slowLimit}");
+                parts.Add($"--fast-limit={fastLimit}");
+                parts.Add($"--tctl-temp={tjMax}");
+                parts.Add($"--cHTC-temp={tjMax}");
+
+                if (preset.CpuCoUnified)
+                {
+                    int coValue = (int)preset.CpuCoUnifiedValue;
+                    uint coEncoded = coValue < 0
+                        ? (uint)(0x1000000 - Math.Abs(coValue))
+                        : (uint)coValue;
+                    parts.Add($"--set-coall={coEncoded}");
+                }
+                else
+                {
+                    int coCcd0 = (int)preset.CpuCoCcd0;
+                    int coCcd1 = (int)preset.CpuCoCcd1;
+                    for (int ccd = 0; ccd < 2; ccd++)
+                    {
+                        int offset = ccd == 0 ? coCcd0 : coCcd1;
+                        for (int core = 0; core < 8; core++)
+                        {
+                            uint encoded = BuildCoperArg(ccd, core, offset);
+                            parts.Add($"--set-coper={encoded}");
+                        }
+                    }
+                }
+            }
+            else if (Family.TYPE == Family.ProcessorType.Intel)
+            {
+                parts.Add($"--intel-pl={preset.IntelPl1:F0},{preset.IntelPl2:F0}");
+                if (preset.IntelVolt < 0)
+                    parts.Add($"--intel-volt-cpu={preset.IntelVolt:F0}");
+            }
+
+            if (!skipGpuPower && !string.IsNullOrEmpty(NvTuning.GetGpuName()))
+            {
+                int tgp = (int)preset.GpuTgp;
+                bool dbEnabled = preset.GpuDynamicBoost;
+                int dbOffset = dbEnabled ? (int)preset.GpuDbOffset : 0;
+                int totalWatts = tgp + dbOffset;
+                int core = (int)preset.GpuCoreOffset;
+                int mem = (int)preset.GpuMemOffset;
+                parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
+            }
         }
 
         private static void BuildSkuProfileCommand(string profileName, List<string> parts)
@@ -279,15 +446,22 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// Returns the human-readable display name for a profile.
+        /// Built-in profiles return the profile name as-is.
+        /// Custom presets are displayed as "Custom 1", "Custom 2", etc.
         /// </summary>
         public static string DisplayName(string profileName)
         {
+            // Check for custom preset slots first (e.g. "Custom 3")
+            int customSlot = TryParseCustomSlot(profileName);
+            if (customSlot >= 0)
+                return $"Custom {customSlot + 1}";
+
             return profileName switch
             {
-                string s when s.Equals("Office", StringComparison.OrdinalIgnoreCase) => "Office Preset",
-                string s when s.Equals("Gaming", StringComparison.OrdinalIgnoreCase) => "Gaming Preset",
-                string s when s.Equals("Turbo", StringComparison.OrdinalIgnoreCase) => "Turbo Preset",
-                string s when s.Equals("Custom", StringComparison.OrdinalIgnoreCase) => "Custom Preset",
+                string s when s.Equals("Office", StringComparison.OrdinalIgnoreCase) => "Office",
+                string s when s.Equals("Gaming", StringComparison.OrdinalIgnoreCase) => "Gaming",
+                string s when s.Equals("Turbo", StringComparison.OrdinalIgnoreCase) => "Turbo",
+                string s when s.Equals("Custom", StringComparison.OrdinalIgnoreCase) => "Custom",
                 _ => profileName
             };
         }
