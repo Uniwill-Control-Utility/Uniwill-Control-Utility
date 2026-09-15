@@ -56,6 +56,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                     return;
                 }
 
+                // Subscribe to service events so the page responds to connection changes
+                // even before it's navigated to (e.g., auto-connect at startup).
+                _waterCoolerService.ConnectionStateChanged += OnConnectionStateChanged;
+                _waterCoolerService.StatusChanged += OnStatusChanged;
+
                 // Get DeviceApplier for centralized device commands and override management
                 _deviceApplier = App.GetService<DeviceApplier>();
 
@@ -83,8 +88,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (_waterCoolerService == null) return;
 
-            _waterCoolerService.ConnectionStateChanged += OnConnectionStateChanged;
-            _waterCoolerService.StatusChanged += OnStatusChanged;
+            // Service event subscriptions are in InitializePage() (constructor) so they're
+            // active even before the first navigation. No need to subscribe here.
 
             // Apply current override state (may already be overridden from startup or Adaptive page).
             // DeviceApplier event subscription is done in InitializePage() so we receive events
@@ -490,10 +495,20 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void Page_Unloaded(object sender, RoutedEventArgs e)
         {
-            // Service events stay subscribed — the page lifetime matches the app lifetime.
-            // DeviceApplier events also stay subscribed. Unsubscribing caused a permanent
-            // disconnect: the constructor subscribes once, the first navigation away
-            // unsubscribes, and Loaded never re-subscribes.
+            // Unsubscribe from service events to allow this scoped instance to be GC'd.
+            // The next navigation creates a fresh instance whose constructor re-subscribes.
+            if (_waterCoolerService != null)
+            {
+                _waterCoolerService.ConnectionStateChanged -= OnConnectionStateChanged;
+                _waterCoolerService.StatusChanged -= OnStatusChanged;
+            }
+
+            // Unsubscribe from DeviceApplier events.
+            if (_deviceApplier != null)
+            {
+                _deviceApplier.WatercoolerOverrideChanged -= OnWatercoolerOverrideChanged;
+                _deviceApplier.WatercoolerPresetApplied -= OnWatercoolerPresetApplied;
+            }
 
             // Stop glow pulse timer to prevent leaks
             StopGlowPulse();
