@@ -125,12 +125,31 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// Background reconnection loop that runs when disconnected (not by user).
-        /// Periodically discovers fresh devices and attempts to reconnect.
-        /// This handles cases where the HID arrival callback doesn't fire
-        /// (e.g., Bluetooth off→on, device reconnects through Windows settings).
+        /// Uses exponential backoff with a wake mechanism (HID arrival wakes the delay).
+        /// After exhausting all delays, gives up and waits for the health check to
+        /// trigger a new round. This matches THRM's reconnect strategy.
         /// </summary>
         private CancellationTokenSource? _reconnectCts;
         private Thread? _reconnectThread;
+        private readonly object _reconnectLock = new();
+
+        /// <summary>ManualResetEvent used to wake the reconnect loop from HID arrival.</summary>
+        private ManualResetEvent? _reconnectWakeEvent;
+
+        /// <summary>
+        /// Monitors device health every 30 seconds. If disconnected, triggers a
+        /// new reconnect round. This ensures we keep trying even after the
+        /// exponential backoff has exhausted all its delays.
+        /// </summary>
+        private CancellationTokenSource? _healthCheckCts;
+        private Thread? _healthCheckThread;
+
+        /// <summary>
+        /// Incremented on each disconnect or suspend. Used to prevent stale
+        /// connection attempts from overriding newer ones (e.g., if two reconnect
+        /// rounds are in-flight simultaneously).
+        /// </summary>
+        private int _connectGeneration;
 
         /* ------------------------------------------------------------------ */
         /*  Time-based curve schedule monitor                                  */
@@ -277,8 +296,10 @@ namespace Uniwill_Control_Utility.Services
         public void SuspendAllServices()
         {
             _userDisconnected = true; // Block any auto-reconnect in-flight
+            _connectGeneration++; // Invalidate any in-flight reconnect
             DisconnectAsync();
             StopReconnectLoop();
+            StopHealthCheck();
             StopDeviceMonitor();
             StopHidArrivalNotification();
             StopPowerNotificationMonitor();
@@ -293,10 +314,12 @@ namespace Uniwill_Control_Utility.Services
         {
             LoadSettings();
             _userDisconnected = false;
+            _connectGeneration++; // Invalidate any stale reconnect from before suspend
 
             StartPowerNotificationMonitor();
             StartHidArrivalNotification();
             StartDeviceMonitor();
+            StartHealthCheck();
             StartTimeScheduleMonitor();
 
             // Auto-connect if enabled
@@ -324,6 +347,7 @@ namespace Uniwill_Control_Utility.Services
             StartPowerNotificationMonitor();
             StartHidArrivalNotification();
             StartDeviceMonitor();
+            StartHealthCheck();
             StartTimeScheduleMonitor();
 
             // Auto-connect on app startup (like THRM does 1 second after launch).
@@ -633,6 +657,9 @@ namespace Uniwill_Control_Utility.Services
                 // so it can detect future plug/unplug transitions while connected.
                 StartDeviceMonitor();
 
+                // Start health check if not already running
+                StartHealthCheck();
+
                 // Start background read loop
                 StartReadLoop();
 
@@ -712,6 +739,7 @@ namespace Uniwill_Control_Utility.Services
             // (e.g., Bluetooth off→on, device reconnects through Windows settings).
             if (!_userDisconnected && _settings.AutoConnect)
             {
+                _connectGeneration++; // Invalidate any in-flight connection attempt
                 // Stop the device monitor to avoid two threads doing HID handle operations.
                 // The reconnect loop handles device discovery with the same capability.
                 StopDeviceMonitor();
@@ -727,6 +755,7 @@ namespace Uniwill_Control_Utility.Services
         public void DisconnectByUser()
         {
             _userDisconnected = true;
+            _connectGeneration++; // Invalidate any in-flight reconnect
             DisconnectAsync();
         }
 
@@ -1648,6 +1677,7 @@ namespace Uniwill_Control_Utility.Services
                 }
                 catch (Exception) { /* non-critical during suspend */ }
 
+                _connectGeneration++; // Invalidate any in-flight reconnect
                 DisconnectAsync();
             }
             else
@@ -1656,7 +1686,12 @@ namespace Uniwill_Control_Utility.Services
                 _ = Task.Run(async () =>
                 {
                     await Task.Delay(2000, CancellationToken.None); // Wait for system to stabilize after resume
-                    await TryAutoConnectAsync();
+                    if (_settings.AutoConnect && !_userDisconnected)
+                    {
+                        _connectGeneration++; // Invalidate stale reconnect from before suspend
+                        StopReconnectLoop();
+                        await TryAutoConnectAsync();
+                    }
                 });
             }
         }
@@ -1766,22 +1801,30 @@ namespace Uniwill_Control_Utility.Services
                         // not the saved LastDevicePath which may be stale after a reconnect.
                         if (!IsConnected && !_userDisconnected && _settings.AutoConnect)
                         {
-                            // Run async — callbacks must return quickly.
-                            // Retry with increasing delay because the HID device may not be
-                            // fully ready when the arrival notification fires (BLE-HID devices
-                            // need time for Windows to finish enumerating the interface).
+                            // If a reconnect loop is already running, wake it to skip the
+                            // current backoff delay. Otherwise, start a fresh reconnect with
+                            // 0 initial delay (THRM's approach for HID arrival).
+                            bool woke = WakeReconnect();
+                            if (!woke)
+                            {
+                                // No reconnect loop running — start one with immediate attempt
+                                _connectGeneration++;
+                                StartReconnectLoop();
+                            }
+
+                            // Also try a direct connect in case the reconnect loop hasn't
+                            // started yet or is in a backoff delay. This handles the race
+                            // where HID arrival fires before the reconnect loop is alive.
                             _ = Task.Run(async () =>
                             {
-                                for (int attempt = 0; attempt < 4; attempt++)
+                                await Task.Delay(1000, CancellationToken.None); // Wait for HID to stabilize
+                                if (IsConnected || _userDisconnected)
+                                    return;
+                                bool ok = await ConnectAsync(path);
+                                if (ok)
                                 {
-                                    await Task.Delay(500 * (attempt + 1), CancellationToken.None); // 0.5s, 1s, 1.5s, 2s
-                                    if (IsConnected) return; // Another path may have connected already
-                                    bool ok = await ConnectAsync(path);
-                                    if (ok)
-                                    {
-                                        System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Auto-connected via HID arrival: {path}");
-                                        return;
-                                    }
+                                    System.Diagnostics.Debug.WriteLine(
+                                        $"[FlydigiCoolerService] Auto-connected via HID arrival: {path}");
                                 }
                             });
                         }
@@ -1935,93 +1978,147 @@ namespace Uniwill_Control_Utility.Services
 
         #endregion
 
-        #region Background Reconnect Loop
+        #region Background Reconnect Loop (THRM-style exponential backoff)
 
         /// <summary>
-        /// Starts a background thread that periodically tries to reconnect when
-        /// disconnected (not by user). Uses fresh device discovery to get current
-        /// device paths, which handles cases where the HID path changes after
-        /// Bluetooth off→on cycles.
+        /// Exponential backoff delays for reconnect attempts (matches THRM).
+        /// 2s, 5s, 10s, 15s, 20s, 30s, 30s, 60s, 60s, 60s.
+        /// After exhausting all delays, the loop exits and the health check
+        /// (running every 30s) will trigger a new round if still disconnected.
+        /// </summary>
+        private static readonly int[] ReconnectDelaysMs =
+        {
+            2000, 5000, 10000, 15000, 20000,
+            30000, 30000, 60000, 60000, 60000
+        };
+
+        /// <summary>
+        /// Starts a reconnect thread that runs exponential backoff attempts.
+        /// HID arrival can wake the backoff early via WakeReconnect().
+        /// After all delays are exhausted, the thread exits — the health check
+        /// will restart a new round if the device is still disconnected.
         /// </summary>
         private void StartReconnectLoop()
         {
-            // Don't start a second loop if one is already running
-            if (_reconnectCts != null)
-                return;
-
-            try
+            lock (_reconnectLock)
             {
-                _reconnectCts = new CancellationTokenSource();
-                var token = _reconnectCts.Token;
+                // Don't start a second loop if one is already running
+                if (_reconnectCts != null)
+                    return;
 
-                _reconnectThread = new Thread(() =>
+                try
                 {
-                    System.Diagnostics.Debug.WriteLine("[FlydigiCoolerService] Background reconnect loop started");
+                    _reconnectCts = new CancellationTokenSource();
+                    _reconnectWakeEvent = new ManualResetEvent(false);
+                    var token = _reconnectCts.Token;
+                    int generation = _connectGeneration;
 
-                    while (!token.IsCancellationRequested)
+                    _reconnectThread = new Thread(() =>
                     {
-                        // Wait 5 seconds between attempts to avoid interfering with device enumeration
-                        for (int i = 0; i < 50; i++)
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[FlydigiCoolerService] Reconnect loop started (generation={generation}, {ReconnectDelaysMs.Length} delays)");
+
+                        for (int i = 0; i < ReconnectDelaysMs.Length; i++)
                         {
                             if (token.IsCancellationRequested)
-                                return;
-                            Thread.Sleep(100);
-                        }
-
-                        // Already connected (by HID arrival callback, device monitor, etc.)
-                        if (IsConnected || _userDisconnected)
-                        {
-                            System.Diagnostics.Debug.WriteLine("[FlydigiCoolerService] Background reconnect loop stopping (already connected or user disconnected)");
-                            return;
-                        }
-
-                        try
-                        {
-                            // Discover fresh devices to get current device paths
-                            var devices = DiscoverDevices();
-                            if (devices.Count > 0)
                             {
-                                var path = devices[0].DevicePath;
-                                System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Background reconnect attempt: {path}");
+                                System.Diagnostics.Debug.WriteLine("[FlydigiCoolerService] Reconnect loop cancelled");
+                                return;
+                            }
 
-                                // Update saved path in case it changed
-                                _settings.LastDevicePath = path;
-                                SaveSettings();
+                            if (IsConnected || _userDisconnected)
+                            {
+                                System.Diagnostics.Debug.WriteLine(
+                                    "[FlydigiCoolerService] Reconnect loop stopping (already connected or user disconnected)");
+                                return;
+                            }
 
-                                _ = Task.Run(async () =>
+                            // Check if a newer generation has started a fresh reconnect
+                            if (generation != _connectGeneration)
+                            {
+                                System.Diagnostics.Debug.WriteLine(
+                                    $"[FlydigiCoolerService] Reconnect loop stale (generation {generation} vs {_connectGeneration}), stopping");
+                                return;
+                            }
+
+                            int delayMs = ReconnectDelaysMs[i];
+                            if (delayMs > 0)
+                            {
+                                System.Diagnostics.Debug.WriteLine(
+                                    $"[FlydigiCoolerService] Waiting {delayMs}ms before reconnect attempt {i + 1}/{ReconnectDelaysMs.Length}");
+
+                                // Wait for delay, cancellation, or wake signal from HID arrival
+                                WaitHandle[] waitHandles =
                                 {
-                                    // Wait 1 second for the HID interface to be fully ready
-                                    await Task.Delay(1000, CancellationToken.None);
-                                    if (IsConnected || _userDisconnected)
-                                        return;
-                                    bool ok = await ConnectAsync(path);
-                                    if (ok)
+                                    _reconnectCts.Token.WaitHandle,
+                                    _reconnectWakeEvent
+                                };
+                                int result = WaitHandle.WaitAny(waitHandles, delayMs);
+
+                                if (result == 0) // cancelled
+                                {
+                                    System.Diagnostics.Debug.WriteLine("[FlydigiCoolerService] Reconnect loop cancelled during wait");
+                                    return;
+                                }
+                                // result == 1 means woken by HID arrival — skip to connect attempt immediately
+                                // result == 2 means timeout — proceed normally
+                            }
+
+                            // Check again before attempting connect
+                            if (IsConnected || _userDisconnected || generation != _connectGeneration)
+                                return;
+
+                            try
+                            {
+                                var devices = DiscoverDevices();
+                                if (devices.Count > 0)
+                                {
+                                    var path = devices[0].DevicePath;
+                                    System.Diagnostics.Debug.WriteLine(
+                                        $"[FlydigiCoolerService] Reconnect attempt {i + 1}: {path}");
+
+                                    _settings.LastDevicePath = path;
+                                    SaveSettings();
+
+                                    _ = Task.Run(async () =>
                                     {
-                                        System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Background reconnected: {path}");
-                                    }
-                                    else
-                                    {
-                                        System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Background reconnect failed for: {path}");
-                                    }
-                                });
+                                        await Task.Delay(1000, CancellationToken.None);
+                                        if (IsConnected || _userDisconnected || generation != _connectGeneration)
+                                            return;
+                                        bool ok = await ConnectAsync(path);
+                                        if (ok)
+                                        {
+                                            System.Diagnostics.Debug.WriteLine(
+                                                $"[FlydigiCoolerService] Reconnected on attempt {i + 1}: {path}");
+                                        }
+                                        else
+                                        {
+                                            System.Diagnostics.Debug.WriteLine(
+                                                $"[FlydigiCoolerService] Reconnect attempt {i + 1} failed: {path}");
+                                        }
+                                    });
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine(
+                                    $"[FlydigiCoolerService] Reconnect discovery failed: {ex.Message}");
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            // Non-critical: discovery failures during reconnect
-                            System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Reconnect discovery failed: {ex.Message}");
-                        }
-                    }
-                })
+
+                        System.Diagnostics.Debug.WriteLine(
+                            "[FlydigiCoolerService] Reconnect loop exhausted all delays, health check will trigger new round");
+                    })
+                    {
+                        IsBackground = true,
+                        Name = "FlydigiReconnectLoop"
+                    };
+                    _reconnectThread.Start();
+                }
+                catch (Exception)
                 {
-                    IsBackground = true,
-                    Name = "FlydigiReconnectLoop"
-                };
-                _reconnectThread.Start();
-            }
-            catch (Exception)
-            {
-                // Non-critical: reconnect loop is optional
+                    // Non-critical: reconnect loop is optional
+                }
             }
         }
 
@@ -2030,17 +2127,117 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private void StopReconnectLoop()
         {
+            lock (_reconnectLock)
+            {
+                try
+                {
+                    _reconnectCts?.Cancel();
+                }
+                catch (Exception) { /* ignore */ }
+
+                _reconnectThread?.Join(2000);
+
+                _reconnectCts?.Dispose();
+                _reconnectCts = null;
+                _reconnectThread = null;
+                _reconnectWakeEvent?.Dispose();
+                _reconnectWakeEvent = null;
+            }
+        }
+
+        /// <summary>
+        /// Wakes the reconnect loop early when a HID device arrives.
+        /// Returns true if a reconnect loop was running and was woken.
+        /// </summary>
+        private bool WakeReconnect()
+        {
             try
             {
-                _reconnectCts?.Cancel();
+                if (_reconnectWakeEvent != null)
+                {
+                    _reconnectWakeEvent.Set();
+                    return true;
+                }
+            }
+            catch { /* Non-critical */ }
+            return false;
+        }
+
+        #endregion
+
+        #region Health Check (30s interval, triggers reconnect if disconnected)
+
+        /// <summary>
+        /// Starts a health check thread that runs every 30 seconds. If the device
+        /// is disconnected (and not user-disconnected), it starts a new reconnect
+        /// round. This ensures we keep trying even after the exponential backoff
+        /// has exhausted all its delays.
+        /// </summary>
+        private void StartHealthCheck()
+        {
+            // Don't start a second health check if one is already running
+            if (_healthCheckCts != null)
+                return;
+
+            try
+            {
+                _healthCheckCts = new CancellationTokenSource();
+                var token = _healthCheckCts.Token;
+
+                _healthCheckThread = new Thread(() =>
+                {
+                    System.Diagnostics.Debug.WriteLine("[FlydigiCoolerService] Health check started (30s interval)");
+
+                    while (!token.IsCancellationRequested)
+                    {
+                        // Wait 30 seconds
+                        for (int i = 0; i < 300; i++)
+                        {
+                            if (token.IsCancellationRequested)
+                                return;
+                            Thread.Sleep(100);
+                        }
+
+                        try
+                        {
+                            if (IsConnected || _userDisconnected)
+                                continue;
+
+                            System.Diagnostics.Debug.WriteLine(
+                                "[FlydigiCoolerService] Health check: disconnected, starting reconnect round");
+                            StartReconnectLoop();
+                        }
+                        catch { /* Non-critical */ }
+                    }
+                })
+                {
+                    IsBackground = true,
+                    Name = "FlydigiHealthCheck"
+                };
+                _healthCheckThread.Start();
+            }
+            catch (Exception)
+            {
+                // Non-critical: health check is optional
+            }
+        }
+
+        /// <summary>
+        /// Stops the health check thread.
+        /// </summary>
+        private void StopHealthCheck()
+        {
+            try
+            {
+                _healthCheckCts?.Cancel();
             }
             catch (Exception) { /* ignore */ }
 
-            _reconnectThread?.Join(2000);
+            _healthCheckThread?.Join(2000);
 
-            _reconnectCts?.Dispose();
-            _reconnectCts = null;
-            _reconnectThread = null;
+            _healthCheckCts?.Dispose();
+            _healthCheckCts = null;
+            _healthCheckThread = null;
         }
 
         #endregion
@@ -2177,6 +2374,7 @@ namespace Uniwill_Control_Utility.Services
                 if (disposing)
                 {
                     StopReconnectLoop();
+                    StopHealthCheck();
                     StopScheduleMonitor();
                     StopHidArrivalNotification();
                     StopDeviceMonitor();
