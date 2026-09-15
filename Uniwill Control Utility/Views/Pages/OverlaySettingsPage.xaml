@@ -366,25 +366,56 @@
                             <Border Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                            <!-- Panel opacity -->
+                            <!-- Background opacity -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Panel opacity" />
+                                    <ui:TextBlock FontTypography="Body" Text="Background opacity" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Adjust the overlay panel transparency." />
+                                                   Text="Adjust the card panel background transparency." />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                    <TextBlock x:Name="OpacityValueText"
+                                    <TextBlock x:Name="BackgroundOpacityValueText"
                                                FontSize="13"
                                                Margin="0,0,8,0"
                                                VerticalAlignment="Center" />
-                                    <Slider x:Name="OpacitySlider"
+                                    <Slider x:Name="BackgroundOpacitySlider"
+                                            Width="140"
+                                            Minimum="0.25"
+                                            Maximum="1"
+                                            TickFrequency="0.05"
+                                            IsSnapToTickEnabled="True" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+
+                            <!-- Content opacity -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Content opacity" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Adjust the text and graph transparency." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <TextBlock x:Name="ContentOpacityValueText"
+                                               FontSize="13"
+                                               Margin="0,0,8,0"
+                                               VerticalAlignment="Center" />
+                                    <Slider x:Name="ContentOpacitySlider"
                                             Width="140"
                                             Minimum="0.25"
                                             Maximum="1"
@@ -422,6 +453,40 @@
                             </Grid>
                         </StackPanel>
                     </ui:CardExpander>
+
+                    <!-- Hide when no game -->
+                    <ui:CardExpander Margin="0,0,0,8"
+                                     IsExpanded="True">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C5;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Visibility" />
+                            </StackPanel>
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Hide when no game" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Automatically hide the overlay when no game is detected."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="HideWhenNoGameCheckBox"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off" />
+                            </Grid>
+                        </StackPanel>
+                    </ui:CardExpander>
                 </StackPanel>
             </Grid>
         </ScrollViewer>
@@ -429,6 +494,10 @@
         <!-- Row 1: Bottom bar -->
         <ui:Card Grid.Row="1" MaxWidth="1080" HorizontalAlignment="Stretch" Margin="16,8,16,12" Padding="12,8" SnapsToDevicePixels="True">
             <Grid>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <ui:FontIcon x:Name="RtssStatusIcon" FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="16" VerticalAlignment="Center" Margin="4,0,12,0" Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
+                    <TextBlock x:Name="RtssStatusText" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <ui:Button Margin="0,0,8,0" Click="PreviewButton_Click">
                         <StackPanel Orientation="Horizontal">

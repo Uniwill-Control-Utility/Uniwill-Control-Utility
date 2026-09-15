@@ -3,14 +3,17 @@ using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Services;
+using Uniwill_Control_Utility.Services.Performance;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
     public partial class OverlaySettingsPage : Page
     {
         private readonly OverlayManagerService _overlay;
+        private readonly DispatcherTimer _rtssTimer;
         private bool _saveInProgress;
 
         public OverlaySettingsPage(OverlayManagerService overlay)
@@ -19,10 +22,39 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             InitializeComponent();
             ScaleSlider.ValueChanged += (_, __) => ScaleValueText.Text = ScaleSlider.Value.ToString("P0");
-            OpacitySlider.ValueChanged += (_, __) => OpacityValueText.Text = OpacitySlider.Value.ToString("P0");
+            BackgroundOpacitySlider.ValueChanged += (_, __) => BackgroundOpacityValueText.Text = BackgroundOpacitySlider.Value.ToString("P0");
+            ContentOpacitySlider.ValueChanged += (_, __) => ContentOpacityValueText.Text = ContentOpacitySlider.Value.ToString("P0");
             LoadOptions(_overlay.CurrentOptions);
             ScaleValueText.Text = ScaleSlider.Value.ToString("P0");
-            OpacityValueText.Text = OpacitySlider.Value.ToString("P0");
+            BackgroundOpacityValueText.Text = BackgroundOpacitySlider.Value.ToString("P0");
+            ContentOpacityValueText.Text = ContentOpacitySlider.Value.ToString("P0");
+
+            // Poll RTSS status every 2 seconds.
+            _rtssTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            _rtssTimer.Tick += (_, __) => UpdateRtssStatus();
+            _rtssTimer.Start();
+            UpdateRtssStatus();
+
+            Loaded += (_, __) => _rtssTimer.Start();
+            Unloaded += (_, __) => _rtssTimer.Stop();
+        }
+
+        private void UpdateRtssStatus()
+        {
+            if (RtssReader.IsRunning())
+            {
+                RtssStatusIcon.Glyph = "\xE946"; // Info
+                RtssStatusIcon.Foreground = Application.Current.FindResource("SystemFillColorSuccessBrush") as System.Windows.Media.Brush;
+                RtssStatusText.Text = "RTSS running";
+                RtssStatusText.Foreground = Application.Current.FindResource("TextFillColorSecondaryBrush") as System.Windows.Media.Brush;
+            }
+            else
+            {
+                RtssStatusIcon.Glyph = "\xE7BA"; // Warning
+                RtssStatusIcon.Foreground = Application.Current.FindResource("SystemFillColorCautionBrush") as System.Windows.Media.Brush;
+                RtssStatusText.Text = "RTSS not running";
+                RtssStatusText.Foreground = Application.Current.FindResource("SystemFillColorCautionBrush") as System.Windows.Media.Brush;
+            }
         }
 
         private void LoadOptions(OverlayOptions options)
@@ -37,16 +69,20 @@ namespace Uniwill_Control_Utility.Views.Pages
             ScaleSlider.Value = IsFinitePositive(options.Scale)
                 ? options.Scale
                 : 1.0;
-            OpacitySlider.Value = IsFinite(options.Opacity)
-                ? Math.Clamp(options.Opacity, 0.0, 1.0)
+            BackgroundOpacitySlider.Value = IsFinite(options.BackgroundOpacity)
+                ? Math.Clamp(options.BackgroundOpacity, 0.0, 1.0)
+                : 0.95;
+            ContentOpacitySlider.Value = IsFinite(options.ContentOpacity)
+                ? Math.Clamp(options.ContentOpacity, 0.0, 1.0)
                 : 1.0;
             ShowFpsCheckBox.IsChecked = options.ShowFps;
             ShowFrameTimesCheckBox.IsChecked = options.ShowFrameTimes;
             ShowGpuCheckBox.IsChecked = options.ShowGpu;
             ShowCpuCheckBox.IsChecked = options.ShowCpu;
             ShowMemoryCheckBox.IsChecked = options.ShowMemory;
-            ShowBatteryCheckBox.IsChecked = options.ShowBattery;
+           ShowBatteryCheckBox.IsChecked = options.ShowBattery;
             ShowGraphsCheckBox.IsChecked = options.ShowGraphs;
+            HideWhenNoGameCheckBox.IsChecked = options.HideWhenNoGame;
         }
 
         private void HotkeyTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -106,12 +142,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (!IsFinitePositive(scale))
                 scale = 1.0;
 
-            double opacity = OpacitySlider.Value;
+            double backgroundOpacity = BackgroundOpacitySlider.Value;
+            double contentOpacity = ContentOpacitySlider.Value;
 
-            if (!IsFinite(opacity))
-                opacity = 1.0;
+            if (!IsFinite(backgroundOpacity))
+                backgroundOpacity = 0.95;
+            if (!IsFinite(contentOpacity))
+                contentOpacity = 1.0;
 
-            opacity = Math.Clamp(opacity, 0.0, 1.0);
+            backgroundOpacity = Math.Clamp(backgroundOpacity, 0.0, 1.0);
+            contentOpacity = Math.Clamp(contentOpacity, 0.0, 1.0);
 
             return current with
             {
@@ -121,14 +161,16 @@ namespace Uniwill_Control_Utility.Views.Pages
                 ToggleContentsHotkey = ToggleContentsHotkeyTextBox.Text.Trim(),
                 RefreshIntervalMs = refreshInterval,
                 Scale = scale,
-                Opacity = opacity,
+                BackgroundOpacity = backgroundOpacity,
+                ContentOpacity = contentOpacity,
                 ShowFps = ShowFpsCheckBox.IsChecked == true,
                 ShowFrameTimes = ShowFrameTimesCheckBox.IsChecked == true,
                 ShowGpu = ShowGpuCheckBox.IsChecked == true,
                 ShowCpu = ShowCpuCheckBox.IsChecked == true,
                 ShowMemory = ShowMemoryCheckBox.IsChecked == true,
                 ShowBattery = ShowBatteryCheckBox.IsChecked == true,
-                ShowGraphs = ShowGraphsCheckBox.IsChecked == true
+                ShowGraphs = ShowGraphsCheckBox.IsChecked == true,
+                HideWhenNoGame = HideWhenNoGameCheckBox.IsChecked == true
             };
         }
 

@@ -40,9 +40,11 @@ namespace Uniwill_Control_Utility.ViewModels
         private bool _disposed;
 
         [ObservableProperty] private Visibility _contentVisibility = Visibility.Visible;
+        [ObservableProperty] private bool _gameActive = true;
         [ObservableProperty] private double _windowWidth = BaseDesignWidth;
         [ObservableProperty] private double _windowHeight = BaseDesignHeight;
-        [ObservableProperty] private double _overlayOpacity = 0.95;
+        [ObservableProperty] private double _backgroundOpacity = 0.95;
+        [ObservableProperty] private double _contentOpacity = 1.0;
         [ObservableProperty] private bool _showFps = true;
         [ObservableProperty] private bool _showFrameTimes = true;
         [ObservableProperty] private bool _showGpu = true;
@@ -50,6 +52,7 @@ namespace Uniwill_Control_Utility.ViewModels
         [ObservableProperty] private bool _showMemory = true;
         [ObservableProperty] private bool _showBattery = true;
         [ObservableProperty] private bool _showGraphs = true;
+        [ObservableProperty] private bool _hideWhenNoGame;
         [ObservableProperty] private int _currentFps;
         [ObservableProperty] private int _onePercentLowFps;
         [ObservableProperty] private int _pointOnePercentLowFps;
@@ -91,7 +94,16 @@ namespace Uniwill_Control_Utility.ViewModels
         public FontFamily OverlayFontFamily { get; } = new("Cascadia Mono");
         public Brush PrimaryTextBrush { get; } = CreateBrush("#F5F7F7");
         public Brush MutedTextBrush { get; } = CreateBrush("#D2D8D9");
-        public Brush PanelBackgroundBrush { get; } = CreateBrush("#D20A1114");
+        private Brush _panelBackgroundBrush = CreateBrush("#D20A1114");
+        public Brush PanelBackgroundBrush
+        {
+            get => _panelBackgroundBrush;
+            private set
+            {
+                _panelBackgroundBrush = value;
+                OnPropertyChanged();
+            }
+        }
         public Brush PanelBorderBrush { get; } = CreateBrush("#704A5C61");
         public Brush SeparatorBrush { get; } = CreateBrush("#806A797D");
         public Brush GraphGridLineBrush { get; } = CreateBrush("#4A607176");
@@ -205,19 +217,23 @@ namespace Uniwill_Control_Utility.ViewModels
                 StopMonitoring();
 
             double scale = IsFinite(options.Scale) && options.Scale > 0 ? Math.Clamp(options.Scale, 0.3, 3.0) : 1.0;
-            double opacity = IsFinite(options.Opacity) ? Math.Clamp(options.Opacity, 0.0, 1.0) : 0.95;
+            double backgroundOpacity = IsFinite(options.BackgroundOpacity) ? Math.Clamp(options.BackgroundOpacity, 0.0, 1.0) : 0.95;
+            double contentOpacity = IsFinite(options.ContentOpacity) ? Math.Clamp(options.ContentOpacity, 0.0, 1.0) : 1.0;
             int refreshInterval = Math.Max(16, options.RefreshIntervalMs);
 
             _options = options with
             {
                 Scale = scale,
-                Opacity = opacity,
+                BackgroundOpacity = backgroundOpacity,
+                ContentOpacity = contentOpacity,
                 RefreshIntervalMs = refreshInterval
             };
 
             WindowWidth = BaseDesignWidth * scale;
             WindowHeight = BaseDesignHeight * scale;
-            OverlayOpacity = opacity;
+            BackgroundOpacity = backgroundOpacity;
+            ContentOpacity = contentOpacity;
+            UpdatePanelBackgroundBrush(backgroundOpacity);
             ShowFps = options.ShowFps;
             ShowFrameTimes = options.ShowFrameTimes;
             ShowGpu = options.ShowGpu;
@@ -225,6 +241,7 @@ namespace Uniwill_Control_Utility.ViewModels
             ShowMemory = options.ShowMemory;
             ShowBattery = options.ShowBattery;
             ShowGraphs = options.ShowGraphs;
+            HideWhenNoGame = options.HideWhenNoGame;
             _timer.Interval = TimeSpan.FromMilliseconds(refreshInterval);
             NotifyVisibilityProperties();
 
@@ -296,6 +313,10 @@ namespace Uniwill_Control_Utility.ViewModels
 
                 HardwareMetricsSnapshot hardware = _lastHardware;
                 FpsMetricsSnapshot fps = _fps.Latest;
+
+                // Track whether a game is actively being monitored.
+                bool wasGameActive = GameActive;
+                GameActive = fps.IsAvailable;
 
                 CurrentFps = fps.Fps;
                 OnePercentLowFps = fps.OnePercentLowFps;
@@ -524,6 +545,13 @@ namespace Uniwill_Control_Utility.ViewModels
             var geometry = new PathGeometry(new[] { figure });
             geometry.Freeze();
             return geometry;
+        }
+
+        private void UpdatePanelBackgroundBrush(double backgroundOpacity)
+        {
+            byte alpha = (byte)Math.Clamp((int)(backgroundOpacity * 255), 0, 255);
+            string colorString = $"{alpha:X2}0A1114";
+            PanelBackgroundBrush = CreateBrush($"#{colorString}");
         }
 
         private static Geometry CreateFrozenGeometry(string data)

@@ -62,10 +62,33 @@ namespace Uniwill_Control_Utility.Views.Overlay
 
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName != nameof(PerformanceOverlayViewModel.WindowWidth) && e.PropertyName != nameof(PerformanceOverlayViewModel.WindowHeight))
+            if (e.PropertyName == nameof(PerformanceOverlayViewModel.WindowWidth) ||
+                e.PropertyName == nameof(PerformanceOverlayViewModel.WindowHeight))
+            {
+                QueueSizeUpdate();
+            }
+
+            if (e.PropertyName == nameof(PerformanceOverlayViewModel.GameActive))
+            {
+                HandleGameActiveChanged();
+            }
+        }
+
+        private void HandleGameActiveChanged()
+        {
+            if (!_viewModel.HideWhenNoGame)
                 return;
 
-            QueueSizeUpdate();
+            if (_viewModel.GameActive)
+            {
+                if (!IsVisible)
+                    Show();
+            }
+            else
+            {
+                if (IsVisible)
+                    Hide();
+            }
         }
 
         private void QueueSizeUpdate()

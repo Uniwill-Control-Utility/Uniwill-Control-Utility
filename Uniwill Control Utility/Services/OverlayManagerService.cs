@@ -65,7 +65,11 @@ namespace Uniwill_Control_Utility.Services
             OverlayOptions options = _settingsStore.Current;
 
             if (options.Enabled)
+            {
                 EnsureHook();
+                // Re-apply current options (with defaults) so the ViewModel picks up new properties.
+                RunOnUiThread(() => _viewModel?.ApplyOptions(options));
+            }
 
             if (options.Enabled && options.ShowOnStartup)
                 ShowOverlay();

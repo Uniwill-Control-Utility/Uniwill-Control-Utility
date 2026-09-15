@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -84,6 +85,14 @@ namespace Uniwill_Control_Utility.Services.Performance
         // Win32 file mapping access flags
         private const uint FileMapRead = 0x0004;
 
+        // Ring buffer for frame-time percentile calculation.
+        // RTSS shared memory only exposes the latest per-frame time (dwFrameTime).
+        // We accumulate samples across TryRead calls and compute real 1% / 0.1% lows.
+        private const int FrameTimeBufferSize = 8192;
+        private static readonly double[] _frameTimeRingBuffer = new double[FrameTimeBufferSize];
+        private static int _ringNext;
+        private static int _ringCount;
+
         [LibraryImport("kernel32.dll", EntryPoint = "OpenFileMappingW", StringMarshalling = StringMarshalling.Utf16)]
         private static partial IntPtr OpenFileMapping(uint dwDesiredAccess, [MarshalAs(UnmanagedType.Bool)] bool bInheritHandle, string lpName);
 
@@ -96,6 +105,34 @@ namespace Uniwill_Control_Utility.Services.Performance
 
         [LibraryImport("kernel32.dll")]
         private static partial int CloseHandle(IntPtr hObject);
+
+        /// <summary>Quick check whether RTSS shared memory is accessible (RTSS is running).</summary>
+        public static bool IsRunning()
+        {
+            IntPtr mappingHandle = OpenFileMapping(FileMapRead, false, SharedMemoryName);
+            if (mappingHandle == IntPtr.Zero)
+                return false;
+            IntPtr viewPtr = MapViewOfFile(mappingHandle, FileMapRead, 0, 0, 0);
+            if (viewPtr == IntPtr.Zero)
+            {
+                CloseHandle(mappingHandle);
+                return false;
+            }
+            try
+            {
+                RtssHeader header = Marshal.PtrToStructure<RtssHeader>(viewPtr);
+                return header.Signature == ValidSignature;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                UnmapViewOfFile(viewPtr);
+                CloseHandle(mappingHandle);
+            }
+        }
 
         // Debounce logging so the debug output doesn't flood at 2 Hz.
         private static readonly object _logSync = new();
@@ -297,14 +334,68 @@ namespace Uniwill_Control_Utility.Services.Performance
             double fps = dwFrameTime > 0 ? 1_000_000.0 / dwFrameTime : 0;
             double frameTimeMs = dwFrameTime / 1000.0;
 
-            // Percentiles: use per-frame value as fallback.
-            // RTSS v2.13+ has dwStatFramerate1Dot0PercentLow and dwStatFramerate0Dot1PercentLow
-            // but they are at version-dependent offsets. The per-frame FPS is sufficient for now.
+            // Feed valid frame time into the ring buffer for percentile calculation.
+            if (dwFrameTime > 0)
+            {
+                _frameTimeRingBuffer[_ringNext] = frameTimeMs;
+                _ringNext = (_ringNext + 1) % FrameTimeBufferSize;
+                if (_ringCount < FrameTimeBufferSize)
+                    _ringCount++;
+            }
+
+            // Calculate real 1% and 0.1% lows from the ring buffer.
+            double onePercentLowFps = fps;
+            double onePercentFrameTimeMs = frameTimeMs;
+            double pointOnePercentLowFps = fps;
+            double pointOnePercentFrameTimeMs = frameTimeMs;
+
+            if (_ringCount >= 2)
+            {
+                try
+                {
+                    double[] rented = ArrayPool<double>.Shared.Rent(_ringCount);
+                    try
+                    {
+                        // Copy ring buffer to linear array.
+                        int oldest = _ringCount == FrameTimeBufferSize ? _ringNext : 0;
+                        for (int i = 0; i < _ringCount; i++)
+                            rented[i] = _frameTimeRingBuffer[(oldest + i) % FrameTimeBufferSize];
+
+                        // Sort ascending — slowest (worst) frames are at the end.
+                        Array.Sort(rented, 0, _ringCount);
+
+                        // 1% low: average of the worst 1% of frames (highest frame times).
+                        int count1Percent = Math.Max(1, (int)Math.Ceiling(_ringCount * 0.01));
+                        double sum1Percent = 0;
+                        for (int i = _ringCount - count1Percent; i < _ringCount; i++)
+                            sum1Percent += rented[i];
+                        onePercentFrameTimeMs = sum1Percent / count1Percent;
+                        onePercentLowFps = 1000.0 / onePercentFrameTimeMs;
+
+                        // 0.1% low: average of the worst 0.1% of frames.
+                        int count01Percent = Math.Max(1, (int)Math.Ceiling(_ringCount * 0.001));
+                        double sum01Percent = 0;
+                        for (int i = _ringCount - count01Percent; i < _ringCount; i++)
+                            sum01Percent += rented[i];
+                        pointOnePercentFrameTimeMs = sum01Percent / count01Percent;
+                        pointOnePercentLowFps = 1000.0 / pointOnePercentFrameTimeMs;
+                    }
+                    finally
+                    {
+                        ArrayPool<double>.Shared.Return(rented);
+                    }
+                }
+                catch
+                {
+                    // Percentile calculation failure must not break the FPS read — fall back to current values.
+                }
+            }
+
             return new RtssFpsData(
                 expectedPid, processName, graphicsApi,
                 fps, frameTimeMs,
-                fps, frameTimeMs,
-                fps, frameTimeMs);
+                onePercentLowFps, onePercentFrameTimeMs,
+                pointOnePercentLowFps, pointOnePercentFrameTimeMs);
         }
 
         private static string DecodeGraphicsApi(int apiFlag)

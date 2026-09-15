@@ -1,8 +1,11 @@
 using System;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Scripts.Misc;
 
 namespace Uniwill_Control_Utility.Services.Performance
@@ -61,8 +64,6 @@ namespace Uniwill_Control_Utility.Services.Performance
             {
                 _processor = new FpsTraceProcessor();
                 _processor.Start();
-                _cancellation = new CancellationTokenSource();
-                Task.Run(() => SampleAsync(_cancellation.Token));
             }
             catch (Exception ex)
             {
@@ -70,6 +71,10 @@ namespace Uniwill_Control_Utility.Services.Performance
                 _processor = null;
                 DiagnosticLogger.LogError(ex, "Failed to start the ETW FPS monitor");
             }
+
+            // Always start the sampling loop even if ETW failed — RTSS still works.
+            _cancellation = new CancellationTokenSource();
+            Task.Run(() => SampleAsync(_cancellation.Token));
         }
 
         private async Task SampleAsync(CancellationToken cancellationToken)
@@ -82,6 +87,15 @@ namespace Uniwill_Control_Utility.Services.Performance
                 // Try RTSS first — it works with DX12, anti-cheat, and all graphics APIs.
                 if (RtssReader.TryRead(processId, out RtssFpsData rtssData) && rtssData.Fps > 0)
                 {
+                    // If RTSS returned a different PID than the foreground, it used the fallback
+                    // (best game-like process in RTSS). Only accept the fallback if the foreground
+                    // process is a recognized installed game — otherwise the user alt-tabbed away.
+                    if (rtssData.ProcessId != processId && !IsRecognizedGame(processId))
+                    {
+                        Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
+                        continue;
+                    }
+
                     // Use the PID from RTSS data (may differ from foreground PID when overlay is on top).
                     int actualPid = rtssData.ProcessId;
 
@@ -116,7 +130,10 @@ namespace Uniwill_Control_Utility.Services.Performance
                 // Fall back to ETW when RTSS is not available or has no data for this process.
                 FpsTraceProcessor? processor = _processor;
                 if (processor is null)
-                    return;
+                {
+                    Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
+                    continue;
+                }
 
                 try
                 {
@@ -217,6 +234,48 @@ namespace Uniwill_Control_Utility.Services.Performance
             return "N/A";
         }
 
+        /// <summary>
+        /// Checks whether the given process ID matches a recognized installed game
+        /// from Game_Manager.installedGames (same positive-list used by the Adaptive page).
+        /// </summary>
+        private static bool IsRecognizedGame(int processId)
+        {
+            if (processId <= 0)
+                return false;
+
+            var games = Game_Manager.installedGames;
+            if (games is null || games.Count == 0)
+                return false;
+
+            try
+            {
+                using Process process = Process.GetProcessById(processId);
+                string exeName = process.ProcessName;
+                string? exePath = process.MainModule?.FileName;
+
+                foreach (var game in games)
+                {
+                    // Match by executable path (most reliable).
+                    if (!string.IsNullOrWhiteSpace(game.path) &&
+                        !string.IsNullOrWhiteSpace(exePath) &&
+                        exePath.Contains(game.path, StringComparison.OrdinalIgnoreCase))
+                        return true;
+
+                    // Match by exe name.
+                    if (!string.IsNullOrWhiteSpace(game.exe) &&
+                        exeName.Contains(game.exe, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+
+                return false;
+            }
+            catch
+            {
+                // Process gone or inaccessible (anti-cheat protection) — can't verify.
+                return false;
+            }
+        }
+
         private static bool TryGetProcessDetails(int processId, out string name, out string path)
         {
             name = string.Empty;
@@ -278,6 +337,7 @@ namespace Uniwill_Control_Utility.Services.Performance
             IntPtr window = GetForegroundWindow();
             if (window == IntPtr.Zero)
                 return 0;
+
             _ = GetWindowThreadProcessId(window, out uint processId);
             return unchecked((int)processId);
         }

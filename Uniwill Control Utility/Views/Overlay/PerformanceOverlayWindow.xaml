@@ -52,7 +52,7 @@
     </Window.Resources>
 
     <Grid Visibility="{Binding ContentVisibility}"
-          Opacity="{Binding OverlayOpacity}"
+          Opacity="{Binding ContentOpacity}"
           ClipToBounds="True">
 
         <Viewbox Stretch="Fill"

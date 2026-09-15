@@ -54,7 +54,11 @@ namespace Uniwill_Control_Utility.Services
             try
             {
                 if (File.Exists(_settingsPath))
-                    return JsonSerializer.Deserialize<OverlayOptions>(File.ReadAllText(_settingsPath)) ?? new OverlayOptions();
+                {
+                    var loaded = JsonSerializer.Deserialize<OverlayOptions>(File.ReadAllText(_settingsPath));
+                    if (loaded is not null)
+                        return ApplyDefaults(loaded);
+                }
             }
             catch
             {
@@ -63,5 +67,23 @@ namespace Uniwill_Control_Utility.Services
 
             return new OverlayOptions();
         }
+
+        /// <summary>Applies default values for properties that may be missing from older saved files.</summary>
+        private static OverlayOptions ApplyDefaults(OverlayOptions options)
+        {
+            return options with
+            {
+                BackgroundOpacity = IsFinite(options.BackgroundOpacity)
+                    ? Math.Clamp(options.BackgroundOpacity, 0.0, 1.0)
+                    : 0.95,
+                ContentOpacity = IsFinite(options.ContentOpacity)
+                    ? Math.Clamp(options.ContentOpacity, 0.0, 1.0)
+                    : 1.0,
+                // New properties default to true when not present in saved file.
+                HideWhenNoGame = true
+            };
+        }
+
+        private static bool IsFinite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
     }
 }
