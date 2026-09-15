@@ -78,6 +78,42 @@ namespace Uniwill_Control_Utility.Services.Performance
             while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
             {
                 int processId = GetForegroundProcessId();
+
+                // Try RTSS first — it works with DX12, anti-cheat, and all graphics APIs.
+                if (RtssReader.TryRead(processId, out RtssFpsData rtssData) && rtssData.Fps > 0)
+                {
+                    // Use the PID from RTSS data (may differ from foreground PID when overlay is on top).
+                    int actualPid = rtssData.ProcessId;
+
+                    // TryGetProcessDetails may fail for anti-cheat-protected games (EAC blocks MainModule access).
+                    // RTSS already provides the process name and executable path, so use those as fallback.
+                    string name = string.Empty;
+                    string path = string.Empty;
+                    if (!TryGetProcessDetailsCached(actualPid, out name, out path))
+                    {
+                        // Extract file name from RTSS-provided path (RTSS stores full path in szName).
+                        path = rtssData.ProcessName;
+                        name = System.IO.Path.GetFileNameWithoutExtension(rtssData.ProcessName);
+                    }
+
+                    Volatile.Write(ref _latest, new FpsMetricsSnapshot
+                    {
+                        IsAvailable = true,
+                        ProcessId = actualPid,
+                        ProcessName = name,
+                        ExecutablePath = path,
+                        GraphicsApi = rtssData.GraphicsApi,
+                        Fps = (int)Math.Round(rtssData.Fps),
+                        FrameTimeMs = rtssData.FrameTimeMs,
+                        OnePercentLowFps = (int)Math.Round(rtssData.OnePercentLowFps),
+                        OnePercentFrameTimeMs = rtssData.OnePercentFrameTimeMs,
+                        PointOnePercentLowFps = (int)Math.Round(rtssData.PointOnePercentLowFps),
+                        PointOnePercentFrameTimeMs = rtssData.PointOnePercentFrameTimeMs
+                    });
+                    continue;
+                }
+
+                // Fall back to ETW when RTSS is not available or has no data for this process.
                 FpsTraceProcessor? processor = _processor;
                 if (processor is null)
                     return;
