@@ -386,21 +386,20 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.HideFlydigi = true;
             Settings.Default.Save();
 
-            // Disconnect the Flydigi cooler if connected (fire-and-forget to avoid UI freeze)
+            // Fully suspend all Flydigi background services (fire-and-forget to avoid UI freeze)
             System.Threading.Tasks.Task.Run(() =>
             {
                 try
                 {
                     var coolerService = App.GetService<FlydigiCoolerService>();
-                    coolerService?.DisconnectAsync();
+                    coolerService?.SuspendAllServices();
 
                     var bs1Service = App.GetService<Bs1Service>();
-                    bs1Service?.DisconnectAsync().Wait();
+                    bs1Service?.SuspendAllServices();
                 }
                 catch (Exception)
                     {
-                        // Ignore disconnect errors — this is a best-effort cleanup when hiding Flydigi.
-                        // The device may already be disconnected or unavailable.
+                        // Ignore — best-effort cleanup when disabling Flydigi.
                     }
             });
         }
@@ -409,6 +408,20 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             Settings.Default.HideFlydigi = false;
             Settings.Default.Save();
+
+            // Resume all Flydigi background services
+            try
+            {
+                var coolerService = App.GetService<FlydigiCoolerService>();
+                coolerService?.ResumeBackgroundServices();
+
+                var bs1Service = App.GetService<Bs1Service>();
+                bs1Service?.ResumeBackgroundServices();
+            }
+            catch (Exception)
+            {
+                // Non-critical: resume failures shouldn't block the UI.
+            }
         }
 
         private void cbDisableCpuVoltageControl_Checked(object sender, RoutedEventArgs e)

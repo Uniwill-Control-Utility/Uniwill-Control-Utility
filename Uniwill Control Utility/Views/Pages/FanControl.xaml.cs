@@ -438,13 +438,15 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (InfoBanner.Severity == newSeverity && InfoBanner.Message == newMessage)
                 return;
 
-            // Toggle IsOpen to force the InfoBar template to re-apply and pick up
-            // the new Message. WPF UI's InfoBar doesn't always re-render the content
-            // when Severity and Message change simultaneously.
+            // WPF UI's InfoBar doesn't reliably re-render the Message content when
+            // Severity and Message change on the same dispatcher tick. Close first,
+            // then re-open on the next frame so the template picks up both properties.
             InfoBanner.IsOpen = false;
             InfoBanner.Severity = newSeverity;
             InfoBanner.Message = newMessage;
-            InfoBanner.IsOpen = true;
+
+            Dispatcher.Invoke(() => InfoBanner.IsOpen = true,
+                System.Windows.Threading.DispatcherPriority.Background);
         }
 
         private enum BannerState

@@ -97,6 +97,36 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>Set when user explicitly clicks Disconnect. Prevents auto-reconnect.</summary>
         private bool _userDisconnected;
 
+        /// <summary>
+        /// Stops all background threads and disconnects the device.
+        /// Called when the user disables Flydigi cooler functionality in Settings.
+        /// </summary>
+        public void SuspendAllServices()
+        {
+            _userDisconnected = true;
+            DisconnectAsync();
+            StopOsLevelMonitor();
+        }
+
+        /// <summary>
+        /// Restarts background services after a prior <see cref="SuspendAllServices"/> call.
+        /// </summary>
+        public void ResumeBackgroundServices()
+        {
+            LoadSettings();
+            _userDisconnected = false;
+            StartOsLevelMonitor();
+
+            if (_settings.AutoConnect)
+            {
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(1000, CancellationToken.None);
+                    await TryAutoConnectAsync();
+                });
+            }
+        }
+
         /* ------------------------------------------------------------------ */
         /*  Constructor / Settings                                             */
         /* ------------------------------------------------------------------ */
@@ -107,6 +137,12 @@ namespace Uniwill_Control_Utility.Services
         public Bs1Service()
         {
             LoadSettings();
+
+            // If the user has disabled Flydigi functionality entirely, skip all
+            // background initialization to avoid any unnecessary BLE operations.
+            if (Properties.Settings.Default.HideFlydigi)
+                return;
+
             StartOsLevelMonitor();
 
             // Auto-connect on app startup (like THRM does 1 second after launch).

@@ -123,6 +123,15 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private bool _userDisconnected;
 
+        /// <summary>
+        /// Background reconnection loop that runs when disconnected (not by user).
+        /// Periodically discovers fresh devices and attempts to reconnect.
+        /// This handles cases where the HID arrival callback doesn't fire
+        /// (e.g., Bluetooth off→on, device reconnects through Windows settings).
+        /// </summary>
+        private CancellationTokenSource? _reconnectCts;
+        private Thread? _reconnectThread;
+
         /* ------------------------------------------------------------------ */
         /*  Time-based curve schedule monitor                                  */
         /* ------------------------------------------------------------------ */
@@ -260,11 +269,58 @@ namespace Uniwill_Control_Utility.Services
 
         public bool IsConnected => _device != null && _device.IsOpen;
 
+        /// <summary>
+        /// Stops all background threads and disconnects the device.
+        /// Called when the user disables Flydigi cooler functionality in Settings.
+        /// Use <see cref="ResumeBackgroundServices"/> to re-enable.
+        /// </summary>
+        public void SuspendAllServices()
+        {
+            _userDisconnected = true; // Block any auto-reconnect in-flight
+            DisconnectAsync();
+            StopReconnectLoop();
+            StopDeviceMonitor();
+            StopHidArrivalNotification();
+            StopPowerNotificationMonitor();
+            StopScheduleMonitor();
+        }
+
+        /// <summary>
+        /// Restarts all background threads after a prior <see cref="SuspendAllServices"/> call.
+        /// Called when the user re-enables Flydigi cooler functionality in Settings.
+        /// </summary>
+        public void ResumeBackgroundServices()
+        {
+            LoadSettings();
+            _userDisconnected = false;
+
+            StartPowerNotificationMonitor();
+            StartHidArrivalNotification();
+            StartDeviceMonitor();
+            StartTimeScheduleMonitor();
+
+            // Auto-connect if enabled
+            if (_settings.AutoConnect)
+            {
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(1000, CancellationToken.None);
+                    await TryAutoConnectAsync();
+                });
+            }
+        }
+
         public FlydigiCoolerDeviceInfo? ConnectedDeviceInfo { get; private set; }
 
         public FlydigiCoolerService()
         {
             LoadSettings();
+
+            // If the user has disabled Flydigi functionality entirely, skip all
+            // background initialization to avoid any unnecessary HID operations.
+            if (Properties.Settings.Default.HideFlydigi)
+                return;
+
             StartPowerNotificationMonitor();
             StartHidArrivalNotification();
             StartDeviceMonitor();
@@ -518,8 +574,16 @@ namespace Uniwill_Control_Utility.Services
         public async Task<bool> ConnectAsync(string devicePath)
         {
             ClearUserDisconnected();
-            var devices = HidDevices.Enumerate(Bs2ProProductId.VendorId, Bs2ProProductId.AllProductIds);
+            var devices = HidDevices.Enumerate(Bs2ProProductId.VendorId, Bs2ProProductId.AllProductIds).ToList();
             var target = devices.FirstOrDefault(d => d.DevicePath == devicePath);
+
+            // If the saved path is stale (e.g., after a Bluetooth reconnect where
+            // Windows may not change the device path), fall back to any available device.
+            if (target == null && devices.Count > 0)
+            {
+                target = devices[0];
+                System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Saved path {devicePath} not found, falling back to {target.DevicePath}");
+            }
 
             if (target == null)
             {
@@ -561,6 +625,13 @@ namespace Uniwill_Control_Utility.Services
                 // Cache device path for auto-reconnect
                 _settings.LastDevicePath = devicePath;
                 SaveSettings();
+
+                // Stop any background reconnection loop — we're connected now.
+                StopReconnectLoop();
+
+                // Restart the device monitor (stopped when reconnect loop started)
+                // so it can detect future plug/unplug transitions while connected.
+                StartDeviceMonitor();
 
                 // Start background read loop
                 StartReadLoop();
@@ -635,6 +706,17 @@ namespace Uniwill_Control_Utility.Services
             _lastKnownTargetRpm = 0;
             RaiseConnected(false);
             RaiseStatus("Disconnected");
+
+            // Start background reconnection loop if this wasn't a user-initiated disconnect.
+            // This handles cases where the HID arrival callback doesn't fire
+            // (e.g., Bluetooth off→on, device reconnects through Windows settings).
+            if (!_userDisconnected && _settings.AutoConnect)
+            {
+                // Stop the device monitor to avoid two threads doing HID handle operations.
+                // The reconnect loop handles device discovery with the same capability.
+                StopDeviceMonitor();
+                StartReconnectLoop();
+            }
         }
 
         /// <summary>
@@ -1330,7 +1412,10 @@ namespace Uniwill_Control_Utility.Services
         ///   2. 0x21 00 00 → 50ms
         ///   3. 0x24 (exit realtime mode)
         /// </summary>
-        public async Task<bool> WriteRealtimeRpmAsync(ushort rpm)
+        /// <param name="rpm">Target RPM (0 = off).</param>
+        /// <param name="force">If true, sends the command even if RPM hasn't changed.
+        /// Use for keepalive to prevent the device from drifting out of realtime mode.</param>
+        public async Task<bool> WriteRealtimeRpmAsync(ushort rpm, bool force = false)
         {
             if (!IsConnected)
                 return false;
@@ -1341,8 +1426,9 @@ namespace Uniwill_Control_Utility.Services
                 return false;
             }
 
-            // Skip redundant writes when RPM hasn't changed and we're already in realtime mode
-            if (_hasCommandedRpm && _lastCommandedRpm == rpm && _realtimeMode)
+            // Skip redundant writes when RPM hasn't changed and we're already in realtime mode.
+            // Bypass when force=true (keepalive) to prevent the device from drifting.
+            if (!force && _hasCommandedRpm && _lastCommandedRpm == rpm && _realtimeMode)
                 return true;
 
             bool success;
@@ -1394,8 +1480,9 @@ namespace Uniwill_Control_Utility.Services
                     _realtimeMode = true;
                 }
 
-                // Same-value skip: device already at this RPM, no need to resend
-                if (_hasCommandedRpm && _lastCommandedRpm == rpm)
+                // Same-value skip: device already at this RPM, no need to resend.
+                // Bypass when force=true (keepalive) to prevent the device from drifting.
+                if (!force && _hasCommandedRpm && _lastCommandedRpm == rpm)
                     return true;
 
                 byte rpmLo = (byte)(rpm & 0xFF);
@@ -1711,6 +1798,10 @@ namespace Uniwill_Control_Utility.Services
 
         private void StartDeviceMonitor()
         {
+            // Guard against double-start
+            if (_deviceMonitorCts != null)
+                return;
+
             try
             {
                 _deviceMonitorCts = new CancellationTokenSource();
@@ -1840,6 +1931,116 @@ namespace Uniwill_Control_Utility.Services
 
             _deviceMonitorCts?.Dispose();
             _deviceMonitorCts = null;
+        }
+
+        #endregion
+
+        #region Background Reconnect Loop
+
+        /// <summary>
+        /// Starts a background thread that periodically tries to reconnect when
+        /// disconnected (not by user). Uses fresh device discovery to get current
+        /// device paths, which handles cases where the HID path changes after
+        /// Bluetooth off→on cycles.
+        /// </summary>
+        private void StartReconnectLoop()
+        {
+            // Don't start a second loop if one is already running
+            if (_reconnectCts != null)
+                return;
+
+            try
+            {
+                _reconnectCts = new CancellationTokenSource();
+                var token = _reconnectCts.Token;
+
+                _reconnectThread = new Thread(() =>
+                {
+                    System.Diagnostics.Debug.WriteLine("[FlydigiCoolerService] Background reconnect loop started");
+
+                    while (!token.IsCancellationRequested)
+                    {
+                        // Wait 5 seconds between attempts to avoid interfering with device enumeration
+                        for (int i = 0; i < 50; i++)
+                        {
+                            if (token.IsCancellationRequested)
+                                return;
+                            Thread.Sleep(100);
+                        }
+
+                        // Already connected (by HID arrival callback, device monitor, etc.)
+                        if (IsConnected || _userDisconnected)
+                        {
+                            System.Diagnostics.Debug.WriteLine("[FlydigiCoolerService] Background reconnect loop stopping (already connected or user disconnected)");
+                            return;
+                        }
+
+                        try
+                        {
+                            // Discover fresh devices to get current device paths
+                            var devices = DiscoverDevices();
+                            if (devices.Count > 0)
+                            {
+                                var path = devices[0].DevicePath;
+                                System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Background reconnect attempt: {path}");
+
+                                // Update saved path in case it changed
+                                _settings.LastDevicePath = path;
+                                SaveSettings();
+
+                                _ = Task.Run(async () =>
+                                {
+                                    // Wait 1 second for the HID interface to be fully ready
+                                    await Task.Delay(1000, CancellationToken.None);
+                                    if (IsConnected || _userDisconnected)
+                                        return;
+                                    bool ok = await ConnectAsync(path);
+                                    if (ok)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Background reconnected: {path}");
+                                    }
+                                    else
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Background reconnect failed for: {path}");
+                                    }
+                                });
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            // Non-critical: discovery failures during reconnect
+                            System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Reconnect discovery failed: {ex.Message}");
+                        }
+                    }
+                })
+                {
+                    IsBackground = true,
+                    Name = "FlydigiReconnectLoop"
+                };
+                _reconnectThread.Start();
+            }
+            catch (Exception)
+            {
+                // Non-critical: reconnect loop is optional
+            }
+        }
+
+        /// <summary>
+        /// Stops the background reconnection loop.
+        /// </summary>
+        private void StopReconnectLoop()
+        {
+            try
+            {
+                _reconnectCts?.Cancel();
+            }
+            catch (Exception) { /* ignore */ }
+
+            _reconnectThread?.Join(2000);
+
+            _reconnectCts?.Dispose();
+            _reconnectCts = null;
+            _reconnectThread = null;
         }
 
         #endregion
@@ -1975,6 +2176,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 if (disposing)
                 {
+                    StopReconnectLoop();
                     StopScheduleMonitor();
                     StopHidArrivalNotification();
                     StopDeviceMonitor();

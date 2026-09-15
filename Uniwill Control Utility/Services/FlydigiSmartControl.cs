@@ -139,10 +139,11 @@ namespace Uniwill_Control_Utility.Services
 
             // Periodic keepalive: re-send the last RPM every 5 ticks (~5 seconds) to maintain
             // the device's realtime mode. The BS2 Pro device will exit realtime mode if it
-            // doesn't receive RPM commands regularly.
+            // doesn't receive RPM commands regularly. Use force=true to bypass the same-value
+            // skip so the command actually reaches the device and prevents RPM drift.
             if (_tickCounter % 5 == 0 && _lastCommandedRpm.HasValue && _lastCommandedRpm.Value > 0)
             {
-                _ = _coolerService.WriteRealtimeRpmAsync(_lastCommandedRpm.Value);
+                _ = _coolerService.WriteRealtimeRpmAsync(_lastCommandedRpm.Value, force: true);
             }
 
             // 2. Read temperature based on TempSource
