@@ -46,7 +46,17 @@ namespace Uniwill_Control_Utility.Services.Performance
                 // Win32k provider may not be available on all systems; DXGKrnl is sufficient.
             }
             _session.Source.AllEvents += OnEvent;
-            _traceThread = new Thread(() => _session.Source.Process())
+            _traceThread = new Thread(() =>
+            {
+                try
+                {
+                    _session.Source.Process();
+                }
+                catch
+                {
+                    // Trace processing errors must not crash the app.
+                }
+            })
             {
                 IsBackground = true,
                 Name = "UCU FPS trace"

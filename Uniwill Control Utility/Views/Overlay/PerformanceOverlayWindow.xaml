@@ -410,7 +410,7 @@
                             </Border>
                         </Grid>
                     </Border>
-<Border Grid.Row="2"
+                    <Border Grid.Row="2"
                             Style="{StaticResource PanelStyle}"
                             Visibility="{Binding CpuRowVisibility}">
 

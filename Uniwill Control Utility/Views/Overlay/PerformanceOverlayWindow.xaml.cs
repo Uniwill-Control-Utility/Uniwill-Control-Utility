@@ -43,8 +43,13 @@ namespace Uniwill_Control_Utility.Views.Overlay
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
             IntPtr handle = new WindowInteropHelper(this).Handle;
-            int style = GetWindowLong(handle, ExtendedStyleIndex);
-            _ = SetWindowLong(handle, ExtendedStyleIndex, style | TransparentStyle | LayeredStyle | ToolWindowStyle | NoActivateStyle);
+            IntPtr style = GetWindowLongPtr(handle, ExtendedStyleIndex);
+            _ = SetWindowLongPtr(handle, ExtendedStyleIndex,
+                style | (IntPtr)TransparentStyle | (IntPtr)LayeredStyle | (IntPtr)ToolWindowStyle | (IntPtr)NoActivateStyle);
+
+            // Enable input transparency so mouse events pass through to windows below.
+            // ACCENT_ENABLE_TRANSPARENTGRADIENT (3) makes the DWM route input to the window behind us.
+            SetWindowInputTransparent(handle);
 
             if (!_displaySettingsSubscribed)
             {
@@ -153,10 +158,50 @@ namespace Uniwill_Control_Utility.Views.Overlay
             return IsFinite(value) && value > 0;
         }
 
-        [LibraryImport("user32.dll", SetLastError = true)]
-        private static partial int GetWindowLong(IntPtr window, int index);
+        [LibraryImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+        private static partial IntPtr GetWindowLongPtr(IntPtr window, int index);
 
-        [LibraryImport("user32.dll", SetLastError = true)]
-        private static partial int SetWindowLong(IntPtr window, int index, int newStyle);
+        [LibraryImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+        private static partial IntPtr SetWindowLongPtr(IntPtr window, int index, IntPtr newStyle);
+
+        // SetWindowCompositionAttribute: ACCENT_ENABLE_TRANSPARENTGRADIENT (3)
+        // makes the DWM route mouse input through the window to whatever is behind it.
+        private const int WcaAccentPolicy = 19;
+        private const int AccentTransparentGradient = 3;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct WindowCompositionAttributeData
+        {
+            public int Attribute;
+            public IntPtr Data;
+            public int Size;
+        }
+
+      [LibraryImport("user32.dll")]
+        private static partial void SetWindowCompositionAttribute(IntPtr window, ref WindowCompositionAttributeData data);
+
+        private static void SetWindowInputTransparent(IntPtr handle)
+        {
+            int accent = AccentTransparentGradient;
+            IntPtr accentPtr = IntPtr.Zero;
+            try
+            {
+                accentPtr = Marshal.AllocHGlobal(Marshal.SizeOf<int>());
+                Marshal.WriteInt32(accentPtr, accent);
+
+                var data = new WindowCompositionAttributeData
+                {
+                    Attribute = WcaAccentPolicy,
+                    Data = accentPtr,
+                    Size = Marshal.SizeOf<int>()
+                };
+
+                SetWindowCompositionAttribute(handle, ref data);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(accentPtr);
+            }
+        }
     }
 }

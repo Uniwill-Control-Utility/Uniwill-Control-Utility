@@ -82,28 +82,35 @@ namespace Uniwill_Control_Utility.Services.Performance
                 if (processor is null)
                     return;
 
-                processor.TargetProcessId = processId;
-                FrameStatistics statistics = processor.GetStatistics(processId);
-                if (statistics.Fps == 0 || !TryGetProcessDetailsCached(processId, out string name, out string path))
+                try
                 {
-                    Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
-                    continue;
-                }
+                    processor.TargetProcessId = processId;
+                    FrameStatistics statistics = processor.GetStatistics(processId);
+                    if (statistics.Fps == 0 || !TryGetProcessDetailsCached(processId, out string name, out string path))
+                    {
+                        Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
+                        continue;
+                    }
 
-                Volatile.Write(ref _latest, new FpsMetricsSnapshot
+                    Volatile.Write(ref _latest, new FpsMetricsSnapshot
+                    {
+                        IsAvailable = true,
+                        ProcessId = processId,
+                        ProcessName = name,
+                        ExecutablePath = path,
+                        GraphicsApi = GetGraphicsApi(processId),
+                        Fps = (int)Math.Round(statistics.Fps),
+                        FrameTimeMs = statistics.FrameTimeMs,
+                        OnePercentLowFps = (int)Math.Round(statistics.OnePercentLowFps),
+                        OnePercentFrameTimeMs = statistics.OnePercentFrameTimeMs,
+                        PointOnePercentLowFps = (int)Math.Round(statistics.PointOnePercentLowFps),
+                        PointOnePercentFrameTimeMs = statistics.PointOnePercentFrameTimeMs
+                    });
+                }
+                catch
                 {
-                    IsAvailable = true,
-                    ProcessId = processId,
-                    ProcessName = name,
-                    ExecutablePath = path,
-                    GraphicsApi = GetGraphicsApi(processId),
-                    Fps = (int)Math.Round(statistics.Fps),
-                    FrameTimeMs = statistics.FrameTimeMs,
-                    OnePercentLowFps = (int)Math.Round(statistics.OnePercentLowFps),
-                    OnePercentFrameTimeMs = statistics.OnePercentFrameTimeMs,
-                    PointOnePercentLowFps = (int)Math.Round(statistics.PointOnePercentLowFps),
-                    PointOnePercentFrameTimeMs = statistics.PointOnePercentFrameTimeMs
-                });
+                    // A transient ETW read failure must not crash the sampling loop.
+                }
             }
         }
 
