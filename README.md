@@ -3,7 +3,7 @@
 [![Download Latest](https://img.shields.io/github/downloads/jgudec/Uniwill-Control-Utility/latest/total?style=flat-square&color=orange&label=Download%20Latest)](https://github.com/jgudec/Uniwill-Control-Utility/releases/latest)
 [![Total Downloads](https://img.shields.io/github/downloads/jgudec/Uniwill-Control-Utility/total?style=flat-square&color=orange&label=Download%20Total)](https://github.com/jgudec/Uniwill-Control-Utility/releases/latest)
 
-![Dashboard](screenshots/dashboard.png)
+![Dashboard](screenshots/dashboard.jpg)
 
 This project is still very much a **WORK IN PROGRESS**!
 
@@ -224,41 +224,41 @@ Application preferences, diagnostics, updates, and embedded system information.
 - "AMD", "APU", "Ryzen", and "AMD Ryzen" are trademarked by and belong to Advanced Micro Devices, Inc. This project makes no claims to these assets and uses them for informational purposes only.
 
 ## Screenshots
-![Dashboard](screenshots/dashboard.png)
+![Dashboard](screenshots/dashboard.jpg)
 
-![Presets](screenshots/presets.png)
+![Presets](screenshots/presets.jpg)
 
-![GPU Curve](screenshots/gpu-curve.png)
+![GPU Curve](screenshots/gpu-curve.jpg)
 
-![Adaptive](screenshots/adaptive.png)
+![Adaptive](screenshots/adaptive.jpg)
 
-![Hydro UI](screenshots/hydro-ui.png)
+![Hydro UI](screenshots/hydro-ui.jpg)
 
-![Fan Control](screenshots/fan-control.png)
+![Fan Control](screenshots/fan-control.jpg)
 
-![Keyboard](screenshots/keyboard.png)
+![Keyboard](screenshots/keyboard.jpg)
 
-![Per-Key Keyboard](screenshots/keyboard-per-key.png)
+![Per-Key Keyboard](screenshots/keyboard-per-key.jpg)
 
-![Light Bar](screenshots/light-bar.png)
+![Light Bar](screenshots/light-bar.jpg)
 
-![Battery](screenshots/battery.png)
+![Battery](screenshots/battery.jpg)
 
-![Overlay](screenshots/overlay.png)
+![Overlay](screenshots/overlay.jpg)
 
-![Auto](screenshots/automations.png)
+![Auto](screenshots/automations.jpg)
 
-![Flydigi 1](screenshots/flydigi-1.png)
+![Flydigi 1](screenshots/flydigi-1.jpg)
 
-![Flydigi 2](screenshots/flydigi-2.png)
+![Flydigi 2](screenshots/flydigi-2.jpg)
 
-![Settings](screenshots/settings.png)
+![Settings](screenshots/settings.jpg)
 
 ## Installation
 
 1. Head over to the [Releases](https://github.com/jgudec/Uniwill-Control-Utility/releases) page
 2. Download the latest zip
-3. Extract the zip into e.g. the C: drive
+3. Extract the zip
 4. Launch **Uniwill-Control-Utility.exe**
 
 ## Credits
