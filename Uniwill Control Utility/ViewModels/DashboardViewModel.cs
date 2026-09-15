@@ -357,18 +357,16 @@ namespace Uniwill_Control_Utility.ViewModels
             Debug.WriteLine(
                 $"INFO | {nameof(DashboardViewModel)} navigated from.");
 
+            // Stop the polling timers so we don't read hardware while invisible.
             _refreshTimer.IsEnabled = false;
             _batteryEcTimer.IsEnabled = false;
 
-            // Dispose lease on a background thread to avoid _computer.Close()
-            // blocking the UI during navigation.
-            var lease = _lease;
-            _lease = null;
-
-            if (lease is not null)
-            {
-                _ = System.Threading.Tasks.Task.Run(() => lease.Dispose());
-            }
+            // Keep the hardware monitoring lease alive. Disposing it closes the
+            // LibreHardwareMonitor Computer instance, which forces a full hardware
+            // re-probe (enumeration + sensor tree walk) on the next navigation back.
+            // Keeping the lease active means the sensor data is cached and the next
+            // OnNavigatedToAsync can resume polling immediately with no re-probe cost.
+            // The lease is only disposed when the app exits (via DI container teardown).
 
             return Task.CompletedTask;
         }
