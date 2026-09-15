@@ -1430,29 +1430,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Hide adaptive snackbar
             HideAdaptiveSnackbar();
 
-            // Capture refs before cancellation so we can still clean up.
-            var lease = _monitoringLease;
-            _monitoringLease = null;
+            // Keep the hardware monitoring lease alive. Disposing it closes the
+            // LibreHardwareMonitor Computer instance, forcing a full hardware re-probe
+            // on the next navigation back. The lease stays active until app exit
+            // (DI container teardown). The _statusTimer is already stopped above, so
+            // no polling happens while the page is invisible.
 
             // Signal all waiting tasks to cancel.
             _pageCts.Cancel();
-
-            if (lease is not null)
-            {
-                _ = Task.Run(async () =>
-                {
-                    bool acquired = await _ecSemaphore.WaitAsync(TimeSpan.FromSeconds(3));
-                    try
-                    {
-                        lease?.Dispose();
-                    }
-                    finally
-                    {
-                        if (acquired)
-                            _ecSemaphore.Release();
-                    }
-                });
-            }
 
             // NOTE: Do NOT call RestoreAutoFanControl() here.
             // The user's fan curve should persist across app shutdowns.
