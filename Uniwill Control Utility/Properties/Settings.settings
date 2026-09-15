@@ -92,6 +92,9 @@
     <Setting Name="ApplyOnStart" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
+    <Setting Name="ShowPrerequisiteDialog" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
     <Setting Name="FirstBoot" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>

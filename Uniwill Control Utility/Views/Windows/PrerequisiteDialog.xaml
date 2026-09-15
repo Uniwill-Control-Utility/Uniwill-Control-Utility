@@ -1,0 +1,165 @@
+<ui:FluentWindow x:Class="Uniwill_Control_Utility.Views.Windows.PrerequisiteDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    mc:Ignorable="d"
+    Title="Uniwill Control Utility"
+    Width="720"
+    Height="Auto"
+    MinWidth="640"
+    SizeToContent="Height"
+    MaxHeight="700"
+    d:Background="{DynamicResource ApplicationBackgroundBrush}"
+    Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+    ExtendsContentIntoTitleBar="True"
+    WindowBackdropType="Mica"
+    WindowCornerPreference="Round"
+    WindowStartupLocation="CenterScreen"
+    ResizeMode="NoResize"
+    SnapsToDevicePixels="True"
+    UseLayoutRounding="True">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0"
+                     Title="Prerequisites"
+                     Icon="pack://application:,,,/Assets/applicationIcon-256.png"
+                     CanMaximize="False"
+                     ShowMaximize="False"
+                     ShowMinimize="False"
+                     ShowClose="False" />
+
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      Padding="0,0,4,0">
+            <StackPanel Margin="18">
+
+                <!-- Intro -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <ui:SymbolIcon Symbol="Info20" FontSize="24" Margin="0,0,10,0" />
+                    <TextBlock FontSize="20"
+                               FontWeight="Medium"
+                               VerticalAlignment="Center"
+                               Text="Required Software" />
+                </StackPanel>
+
+                <TextBlock Margin="34,0,0,16"
+                           FontSize="13"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           TextWrapping="Wrap"
+                           Text="UCU requires two third-party tools to access hardware sensors and display FPS overlays. Please install any that are missing before continuing." />
+
+                <!-- PawnIO card -->
+                <ui:Card x:Name="CardPawnIo"
+                         Padding="16"
+                         Margin="0,0,0,12"
+                         RenderOptions.EdgeMode="Aliased"
+                         SnapsToDevicePixels="True">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon x:Name="PawnIoStatusIcon"
+                                               Symbol="CheckmarkCircle20"
+                                               FontSize="18"
+                                               Margin="0,0,8,0"
+                                               VerticalAlignment="Center" />
+                                <TextBlock FontSize="15"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
+                                           Text="PawnIO Driver" />
+                            </StackPanel>
+
+                            <TextBlock Margin="0,6,0,0"
+                                       FontSize="13"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="Low-level hardware driver that lets UCU control CPU power limits (TDP) and voltage." />
+                        </StackPanel>
+
+                        <ui:Button x:Name="PawnIoButton"
+                                   Grid.Column="1"
+                                   Width="140"
+                                   Height="34"
+                                   Margin="12,0,0,0"
+                                   VerticalAlignment="Top"
+                                   Appearance="Primary"
+                                   Click="PawnIoButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="ArrowDownload20" Margin="0,0,6,0" />
+                                <TextBlock Text="Install" />
+                            </StackPanel>
+                        </ui:Button>
+                    </Grid>
+                </ui:Card>
+
+                <!-- RTSS card -->
+                <ui:Card x:Name="CardRtss"
+                         Padding="16"
+                         Margin="0,0,0,12"
+                         RenderOptions.EdgeMode="Aliased"
+                         SnapsToDevicePixels="True">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon x:Name="RtssStatusIcon"
+                                               Symbol="CheckmarkCircle20"
+                                               FontSize="18"
+                                               Margin="0,0,8,0"
+                                               VerticalAlignment="Center" />
+                                <TextBlock FontSize="15"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
+                                           Text="RivaTuner Statistics Server (RTSS)" />
+                            </StackPanel>
+
+                            <TextBlock Margin="0,6,0,0"
+                                       FontSize="13"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="Required for the FPS overlay to work with modern titles (DirectX 12, Vulkan). UCU has a built-in fallback for older games, but RTSS provides more reliable frame rate data for newer APIs. The overlay will still function without RTSS, but may not display FPS for all games." />
+                        </StackPanel>
+
+                        <ui:Button x:Name="RtssButton"
+                                   Grid.Column="1"
+                                   Width="140"
+                                   Height="34"
+                                   Margin="12,0,0,0"
+                                   VerticalAlignment="Top"
+                                   Appearance="Primary"
+                                   Click="RtssButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="ArrowDownload20" Margin="0,0,6,0" />
+                                <TextBlock Text="Download" />
+                            </StackPanel>
+                        </ui:Button>
+                    </Grid>
+                </ui:Card>
+
+                <!-- Continue button -->
+                <ui:Button x:Name="ContinueButton"
+                           Width="140"
+                           Height="38"
+                           HorizontalAlignment="Right"
+                           Appearance="Primary"
+                           Click="ContinueButton_Click"
+                           Content="Continue" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</ui:FluentWindow>

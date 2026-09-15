@@ -451,6 +451,40 @@ namespace Uniwill_Control_Utility
             {
                 _logger?.LogError(ex, "Failed to sync game library");
             }
+
+            // Show the prerequisite checklist on first startup.
+            if (Settings.Default.ShowPrerequisiteDialog)
+                SafeFireAndForget(ShowPrerequisiteDialogAsync());
+        }
+
+        private static async Task ShowPrerequisiteDialogAsync()
+        {
+            // Brief delay so the main window has time to render first.
+            await Task.Delay(500);
+
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                try
+                {
+                    var dialog = new Views.Windows.PrerequisiteDialog();
+
+                    // Scope the dialog to the main window so it stays above UCU
+                    // without being globally topmost across all applications.
+                    Window? owner = Application.Current.MainWindow;
+                    if (owner is not null)
+                        dialog.Owner = owner;
+
+                    dialog.ShowDialog();
+
+                    // Only show on first startup.
+                    Settings.Default.ShowPrerequisiteDialog = false;
+                    Settings.Default.Save();
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Failed to show prerequisite dialog");
+                }
+            });
         }
 
         private EventWaitHandle? _showEvent;

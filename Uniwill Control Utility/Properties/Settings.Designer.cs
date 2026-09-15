@@ -374,6 +374,18 @@ namespace Uniwill_Control_Utility.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ShowPrerequisiteDialog {
+            get {
+                return ((bool)(this["ShowPrerequisiteDialog"]));
+            }
+            set {
+                this["ShowPrerequisiteDialog"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool FirstBoot {
             get {
                 return ((bool)(this["FirstBoot"]));
