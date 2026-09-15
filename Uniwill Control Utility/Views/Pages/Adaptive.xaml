@@ -932,8 +932,10 @@
                                           SelectedIndex="0"
                                           SelectionChanged="cbxBs2ProCurve_SelectionChanged">
                                     <ComboBoxItem Content="Silent"/>
+                                    <ComboBoxItem Content="Quiet"/>
                                     <ComboBoxItem Content="Balanced"/>
                                     <ComboBoxItem Content="Performance"/>
+                                    <ComboBoxItem Content="Freezy"/>
                                     <ComboBoxItem Content="Custom"/>
                                 </ComboBox>
                             </Grid>

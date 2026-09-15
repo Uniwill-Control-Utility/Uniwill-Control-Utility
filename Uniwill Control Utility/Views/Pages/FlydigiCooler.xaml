@@ -861,6 +861,182 @@
                                                   ValueChanged="nudAvoidance_ValueChanged"/>
                                     </StackPanel>
                                 </Grid>
+
+                            <!-- Divider before Time Schedule (BS1-hidable) -->
+                            <Border x:Name="TimeScheduleDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Time Schedule (BS1-hidable) -->
+                            <Grid x:Name="RowTimeSchedule">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Time Schedule" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Auto-switch fan curve profiles based on time of day." />
+                                </StackPanel>
+                                <ui:ToggleSwitch Name="tsTimeSchedule"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="tsTimeSchedule_Checked"
+                                                 Unchecked="tsTimeSchedule_Unchecked"/>
+                            </Grid>
+
+                            <!-- Divider before Time Schedule Entries (collapsed by default) -->
+                            <Border x:Name="TimeScheduleEntriesDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Row: Time Schedule Entries (collapsed by default, shown with toggle) -->
+                            <Grid x:Name="TimeScheduleEntriesRow" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Schedule Entries" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Each entry activates a curve profile during the time window shown." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                    <Button Name="btnAddScheduleEntry"
+                                            Content="Add Entry"
+                                            Width="100"
+                                            Click="btnAddScheduleEntry_Click"
+                                            Margin="0,0,0,0"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Time Schedule Entry List (collapsed by default) -->
+                            <ItemsControl x:Name="icTimeScheduleEntries"
+                                          Visibility="Collapsed"
+                                          Margin="0,8,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,4,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="80" />
+                                                <ColumnDefinition Width="20" />
+                                                <ColumnDefinition Width="80" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="140" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <ui:TextBlock FontTypography="Caption"
+                                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                               Text="Start"/>
+                                                <ui:NumberBox x:Name="nbStartHour"
+                                                              Minimum="0" Maximum="23"
+                                                              MaxDecimalPlaces="0"
+                                                              SmallChange="1"
+                                                              ValueChanged="ScheduleEntry_ValueChanged"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="-" VerticalAlignment="Center"/>
+                                            <StackPanel Grid.Column="2">
+                                                <ui:TextBlock FontTypography="Caption"
+                                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                               Text="End"/>
+                                                <ui:NumberBox x:Name="nbEndHour"
+                                                              Minimum="0" Maximum="23"
+                                                              MaxDecimalPlaces="0"
+                                                              SmallChange="1"
+                                                              ValueChanged="ScheduleEntry_ValueChanged"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="3"
+                                                       Text="{Binding ProfileName}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="8,0,0,0"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"/>
+                                            <ComboBox Grid.Column="4"
+                                                      x:Name="cbProfile"
+                                                      SelectedValue="{Binding ProfileName, Mode=TwoWay}"
+                                                      SelectionChanged="ScheduleProfile_SelectionChanged"
+                                                      MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown">
+                                                <ComboBoxItem Content="Silent"/>
+                                                <ComboBoxItem Content="Quiet"/>
+                                                <ComboBoxItem Content="Balanced"/>
+                                                <ComboBoxItem Content="Performance"/>
+                                                <ComboBoxItem Content="Freezy"/>
+                                            </ComboBox>
+                                            <Button Grid.Column="5"
+                                                    Content="&#xE74D;"
+                                                    FontFamily="Segoe MDL2 Assets"
+                                                    Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                                    Width="32"
+                                                    Margin="8,0,0,0"
+                                                    Click="btnRemoveScheduleEntry_Click"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- Divider before Learning Engine (BS1-hidable) -->
+                            <Border x:Name="LearningDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Learning Engine (BS1-hidable) -->
+                            <Grid x:Name="RowLearningEngine">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Learning Engine" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Auto-adjust curve offsets based on temperature observations." />
+                                </StackPanel>
+                                <ui:ToggleSwitch Name="tsLearning"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="tsLearning_Checked"
+                                                 Unchecked="tsLearning_Unchecked"/>
+                            </Grid>
+
+                            <!-- Divider before Learning Bias (collapsed by default) -->
+                            <Border x:Name="LearningBiasDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Row: Learning Bias (collapsed by default, shown with toggle) -->
+                            <Grid x:Name="RowLearningBias" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Learning Bias" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Balanced = equal, Cooling = favors heat prevention, Quiet = favors staying quiet." />
+                                </StackPanel>
+                                <ComboBox Name="cbxLearningBias"
+                                          Grid.Column="1"
+                                          MinWidth="120"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          SelectionChanged="cbxLearningBias_SelectionChanged"
+                                          MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown">
+                                    <ComboBoxItem Content="Balanced"/>
+                                    <ComboBoxItem Content="Cooling"/>
+                                    <ComboBoxItem Content="Quiet"/>
+                                </ComboBox>
+                            </Grid>
                             </StackPanel>
                     </ui:CardExpander>
 

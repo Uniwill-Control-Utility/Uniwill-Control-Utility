@@ -230,8 +230,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         // Curve profile identifiers
         private const string CurveProfileSilent = "Silent";
+        private const string CurveProfileQuiet = "Quiet";
         private const string CurveProfileBalanced = "Balanced";
         private const string CurveProfilePerformance = "Performance";
+        private const string CurveProfileFreezy = "Freezy";
         private const string CurveProfileCustom = "Custom";
 
         // BS2 Pro RGB mode identifiers
@@ -1428,7 +1430,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             return curveProfileId switch
             {
                 CurveProfileSilent => FlydigiFanCurveProfile.CreateSilent(),
+                CurveProfileQuiet => FlydigiFanCurveProfile.CreateQuiet(),
                 CurveProfilePerformance => FlydigiFanCurveProfile.CreatePerformance(),
+                CurveProfileFreezy => FlydigiFanCurveProfile.CreateFreezy(),
                 CurveProfileCustom => LoadBs1CustomCurveProfile(bs1Service),
                 _ => FlydigiFanCurveProfile.CreateBalanced()
             };
@@ -1440,7 +1444,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             return curveProfileId switch
             {
                 CurveProfileSilent => FlydigiFanCurveProfile.CreateSilent(),
+                CurveProfileQuiet => FlydigiFanCurveProfile.CreateQuiet(),
                 CurveProfilePerformance => FlydigiFanCurveProfile.CreatePerformance(),
+                CurveProfileFreezy => FlydigiFanCurveProfile.CreateFreezy(),
                 CurveProfileCustom => LoadCustomCurveProfile(flydigiService),
                 _ => FlydigiFanCurveProfile.CreateBalanced()
             };
@@ -2172,9 +2178,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             return index switch
             {
                 0 => CurveProfileSilent,
-                1 => CurveProfileBalanced,
-                2 => CurveProfilePerformance,
-                3 => CurveProfileCustom,
+                1 => CurveProfileQuiet,
+                2 => CurveProfileBalanced,
+                3 => CurveProfilePerformance,
+                4 => CurveProfileFreezy,
+                5 => CurveProfileCustom,
                 _ => CurveProfileSilent
             };
         }
@@ -2184,9 +2192,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             return profileId switch
             {
                 CurveProfileSilent => 0,
-                CurveProfileBalanced => 1,
-                CurveProfilePerformance => 2,
-                CurveProfileCustom => 3,
+                CurveProfileQuiet => 1,
+                CurveProfileBalanced => 2,
+                CurveProfilePerformance => 3,
+                CurveProfileFreezy => 4,
+                CurveProfileCustom => 5,
                 _ => 0
             };
         }
@@ -2279,7 +2289,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Bs2ProCurveEditorDivider.Visibility = Visibility.Collapsed;
                 Bs2ProCurveEditor.Visibility = Visibility.Collapsed;
             }
-            else if (Bs2ProCurveEditor is not null && cbxBs2ProCurve?.SelectedIndex == 3)
+            else if (Bs2ProCurveEditor is not null && cbxBs2ProCurve?.SelectedIndex == 5)
             {
                 // Re-entering Curve mode with Custom selected — re-show editor
                 Bs2ProCurveEditorDivider.Visibility = Visibility.Visible;
@@ -2302,7 +2312,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (cbxBs2ProCurve is null || Bs2ProCurveEditor is null)
                 return;
 
-            bool isCustom = cbxBs2ProCurve.SelectedIndex == 3;
+            bool isCustom = cbxBs2ProCurve.SelectedIndex == 5;
             Bs2ProCurveEditorDivider.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
             Bs2ProCurveEditor.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
 

@@ -146,6 +146,91 @@ namespace Uniwill_Control_Utility.Models
         }
 
         /// <summary>
+        /// Creates a quiet profile: starts rising at 55°C, max 3000 RPM.
+        /// Fills the gap between Silent (65°C start) and Balanced (50°C start).
+        /// Points: 0°C→1300, 55°C→1300, 80°C→3000, 100°C→3000.
+        /// </summary>
+        public static FlydigiFanCurveProfile CreateQuiet()
+        {
+            return new FlydigiFanCurveProfile
+            {
+                Name = "Quiet",
+                Id = Guid.NewGuid().ToString(),
+                Points = new List<FanCurvePoint>
+                {
+                    new FanCurvePoint { Temperature = 0, Rpm = 1300 },
+                    new FanCurvePoint { Temperature = 55, Rpm = 1300 },
+                    new FanCurvePoint { Temperature = 80, Rpm = 3000 },
+                    new FanCurvePoint { Temperature = 100, Rpm = 3000 },
+                }
+            };
+        }
+
+        /// <summary>
+        /// Creates a freezy profile: 1300 RPM baseline at all temps,
+        /// aggressive ramp to 4000 RPM by 70°C. Maximum cooling.
+        /// Points: 0°C→1300, 30°C→1300, 70°C→4000, 100°C→4000.
+        /// </summary>
+        public static FlydigiFanCurveProfile CreateFreezy()
+        {
+            return new FlydigiFanCurveProfile
+            {
+                Name = "Freezy",
+                Id = Guid.NewGuid().ToString(),
+                Points = new List<FanCurvePoint>
+                {
+                    new FanCurvePoint { Temperature = 0, Rpm = 1300 },
+                    new FanCurvePoint { Temperature = 30, Rpm = 1300 },
+                    new FanCurvePoint { Temperature = 70, Rpm = 4000 },
+                    new FanCurvePoint { Temperature = 100, Rpm = 4000 },
+                }
+            };
+        }
+
+        /// <summary>
+        /// Inverse lookup: returns the temperature that corresponds to the given RPM
+        /// on this curve. Used by the learning engine to compute the implied target
+        /// temperature for a commanded RPM. Returns the midpoint temperature of the
+        /// profile if no match is found.
+        /// </summary>
+        public double GetTemperatureForRpm(ushort rpm)
+        {
+            if (Points.Count == 0)
+                return 50.0;
+
+            var sorted = Points.OrderBy(p => p.Temperature).ToList();
+
+            // Exact match on a point
+            foreach (var p in sorted)
+            {
+                if (p.Rpm == rpm)
+                    return p.Temperature;
+            }
+
+            // Find bracketing RPM points and interpolate temperature
+            FanCurvePoint? lower = null;
+            for (int i = 0; i < sorted.Count - 1; i++)
+            {
+                int lo = Math.Min(sorted[i].Rpm, sorted[i + 1].Rpm);
+                int hi = Math.Max(sorted[i].Rpm, sorted[i + 1].Rpm);
+                if (rpm >= lo && rpm <= hi)
+                {
+                    var a = sorted[i];
+                    var b = sorted[i + 1];
+                    if (a.Rpm == b.Rpm)
+                        return a.Temperature;
+                    double frac = (rpm - a.Rpm) * 1.0 / (b.Rpm - a.Rpm);
+                    return a.Temperature + frac * (b.Temperature - a.Temperature);
+                }
+            }
+
+            // Out of range — clamp to nearest endpoint
+            if (rpm <= sorted[0].Rpm)
+                return sorted[0].Temperature;
+            return sorted[sorted.Count - 1].Temperature;
+        }
+
+        /// <summary>
         /// Serializes the profile to a JSON string.
         /// </summary>
         public string ToJSON()

@@ -1316,8 +1316,10 @@ namespace Uniwill_Control_Utility.Views.Windows
                 FlydigiFanCurveProfile profile;
 
                 if (tag == "Silent") profile = FlydigiFanCurveProfile.CreateSilent();
+                else if (tag == "Quiet") profile = FlydigiFanCurveProfile.CreateQuiet();
                 else if (tag == "Balanced") profile = FlydigiFanCurveProfile.CreateBalanced();
                 else if (tag == "Performance") profile = FlydigiFanCurveProfile.CreatePerformance();
+                else if (tag == "Freezy") profile = FlydigiFanCurveProfile.CreateFreezy();
                 else if (tag == "Custom")
                 {
                     profile = FlydigiFanCurveProfile.FromJSON(fc.GetSettings().CustomCurveJson);

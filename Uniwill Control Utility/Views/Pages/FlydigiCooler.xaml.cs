@@ -306,6 +306,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 RowSmartStartStop.Visibility = Visibility.Collapsed;
                 GearLightDivider.Visibility = Visibility.Collapsed;
                 RowGearLight.Visibility = Visibility.Collapsed;
+                TimeScheduleDivider.Visibility = Visibility.Collapsed;
+                RowTimeSchedule.Visibility = Visibility.Collapsed;
+                LearningDivider.Visibility = Visibility.Collapsed;
+                RowLearningEngine.Visibility = Visibility.Collapsed;
 
                 // Hide sub-gear selector — BS1 has no sub-levels
                 spGearSubLevel.Visibility = Visibility.Collapsed;
@@ -331,6 +335,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 RowSmartStartStop.Visibility = Visibility.Visible;
                 GearLightDivider.Visibility = Visibility.Visible;
                 RowGearLight.Visibility = Visibility.Visible;
+                TimeScheduleDivider.Visibility = Visibility.Visible;
+                RowTimeSchedule.Visibility = Visibility.Visible;
+                LearningDivider.Visibility = Visibility.Visible;
+                RowLearningEngine.Visibility = Visibility.Visible;
 
                 spGearSubLevel.Visibility = Visibility.Visible;
 
@@ -989,12 +997,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbxCurveProfile.Items.Clear();
 
             var silent = FlydigiFanCurveProfile.CreateSilent();
+            var quiet = FlydigiFanCurveProfile.CreateQuiet();
             var balanced = FlydigiFanCurveProfile.CreateBalanced();
             var performance = FlydigiFanCurveProfile.CreatePerformance();
+            var freezy = FlydigiFanCurveProfile.CreateFreezy();
 
             cbxCurveProfile.Items.Add(new ComboBoxItem { Content = silent.Name, Tag = silent });
+            cbxCurveProfile.Items.Add(new ComboBoxItem { Content = quiet.Name, Tag = quiet });
             cbxCurveProfile.Items.Add(new ComboBoxItem { Content = balanced.Name, Tag = balanced });
             cbxCurveProfile.Items.Add(new ComboBoxItem { Content = performance.Name, Tag = performance });
+            cbxCurveProfile.Items.Add(new ComboBoxItem { Content = freezy.Name, Tag = freezy });
 
             // Load saved custom curve if it exists
             string? customCurveJson = null;
@@ -1020,8 +1032,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
             }
 
-            // Default to Balanced (index 1)
-            cbxCurveProfile.SelectedIndex = 1;
+            // Default to Balanced (index 2)
+            cbxCurveProfile.SelectedIndex = 2;
             _activeProfile = balanced;
         }
 
@@ -1489,6 +1501,152 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
+       /* ------------------------------------------------------------------ */
+        /*  Time Schedule Handlers                                             */
+        /* ------------------------------------------------------------------ */
+
+        private void tsTimeSchedule_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_coolerService != null)
+            {
+                var settings = _coolerService.GetSettings();
+                settings.TimeScheduleEnabled = true;
+                _coolerService.PersistSettings();
+            }
+
+            TimeScheduleEntriesDivider.Visibility = Visibility.Visible;
+            TimeScheduleEntriesRow.Visibility = Visibility.Visible;
+            icTimeScheduleEntries.Visibility = Visibility.Visible;
+        }
+
+        private void tsTimeSchedule_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_coolerService != null)
+            {
+                var settings = _coolerService.GetSettings();
+                settings.TimeScheduleEnabled = false;
+                _coolerService.PersistSettings();
+            }
+
+            TimeScheduleEntriesDivider.Visibility = Visibility.Collapsed;
+            TimeScheduleEntriesRow.Visibility = Visibility.Collapsed;
+            icTimeScheduleEntries.Visibility = Visibility.Collapsed;
+        }
+
+        private void btnAddScheduleEntry_Click(object sender, RoutedEventArgs e)
+        {
+            if (_coolerService == null) return;
+
+            var entry = new TimeCurveEntry { StartTime = "08:00", EndTime = "18:00", ProfileName = "Balanced" };
+            var settings = _coolerService.GetSettings();
+            settings.TimeScheduleEntries.Add(entry);
+            _coolerService.PersistSettings();
+
+            // Refresh the items control
+            icTimeScheduleEntries.ItemsSource = settings.TimeScheduleEntries;
+        }
+
+        private void btnRemoveScheduleEntry_Click(object sender, RoutedEventArgs e)
+        {
+            if (_coolerService == null || sender is not Button btn) return;
+            var entry = btn.DataContext as TimeCurveEntry;
+            if (entry == null) return;
+
+            var settings = _coolerService.GetSettings();
+            settings.TimeScheduleEntries.Remove(entry);
+            _coolerService.PersistSettings();
+
+            icTimeScheduleEntries.ItemsSource = settings.TimeScheduleEntries;
+        }
+
+        private void ScheduleEntry_ValueChanged(object? sender, RoutedEventArgs e)
+        {
+            if (_coolerService == null || sender is not Wpf.Ui.Controls.NumberBox nb) return;
+            var entry = nb.DataContext as TimeCurveEntry;
+            if (entry == null || !nb.Value.HasValue) return;
+
+            // Update the entry's start or end time based on which number box fired.
+            // The name isn't directly available, so we check the parent grid.
+            var grid = FindParent<Grid>(nb);
+            if (grid == null) return;
+
+            var nbStart = grid.FindName("nbStartHour") as Wpf.Ui.Controls.NumberBox;
+            var nbEnd = grid.FindName("nbEndHour") as Wpf.Ui.Controls.NumberBox;
+
+            if (nb == nbStart && nbStart.Value.HasValue)
+                entry.StartTime = $"{nbStart.Value.Value:D2}:00";
+            else if (nb == nbEnd && nbEnd.Value.HasValue)
+                entry.EndTime = $"{nbEnd.Value.Value:D2}:00";
+
+            _coolerService.PersistSettings();
+        }
+
+        private void ScheduleProfile_SelectionChanged(object sender, EventArgs e)
+        {
+            if (_coolerService == null) return;
+            _coolerService.PersistSettings();
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Learning Engine Handlers                                           */
+        /* ------------------------------------------------------------------ */
+
+        private void tsLearning_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_coolerService != null)
+            {
+                var settings = _coolerService.GetSettings();
+                settings.LearningEnabled = true;
+                _coolerService.PersistSettings();
+            }
+
+            LearningBiasDivider.Visibility = Visibility.Visible;
+            RowLearningBias.Visibility = Visibility.Visible;
+        }
+
+        private void tsLearning_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_coolerService != null)
+            {
+                var settings = _coolerService.GetSettings();
+                settings.LearningEnabled = false;
+                _coolerService.PersistSettings();
+            }
+
+            LearningBiasDivider.Visibility = Visibility.Collapsed;
+            RowLearningBias.Visibility = Visibility.Collapsed;
+        }
+
+        private void cbxLearningBias_SelectionChanged(object sender, EventArgs e)
+        {
+            if (_coolerService == null) return;
+
+            var bias = cbxLearningBias.SelectedIndex switch
+            {
+                0 => "balanced",
+                1 => "cooling",
+                2 => "quiet",
+                _ => "balanced"
+            };
+
+            var settings = _coolerService.GetSettings();
+            settings.LearningBias = bias;
+            _coolerService.PersistSettings();
+        }
+
+        /// <summary>Walk up the visual tree to find a parent of the specified type.</summary>
+        private static T? FindParent<T>(DependencyObject child) where T : DependencyObject
+        {
+            var parent = VisualTreeHelper.GetParent(child);
+            while (parent != null)
+            {
+                if (parent is T result)
+                    return result;
+                parent = VisualTreeHelper.GetParent(parent);
+            }
+            return null;
+        }
+
         /* ------------------------------------------------------------------ */
         /*  Event Callbacks                                                    */
         /* ------------------------------------------------------------------ */
@@ -1723,6 +1881,31 @@ namespace Uniwill_Control_Utility.Views.Pages
             tsPowerOnStart.IsChecked = settings.PowerOnStart;
             cbxSmartStartStop.SelectedIndex = settings.SmartStartStopMode;
             tsGearLight.IsChecked = settings.GearLightEnabled;
+
+            // Time schedule
+            tsTimeSchedule.IsChecked = settings.TimeScheduleEnabled;
+            if (settings.TimeScheduleEnabled)
+            {
+                TimeScheduleEntriesDivider.Visibility = Visibility.Visible;
+                TimeScheduleEntriesRow.Visibility = Visibility.Visible;
+                icTimeScheduleEntries.Visibility = Visibility.Visible;
+                icTimeScheduleEntries.ItemsSource = settings.TimeScheduleEntries;
+            }
+
+            // Learning engine
+            tsLearning.IsChecked = settings.LearningEnabled;
+            if (settings.LearningEnabled)
+            {
+                LearningBiasDivider.Visibility = Visibility.Visible;
+                RowLearningBias.Visibility = Visibility.Visible;
+            }
+            var learningBiasIndex = settings.LearningBias.ToLowerInvariant() switch
+            {
+                "cooling" => 1,
+                "quiet" => 2,
+                _ => 0
+            };
+            cbxLearningBias.SelectedIndex = learningBiasIndex;
 
             // RGB settings
             var rgbModeIndex = GetRgbModeIndex(settings.RgbMode);
@@ -2212,6 +2395,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             nudAvoidanceStart.IsEnabled = enabled;
             nudAvoidanceEnd.IsEnabled = enabled;
             cbxTempSource.IsEnabled = enabled;
+            tsTimeSchedule.IsEnabled = enabled;
+            btnAddScheduleEntry.IsEnabled = enabled;
+            tsLearning.IsEnabled = enabled;
+            cbxLearningBias.IsEnabled = enabled;
         }
 
         private static int GetRgbModeIndex(string mode) => mode.ToLowerInvariant() switch

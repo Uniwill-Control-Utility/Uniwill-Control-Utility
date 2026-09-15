@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using Uniwill_Control_Utility.Models;
 
@@ -22,8 +23,20 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>Last RPM value actually commanded to the device (for ramp limiting).</summary>
         private ushort? _lastCommandedRpm;
 
+        /// <summary>Smoothed RPM from the asymmetric ramp limiter (carried across ticks).</summary>
+        private ushort? _lastSmoothedRpm;
+
+        /// <summary>Last target RPM computed from the curve (before ramp limiting, for keepalive use).</summary>
+        private ushort? _lastTargetRpm;
+
+        /// <summary>Last RPM sent by the keepalive (for ramp-limiting the keepalive itself).</summary>
+        private ushort? _lastKeepaliveRpm;
+
         /// <summary>Tick counter for periodic keepalive (re-send RPM to maintain device realtime mode).</summary>
         private int _tickCounter;
+
+        /// <summary>Learning engine that observes steady-state temps and adjusts curve offsets.</summary>
+        private readonly FlydigiLearningEngine _learningEngine = new();
 
         /* ------------------------------------------------------------------ */
         /*  Public state                                                       */
@@ -49,7 +62,11 @@ namespace Uniwill_Control_Utility.Services
                 // without being blocked by hysteresis or ramp limiting.
                 _filteredTemperature = null;
                 _lastCommandedRpm = null;
+                _lastSmoothedRpm = null;
+                _lastTargetRpm = null;
+                _lastKeepaliveRpm = null;
                 _tickCounter = 0;
+                _learningEngine.Reset();
             }
         }
         private FlydigiFanCurveProfile? _activeProfile;
@@ -137,15 +154,6 @@ namespace Uniwill_Control_Utility.Services
             if (!_coolerService.IsConnected || ActiveProfile == null)
                 return;
 
-            // Periodic keepalive: re-send the last RPM every 5 ticks (~5 seconds) to maintain
-            // the device's realtime mode. The BS2 Pro device will exit realtime mode if it
-            // doesn't receive RPM commands regularly. Use force=true to bypass the same-value
-            // skip so the command actually reaches the device and prevents RPM drift.
-            if (_tickCounter % 5 == 0 && _lastCommandedRpm.HasValue && _lastCommandedRpm.Value > 0)
-            {
-                _ = _coolerService.WriteRealtimeRpmAsync(_lastCommandedRpm.Value, force: true);
-            }
-
             // 2. Read temperature based on TempSource
             double? rawTemp = ReadTemperature();
             if (!rawTemp.HasValue)
@@ -154,16 +162,11 @@ namespace Uniwill_Control_Utility.Services
             // 3. Asymmetric EWMA filtering
             double filtered = ApplyEwmaFilter(rawTemp.Value);
 
-            // 4. Hysteresis deadzone check
-            if (_filteredTemperature.HasValue && Math.Abs(filtered - _filteredTemperature.Value) < HysteresisDeadzone)
-                return;
-
-            _filteredTemperature = filtered;
-
-            // 5. Compute target RPM from fan curve
+            // 4. Compute target RPM from fan curve (always, even when hysteresis blocks).
+            // This ensures _lastTargetRpm stays current for the keepalive below.
             ushort targetRpm = ActiveProfile.GetRpmForTemperature(filtered);
 
-            // 6. Apply speed avoidance
+            // 5. Apply speed avoidance
             if (Settings != null)
             {
                 targetRpm = FlydigiSpeedAvoidance.Apply(
@@ -174,17 +177,69 @@ namespace Uniwill_Control_Utility.Services
                     filtered);
             }
 
+            // 6. Apply learning offset
+            if (Settings != null && Settings.LearningEnabled)
+            {
+                _learningEngine.IsLearningEnabled = true;
+                _learningEngine.BiasMode = Settings.LearningBias;
+
+                // Determine which curve segment (gear index) we're in for per-gear learning
+                int gearIndex = GetCurveSegmentIndex(filtered);
+
+                // Feed observation: observed temp vs. the implied target temp for current RPM
+                // The target temp is inverse: what temp should produce this RPM on the curve.
+                // We use the filtered temp as both observed and derive target from curve inverse.
+                if (_lastCommandedRpm.HasValue)
+                {
+                    double impliedTargetTemp = ActiveProfile.GetTemperatureForRpm(_lastCommandedRpm.Value);
+                    _learningEngine.FeedObservation(gearIndex, filtered, impliedTargetTemp, _lastCommandedRpm.Value);
+                }
+
+                // Apply learned offset to RPM target
+                double offset = _learningEngine.GetEffectiveOffset(gearIndex);
+                if (offset != 0.0)
+                {
+                    int adjustedRpm = (int)targetRpm + (int)Math.Round(offset);
+                    targetRpm = (ushort)Math.Clamp(adjustedRpm, FlydigiFanCurveProfile.MinRpm, FlydigiFanCurveProfile.MaxRpm);
+                }
+            }
+
             // 7. Critical temperature overrides
             targetRpm = ApplyCriticalTempOverride(targetRpm, filtered);
 
-            // 8. Ramp limiting
+            // 7. Store the un-limited target for keepalive use
+            _lastTargetRpm = targetRpm;
+
+            // 8. Hysteresis deadzone check — gates the ramp-limited command to the device.
+            // The keepalive (below) still runs to prevent device drift, but uses the
+            // current target RPM so the fan gradually reaches the correct speed.
+            bool hysteresisBlocked = _filteredTemperature.HasValue
+                && Math.Abs(filtered - _filteredTemperature.Value) < HysteresisDeadzone;
+
+            // 9. Periodic keepalive: re-send the current target RPM every 5 ticks (~5 seconds)
+            // to maintain the device's realtime mode. Uses the freshly computed target RPM
+            // with ramp-limiting so that during hysteresis-blocking periods the fan gradually
+            // reaches the correct speed rather than staying at a stale value or jumping.
+            if (_tickCounter % 5 == 0 && _lastTargetRpm.Value > 0)
+            {
+                ushort keepaliveRpm = ApplyKeepaliveRampLimit(_lastTargetRpm.Value);
+                _lastKeepaliveRpm = keepaliveRpm;
+                _ = _coolerService.WriteRealtimeRpmAsync(keepaliveRpm, force: true);
+            }
+
+            if (hysteresisBlocked)
+                return;
+
+            _filteredTemperature = filtered;
+
+            // 10. Ramp limiting
             targetRpm = ApplyRampLimit(targetRpm);
 
-            // 9. Send to device (fire-and-forget)
+            // 11. Send to device (fire-and-forget)
             _ = _coolerService.WriteRealtimeRpmAsync(targetRpm);
             _lastCommandedRpm = targetRpm;
 
-            // 10. Update properties and raise event
+            // 12. Update properties and raise event
             CurrentTemperature = filtered;
             TargetRpm = targetRpm;
             TemperatureUpdated?.Invoke(this, (filtered, targetRpm));
@@ -210,16 +265,17 @@ namespace Uniwill_Control_Utility.Services
         /* ------------------------------------------------------------------ */
 
         /// <summary>
-        /// Applies asymmetric exponential weighted moving average.
-        /// Rising temperatures use alpha=0.5 (fast response).
-        /// Falling temperatures use alpha=0.15 (slow decay, prevents fan flutter).
+        /// Applies symmetric exponential weighted moving average.
+        /// Uses alpha=0.5 for both rising and falling temperatures.
+        /// The hysteresis deadzone prevents fan oscillation — no need for
+        /// asymmetric slow-decay which causes stale RPM targets when temps drop.
         /// </summary>
         private double ApplyEwmaFilter(double rawTemp)
         {
             if (!_filteredTemperature.HasValue)
                 return rawTemp;
 
-            double alpha = rawTemp >= _filteredTemperature.Value ? 0.5 : 0.15;
+            const double alpha = 0.5;
             return alpha * rawTemp + (1.0 - alpha) * _filteredTemperature.Value;
         }
 
@@ -246,17 +302,54 @@ namespace Uniwill_Control_Utility.Services
         /* ------------------------------------------------------------------ */
 
         /// <summary>
-        /// Clamps the RPM change to ±MaxRpmChangePerCycle from the last commanded RPM.
-        /// Prevents sudden, jarring fan speed jumps.
+        /// Asymmetric EWMA ramp limiter. Fast ramp up (alpha=0.4) so the fan
+        /// responds quickly to heating. Slow ramp down (alpha=0.08) so the fan
+        /// decreases gradually when temps drop, avoiding sudden noise changes.
         /// </summary>
         private ushort ApplyRampLimit(ushort targetRpm)
         {
-            if (!_lastCommandedRpm.HasValue)
+            if (!_lastSmoothedRpm.HasValue)
                 return targetRpm;
 
-            int delta = targetRpm - _lastCommandedRpm.Value;
+            int delta = targetRpm - _lastSmoothedRpm.Value;
+            double alpha = delta >= 0 ? 0.4 : 0.08;
+
+            double smoothed = _lastSmoothedRpm.Value + alpha * delta;
+            _lastSmoothedRpm = (ushort)Math.Round(smoothed);
+            return _lastSmoothedRpm.Value;
+        }
+
+        /// <summary>
+        /// Clamps the keepalive RPM change to ±MaxRpmChangePerCycle from the last
+        /// keepalive RPM. This allows the fan to gradually reach the correct target
+        /// during hysteresis-blocking periods without sudden jumps.
+        /// </summary>
+        private ushort ApplyKeepaliveRampLimit(ushort targetRpm)
+        {
+            if (!_lastKeepaliveRpm.HasValue)
+                return targetRpm;
+
+            int delta = targetRpm - _lastKeepaliveRpm.Value;
             int clampedDelta = Math.Clamp(delta, -MaxRpmChangePerCycle, MaxRpmChangePerCycle);
-            return (ushort)(_lastCommandedRpm.Value + clampedDelta);
+            return (ushort)(_lastKeepaliveRpm.Value + clampedDelta);
+        }
+
+        /// <summary>
+        /// Returns the index of the curve segment the given temperature falls into.
+        /// Used as a gear index for per-segment learning.
+        /// </summary>
+        private int GetCurveSegmentIndex(double temp)
+        {
+            if (ActiveProfile == null || ActiveProfile.Points.Count < 2)
+                return 0;
+
+            var sorted = ActiveProfile.Points.OrderBy(p => p.Temperature).ToList();
+            for (int i = 0; i < sorted.Count - 1; i++)
+            {
+                if (temp >= sorted[i].Temperature && temp < sorted[i + 1].Temperature)
+                    return i;
+            }
+            return Math.Max(0, sorted.Count - 2);
         }
 
         /* ------------------------------------------------------------------ */

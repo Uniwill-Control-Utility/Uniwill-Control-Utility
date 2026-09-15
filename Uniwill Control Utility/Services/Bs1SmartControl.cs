@@ -22,6 +22,9 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>Last RPM value actually commanded to the device (for ramp limiting).</summary>
         private ushort? _lastCommandedRpm;
 
+        /// <summary>Smoothed RPM from the asymmetric ramp limiter (carried across ticks).</summary>
+        private ushort? _lastSmoothedRpm;
+
         /* ------------------------------------------------------------------ */
         /*  Public state                                                       */
         /* ------------------------------------------------------------------ */
@@ -45,6 +48,7 @@ namespace Uniwill_Control_Utility.Services
                 // Force re-evaluation on next tick so the new profile takes effect immediately
                 _filteredTemperature = null;
                 _lastCommandedRpm = null;
+                _lastSmoothedRpm = null;
             }
         }
         private FlydigiFanCurveProfile? _activeProfile;
@@ -195,16 +199,17 @@ namespace Uniwill_Control_Utility.Services
         /* ------------------------------------------------------------------ */
 
         /// <summary>
-        /// Applies asymmetric exponential weighted moving average.
-        /// Rising temperatures use alpha=0.5 (fast response).
-        /// Falling temperatures use alpha=0.15 (slow decay, prevents fan flutter).
+        /// Applies symmetric exponential weighted moving average.
+        /// Uses alpha=0.5 for both rising and falling temperatures.
+        /// The hysteresis deadzone prevents fan oscillation — no need for
+        /// asymmetric slow-decay which causes stale RPM targets when temps drop.
         /// </summary>
         private double ApplyEwmaFilter(double rawTemp)
         {
             if (!_filteredTemperature.HasValue)
                 return rawTemp;
 
-            double alpha = rawTemp >= _filteredTemperature.Value ? 0.5 : 0.15;
+            const double alpha = 0.5;
             return alpha * rawTemp + (1.0 - alpha) * _filteredTemperature.Value;
         }
 
@@ -231,17 +236,21 @@ namespace Uniwill_Control_Utility.Services
         /* ------------------------------------------------------------------ */
 
         /// <summary>
-        /// Clamps the RPM change to ±MaxRpmChangePerCycle from the last commanded RPM.
-        /// Prevents sudden, jarring fan speed jumps.
+        /// Asymmetric EWMA ramp limiter. Fast ramp up (alpha=0.4) so the fan
+        /// responds quickly to heating. Slow ramp down (alpha=0.08) so the fan
+        /// decreases gradually when temps drop, avoiding sudden noise changes.
         /// </summary>
         private ushort ApplyRampLimit(ushort targetRpm)
         {
-            if (!_lastCommandedRpm.HasValue)
+            if (!_lastSmoothedRpm.HasValue)
                 return targetRpm;
 
-            int delta = targetRpm - _lastCommandedRpm.Value;
-            int clampedDelta = Math.Clamp(delta, -MaxRpmChangePerCycle, MaxRpmChangePerCycle);
-            return (ushort)(_lastCommandedRpm.Value + clampedDelta);
+            int delta = targetRpm - _lastSmoothedRpm.Value;
+            double alpha = delta >= 0 ? 0.4 : 0.08;
+
+            double smoothed = _lastSmoothedRpm.Value + alpha * delta;
+            _lastSmoothedRpm = (ushort)Math.Round(smoothed);
+            return _lastSmoothedRpm.Value;
         }
 
         /* ------------------------------------------------------------------ */
