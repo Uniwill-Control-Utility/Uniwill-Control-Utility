@@ -47,7 +47,7 @@
                 <StackPanel Grid.Row="1"
                             MaxWidth="1080"
                             HorizontalAlignment="Stretch"
-                            Margin="16,16,16,18">
+                            Margin="12,16,16,18">
 
                     <!-- Hardware metrics: CPU & GPU -->
                     <Grid Margin="0,0,0,8">

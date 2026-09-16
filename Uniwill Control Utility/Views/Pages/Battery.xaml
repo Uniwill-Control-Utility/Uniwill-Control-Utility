@@ -39,13 +39,13 @@
                 </Grid.RowDefinitions>
 
                 <!-- Page title block -->
-                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,24,0,0">
+                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,16,0,0">
                     <TextBlock FontSize="26"
                                FontWeight="Medium"
-                               Margin="16,0,16,0"
+                               Margin="12,0,16,0"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                Text="Battery" />
-                    <TextBlock Margin="16,8,16,12"
+                    <TextBlock Margin="12,8,16,12"
                                FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                Text="Manage battery charging limit and view health information."
@@ -53,7 +53,7 @@
                 </StackPanel>
 
                 <!-- Content cards -->
-                <StackPanel Grid.Row="1" Margin="16,16,16,18">
+                <StackPanel Grid.Row="1" Margin="12,16,16,18">
 
                     <!-- Unavailable state -->
                     <ui:CardControl x:Name="BatteryUnavailable" Visibility="Collapsed" Margin="0,0,0,8">
@@ -327,7 +327,7 @@
         </ScrollViewer>
 
         <!-- Row 1: Bottom bar — Refresh button anchored right -->
-        <ui:Card x:Name="bottomBar" Grid.Row="1" MaxWidth="1052" HorizontalAlignment="Stretch" Margin="16,8,16,12" Padding="12,8" SnapsToDevicePixels="True">
+        <ui:Card x:Name="bottomBar" Grid.Row="1" MaxWidth="1052" HorizontalAlignment="Stretch" Margin="12,8,16,12" Padding="12,8" SnapsToDevicePixels="True">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />

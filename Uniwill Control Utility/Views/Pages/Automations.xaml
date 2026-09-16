@@ -60,13 +60,13 @@
                 </Grid.RowDefinitions>
 
                 <!-- Row 0: Page title block -->
-                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,24,0,8">
+                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,16,0,8">
                     <TextBlock FontSize="26"
                                FontWeight="Medium"
-                               Margin="16,0,24,0"
+                               Margin="14,0,24,0"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                Text="Automations" />
-                    <TextBlock Margin="16,8,24,12"
+                    <TextBlock Margin="14,8,24,12"
                                FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                Text="Apply presets automatically when power or system state changes."
@@ -74,7 +74,7 @@
                 </StackPanel>
 
                 <!-- Row 1: Content cards -->
-                <StackPanel Grid.Row="1" Margin="16,0,16,16">
+                <StackPanel Grid.Row="1" Margin="12,0,16,16">
 
                 <!-- Preset on Battery Charge -->
                 <ui:CardControl Margin="0,0,0,8">

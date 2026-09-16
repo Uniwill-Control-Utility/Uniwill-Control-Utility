@@ -51,15 +51,15 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <!-- Row 0: Page title block (16px side margin, 24px top for non-Home page) -->
-                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,24,0,0">
+                <!-- Row 0: Page title block (16px side margin, 16px top for non-Home page) -->
+                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,16,0,0">
                     <TextBlock x:Name="tbPageTitle"
                                FontSize="26"
                                FontWeight="Medium"
-                               Margin="16,0,36,0"
+                               Margin="12,0,36,0"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                Text="Flydigi Cooler Control" />
-                    <TextBlock Margin="16,8,36,12"
+                    <TextBlock Margin="12,8,36,12"
                                FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                Text="Control your Flydigi laptop cooler's fan speed, RGB lighting, and other settings."
@@ -67,7 +67,7 @@
                 </StackPanel>
 
                 <!-- Row 1: Content cards (16px side margin, 16px top) -->
-                <StackPanel Grid.Row="1" Margin="16,16,16,18">
+                <StackPanel Grid.Row="1" Margin="12,16,16,18">
 
                     <!-- Connection info bar (hidden once connected) -->
                     <ui:InfoBar x:Name="InfoBarConnection"
@@ -152,7 +152,7 @@
                                             Height="30"
                                             Width="1"
                                             Fill="{DynamicResource ControlFillColorSecondaryBrush}"
-                                            Margin="16,4"/>
+                                            Margin="12,4"/>
                                 <StackPanel Grid.Column="2" HorizontalAlignment="Center">
                                     <TextBlock Text="Device Temp" FontWeight="SemiBold" HorizontalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
                                     <TextBlock Name="tbTemperature" Text="--" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>

@@ -55,13 +55,13 @@
                 </Grid.RowDefinitions>
 
                 <!-- Page title block -->
-                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,24,0,0">
+                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,16,0,0">
                     <TextBlock FontSize="26"
                                FontWeight="Medium"
-                               Margin="16,0,16,0"
+                               Margin="12,0,16,0"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                Text="Settings" />
-                    <TextBlock Margin="16,8,16,12"
+                    <TextBlock Margin="12,8,16,12"
                                FontSize="12"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                Text="Configure startup behaviour, automation, diagnostics and updates."
@@ -69,7 +69,7 @@
                 </StackPanel>
 
                 <!-- Content cards -->
-                <StackPanel Grid.Row="1" Margin="16,16,16,18">
+                <StackPanel Grid.Row="1" Margin="12,16,16,18">
 
                     <!-- MiniLED Local Dimming (hidden for non-MiniLED panels) -->
                     <ui:CardControl x:Name="CardLocalDimming" Margin="0,0,0,8" Visibility="Collapsed">
