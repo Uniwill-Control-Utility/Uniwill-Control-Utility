@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
@@ -53,6 +54,20 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void InitializeDeviceInfo()
         {
+            // Hardware detection may still be running on a background thread.
+            // Subscribe to the completion event so we populate the header as soon
+            // as the data is ready, without blocking page construction.
+            App.HardwareDetectionCompleted += OnHardwareDetectionCompleted;
+
+            // If detection already finished (e.g. app was already running), populate now.
+            if (!string.IsNullOrEmpty(Family.LaptopModel) || !string.IsNullOrEmpty(Family.CPUName))
+            {
+                OnHardwareDetectionCompleted();
+            }
+        }
+
+        private void OnHardwareDetectionCompleted()
+        {
             string model = Family.LaptopModel;
             string cpuName = Family.CPUName;
             string gpuName = Family.GPUName;
@@ -88,9 +103,21 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (!string.IsNullOrEmpty(gpuName))
                 _header.LaptopGPUName = FilterGpuName(gpuName);
 
-            _header.LaptopDisplaySpec = SystemSpecs.GetDisplayString();
-            _header.LaptopRam = SystemSpecs.GetRamString();
-            _header.LaptopStorage = SystemSpecs.GetStorageString();
+            // Run the slower SystemSpecs WMI queries on a background thread so they
+            // don't block the UI. These are cosmetic (display/RAM/storage specs).
+            _ = Task.Run(() =>
+            {
+                var display = SystemSpecs.GetDisplayString();
+                var ram = SystemSpecs.GetRamString();
+                var storage = SystemSpecs.GetStorageString();
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    _header.LaptopDisplaySpec = display;
+                    _header.LaptopRam = ram;
+                    _header.LaptopStorage = storage;
+                });
+            });
         }
 
         /// <summary>

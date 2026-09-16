@@ -258,95 +258,98 @@ namespace Uniwill_Control_Utility.ViewModels
             Debug.WriteLine(
                 $"INFO | {nameof(DashboardViewModel)} navigated to.");
 
-            // Initialize EC and acquire hardware monitoring lease on a background
-            // thread to avoid blocking the UI while probes run.
+            // Phase 1 (fast): acquire the LHM lease on a background thread so the
+            // UI never freezes, then immediately start the metrics timer.
             _ = System.Threading.Tasks.Task.Run(() =>
             {
-                if (_uniwillEc is not null)
-                {
-                    try
-                    {
-                        _uniwillEc.Initialize();
-                    }
-                    catch { /* EC not available on this hardware */ }
-
-                    // Auto-apply the saved fan curve on startup. The app always launches
-                    // on Dashboard, so this is the right place to apply the last saved curve.
-                    try
-                    {
-                        var settings = FanControlSettingsService.Load();
-                        Models.EcFanCurve cpuCurve;
-                        Models.EcFanCurve gpuCurve;
-
-                        if (settings.UnifiedMode)
-                        {
-                            var unifiedCurve = settings.UnifiedPreset == "Custom" && settings.UnifiedDuties?.Length == 11
-                                ? BuildCustomCurve(settings.UnifiedDuties)
-                                : GetPresetCurve(settings.UnifiedPreset);
-                            cpuCurve = unifiedCurve;
-                            gpuCurve = unifiedCurve;
-                        }
-                        else
-                        {
-                            cpuCurve = settings.CpuPreset == "Custom" && settings.CpuDuties?.Length == 11
-                                ? BuildCustomCurve(settings.CpuDuties)
-                                : GetPresetCurve(settings.CpuPreset);
-                            gpuCurve = settings.GpuPreset == "Custom" && settings.GpuDuties?.Length == 11
-                                ? BuildCustomCurve(settings.GpuDuties)
-                                : GetPresetCurve(settings.GpuPreset);
-                        }
-
-                        var cpuTemps = settings.UnifiedMode
-                            ? (settings.UnifiedTempThresholds ?? Models.EcFanCurve.CpuTemperatures)
-                            : (settings.CpuTempThresholds ?? Models.EcFanCurve.CpuTemperatures);
-                        var gpuTemps = settings.UnifiedMode
-                            ? cpuTemps
-                            : (settings.GpuTempThresholds ?? Models.EcFanCurve.GpuTemperatures);
-
-                        _uniwillEc.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
-                        Debug.WriteLine("INFO | DashboardViewModel: Fan curve auto-applied on startup");
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"WARN | DashboardViewModel: Fan curve auto-apply failed: {ex.Message}");
-                    }
-                }
-
                 _lease = _hardwareMonitoring.Acquire(
                     HardwareMonitoringCategory.Cpu |
                     HardwareMonitoringCategory.Gpu |
                     HardwareMonitoringCategory.Memory |
                     HardwareMonitoringCategory.Battery);
 
-                // Fetch static battery data (health, charge limit) once on navigation.
-                // Temperature is refreshed on the timer below.
-                if (_uniwillEc is not null)
-                {
-                    try
-                    {
-                        var telemetry = _uniwillEc.ReadBatteryTelemetry();
-                        if (telemetry is not null)
-                        {
-                            _batteryHealthPercent = telemetry.Value.HealthPercent;
-                            _batteryTemperatureC = telemetry.Value.TemperatureC;
-                        }
-                    }
-                    catch { /* EC read failed */ }
-
-                    try
-                    {
-                        _batteryChargeLimit = _uniwillEc.GetBatteryMode();
-                    }
-                    catch { /* EC read failed */ }
-                }
-
-                // Start the timers on the UI thread
+                // Start polling as soon as LHM is ready — don't wait for EC.
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     _refreshTimer.IsEnabled = true;
                     _batteryEcTimer.IsEnabled = true;
                     OnRefreshTimerTick(null, EventArgs.Empty);
                 });
+            });
+
+            // Phase 2 (slow): EC handshake and fan-curve auto-apply run in parallel
+            // on a separate background thread.  The EC data (fan PWM, battery telemetry)
+            // enriches snapshots on subsequent ticks but is not required for core metrics.
+            _ = System.Threading.Tasks.Task.Run(() =>
+            {
+                if (_uniwillEc is null)
+                    return;
+
+                try
+                {
+                    _uniwillEc.Initialize();
+                }
+                catch { /* EC not available on this hardware */ }
+
+                // Auto-apply the saved fan curve on startup. The app always launches
+                // on Dashboard, so this is the right place to apply the last saved curve.
+                try
+                {
+                    var settings = FanControlSettingsService.Load();
+                    Models.EcFanCurve cpuCurve;
+                    Models.EcFanCurve gpuCurve;
+
+                    if (settings.UnifiedMode)
+                    {
+                        var unifiedCurve = settings.UnifiedPreset == "Custom" && settings.UnifiedDuties?.Length == 11
+                            ? BuildCustomCurve(settings.UnifiedDuties)
+                            : GetPresetCurve(settings.UnifiedPreset);
+                        cpuCurve = unifiedCurve;
+                        gpuCurve = unifiedCurve;
+                    }
+                    else
+                    {
+                        cpuCurve = settings.CpuPreset == "Custom" && settings.CpuDuties?.Length == 11
+                            ? BuildCustomCurve(settings.CpuDuties)
+                            : GetPresetCurve(settings.CpuPreset);
+                        gpuCurve = settings.GpuPreset == "Custom" && settings.GpuDuties?.Length == 11
+                            ? BuildCustomCurve(settings.GpuDuties)
+                            : GetPresetCurve(settings.GpuPreset);
+                    }
+
+                    var cpuTemps = settings.UnifiedMode
+                        ? (settings.UnifiedTempThresholds ?? Models.EcFanCurve.CpuTemperatures)
+                        : (settings.CpuTempThresholds ?? Models.EcFanCurve.CpuTemperatures);
+                    var gpuTemps = settings.UnifiedMode
+                        ? cpuTemps
+                        : (settings.GpuTempThresholds ?? Models.EcFanCurve.GpuTemperatures);
+
+                    _uniwillEc.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                    Debug.WriteLine("INFO | DashboardViewModel: Fan curve auto-applied on startup");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"WARN | DashboardViewModel: Fan curve auto-apply failed: {ex.Message}");
+                }
+
+                // Fetch static battery data (health, charge limit) once on navigation.
+                // Temperature is refreshed on the timer below.
+                try
+                {
+                    var telemetry = _uniwillEc.ReadBatteryTelemetry();
+                    if (telemetry is not null)
+                    {
+                        _batteryHealthPercent = telemetry.Value.HealthPercent;
+                        _batteryTemperatureC = telemetry.Value.TemperatureC;
+                    }
+                }
+                catch { /* EC read failed */ }
+
+                try
+                {
+                    _batteryChargeLimit = _uniwillEc.GetBatteryMode();
+                }
+                catch { /* EC read failed */ }
             });
 
             return Task.CompletedTask;

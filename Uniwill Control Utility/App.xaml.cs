@@ -73,6 +73,12 @@ namespace Uniwill_Control_Utility
         internal static bool HasMiniLEDPanel { get; private set; }
 
         /// <summary>
+        /// Fired when background hardware detection (WMI queries, NVML) completes.
+        /// Subscribers can use this to populate UI that depends on Family.* statics.
+        /// </summary>
+        internal static event Action? HardwareDetectionCompleted;
+
+        /// <summary>
         /// Occurs when the application is loading.
         /// </summary>
         private async void OnStartup(object sender, StartupEventArgs e)
@@ -307,28 +313,9 @@ namespace Uniwill_Control_Utility
                 if (File.Exists("C:\\Uniwill.Control.Utility.msi"))
                     File.Delete("C:\\Uniwill.Control.Utility.msi");
 
-                Family.setCpuFamily();
-
-                // Detect whether the laptop has a MiniLED display panel.
-                try
-                {
-                    HasMiniLEDPanel = PanelDatabase.IsMiniLED();
-                    Log.Information("Display panel: {PanelType}", HasMiniLEDPanel ? "MiniLED" : "non-MiniLED");
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "Failed to detect panel type, assuming non-MiniLED");
-                }
-
-                // Resolve the current laptop SKU (XMG Neo 16 E25/A25 + GPU variant)
-                try
-                {
-                    Services.SkuResolver.Initialize();
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "SkuResolver.Initialize() failed - falling back to generic limits");
-                }
+                // Run slow hardware detection (WMI queries, NVML) on a background
+                // thread so the window can appear immediately.
+                SafeFireAndForget(DetectHardwareAsync());
 
                 string? entryLocation = System.Reflection.Assembly.GetEntryAssembly()?.Location;
                 string path = System.IO.Path.GetDirectoryName(entryLocation)!;
@@ -351,69 +338,13 @@ namespace Uniwill_Control_Utility
 
                 await _host.StartAsync(CancellationToken.None);
 
-                // Auto-connect watercooler on startup if enabled
-                try
-                {
-                    var waterCoolerService = _host.Services.GetService<WaterCoolerService>();
-                    if (waterCoolerService != null && WaterCoolerHardwareDetector.IsSupportedHardware())
-                        await waterCoolerService.TryAutoConnectAsync();
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Failed to auto-connect watercooler");
-                }
+                // Kick off device auto-connects in parallel so they don't block
+                // the dashboard from appearing.  The dashboard's device cards
+                // already handle late-arriving connections (they toggle visibility).
+                SafeFireAndForget(AutoConnectDevicesAsync());
 
-                // Auto-connect Flydigi BS2 Pro cooling pad on startup if enabled
-                try
-                {
-                    if (!Settings.Default.HideFlydigi)
-                    {
-                        var flydigiCoolerService = _host.Services.GetService<FlydigiCoolerHidService>();
-                        if (flydigiCoolerService != null && FlydigiCoolerHidService.IsDeviceAvailable())
-                            await flydigiCoolerService.TryAutoConnectAsync();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Failed to auto-connect Flydigi cooler");
-                }
-
-                // Auto-connect Flydigi BS1 (BLE) cooling pad on startup if enabled
-                try
-                {
-                    if (!Settings.Default.HideFlydigi)
-                    {
-                        var bs1Service = _host.Services.GetService<FlydigiCoolerBleService>();
-                        if (bs1Service != null)
-                            await bs1Service.TryAutoConnectAsync();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Failed to auto-connect Flydigi BS1");
-                }
-
-                // Restore Adaptive Mode override state from previous session
-                // Only restore if Adaptive Mode was actually running when the app closed
-                try
-                {
-                    var deviceApplier = _host.Services.GetService<DeviceApplier>();
-                    if (deviceApplier != null && Settings.Default.isAdaptiveModeRunning)
-                    {
-                        if (!Settings.Default.HideFlydigi && Settings.Default.AdaptiveBs2ProEnabled)
-                            deviceApplier.EnableFlydigiOverride();
-
-                        if (Settings.Default.AdaptiveWcEnabled)
-                            deviceApplier.EnableWatercoolerOverride();
-
-                        if (Settings.Default.AdaptiveKeyboardEnabled)
-                            deviceApplier.EnableKeyboardOverride();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Failed to restore Adaptive Mode override state");
-                }
+                // Restore Adaptive Mode override state from previous session.
+                SafeFireAndForget(RestoreAdaptiveModeAsync());
 
                 SafeFireAndForget(RunPostStartupTasksAsync());
             }
@@ -422,6 +353,103 @@ namespace Uniwill_Control_Utility
                 Log.Logger.Fatal(ex, "Failed to build and start a host");
                 MessageBox.Show(ex.Message);
             }
+        }
+
+        private static async Task DetectHardwareAsync()
+        {
+            try
+            {
+                await Task.Run(() =>
+                {
+                    Family.setCpuFamily();
+                    HasMiniLEDPanel = PanelDatabase.IsMiniLED();
+                    SkuResolver.Initialize();
+                });
+
+                // Notify subscribers on the UI thread that hardware detection is done.
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    HardwareDetectionCompleted?.Invoke();
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to detect hardware");
+            }
+        }
+
+        private static async Task AutoConnectDevicesAsync()
+        {
+            // Auto-connect watercooler on startup if enabled
+            try
+            {
+                var waterCoolerService = _host?.Services.GetService<WaterCoolerService>();
+                if (waterCoolerService != null && WaterCoolerHardwareDetector.IsSupportedHardware())
+                    await waterCoolerService.TryAutoConnectAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to auto-connect watercooler");
+            }
+
+            // Auto-connect Flydigi BS2 Pro cooling pad on startup if enabled
+            try
+            {
+                if (!Settings.Default.HideFlydigi)
+                {
+                    var flydigiCoolerService = _host?.Services.GetService<FlydigiCoolerHidService>();
+                    if (flydigiCoolerService != null && FlydigiCoolerHidService.IsDeviceAvailable())
+                        await flydigiCoolerService.TryAutoConnectAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to auto-connect Flydigi cooler");
+            }
+
+            // Auto-connect Flydigi BS1 (BLE) cooling pad on startup if enabled
+            try
+            {
+                if (!Settings.Default.HideFlydigi)
+                {
+                    var bs1Service = _host?.Services.GetService<FlydigiCoolerBleService>();
+                    if (bs1Service != null)
+                        await bs1Service.TryAutoConnectAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to auto-connect Flydigi BS1");
+            }
+        }
+
+        private static async Task RestoreAdaptiveModeAsync()
+        {
+            // Restore Adaptive Mode override state from previous session.
+            // Only restore if Adaptive Mode was actually running when the app closed.
+            try
+            {
+                var deviceApplier = _host?.Services.GetService<DeviceApplier>();
+                if (deviceApplier != null && Settings.Default.isAdaptiveModeRunning)
+                {
+                    if (!Settings.Default.HideFlydigi && Settings.Default.AdaptiveBs2ProEnabled)
+                        deviceApplier.EnableFlydigiOverride();
+
+                    if (Settings.Default.AdaptiveWcEnabled)
+                        deviceApplier.EnableWatercoolerOverride();
+
+                    if (Settings.Default.AdaptiveKeyboardEnabled)
+                        deviceApplier.EnableKeyboardOverride();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to restore Adaptive Mode override state");
+            }
+
+            // Small delay so the overrides apply after devices have had a
+            // chance to finish connecting (avoids racing with TryAutoConnectAsync).
+            await Task.Delay(500);
         }
 
         private static async Task RunPostStartupTasksAsync()

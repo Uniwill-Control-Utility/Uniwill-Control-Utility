@@ -75,6 +75,7 @@
                    VerticalContentAlignment="Center"
                    Content="--"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
         </Grid>
     </Border>
 </UserControl>
