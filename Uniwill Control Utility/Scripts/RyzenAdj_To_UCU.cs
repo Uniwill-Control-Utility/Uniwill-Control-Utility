@@ -6,7 +6,6 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Uniwill_Control_Utility.Scripts.GPUs.AMD;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Uniwill_Control_Utility.Scripts.Intel_Backend;
 using Uniwill_Control_Utility.Scripts.Misc;
@@ -32,14 +31,14 @@ namespace Uniwill_Control_Utility.Scripts
         // Set from App.xaml.cs or MainWindowViewModel after DI resolves the service.
         internal static UniwillECService? EcService { get; set; }
 
-        public static void Translate(string ryzenAdjString, bool isAutoReapply = false, bool isAutoOC = false, string? appliedName = null, bool localizeAppliedName = false) =>
-            _ = TranslateAsync(ryzenAdjString, isAutoReapply, isAutoOC, appliedName, localizeAppliedName);
+        public static void Translate(string ryzenAdjString, bool isAutoReapply = false, string? appliedName = null, bool localizeAppliedName = false) =>
+            _ = TranslateAsync(ryzenAdjString, isAutoReapply, appliedName, localizeAppliedName);
 
-        public static Task TranslateAsync(string ryzenAdjString, bool isAutoReapply = false, bool isAutoOC = false, string? appliedName = null, bool localizeAppliedName = false) =>
-            Task.Run(() => TranslateCore(ryzenAdjString, isAutoReapply, isAutoOC, appliedName, localizeAppliedName));
+        public static Task TranslateAsync(string ryzenAdjString, bool isAutoReapply = false, string? appliedName = null, bool localizeAppliedName = false) =>
+            Task.Run(() => TranslateCore(ryzenAdjString, isAutoReapply, appliedName, localizeAppliedName));
 
         #pragma warning disable S1172 // Unused parameters
-        private static void TranslateCore(string ryzenAdjString, bool _isAutoReapply, bool isAutoOC, string? appliedName, bool localizeAppliedName)
+        private static void TranslateCore(string ryzenAdjString, bool _isAutoReapply, string? appliedName, bool localizeAppliedName)
         #pragma warning restore S1172
         {
             try
@@ -64,11 +63,7 @@ namespace Uniwill_Control_Utility.Scripts
 
                             DiagnosticLogger.LogDebug($"Processing: {ryzenAdjCommandString}={ryzenAdjCommandValueString}");
 
-                            if (ryzenAdjCommandString.Contains("UCUSR"))
-                            {
-                                UCUSR(ryzenAdjCommandString, ryzenAdjCommandValueString);
-                            }
-                            else if (ryzenAdjCommandString.Contains("CCD-Affinity"))
+                            if (ryzenAdjCommandString.Contains("CCD-Affinity"))
                             {
                                 CpuAffinityManager.SetGlobalAffinity(Convert.ToInt32(ryzenAdjCommandValueString));
                             }
@@ -86,10 +81,6 @@ namespace Uniwill_Control_Utility.Scripts
                             else if (ryzenAdjCommandString.Contains("Refresh-Rate"))
                             {
                                 Uniwill_Control_Utility.Scripts.Misc.Display.ApplySettings(Convert.ToInt32(ryzenAdjCommandValueString));
-                            }
-                            else if (ryzenAdjCommandString.Contains("ADLX"))
-                            {
-                                ADLX(ryzenAdjCommandString, ryzenAdjCommandValueString);
                             }
                             else if (ryzenAdjCommandString.Contains("NVIDIA"))
                             {
@@ -171,10 +162,6 @@ namespace Uniwill_Control_Utility.Scripts
 
                                 if (ryzenAdjCommand.Contains("skin")) ryzenAdjCommandValue *= 256; // millidegrees to decidegrees
 
-                                if (ryzenAdjCommand.Contains("coall") && Settings.Default.isAutoUvCPU && !isAutoOC) continue;
-                                if (ryzenAdjCommand.Contains("coper") && Settings.Default.isAutoUvCPU && !isAutoOC) continue;
-                                if (ryzenAdjCommand.Contains("cogfx") && Settings.Default.isAutoUviGPU && !isAutoOC) continue;
-
                                 DiagnosticLogger.LogInfo($"SMU sending: {ryzenAdjCommandString} = 0x{ryzenAdjCommandValue:X} ({ryzenAdjCommandValue})");
 
                                 if (ryzenAdjCommandValue <= 0 && !ryzenAdjCommandString.Contains("co")) SMUCommands.applySettings(ryzenAdjCommandString, 0x0);
@@ -194,65 +181,13 @@ namespace Uniwill_Control_Utility.Scripts
                         }
                 }
 
-                if (!isAutoOC)
-                {
-                    LastAppliedSettingsService.Update(normalizedCommands, appliedName, localizeAppliedName);
-                }
+                LastAppliedSettingsService.Update(normalizedCommands, appliedName, localizeAppliedName);
             }
             catch (Exception ex)
             {
                 DiagnosticLogger.LogError(ex, "Failed to translate RyzenAdj command string");
             }
         }
-
-private static void ADLX(string command, string value)
-        {
-            try
-            {
-                DiagnosticLogger.LogDebug($"ADLX: {command}={value}");
-                string[] variables = value.Split('-');
-
-                if (command == "ADLX-Lag") _ = ADLXBackend.SetAntiLag(int.Parse(variables[0]), bool.Parse(variables[1]));
-                if (command == "ADLX-Boost") _ = ADLXBackend.SetBoost(int.Parse(variables[0]), bool.Parse(variables[1]), int.Parse(variables[2]));
-                if (command == "ADLX-RSR")
-                {
-                    _ = ADLXBackend.SetRSR(bool.Parse(variables[0]));
-                    _ = ADLXBackend.SetRSRSharpness(int.Parse(variables[1]));
-                }
-                if (command == "ADLX-Chill") _ = ADLXBackend.SetChill(int.Parse(variables[0]), bool.Parse(variables[1]), int.Parse(variables[2]), int.Parse(variables[3]));
-                if (command == "ADLX-Sync") _ = ADLXBackend.SetEnhancedSync(int.Parse(variables[0]), bool.Parse(variables[1]));
-                if (command == "ADLX-ImageSharp") _ = ADLXBackend.SetImageSharpning(int.Parse(variables[0]), bool.Parse(variables[1]), int.Parse(variables[2]));
-            }
-            catch (Exception ex)
-            {
-                DiagnosticLogger.LogError(ex, "Failed to apply ADLX settings");
-            }
-        }
-
-        private static void UCUSR(string command, string value)
-        {
-            try
-            {
-                DiagnosticLogger.LogDebug($"UCUSR: {command}={value}");
-                string[] variables = value.Split('-');
-
-                if (command == "UCUSR")
-                {
-                    Uniwill_Control_Utility.Properties.Settings.Default.AdapterIdx = 0;
-                    Uniwill_Control_Utility.Properties.Settings.Default.isMagpie = Convert.ToBoolean(variables[0]);
-                    Uniwill_Control_Utility.Properties.Settings.Default.VSync = Convert.ToBoolean(variables[1]);
-                    Uniwill_Control_Utility.Properties.Settings.Default.Sharpness = Convert.ToDouble(variables[2]);
-                    Uniwill_Control_Utility.Properties.Settings.Default.ResMode = Convert.ToInt32(variables[3]);
-                    Uniwill_Control_Utility.Properties.Settings.Default.AutoRestore = Convert.ToBoolean(variables[0]);
-                    Uniwill_Control_Utility.Properties.Settings.Default.Save();
-                }
-            }
-            catch (Exception ex)
-            {
-                DiagnosticLogger.LogError(ex, "Failed to apply UCUSR settings");
-            }
-        }
-
         private static void NVIDIA(string command, string value)
         {
             try
