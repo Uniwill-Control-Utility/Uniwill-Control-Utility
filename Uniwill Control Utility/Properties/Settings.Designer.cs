@@ -491,376 +491,35 @@ namespace Uniwill_Control_Utility.Properties {
             }
         }
 
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("Alt+F")]
-        public string MagpieHotkey {
-            get {
-                return ((string)(this["MagpieHotkey"]));
-            }
-            set {
-                this["MagpieHotkey"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("1")]
-        public int ScaleMode {
-            get {
-                return ((int)(this["ScaleMode"]));
-            }
-            set {
-                this["ScaleMode"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0")]
-        public uint CaptureMode {
-            get {
-                return ((uint)(this["CaptureMode"]));
-            }
-            set {
-                this["CaptureMode"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("1")]
-        public uint LoggingLevel {
-            get {
-                return ((uint)(this["LoggingLevel"]));
-            }
-            set {
-                this["LoggingLevel"] = value;
-            }
-        }
 
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool NoCursor {
-            get {
-                return ((bool)(this["NoCursor"]));
-            }
-            set {
-                this["NoCursor"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool DisableLowLatency {
-            get {
-                return ((bool)(this["DisableLowLatency"]));
-            }
-            set {
-                this["DisableLowLatency"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("1")]
-        public float CursorZoomFactor {
-            get {
-                return ((float)(this["CursorZoomFactor"]));
-            }
-            set {
-                this["CursorZoomFactor"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool DisableWindowResizing {
-            get {
-                return ((bool)(this["DisableWindowResizing"]));
-            }
-            set {
-                this["DisableWindowResizing"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0")]
-        public uint CursorInterpolationMode {
-            get {
-                return ((uint)(this["CursorInterpolationMode"]));
-            }
-            set {
-                this["CursorInterpolationMode"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool DisableDirectFlip {
-            get {
-                return ((bool)(this["DisableDirectFlip"]));
-            }
-            set {
-                this["DisableDirectFlip"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool Is3DMode {
-            get {
-                return ((bool)(this["Is3DMode"]));
-            }
-            set {
-                this["Is3DMode"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0")]
-        public int AdapterIdx {
-            get {
-                return ((int)(this["AdapterIdx"]));
-            }
-            set {
-                this["AdapterIdx"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool CropTitleBarOfUWP {
-            get {
-                return ((bool)(this["CropTitleBarOfUWP"]));
-            }
-            set {
-                this["CropTitleBarOfUWP"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool SimulateExclusiveFullscreen {
-            get {
-                return ((bool)(this["SimulateExclusiveFullscreen"]));
-            }
-            set {
-                this["SimulateExclusiveFullscreen"] = value;
-            }
-        }
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0")]
-        public uint CropLeft {
-            get {
-                return ((uint)(this["CropLeft"]));
-            }
-            set {
-                this["CropLeft"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0")]
-        public uint CropTop {
-            get {
-                return ((uint)(this["CropTop"]));
-            }
-            set {
-                this["CropTop"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0")]
-        public uint CropRight {
-            get {
-                return ((uint)(this["CropRight"]));
-            }
-            set {
-                this["CropRight"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0")]
-        public uint CropBottom {
-            get {
-                return ((uint)(this["CropBottom"]));
-            }
-            set {
-                this["CropBottom"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool CustomCropping {
-            get {
-                return ((bool)(this["CustomCropping"]));
-            }
-            set {
-                this["CustomCropping"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool VSync {
-            get {
-                return ((bool)(this["VSync"]));
-            }
-            set {
-                this["VSync"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool DebugSaveEffectSources {
-            get {
-                return ((bool)(this["DebugSaveEffectSources"]));
-            }
-            set {
-                this["DebugSaveEffectSources"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool DebugWarningsAreErrors {
-            get {
-                return ((bool)(this["DebugWarningsAreErrors"]));
-            }
-            set {
-                this["DebugWarningsAreErrors"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool ShowFPS {
-            get {
-                return ((bool)(this["ShowFPS"]));
-            }
-            set {
-                this["ShowFPS"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool AdjustCursorSpeed {
-            get {
-                return ((bool)(this["AdjustCursorSpeed"]));
-            }
-            set {
-                this["AdjustCursorSpeed"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool DebugBreakpointMode {
-            get {
-                return ((bool)(this["DebugBreakpointMode"]));
-            }
-            set {
-                this["DebugBreakpointMode"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool DebugDisableEffectCache {
-            get {
-                return ((bool)(this["DebugDisableEffectCache"]));
-            }
-            set {
-                this["DebugDisableEffectCache"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0")]
-        public uint MultiMonitorUsage {
-            get {
-                return ((uint)(this["MultiMonitorUsage"]));
-            }
-            set {
-                this["MultiMonitorUsage"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool AutoRestore {
-            get {
-                return ((bool)(this["AutoRestore"]));
-            }
-            set {
-                this["AutoRestore"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("2")]
-        public int ResMode {
-            get {
-                return ((int)(this["ResMode"]));
-            }
-            set {
-                this["ResMode"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool isMagpie {
-            get {
-                return ((bool)(this["isMagpie"]));
-            }
-            set {
-                this["isMagpie"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0.8")]
-        public double Sharpness {
-            get {
-                return ((double)(this["Sharpness"]));
-            }
-            set {
-                this["Sharpness"] = value;
-            }
-        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
@@ -970,29 +629,7 @@ namespace Uniwill_Control_Utility.Properties {
             }
         }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool isAutoUvCPU {
-            get {
-                return ((bool)(this["isAutoUvCPU"]));
-            }
-            set {
-                this["isAutoUvCPU"] = value;
-            }
-        }
         
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool isAutoUviGPU {
-            get {
-                return ((bool)(this["isAutoUviGPU"]));
-            }
-            set {
-                this["isAutoUviGPU"] = value;
-            }
-        }
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
