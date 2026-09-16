@@ -39,7 +39,7 @@
             <Label Grid.Row="8" HorizontalAlignment="Right" VerticalContentAlignment="Center"
                    Foreground="{DynamicResource TextFillColorPrimaryBrush}">20%</Label>
             <Label Grid.Row="10" HorizontalAlignment="Right" VerticalContentAlignment="Center"
-                   Content="Fan Speed"
+                   Content="0%"
                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
         </Grid>
 

@@ -602,7 +602,7 @@
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>
-                                <ui:TextBlock FontTypography="Body" Text="laptop Information" />
+                                <ui:TextBlock FontTypography="Body" Text="Laptop Information" />
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"

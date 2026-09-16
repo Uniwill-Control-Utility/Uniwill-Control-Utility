@@ -111,7 +111,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Show the overlay when UXTU starts." />
+                                                   Text="Show the overlay when UCU starts." />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="StartupCheckBox"
                                                  Grid.Column="1"

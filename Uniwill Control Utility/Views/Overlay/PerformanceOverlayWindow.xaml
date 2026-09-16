@@ -1,7 +1,7 @@
 <Window x:Class="Uniwill_Control_Utility.Views.Overlay.PerformanceOverlayWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="UXTU Performance Overlay"
+        Title="UCU Performance Overlay"
         Width="{Binding WindowWidth}"
         Height="{Binding WindowHeight}"
         MinWidth="320"
