@@ -1,6 +1,4 @@
 using Accord.Math.Distances;
-using AutoOC.Controllers;
-using AutoOC.Monitors;
 using DuoVia.FuzzyStrings;
 using GameLib.Plugin.RiotGames.Model;
 using Gma.System.MouseKeyHook;
@@ -33,7 +31,6 @@ using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Scripts.Intel_Backend;
 using Uniwill_Control_Utility.Scripts.Misc;
-using Uniwill_Control_Utility.Scripts.UCU_Super_Resolution;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Controls;
 using Wpf.Ui;
@@ -50,7 +47,6 @@ namespace Uniwill_Control_Utility.Views.Windows
         public ViewModels.MainWindowViewModel ViewModel { get; set; }
 
         DispatcherTimer Misc = new DispatcherTimer();
-        public DispatcherTimer autoRestore = new DispatcherTimer();
 
         public static bool isMini { get; private set; }
         public static NavigationView _mainWindowNav;
@@ -72,10 +68,6 @@ namespace Uniwill_Control_Utility.Views.Windows
             Misc.Interval = TimeSpan.FromSeconds(1);
             Misc.Tick += Misc_Tick;
             Misc.Start();
-
-            autoRestore.Interval = TimeSpan.FromSeconds(1);
-            autoRestore.Tick += Controller.AutoRestore_Tick;
-            autoRestore.Start();
 
             SetupNavigationService(pageProvider);
             SetupUI();
@@ -206,15 +198,6 @@ namespace Uniwill_Control_Utility.Views.Windows
             ModelNameText.Text = "Uniwill Control Utility";
 
             tbMain.Title = "Uniwill Control Utility";
-
-            try
-            {
-                Controller.SetUpMagWindow(this);
-            }
-            catch (Exception ex)
-            {
-                Log.Logger.Error(ex, "Failed to setup MagWindow");
-            }
 
              Wpf.Ui.Appearance.SystemThemeWatcher.Watch(this, WindowBackdropType.Mica, true);
         }
@@ -561,57 +544,14 @@ namespace Uniwill_Control_Utility.Views.Windows
         }
 
 
-        InstabilityMonitor monitor = null;
-
-        AdaptiveUndervoltController iGpuController = null;
-
-        int lastiGPUUVOffset = 0;
         private async void Misc_Tick(object sender, EventArgs e)
         {
             try
             {
-                if (Settings.Default.isAutoUviGPU)
-                {
-                    if (monitor == null) monitor = new InstabilityMonitor();
-
-                    if(iGpuController == null) iGpuController = new AdaptiveUndervoltController(
-                        monitor,
-                        minOffset: -50,
-                        stepSize: 1,
-                        stableThreshold: 8,
-                        cooldownThreshold: 4,
-                        isIgpu : true
-                    );
-
-                    var newOffset = iGpuController.UpdateOffset();
-                    var commandValues = "";
-
-                    if (newOffset >= 0) commandValues = commandValues + $"--set-cogfx={newOffset} ";
-                    if (newOffset < 0) commandValues = commandValues + $"--set-cogfx={Convert.ToUInt32(0x100000 - (uint)(-1 * (int)newOffset))} ";
-
-                    if (lastiGPUUVOffset != newOffset)
-                    {
-                        await RyzenAdj_To_UCU.TranslateAsync(commandValues, false, true);
-                        lastiGPUUVOffset = newOffset;
-                    }
-
-                    iGpuController.RecordAppliedOffset(newOffset);
-                }
-                else if (!Settings.Default.isAutoUviGPU && iGpuController != null)
-                {
-                    iGpuController.Dispose();
-                    iGpuController = null;
-                }
-
-                if (!Settings.Default.isAutoUvCPU && !Settings.Default.isAutoUviGPU && monitor != null)
-                {
-                    monitor.Stop();
-                    monitor = null;
-                }
             }
             catch (Exception ex)
             {
-                DiagnosticLogger.LogError(ex, "Failed during adaptive undervolt monitoring tick");
+                DiagnosticLogger.LogError(ex, "Failed during misc monitoring tick");
             }
         }
 
@@ -1041,7 +981,6 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             Settings.Default.isAdaptiveModeRunning = false;
             Settings.Default.Save();
-            Controller.magWindow?.Dispose();
             Application.Current.Shutdown();
         }
 
@@ -1056,19 +995,10 @@ namespace Uniwill_Control_Utility.Views.Windows
             
             Settings.Default.isAdaptiveModeRunning = false;
             Settings.Default.Save();
-            Controller.magWindow?.Dispose();
-            //Fan_Control.disableFanControl();
         }
 
         private void mainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            Dispatcher.BeginInvoke(
-                DispatcherPriority.ApplicationIdle,
-                new Action(() =>
-                {
-                    Controller.SetUpMagWindow(this);
-                }));
-
             if (Settings.Default.StartMini)
             {
                 this.WindowState = WindowState.Minimized;
@@ -1214,7 +1144,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
 
-            var fc = App.GetService<FlydigiCoolerService>();
+            var fc = App.GetService<FlydigiCoolerHidService>();
             if (fc == null || !fc.IsConnected)
             {
                 ToastNotification.ShowToastNotification("Flydigi", "Cooler not connected");
@@ -1267,7 +1197,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             // Show/hide Custom item based on whether a custom curve exists
             try
             {
-                var fc = App.GetService<FlydigiCoolerService>();
+                var fc = App.GetService<FlydigiCoolerHidService>();
                 bool hasCustom = false;
                 if (fc != null)
                 {
@@ -1284,7 +1214,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (sender is not MenuItem item)
                 return;
 
-            var fc = App.GetService<FlydigiCoolerService>();
+            var fc = App.GetService<FlydigiCoolerHidService>();
             if (fc == null || !fc.IsConnected)
             {
                 ToastNotification.ShowToastNotification("Flydigi", "Cooler not connected");
@@ -1351,7 +1281,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
 
-            var fc = App.GetService<FlydigiCoolerService>();
+            var fc = App.GetService<FlydigiCoolerHidService>();
             if (fc == null || !fc.IsConnected)
             {
                 ToastNotification.ShowToastNotification("Flydigi", "Cooler not connected");
@@ -1567,7 +1497,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             try
             {
-                var fc = App.GetService<FlydigiCoolerService>();
+                var fc = App.GetService<FlydigiCoolerHidService>();
                 if (fc == null) return;
 
                 var settings = fc.GetSettings();

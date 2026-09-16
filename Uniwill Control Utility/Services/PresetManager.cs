@@ -61,10 +61,6 @@ namespace Uniwill_Control_Utility.Services
         public int intelClockRatioC6 { get; set; } = 20;
         public int intelClockRatioC7 { get; set; } = 20;
         public int intelClockRatioC8 { get; set; } = 20;
-        public int rsr { get; set; }
-        public int boost { get; set; }
-        public int imageSharp { get; set; }
-
         public int ccd1Core1 { get; set; }
         public int ccd1Core2 { get; set; }
         public int ccd1Core3 { get; set; }
@@ -132,11 +128,6 @@ namespace Uniwill_Control_Utility.Services
         public bool isIntelCpuTemp { get; set; }
 
         public bool isRadeonGraphics { get; set; }
-        public bool isAntiLag { get; set; }
-        public bool isRSR { get; set; }
-        public bool isBoost { get; set; }
-        public bool isImageSharp { get; set; }
-        public bool isSync { get; set; }
         public bool isNVIDIA { get; set; }
         public bool IsCCD1Core1 { get; set; }
         public bool IsCCD1Core2 { get; set; }
@@ -190,13 +181,7 @@ namespace Uniwill_Control_Utility.Services
         public bool isWindowsMaxUnparkedCores { get; set; }
         public int windowsMaxUnparkedCores { get; set; } = 100;
 
-        public bool isMag { get; set; }
-        public bool isVsync { get; set; }
-        public bool isRecap { get; set; }
-        public int Sharpness { get; set; }
-        public int ResScaleIndex { get; set; }
-
-    }
+      }
 
     public class PresetManager
     {
