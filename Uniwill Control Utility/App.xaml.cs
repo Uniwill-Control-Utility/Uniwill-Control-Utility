@@ -206,10 +206,10 @@ namespace Uniwill_Control_Utility
                         // Flydigi BS2 Pro cooling pad page and service
                         // Singleton so the host disposes it on shutdown (stops background timers).
                         services.AddSingleton<Views.Pages.FlydigiCooler>();
-                        services.AddSingleton<FlydigiCoolerService>();
+                        services.AddSingleton<FlydigiCoolerHidService>();
 
                         // Flydigi BS1 (BLE-only) cooling pad service
-                        services.AddSingleton<Bs1Service>();
+                        services.AddSingleton<FlydigiCoolerBleService>();
 
                         // Uniwill EC access (for XMG / TUXEDO laptops)
                         services.AddSingleton<UniwillECService>(provider =>
@@ -368,8 +368,8 @@ namespace Uniwill_Control_Utility
                 {
                     if (!Settings.Default.HideFlydigi)
                     {
-                        var flydigiCoolerService = _host.Services.GetService<FlydigiCoolerService>();
-                        if (flydigiCoolerService != null && FlydigiCoolerService.IsDeviceAvailable())
+                        var flydigiCoolerService = _host.Services.GetService<FlydigiCoolerHidService>();
+                        if (flydigiCoolerService != null && FlydigiCoolerHidService.IsDeviceAvailable())
                             await flydigiCoolerService.TryAutoConnectAsync();
                     }
                 }
@@ -383,7 +383,7 @@ namespace Uniwill_Control_Utility
                 {
                     if (!Settings.Default.HideFlydigi)
                     {
-                        var bs1Service = _host.Services.GetService<Bs1Service>();
+                        var bs1Service = _host.Services.GetService<FlydigiCoolerBleService>();
                         if (bs1Service != null)
                             await bs1Service.TryAutoConnectAsync();
                     }
@@ -633,16 +633,16 @@ namespace Uniwill_Control_Utility
 
             try
             {
-                var coolerService = App._host?.Services.GetService<FlydigiCoolerService>();
+                var coolerService = App._host?.Services.GetService<FlydigiCoolerHidService>();
                 coolerService?.DisconnectAsync();
             }
             catch { /* Non-critical: disconnect during teardown is best-effort */ }
 
             try
             {
-                var bs1Service = App._host?.Services.GetService<Bs1Service>();
+                var bs1Service = App._host?.Services.GetService<FlydigiCoolerBleService>();
 
-                // Bs1Service.Dispose performs synchronous cleanup (no async disconnect).
+                // FlydigiCoolerBleService.Dispose performs synchronous cleanup (no async disconnect).
                 // We call it here to ensure the BLE GATT session and device are released
                 // before the process exits. Disposing an already-disconnected service is safe.
                 bs1Service?.Dispose();

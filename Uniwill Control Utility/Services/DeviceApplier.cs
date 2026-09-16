@@ -15,8 +15,8 @@ namespace Uniwill_Control_Utility.Services
     /// </summary>
     public class DeviceApplier
     {
-        private readonly FlydigiCoolerService _flydigiService;
-        private readonly Bs1Service? _bs1Service;
+        private readonly FlydigiCoolerHidService _flydigiService;
+        private readonly FlydigiCoolerBleService? _bs1Service;
         private readonly WaterCoolerService _waterCoolerService;
         private readonly UniwillECService? _uniwillEc;
 
@@ -125,7 +125,7 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private KeyboardSettings? _savedKeyboardSettings;
 
-        public DeviceApplier(FlydigiCoolerService flydigiService, Bs1Service? bs1Service, WaterCoolerService waterCoolerService, UniwillECService? uniwillEc = null)
+        public DeviceApplier(FlydigiCoolerHidService flydigiService, FlydigiCoolerBleService? bs1Service, WaterCoolerService waterCoolerService, UniwillECService? uniwillEc = null)
         {
             _flydigiService = flydigiService;
             _bs1Service = bs1Service;

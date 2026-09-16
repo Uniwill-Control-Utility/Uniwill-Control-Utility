@@ -22,8 +22,8 @@ namespace Uniwill_Control_Utility.ViewModels
         private readonly IHardwareMonitoringService _hardwareMonitoring;
         private readonly UniwillECService? _uniwillEc;
         private readonly WaterCoolerService _waterCoolerService;
-        private readonly FlydigiCoolerService _flydigiService;
-        private readonly Bs1Service _bs1Service;
+        private readonly FlydigiCoolerHidService _flydigiService;
+        private readonly FlydigiCoolerBleService _bs1Service;
         private readonly DispatcherTimer _refreshTimer;
         private readonly DispatcherTimer _batteryEcTimer;
         private IDisposable? _lease;
@@ -36,8 +36,8 @@ namespace Uniwill_Control_Utility.ViewModels
             IHardwareMonitoringService hardwareMonitoring,
             UniwillECService? uniwillEc,
             WaterCoolerService waterCoolerService,
-            FlydigiCoolerService flydigiService,
-            Bs1Service bs1Service)
+            FlydigiCoolerHidService flydigiService,
+            FlydigiCoolerBleService bs1Service)
         {
             _navigationService = navigationService
                 ?? throw new ArgumentNullException(nameof(navigationService));

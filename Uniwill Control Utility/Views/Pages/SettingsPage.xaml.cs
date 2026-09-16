@@ -391,10 +391,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 try
                 {
-                    var coolerService = App.GetService<FlydigiCoolerService>();
+                    var coolerService = App.GetService<FlydigiCoolerHidService>();
                     coolerService?.SuspendAllServices();
 
-                    var bs1Service = App.GetService<Bs1Service>();
+                    var bs1Service = App.GetService<FlydigiCoolerBleService>();
                     bs1Service?.SuspendAllServices();
                 }
                 catch (Exception)
@@ -412,10 +412,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Resume all Flydigi background services
             try
             {
-                var coolerService = App.GetService<FlydigiCoolerService>();
+                var coolerService = App.GetService<FlydigiCoolerHidService>();
                 coolerService?.ResumeBackgroundServices();
 
-                var bs1Service = App.GetService<Bs1Service>();
+                var bs1Service = App.GetService<FlydigiCoolerBleService>();
                 bs1Service?.ResumeBackgroundServices();
             }
             catch (Exception)

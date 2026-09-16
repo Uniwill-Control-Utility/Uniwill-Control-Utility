@@ -17,7 +17,7 @@ namespace Uniwill_Control_Utility.Services
     /// HID communication layer for Flydigi BS series cooling pads (BS2, BS2 PRO, BS3, BS3 PRO).
     /// Uses HidLibrary for device I/O with the 5A A5 frame protocol.
     /// </summary>
-    public class FlydigiCoolerService : IDisposable
+    public class FlydigiCoolerHidService : IDisposable
     {
         /* ------------------------------------------------------------------ */
         /*  Windows power notification P/Invoke                                 */
@@ -335,7 +335,7 @@ namespace Uniwill_Control_Utility.Services
 
         public FlydigiCoolerDeviceInfo? ConnectedDeviceInfo { get; private set; }
 
-        public FlydigiCoolerService()
+        public FlydigiCoolerHidService()
         {
             LoadSettings();
 
@@ -606,7 +606,7 @@ namespace Uniwill_Control_Utility.Services
             if (target == null && devices.Count > 0)
             {
                 target = devices[0];
-                System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Saved path {devicePath} not found, falling back to {target.DevicePath}");
+                System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerHidService] Saved path {devicePath} not found, falling back to {target.DevicePath}");
             }
 
             if (target == null)
@@ -1730,17 +1730,17 @@ namespace Uniwill_Control_Utility.Services
 
                 if (result == 0) // CR_SUCCESS
                 {
-                    System.Diagnostics.Debug.WriteLine("[FlydigiCoolerService] HID arrival notification registered");
+                    System.Diagnostics.Debug.WriteLine("[FlydigiCoolerHidService] HID arrival notification registered");
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] HID arrival notification failed: {result}");
+                    System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerHidService] HID arrival notification failed: {result}");
                 }
             }
             catch (Exception ex)
             {
                 // Non-critical: fall back to the polling device monitor
-                System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] HID arrival notification error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerHidService] HID arrival notification error: {ex.Message}");
             }
         }
 
@@ -1767,7 +1767,7 @@ namespace Uniwill_Control_Utility.Services
                 {
                     if (IsConnected)
                     {
-                        System.Diagnostics.Debug.WriteLine("[FlydigiCoolerService] Flydigi HID device removed");
+                        System.Diagnostics.Debug.WriteLine("[FlydigiCoolerHidService] Flydigi HID device removed");
                         DisconnectAsync();
                     }
                     return;
@@ -1793,7 +1793,7 @@ namespace Uniwill_Control_Utility.Services
                 {
                     if (lowerPath.Contains(identifier))
                     {
-                        System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Flydigi HID device arrived: {path}");
+                        System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerHidService] Flydigi HID device arrived: {path}");
                         FlydigiHardwareDetector.InvalidateCache();
 
                         // Auto-connect if not already connected and user didn't explicitly disconnect.
@@ -1824,7 +1824,7 @@ namespace Uniwill_Control_Utility.Services
                                 if (ok)
                                 {
                                     System.Diagnostics.Debug.WriteLine(
-                                        $"[FlydigiCoolerService] Auto-connected via HID arrival: {path}");
+                                        $"[FlydigiCoolerHidService] Auto-connected via HID arrival: {path}");
                                 }
                             });
                         }
@@ -1891,7 +1891,7 @@ namespace Uniwill_Control_Utility.Services
                                             await Task.Delay(500, CancellationToken.None);
                                             bool ok = await ConnectAsync(freshPath);
                                             if (ok)
-                                                System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerService] Auto-connected via device monitor: {freshPath}");
+                                                System.Diagnostics.Debug.WriteLine($"[FlydigiCoolerHidService] Auto-connected via device monitor: {freshPath}");
                                         });
                                     }
                                 }
@@ -2016,20 +2016,20 @@ namespace Uniwill_Control_Utility.Services
                     _reconnectThread = new Thread(() =>
                     {
                         System.Diagnostics.Debug.WriteLine(
-                            $"[FlydigiCoolerService] Reconnect loop started (generation={generation}, {ReconnectDelaysMs.Length} delays)");
+                            $"[FlydigiCoolerHidService] Reconnect loop started (generation={generation}, {ReconnectDelaysMs.Length} delays)");
 
                         for (int i = 0; i < ReconnectDelaysMs.Length; i++)
                         {
                             if (token.IsCancellationRequested)
                             {
-                                System.Diagnostics.Debug.WriteLine("[FlydigiCoolerService] Reconnect loop cancelled");
+                                System.Diagnostics.Debug.WriteLine("[FlydigiCoolerHidService] Reconnect loop cancelled");
                                 return;
                             }
 
                             if (IsConnected || _userDisconnected)
                             {
                                 System.Diagnostics.Debug.WriteLine(
-                                    "[FlydigiCoolerService] Reconnect loop stopping (already connected or user disconnected)");
+                                    "[FlydigiCoolerHidService] Reconnect loop stopping (already connected or user disconnected)");
                                 return;
                             }
 
@@ -2037,7 +2037,7 @@ namespace Uniwill_Control_Utility.Services
                             if (generation != _connectGeneration)
                             {
                                 System.Diagnostics.Debug.WriteLine(
-                                    $"[FlydigiCoolerService] Reconnect loop stale (generation {generation} vs {_connectGeneration}), stopping");
+                                    $"[FlydigiCoolerHidService] Reconnect loop stale (generation {generation} vs {_connectGeneration}), stopping");
                                 return;
                             }
 
@@ -2045,7 +2045,7 @@ namespace Uniwill_Control_Utility.Services
                             if (delayMs > 0)
                             {
                                 System.Diagnostics.Debug.WriteLine(
-                                    $"[FlydigiCoolerService] Waiting {delayMs}ms before reconnect attempt {i + 1}/{ReconnectDelaysMs.Length}");
+                                    $"[FlydigiCoolerHidService] Waiting {delayMs}ms before reconnect attempt {i + 1}/{ReconnectDelaysMs.Length}");
 
                                 // Wait for delay, cancellation, or wake signal from HID arrival
                                 WaitHandle[] waitHandles =
@@ -2057,7 +2057,7 @@ namespace Uniwill_Control_Utility.Services
 
                                 if (result == 0) // cancelled
                                 {
-                                    System.Diagnostics.Debug.WriteLine("[FlydigiCoolerService] Reconnect loop cancelled during wait");
+                                    System.Diagnostics.Debug.WriteLine("[FlydigiCoolerHidService] Reconnect loop cancelled during wait");
                                     return;
                                 }
                                 // result == 1 means woken by HID arrival — skip to connect attempt immediately
@@ -2075,7 +2075,7 @@ namespace Uniwill_Control_Utility.Services
                                 {
                                     var path = devices[0].DevicePath;
                                     System.Diagnostics.Debug.WriteLine(
-                                        $"[FlydigiCoolerService] Reconnect attempt {i + 1}: {path}");
+                                        $"[FlydigiCoolerHidService] Reconnect attempt {i + 1}: {path}");
 
                                     _settings.LastDevicePath = path;
                                     SaveSettings();
@@ -2089,12 +2089,12 @@ namespace Uniwill_Control_Utility.Services
                                         if (ok)
                                         {
                                             System.Diagnostics.Debug.WriteLine(
-                                                $"[FlydigiCoolerService] Reconnected on attempt {i + 1}: {path}");
+                                                $"[FlydigiCoolerHidService] Reconnected on attempt {i + 1}: {path}");
                                         }
                                         else
                                         {
                                             System.Diagnostics.Debug.WriteLine(
-                                                $"[FlydigiCoolerService] Reconnect attempt {i + 1} failed: {path}");
+                                                $"[FlydigiCoolerHidService] Reconnect attempt {i + 1} failed: {path}");
                                         }
                                     });
                                 }
@@ -2102,12 +2102,12 @@ namespace Uniwill_Control_Utility.Services
                             catch (Exception ex)
                             {
                                 System.Diagnostics.Debug.WriteLine(
-                                    $"[FlydigiCoolerService] Reconnect discovery failed: {ex.Message}");
+                                    $"[FlydigiCoolerHidService] Reconnect discovery failed: {ex.Message}");
                             }
                         }
 
                         System.Diagnostics.Debug.WriteLine(
-                            "[FlydigiCoolerService] Reconnect loop exhausted all delays, health check will trigger new round");
+                            "[FlydigiCoolerHidService] Reconnect loop exhausted all delays, health check will trigger new round");
                     })
                     {
                         IsBackground = true,
@@ -2186,7 +2186,7 @@ namespace Uniwill_Control_Utility.Services
 
                 _healthCheckThread = new Thread(() =>
                 {
-                    System.Diagnostics.Debug.WriteLine("[FlydigiCoolerService] Health check started (30s interval)");
+                    System.Diagnostics.Debug.WriteLine("[FlydigiCoolerHidService] Health check started (30s interval)");
 
                     while (!token.IsCancellationRequested)
                     {
@@ -2204,7 +2204,7 @@ namespace Uniwill_Control_Utility.Services
                                 continue;
 
                             System.Diagnostics.Debug.WriteLine(
-                                "[FlydigiCoolerService] Health check: disconnected, starting reconnect round");
+                                "[FlydigiCoolerHidService] Health check: disconnected, starting reconnect round");
                             StartReconnectLoop();
                         }
                         catch { /* Non-critical */ }

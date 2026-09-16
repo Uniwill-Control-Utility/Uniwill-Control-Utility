@@ -185,7 +185,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             if (isBs1)
             {
-                // BS1 supports Curve (Auto) via app-localized Bs1SmartControl — keep all 3 fan modes.
+                // BS1 supports Curve (Auto) via app-localized FlydigiBs1SmartControl — keep all 3 fan modes.
                 nudBs2ProRpm.Maximum = MaxRpmBs1;
                 sdBs2ProRpm.Maximum = MaxRpmBs1;
                 if (nudBs2ProRpm.Value > MaxRpmBs1)
@@ -266,7 +266,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private DeviceApplier? _deviceApplier;
         private FlydigiSmartControl? _bs2ProSmartControl;
         private FlydigiTemperatureProvider? _bs2ProTempProvider;
-        private Bs1SmartControl? _bs1SmartControl;
+        private FlydigiBs1SmartControl? _bs1SmartControl;
         private async void setUp()
         {
             try
@@ -469,7 +469,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                     // Stop smart control when Adaptive Mode stops
                     StopBs2ProSmartControl();
-                    StopBs1SmartControl();
+                    StopFlydigiBs1SmartControl();
 
                     // Lift DeviceApplier overrides when Adaptive Mode stops so that
                     // the Flydigi/Watercooler pages regain control and hide their overlays.
@@ -924,7 +924,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 // Stop any existing smart control (curve mode) so it restarts with the new profile
                 StopBs2ProSmartControl();
-                StopBs1SmartControl();
+                StopFlydigiBs1SmartControl();
             }
             catch (Exception ex)
             {
@@ -1325,7 +1325,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (_bs2ProSmartControl != null)
                     StopBs2ProSmartControl();
                 if (_bs1SmartControl != null)
-                    StopBs1SmartControl();
+                    StopFlydigiBs1SmartControl();
 
                 byte? gear = null;
                 ushort? rpm = null;
@@ -1382,7 +1382,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             if (isBs1Curve)
             {
-                var bs1Service = App.GetService<Bs1Service>();
+                var bs1Service = App.GetService<FlydigiCoolerBleService>();
                 if (bs1Service?.IsConnected != true)
                     return;
 
@@ -1391,7 +1391,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (_bs1SmartControl == null)
                 {
                     var tempProvider = new FlydigiTemperatureProvider();
-                    _bs1SmartControl = new Bs1SmartControl(bs1Service, tempProvider);
+                    _bs1SmartControl = new FlydigiBs1SmartControl(bs1Service, tempProvider);
                     _bs1SmartControl.ActiveProfile = curveProfile;
                     _bs1SmartControl.Settings = bs1Service.GetSettings();
                     _bs1SmartControl.TempSource = bs1Service.GetSettings().TempSource;
@@ -1404,7 +1404,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             else
             {
-                var flydigiService = App.GetService<FlydigiCoolerService>();
+                var flydigiService = App.GetService<FlydigiCoolerHidService>();
                 if (flydigiService?.IsConnected != true)
                     return;
 
@@ -1424,7 +1424,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private FlydigiFanCurveProfile GetBs1CurveProfile(Bs1Service bs1Service)
+        private FlydigiFanCurveProfile GetBs1CurveProfile(FlydigiCoolerBleService bs1Service)
         {
             string curveProfileId = GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex);
             return curveProfileId switch
@@ -1438,7 +1438,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             };
         }
 
-        private FlydigiFanCurveProfile GetBs2CurveProfile(FlydigiCoolerService flydigiService)
+        private FlydigiFanCurveProfile GetBs2CurveProfile(FlydigiCoolerHidService flydigiService)
         {
             string curveProfileId = GetBs2ProCurveProfileId(cbxBs2ProCurve.SelectedIndex);
             return curveProfileId switch
@@ -2217,7 +2217,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private void StopBs1SmartControl()
+        private void StopFlydigiBs1SmartControl()
         {
             if (_bs1SmartControl != null)
             {
@@ -2228,7 +2228,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>Loads the custom curve profile from Bs1 settings, falling back to Balanced.</summary>
-        private static FlydigiFanCurveProfile LoadBs1CustomCurveProfile(Bs1Service bs1Service)
+        private static FlydigiFanCurveProfile LoadBs1CustomCurveProfile(FlydigiCoolerBleService bs1Service)
         {
             try
             {
@@ -2246,7 +2246,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>Loads the custom curve profile from Bs2Pro settings, falling back to Balanced.</summary>
-        private static FlydigiFanCurveProfile LoadCustomCurveProfile(FlydigiCoolerService? flydigiService)
+        private static FlydigiFanCurveProfile LoadCustomCurveProfile(FlydigiCoolerHidService? flydigiService)
         {
             try
             {
@@ -2296,7 +2296,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Bs2ProCurveEditor.Visibility = Visibility.Visible;
                 try
                 {
-                    var flydigiService = App.GetService<FlydigiCoolerService>();
+                    var flydigiService = App.GetService<FlydigiCoolerHidService>();
                     Bs2ProCurveEditor.SetCurve(LoadCustomCurveProfile(flydigiService));
                 }
                 catch (Exception)
@@ -2321,7 +2321,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Load custom curve or fall back to Balanced default
                 try
                 {
-                    var flydigiService = App.GetService<FlydigiCoolerService>();
+                    var flydigiService = App.GetService<FlydigiCoolerHidService>();
                     Bs2ProCurveEditor.SetCurve(LoadCustomCurveProfile(flydigiService));
                 }
                 catch (Exception)

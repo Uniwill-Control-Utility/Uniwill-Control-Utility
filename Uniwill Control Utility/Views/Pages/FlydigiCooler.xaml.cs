@@ -24,8 +24,8 @@ namespace Uniwill_Control_Utility.Views.Pages
     {
         private bool _isInitialized;
         private bool _disposed;
-        private FlydigiCoolerService? _coolerService;
-        private Bs1Service? _bs1Service;
+        private FlydigiCoolerHidService? _coolerService;
+        private FlydigiCoolerBleService? _bs1Service;
         private DeviceApplier? _deviceApplier;
         private MultiColorPickerControl? mcRotationColors;
         private Wpf.Ui.Controls.Snackbar? _adaptiveSnackbar;
@@ -34,7 +34,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool _isBs1Device;
 
         private FlydigiSmartControl? _smartControl;
-        private Bs1SmartControl? _bs1SmartControl;
+        private FlydigiBs1SmartControl? _bs1SmartControl;
         private FlydigiTemperatureProvider? _tempProvider;
         private System.Threading.Timer? _tempTimer;
 
@@ -102,8 +102,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             try
             {
-                _coolerService = App.GetService<FlydigiCoolerService>();
-                _bs1Service = App.GetService<Bs1Service>();
+                _coolerService = App.GetService<FlydigiCoolerHidService>();
+                _bs1Service = App.GetService<FlydigiCoolerBleService>();
 
                 if (_coolerService == null && _bs1Service == null)
                 {
@@ -634,7 +634,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 StopAutoControl();
 
                 _tempProvider ??= new FlydigiTemperatureProvider();
-                _bs1SmartControl = new Bs1SmartControl(_bs1Service, _tempProvider);
+                _bs1SmartControl = new FlydigiBs1SmartControl(_bs1Service, _tempProvider);
                 _bs1SmartControl.ActiveProfile = _activeProfile;
                 _bs1SmartControl.Settings = _bs1Service.GetSettings();
                 _bs1SmartControl.TempSource = _bs1Service.GetSettings().TempSource;
@@ -2436,7 +2436,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Scan for HID devices (BS2+) — uses BLE ad scan fallback if HID enum finds nothing
                 if (_coolerService != null)
                 {
-                    var hidDevices = await FlydigiCoolerService.DiscoverDevicesAsync();
+                    var hidDevices = await FlydigiCoolerHidService.DiscoverDevicesAsync();
                     foreach (var device in hidDevices)
                     {
                         cbxDevices.Items.Add(new ComboBoxItem
@@ -2507,7 +2507,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     // 1. HID enumeration (BS2+) — instant, finds connected devices
                     if (_coolerService != null)
                     {
-                        var hidDevices = FlydigiCoolerService.DiscoverDevices();
+                        var hidDevices = FlydigiCoolerHidService.DiscoverDevices();
                         foreach (var device in hidDevices)
                         {
                             discoveredDevices.Add((device.ModelName, (object)device));

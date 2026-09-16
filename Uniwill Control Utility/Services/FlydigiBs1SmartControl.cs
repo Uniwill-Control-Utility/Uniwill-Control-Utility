@@ -9,9 +9,9 @@ namespace Uniwill_Control_Utility.Services
     /// Unlike BS2+, the BS1 has no built-in temperature curve, so all curve computation
     /// happens host-side: read temperature → interpolate fan curve → send RPM via BLE.
     /// </summary>
-    public sealed class Bs1SmartControl : IDisposable
+    public sealed class FlydigiBs1SmartControl : IDisposable
     {
-        private readonly Bs1Service _bs1Service;
+        private readonly FlydigiCoolerBleService _bs1Service;
         private readonly FlydigiTemperatureProvider _temperatureProvider;
         private Timer? _timer;
         private bool _disposed;
@@ -91,7 +91,7 @@ namespace Uniwill_Control_Utility.Services
         /*  Constructor                                                        */
         /* ------------------------------------------------------------------ */
 
-        public Bs1SmartControl(Bs1Service bs1Service, FlydigiTemperatureProvider temperatureProvider)
+        public FlydigiBs1SmartControl(FlydigiCoolerBleService bs1Service, FlydigiTemperatureProvider temperatureProvider)
         {
             _bs1Service = bs1Service;
             _temperatureProvider = temperatureProvider;

@@ -22,8 +22,8 @@ namespace Uniwill_Control_Utility.Views.Pages
  
         private readonly IHardwareMonitoringService _hardwareMonitoring;
         private readonly UniwillECService? _uniwillEc;
-        private readonly FlydigiCoolerService _flydigiService;
-        private readonly Bs1Service _bs1Service;
+        private readonly FlydigiCoolerHidService _flydigiService;
+        private readonly FlydigiCoolerBleService _bs1Service;
         private readonly DeviceApplier _deviceApplier;
         private bool _loadingSettings;
         private DispatcherTimer? _statusTimer;
@@ -41,8 +41,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             IHardwareMonitoringService hardwareMonitoring,
             DeviceApplier deviceApplier,
             UniwillECService? uniwillEc = null,
-            FlydigiCoolerService? flydigiService = null,
-            Bs1Service? bs1Service = null)
+            FlydigiCoolerHidService? flydigiService = null,
+            FlydigiCoolerBleService? bs1Service = null)
         {
             _hardwareMonitoring = hardwareMonitoring;
             _deviceApplier = deviceApplier;

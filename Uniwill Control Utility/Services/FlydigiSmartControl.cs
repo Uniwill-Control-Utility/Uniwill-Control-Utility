@@ -12,7 +12,7 @@ namespace Uniwill_Control_Utility.Services
     /// </summary>
     public sealed class FlydigiSmartControl : IDisposable
     {
-        private readonly FlydigiCoolerService _coolerService;
+        private readonly FlydigiCoolerHidService _coolerService;
         private readonly FlydigiTemperatureProvider _temperatureProvider;
         private Timer? _timer;
         private bool _disposed;
@@ -109,7 +109,7 @@ namespace Uniwill_Control_Utility.Services
         /*  Constructor                                                        */
         /* ------------------------------------------------------------------ */
 
-        public FlydigiSmartControl(FlydigiCoolerService coolerService, FlydigiTemperatureProvider temperatureProvider)
+        public FlydigiSmartControl(FlydigiCoolerHidService coolerService, FlydigiTemperatureProvider temperatureProvider)
         {
             _coolerService = coolerService;
             _temperatureProvider = temperatureProvider;

@@ -20,10 +20,10 @@ namespace Uniwill_Control_Utility.Services
     /// Communication uses a custom 5A A5 protocol on top. Unlike BS2+, the BS1 is BLE-only
     /// (no HID), requires heartbeat keepalive packets, and has no RGB support.
     /// </summary>
-    public sealed class Bs1Service : IDisposable
+    public sealed class FlydigiCoolerBleService : IDisposable
     {
         // Flydigi BS1 GATT UUIDs (verified against THRM source)
-        private static readonly Guid Bs1ServiceUuid = new(0x0000fff0, 0x0000, 0x1000, 0x80, 0x00, 0x00, 0x80, 0x5f, 0x9b, 0x34, 0xfb);
+        private static readonly Guid FlydigiCoolerBleServiceUuid = new(0x0000fff0, 0x0000, 0x1000, 0x80, 0x00, 0x00, 0x80, 0x5f, 0x9b, 0x34, 0xfb);
         private static readonly Guid Bs1WriteCharUuid = new(0x0000fff2, 0x0000, 0x1000, 0x80, 0x00, 0x00, 0x80, 0x5f, 0x9b, 0x34, 0xfb);
         private static readonly Guid Bs1NotifyCharUuid = new(0x0000fff1, 0x0000, 0x1000, 0x80, 0x00, 0x00, 0x80, 0x5f, 0x9b, 0x34, 0xfb);
 
@@ -134,7 +134,7 @@ namespace Uniwill_Control_Utility.Services
         private static readonly string settingsFolder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "UCU");
 
-        public Bs1Service()
+        public FlydigiCoolerBleService()
         {
             LoadSettings();
 
@@ -590,7 +590,7 @@ namespace Uniwill_Control_Utility.Services
 
                     // Discover Flydigi BS1 GATT service (0xFFF0)
                     Log(LogPrefix + " Discovering GATT services...");
-                    var services = await _device.GetGattServicesForUuidAsync(Bs1ServiceUuid);
+                    var services = await _device.GetGattServicesForUuidAsync(FlydigiCoolerBleServiceUuid);
                     Log($"{LogPrefix} Service discovery status: {services.Status}, found {services.Services.Count} service(s)");
 
                     // Fallback: enumerate ALL services if UUID-filtered discovery found nothing
