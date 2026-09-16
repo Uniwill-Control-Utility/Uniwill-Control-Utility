@@ -93,7 +93,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbStartBoot.IsChecked = Settings.Default.StartOnBoot;
             cbStartMini.IsChecked = Settings.Default.StartMini;
             cbMinimizeClose.IsChecked = Settings.Default.MinimizeClose;
-            cbApplyStart.IsChecked = Settings.Default.ApplyOnStart;
             cbAutoCheck.IsChecked = Settings.Default.UpdateCheck;
             cbAdaptive.IsChecked = Settings.Default.isStartAdpative;
             cbGpuPowerBoost.IsChecked = Settings.Default.EnableGpuPowerBoost;
@@ -330,18 +329,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void cbMinimizeClose_Unchecked(object sender, RoutedEventArgs e)
         {
             Settings.Default.MinimizeClose = false;
-            Settings.Default.Save();
-        }
-
-        private void cbApplyStart_Checked(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.ApplyOnStart = true;
-            Settings.Default.Save();
-        }
-
-        private void cbApplyStart_Unchecked(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.ApplyOnStart = false;
             Settings.Default.Save();
         }
 

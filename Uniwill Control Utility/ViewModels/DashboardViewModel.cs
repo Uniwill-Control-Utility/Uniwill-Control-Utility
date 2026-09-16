@@ -345,9 +345,20 @@ namespace Uniwill_Control_Utility.ViewModels
                 }
                 catch { /* EC read failed */ }
 
+                // Re-apply the saved battery charge limit on startup. The EC resets
+                // to BIOS default (100%) on every cold boot, so we always write the
+                // user's saved preference back.
                 try
                 {
-                    _batteryChargeLimit = _uniwillEc.GetBatteryMode();
+                    int savedMode = Properties.Settings.Default.BatteryMode;
+                    int currentMode = _uniwillEc.GetBatteryMode();
+                    if (savedMode != currentMode)
+                    {
+                        _uniwillEc.SetBatteryMode(savedMode);
+                        Debug.WriteLine($"INFO | DashboardViewModel: Restored battery charge limit to mode {savedMode} (was {currentMode})");
+                    }
+
+                    _batteryChargeLimit = savedMode;
                 }
                 catch { /* EC read failed */ }
             });

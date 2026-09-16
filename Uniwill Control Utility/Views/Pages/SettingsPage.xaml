@@ -213,32 +213,6 @@
                             </Grid>
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- Row: Reapply settings on start -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Reapply settings on start" />
-                                    <ui:TextBlock Margin="0,2,0,2"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Apply the last active preset when the application launches." />
-                                </StackPanel>
-                                <ui:ToggleSwitch x:Name="cbApplyStart"
-                                                 Grid.Column="1"
-                                                 LabelPosition="Left"
-                                                 OnContent="On"
-                                                 OffContent="Off"
-                                                 Checked="cbApplyStart_Checked"
-                                                 Unchecked="cbApplyStart_Unchecked" />
-                            </Grid>
-
-                            <!-- Divider -->
                             <Border x:Name="AutoCheckDivider"
                                     Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
