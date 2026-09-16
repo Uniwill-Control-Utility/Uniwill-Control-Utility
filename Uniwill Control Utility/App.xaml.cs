@@ -57,7 +57,7 @@ namespace Uniwill_Control_Utility
 
         internal static readonly string version = "26.2.2";
         private Mutex? mutex;
-        private const string MutexName = "UniversalX86TuningUtility";
+        private const string MutexName = "UniwillControlUtility";
 
         internal static readonly string SCALE_MODELS_JSON_PATH = ".\\ScaleModels.json";
         internal static readonly string LOGS_FOLDER = ".\\logs\\";
@@ -301,11 +301,11 @@ namespace Uniwill_Control_Utility
                     return;
                 } else StartSingleInstanceListener();
 
-                if (File.Exists("C:\\Universal.x86.Tuning.Utility.V2.msi"))
-                    File.Delete("C:\\Universal.x86.Tuning.Utility.V2.msi");
+                if (File.Exists("C:\\Uniwill.Control.Utility.V2.msi"))
+                    File.Delete("C:\\Uniwill.Control.Utility.V2.msi");
 
-                if (File.Exists("C:\\Universal.x86.Tuning.Utility.msi"))
-                    File.Delete("C:\\Universal.x86.Tuning.Utility.msi");
+                if (File.Exists("C:\\Uniwill.Control.Utility.msi"))
+                    File.Delete("C:\\Uniwill.Control.Utility.msi");
 
                 Family.setCpuFamily();
 
