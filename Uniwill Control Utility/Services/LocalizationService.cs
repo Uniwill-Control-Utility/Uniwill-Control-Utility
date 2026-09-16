@@ -44,27 +44,28 @@ namespace Uniwill_Control_Utility.Services
 
         private static readonly LanguageOption[] Languages = new LanguageOption[]
         {
-            new("en-GB", "English"),
-            new("cy-GB", "Cymraeg"),
-            new("zh-CN", "简体中文"),
-            new("ja-JP", "日本語"),
-            new("uk-UA", "Українська"),
-            new("de-DE", "Deutsch"),
-            new("tr-TR", "Türkçe"),
-            new("id-ID", "Bahasa Indonesia"),
-            new("pt-BR", "Português (Brasil)"),
-            new("fr-FR", "Français"),
-            new("es-ES", "Español"),
-            new("nl-NL", "Nederlands"),
-            new("pt-PT", "Português"),
-            new("ru-RU", "Русский"),
-            new("it-IT", "Italiano"),
-            new("pl-PL", "Polski"),
-            new("hi-IN", "हिन्दी"),
-            new("fil-PH", "Filipino"),
+            new("ar-SA", "العربية (السعودية)"),
             new("ms-MY", "Bahasa Melayu"),
+            new("id-ID", "Bahasa Indonesia"),
+            new("zh-CN", "简体中文"),
+            new("cy-GB", "Cymraeg"),
+            new("de-DE", "Deutsch"),
+            new("en-GB", "English"),
+            new("fil-PH", "Filipino"),
+            new("fr-FR", "Français"),
+            new("hi-IN", "हिन्दी"),
+            new("hr-HR", "Hrvatski"),
+            new("it-IT", "Italiano"),
+            new("ja-JP", "日本語"),
+            new("nl-NL", "Nederlands"),
+            new("pl-PL", "Polski"),
+            new("pt-PT", "Português"),
+            new("pt-BR", "Português (Brasil)"),
+            new("ru-RU", "Русский"),
             new("th-TH", "ไทย"),
-            new("ar-SA", "العربية (السعودية)")
+            new("tr-TR", "Türkçe"),
+            new("uk-UA", "Українська"),
+            new("es-ES", "Español")
         };
 
         private static readonly Dictionary<string, Dictionary<string, string>> Catalogues = new(StringComparer.OrdinalIgnoreCase);
