@@ -29,6 +29,7 @@ namespace Uniwill_Control_Utility.Services
 
         private DateTime _lastHotkeyUtc = DateTime.MinValue;
         private bool _contentsVisible = true;
+        private bool _userShowIntent;
         private bool _disposed;
 
         public OverlayOptions CurrentOptions =>
@@ -73,6 +74,8 @@ namespace Uniwill_Control_Utility.Services
 
             if (options.Enabled && options.ShowOnStartup)
                 ShowOverlay();
+            else if (options.Enabled && options.VisibleOnLastShutdown)
+                ShowOverlay();
 
             return Task.CompletedTask;
         }
@@ -89,6 +92,7 @@ namespace Uniwill_Control_Utility.Services
                 try
                 {
                     SavePosition();
+                    SaveVisibilityState();
                 }
                 finally
                 {
@@ -151,6 +155,7 @@ namespace Uniwill_Control_Utility.Services
                 EnsureWindow();
 
                 _contentsVisible = true;
+                _userShowIntent = true;
 
                 _viewModel!.SetContentVisible(true);
                 _viewModel.StartMonitoring();
@@ -172,6 +177,7 @@ namespace Uniwill_Control_Utility.Services
 
             RunOnUiThread(() =>
             {
+                _userShowIntent = false;
                 StopMonitoring();
                 _window?.Hide();
             });
@@ -439,6 +445,19 @@ namespace Uniwill_Control_Utility.Services
                         Left = left,
                         Top = top
                     });
+
+            SaveOptionsIfChanged(options);
+        }
+
+        private void SaveVisibilityState()
+        {
+            OverlayOptions current = _settingsStore.Current;
+
+            if (current.VisibleOnLastShutdown == _userShowIntent)
+                return;
+
+            OverlayOptions options = NormaliseForStorage(
+                current with { VisibleOnLastShutdown = _userShowIntent });
 
             SaveOptionsIfChanged(options);
         }

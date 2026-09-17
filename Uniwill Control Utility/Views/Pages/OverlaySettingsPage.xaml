@@ -203,7 +203,8 @@
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
-                                                 OffContent="Off" />
+                                                 OffContent="Off"
+  />
                             </Grid>
 
                             <!-- Divider -->
@@ -221,7 +222,8 @@
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
-                                                 OffContent="Off" />
+                                                 OffContent="Off"
+  />
                             </Grid>
 
                             <!-- Divider -->
@@ -242,7 +244,8 @@
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
-                                                 OffContent="Off" />
+                                                 OffContent="Off"
+  />
                             </Grid>
 
                             <!-- Divider -->
@@ -260,7 +263,8 @@
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
-                                                 OffContent="Off" />
+                                                 OffContent="Off"
+  />
                             </Grid>
 
                             <!-- Divider -->
@@ -278,7 +282,8 @@
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
-                                                 OffContent="Off" />
+                                                 OffContent="Off"
+  />
                             </Grid>
 
                             <!-- Divider -->
@@ -296,7 +301,8 @@
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
-                                                 OffContent="Off" />
+                                                 OffContent="Off"
+  />
                             </Grid>
 
                             <!-- Divider -->
@@ -314,7 +320,8 @@
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
-                                                 OffContent="Off" />
+                                                 OffContent="Off"
+  />
                             </Grid>
                         </StackPanel>
                     </ui:CardExpander>
@@ -483,7 +490,8 @@
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
-                                                 OffContent="Off" />
+                                                 OffContent="Off"
+  />
                             </Grid>
                         </StackPanel>
                     </ui:CardExpander>
@@ -505,16 +513,10 @@
                             <TextBlock Text="Show" VerticalAlignment="Center" />
                         </StackPanel>
                     </ui:Button>
-                    <ui:Button Margin="0,0,8,0" Click="HideButton_Click">
+                    <ui:Button Click="HideButton_Click">
                         <StackPanel Orientation="Horizontal">
                             <ui:SymbolIcon Symbol="EyeOff20" FontSize="24" Margin="0,0,8,0" />
                             <TextBlock Text="Hide" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </ui:Button>
-                    <ui:Button Click="ApplyButton_Click">
-                        <StackPanel Orientation="Horizontal">
-                            <ui:SymbolIcon Symbol="Save20" FontSize="24" Margin="0,0,8,0" />
-                            <TextBlock Text="Save" VerticalAlignment="Center" />
                         </StackPanel>
                     </ui:Button>
                 </StackPanel>

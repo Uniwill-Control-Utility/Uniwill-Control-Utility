@@ -21,13 +21,63 @@ namespace Uniwill_Control_Utility.Views.Pages
             _overlay = overlay ?? throw new ArgumentNullException(nameof(overlay));
 
             InitializeComponent();
-            ScaleSlider.ValueChanged += (_, __) => ScaleValueText.Text = ScaleSlider.Value.ToString("P0");
-            BackgroundOpacitySlider.ValueChanged += (_, __) => BackgroundOpacityValueText.Text = BackgroundOpacitySlider.Value.ToString("P0");
-            ContentOpacitySlider.ValueChanged += (_, __) => ContentOpacityValueText.Text = ContentOpacitySlider.Value.ToString("P0");
-            LoadOptions(_overlay.CurrentOptions);
+
+            // Suppress auto-save while populating controls from stored settings.
+            _saveInProgress = true;
+            try
+            {
+                LoadOptions(_overlay.CurrentOptions);
+            }
+            finally
+            {
+                _saveInProgress = false;
+            }
+
+            // Wire up UI update handlers and auto-save after initial load is complete.
+            ScaleSlider.ValueChanged += (_, __) =>
+            {
+                ScaleValueText.Text = ScaleSlider.Value.ToString("P0");
+                SaveOptions();
+            };
+
+            BackgroundOpacitySlider.ValueChanged += (_, __) =>
+            {
+                BackgroundOpacityValueText.Text = BackgroundOpacitySlider.Value.ToString("P0");
+                SaveOptions();
+            };
+
+            ContentOpacitySlider.ValueChanged += (_, __) =>
+            {
+                ContentOpacityValueText.Text = ContentOpacitySlider.Value.ToString("P0");
+                SaveOptions();
+            };
+
             ScaleValueText.Text = ScaleSlider.Value.ToString("P0");
             BackgroundOpacityValueText.Text = BackgroundOpacitySlider.Value.ToString("P0");
             ContentOpacityValueText.Text = ContentOpacitySlider.Value.ToString("P0");
+
+            EnabledCheckBox.Checked += (_, __) => SaveOptions();
+            EnabledCheckBox.Unchecked += (_, __) => SaveOptions();
+            StartupCheckBox.Checked += (_, __) => SaveOptions();
+            StartupCheckBox.Unchecked += (_, __) => SaveOptions();
+            ShowFpsCheckBox.Checked += (_, __) => SaveOptions();
+            ShowFpsCheckBox.Unchecked += (_, __) => SaveOptions();
+            ShowFrameTimesCheckBox.Checked += (_, __) => SaveOptions();
+            ShowFrameTimesCheckBox.Unchecked += (_, __) => SaveOptions();
+            ShowGpuCheckBox.Checked += (_, __) => SaveOptions();
+            ShowGpuCheckBox.Unchecked += (_, __) => SaveOptions();
+            ShowCpuCheckBox.Checked += (_, __) => SaveOptions();
+            ShowCpuCheckBox.Unchecked += (_, __) => SaveOptions();
+            ShowMemoryCheckBox.Checked += (_, __) => SaveOptions();
+            ShowMemoryCheckBox.Unchecked += (_, __) => SaveOptions();
+            ShowBatteryCheckBox.Checked += (_, __) => SaveOptions();
+            ShowBatteryCheckBox.Unchecked += (_, __) => SaveOptions();
+            ShowGraphsCheckBox.Checked += (_, __) => SaveOptions();
+            ShowGraphsCheckBox.Unchecked += (_, __) => SaveOptions();
+            HideWhenNoGameCheckBox.Checked += (_, __) => SaveOptions();
+            HideWhenNoGameCheckBox.Unchecked += (_, __) => SaveOptions();
+
+            RefreshIntervalNumberBox.ValueChanged += (_, __) => SaveOptions();
 
             // Poll RTSS status every 2 seconds.
             _rtssTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
@@ -125,6 +175,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             textBox.Text = value.ToString();
             textBox.CaretIndex = textBox.Text.Length;
+
+            SaveOptions();
         }
 
         private OverlayOptions ReadOptions()
@@ -175,6 +227,36 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         private bool SaveOptions()
+        {
+            if (_saveInProgress)
+                return false;
+
+            _saveInProgress = true;
+
+            try
+            {
+                OverlayOptions options = ReadOptions();
+
+                _overlay.ApplyOptions(options);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                MessageBox.Show(
+                    LocalizationService.Format("The overlay settings could not be saved.\n\n{0}", exception.Message),
+                    LocalizationService.Get("Overlay settings error"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+
+                return false;
+            }
+            finally
+            {
+                _saveInProgress = false;
+            }
+        }
+
+        private bool SaveOptionsWithValidation()
         {
             if (_saveInProgress)
                 return false;
@@ -236,20 +318,15 @@ namespace Uniwill_Control_Utility.Views.Pages
             return false;
         }
 
-        private void ApplyButton_Click(object sender, RoutedEventArgs e)
-        {
-            SaveOptions();
-        }
-
         private void VisibilityButton_Click(object sender, RoutedEventArgs e)
         {
-            if (SaveOptions())
+            if (SaveOptionsWithValidation())
                 _overlay.ToggleOverlay();
         }
 
         private void PreviewButton_Click(object sender, RoutedEventArgs e)
         {
-            if (SaveOptions())
+            if (SaveOptionsWithValidation())
                 _overlay.ShowOverlay();
         }
 
@@ -260,7 +337,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void ContentsVisibilityButton_Click(object sender, RoutedEventArgs e)
         {
-            if (SaveOptions())
+            if (SaveOptionsWithValidation())
                 _overlay.ToggleContents();
         }
 
