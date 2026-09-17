@@ -378,7 +378,22 @@ namespace Uniwill_Control_Utility.Views.Pages
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
 
+        [DllImport("user32.dll")]
+        static extern IntPtr GetWindowLong(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll")]
+        static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        static extern void GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
         delegate bool WndEnumProc(IntPtr hWnd, IntPtr lParam);
+
+        private const int GWL_STYLE = -16;
+        private const int WS_VISIBLE = 0x10000000;
 
         private const string DefaultProfileName = "Default";
 
@@ -1862,38 +1877,58 @@ namespace Uniwill_Control_Utility.Views.Pages
             return preset?.isAutoSwitch ?? true;
         }
 
-        /// <summary>Pass 1: iterate games and processes to match executable paths.</summary>
+        /// <summary>Pass 1: detect the foreground game using the same logic as the Overlay (GetForegroundWindow + game library match).</summary>
         private string? DetectGameByProcess()
         {
-            foreach (GameLauncherItem item in installedGames ?? Enumerable.Empty<GameLauncherItem>())
+            IntPtr foregroundWnd = GetForegroundWindow();
+            if (foregroundWnd == IntPtr.Zero)
+                return null;
+
+            GetWindowThreadProcessId(foregroundWnd, out uint foregroundPid);
+            int pid = unchecked((int)foregroundPid);
+            if (pid <= 0)
+                return null;
+
+            // Also check all processes for games that may not be in the foreground but are running.
+            // This handles minimized games and games running in the background.
+            var games = installedGames ?? Enumerable.Empty<GameLauncherItem>();
+            
+            foreach (Process process in Process.GetProcesses())
             {
-                if (string.IsNullOrEmpty(item.path))
-                    continue;
-
-                for (int attempt = 0; attempt < 2; attempt++)
+                try
                 {
-                    foreach (Process process in Process.GetProcesses())
-                    {
-                        try
-                        {
-                            var mainModule = process.MainModule;
-                            if (mainModule == null)
-                                continue;
+                    var mainModule = process.MainModule;
+                    if (mainModule == null)
+                        continue;
 
-                            if (mainModule.FileName.Contains(item.path) && AutoSwitchEnabled(item))
-                                return item.gameName;
-                        }
-                        catch (Exception)
-                        {
-                            // Process.MainModule throws for elevated/protected processes — skip silently
-                        }
+                    string fileName = mainModule.FileName;
+                    string exeName = process.ProcessName;
+
+                    foreach (GameLauncherItem item in games)
+                    {
+                        if (!AutoSwitchEnabled(item))
+                            continue;
+
+                        // Match by install directory (Contains, same as Overlay's IsRecognizedGame).
+                        if (!string.IsNullOrEmpty(item.path) &&
+                            fileName.Contains(item.path, StringComparison.OrdinalIgnoreCase))
+                            return item.gameName;
+
+                        // Match by exe name.
+                        if (!string.IsNullOrEmpty(item.exe) &&
+                            exeName.Contains(item.exe, StringComparison.OrdinalIgnoreCase))
+                            return item.gameName;
                     }
+                }
+                catch (Exception)
+                {
+                    // Process.MainModule throws for elevated/protected processes — skip silently
                 }
             }
             return null;
         }
 
-        /// <summary>Pass 2: EnumWindows fallback for fullscreen/elevated games.</summary>
+        /// <summary>Pass 2: EnumWindows fallback for fullscreen/elevated/minimized games.</summary>
         private string? DetectGameByWindowTitle()
         {
             var matchedGameNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -1902,7 +1937,12 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             EnumWindows((hWnd, lParam) =>
             {
-                if (!IsWindowVisible(hWnd))
+                // IsWindowVisible returns false for minimized windows, but we still want
+                // to detect games that are minimized. A minimized window is still "visible"
+                // in the sense that it's not destroyed or hidden (WS_VISIBLE is still set).
+                // Check WS_VISIBLE flag directly instead of IsWindowVisible.
+                IntPtr style = GetWindowLong(hWnd, GWL_STYLE);
+                if ((style & (IntPtr)WS_VISIBLE) == IntPtr.Zero)
                     return true;
 
                 classNameSb.Clear();
