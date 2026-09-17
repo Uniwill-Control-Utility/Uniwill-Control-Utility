@@ -1751,8 +1751,8 @@
                     </ui:Button>
                     <ToggleButton Width="185" Height="36" Name="btnStart" Click="btnStart_Click" IsEnabled="False">
                         <StackPanel Orientation="Horizontal">
-                            <ui:SymbolIcon Name="siStartIcon" Symbol="Play20" FontSize="24"/>
-                            <TextBlock Name="tbxStartText" VerticalAlignment="Center" Margin="9,0,0,0">Start Adaptive Mode</TextBlock>
+                            <ui:FontIcon Name="siStartIcon" FontFamily="Segoe Fluent Icons" Glyph="&#xE768;" FontSize="20" Margin="2,0,8,0"/>
+                            <TextBlock Name="tbxStartText" VerticalAlignment="Center">Start Adaptive Mode</TextBlock>
                         </StackPanel>
                     </ToggleButton>
                 </StackPanel>

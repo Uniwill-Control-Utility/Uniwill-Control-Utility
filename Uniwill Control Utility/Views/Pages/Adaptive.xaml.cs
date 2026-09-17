@@ -456,7 +456,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     start = false;
                     btnStart.IsChecked = false;
-                    siStartIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Play20;
+                    siStartIcon.Glyph = "\uE768"; // Play icon (Segoe Fluent Icons)
                     tbxStartText.Text = LocalizationService.Get("Start Adaptive Mode");
                     GetSensor.CloseSensor();
                     Settings.Default.isAdaptiveModeRunning = false;
@@ -487,7 +487,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     start = true;
                     btnStart.IsChecked = true;
-                    siStartIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Stop20;
+                    siStartIcon.Glyph = "\uE71A"; // Stop icon (Segoe Fluent Icons)
                     tbxStartText.Text = LocalizationService.Get("Stop Adaptive Mode");
                     await Task.Run(() => GetSensor.OpenSensor());
                     Settings.Default.isAdaptiveModeRunning = true;
@@ -532,21 +532,29 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// Restores the btnStart ToggleButton icon, text, and IsChecked state
         /// from Settings so the button reflects the actual Adaptive Mode state.
         /// Called from Page_Loaded when navigating back to this page.
+        /// 
+        /// Checks isStartAdpative as a fallback because isAdaptiveModeRunning is set
+        /// asynchronously inside ToggleAdaptiveMode() (after GetSensor.OpenSensor).
+        /// When navigating back, setUp()'s async work may not have reached that line
+        /// yet, so isAdaptiveModeRunning could still be false even though the user
+        /// previously started Adaptive Mode.
         /// </summary>
         private void RestoreAdaptiveButtonState()
         {
-            if (Settings.Default.isAdaptiveModeRunning)
+            bool wasRunning = Settings.Default.isAdaptiveModeRunning || Settings.Default.isStartAdpative;
+
+            if (wasRunning)
             {
                 start = true;
                 btnStart.IsChecked = true;
-                siStartIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Stop20;
+                siStartIcon.Glyph = "\uE71A"; // Stop icon (Segoe Fluent Icons)
                 tbxStartText.Text = LocalizationService.Get("Stop Adaptive Mode");
             }
             else
             {
                 start = false;
                 btnStart.IsChecked = false;
-                siStartIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Play20;
+                siStartIcon.Glyph = "\uE768"; // Play icon (Segoe Fluent Icons)
                 tbxStartText.Text = LocalizationService.Get("Start Adaptive Mode");
             }
         }
