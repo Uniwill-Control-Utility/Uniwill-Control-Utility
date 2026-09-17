@@ -503,6 +503,7 @@
   "Set the temperature (°C) at which each fan speed zone activates. Index 0 is the OFF threshold.": "Her bir fan hızı bölgesinin etkinleşeceği sıcaklığı (°C) ayarlayın. İndeks 0, KAPALI eşiğidir.",
   "Settings": "Ayarlar",
   "Shift + Click point — range select": "Shift + Noktaya tıklama — aralık seçimi",
+  "Shift + Double-press Enter — flatten selection": "Shift + Enter'a çift basın — seçimi düzleştir",
   "Show": "Göster",
   "Show an LED indicator for the current gear level.": "Mevcut hız kademesi için bir LED göstergesi gösterin.",
   "Show on startup": "Başlangıçta göster",

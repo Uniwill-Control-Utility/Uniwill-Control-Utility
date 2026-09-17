@@ -503,6 +503,7 @@
   "Set the temperature (°C) at which each fan speed zone activates. Index 0 is the OFF threshold.": "กำหนดอุณหภูมิ (°C) ที่แต่ละโซนความเร็วพัดลมจะเริ่มทำงาน ดัชนี 0 คือเกณฑ์การปิดการทำงาน (OFF)",
   "Settings": "การตั้งค่า",
   "Shift + Click point — range select": "Shift + คลิกที่จุด — เลือกช่วง",
+  "Shift + Double-press Enter — flatten selection": "Shift + ดับเบิลคลิก Enter — ยุบรวมการเลือก (Flatten selection)",
   "Show": "แสดง",
   "Show an LED indicator for the current gear level.": "แสดงไฟแสดงสถานะ LED สำหรับระดับเกียร์ปัจจุบัน",
   "Show on startup": "แสดงเมื่อเริ่มต้นระบบ",

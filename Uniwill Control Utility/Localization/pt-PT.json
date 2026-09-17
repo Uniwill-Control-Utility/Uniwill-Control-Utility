@@ -503,6 +503,7 @@
   "Set the temperature (°C) at which each fan speed zone activates. Index 0 is the OFF threshold.": "Defina a temperatura (°C) em que cada zona de velocidade da ventoinha é ativada. O índice 0 é o limiar de DESLIGADO (OFF).",
   "Settings": "Definições",
   "Shift + Click point — range select": "Shift + Clique no ponto — seleção de intervalo",
+  "Shift + Double-press Enter — flatten selection": "Shift + Premir Enter duas vezes — achatar seleçãoo",
   "Show": "Mostrar",
   "Show an LED indicator for the current gear level.": "Mostre um indicador LED para o nível de mudança atual.",
   "Show on startup": "Mostrar no arranque",

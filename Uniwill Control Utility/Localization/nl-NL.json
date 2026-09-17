@@ -503,6 +503,7 @@
   "Set the temperature (°C) at which each fan speed zone activates. Index 0 is the OFF threshold.": "Stel de temperatuur (°C) in waarbij elke ventilatorsnelheidszone wordt geactiveerd. Index 0 is de UIT-drempel.",
   "Settings": "Instellingen",
   "Shift + Click point — range select": "Shift + Klik op punt — bereik selecteren",
+  "Shift + Double-press Enter — flatten selection": "Shift + Dubbel drukken op Enter — selectie vlak maken",
   "Show": "Tonen",
   "Show an LED indicator for the current gear level.": "Toon een LED-indicator voor het huidige versnellingsniveau.",
   "Show on startup": "Tonen bij opstarten",

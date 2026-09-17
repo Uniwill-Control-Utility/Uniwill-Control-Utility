@@ -503,6 +503,7 @@
   "Set the temperature (°C) at which each fan speed zone activates. Index 0 is the OFF threshold.": "Itakda ang temperatura (°C) kung kailan mag-a-activate ang bawat zone ng bilis ng fan. Ang Index 0 ay ang threshold ng pagiging OFF.",
   "Settings": "Mga Setting",
   "Shift + Click point — range select": "Shift + I-click ang punto — pumili ng saklaw",
+  "Shift + Double-press Enter — flatten selection": "Shift + Double-press Enter — i-flatten ang selection",
   "Show": "Ipakita",
   "Show an LED indicator for the current gear level.": "Magpakita ng LED indicator para sa kasalukuyang antas ng gear.",
   "Show on startup": "Ipakita sa startup",

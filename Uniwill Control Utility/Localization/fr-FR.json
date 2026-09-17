@@ -503,6 +503,7 @@
   "Set the temperature (°C) at which each fan speed zone activates. Index 0 is the OFF threshold.": "Réglez la température (°C) à laquelle chaque zone de vitesse du ventilateur s'active. L'index 0 est le seuil de désactivation (OFF).",
   "Settings": "Paramètres",
   "Shift + Click point — range select": "Maj + Clic sur un point — sélectionner une plage",
+  "Shift + Double-press Enter — flatten selection": "Shift + Double-pression sur Entrée — aplatir la sélection",
   "Show": "Afficher",
   "Show an LED indicator for the current gear level.": "Afficher un indicateur LED pour le niveau de vitesse actuel.",
   "Show on startup": "Afficher au démarrage",

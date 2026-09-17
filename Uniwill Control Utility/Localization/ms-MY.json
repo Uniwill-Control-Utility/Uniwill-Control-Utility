@@ -503,6 +503,7 @@
   "Set the temperature (°C) at which each fan speed zone activates. Index 0 is the OFF threshold.": "Tetapkan suhu (°C) di mana setiap zon kelajuan kipas diaktifkan. Indeks 0 ialah ambang MATI.",
   "Settings": "Tetapan",
   "Shift + Click point — range select": "Shift + Klik titik — pilih julat",
+  "Shift + Double-press Enter — flatten selection": "Shift + Tekan dua kali Enter — ratakan pilihan",
   "Show": "Tunjukkan",
   "Show an LED indicator for the current gear level.": "Tunjukkan penunjuk LED untuk tahap gear semasa.",
   "Show on startup": "Tunjukkan semasa permulaan",

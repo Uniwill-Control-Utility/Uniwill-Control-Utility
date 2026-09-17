@@ -504,6 +504,7 @@
   "Set the temperature (°C) at which each fan speed zone activates. Index 0 is the OFF threshold.": "设置每个风扇转速区域激活时的温度 (°C)。索引 0 是关闭 (OFF) 阈值。",
   "Settings": "设置",
   "Shift + Click point — range select": "Shift + 点击点 — 范围选择",
+  "Shift + Double-press Enter — flatten selection": "Shift + 双击回车 (Enter) — 扁平化选择区域",
   "Show": "显示",
   "Show an LED indicator for the current gear level.": "显示当前档位级别的 LED 指示灯。",
   "Show on startup": "启动时显示",

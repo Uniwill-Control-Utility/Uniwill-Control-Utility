@@ -503,6 +503,7 @@
   "Set the temperature (°C) at which each fan speed zone activates. Index 0 is the OFF threshold.": "各ファン速度ゾーンがアクティブになる温度 (°C) を設定します。インデックス 0 は OFF (停止) のしきい値です。",
   "Settings": "設定",
   "Shift + Click point — range select": "Shift + ポイントクリック — 範囲選択",
+  "Shift + Double-press Enter — flatten selection": "Shift + Enter を 2 回押す — 選択範囲をフラット化",
   "Show": "表示",
   "Show an LED indicator for the current gear level.": "現在のギアレベルを LED インジケーターで表示します。",
   "Show on startup": "起動時に表示",

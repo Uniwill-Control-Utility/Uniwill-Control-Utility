@@ -503,6 +503,7 @@
   "Set the temperature (°C) at which each fan speed zone activates. Index 0 is the OFF threshold.": "वह तापमान (°C) सेट करें जिस पर प्रत्येक फैन गति क्षेत्र (Zone) सक्रिय होता है। इंडेक्स 0 OFF थ्रेशोल्ड है।",
   "Settings": "सेटिंग्स",
   "Shift + Click point — range select": "Shift + Click बिंदु — रेंज चयन",
+  "Shift + Double-press Enter — flatten selection": "Shift + डबल-प्रेस Enter — चयन को समतल (flatten) करें",
   "Show": "दिखाएं",
   "Show an LED indicator for the current gear level.": "वर्तमान गियर स्तर के लिए एक LED संकेतक दिखाएं।",
   "Show on startup": "स्टार्टअप पर दिखाएं",
