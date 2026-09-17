@@ -106,7 +106,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Show/hide EC Fan card based on Uniwill EC availability.
             // Run the hardware probe on a background thread to avoid blocking
-            // the initial page render — EC register reads can take seconds.
+            // the initial page render â€” EC register reads can take seconds.
             _ = Task.Run(() =>
             {
                 bool uniwillAvailable = false;
@@ -174,7 +174,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool isBs1 = deviceType == ConnectedDeviceType.BS1;
             tbBs2ProTitle.Text = "Flydigi Cooler";
 
-            // BS1 has no RGB — hide the RGB divider and all RGB controls
+            // BS1 has no RGB â€” hide the RGB divider and all RGB controls
             if (Bs2ProRgbDivider != null)
                 Bs2ProRgbDivider.Visibility = isBs1 ? Visibility.Collapsed : Visibility.Visible;
             if (spBs2ProRgbMode != null)
@@ -185,7 +185,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             if (isBs1)
             {
-                // BS1 supports Curve (Auto) via app-localized FlydigiBs1SmartControl — keep all 3 fan modes.
+                // BS1 supports Curve (Auto) via app-localized FlydigiBs1SmartControl â€” keep all 3 fan modes.
                 nudBs2ProRpm.Maximum = MaxRpmBs1;
                 sdBs2ProRpm.Maximum = MaxRpmBs1;
                 if (nudBs2ProRpm.Value > MaxRpmBs1)
@@ -381,15 +381,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         [DllImport("user32.dll")]
         static extern IntPtr GetWindowLong(IntPtr hWnd, int nIndex);
 
-        [DllImport("user32.dll")]
-        static extern bool IsIconic(IntPtr hWnd);
-
-        [DllImport("user32.dll")]
-        static extern IntPtr GetForegroundWindow();
-
-        [DllImport("user32.dll")]
-        static extern void GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
-
         delegate bool WndEnumProc(IntPtr hWnd, IntPtr lParam);
 
         private const int GWL_STYLE = -16;
@@ -537,8 +528,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
- #pragma warning disable CS0649 // Field is never assigned to — set via XAML bindings
- #pragma warning disable CS0169 // Field is never used — read by XAML bindings
+ #pragma warning disable CS0649 // Field is never assigned to â€” set via XAML bindings
+ #pragma warning disable CS0169 // Field is never used â€” read by XAML bindings
         private static int CPUTemp, CPULoad, CPUClock, CPUPower, GPULoad, GPUClock, GPUMemClock;
 #pragma warning restore CS0649
 #pragma warning restore CS0169
@@ -619,7 +610,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (AdpSdBoost.Value > AdpSdBoost.Maximum)
                 AdpSdBoost.Value = AdpSdBoost.Maximum;
 
-            // GPU TGP slider — set per-GPU max range (matches Presets page)
+            // GPU TGP slider â€” set per-GPU max range (matches Presets page)
             if (sdGpuSettings.Visibility == Visibility.Visible)
             {
                 string gpuName = NvTuning.GetGpuName()?.ToLowerInvariant() ?? string.Empty;
@@ -737,7 +728,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             sdKbBrightness.Value = brightness;
             tbKbBrightnessValue.Text = brightness.ToString();
             cbxKbEffect.SelectedIndex = GetKbEffectIndex(preset.KbEffectMode);
-            // Explicitly update effect UI after setting the index — the SelectionChanged
+            // Explicitly update effect UI after setting the index â€” the SelectionChanged
             // event may not fire if the index already matches, leaving controls hidden.
             UpdateKbEffectUi();
             KbColorPicker.SelectedColor = Color.FromRgb(preset.KbColorR, preset.KbColorG, preset.KbColorB);
@@ -796,7 +787,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 AdpSdNvMem.Value = Math.Clamp(preset.GpuMemClock, -1000, 2000);
                 // Show/hide Dynamic Boost offset based on toggle
                 AdpSpNvDbOffset.Visibility = preset.GpuDynamicBoost ? Visibility.Visible : Visibility.Collapsed;
-                // Reset user-touched flag when loading preset — start fresh
+                // Reset user-touched flag when loading preset â€” start fresh
                 _adpUserTouchedCoreSlider = false;
                 // Gap 4: Track which curve this profile wants (apply deferred to update() loop)
                 _adpActiveCurveName = preset.GpuVfCurveName;
@@ -1183,15 +1174,13 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                     if (cbxPowerPreset.Items.Count > 0 && cbAutoSwitch.IsChecked == true)
                     {
-                        string selectedGameName = string.Empty;
-
-                        Dispatcher.Invoke(() =>
+                        // Only auto-switch when the detected game changed from the previous tick.
+                        // Compare against _lastDetectedGame instead of the combobox selection so that
+                        // manual combobox changes don't get overwritten by stale detection results.
+                        if (_lastDetectedGame != runningGameName)
                         {
-                            selectedGameName = cbxPowerPreset.SelectedItem?.ToString() ?? string.Empty;
-                        });
+                            _lastDetectedGame = runningGameName;
 
-                        if (selectedGameName != runningGameName)
-                        {
                             await Dispatcher.InvokeAsync(() =>
                             {
                                 getRunningGame(runningGameName);
@@ -1265,7 +1254,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private byte lastLbSpeed = 0;
         // V-F Curve editor window (singleton, like Presets page)
         private Views.Windows.VfCurveEditorWindow? _vfEditorWindow;
-        // True when user manually changes the core clock slider — curve label is suppressed
+        // True when user manually changes the core clock slider â€” curve label is suppressed
         private bool _adpUserTouchedCoreSlider;
         // Name of the V-F curve loaded by the current per-game profile (empty = no curve)
         private string _adpActiveCurveName = string.Empty;
@@ -1703,7 +1692,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             int memClock = (int)AdpSdNvMem.Value;
 
             // When a V-F curve is active and user hasn't touched the slider,
-            // skip the core clock offset — the curve handles per-point frequency.
+            // skip the core clock offset â€” the curve handles per-point frequency.
             int coreClock = (AdpVfCurveActive && !_adpUserTouchedCoreSlider)
                 ? 0 : (int)AdpSdNvCore.Value;
 
@@ -1817,10 +1806,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             // appears immediately and control updates happen in a second pass.
             if (cbxPowerPreset.SelectedItem is string presetName)
             {
+                // Sync _lastDetectedGame with the current combobox selection so that
+                // sensors_Tick doesn't trigger a spurious switch on first navigation.
+                _lastDetectedGame = presetName;
+
                 Dispatcher.InvokeAsync(() =>
                 {
                     adaptivePresetManager = new AdaptivePresetManager(Settings.Default.Path + "adaptivePresets.json");
-                    // Don't reset tracking on navigation — just load the preset UI values
+                    // Don't reset tracking on navigation â€” just load the preset UI values
                     loadPreset(presetName, resetTracking: false);
                     // Ensure Keyboard RGB effect controls visibility matches the mode selector.
                     // Needed because loadPreset skips UI updates when preset is null
@@ -1868,6 +1861,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private string runningGameName = DefaultProfileName;
         private string lastConfirmedGame = DefaultProfileName;
+        private string _lastDetectedGame = DefaultProfileName;
         private int gameMissingCount = 0;
         private const int maxGameMisses = 2;
 
@@ -1877,52 +1871,46 @@ namespace Uniwill_Control_Utility.Views.Pages
             return preset?.isAutoSwitch ?? true;
         }
 
-        /// <summary>Pass 1: detect the foreground game using the same logic as the Overlay (GetForegroundWindow + game library match).</summary>
+        /// <summary>Pass 1: iterate games and processes to match executable paths (same structure as UXTU original).</summary>
         private string? DetectGameByProcess()
         {
-            IntPtr foregroundWnd = GetForegroundWindow();
-            if (foregroundWnd == IntPtr.Zero)
-                return null;
-
-            GetWindowThreadProcessId(foregroundWnd, out uint foregroundPid);
-            int pid = unchecked((int)foregroundPid);
-            if (pid <= 0)
-                return null;
-
-            // Also check all processes for games that may not be in the foreground but are running.
-            // This handles minimized games and games running in the background.
             var games = installedGames ?? Enumerable.Empty<GameLauncherItem>();
-            
-            foreach (Process process in Process.GetProcesses())
+
+            foreach (GameLauncherItem item in games)
             {
-                try
+                if (string.IsNullOrEmpty(item.path))
+                    continue;
+
+                for (int attempt = 0; attempt < 2; attempt++)
                 {
-                    var mainModule = process.MainModule;
-                    if (mainModule == null)
-                        continue;
-
-                    string fileName = mainModule.FileName;
-                    string exeName = process.ProcessName;
-
-                    foreach (GameLauncherItem item in games)
+                    foreach (Process process in Process.GetProcesses())
                     {
-                        if (!AutoSwitchEnabled(item))
-                            continue;
+                        try
+                        {
+                            var mainModule = process.MainModule;
+                            if (mainModule == null)
+                                continue;
 
-                        // Match by install directory (Contains, same as Overlay's IsRecognizedGame).
-                        if (!string.IsNullOrEmpty(item.path) &&
-                            fileName.Contains(item.path, StringComparison.OrdinalIgnoreCase))
-                            return item.gameName;
+                            string fileName = mainModule.FileName;
 
-                        // Match by exe name.
-                        if (!string.IsNullOrEmpty(item.exe) &&
-                            exeName.Contains(item.exe, StringComparison.OrdinalIgnoreCase))
-                            return item.gameName;
+                            if (fileName.Contains(item.path, StringComparison.OrdinalIgnoreCase)
+                                && AutoSwitchEnabled(item))
+                            {
+                                return item.gameName;
+                            }
+
+                            if (!string.IsNullOrEmpty(item.exe) &&
+                                process.ProcessName.Contains(item.exe, StringComparison.OrdinalIgnoreCase)
+                                && AutoSwitchEnabled(item))
+                            {
+                                return item.gameName;
+                            }
+                        }
+                        catch (Exception)
+                        {
+                            // Process.MainModule throws for elevated/protected processes - skip silently
+                        }
                     }
-                }
-                catch (Exception)
-                {
-                    // Process.MainModule throws for elevated/protected processes — skip silently
                 }
             }
             return null;
@@ -2018,7 +2006,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     _isUpdatingPresetSelection = false;
 
                     // Load the new preset's UI values. The device override flags being
-                    // active does not prevent profile switching — the new profile may
+                    // active does not prevent profile switching â€” the new profile may
                     // have different override settings (ON vs OFF) that need to apply.
                     // Use resetTracking: true so the next update() tick applies the
                     // new preset's settings to the device and CPU/GPU controls.
@@ -2051,12 +2039,12 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 if (_hydroConnected && !wasConnected)
                 {
-                    // Cooler just connected — show the card.
+                    // Cooler just connected â€” show the card.
                     sdHydroUI.Visibility = Visibility.Visible;
                 }
                 else if (!_hydroConnected && wasConnected)
                 {
-                    // Cooler just disconnected — hide card, disable checkbox, stop override.
+                    // Cooler just disconnected â€” hide card, disable checkbox, stop override.
                     sdHydroUI.Visibility = Visibility.Collapsed;
                     cbxWcEnabled.IsChecked = false;
                     Settings.Default.AdaptiveWcEnabled = false;
@@ -2288,7 +2276,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             catch (Exception)
             {
-                // Corrupted custom curve JSON — fall back to Balanced
+                // Corrupted custom curve JSON â€” fall back to Balanced
             }
             return FlydigiFanCurveProfile.CreateBalanced();
         }
@@ -2308,7 +2296,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             catch (Exception)
             {
-                // Corrupted custom curve JSON — fall back to Balanced
+                // Corrupted custom curve JSON â€” fall back to Balanced
             }
             return FlydigiFanCurveProfile.CreateBalanced();
         }
@@ -2330,7 +2318,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             spBs2ProRpm.Visibility = mode == 1 ? Visibility.Visible : Visibility.Collapsed;
             spBs2ProCurve.Visibility = mode == 2 ? Visibility.Visible : Visibility.Collapsed;
 
-            // Hide curve editor when leaving Curve (Auto) mode — it only makes sense
+            // Hide curve editor when leaving Curve (Auto) mode â€” it only makes sense
             // inside the Curve mode sub-pane. Re-show if already in Curve + Custom.
             if (mode != 2)
             {
@@ -2339,7 +2327,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             else if (Bs2ProCurveEditor is not null && cbxBs2ProCurve?.SelectedIndex == 5)
             {
-                // Re-entering Curve mode with Custom selected — re-show editor
+                // Re-entering Curve mode with Custom selected â€” re-show editor
                 Bs2ProCurveEditorDivider.Visibility = Visibility.Visible;
                 Bs2ProCurveEditor.Visibility = Visibility.Visible;
                 try
@@ -2495,7 +2483,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     Bs2ProRgbStaticBrightnessDivider.Visibility = Visibility.Visible;
                     spBs2ProRgbBrightness.Visibility = Visibility.Visible;
                     break;
-                case 4: // Flowing — no color picker, so skip the sub divider to avoid a bare divider above Brightness
+                case 4: // Flowing â€” no color picker, so skip the sub divider to avoid a bare divider above Brightness
                     Bs2ProRgbStaticBrightnessDivider.Visibility = Visibility.Visible;
                     spBs2ProRgbBrightness.Visibility = Visibility.Visible;
                     Bs2ProRgbFlowingSpeedDivider.Visibility = Visibility.Visible;
@@ -2676,7 +2664,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         /// <summary>
         /// Shows/hides Color, Multi-Color, Rest color, and Speed controls based on the
-        /// selected effect — mirroring the Keyboard page's UpdateEffectUi().
+        /// selected effect â€” mirroring the Keyboard page's UpdateEffectUi().
         /// </summary>
         private void UpdateKbEffectUi()
         {
@@ -2698,7 +2686,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             string effect = GetKbEffectFromIndex(cbxKbEffect.SelectedIndex);
 
-            // Rainbow has fixed colors — no color controls, no speed.
+            // Rainbow has fixed colors â€” no color controls, no speed.
             if (ParseKbEffect(effect) == KeyboardEffect.Rainbow)
             {
                 sepKbColor.Visibility = Visibility.Collapsed;
@@ -2756,12 +2744,12 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void KbMultiColorPicker_ColorsChanged(object sender, EventArgs e)
         {
-            // Multi-color colors changed — will be picked up by update() loop's diff tracking
+            // Multi-color colors changed â€” will be picked up by update() loop's diff tracking
         }
 
         private void KbColorPicker_ColorChangedDelayed(object sender, EventArgs e)
         {
-            // Color changed — will be picked up by update() loop's diff tracking
+            // Color changed â€” will be picked up by update() loop's diff tracking
         }
 
         /// <summary>
@@ -3026,7 +3014,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     AdpLblBoost.Text = $"{slider.Value:F0} W";
                     break;
                 case "AdpSdTjMax":
-                    AdpLblTjMax.Text = $"{slider.Value:F0} °C";
+                    AdpLblTjMax.Text = $"{slider.Value:F0} Â°C";
                     break;
                 case "AdpSdCoUnified":
                     AdpLblCoUnified.Text = $"{slider.Value:+0;-0;0}";
@@ -3179,7 +3167,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
             }
 
-            // Reload presets from disk — editor auto-saves independently
+            // Reload presets from disk â€” editor auto-saves independently
             var presets = Uniwill_Control_Utility.Models.VfCurvePresetStore.Load();
 
             // Find active preset (first with changes)
@@ -3199,7 +3187,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             _vfEditorWindow.Closed += (_, _) => _vfEditorWindow = null;
             _vfEditorWindow.CurveChanged += (_, _) =>
             {
-                _adpUserTouchedCoreSlider = false; // User went back to curve — reclaim from slider
+                _adpUserTouchedCoreSlider = false; // User went back to curve â€” reclaim from slider
                 updateAdpCoreLabel();
                 // Only apply to hardware if Adaptive Mode is running AND GPU Settings is enabled
                 if (start && (cbxGpuEnabled.IsChecked ?? false))

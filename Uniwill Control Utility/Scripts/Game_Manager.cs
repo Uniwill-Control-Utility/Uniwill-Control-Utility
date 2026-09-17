@@ -91,9 +91,14 @@ namespace Uniwill_Control_Utility.Scripts
                                             }
                                         }
                                     }
-                                    if (launcherItem.path == "" || launcherItem.exe == "")
+                                    // Always fall back to InstallDir for path — it's reliable for Steam games.
+                                    // Only fall back to the last exe name when we couldn't determine the exe.
+                                    if (launcherItem.path == "")
                                     {
-                                        launcherItem.path = Path.GetFileNameWithoutExtension(game.Executables.Last());
+                                        launcherItem.path = game.InstallDir;
+                                    }
+                                    if (launcherItem.exe == "")
+                                    {
                                         launcherItem.exe = Path.GetFileNameWithoutExtension(game.Executables.Last());
                                     }
 
