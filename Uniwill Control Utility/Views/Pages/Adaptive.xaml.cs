@@ -3198,6 +3198,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void AdpTsLightBarPower_Toggled(object sender, RoutedEventArgs e)
         {
+            // Only apply when Adaptive Mode is running AND Light Bar override is enabled.
+            if (!start || !(cbxLbEnabled.IsChecked ?? false))
+                return;
+
             bool isOn = AdpTsLightBarPower.IsChecked == true;
             if (_hidService == null)
                 return;
@@ -3262,10 +3266,15 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         /// <summary>
         /// Immediately applies the current Light Bar override settings to the HID device.
+        /// Only applies when Adaptive Mode is running AND Light Bar override is enabled.
         /// Resets the relevant last* tracking variables so update() doesn't re-apply.
         /// </summary>
         private void ApplyLbOverrideImmediate()
         {
+            // Only apply when Adaptive Mode is running AND Light Bar override is enabled.
+            if (!start || !(cbxLbEnabled.IsChecked ?? false))
+                return;
+
             if (_hidService == null)
                 return;
 
