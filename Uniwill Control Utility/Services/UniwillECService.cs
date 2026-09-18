@@ -481,7 +481,8 @@ namespace Uniwill_Control_Utility.Services
             lock (_lock)
             {
                 ctgpOffset = Math.Clamp(ctgpOffset, 0, 255);
-                DebugLog($"ActivateGpuPowerControl(ctgpOffset={ctgpOffset}, dbOffset={dbOffset})");
+                byte dbClamped = (byte)Math.Clamp(dbOffset, 0, 25);
+                DebugLog($"ActivateGpuPowerControl(ctgpOffset={ctgpOffset}, dbOffset={dbOffset}, dbClamped={dbClamped})");
 
                 // Prerequisite: enable CUSTOM_PROFILE mode so the EC accepts GPU power writes.
                 byte beforeCp = (byte)ReadEC(REG_CUSTOM_PROFILE);
@@ -496,8 +497,11 @@ namespace Uniwill_Control_Utility.Services
                 // Step 0.5: Enable CTGP/DB feature in EC (0x0743).
                 // tuxedo-drivers writes this register to enable GPU power control.
                 // Bits: GENERAL(0x01), DB(0x02), CTGP(0x04)
-                // All three must be set for the NVIDIA driver to recognize EC power limits.
-                byte ctgpDbEnable = CTGP_DB_ENABLE_GENERAL | CTGP_DB_ENABLE_DB | CTGP_DB_ENABLE_CTGP; // 0x07
+                // Only set the DB bit when dbClamped > 0; otherwise the NVIDIA driver
+                // sees DB enabled and applies its own internal boost on top of the TGP.
+                byte ctgpDbEnable = (byte)(CTGP_DB_ENABLE_GENERAL | CTGP_DB_ENABLE_CTGP);
+                if (dbClamped > 0)
+                    ctgpDbEnable |= CTGP_DB_ENABLE_DB;
                 WriteEC(REG_CTGP_DB_ENABLE, ctgpDbEnable);
                 Thread.Sleep(EcDelayMs);
 
@@ -510,7 +514,6 @@ namespace Uniwill_Control_Utility.Services
                 Thread.Sleep(EcDelayMs);
 
                 // Step 3: Dynamic Boost offset (watts the GPU can borrow from CPU)
-                byte dbClamped = (byte)Math.Clamp(dbOffset, 0, 25);
                 WriteEC(REG_CTGP_DB_DB_OFFSET, dbClamped);
                 Thread.Sleep(EcDelayMs);
 

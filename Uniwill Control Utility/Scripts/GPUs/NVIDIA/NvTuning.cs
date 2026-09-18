@@ -375,24 +375,32 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
             return true;
         }
 
+        private static string? _cachedGpuName;
+
         public static string GetGpuName()
         {
+            if (_cachedGpuName != null)
+                return _cachedGpuName;
+
             try
             {
                 if (!TryGetNvmlGpu(out IntPtr gpu)) return string.Empty;
 
                 var name = new StringBuilder(96);
 
-                return Nvml.nvmlDeviceGetName(gpu, name, (uint)name.Capacity) == Nvml.NVML_SUCCESS
-                    ? name.ToString()
-                    : string.Empty;
+                if (Nvml.nvmlDeviceGetName(gpu, name, (uint)name.Capacity) == Nvml.NVML_SUCCESS)
+                {
+                    _cachedGpuName = name.ToString();
+                    return _cachedGpuName;
+                }
             }
             catch (Exception ex)
             {
                 // NVML P/Invoke may throw SEHException on GPU removal or driver errors.
                 DiagnosticLogger.LogInfo($"GetGpuName: EXCEPTION {ex.GetType().Name}: {ex.Message}");
-                return string.Empty;
             }
+
+            return string.Empty;
         }
 
         public static int SetMaxGPUClock(int clock)

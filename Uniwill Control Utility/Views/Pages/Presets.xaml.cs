@@ -141,14 +141,18 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Initialize slider defaults from stored profile values so the status card
             // shows correct values even when the custom panel is collapsed.
-            sdSustained.Value = _profileSustained;
-            sdBoost.Value = _profileBoost;
-            sdTjMax.Value = _profileTjMax;
+            // For Custom profile, LoadCustomValues() already loaded slider values, so skip.
+            if (_currentProfile != "Custom")
+            {
+                sdSustained.Value = _profileSustained;
+                sdBoost.Value = _profileBoost;
+                sdTjMax.Value = _profileTjMax;
 
-            sdNvPower.Value = _profileGpuTgp;
-            togDynamicBoost.IsChecked = _profileGpuDb;
-            sdNvDbOffset.Value = _profileGpuDbOffset;
-            spNvDbOffset.Visibility = _profileGpuDb ? Visibility.Visible : Visibility.Collapsed;
+                sdNvPower.Value = _profileGpuTgp;
+                togDynamicBoost.IsChecked = _profileGpuDb;
+                sdNvDbOffset.Value = _profileGpuDbOffset;
+                spNvDbOffset.Visibility = _profileGpuDb ? Visibility.Visible : Visibility.Collapsed;
+            }
 
             // Read back GPU clock offsets from hardware (Afterburner, NVCP, etc.)
             // For Custom profile, saved values are already loaded by LoadCustomValues().
@@ -324,8 +328,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 sdIntelTuning.Visibility = Visibility.Collapsed;
             }
 
-            // Apply voltage control visibility from global setting
+            // Hide CO/voltage offset row in status card and slider controls when voltage control is disabled
             bool voltageEnabled = CpuVoltageEnabled;
+            tbCoLabel.Visibility = voltageEnabled ? Visibility.Visible : Visibility.Collapsed;
+            tbCoOffset.Visibility = voltageEnabled ? Visibility.Visible : Visibility.Collapsed;
             coControlsPanel?.SetValue(VisibilityProperty, voltageEnabled ? Visibility.Visible : Visibility.Collapsed);
             intelVoltControlsPanel?.SetValue(VisibilityProperty, voltageEnabled ? Visibility.Visible : Visibility.Collapsed);
 
@@ -436,9 +442,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             sdNvPower.Minimum = min;
             sdNvPower.Maximum = max;
 
-            // Clamp current value to new range
-            if (sdNvPower.Value < min) sdNvPower.Value = min;
+            // Clamp current value to new range only if out of bounds.
+            // This handles the case where GPU Power Boost setting changes
+            // (e.g., user disables boost, reducing the max from 225 to 150).
             if (sdNvPower.Value > max) sdNvPower.Value = max;
+            if (sdNvPower.Value < min) sdNvPower.Value = min;
         }
 
         private void setProfileTooltips()
@@ -798,10 +806,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                         tbCoOffset.Text = $"{_profileCoCcd0:+0;-0;0} | {_profileCoCcd1:+0;-0;0}";
                     }
                 }
-                else
-                {
-                    tbCoOffset.Text = "BIOS-level";
-                }
                 tbGpuTgp.Text = $"{_profileGpuTgp:F0} W";
                 tbGpuDb.Text = _profileGpuDb ? $"+{_profileGpuDbOffset:F0} W" : "Off";
             }
@@ -811,8 +815,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tbPl2.Text = $"{_profileIntelPl2:F0} W";
                 if (CpuVoltageEnabled)
                     tbCoOffset.Text = $"{sdIntelVolt.Value:+0;-0;0} mV";
-                else
-                    tbCoOffset.Text = "BIOS-level";
                 tbGpuTgp.Text = $"{_profileGpuTgp:F0} W";
                 tbGpuDb.Text = _profileGpuDb ? $"+{_profileGpuDbOffset:F0} W" : "Off";
             }
