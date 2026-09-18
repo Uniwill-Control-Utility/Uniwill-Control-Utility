@@ -614,7 +614,7 @@
                                                VerticalAlignment="Center"
                                                Margin="0,0,8,0"
                                                Text="0 MHz" />
-                                    <Slider x:Name="AdpSdNvMem" Width="140" Maximum="2000" Minimum="-1000" Value="0" TickFrequency="50" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                    <Slider x:Name="AdpSdNvMem" Width="140" Maximum="3000" Minimum="-1000" Value="0" TickFrequency="50" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
                         </StackPanel>

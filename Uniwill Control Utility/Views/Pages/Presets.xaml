@@ -724,7 +724,7 @@
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0"
                                                    Text="0 MHz" />
-                                        <Slider x:Name="sdNvMem" Width="140" Maximum="2000" Minimum="-1000" TickFrequency="50" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
+                                        <Slider x:Name="sdNvMem" Width="140" Maximum="3000" Minimum="-1000" TickFrequency="50" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                             </StackPanel>
