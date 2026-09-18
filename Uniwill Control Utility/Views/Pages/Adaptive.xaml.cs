@@ -495,9 +495,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                     btnStart.IsChecked = true;
                     siStartIcon.Glyph = "\uE71A"; // Stop icon (Segoe Fluent Icons)
                     tbxStartText.Text = LocalizationService.Get("Stop Adaptive Mode");
+                    // Set synchronously before async work so RestoreAdaptiveButtonState()
+                    // can read it if the user navigates away and back before OpenSensor finishes.
+                    Settings.Default.isStartAdpative = true;
+                    Settings.Default.Save();
                     await Task.Run(() => GetSensor.OpenSensor());
                     Settings.Default.isAdaptiveModeRunning = true;
-                    Settings.Default.isStartAdpative = true;
 
                     // Enable auto-switch when Adaptive Mode starts
                     cbAutoSwitch.IsChecked = true;
