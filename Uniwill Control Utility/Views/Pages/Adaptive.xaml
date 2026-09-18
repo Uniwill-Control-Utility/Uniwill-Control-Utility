@@ -5,7 +5,7 @@
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:local="clr-namespace:Uniwill_Control_Utility.Views.Pages"
       xmlns:controls="clr-namespace:Uniwill_Control_Utility.Views.Controls"
-      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml" xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
       d:DataContext="{d:DesignInstance local:Adaptive, IsDesignTimeCreatable=False}"
       d:Background="{DynamicResource ApplicationBackgroundBrush}"
       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
@@ -84,7 +84,7 @@
                                     IsExpanded="False"
                                     Margin="0,0,0,8">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE950;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE950;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -416,7 +416,7 @@
                                     IsExpanded="False"
                                     Margin="0,0,0,8">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF211;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF211;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -627,7 +627,7 @@
                                      IsExpanded="False"
                                      Margin="0,0,0,8">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEB42;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEB42;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -779,7 +779,7 @@
                                     IsExpanded="False"
                                     Margin="0,0,0,8">
                         <ui:CardExpander.Icon>
-                            <controls:FlydigiIconElement Margin="4,0,6,0" />
+                            <controls:FlydigiIconElement Margin="6,0,4,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -1139,36 +1139,51 @@
                                     IsEnabled="True"
                                     IsExpanded="False"
                                     Margin="0,0,0,8">
-                        <ui:CardExpander.Icon>
-                            <ui:SymbolIcon Symbol="Gauge24" Margin="4,0,6,0" />
-                        </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <StackPanel Orientation="Horizontal">
+
+                                <!-- Left side: Icon + Title/Subtitle stacked properly -->
+                                <Grid Grid.Column="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Icon -->
+                                    <iconPacks:PackIconLucide Grid.Column="0"
+                                      Kind="Fan" 
+                                      Width="20" 
+                                      Height="20" 
+                                      Margin="6,0,19,0" 
+                                      VerticalAlignment="Center" />
+
+                                    <!-- Title & Subtitle Stack -->
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <ui:TextBlock FontTypography="Body" Text="Fan Control" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                               FontTypography="Caption"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                               Text="Per-game fan curve control for the EC fan controller."
+                               TextWrapping="Wrap" />
                                     </StackPanel>
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Per-game fan curve control for the EC fan controller."
-                                                   TextWrapping="Wrap" />
-                                </StackPanel>
+                                </Grid>
+
+                                <!-- Right side: Toggle Switch -->
                                 <StackPanel Grid.Column="1"
-                                            Orientation="Horizontal"
-                                            VerticalAlignment="Center">
+                    Orientation="Horizontal"
+                    VerticalAlignment="Center">
                                     <ui:ToggleSwitch x:Name="cbxEcFanEnabled"
-                                                     Margin="0,0,9,0"
-                                                     LabelPosition="Left"
-                                                     OnContent="On"
-                                                     OffContent="Off"
-                                                     ToolTip="Enable EC fan controls for this game"
-                                                     Checked="cbxEcFanEnabled_Toggled"
-                                                     Unchecked="cbxEcFanEnabled_Toggled" />
+                             Margin="0,0,9,0"
+                             LabelPosition="Left"
+                             OnContent="On"
+                             OffContent="Off"
+                             ToolTip="Enable EC fan controls for this game"
+                             Checked="cbxEcFanEnabled_Toggled"
+                             Unchecked="cbxEcFanEnabled_Toggled" />
                                 </StackPanel>
                             </Grid>
                         </ui:CardExpander.Header>
@@ -1182,7 +1197,7 @@
                                 <StackPanel Grid.Column="0">
                                     <StackPanel Orientation="Horizontal">
                                         <ui:TextBlock FontTypography="Body" Text="Fan Curve Mode" />
-                                        <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select Unified (single curve) or Split (separate CPU/GPU curves)." VerticalAlignment="Bottom" />
+                                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="16" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select Unified (single curve) or Split (separate CPU/GPU curves)." VerticalAlignment="Bottom" />
                                     </StackPanel>
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
@@ -1208,7 +1223,7 @@
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="Fan Curve Profile" />
-                                            <ui:SymbolIcon Symbol="Info20" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select a fan curve profile for this game." VerticalAlignment="Bottom" />
+                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="16" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select a fan curve profile for this game." VerticalAlignment="Bottom" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
@@ -1287,7 +1302,7 @@
                         Margin="0,0,0,8"
                         Expanded="sdKeyboard_Expanded">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE92E;" FontSize="20" Margin="6,0,8,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE92E;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -1534,7 +1549,7 @@
                                     IsExpanded="False"
                                     Margin="0,0,0,8">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xED39;" FontSize="20" Margin="6,0,8,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xED39;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -1735,8 +1750,8 @@
                 <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
                     <TextBlock Text="Games/Apps:" VerticalAlignment="Center" FontSize="13" FontWeight="Medium" Margin="2,0,12,0"/>
                     <ComboBox Width="225" Name="cbxPowerPreset" SelectionChanged="cbxPowerPreset_SelectionChanged" Height="37" Margin="0,0,9,0"/>
-                    <ui:Button Height="37" Width="50" Name="btnReloadApps" ToolTip="Updates dropdown list with games/apps" Click="btnReloadApps_Click">
-                        <ui:SymbolIcon Symbol="ArrowSync20" FontSize="24"/>
+                    <ui:Button Name="btnReloadApps" ToolTip="Updates dropdown list with games/apps" Click="btnReloadApps_Click">
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE777;" FontSize="16"/>
                     </ui:Button>
                     <CheckBox Name="cbExcludeFromSwitching" Content="Exclude from switching" VerticalAlignment="Center" Margin="12,0,0,0" FontSize="13"/>
                 </StackPanel>
@@ -1746,15 +1761,16 @@
                     <TextBlock Text="Polling Rate" VerticalAlignment="Center" FontSize="13" Margin="0,0,8,0" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Visibility="Collapsed"/>
                     <ui:NumberBox x:Name="nudPolling" Minimum="1" Maximum="8" Value="2" SmallChange="0.05" MaxDecimalPlaces="2" Margin="0,0,12,0" Visibility="Collapsed"/>
                     <CheckBox Name="cbAutoSwitch" Content="Auto switch app profile" VerticalAlignment="Center" Click="cbAutoSwitch_Click" Margin="0,0,12,0" Visibility="Collapsed"/>
-                    <ui:Button Width="50" Name="btnSave" ToolTip="Save current settings" Click="btnSave_Click" IsEnabled="False" Margin="0,0,8,0">
-                        <ui:SymbolIcon Symbol="Save20" FontSize="24"/>
-                    </ui:Button>
-                    <ToggleButton Width="185" Height="36" Name="btnStart" Click="btnStart_Click" IsEnabled="False">
-                        <StackPanel Orientation="Horizontal">
-                            <ui:FontIcon Name="siStartIcon" FontFamily="Segoe Fluent Icons" Glyph="&#xE768;" FontSize="20" Margin="2,0,8,0"/>
-                            <TextBlock Name="tbxStartText" VerticalAlignment="Center">Start Adaptive Mode</TextBlock>
-                        </StackPanel>
-                    </ToggleButton>
+                    <ui:Button Width="50" 
+                               Name="btnSave" 
+                               ToolTip="Save current settings" 
+                               Click="btnSave_Click" 
+                               IsEnabled="False" 
+                               Margin="0,0,8,0"
+                               Icon="{ui:FontIcon FontFamily='Segoe Fluent Icons', Glyph='&#xE74E;', FontSize=16}"/>
+                    <ui:Button Name="btnStart" Click="btnStart_Click" IsEnabled="False"
+                        ToolTip="Start Adaptive Mode"
+                        Icon="{ui:FontIcon FontFamily='Segoe Fluent Icons', Glyph='&#xE768;', FontSize=16}"/>
                 </StackPanel>
             </Grid>
         </ui:Card>

@@ -75,7 +75,7 @@ namespace Uniwill_Control_Utility.ViewModels
             // Fan Control, Keyboard, Light Bar, Battery, CPU Temp Limit in footer for Uniwill EC hardware (XMG / TUXEDO)
             if (_uniwillEc is not null && _uniwillEc.Initialize())
             {
-                createNavItem("Fan Control", "fancontrol", "\uF42F", typeof(Views.Pages.FanControl), false);
+                NavigationItems.Add(CreateFanControlNavItem());
 
                 createNavItem("Keyboard", "keyboard", "\uE765", typeof(Views.Pages.Keyboard), false);
 
@@ -106,7 +106,7 @@ namespace Uniwill_Control_Utility.ViewModels
                     "adaptive" => SymbolRegular.Radar20,
                     "overlay" => SymbolRegular.DesktopPulse24,
                     "auto" => SymbolRegular.Transmission24,
-                    "fancontrol" => SymbolRegular.Gauge24,
+                    "fancontrol" => SymbolRegular.Empty, // uses FanIconElement, not SymbolIcon
                     "keyboard" => SymbolRegular.Keyboard24,
                     "battery" => SymbolRegular.Empty, // uses FontIcon, not SymbolIcon
                     "settings" => SymbolRegular.Settings24,
@@ -165,6 +165,20 @@ namespace Uniwill_Control_Utility.ViewModels
             {
                 TargetPageTag = "flydigicooler",
                 Icon = new FlydigiIconElement()
+            };
+        }
+
+        /// <summary>
+        /// Creates the Fan Control navigation item with a custom fan icon.
+        /// Uses a FanIconElement (a Path-based IconElement) whose Fill binds to the
+        /// parent NavigationViewItem's Foreground, so it follows theme changes automatically.
+        /// </summary>
+        public static NavigationViewItem CreateFanControlNavItem()
+        {
+            return new NavigationViewItem("Fan Control", SymbolRegular.Empty, typeof(Views.Pages.FanControl))
+            {
+                TargetPageTag = "fancontrol",
+                Icon = new Views.Controls.FanIconElement()
             };
         }
 

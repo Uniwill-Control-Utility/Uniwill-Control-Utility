@@ -45,6 +45,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             this.gpuInventory = gpuInventory;
             InitializeComponent();
 
+            IsVisibleChanged += Page_IsVisibleChanged;
             _ = Tablet.TabletDevices;
             setUp();
 
@@ -354,7 +355,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 btnStart.IsEnabled = true;
                 btnSave.IsEnabled = true;
 
-                if (Settings.Default.isStartAdpative) await ToggleAdaptiveMode();
+                if (Settings.Default.isStartAdpative && !start) await ToggleAdaptiveMode();
             }
             catch (Exception ex)
             {
@@ -446,11 +447,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool start = false;
         private void btnStart_Click(object sender, RoutedEventArgs e)
         {
-            // Prevent the ToggleButton from auto-toggling - we manage IsChecked ourselves
-            if (sender is System.Windows.Controls.Primitives.ToggleButton tb)
-            {
-                tb.IsChecked = start; // revert the auto-toggle
-            }
             _ = ToggleAdaptiveMode();
         }
 
@@ -461,9 +457,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (start)
                 {
                     start = false;
-                    btnStart.IsChecked = false;
-                    siStartIcon.Glyph = "\uE768"; // Play icon (Segoe Fluent Icons)
-                    tbxStartText.Text = LocalizationService.Get("Start Adaptive Mode");
+                    btnStart.Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary;
+                    btnStart.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uE768", FontSize = 16 }; // Play icon
+                    btnStart.ToolTip = LocalizationService.Get("Start Adaptive Mode");
                     GetSensor.CloseSensor();
                     Settings.Default.isAdaptiveModeRunning = false;
                     Settings.Default.isStartAdpative = false;
@@ -492,9 +488,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 else
                 {
                     start = true;
-                    btnStart.IsChecked = true;
-                    siStartIcon.Glyph = "\uE71A"; // Stop icon (Segoe Fluent Icons)
-                    tbxStartText.Text = LocalizationService.Get("Stop Adaptive Mode");
+                    btnStart.Appearance = Wpf.Ui.Controls.ControlAppearance.Primary;
+                    btnStart.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uE71A", FontSize = 16 }; // Stop icon
+                    btnStart.ToolTip = LocalizationService.Get("Stop Adaptive Mode");
                     // Set synchronously before async work so RestoreAdaptiveButtonState()
                     // can read it if the user navigates away and back before OpenSensor finishes.
                     Settings.Default.isStartAdpative = true;
@@ -555,16 +551,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (wasRunning)
             {
                 start = true;
-                btnStart.IsChecked = true;
-                siStartIcon.Glyph = "\uE71A"; // Stop icon (Segoe Fluent Icons)
-                tbxStartText.Text = LocalizationService.Get("Stop Adaptive Mode");
+                btnStart.Appearance = Wpf.Ui.Controls.ControlAppearance.Primary;
+                btnStart.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uE71A", FontSize = 16 };
+                btnStart.ToolTip = LocalizationService.Get("Stop Adaptive Mode");
             }
             else
             {
                 start = false;
-                btnStart.IsChecked = false;
-                siStartIcon.Glyph = "\uE768"; // Play icon (Segoe Fluent Icons)
-                tbxStartText.Text = LocalizationService.Get("Start Adaptive Mode");
+                btnStart.Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary;
+                btnStart.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uE768", FontSize = 16 };
+                btnStart.ToolTip = LocalizationService.Get("Start Adaptive Mode");
             }
         }
 
@@ -1790,6 +1786,23 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.Save();
         }
 
+        /// <summary>
+        /// Restores the btnStart button state when the page becomes visible.
+        /// Page.Loaded only fires once (wpfui reuses the same scoped instance),
+        /// so we use IsVisibleChanged which fires on every navigation back to this page.
+        ///
+        /// Deferred to ContextIdle so it runs AFTER LocalizationService.ApplyTree()
+        /// has finished re-applying translations (which fires at Loaded priority and
+        /// would otherwise overwrite our button text).
+        /// </summary>
+        private void Page_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if ((bool)e.NewValue)
+            {
+                Dispatcher.InvokeAsync(new Action(RestoreAdaptiveButtonState), DispatcherPriority.Normal);
+            }
+        }
+
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
             // Recheck Flydigi card visibility on navigation (device may have connected/disconnected)
@@ -1797,10 +1810,6 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Refresh CPU voltage control visibility so setting changes from Settings page take effect
             UpdateAdpCpuUI();
-
-            // Restore button state from settings so the ToggleButton reflects
-            // the actual Adaptive Mode state when navigating back to this page.
-            RestoreAdaptiveButtonState();
 
             // Apply dynamic power limit max to SPL/FPL sliders based on CPU SKU
             ApplyAdpPowerLimitMax();
