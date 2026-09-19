@@ -201,13 +201,28 @@ namespace Uniwill_Control_Utility.Scripts
                 string[] variables = ParseNvidiaClocks(value);
                 DiagnosticLogger.LogInfo($"NVIDIA: parsed {variables.Length} tokens: [{string.Join(", ", variables)}]");
 
+                // When GPU clock control is disabled in Settings, skip all clock-related
+                // NvAPI calls (SetMaxGPUClock, SetClocks) so that third-party tools like
+                // MSI Afterburner keep their offsets. Power limit changes still apply.
+                bool gpuClockEnabled = Settings.Default.EnableGpuClockControl;
+
                 if (command == "NVIDIA-Clocks" && variables.Length == 2)
                 {
+                    if (!gpuClockEnabled)
+                    {
+                        DiagnosticLogger.LogInfo("NVIDIA: SetClocks skipped — GPU clock control disabled");
+                        return;
+                    }
                     DiagnosticLogger.LogInfo($"NVIDIA: SetClocks({variables[0]}, {variables[1]})");
                     NvTuning.SetClocks(int.Parse(variables[0]), int.Parse(variables[1]));
                 }
                 else if (command == "NVIDIA-Clocks" && variables.Length == 3)
                 {
+                    if (!gpuClockEnabled)
+                    {
+                        DiagnosticLogger.LogInfo("NVIDIA: SetMaxGPUClock + SetClocks skipped — GPU clock control disabled");
+                        return;
+                    }
                     DiagnosticLogger.LogInfo($"NVIDIA: SetMaxGPUClock({variables[0]}), SetClocks({variables[1]}, {variables[2]})");
                     NvTuning.SetMaxGPUClock(int.Parse(variables[0]));
                     NvTuning.SetClocks(int.Parse(variables[1]), int.Parse(variables[2]));
@@ -215,18 +230,32 @@ namespace Uniwill_Control_Utility.Scripts
                 else if (command == "NVIDIA-Clocks" && variables.Length == 4)
                 {
                     // Legacy: 0-core-mem-watts (no DB offset, total watts = watts)
-                    DiagnosticLogger.LogInfo($"NVIDIA: SetMaxGPUClock({variables[0]}), SetClocks({variables[1]}, {variables[2]}), SetPowerLimit({variables[3]}, dbOffset=0)");
-                    NvTuning.SetMaxGPUClock(int.Parse(variables[0]));
-                    NvTuning.SetClocks(int.Parse(variables[1]), int.Parse(variables[2]));
+                    if (!gpuClockEnabled)
+                    {
+                        DiagnosticLogger.LogInfo($"NVIDIA: SetMaxGPUClock + SetClocks skipped — GPU clock control disabled; applying power limit only");
+                    }
+                    else
+                    {
+                        DiagnosticLogger.LogInfo($"NVIDIA: SetMaxGPUClock({variables[0]}), SetClocks({variables[1]}, {variables[2]}), SetPowerLimit({variables[3]}, dbOffset=0)");
+                        NvTuning.SetMaxGPUClock(int.Parse(variables[0]));
+                        NvTuning.SetClocks(int.Parse(variables[1]), int.Parse(variables[2]));
+                    }
                     NvTuning.SetPowerLimit(int.Parse(variables[3]), 0);
                     DiagnosticLogger.LogInfo($"NVIDIA: SetPowerLimit returned");
                 }
                 else if (command == "NVIDIA-Clocks" && variables.Length == 5)
                 {
                     // New: 0-core-mem-totalWatts-dbOffset
-                    DiagnosticLogger.LogInfo($"NVIDIA: SetMaxGPUClock({variables[0]}), SetClocks({variables[1]}, {variables[2]}), SetPowerLimit({variables[3]}, dbOffset={variables[4]})");
-                    NvTuning.SetMaxGPUClock(int.Parse(variables[0]));
-                    NvTuning.SetClocks(int.Parse(variables[1]), int.Parse(variables[2]));
+                    if (!gpuClockEnabled)
+                    {
+                        DiagnosticLogger.LogInfo($"NVIDIA: SetMaxGPUClock + SetClocks skipped — GPU clock control disabled; applying power limit only");
+                    }
+                    else
+                    {
+                        DiagnosticLogger.LogInfo($"NVIDIA: SetMaxGPUClock({variables[0]}), SetClocks({variables[1]}, {variables[2]}), SetPowerLimit({variables[3]}, dbOffset={variables[4]})");
+                        NvTuning.SetMaxGPUClock(int.Parse(variables[0]));
+                        NvTuning.SetClocks(int.Parse(variables[1]), int.Parse(variables[2]));
+                    }
                     NvTuning.SetPowerLimit(int.Parse(variables[3]), int.Parse(variables[4]));
                     DiagnosticLogger.LogInfo($"NVIDIA: SetPowerLimit returned");
                 }
