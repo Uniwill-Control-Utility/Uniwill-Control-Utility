@@ -83,7 +83,7 @@ namespace Uniwill_Control_Utility.Models
             WriteIndented = true
         };
 
-        private static string FilePath
+        public static string FilePath
         {
             get
             {

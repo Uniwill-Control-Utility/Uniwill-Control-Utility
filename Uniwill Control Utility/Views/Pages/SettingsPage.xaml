@@ -442,11 +442,11 @@
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>
-                                <ui:TextBlock FontTypography="Body" Text="Preset backup" />
+                                <ui:TextBlock FontTypography="Body" Text="Backup &amp; restore" />
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Back up or import custom and adaptive mode presets."
+                                               Text="Back up or restore all presets, settings, and profiles."
                                                TextWrapping="Wrap" />
                             </StackPanel>
                         </ui:CardExpander.Header>
@@ -459,11 +459,12 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Preset files" />
+                                    <ui:TextBlock FontTypography="Body" Text="Full backup" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Existing presets with the same name will be replaced during import." />
+                                                   Text="Includes presets, fan curves, V-F curves, overlay, cooler settings, and application preferences. Existing data will be replaced during import."
+                                                   TextWrapping="Wrap" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -476,7 +477,7 @@
                                                            FontSize="22"
                                                            Symbol="ArrowDownload20" />
                                             <TextBlock VerticalAlignment="Center"
-                                                       Text="Back up presets" />
+                                                       Text="Export backup" />
                                         </StackPanel>
                                     </ui:Button>
 
@@ -490,7 +491,7 @@
                                                            FontSize="22"
                                                            Symbol="ArrowUpload20" />
                                             <TextBlock VerticalAlignment="Center"
-                                                       Text="Import presets" />
+                                                       Text="Import backup" />
                                         </StackPanel>
                                     </ui:Button>
                                 </StackPanel>

@@ -36,7 +36,7 @@ namespace Uniwill_Control_Utility.Models
         private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
         private static string? _filePath;
 
-        private static string FilePath
+        public static string FilePath
         {
             get
             {

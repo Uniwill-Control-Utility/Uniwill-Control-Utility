@@ -630,7 +630,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 AddExtension = true,
                 DefaultExt = PresetExtension,
                 FileName = $"UCU-Presets-{DateTime.Now:yyyy-MM-dd}{PresetExtension}",
-                Filter = $"{LocalizationService.Get("UCU preset backup")} (*{PresetExtension})|*{PresetExtension}"
+                Filter = $"{LocalizationService.Get("UCU backup")} (*{PresetExtension})|*{PresetExtension}"
             };
 
             if (dialog.ShowDialog() != true)
@@ -643,16 +643,17 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 var result = await PresetBackupService.ExportAsync(Settings.Default.Path, dialog.FileName);
                 ShowPresetBackupStatus(
-                    LocalizationService.Get("Preset backup saved"),
-                    LocalizationService.Format("Backed up {0} custom presets and {1} adaptive mode presets.", result.CustomPresetCount, result.AdaptivePresetCount),
+                    LocalizationService.Get("Backup saved"),
+                    LocalizationService.Format("Backed up {0} custom presets, {1} adaptive presets, {2} V-F curves, and {3} settings.",
+                        result.CustomPresetCount, result.AdaptivePresetCount, result.VfCurveCount, result.SettingsCount),
                     Wpf.Ui.Controls.InfoBarSeverity.Success);
             }
             catch (Exception exception)
             {
-                DiagnosticLogger.LogError(exception, "Failed to back up presets");
+                DiagnosticLogger.LogError(exception, "Failed to export backup");
                 ShowPresetBackupStatus(
-                    LocalizationService.Get("Preset backup failed"),
-                    LocalizationService.Format("The presets could not be backed up.\n\n{0}", exception.Message),
+                    LocalizationService.Get("Backup failed"),
+                    LocalizationService.Format("The backup could not be exported.\n\n{0}", exception.Message),
                     Wpf.Ui.Controls.InfoBarSeverity.Error);
             }
             finally
@@ -667,7 +668,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 CheckFileExists = true,
                 DefaultExt = PresetExtension,
-                Filter = $"{LocalizationService.Get("UCU preset backup")} (*{PresetExtension};*.json)|*{PresetExtension};*.json"
+                Filter = $"{LocalizationService.Get("UCU backup")} (*{PresetExtension};*.json)|*{PresetExtension};*.json"
             };
 
             if (dialog.ShowDialog() != true)
@@ -680,23 +681,24 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 var result = await PresetBackupService.ImportAsync(Settings.Default.Path, dialog.FileName);
                 ShowPresetBackupStatus(
-                    LocalizationService.Get("Preset import complete"),
-                    LocalizationService.Format("Imported {0} custom presets and {1} adaptive mode presets.", result.CustomPresetCount, result.AdaptivePresetCount),
+                    LocalizationService.Get("Import complete"),
+                    LocalizationService.Format("Imported {0} custom presets, {1} adaptive presets, {2} V-F curves, and {3} settings.",
+                        result.CustomPresetCount, result.AdaptivePresetCount, result.VfCurveCount, result.SettingsCount),
                     Wpf.Ui.Controls.InfoBarSeverity.Success);
             }
             catch (InvalidDataException)
             {
                 ShowPresetBackupStatus(
-                    LocalizationService.Get("Preset import failed"),
-                    LocalizationService.Get("The selected file is not a valid UCU preset backup."),
+                    LocalizationService.Get("Import failed"),
+                    LocalizationService.Get("The selected file is not a valid UCU backup."),
                     Wpf.Ui.Controls.InfoBarSeverity.Error);
             }
             catch (Exception exception)
             {
-                DiagnosticLogger.LogError(exception, "Failed to import presets");
+                DiagnosticLogger.LogError(exception, "Failed to import backup");
                 ShowPresetBackupStatus(
-                    LocalizationService.Get("Preset import failed"),
-                    LocalizationService.Format("The presets could not be imported.\n\n{0}", exception.Message),
+                    LocalizationService.Get("Import failed"),
+                    LocalizationService.Format("The backup could not be imported.\n\n{0}", exception.Message),
                     Wpf.Ui.Controls.InfoBarSeverity.Error);
             }
             finally
