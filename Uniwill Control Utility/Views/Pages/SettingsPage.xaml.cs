@@ -92,7 +92,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             cbStartBoot.IsChecked = Settings.Default.StartOnBoot;
             nbStartupDelay.Value = Settings.Default.StartupDelaySeconds;
-            StartupDelayRow.Visibility = Settings.Default.StartOnBoot ? Visibility.Visible : Visibility.Collapsed;
+            bool bootEnabled = Settings.Default.StartOnBoot;
+            StartupDelayDivider.Visibility = bootEnabled ? Visibility.Visible : Visibility.Collapsed;
+            StartupDelayRow.Visibility = bootEnabled ? Visibility.Visible : Visibility.Collapsed;
             cbStartMini.IsChecked = Settings.Default.StartMini;
             cbMinimizeClose.IsChecked = Settings.Default.MinimizeClose;
             cbAutoCheck.IsChecked = Settings.Default.UpdateCheck;
@@ -268,6 +270,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbStartBoot_Checked(object sender, RoutedEventArgs e)
         {
+            StartupDelayDivider.Visibility = Visibility.Visible;
             StartupDelayRow.Visibility = Visibility.Visible;
             UpdateScheduledTask();
 
@@ -277,6 +280,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbStartBoot_Unchecked(object sender, RoutedEventArgs e)
         {
+            StartupDelayDivider.Visibility = Visibility.Collapsed;
             StartupDelayRow.Visibility = Visibility.Collapsed;
 
             using (TaskService ts = new TaskService())

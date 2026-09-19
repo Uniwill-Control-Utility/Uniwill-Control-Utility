@@ -160,9 +160,10 @@
                                                  Unchecked="cbStartBoot_Unchecked" />
                             </Grid>
 
-                            <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Divider (hidden with Startup delay row) -->
+                            <Border x:Name="StartupDelayDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
 
                             <!-- Row: Startup delay (hidden when Start on system boot is OFF) -->
                             <Grid x:Name="StartupDelayRow" Visibility="Collapsed">
