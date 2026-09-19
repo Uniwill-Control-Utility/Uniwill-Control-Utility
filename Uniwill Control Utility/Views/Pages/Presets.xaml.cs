@@ -86,6 +86,19 @@ namespace Uniwill_Control_Utility.Views.Pages
                 setProfileTooltips();
                 loadSavedProfile();
 
+                // For Custom profile, restore slider values saved by Apply (Settings.Default).
+                // Must run in OnNavigatedToAsync because Page_Loaded only fires once
+                // for scoped pages that stay in the visual tree.
+                // This runs AFTER selectProfile() which calls LoadCustomPreset from
+                // CustomPresetStore, so Settings.Default values take precedence (they
+                // are the latest saved by btnApply_Click).
+                if (_currentProfile == "Custom")
+                {
+                    LoadCustomValues();
+                    updateStatus();
+                    updateAllLabels();
+                }
+
                 // Update overlay based on Adaptive Mode override state
                 UpdateAdaptiveOverlay();
             }
@@ -131,10 +144,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             // shows correctly even if the editor was never opened in this session.
             detectAndActivateVfCurve();
 
-            // For Custom profile, restore saved slider values.
+            // For Custom profile, restore UI state (radio buttons, apply-on-startup checkbox).
+            // LoadCustomValues() is already called in OnNavigatedToAsync.
             if (_currentProfile == "Custom")
             {
-                LoadCustomValues();
                 updateRadioButtonStyles();
                 cbApplyOnStartup.IsChecked = Settings.Default.ApplyOnStart;
             }
@@ -184,11 +197,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Update status from stored values (sliders may be in collapsed panel)
             updateStatus();
 
-            // Update labels if custom panel is visible
-            if (customScroll.Visibility == Visibility.Visible)
-            {
-                updateAllLabels();
-            }
+            // Update labels — always refresh so the TGP label matches the slider value
+            // even when the custom panel is collapsed (pre-made profiles).
+            updateAllLabels();
 
             // Update overlay based on Adaptive Mode override state
             UpdateAdaptiveOverlay();
