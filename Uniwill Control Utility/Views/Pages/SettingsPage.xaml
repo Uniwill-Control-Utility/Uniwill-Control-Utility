@@ -164,6 +164,33 @@
                             <Border Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
+                            <!-- Row: Startup delay (hidden when Start on system boot is OFF) -->
+                            <Grid x:Name="StartupDelayRow" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Startup delay" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Wait before launching after logon (0–120 seconds)." />
+                                </StackPanel>
+                                <ui:NumberBox x:Name="nbStartupDelay"
+                                              Grid.Column="1"
+                                              HorizontalAlignment="Right"
+                                              Minimum="0"
+                                              Maximum="120"
+                                              SmallChange="5"
+                                              MaxDecimalPlaces="0"
+                                              ValueChanged="nbStartupDelay_ValueChanged" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
                             <!-- Row: Start minimised -->
                             <Grid>
                                 <Grid.ColumnDefinitions>

@@ -91,6 +91,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             _languageSelectionReady = true;
 
             cbStartBoot.IsChecked = Settings.Default.StartOnBoot;
+            nbStartupDelay.Value = Settings.Default.StartupDelaySeconds;
+            StartupDelayRow.Visibility = Settings.Default.StartOnBoot ? Visibility.Visible : Visibility.Collapsed;
             cbStartMini.IsChecked = Settings.Default.StartMini;
             cbMinimizeClose.IsChecked = Settings.Default.MinimizeClose;
             cbAutoCheck.IsChecked = Settings.Default.UpdateCheck;
@@ -266,29 +268,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbStartBoot_Checked(object sender, RoutedEventArgs e)
         {
-            // Create the scheduled task
-            using (TaskService ts = new TaskService())
-            {
-                if (!ts.RootFolder.AllTasks.Any(t => t.Name == ScheduledTaskName))
-                {
-                    TaskDefinition td = ts.NewTask();
-                    td.Principal.RunLevel = TaskRunLevel.Highest;
-                    td.RegistrationInfo.Description = "Start UCU";
-                    td.Settings.DisallowStartIfOnBatteries = false;
-                    td.Settings.StopIfGoingOnBatteries = false;
-                    td.Settings.DisallowStartOnRemoteAppSession = false;
-
-                    td.Triggers.Add(new LogonTrigger());
-
-                    string path = System.Reflection.Assembly.GetEntryAssembly()?.Location
-                        ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
-                    path = Path.ChangeExtension(path, ".exe");
-
-                    td.Actions.Add(path);
-
-                    ts.RootFolder.RegisterTaskDefinition(ScheduledTaskName, td);
-                }
-            }
+            StartupDelayRow.Visibility = Visibility.Visible;
+            UpdateScheduledTask();
 
             Settings.Default.StartOnBoot = true;
             Settings.Default.Save();
@@ -296,6 +277,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbStartBoot_Unchecked(object sender, RoutedEventArgs e)
         {
+            StartupDelayRow.Visibility = Visibility.Collapsed;
+
             using (TaskService ts = new TaskService())
             {
                 if (ts.RootFolder.AllTasks.Any(t => t.Name == ScheduledTaskName))
@@ -306,6 +289,57 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             Settings.Default.StartOnBoot = false;
             Settings.Default.Save();
+        }
+
+        /// <summary>
+        /// Creates or updates the Windows scheduled task with the current startup delay.
+        /// </summary>
+        private void UpdateScheduledTask()
+        {
+            using (TaskService ts = new TaskService())
+            {
+                // Delete existing task so we can recreate with updated delay
+                if (ts.RootFolder.AllTasks.Any(t => t.Name == ScheduledTaskName))
+                {
+                    ts.RootFolder.DeleteTask(ScheduledTaskName);
+                }
+
+                TaskDefinition td = ts.NewTask();
+                td.Principal.RunLevel = TaskRunLevel.Highest;
+                td.RegistrationInfo.Description = "Start UCU";
+                td.Settings.DisallowStartIfOnBatteries = false;
+                td.Settings.StopIfGoingOnBatteries = false;
+                td.Settings.DisallowStartOnRemoteAppSession = false;
+
+                int delaySeconds = (int)(nbStartupDelay.Value ?? 0);
+                var trigger = new LogonTrigger()
+                {
+                    Delay = TimeSpan.FromSeconds(delaySeconds)
+                };
+                td.Triggers.Add(trigger);
+
+                string path = System.Reflection.Assembly.GetEntryAssembly()?.Location
+                    ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
+                path = Path.ChangeExtension(path, ".exe");
+
+                td.Actions.Add(path);
+
+                ts.RootFolder.RegisterTaskDefinition(ScheduledTaskName, td);
+            }
+        }
+
+        private void nbStartupDelay_ValueChanged(object sender, RoutedEventArgs e)
+        {
+            int seconds = (int)(nbStartupDelay.Value ?? 0);
+
+            Settings.Default.StartupDelaySeconds = seconds;
+            Settings.Default.Save();
+
+            // Update the scheduled task with the new delay if Start on boot is ON
+            if (cbStartBoot.IsChecked == true)
+            {
+                UpdateScheduledTask();
+            }
         }
 
         private void cbStartMini_Checked(object sender, RoutedEventArgs e)
