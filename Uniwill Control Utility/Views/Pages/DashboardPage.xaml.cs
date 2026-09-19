@@ -43,7 +43,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Gate Flydigi control by user setting — collapsed immediately so it
             // doesn't flash visible before the first metrics update.
-            if (Settings.Default.HideFlydigi)
+            if (!Settings.Default.EnableFlydigi)
                 _flydigi.Visibility = Visibility.Collapsed;
 
             // Pass navigation service to device controls for "Connect" buttons
@@ -292,8 +292,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Update metrics first — each control sets its own visibility based on connection state.
             _hydroUi.UpdateMetrics(snapshot);
 
-            // Only update Flydigi metrics if not disabled in Settings
-            if (!Settings.Default.HideFlydigi)
+            // Only update Flydigi metrics if enabled in Settings
+            if (Settings.Default.EnableFlydigi)
                 _flydigi.UpdateMetrics(snapshot);
 
             // Adjust layout based on which cards are visible.

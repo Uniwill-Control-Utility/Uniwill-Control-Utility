@@ -300,7 +300,7 @@
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="False">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE733;" FontSize="20" Margin="6,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE90F;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>
@@ -308,7 +308,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Disable specific features that you don't want the application to control."
+                                               Text="Enable or disable specific features in the application."
                                                TextWrapping="Wrap" />
                             </StackPanel>
                         </ui:CardExpander.Header>
@@ -324,7 +324,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Disables GPU curve/core clock offset and memory clock offset in Presets and Adaptive pages."
+                                                   Text="Controls GPU curve/core clock offset and memory clock offset in Presets and Adaptive pages."
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="cbDisableGpuClockControl"
@@ -351,7 +351,7 @@
                                     <ui:TextBlock Margin="0,2,0,2"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Disconnect the Flydigi cooler and hide all related UI elements. (App restart required)" />
+                                                   Text="Show or hide the Flydigi cooler controls. (App restart required)" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="cbHideFlydigi"
                                                  Grid.Column="1"
@@ -377,7 +377,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="For those who perform voltage control via BIOS (or for cases where it's locked down on the BIOS level)"
+                                                   Text="Disable if you perform voltage control via BIOS or if it's locked at the BIOS level"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="cbDisableCpuVoltageControl"

@@ -301,7 +301,7 @@
                                         <Slider x:Name="sdTjMax" Width="140" Maximum="105" Minimum="70" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
-                                <!-- CO controls container (hidden when DisableCpuVoltageControl is ON) -->
+                                <!-- CO controls container (hidden when EnableCpuVoltageControl is OFF) -->
                                 <StackPanel x:Name="coControlsPanel">
                                 <!-- Divider -->
                                 <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
@@ -508,7 +508,7 @@
                                         <Slider x:Name="sdIntelPl2" Width="140" Maximum="200" Minimum="10" Value="60" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
-                                <!-- Intel Undervolt controls container (hidden when DisableCpuVoltageControl is ON) -->
+                                <!-- Intel Undervolt controls container (hidden when EnableCpuVoltageControl is OFF) -->
                                 <StackPanel x:Name="intelVoltControlsPanel">
                                 <!-- Divider -->
                                 <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
@@ -643,7 +643,7 @@
                                     </Grid>
                                 </StackPanel>
                                 </StackPanel>
-                                <!-- GPU Clock Controls (hidden when DisableGpuClockControl is ON) -->
+                                <!-- GPU Clock Controls (hidden when EnableGpuClockControl is OFF) -->
                                 <StackPanel x:Name="GpuClockControlsPanel">
                                     <!-- Divider -->
                                     <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />

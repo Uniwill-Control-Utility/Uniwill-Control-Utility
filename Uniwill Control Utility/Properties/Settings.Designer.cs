@@ -233,10 +233,10 @@ namespace Uniwill_Control_Utility.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool DisableCpuVoltageControl {
-            get { return ((bool)(this["DisableCpuVoltageControl"])); }
-            set { this["DisableCpuVoltageControl"] = value; }
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool EnableCpuVoltageControl {
+            get { return ((bool)(this["EnableCpuVoltageControl"])); }
+            set { this["EnableCpuVoltageControl"] = value; }
         }
 
         [global::System.Configuration.UserScopedSettingAttribute()]
@@ -777,13 +777,13 @@ namespace Uniwill_Control_Utility.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool HideFlydigi {
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool EnableFlydigi {
             get {
-                return ((bool)(this["HideFlydigi"]));
+                return ((bool)(this["EnableFlydigi"]));
             }
             set {
-                this["HideFlydigi"] = value;
+                this["EnableFlydigi"] = value;
             }
         }
 
@@ -797,10 +797,10 @@ namespace Uniwill_Control_Utility.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool DisableGpuClockControl {
-            get { return ((bool)(this["DisableGpuClockControl"])); }
-            set { this["DisableGpuClockControl"] = value; }
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool EnableGpuClockControl {
+            get { return ((bool)(this["EnableGpuClockControl"])); }
+            set { this["EnableGpuClockControl"] = value; }
         }
 
         [global::System.Configuration.UserScopedSettingAttribute()]

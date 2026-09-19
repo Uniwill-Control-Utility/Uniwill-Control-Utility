@@ -395,7 +395,7 @@ namespace Uniwill_Control_Utility
             // Auto-connect Flydigi BS2 Pro cooling pad on startup if enabled
             try
             {
-                if (!Settings.Default.HideFlydigi)
+                if (Settings.Default.EnableFlydigi)
                 {
                     var flydigiCoolerService = _host?.Services.GetService<FlydigiCoolerHidService>();
                     if (flydigiCoolerService != null && FlydigiCoolerHidService.IsDeviceAvailable())
@@ -410,7 +410,7 @@ namespace Uniwill_Control_Utility
             // Auto-connect Flydigi BS1 (BLE) cooling pad on startup if enabled
             try
             {
-                if (!Settings.Default.HideFlydigi)
+                if (Settings.Default.EnableFlydigi)
                 {
                     var bs1Service = _host?.Services.GetService<FlydigiCoolerBleService>();
                     if (bs1Service != null)
@@ -432,7 +432,7 @@ namespace Uniwill_Control_Utility
                 var deviceApplier = _host?.Services.GetService<DeviceApplier>();
                 if (deviceApplier != null && Settings.Default.isAdaptiveModeRunning)
                 {
-                    if (!Settings.Default.HideFlydigi && Settings.Default.AdaptiveBs2ProEnabled)
+                    if (Settings.Default.EnableFlydigi && Settings.Default.AdaptiveBs2ProEnabled)
                         deviceApplier.EnableFlydigiOverride();
 
                     if (Settings.Default.AdaptiveWcEnabled)

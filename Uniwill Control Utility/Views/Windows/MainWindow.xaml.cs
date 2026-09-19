@@ -104,7 +104,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             UpdateTrayFanProfileVisibility();
 
             // Hide Flydigi section if disabled in Settings
-            miSectionFlydigi.Visibility = Settings.Default.HideFlydigi ? Visibility.Collapsed : Visibility.Visible;
+            miSectionFlydigi.Visibility = Settings.Default.EnableFlydigi ? Visibility.Visible : Visibility.Collapsed;
 
             // Hide Hydro UI section if no supported hardware or no cooler connected
             UpdateHydroTrayVisibility();

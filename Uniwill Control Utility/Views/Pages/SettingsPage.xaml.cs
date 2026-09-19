@@ -98,9 +98,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbAutoCheck.IsChecked = Settings.Default.UpdateCheck;
             cbAdaptive.IsChecked = Settings.Default.isStartAdpative;
             cbGpuPowerBoost.IsChecked = Settings.Default.EnableGpuPowerBoost;
-            cbHideFlydigi.IsChecked = Settings.Default.HideFlydigi;
-            cbDisableCpuVoltageControl.IsChecked = Settings.Default.DisableCpuVoltageControl;
-            cbDisableGpuClockControl.IsChecked = Settings.Default.DisableGpuClockControl;
+            cbHideFlydigi.IsChecked = Settings.Default.EnableFlydigi;
+            cbDisableCpuVoltageControl.IsChecked = Settings.Default.EnableCpuVoltageControl;
+            cbDisableGpuClockControl.IsChecked = Settings.Default.EnableGpuClockControl;
 
             cbxLogLevel.SelectedIndex = Settings.Default.DiagnosticLogLevel;
 
@@ -404,7 +404,27 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbHideFlydigi_Checked(object sender, RoutedEventArgs e)
         {
-            Settings.Default.HideFlydigi = true;
+            Settings.Default.EnableFlydigi = true;
+            Settings.Default.Save();
+
+            // Resume all Flydigi background services
+            try
+            {
+                var coolerService = App.GetService<FlydigiCoolerHidService>();
+                coolerService?.ResumeBackgroundServices();
+
+                var bs1Service = App.GetService<FlydigiCoolerBleService>();
+                bs1Service?.ResumeBackgroundServices();
+            }
+            catch (Exception)
+            {
+                // Non-critical: resume failures shouldn't block the UI.
+            }
+        }
+
+        private void cbHideFlydigi_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.EnableFlydigi = false;
             Settings.Default.Save();
 
             // Fully suspend all Flydigi background services (fire-and-forget to avoid UI freeze)
@@ -425,47 +445,27 @@ namespace Uniwill_Control_Utility.Views.Pages
             });
         }
 
-        private void cbHideFlydigi_Unchecked(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.HideFlydigi = false;
-            Settings.Default.Save();
-
-            // Resume all Flydigi background services
-            try
-            {
-                var coolerService = App.GetService<FlydigiCoolerHidService>();
-                coolerService?.ResumeBackgroundServices();
-
-                var bs1Service = App.GetService<FlydigiCoolerBleService>();
-                bs1Service?.ResumeBackgroundServices();
-            }
-            catch (Exception)
-            {
-                // Non-critical: resume failures shouldn't block the UI.
-            }
-        }
-
         private void cbDisableCpuVoltageControl_Checked(object sender, RoutedEventArgs e)
         {
-            Settings.Default.DisableCpuVoltageControl = true;
+            Settings.Default.EnableCpuVoltageControl = true;
             Settings.Default.Save();
         }
 
         private void cbDisableCpuVoltageControl_Unchecked(object sender, RoutedEventArgs e)
         {
-            Settings.Default.DisableCpuVoltageControl = false;
+            Settings.Default.EnableCpuVoltageControl = false;
             Settings.Default.Save();
         }
 
         private void cbDisableGpuClockControl_Checked(object sender, RoutedEventArgs e)
         {
-            Settings.Default.DisableGpuClockControl = true;
+            Settings.Default.EnableGpuClockControl = true;
             Settings.Default.Save();
         }
 
         private void cbDisableGpuClockControl_Unchecked(object sender, RoutedEventArgs e)
         {
-            Settings.Default.DisableGpuClockControl = false;
+            Settings.Default.EnableGpuClockControl = false;
             Settings.Default.Save();
         }
 

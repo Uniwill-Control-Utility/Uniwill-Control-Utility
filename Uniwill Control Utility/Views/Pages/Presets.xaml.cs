@@ -59,10 +59,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         private double _profileIntelPl1 = 45;
         private double _profileIntelPl2 = 60;
 
-        // Voltage control is enabled when DisableCpuVoltageControl setting is False.
-        // When the setting is True, voltage controls (CO for AMD, undervolt for Intel)
+        // Voltage control is enabled when EnableCpuVoltageControl setting is True.
+        // When the setting is False, voltage controls (CO for AMD, undervolt for Intel)
         // are hidden and the app skips voltage-related SMU/MSR commands.
-        private bool CpuVoltageEnabled => !Settings.Default.DisableCpuVoltageControl;
+        private bool CpuVoltageEnabled => Settings.Default.EnableCpuVoltageControl;
 
         public Presets(ILogger<Presets> logger, GpuInventoryService? gpuInventory = null, WaterCoolerService? waterCooler = null, DeviceApplier? deviceApplier = null)
         {
@@ -368,8 +368,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             sdNvidia.Visibility = hasNvidia ? Visibility.Visible : Visibility.Collapsed;
 
-            // Hide GPU clock controls when DisableGpuClockControl is ON
-            bool gpuClockEnabled = !Settings.Default.DisableGpuClockControl;
+            // Hide GPU clock controls when EnableGpuClockControl is OFF
+            bool gpuClockEnabled = Settings.Default.EnableGpuClockControl;
             GpuClockControlsPanel.Visibility = gpuClockEnabled ? Visibility.Visible : Visibility.Collapsed;
             tbCoreLabel.Visibility = gpuClockEnabled ? Visibility.Visible : Visibility.Collapsed;
             tbCoreClock.Visibility = gpuClockEnabled ? Visibility.Visible : Visibility.Collapsed;
@@ -794,7 +794,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
 
             // Update GPU clock offset display from slider values
-            if (sdNvidia.Visibility == Visibility.Visible && !Settings.Default.DisableGpuClockControl)
+            if (sdNvidia.Visibility == Visibility.Visible && Settings.Default.EnableGpuClockControl)
             {
                 string coreText;
                 if (VfCurveActive && !_userTouchedCoreSlider)
@@ -1295,8 +1295,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 else
                 {
-                    int core = Settings.Default.DisableGpuClockControl ? 0 : (int)sdNvCore.Value;
-                    int mem = Settings.Default.DisableGpuClockControl ? 0 : (int)sdNvMem.Value;
+                    int core = Settings.Default.EnableGpuClockControl ? (int)sdNvCore.Value : 0;
+                    int mem = Settings.Default.EnableGpuClockControl ? (int)sdNvMem.Value : 0;
                     int tgp = (int)sdNvPower.Value;
                     bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
                     bool dbEnabled = !boostEnabled && togDynamicBoost.IsChecked == true;

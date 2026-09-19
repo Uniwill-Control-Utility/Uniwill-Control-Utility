@@ -26,7 +26,7 @@ namespace Uniwill_Control_Utility.Views.Controls
         public void UpdateMetrics(DeviceMetricsSnapshot snapshot)
         {
             // Hide the card if Flydigi is disabled via Settings
-            if (Settings.Default.HideFlydigi)
+            if (!Settings.Default.EnableFlydigi)
             {
                 this.Visibility = Visibility.Collapsed;
                 return;

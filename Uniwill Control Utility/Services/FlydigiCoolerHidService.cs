@@ -341,7 +341,7 @@ namespace Uniwill_Control_Utility.Services
 
             // If the user has disabled Flydigi functionality entirely, skip all
             // background initialization to avoid any unnecessary HID operations.
-            if (Properties.Settings.Default.HideFlydigi)
+            if (!Properties.Settings.Default.EnableFlydigi)
                 return;
 
             StartPowerNotificationMonitor();

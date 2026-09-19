@@ -105,8 +105,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool hasNvidia = !string.IsNullOrEmpty(NvTuning.GetGpuName());
             sdGpuSettings.Visibility = hasNvidia ? Visibility.Visible : Visibility.Collapsed;
 
-            // Hide GPU clock controls when DisableGpuClockControl is ON
-            bool adpGpuClockEnabled = !Settings.Default.DisableGpuClockControl;
+            // Hide GPU clock controls when EnableGpuClockControl is OFF
+            bool adpGpuClockEnabled = Settings.Default.EnableGpuClockControl;
             AdpGpuClockControlsPanel.Visibility = adpGpuClockEnabled ? Visibility.Visible : Visibility.Collapsed;
 
             // Show/hide EC Fan card based on Uniwill EC availability.
@@ -156,7 +156,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void UpdateFlydigiCardVisibility()
         {
             // Hide card if Flydigi functionality is disabled in Settings
-            if (Settings.Default.HideFlydigi)
+            if (!Settings.Default.EnableFlydigi)
             {
                 sdBs2Pro.Visibility = Visibility.Collapsed;
                 // Ensure override is turned off when Flydigi is disabled
@@ -397,8 +397,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         // when getRunningGame already called it directly with resetTracking: false.
         private bool _isUpdatingPresetSelection;
 
-        // Voltage control is enabled when DisableCpuVoltageControl setting is False.
-        private bool AdpCpuVoltageEnabled => !Settings.Default.DisableCpuVoltageControl;
+        // Voltage control is enabled when EnableCpuVoltageControl setting is True.
+        private bool AdpCpuVoltageEnabled => Settings.Default.EnableCpuVoltageControl;
 
         // Window classes that are NOT games (browsers, notifications, taskbar, etc.)
         private static readonly HashSet<string> _excludedWindowClasses = new(StringComparer.OrdinalIgnoreCase)
@@ -512,7 +512,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     // what the user has configured in the active profile.
                     if (_deviceApplier != null)
                     {
-                        if (!Settings.Default.HideFlydigi && (cbxBs2ProEnabled.IsChecked ?? false) && !_deviceApplier.IsFlydigiOverridden)
+                        if (Settings.Default.EnableFlydigi && (cbxBs2ProEnabled.IsChecked ?? false) && !_deviceApplier.IsFlydigiOverridden)
                             _deviceApplier.EnableFlydigiOverride();
                         if (_hydroConnected && (cbxWcEnabled.IsChecked ?? false) && !_deviceApplier.IsWatercoolerOverridden)
                             _deviceApplier.EnableWatercoolerOverride();
@@ -825,7 +825,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // is true (profile switch). When resetTracking is false (Page_Loaded,
             // game detection without profile change), preserve the user's current
             // checkbox edits so they aren't overwritten by the saved preset.
-            if (!Settings.Default.HideFlydigi && cbxBs2ProEnabled.IsChecked != preset.Bs2ProEnabled)
+            if (Settings.Default.EnableFlydigi && cbxBs2ProEnabled.IsChecked != preset.Bs2ProEnabled)
                 cbxBs2ProEnabled.IsChecked = preset.Bs2ProEnabled;
             if (cbxWcEnabled.IsChecked != preset.WcEnabled)
                 cbxWcEnabled.IsChecked = preset.WcEnabled;
@@ -1078,7 +1078,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void cbxBs2ProEnabled_Toggled(object sender, RoutedEventArgs e)
         {
             // Guard: don't allow enabling override when Flydigi is disabled in Settings
-            if (Settings.Default.HideFlydigi)
+            if (!Settings.Default.EnableFlydigi)
             {
                 cbxBs2ProEnabled.IsChecked = false;
                 return;
@@ -1323,7 +1323,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async Task ApplyBs2ProIfNeeded()
         {
-            if (Settings.Default.HideFlydigi || !(cbxBs2ProEnabled.IsChecked ?? false))
+            if (!Settings.Default.EnableFlydigi || !(cbxBs2ProEnabled.IsChecked ?? false))
                 return;
 
             string bs2Mode = GetBs2ProFanModeFromIndex(cbxBs2ProFanMode.SelectedIndex);
@@ -1698,7 +1698,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
             bool dbEnabled = !boostEnabled && AdpTogDynamicBoost.IsChecked == true;
             int dbOffset = dbEnabled ? (int)AdpSdNvDbOffset.Value : 0;
-            bool gpuClockDisabled = Settings.Default.DisableGpuClockControl;
+            bool gpuClockDisabled = !Settings.Default.EnableGpuClockControl;
             int memClock = gpuClockDisabled ? 0 : (int)AdpSdNvMem.Value;
 
             // When a V-F curve is active and user hasn't touched the slider,

@@ -197,7 +197,7 @@
                                     <Slider x:Name="AdpSdTjMax" Width="140" Maximum="105" Minimum="70" Value="95" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
-                            <!-- CO controls panel (hidden when DisableCpuVoltageControl is ON) -->
+                            <!-- CO controls panel (hidden when EnableCpuVoltageControl is OFF) -->
                             <StackPanel x:Name="AdpCoControlsPanel" Visibility="Collapsed">
                             <!-- Divider -->
                             <Border x:Name="AdpDividerBeforeCoControls" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
@@ -533,7 +533,7 @@
                                     </Grid>
                                 </StackPanel>
                             </StackPanel>
-                            <!-- GPU Clock Controls (hidden when DisableGpuClockControl is ON) -->
+                            <!-- GPU Clock Controls (hidden when EnableGpuClockControl is OFF) -->
                             <StackPanel x:Name="AdpGpuClockControlsPanel">
                                 <!-- Divider -->
                                 <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />

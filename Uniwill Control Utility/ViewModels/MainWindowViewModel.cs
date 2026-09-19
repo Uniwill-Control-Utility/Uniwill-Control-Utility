@@ -67,7 +67,7 @@ namespace Uniwill_Control_Utility.ViewModels
             }
 
             // Flydigi cooler in footer (hidden if user has disabled it in Settings)
-            if (!Settings.Default.HideFlydigi)
+            if (Settings.Default.EnableFlydigi)
             {
                 NavigationFooter.Add(CreateFlydigiNavItem());
             }
