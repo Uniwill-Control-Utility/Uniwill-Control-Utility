@@ -119,8 +119,10 @@ namespace Uniwill_Control_Utility.Scripts
             try
             {
                 // --- Panel type and refresh rate from WmiMonitorID ---
-                string? panelModel = null;
-                string? hardwareId = null;
+                // Iterate all active monitors and pick the first one that matches a known panel
+                // in the database. This avoids picking an external/virtual display that happens
+                // to enumerate before the internal laptop panel.
+                PanelInfo? panelInfo = null;
 
                 try
                 {
@@ -132,48 +134,43 @@ namespace Uniwill_Control_Utility.Scripts
                             if (!(bool)monitor["Active"])
                                 continue;
 
-                            // User-friendly panel model name
+                            string? friendlyName = null;
                             byte[]? friendlyNameBytes = monitor["UserFriendlyName"] as byte[];
                             int nameLen = Convert.ToInt32(monitor["UserFriendlyNameLength"]);
                             if (friendlyNameBytes != null && nameLen > 0)
                             {
-                                string name = Encoding.ASCII.GetString(friendlyNameBytes)
+                                friendlyName = Encoding.ASCII.GetString(friendlyNameBytes)
                                     .TrimEnd('\0', '\r', '\n', ' ');
-                                if (!string.IsNullOrEmpty(name))
-                                    panelModel = name;
                             }
 
-                            // Hardware ID from InstanceName: "DISPLAY\BOE0D5A\5&..."
+                            string? hwId = null;
                             string instanceName = Convert.ToString(monitor["InstanceName"]) ?? "";
                             if (!string.IsNullOrEmpty(instanceName))
                             {
                                 int bs1 = instanceName.IndexOf('\\');
                                 int bs2 = instanceName.IndexOf('\\', bs1 + 1);
                                 if (bs1 >= 0 && bs2 > bs1)
-                                {
-                                    hardwareId = instanceName.Substring(bs1 + 1, bs2 - bs1 - 1);
-                                }
+                                    hwId = instanceName.Substring(bs1 + 1, bs2 - bs1 - 1);
                             }
 
-                            // First active monitor is the internal panel
-                            break;
+                            // Try hardware ID first, then model name — stop at first match.
+                            PanelInfo? info = null;
+
+                            if (!string.IsNullOrEmpty(hwId))
+                                info = PanelDatabase.LookupByHardwareId(hwId);
+
+                            if (info == null && !string.IsNullOrEmpty(friendlyName))
+                                info = PanelDatabase.LookupByModel(friendlyName);
+
+                            if (info != null)
+                            {
+                                panelInfo = info;
+                                break;
+                            }
                         }
                     }
                 }
                 catch { /* root\wmi not available */ }
-
-                // Look up panel info from database
-                PanelInfo? panelInfo = null;
-
-                if (!string.IsNullOrEmpty(hardwareId))
-                {
-                    panelInfo = PanelDatabase.LookupByHardwareId(hardwareId);
-                }
-
-                if (panelInfo == null && !string.IsNullOrEmpty(panelModel))
-                {
-                    panelInfo = PanelDatabase.LookupByModel(panelModel);
-                }
 
                 string panelType = panelInfo != null ? panelInfo.Value.PanelType : "IPS";
                 int refreshRate = panelInfo != null ? panelInfo.Value.MaxRefreshRateHz : 165;
