@@ -56,6 +56,19 @@ namespace Uniwill_Control_Utility.Services
                 BaseBoardProductPrefix: "X6AR",
                 ImagePath: "pack://application:,,,/Assets/Laptops/PCSpecialist/Recoil-3-16-Intel.png"),
 
+            // --- Mifcom ---
+            new LaptopModelInfo(
+                DisplayName: "Mifcom 16 (AMD)",
+                SystemManufacturer: "AiStone",
+                BaseBoardProductPrefix: "X6FR",
+                ImagePath: "pack://application:,,,/Assets/Laptops/Mifcom/16.png"),
+
+            new LaptopModelInfo(
+                DisplayName: "Mifcom 16 (Intel)",
+                SystemManufacturer: "AiStone",
+                BaseBoardProductPrefix: "X6AR",
+                ImagePath: "pack://application:,,,/Assets/Laptops/Mifcom/16.png"),
+
             // --- TUXEDO ---
             // TUXEDO computers use the same TongFeng chassis. Add entries when images are available.
             // e.g. new LaptopModelInfo("TUXEDO Pulse 15", "TUXEDO", "X6FR", "..."),
