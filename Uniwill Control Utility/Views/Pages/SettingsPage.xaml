@@ -266,32 +266,47 @@
                                                  Unchecked="cbAdaptive_Unchecked" />
                             </Grid>
 
-                            <!-- Divider -->
-                            <Border x:Name="GpuPowerBoostDivider"
-                                    Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
-                                    Visibility="Collapsed" />
+                         </StackPanel>
+                    </ui:CardExpander>
 
-                            <!-- Row: GPU Power Boost (RTX 5080/5090 only) -->
-                            <Grid x:Name="GpuPowerBoostRow" Visibility="Collapsed">
+                    <!-- Feature Control -->
+                    <ui:CardExpander Margin="0,0,0,8"
+                                     IsExpanded="False">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE733;" FontSize="20" Margin="6,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Feature Control" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Disable specific features that you don't want the application to control."
+                                               TextWrapping="Wrap" />
+                            </StackPanel>
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <!-- Row: Disable GPU clock control -->
+                            <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="GPU Power Boost" />
-                                    <ui:TextBlock Margin="0,2,0,2"
+                                    <ui:TextBlock FontTypography="Body" Text="GPU clock control" />
+                                    <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Allow GPU TGP up to 225W. Only enable if your cooling solution can sustain it." />
+                                                   Text="Disables GPU curve/core clock offset and memory clock offset in Presets and Adaptive pages."
+                                                   TextWrapping="Wrap" />
                                 </StackPanel>
-                                <ui:ToggleSwitch x:Name="cbGpuPowerBoost"
+                                <ui:ToggleSwitch x:Name="cbDisableGpuClockControl"
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
                                                  OffContent="Off"
-                                                 Checked="cbGpuPowerBoost_Checked"
-                                                 Unchecked="cbGpuPowerBoost_Unchecked" />
+                                                 Checked="cbDisableGpuClockControl_Checked"
+                                                 Unchecked="cbDisableGpuClockControl_Unchecked" />
                             </Grid>
 
                             <!-- Divider -->
@@ -305,7 +320,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Disable Flydigi cooler functionality" />
+                                    <ui:TextBlock FontTypography="Body" Text="Flydigi cooler functionality" />
                                     <ui:TextBlock Margin="0,2,0,2"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
@@ -331,7 +346,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Disable CPU voltage control" />
+                                    <ui:TextBlock FontTypography="Body" Text="CPU voltage control" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
@@ -345,6 +360,49 @@
                                                  OffContent="Off"
                                                  Checked="cbDisableCpuVoltageControl_Checked"
                                                  Unchecked="cbDisableCpuVoltageControl_Unchecked" />
+                            </Grid>
+                        </StackPanel>
+                    </ui:CardExpander>
+
+                    <!-- Advanced Features -->
+                    <ui:CardExpander x:Name="GpuPowerBoostCard"
+                                     Margin="0,0,0,8"
+                                     IsExpanded="False"
+                                     Visibility="Collapsed">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF196;" FontSize="20" Margin="6,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Advanced Features" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="For users of custom mods."
+                                               TextWrapping="Wrap" />
+                            </StackPanel>
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <!-- Row: GPU Power Boost (RTX 5080/5090 only) -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="GPU Power Boost" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Allows GPU power limit to reach 250W. Disables Dynamic Boost control. Use only if you have installed the required mod." />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbGpuPowerBoost"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbGpuPowerBoost_Checked"
+                                                 Unchecked="cbGpuPowerBoost_Unchecked" />
                             </Grid>
                         </StackPanel>
                     </ui:CardExpander>

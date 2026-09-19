@@ -786,6 +786,14 @@ namespace Uniwill_Control_Utility.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool DisableGpuClockControl {
+            get { return ((bool)(this["DisableGpuClockControl"])); }
+            set { this["DisableGpuClockControl"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool DisplayLocalDimming {
             get { return ((bool)(this["DisplayLocalDimming"])); }
             set { this["DisplayLocalDimming"] = value; }

@@ -356,6 +356,14 @@ namespace Uniwill_Control_Utility.Views.Pages
                 hasNvidia = !string.IsNullOrEmpty(NvTuning.GetGpuName());
             }
             sdNvidia.Visibility = hasNvidia ? Visibility.Visible : Visibility.Collapsed;
+
+            // Hide GPU clock controls when DisableGpuClockControl is ON
+            bool gpuClockEnabled = !Settings.Default.DisableGpuClockControl;
+            GpuClockControlsPanel.Visibility = gpuClockEnabled ? Visibility.Visible : Visibility.Collapsed;
+            tbCoreLabel.Visibility = gpuClockEnabled ? Visibility.Visible : Visibility.Collapsed;
+            tbCoreClock.Visibility = gpuClockEnabled ? Visibility.Visible : Visibility.Collapsed;
+            tbMemLabel.Visibility = gpuClockEnabled ? Visibility.Visible : Visibility.Collapsed;
+            tbMemClock.Visibility = gpuClockEnabled ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private bool IsHydroConnected => _waterCooler?.IsConnected == true;
@@ -434,8 +442,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
             (int min, int max) = gpuName.ToLowerInvariant() switch
             {
-                var n when n.Contains("rtx 5090") => (95, boostEnabled ? 225 : 150),
-                var n when n.Contains("rtx 5080") => (80, boostEnabled ? 225 : 150),
+                var n when n.Contains("rtx 5090") => (95, boostEnabled ? 250 : 150),
+                var n when n.Contains("rtx 5080") => (80, boostEnabled ? 250 : 150),
                 var n when n.Contains("rtx 5070") => (60, 115),
                 _ => (50, fallbackMax)
             };
@@ -444,9 +452,15 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Clamp current value to new range only if out of bounds.
             // This handles the case where GPU Power Boost setting changes
-            // (e.g., user disables boost, reducing the max from 225 to 150).
+            // (e.g., user disables boost, reducing the max from 250 to 150).
             if (sdNvPower.Value > max) sdNvPower.Value = max;
             if (sdNvPower.Value < min) sdNvPower.Value = min;
+
+            // Hide Dynamic Boost controls when GPU Power Boost is ON
+            bool dbVisible = !boostEnabled;
+            DynamicBoostPanel.Visibility = dbVisible ? Visibility.Visible : Visibility.Collapsed;
+            tbDbLabel.Visibility = dbVisible ? Visibility.Visible : Visibility.Collapsed;
+            tbGpuDb.Visibility = dbVisible ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void setProfileTooltips()
@@ -769,7 +783,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
 
             // Update GPU clock offset display from slider values
-            if (sdNvidia.Visibility == Visibility.Visible)
+            if (sdNvidia.Visibility == Visibility.Visible && !Settings.Default.DisableGpuClockControl)
             {
                 string coreText;
                 if (VfCurveActive && !_userTouchedCoreSlider)
@@ -1270,10 +1284,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 else
                 {
-                    int core = (int)sdNvCore.Value;
-                    int mem = (int)sdNvMem.Value;
+                    int core = Settings.Default.DisableGpuClockControl ? 0 : (int)sdNvCore.Value;
+                    int mem = Settings.Default.DisableGpuClockControl ? 0 : (int)sdNvMem.Value;
                     int tgp = (int)sdNvPower.Value;
-                    bool dbEnabled = togDynamicBoost.IsChecked == true;
+                    bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+                    bool dbEnabled = !boostEnabled && togDynamicBoost.IsChecked == true;
                     int dbOffset = dbEnabled ? (int)sdNvDbOffset.Value : 0;
                     int totalWatts = tgp + dbOffset;
                     parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");

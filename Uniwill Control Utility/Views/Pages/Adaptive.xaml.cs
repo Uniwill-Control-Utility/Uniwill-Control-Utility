@@ -105,6 +105,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool hasNvidia = !string.IsNullOrEmpty(NvTuning.GetGpuName());
             sdGpuSettings.Visibility = hasNvidia ? Visibility.Visible : Visibility.Collapsed;
 
+            // Hide GPU clock controls when DisableGpuClockControl is ON
+            bool adpGpuClockEnabled = !Settings.Default.DisableGpuClockControl;
+            AdpGpuClockControlsPanel.Visibility = adpGpuClockEnabled ? Visibility.Visible : Visibility.Collapsed;
+
             // Show/hide EC Fan card based on Uniwill EC availability.
             // Run the hardware probe on a background thread to avoid blocking
             // the initial page render — EC register reads can take seconds.
@@ -613,16 +617,21 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (sdGpuSettings.Visibility == Visibility.Visible)
             {
                 string gpuName = NvTuning.GetGpuName()?.ToLowerInvariant() ?? string.Empty;
+                bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
                 int gpuMax = gpuName switch
                 {
-                    var n when n.Contains("rtx 5090") => Settings.Default.EnableGpuPowerBoost ? 225 : 150,
-                    var n when n.Contains("rtx 5080") => Settings.Default.EnableGpuPowerBoost ? 225 : 150,
+                    var n when n.Contains("rtx 5090") => boostEnabled ? 250 : 150,
+                    var n when n.Contains("rtx 5080") => boostEnabled ? 250 : 150,
                     var n when n.Contains("rtx 5070") => 115,
                     _ => limits.GpuTgpBaseline
                 };
                 AdpSdNvPower.Maximum = gpuMax;
                 if (AdpSdNvPower.Value > gpuMax)
                     AdpSdNvPower.Value = gpuMax;
+
+                // Hide Dynamic Boost controls when GPU Power Boost is ON
+                bool dbVisible = !boostEnabled;
+                AdpDynamicBoostPanel.Visibility = dbVisible ? Visibility.Visible : Visibility.Collapsed;
             }
         }
 
@@ -1686,14 +1695,18 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
 
             int tgp = (int)AdpSdNvPower.Value;
-            bool dbEnabled = AdpTogDynamicBoost.IsChecked == true;
+            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+            bool dbEnabled = !boostEnabled && AdpTogDynamicBoost.IsChecked == true;
             int dbOffset = dbEnabled ? (int)AdpSdNvDbOffset.Value : 0;
-            int memClock = (int)AdpSdNvMem.Value;
+            bool gpuClockDisabled = Settings.Default.DisableGpuClockControl;
+            int memClock = gpuClockDisabled ? 0 : (int)AdpSdNvMem.Value;
 
             // When a V-F curve is active and user hasn't touched the slider,
             // skip the core clock offset — the curve handles per-point frequency.
-            int coreClock = (AdpVfCurveActive && !_adpUserTouchedCoreSlider)
-                ? 0 : (int)AdpSdNvCore.Value;
+            int coreClock = gpuClockDisabled
+                ? 0
+                : (AdpVfCurveActive && !_adpUserTouchedCoreSlider)
+                    ? 0 : (int)AdpSdNvCore.Value;
 
             bool changed = tgp != lastGpuTgp ||
                 dbEnabled != lastGpuDynamicBoost ||

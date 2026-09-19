@@ -176,14 +176,14 @@
                                     <TextBlock Grid.Row="0" Grid.Column="0" Width="120" FontSize="13" Text="GPU TGP" HorizontalAlignment="Left" />
                                     <TextBlock Grid.Row="0" Grid.Column="1" x:Name="tbGpuTgp" FontSize="13" FontWeight="SemiBold" Text="-- W" />
 
-                                    <TextBlock Grid.Row="1" Grid.Column="0" FontSize="13" Text="Dynamic Boost" Margin="0,4,0,0" HorizontalAlignment="Left" />
-                                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="tbGpuDb" FontSize="13" FontWeight="SemiBold" Text="Off" Margin="0,4,0,0" />
+                                    <TextBlock x:Name="tbDbLabel" Grid.Row="1" Grid.Column="0" FontSize="13" Text="Dynamic Boost" Margin="0,4,0,0" HorizontalAlignment="Left" />
+                                    <TextBlock x:Name="tbGpuDb" Grid.Row="1" Grid.Column="1" FontSize="13" FontWeight="SemiBold" Text="Off" Margin="0,4,0,0" />
 
-                                    <TextBlock Grid.Row="2" Grid.Column="0" FontSize="13" Text="Core Offset" Margin="0,4,0,0" HorizontalAlignment="Left" />
-                                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="tbCoreClock" FontSize="13" FontWeight="SemiBold" Text="--" Margin="0,4,0,0" />
+                                    <TextBlock x:Name="tbCoreLabel" Grid.Row="2" Grid.Column="0" FontSize="13" Text="Core Offset" Margin="0,4,0,0" HorizontalAlignment="Left" />
+                                    <TextBlock x:Name="tbCoreClock" Grid.Row="2" Grid.Column="1" FontSize="13" FontWeight="SemiBold" Text="--" Margin="0,4,0,0" />
 
-                                    <TextBlock Grid.Row="3" Grid.Column="0" FontSize="13" Text="Memory Offset" Margin="0,4,0,0" HorizontalAlignment="Left" />
-                                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="tbMemClock" FontSize="13" FontWeight="SemiBold" Text="--" Margin="0,4,0,0" />
+                                    <TextBlock x:Name="tbMemLabel" Grid.Row="3" Grid.Column="0" FontSize="13" Text="Memory Offset" Margin="0,4,0,0" HorizontalAlignment="Left" />
+                                    <TextBlock x:Name="tbMemClock" Grid.Row="3" Grid.Column="1" FontSize="13" FontWeight="SemiBold" Text="--" Margin="0,4,0,0" />
                                 </Grid>
                             </StackPanel>
                         </Grid>
@@ -589,35 +589,37 @@
                                         <Slider x:Name="sdNvPower" Width="140" Maximum="175" Minimum="50" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
-                                <!-- Divider -->
-                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                                <!-- Dynamic Boost Toggle -->
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <StackPanel Orientation="Horizontal">
-                                            <ui:TextBlock FontTypography="Body" Text="Dynamic Boost" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Allow GPU to borrow power from CPU" VerticalAlignment="Center" />
-                                        </StackPanel>
-                                        <ui:TextBlock Margin="0,2,0,0"
-                                                       FontTypography="Caption"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Enable NVIDIA Dynamic Boost" />
-                                    </StackPanel>
-                                    <ui:ToggleSwitch x:Name="togDynamicBoost" Grid.Column="1" Margin="4,0,0,0" LabelPosition="Left" OnContent="On" OffContent="Off" Checked="togDynamicBoost_Checked" Unchecked="togDynamicBoost_Unchecked" />
-                                </Grid>
-                                <!-- Dynamic Boost Offset (hidden when toggle is off) -->
-                                <StackPanel x:Name="spNvDbOffset" Visibility="Collapsed">
+                                <!-- Dynamic Boost Controls (hidden when GPU Power Boost is ON) -->
+                                <StackPanel x:Name="DynamicBoostPanel">
                                     <!-- Divider -->
                                     <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                                    <Grid Margin="0,0,0,0">
+                                    <!-- Dynamic Boost Toggle -->
+                                    <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:TextBlock FontTypography="Body" Text="Dynamic Boost" />
+                                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Allow GPU to borrow power from CPU" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                            <ui:TextBlock Margin="0,2,0,0"
+                                                           FontTypography="Caption"
+                                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                           Text="Enable NVIDIA Dynamic Boost" />
+                                        </StackPanel>
+                                        <ui:ToggleSwitch x:Name="togDynamicBoost" Grid.Column="1" Margin="4,0,0,0" LabelPosition="Left" OnContent="On" OffContent="Off" Checked="togDynamicBoost_Checked" Unchecked="togDynamicBoost_Unchecked" />
+                                    </Grid>
+                                    <!-- Dynamic Boost Offset (hidden when toggle is off) -->
+                                    <StackPanel x:Name="spNvDbOffset" Visibility="Collapsed">
+                                        <!-- Divider -->
+                                        <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                        <Grid Margin="0,0,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0">
                                             <ui:TextBlock FontTypography="Body" Text="Dynamic Boost Offset" />
                                             <ui:TextBlock Margin="0,2,0,0"
@@ -640,93 +642,97 @@
                                         </StackPanel>
                                     </Grid>
                                 </StackPanel>
-                                <!-- Divider -->
-                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                                <!-- Curve Editor Button -->
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body" Text="Curve Editor" />
-                                        <ui:TextBlock Margin="0,2,0,0"
-                                                       FontTypography="Caption"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Edit voltage-frequency curve per point" />
-                                    </StackPanel>
-                                    <Button x:Name="btnVfCurve"
-                                            Grid.Column="1"
-                                            Content="Edit Curve"
-                                            Click="btnVfCurve_Click"
-                                            Margin="4,0,0,0"
-                                            Padding="12,4" />
-                                </Grid>
-                                <!-- Divider -->
-                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                                <!-- Core Clock Offset (always visible) -->
-                                <Grid>
+                                </StackPanel>
+                                <!-- GPU Clock Controls (hidden when DisableGpuClockControl is ON) -->
+                                <StackPanel x:Name="GpuClockControlsPanel">
+                                    <!-- Divider -->
+                                    <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                    <!-- Curve Editor Button -->
+                                    <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0">
-                                            <ui:TextBlock FontTypography="Body" Text="Core Clock Offset" />
+                                            <ui:TextBlock FontTypography="Body" Text="Curve Editor" />
                                             <ui:TextBlock Margin="0,2,0,0"
                                                            FontTypography="Caption"
                                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                           Text="Uniform core frequency offset" />
+                                                           Text="Edit voltage-frequency curve per point" />
+                                        </StackPanel>
+                                        <Button x:Name="btnVfCurve"
+                                                Grid.Column="1"
+                                                Content="Edit Curve"
+                                                Click="btnVfCurve_Click"
+                                                Margin="4,0,0,0"
+                                                Padding="12,4" />
+                                    </Grid>
+                                    <!-- Divider -->
+                                    <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                    <!-- Core Clock Offset -->
+                                    <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <ui:TextBlock FontTypography="Body" Text="Core Clock Offset" />
+                                                <ui:TextBlock Margin="0,2,0,0"
+                                                               FontTypography="Caption"
+                                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                               Text="Uniform core frequency offset" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1"
+                                                        Orientation="Horizontal"
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Center">
+                                                <TextBlock x:Name="lblNvCore"
+                                                           Width="60"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Margin="0,0,8,0"
+                                                           Text="0 MHz" />
+                                                <Slider x:Name="sdNvCore"
+                                                        Width="140"
+                                                        Maximum="1000"
+                                                        Minimum="-1000"
+                                                        TickFrequency="50"
+                                                        IsSnapToTickEnabled="True"
+                                                        TickPlacement="None"
+                                                        VerticalAlignment="Center"
+                                                        TouchDown="SizeSlider_TouchDown"
+                                                        ValueChanged="Slider_ValueChanged" />
+                                            </StackPanel>
+                                        </Grid>
+                                    <!-- Divider -->
+                                    <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                    <!-- Memory Clock Offset -->
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body" Text="Memory Clock Offset" />
+                                            <ui:TextBlock Margin="0,2,0,0"
+                                                           FontTypography="Caption"
+                                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                           Text="Memory frequency offset" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="1"
                                                     Orientation="Horizontal"
                                                     HorizontalAlignment="Right"
                                                     VerticalAlignment="Center">
-                                            <TextBlock x:Name="lblNvCore"
+                                            <TextBlock x:Name="lblNvMem"
                                                        Width="60"
                                                        HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"
                                                        Margin="0,0,8,0"
                                                        Text="0 MHz" />
-                                            <Slider x:Name="sdNvCore"
-                                                    Width="140"
-                                                    Maximum="1000"
-                                                    Minimum="-1000"
-                                                    TickFrequency="50"
-                                                    IsSnapToTickEnabled="True"
-                                                    TickPlacement="None"
-                                                    VerticalAlignment="Center"
-                                                    TouchDown="SizeSlider_TouchDown"
-                                                    ValueChanged="Slider_ValueChanged" />
+                                            <Slider x:Name="sdNvMem" Width="140" Maximum="3000" Minimum="-1000" TickFrequency="50" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                         </StackPanel>
                                     </Grid>
-                                <!-- Divider -->
-                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                                <!-- Memory Clock Offset -->
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body" Text="Memory Clock Offset" />
-                                        <ui:TextBlock Margin="0,2,0,0"
-                                                       FontTypography="Caption"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Memory frequency offset" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1"
-                                                Orientation="Horizontal"
-                                                HorizontalAlignment="Right"
-                                                VerticalAlignment="Center">
-                                        <TextBlock x:Name="lblNvMem"
-                                                   Width="60"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"
-                                                   Margin="0,0,8,0"
-                                                   Text="0 MHz" />
-                                        <Slider x:Name="sdNvMem" Width="140" Maximum="3000" Minimum="-1000" TickFrequency="50" IsSnapToTickEnabled="True" TickPlacement="None" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
-                                    </StackPanel>
-                                </Grid>
+                                </StackPanel>
                             </StackPanel>
                         </ui:CardExpander>
 

@@ -98,6 +98,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbGpuPowerBoost.IsChecked = Settings.Default.EnableGpuPowerBoost;
             cbHideFlydigi.IsChecked = Settings.Default.HideFlydigi;
             cbDisableCpuVoltageControl.IsChecked = Settings.Default.DisableCpuVoltageControl;
+            cbDisableGpuClockControl.IsChecked = Settings.Default.DisableGpuClockControl;
 
             cbxLogLevel.SelectedIndex = Settings.Default.DiagnosticLogLevel;
 
@@ -106,8 +107,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Show GPU Power Boost toggle only for RTX 5080/5090
             if (Scripts.GPUs.NVIDIA.NvTuning.IsBlackwellHighEnd())
             {
-                GpuPowerBoostRow.Visibility = Visibility.Visible;
-                GpuPowerBoostDivider.Visibility = Visibility.Visible;
+                GpuPowerBoostCard.Visibility = Visibility.Visible;
             }
 
             _ = checkUpdate();
@@ -420,6 +420,18 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void cbDisableCpuVoltageControl_Unchecked(object sender, RoutedEventArgs e)
         {
             Settings.Default.DisableCpuVoltageControl = false;
+            Settings.Default.Save();
+        }
+
+        private void cbDisableGpuClockControl_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.DisableGpuClockControl = true;
+            Settings.Default.Save();
+        }
+
+        private void cbDisableGpuClockControl_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.DisableGpuClockControl = false;
             Settings.Default.Save();
         }
 

@@ -31,12 +31,12 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         // Power limit range (watts)
         private const int MinPowerLimitWatts = 5;
         private const int MaxPowerLimitWattsDefault = 175;
-        private const int MaxPowerLimitWattsBoost = 225;
+        private const int MaxPowerLimitWattsBoost = 250;
         private const int DefaultPowerLimitFallbackWatts = 80;
 
         /// <summary>
         /// Returns the effective maximum power limit based on the user's power boost setting.
-        /// RTX 5080/5090 with boost enabled: 225W. Otherwise: 175W.
+        /// RTX 5080/5090 with boost enabled: 250W. Otherwise: 175W.
         /// </summary>
         public static int MaxPowerLimitWatts =>
             IsBlackwellHighEnd() && Properties.Settings.Default.EnableGpuPowerBoost
