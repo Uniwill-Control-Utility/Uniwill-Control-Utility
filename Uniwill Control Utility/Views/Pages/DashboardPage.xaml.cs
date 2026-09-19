@@ -60,7 +60,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             App.HardwareDetectionCompleted += OnHardwareDetectionCompleted;
 
             // If detection already finished (e.g. app was already running), populate now.
-            if (!string.IsNullOrEmpty(Family.LaptopModel) || !string.IsNullOrEmpty(Family.CPUName))
+            if (!string.IsNullOrEmpty(Family.CPUName))
             {
                 OnHardwareDetectionCompleted();
             }
@@ -68,12 +68,12 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void OnHardwareDetectionCompleted()
         {
-            string model = Family.LaptopModel;
             string cpuName = Family.CPUName;
             string gpuName = Family.GPUName;
+            bool isIntel = Family.TYPE == Scripts.Family.ProcessorType.Intel;
 
-            // Determine laptop image path
-            string? imagePath = GetLaptopImagePath(model, cpuName);
+            // Determine laptop image path from the detector catalog
+            string? imagePath = LaptopDetector.GetImagePath(isIntel);
 
             if (!string.IsNullOrEmpty(imagePath))
             {
@@ -92,12 +92,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _header.SetLaptopImageVisibility(Visibility.Collapsed);
             }
 
-            // Set laptop display name
-            string displayName = !string.IsNullOrEmpty(model)
-                ? GetCleanModelName(model).ToUpperInvariant()
-                : "DESKTOP SYSTEM";
-
-            _header.LaptopName = displayName;
+            // Set laptop display name from the detector (or fallback to "DESKTOP SYSTEM")
+            _header.LaptopName = LaptopDetector.GetDisplayName().ToUpperInvariant();
             _header.LaptopCPUName = CleanCpuName(cpuName);
 
             if (!string.IsNullOrEmpty(gpuName))
@@ -118,59 +114,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                     _header.LaptopStorage = storage;
                 });
             });
-        }
-
-        /// <summary>
-        /// Returns the pack URI for the laptop image based on the detected model and CPU.
-        /// </summary>
-        private static string? GetLaptopImagePath(string model, string cpuName)
-        {
-            string modelUpper = model.ToUpperInvariant();
-            bool isAmd = !cpuName.Contains("Intel", StringComparison.OrdinalIgnoreCase);
-
-            // XMG Neo E25/A25 (both use the same image)
-            if (modelUpper.Contains("XMG") && modelUpper.Contains("NEO"))
-            {
-                return "pack://application:,,,/Assets/Laptops/XMG/Neo-25.png";
-            }
-
-            // PC Specialist Recoil 3 16
-            if (modelUpper.Contains("RECOIL"))
-            {
-                if (isAmd)
-                {
-                    return "pack://application:,,,/Assets/Laptops/PCSpecialist/Recoil-3-16-AMD.png";
-                }
-                else
-                {
-                    return "pack://application:,,,/Assets/Laptops/PCSpecialist/Recoil-3-16-Intel.png";
-                }
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Returns a clean model string for display, stripping manufacturer prefixes.
-        /// </summary>
-        private static string GetCleanModelName(string model)
-        {
-            // XMG Neo: strip "SchenkerTechnologiesGmbH " prefix
-            if (model.Contains("XMG", StringComparison.OrdinalIgnoreCase))
-            {
-                int xmgIndex = model.IndexOf("XMG", StringComparison.OrdinalIgnoreCase);
-                if (xmgIndex > 0)
-                {
-                    string cleaned = model.Substring(xmgIndex).Trim();
-                    // Insert "16" before the variant suffix (e.g., "XMG NEO (A25)" -> "XMG NEO 16 (A25)")
-                    int parenIndex = cleaned.IndexOf('(');
-                    if (parenIndex > 0)
-                        cleaned = cleaned.Insert(parenIndex, "16 ");
-                    return cleaned;
-                }
-            }
-
-            return model;
         }
 
         /// <summary>

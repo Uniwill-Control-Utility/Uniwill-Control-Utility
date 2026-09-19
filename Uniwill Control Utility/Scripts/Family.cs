@@ -56,13 +56,6 @@ namespace Uniwill_Control_Utility.Scripts
             private set => _gpuName = value;
         }
 
-        private static string _laptopModel = string.Empty;
-        internal static string LaptopModel
-        {
-            get => _laptopModel;
-            private set => _laptopModel = value;
-        }
-
         private static int CPUFamily;
         private static int CPUModel;
 
@@ -201,37 +194,6 @@ namespace Uniwill_Control_Utility.Scripts
 #pragma warning restore S3217
                 {
                    CPUName = mo["Name"]?.ToString()?.Trim() ?? "";
-                }
-
-                // Detect laptop/system model from Win32_ComputerSystem
-                try
-                {
-                    ManagementObjectSearcher modelSearcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT Model, Manufacturer FROM Win32_ComputerSystem");
-#pragma warning disable S3217 // Loops should be type-safe
-                    foreach (ManagementObject mo in modelSearcher.Get())
-#pragma warning restore S3217
-                    {
-                        string model = mo["Model"]?.ToString()?.Trim() ?? "";
-                        string manufacturer = mo["Manufacturer"]?.ToString()?.Trim() ?? "";
-
-                        // If the model doesn't already contain the manufacturer name,
-                        // prepend it (e.g., "PCSpecialist Recoil III 16" instead of just "Recoil III 16")
-                        if (!string.IsNullOrEmpty(manufacturer) &&
-                            !string.IsNullOrEmpty(model) &&
-                            !model.StartsWith(manufacturer, StringComparison.OrdinalIgnoreCase))
-                        {
-                            // Skip common manufacturers that are already part of the model string
-                            LaptopModel = $"{manufacturer} {model}";
-                        }
-                        else
-                        {
-                            LaptopModel = model;
-                        }
-                    }
-                }
-                catch (COMException)
-                {
-                    // WMI not available for model detection
                 }
 
                 // Detect all GPUs: separate dedicated GPUs from integrated ones,

@@ -362,6 +362,7 @@ namespace Uniwill_Control_Utility
                 await Task.Run(() =>
                 {
                     Family.setCpuFamily();
+                    LaptopDetector.Initialize();
                     HasMiniLEDPanel = PanelDatabase.IsMiniLED();
                     SkuResolver.Initialize();
                 });
