@@ -70,6 +70,19 @@ namespace Uniwill_Control_Utility.Services
                 ImagePath: "pack://application:,,,/Assets/Laptops/Mifcom/16.png"),
 
             // --- TUXEDO ---
+            new LaptopModelInfo(
+                DisplayName: "Tuxedo Stellaris 16 Gen7 (AMD)",
+                SystemManufacturer: "TUXEDO",
+                BaseBoardProductPrefix: "X6FR",
+                ImagePath: "pack://application:,,,/Assets/Laptops/TuxedoComputers/Stellaris-16-Gen7.png"),
+
+            new LaptopModelInfo(
+                DisplayName: "Tuxedo Stellaris 16 Gen7 (Intel)",
+                SystemManufacturer: "TUXEDO",
+                BaseBoardProductPrefix: "X6AR",
+                ImagePath: "pack://application:,,,/Assets/Laptops/TuxedoComputers/Stellaris-16-Gen7.png"),
+
+            // --- TUXEDO ---
             // TUXEDO computers use the same TongFeng chassis. Add entries when images are available.
             // e.g. new LaptopModelInfo("TUXEDO Pulse 15", "TUXEDO", "X6FR", "..."),
 
