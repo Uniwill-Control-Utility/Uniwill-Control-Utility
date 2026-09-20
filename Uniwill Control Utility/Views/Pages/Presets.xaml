@@ -766,13 +766,6 @@
                               FontSize="13"
                               Margin="0,0,8,0"
                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                <ui:TextBlock x:Name="lblPresetMode"
-                               VerticalAlignment="Center"
-                               FontSize="13"
-                               FontWeight="SemiBold"
-                               Margin="0,0,8,0"
-                               Foreground="{DynamicResource AccentFillColorDefaultBrush}"
-                               Text="Normal" />
                 <RadioButton x:Name="rbProfile1"
                              GroupName="CustomProfile"
                              Content="1"
@@ -818,7 +811,17 @@
                              Click="rbProfile_Click" />
             </StackPanel>
 
-            <!-- Right: Save + Apply buttons -->
+            <!-- Center: Boost mode label (hidden by default) -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ui:TextBlock x:Name="lblPresetMode"
+                               VerticalAlignment="Center"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                               Visibility="Collapsed" />
+            </StackPanel>
+
+            <!-- Right: Clear, Save + Apply buttons -->
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                 <CheckBox x:Name="cbApplyOnStartup"
                           Content="Apply on startup"
@@ -826,6 +829,17 @@
                           VerticalAlignment="Center"
                           FontSize="13"
                           Click="cbApplyOnStartup_Click" />
+                <ui:Button x:Name="btnClear"
+                           Appearance="Secondary"
+                           Click="btnClear_Click"
+                           Margin="0,0,8,0"
+                           Height="36"
+                           Padding="16,0">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" FontSize="16" Margin="0,0,6,0" />
+                        <TextBlock Text="Clear" />
+                    </StackPanel>
+                </ui:Button>
                 <ui:Button x:Name="btnSave"
                            Appearance="Secondary"
                            Click="btnSave_Click"

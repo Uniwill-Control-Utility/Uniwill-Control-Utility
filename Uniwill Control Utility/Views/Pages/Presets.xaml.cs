@@ -129,6 +129,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                     updateAllLabels();
                 }
 
+                // Refresh preset mode label and bottom bar stroke on every navigation
+                // (handles settings changes from the Settings page).
+                bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+                UpdatePresetModeLabel(boostEnabled);
+
                 // Update overlay based on Adaptive Mode override state
                 UpdateAdaptiveOverlay();
             }
@@ -513,10 +518,35 @@ namespace Uniwill_Control_Utility.Views.Pages
             tbDbLabel.Visibility = dbVisible ? Visibility.Visible : Visibility.Collapsed;
             tbGpuDb.Visibility = dbVisible ? Visibility.Visible : Visibility.Collapsed;
 
-            // Update the preset mode label in the bottom bar
+            UpdatePresetModeLabel(boostEnabled);
+        }
+
+        /// <summary>
+        /// Updates the preset mode label in the bottom bar and the boost accent stroke.
+        /// Shows "Boost" when GPU Power Boost is ON, hides the label otherwise.
+        /// Also shows/hides the bottom bar accent stroke.
+        /// </summary>
+        private void UpdatePresetModeLabel(bool boostEnabled)
+        {
             if (lblPresetMode != null)
             {
-                lblPresetMode.Text = boostEnabled ? "Boost" : "Normal";
+                lblPresetMode.Text = boostEnabled ? "Boost" : "";
+                lblPresetMode.Visibility = boostEnabled ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            // Show/hide bottom bar accent stroke
+            if (bottomBar != null)
+            {
+                if (boostEnabled)
+                {
+                    bottomBar.BorderBrush = (System.Windows.Media.Brush)FindResource("TextControlElevationBorderFocusedBrush");
+                    bottomBar.BorderThickness = new Thickness(0, 0, 0, 2);
+                }
+                else
+                {
+                    bottomBar.BorderBrush = null;
+                    bottomBar.BorderThickness = new Thickness(0);
+                }
             }
         }
 
@@ -1267,6 +1297,46 @@ namespace Uniwill_Control_Utility.Views.Pages
             SaveCustomPreset(_customPresetSlot);
             ToastNotification.ShowToastNotification($"Profile {_customPresetSlot + 1} Saved",
                 $"Custom preset has been saved to profile {_customPresetSlot + 1}!");
+        }
+
+        private void btnClear_Click(object sender, RoutedEventArgs e)
+        {
+            var presets = Models.CustomPresetStore.Load(ActivePresetMode);
+            if (_customPresetSlot < 0 || _customPresetSlot >= presets.Length) return;
+
+            // Reset slot to default values (clears all fields)
+            presets[_customPresetSlot] = new Models.CustomPreset();
+            Models.CustomPresetStore.Save(presets, ActivePresetMode);
+
+            // Clear the slider UI to defaults
+            sdSustained.Value = 75;
+            sdBoost.Value = 85;
+            sdTjMax.Value = 95;
+            sdIntelPl1.Value = 45;
+            sdIntelPl2.Value = 60;
+            sdIntelVolt.Value = 0;
+            sdNvPower.Value = 150;
+            togDynamicBoost.IsChecked = false;
+            sdNvDbOffset.Value = 0;
+            sdNvCore.Value = 0;
+            sdNvMem.Value = 0;
+            sdCoCcd0.Value = 0;
+            sdCoCcd1.Value = 0;
+            sdCoUnified.Value = 0;
+            rbCoUnified.IsChecked = true;
+            rbCoPerCcd.IsChecked = false;
+            updateCoVisibility();
+
+            // Reset V-F curve state
+            _vfActivePreset = -1;
+
+            updateAllLabels();
+            updateStatus();
+            updateRadioButtonStyles();
+
+            string modeSuffix = ActivePresetMode == Models.PresetMode.Boost ? " (Boost)" : "";
+            ToastNotification.ShowToastNotification($"Profile {_customPresetSlot + 1} Cleared",
+                $"Custom preset{modeSuffix} has been cleared from profile {_customPresetSlot + 1}!");
         }
 
         private void cbApplyOnStartup_Click(object sender, RoutedEventArgs e)
