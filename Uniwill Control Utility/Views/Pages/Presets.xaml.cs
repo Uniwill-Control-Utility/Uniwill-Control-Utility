@@ -312,7 +312,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Content = message,
                 Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
                 IsCloseButtonEnabled = false,
-                Timeout = TimeSpan.FromSeconds(3),
+                Timeout = TimeSpan.FromSeconds(3)
             };
 
             if (SnackbarPresenter.IsLoaded)
@@ -1318,8 +1318,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void btnSave_Click(object sender, RoutedEventArgs e)
         {
             SaveCustomPreset(_customPresetSlot);
+            string modeSuffix = ActivePresetMode == Models.PresetMode.Boost ? " (Boost)" : "";
             ShowPresetSnackbar($"Profile {_customPresetSlot + 1} Saved",
-                $"Custom preset has been saved to profile {_customPresetSlot + 1}!");
+                $"Custom preset{modeSuffix} has been saved to profile {_customPresetSlot + 1}!");
         }
 
         private void btnClear_Click(object sender, RoutedEventArgs e)
