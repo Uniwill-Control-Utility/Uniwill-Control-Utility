@@ -84,6 +84,7 @@
     <None Remove="Assets\Laptops\Mifcom\16.png" />
     <None Remove="Assets\Laptops\PCSpecialist\Recoil-3-16-AMD.png" />
     <None Remove="Assets\Laptops\PCSpecialist\Recoil-3-16-Intel.png" />
+    <None Remove="Assets\Laptops\Uniwill\IDY.png" />
     <None Remove="Assets\Laptops\XMG\Neo-25.png" />
   </ItemGroup>
 
@@ -124,6 +125,7 @@
     <Resource Include="Assets\Laptops\Mifcom\16.png" />
     <Resource Include="Assets\Laptops\PCSpecialist\Recoil-3-16-AMD.png" />
     <Resource Include="Assets\Laptops\PCSpecialist\Recoil-3-16-Intel.png" />
+    <Resource Include="Assets\Laptops\Uniwill\IDY.png" />
     <Resource Include="Assets\Laptops\XMG\Neo-25.png" />
   </ItemGroup>
 

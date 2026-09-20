@@ -77,13 +77,26 @@ namespace Uniwill_Control_Utility.Services
             // Add entries for any other rebrand that ships TongFeng NB05/NB02 chassis laptops.
         };
 
+        /// <summary>
+        /// Pack URI for the default Uniwill IDY laptop image, used when the chassis
+        /// is detected as TongFeng but the brand isn't in the catalog yet.
+        /// </summary>
+        public const string DefaultImagePath = "pack://application:,,,/Assets/Laptops/Uniwill/IDY.png";
+
         private static LaptopModelInfo? _detectedModel;
+        private static bool? _isTongFengChassis;
         private static bool _initialized;
 
         /// <summary>
-        /// The currently detected laptop model, or null if no match was found.
+        /// The currently detected laptop model, or null if no catalog match was found.
         /// </summary>
         public static LaptopModelInfo? Detected => _detectedModel;
+
+        /// <summary>
+        /// True when the baseboard product starts with a known TongFeng prefix (X6FR / X6AR),
+        /// regardless of whether the brand is in the catalog.
+        /// </summary>
+        public static bool IsTongFengChassis => _isTongFengChassis ?? false;
 
         /// <summary>
         /// Runs the detection once at application startup.
@@ -101,12 +114,18 @@ namespace Uniwill_Control_Utility.Services
                 string? manufacturer = GetWmiStringValue("Win32_ComputerSystem", "Manufacturer");
                 string? baseBoardProduct = GetWmiStringValue("Win32_BaseBoard", "Product");
 
-                if (string.IsNullOrEmpty(manufacturer) || string.IsNullOrEmpty(baseBoardProduct))
+                if (string.IsNullOrEmpty(baseBoardProduct))
                     return;
 
                 string prefix = baseBoardProduct.Length >= BaseBoardPrefixLength
                     ? baseBoardProduct.Substring(0, BaseBoardPrefixLength)
                     : baseBoardProduct;
+
+                // Check for any TongFeng chassis prefix (X6FR = AMD, X6AR = Intel).
+                _isTongFengChassis = prefix.StartsWith("X6", StringComparison.OrdinalIgnoreCase);
+
+                if (string.IsNullOrEmpty(manufacturer))
+                    return;
 
                 _detectedModel = Catalog
                     .FirstOrDefault(m =>
@@ -126,12 +145,13 @@ namespace Uniwill_Control_Utility.Services
             Detected?.DisplayName ?? "DESKTOP SYSTEM";
 
         /// <summary>
-        /// Returns the appropriate image pack URI for the detected laptop and CPU vendor,
-        /// or null if no model is detected.
+        /// Returns the appropriate image pack URI for the detected laptop and CPU vendor.
+        /// Falls back to the default Uniwill IDY image when the chassis is TongFeng but
+        /// the brand isn't in the catalog yet.
         /// </summary>
         /// <param name="isIntel">Whether the current CPU is Intel.</param>
         public static string? GetImagePath(bool isIntel) =>
-            Detected?.GetImagePath(isIntel);
+            Detected?.GetImagePath(isIntel) ?? (IsTongFengChassis ? DefaultImagePath : null);
 
         /// <summary>
         /// Reads the first value of a named property from a WMI class.
