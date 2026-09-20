@@ -7,6 +7,15 @@ using System.Text.Json;
 namespace Uniwill_Control_Utility.Models
 {
     /// <summary>
+    /// Which preset slot pool to use — Normal (Dynamic Boost available) or Boost (GPU Power Boost ON, pure TGP).
+    /// </summary>
+    public enum PresetMode
+    {
+        Normal,
+        Boost
+    }
+
+    /// <summary>
     /// A single Custom preset slot that stores ALL tuning controls (CPU + GPU + V-F curve).
     /// </summary>
     public class CustomPreset
@@ -73,40 +82,51 @@ namespace Uniwill_Control_Utility.Models
 
     /// <summary>
     /// Persists 5 Custom preset slots to a JSON file in the user's AppData folder.
+    /// Maintains two separate pools — Normal (Dynamic Boost available) and Boost (GPU Power Boost ON, pure TGP).
     /// </summary>
     public static class CustomPresetStore
     {
-        private static string? _filePath;
-
         private static readonly JsonSerializerOptions _serializeOptions = new()
         {
             WriteIndented = true
         };
 
-        public static string FilePath
+        private static string AppDataDirectory
         {
             get
             {
-                if (_filePath != null) return _filePath;
-                var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UCU");
-                Directory.CreateDirectory(appData);
-                _filePath = Path.Combine(appData, "custom_presets.json");
-                return _filePath;
+                var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UCU");
+                Directory.CreateDirectory(dir);
+                return dir;
             }
         }
 
-        public static CustomPreset[] Load()
+        private static string FilePathFor(PresetMode mode)
+        {
+            return Path.Combine(AppDataDirectory, mode == PresetMode.Normal ? "custom_presets_normal.json" : "custom_presets_boost.json");
+        }
+
+        /// <summary>
+        /// Legacy path for backward compatibility — maps to Normal mode.
+        /// </summary>
+        public static string FilePath => FilePathFor(PresetMode.Normal);
+
+        /// <summary>
+        /// Loads 5 preset slots for the given mode.
+        /// </summary>
+        public static CustomPreset[] Load(PresetMode mode)
         {
             var presets = Enumerable.Range(0, CustomPreset.MaxSlots)
                 .Select(_ => new CustomPreset())
                 .ToArray();
 
-            if (!File.Exists(FilePath))
+            var path = FilePathFor(mode);
+            if (!File.Exists(path))
                 return presets;
 
             try
             {
-                var json = File.ReadAllText(FilePath);
+                var json = File.ReadAllText(path);
                 var loaded = JsonSerializer.Deserialize<List<CustomPreset>>(json);
                 if (loaded != null)
                 {
@@ -124,16 +144,51 @@ namespace Uniwill_Control_Utility.Models
             return presets;
         }
 
-        public static void Save(CustomPreset[] presets)
+        /// <summary>
+        /// Legacy overload — loads Normal mode presets for backward compatibility.
+        /// </summary>
+        public static CustomPreset[] Load() => Load(PresetMode.Normal);
+
+        /// <summary>
+        /// Saves 5 preset slots for the given mode.
+        /// </summary>
+        public static void Save(CustomPreset[] presets, PresetMode mode)
         {
             try
             {
                 var json = JsonSerializer.Serialize(presets.ToList(), _serializeOptions);
-                File.WriteAllText(FilePath, json);
+                File.WriteAllText(FilePathFor(mode), json);
             }
             catch
             {
                 // Silent fail — presets are in-memory
+            }
+        }
+
+        /// <summary>
+        /// Legacy overload — saves to Normal mode for backward compatibility.
+        /// </summary>
+        public static void Save(CustomPreset[] presets) => Save(presets, PresetMode.Normal);
+
+        /// <summary>
+        /// Migrates legacy custom_presets.json to the new Normal-mode file if it doesn't already exist.
+        /// Call once at startup.
+        /// </summary>
+        public static void MigrateLegacyFile()
+        {
+            var legacyPath = Path.Combine(AppDataDirectory, "custom_presets.json");
+            var normalPath = FilePathFor(PresetMode.Normal);
+
+            if (File.Exists(legacyPath) && !File.Exists(normalPath))
+            {
+                try
+                {
+                    File.Copy(legacyPath, normalPath);
+                }
+                catch
+                {
+                    // Ignore migration failures — Normal pool will start empty
+                }
             }
         }
     }

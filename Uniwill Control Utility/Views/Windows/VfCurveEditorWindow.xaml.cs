@@ -19,11 +19,13 @@ namespace Uniwill_Control_Utility.Views.Windows
         public event EventHandler? CurveChanged;
 
         private readonly int _activePresetSlot;
+        private readonly Models.PresetMode _presetMode;
 
-        public VfCurveEditorWindow(Dictionary<int, int>? initialOffsets = null, int activePresetSlot = 0)
+        public VfCurveEditorWindow(Dictionary<int, int>? initialOffsets = null, int activePresetSlot = 0, Models.PresetMode presetMode = Models.PresetMode.Normal)
         {
             InitializeComponent();
             _activePresetSlot = activePresetSlot;
+            _presetMode = presetMode;
             _editor.CurveChanged += Editor_CurveChanged;
             _editor.LoadCurve(initialOffsets);
 
@@ -49,11 +51,11 @@ namespace Uniwill_Control_Utility.Views.Windows
         private void Editor_CurveChanged(object? sender, EventArgs e)
         {
             // Auto-save V-F curve offsets to the active preset slot in CustomPresetStore.
-            var customPresets = Models.CustomPresetStore.Load();
+            var customPresets = Models.CustomPresetStore.Load(_presetMode);
             if (_activePresetSlot < customPresets.Length)
             {
                 customPresets[_activePresetSlot].VfCurveOffsets = _editor.GetOffsets();
-                Models.CustomPresetStore.Save(customPresets);
+                Models.CustomPresetStore.Save(customPresets, _presetMode);
             }
 
             CurveChanged?.Invoke(this, e);
@@ -66,11 +68,11 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             // Clear UI offsets and save empty curve to active slot.
             _editor.ResetOffsets();
-            var customPresets = Models.CustomPresetStore.Load();
+            var customPresets = Models.CustomPresetStore.Load(_presetMode);
             if (_activePresetSlot < customPresets.Length)
             {
                 customPresets[_activePresetSlot].VfCurveOffsets = new Dictionary<int, int>();
-                Models.CustomPresetStore.Save(customPresets);
+                Models.CustomPresetStore.Save(customPresets, _presetMode);
             }
 
             // Notify parent page so labels refresh and slider flag resets.

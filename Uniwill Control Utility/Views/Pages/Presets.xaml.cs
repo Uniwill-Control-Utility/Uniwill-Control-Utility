@@ -35,6 +35,36 @@ namespace Uniwill_Control_Utility.Views.Pages
         // Custom preset slot state (1-5, maps to index 0-4)
         private int _customPresetSlot = 0;
 
+        /// <summary>
+        /// Returns the active PresetMode based on GPU Power Boost setting.
+        /// Only Blackwell high-end GPUs (RTX 5080/5090) support the Boost pool.
+        /// </summary>
+        private Models.PresetMode ActivePresetMode
+        {
+            get
+            {
+                bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+                return boostEnabled ? Models.PresetMode.Boost : Models.PresetMode.Normal;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the slot index for the active preset mode, persisted separately per mode.
+        /// </summary>
+        private int ActivePresetSlot
+        {
+            get => ActivePresetMode == Models.PresetMode.Boost
+                ? Settings.Default.customPresetSlotBoost
+                : Settings.Default.customPresetSlot;
+            set
+            {
+                if (ActivePresetMode == Models.PresetMode.Boost)
+                    Settings.Default.customPresetSlotBoost = value;
+                else
+                    Settings.Default.customPresetSlot = value;
+            }
+        }
+
         // Custom profile fan curve persistence
         private FanControlSettings? _savedCustomFanSettings;
 
@@ -148,6 +178,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             // LoadCustomValues() is already called in OnNavigatedToAsync.
             if (_currentProfile == "Custom")
             {
+                // Sync _customPresetSlot to the active mode's saved slot
+                _customPresetSlot = ActivePresetSlot;
+                if (_customPresetSlot < 0 || _customPresetSlot >= Models.CustomPreset.MaxSlots)
+                    _customPresetSlot = 0;
+
+                // Sync radio button selection
+                var buttons = new RadioButton[] { rbProfile1, rbProfile2, rbProfile3, rbProfile4, rbProfile5 };
+                for (int i = 0; i < buttons.Length; i++)
+                    buttons[i].IsChecked = i == _customPresetSlot;
+
                 updateRadioButtonStyles();
                 cbApplyOnStartup.IsChecked = Settings.Default.ApplyOnStart;
             }
@@ -472,6 +512,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             DynamicBoostPanel.Visibility = dbVisible ? Visibility.Visible : Visibility.Collapsed;
             tbDbLabel.Visibility = dbVisible ? Visibility.Visible : Visibility.Collapsed;
             tbGpuDb.Visibility = dbVisible ? Visibility.Visible : Visibility.Collapsed;
+
+            // Update the preset mode label in the bottom bar
+            if (lblPresetMode != null)
+            {
+                lblPresetMode.Text = boostEnabled ? "Boost" : "Normal";
+            }
         }
 
         private void setProfileTooltips()
@@ -627,12 +673,25 @@ namespace Uniwill_Control_Utility.Views.Pages
             string profileKey = profile.ToLowerInvariant();
             var skuProfile = Services.SkuResolver.GetProfile(profileKey);
 
+            // When GPU Power Boost is ON, merge TGP + DB offset into a single TGP value
+            // and disable Dynamic Boost (the DB UI controls are hidden in boost mode).
+            bool gpuBoostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+
             if (profile == "Office")
             {
                 if (skuProfile != null)
                 {
+                    int tgp = skuProfile.GpuTgp;
+                    bool db = skuProfile.DynamicBoost;
+                    int dbOffset = skuProfile.DynamicBoostOffset;
+                    if (gpuBoostEnabled && db)
+                    {
+                        tgp += dbOffset;
+                        db = false;
+                        dbOffset = 0;
+                    }
                     setProfileValues(skuProfile.CpuPl1, skuProfile.CpuPl2, 95,
-                        skuProfile.GpuTgp, skuProfile.DynamicBoost, skuProfile.DynamicBoostOffset);
+                        tgp, db, dbOffset);
                 }
                 else
                 {
@@ -649,8 +708,17 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 if (skuProfile != null)
                 {
+                    int tgp = skuProfile.GpuTgp;
+                    bool db = skuProfile.DynamicBoost;
+                    int dbOffset = skuProfile.DynamicBoostOffset;
+                    if (gpuBoostEnabled && db)
+                    {
+                        tgp += dbOffset;
+                        db = false;
+                        dbOffset = 0;
+                    }
                     setProfileValues(skuProfile.CpuPl1, skuProfile.CpuPl2, 95,
-                        skuProfile.GpuTgp, skuProfile.DynamicBoost, skuProfile.DynamicBoostOffset);
+                        tgp, db, dbOffset);
                 }
                 else
                 {
@@ -670,6 +738,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                     int gpuTgp = skuProfile?.GpuTgp ?? 150;
                     bool db = skuProfile?.DynamicBoost ?? true;
                     int dbOffset = skuProfile?.DynamicBoostOffset ?? 25;
+                    if (gpuBoostEnabled && db)
+                    {
+                        gpuTgp += dbOffset;
+                        db = false;
+                        dbOffset = 0;
+                    }
                     setProfileValues(cpuMax, cpuMax, 95, gpuTgp, db, dbOffset);
                 }
                 else
@@ -695,7 +769,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.presetProfile = profile;
             if (profile == "Custom")
             {
-                Settings.Default.customPresetSlot = _customPresetSlot;
+                ActivePresetSlot = _customPresetSlot;
             }
             Settings.Default.Save();
 
@@ -876,7 +950,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 DebugLog($"  V-F curve check: VfCurveActive={VfCurveActive}, _userTouchedCoreSlider={_userTouchedCoreSlider}, _customPresetSlot={_customPresetSlot}, _currentProfile={_currentProfile}");
                 if (_currentProfile == "Custom" && VfCurveActive && !_userTouchedCoreSlider)
                 {
-                    var customPresets = Models.CustomPresetStore.Load();
+                    var customPresets = Models.CustomPresetStore.Load(ActivePresetMode);
                     var offsets = _customPresetSlot >= 0 && _customPresetSlot < customPresets.Length
                         ? customPresets[_customPresetSlot].VfCurveOffsets : new Dictionary<int, int>();
                     DebugLog($"  V-F curve: slot={_customPresetSlot + 1}, offsets.Count={offsets.Count}");
@@ -1044,10 +1118,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         /// <summary>
         /// Saves the current slider/control values to the specified Custom preset slot.
+        /// Uses the active preset mode (Normal/Boost) to route to the correct storage pool.
         /// </summary>
         private void SaveCustomPreset(int slotIndex)
         {
-            var presets = Models.CustomPresetStore.Load();
+            var presets = Models.CustomPresetStore.Load(ActivePresetMode);
             if (slotIndex < 0 || slotIndex >= presets.Length) return;
 
             presets[slotIndex].CpuSustained = sdSustained.Value;
@@ -1077,18 +1152,19 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
             }
 
-            Models.CustomPresetStore.Save(presets);
-            DebugLog($"SaveCustomPreset: slot {slotIndex + 1} saved");
+            Models.CustomPresetStore.Save(presets, ActivePresetMode);
+            DebugLog($"SaveCustomPreset: slot {slotIndex + 1} saved (mode={ActivePresetMode})");
             updateRadioButtonStyles();
         }
 
         /// <summary>
         /// Loads a Custom preset from the specified slot and populates all controls.
         /// Only applies values if the slot has changes (HasChanges returns true).
+        /// Uses the active preset mode (Normal/Boost) to route to the correct storage pool.
         /// </summary>
         private void LoadCustomPreset(int slotIndex)
         {
-            var presets = Models.CustomPresetStore.Load();
+            var presets = Models.CustomPresetStore.Load(ActivePresetMode);
             if (slotIndex < 0 || slotIndex >= presets.Length) return;
 
             var preset = presets[slotIndex];
@@ -1151,10 +1227,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         /// <summary>
         /// Updates RadioButton visual style to indicate which slots have saved presets.
+        /// Uses the active preset mode (Normal/Boost) to route to the correct storage pool.
         /// </summary>
         private void updateRadioButtonStyles()
         {
-            var presets = Models.CustomPresetStore.Load();
+            var presets = Models.CustomPresetStore.Load(ActivePresetMode);
             var buttons = new RadioButton[] { rbProfile1, rbProfile2, rbProfile3, rbProfile4, rbProfile5 };
 
             for (int i = 0; i < buttons.Length; i++)
@@ -1175,7 +1252,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             SaveCustomPreset(_customPresetSlot);
 
             _customPresetSlot = newSlot;
-            Settings.Default.customPresetSlot = newSlot;
+            ActivePresetSlot = newSlot;
             Settings.Default.Save();
 
             // Load the new slot's preset if it has data
@@ -1342,19 +1419,19 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (_vfActivePreset >= 0) return; // Already active from this session.
 
-            // Restore the last active custom preset slot from settings
-            _customPresetSlot = Settings.Default.customPresetSlot;
+            // Restore the last active custom preset slot from settings for the active mode
+            _customPresetSlot = ActivePresetSlot;
             if (_customPresetSlot < 0 || _customPresetSlot >= Models.CustomPreset.MaxSlots)
                 _customPresetSlot = 0;
 
-            var presets = Models.CustomPresetStore.Load();
+            var presets = Models.CustomPresetStore.Load(ActivePresetMode);
             for (int i = 0; i < presets.Length; i++)
             {
                 if (presets[i].VfCurveOffsets.Count > 0)
                 {
                     _vfActivePreset = 0;
                     _customPresetSlot = i;
-                    DebugLog($"V-F curve auto-detected on Custom preset slot {i + 1}");
+                    DebugLog($"V-F curve auto-detected on Custom preset slot {i + 1} (mode={ActivePresetMode})");
                     return;
                 }
             }
@@ -1365,7 +1442,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             get
             {
-                var presets = Models.CustomPresetStore.Load();
+                var presets = Models.CustomPresetStore.Load(ActivePresetMode);
                 int slot = _customPresetSlot;
                 return slot >= 0 && slot < presets.Length && presets[slot].VfCurveOffsets.Count > 0;
             }
@@ -1382,7 +1459,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             // Load V-F curve offsets from the active Custom preset slot
-            var presets = Models.CustomPresetStore.Load();
+            var presets = Models.CustomPresetStore.Load(ActivePresetMode);
             Dictionary<int, int>? offsets = null;
             if (_customPresetSlot >= 0 && _customPresetSlot < presets.Length)
             {
@@ -1393,7 +1470,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Open non-modal curve editor window — user can interact with both windows.
             // The editor auto-saves to the active Custom preset slot.
-            _vfEditorWindow = new Views.Windows.VfCurveEditorWindow(offsets, _customPresetSlot);
+            _vfEditorWindow = new Views.Windows.VfCurveEditorWindow(offsets, _customPresetSlot, ActivePresetMode);
             _vfEditorWindow.Owner = Application.Current.MainWindow;
             _vfEditorWindow.Closed += (_, _) => _vfEditorWindow = null;
             _vfEditorWindow.CurveChanged += (_, _) =>

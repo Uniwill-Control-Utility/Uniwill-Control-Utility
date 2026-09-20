@@ -25,17 +25,29 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>
         /// Returns all available profile names: built-in profiles plus saved custom presets.
         /// Custom presets are only included if the user has saved changes to that slot.
+        /// Scans both Normal and Boost mode pools, suffixing Boost presets with " (Boost)".
         /// </summary>
         public static string[] GetProfileNames()
         {
             var list = new List<string>(BuiltInProfileNames);
 
-            var customPresets = CustomPresetStore.Load();
-            for (int i = 0; i < customPresets.Length; i++)
+            // Scan Normal mode pool
+            var normalPresets = CustomPresetStore.Load(Models.PresetMode.Normal);
+            for (int i = 0; i < normalPresets.Length; i++)
             {
-                if (customPresets[i].HasChanges)
+                if (normalPresets[i].HasChanges)
                 {
-                    list.Add(CustomProfileKey(i));
+                    list.Add(CustomProfileKey(i, Models.PresetMode.Normal));
+                }
+            }
+
+            // Scan Boost mode pool
+            var boostPresets = CustomPresetStore.Load(Models.PresetMode.Boost);
+            for (int i = 0; i < boostPresets.Length; i++)
+            {
+                if (boostPresets[i].HasChanges)
+                {
+                    list.Add(CustomProfileKey(i, Models.PresetMode.Boost));
                 }
             }
 
@@ -43,32 +55,59 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
-        /// Returns the profile key for a custom preset slot (0-based).
-        /// e.g. slot 0 → "Custom 1", slot 4 → "Custom 5"
+        /// Returns the profile key for a custom preset slot (0-based) in the given mode.
+        /// e.g. slot 0, Normal → "Custom 1", slot 0, Boost → "Custom 1 (Boost)"
         /// </summary>
-        public static string CustomProfileKey(int slot)
+        public static string CustomProfileKey(int slot, Models.PresetMode mode)
         {
-            return $"Custom {slot + 1}";
+            return mode == Models.PresetMode.Boost
+                ? $"Custom {slot + 1} (Boost)"
+                : $"Custom {slot + 1}";
+        }
+
+        /// <summary>
+        /// Legacy overload — defaults to Normal mode.
+        /// </summary>
+        public static string CustomProfileKey(int slot) => CustomProfileKey(slot, Models.PresetMode.Normal);
+
+        /// <summary>
+        /// Parses a custom profile key back to a 0-based slot index and mode.
+        /// Returns (-1, Normal) if the key is not a custom preset.
+        /// </summary>
+        public static (int slot, Models.PresetMode mode) TryParseCustomSlotExtended(string profileName)
+        {
+            if (string.IsNullOrEmpty(profileName))
+                return (-1, Models.PresetMode.Normal);
+
+            // Match "Custom N (Boost)" or "Custom N"
+            Models.PresetMode mode = Models.PresetMode.Normal;
+            string toParse = profileName;
+
+            if (profileName.EndsWith(" (Boost)", StringComparison.OrdinalIgnoreCase))
+            {
+                mode = Models.PresetMode.Boost;
+                toParse = profileName.Substring(0, profileName.Length - 8);
+            }
+
+            if (toParse.Length > 7 && toParse.StartsWith("Custom ", StringComparison.OrdinalIgnoreCase))
+            {
+                string numPart = toParse.Substring(7);
+                if (int.TryParse(numPart, out int slot) && slot >= 1 && slot <= CustomPreset.MaxSlots)
+                    return (slot - 1, mode);
+            }
+
+            return (-1, Models.PresetMode.Normal);
         }
 
         /// <summary>
         /// Parses a custom profile key back to a 0-based slot index.
         /// Returns -1 if the key is not a custom preset.
+        /// Legacy overload — ignores mode suffix.
         /// </summary>
         public static int TryParseCustomSlot(string profileName)
         {
-            if (string.IsNullOrEmpty(profileName))
-                return -1;
-
-            // Match "Custom N" where N is 1-5
-            if (profileName.Length > 7 && profileName.StartsWith("Custom ", StringComparison.OrdinalIgnoreCase))
-            {
-                string numPart = profileName.Substring(7);
-                if (int.TryParse(numPart, out int slot) && slot >= 1 && slot <= CustomPreset.MaxSlots)
-                    return slot - 1;
-            }
-
-            return -1;
+            var (slot, _) = TryParseCustomSlotExtended(profileName);
+            return slot;
         }
 
         /// <summary>
@@ -104,11 +143,11 @@ namespace Uniwill_Control_Utility.Services
 
             var parts = new List<string>();
 
-            // Check if this is a custom preset (e.g. "Custom 1", "Custom 3")
-            int customSlot = TryParseCustomSlot(profileName);
+            // Check if this is a custom preset (e.g. "Custom 1", "Custom 3", "Custom 1 (Boost)")
+            var (customSlot, customMode) = TryParseCustomSlotExtended(profileName);
             if (customSlot >= 0)
             {
-                var presets = CustomPresetStore.Load();
+                var presets = CustomPresetStore.Load(customMode);
                 if (customSlot < presets.Length)
                 {
                     var preset = presets[customSlot];
@@ -150,10 +189,10 @@ namespace Uniwill_Control_Utility.Services
             await RyzenAdj_To_UCU.TranslateAsync(command, appliedName: display, localizeAppliedName: false);
 
             // 2. V-F curve (Custom profile only, if active)
-            int customSlot = TryParseCustomSlot(profileName);
+            var (customSlot, customMode) = TryParseCustomSlotExtended(profileName);
             if (customSlot >= 0)
             {
-                var presets = CustomPresetStore.Load();
+                var presets = CustomPresetStore.Load(customMode);
                 if (customSlot < presets.Length && presets[customSlot].VfCurveOffsets.Count > 0)
                 {
                     ApplyVfCurveFromPreset(presets[customSlot]);
@@ -173,7 +212,7 @@ namespace Uniwill_Control_Utility.Services
                     int pl1, pl2;
                     if (customSlot >= 0)
                     {
-                        var presets = CustomPresetStore.Load();
+                        var presets = CustomPresetStore.Load(customMode);
                         pl1 = customSlot < presets.Length ? (int)presets[customSlot].CpuSustained : 75;
                         pl2 = customSlot < presets.Length ? (int)presets[customSlot].CpuBoost : 85;
                     }
@@ -447,14 +486,17 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>
         /// Returns the human-readable display name for a profile.
         /// Built-in profiles return the profile name as-is.
-        /// Custom presets are displayed as "Custom 1", "Custom 2", etc.
+        /// Custom presets are displayed as "Custom 1", "Custom 1 (Boost)", etc.
         /// </summary>
         public static string DisplayName(string profileName)
         {
-            // Check for custom preset slots first (e.g. "Custom 3")
-            int customSlot = TryParseCustomSlot(profileName);
+            // Check for custom preset slots first (e.g. "Custom 3", "Custom 1 (Boost)")
+            var (customSlot, customMode) = TryParseCustomSlotExtended(profileName);
             if (customSlot >= 0)
-                return $"Custom {customSlot + 1}";
+            {
+                string modeSuffix = customMode == Models.PresetMode.Boost ? " (Boost)" : "";
+                return $"Custom {customSlot + 1}{modeSuffix}";
+            }
 
             return profileName switch
             {

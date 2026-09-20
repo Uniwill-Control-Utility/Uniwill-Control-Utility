@@ -1,4 +1,4 @@
-using Accord.Math.Distances;
+﻿using Accord.Math.Distances;
 using DuoVia.FuzzyStrings;
 using GameLib.Plugin.RiotGames.Model;
 using Gma.System.MouseKeyHook;
@@ -199,6 +199,9 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             tbMain.Title = "Uniwill Control Utility";
 
+            // Migrate legacy custom_presets.json to the new dual-mode file structure.
+            Models.CustomPresetStore.MigrateLegacyFile();
+
              Wpf.Ui.Appearance.SystemThemeWatcher.Watch(this, WindowBackdropType.Mica, true);
         }
 
@@ -213,7 +216,10 @@ namespace Uniwill_Control_Utility.Views.Windows
                     {
                         await Task.Run(() => GetBatteryStatus());
 
-                        var presets = Models.CustomPresetStore.Load();
+                        // Determine active preset mode based on current GPU Power Boost setting
+                        bool boostEnabled = Scripts.GPUs.NVIDIA.NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+                        Models.PresetMode mode = boostEnabled ? Models.PresetMode.Boost : Models.PresetMode.Normal;
+                        var presets = Models.CustomPresetStore.Load(mode);
                         // Find the first slot with saved data (slot 0 = Profile 1 is default)
                         int slot = 0;
                         for (int i = 0; i < presets.Length; i++)
@@ -848,23 +854,31 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
             try
             {
-                var presets = Models.CustomPresetStore.Load();
-                int count = 0;
-                int activeSlot = Settings.Default.customPresetSlot;
+                // Determine active preset mode for the "checked" indicator
+                bool boostEnabled = Scripts.GPUs.NVIDIA.NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+                Models.PresetMode activeMode = boostEnabled ? Models.PresetMode.Boost : Models.PresetMode.Normal;
+                int activeSlot = activeMode == Models.PresetMode.Boost
+                    ? Settings.Default.customPresetSlotBoost
+                    : Settings.Default.customPresetSlot;
                 bool isCustomActive = string.Equals(Settings.Default.presetProfile, "Custom", StringComparison.OrdinalIgnoreCase);
 
+                int count = 0;
+
+                // Only show presets from the currently active mode
+                var presets = Models.CustomPresetStore.Load(activeMode);
                 for (int i = 0; i < presets.Length; i++)
                 {
                     if (presets[i].HasChanges)
                     {
+                        string modeSuffix = activeMode == Models.PresetMode.Boost ? " (Boost)" : "";
                         var item = new MenuItem
                         {
-                            Header = $"Custom {i + 1}",
-                            Tag = i,
+                            Header = $"Custom {i + 1}{modeSuffix}",
+                            Tag = (i, activeMode),
                             IsCheckable = true,
                             IsChecked = isCustomActive && i == activeSlot
                         };
-                        item.Click += TrayCustomPreset_Click;
+                        item.Click += TrayCustomPreset_ClickExtended;
                         miSectionPresets.Items.Add(item);
                         count++;
                     }
@@ -892,26 +906,45 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private async void TrayCustomPreset_Click(object? sender, RoutedEventArgs e)
         {
-            if (_isTrayPresetApplying || sender is not MenuItem menuItem || menuItem.Tag is not int slot)
+            // Legacy handler – delegates to extended handler with Normal mode.
+            if (sender is not MenuItem menuItem || menuItem.Tag is not int slot)
+                return;
+            await TrayCustomPresetApplyAsync(slot, Models.PresetMode.Normal);
+        }
+
+        private async void TrayCustomPreset_ClickExtended(object? sender, RoutedEventArgs e)
+        {
+            if (_isTrayPresetApplying || sender is not MenuItem menuItem || menuItem.Tag is not ValueTuple<int, Models.PresetMode> tuple)
+                return;
+            await TrayCustomPresetApplyAsync(tuple.Item1, tuple.Item2);
+        }
+
+        private async Task TrayCustomPresetApplyAsync(int slot, Models.PresetMode mode)
+        {
+            if (_isTrayPresetApplying)
                 return;
             _isTrayPresetApplying = true;
             try
             {
-                var presets = Models.CustomPresetStore.Load();
+                var presets = Models.CustomPresetStore.Load(mode);
                 if (slot >= presets.Length)
                     return;
 
                 var p = presets[slot];
                 string command = BuildCustomCommandString(p);
-                if (!string.IsNullOrWhiteSpace(command))
-                {
-                    await ApplyCustomOnStart(command, p);
-                    ToastNotification.ShowToastNotification($"Custom {slot + 1} Applied!",
-                        $"Custom preset (Profile {slot + 1}) has been applied!");
-                }
+                if (string.IsNullOrWhiteSpace(command))
+                    return;
+
+                await ApplyCustomOnStart(command, p);
+                string modeSuffix = mode == Models.PresetMode.Boost ? " (Boost)" : "";
+                ToastNotification.ShowToastNotification($"Custom {slot + 1}{modeSuffix} Applied!",
+                    $"Custom preset (Profile {slot + 1}) has been applied!");
 
                 Settings.Default.presetProfile = "Custom";
-                Settings.Default.customPresetSlot = slot;
+                if (mode == Models.PresetMode.Boost)
+                    Settings.Default.customPresetSlotBoost = slot;
+                else
+                    Settings.Default.customPresetSlot = slot;
                 Settings.Default.CommandString = command;
                 Settings.Default.Save();
             }
@@ -932,7 +965,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             string profileName = ResolveAutomationProfile(configuredName);
             if (string.IsNullOrEmpty(profileName))
             {
-                // Unknown profile � fall back to raw command execution
+                // Unknown profile � fall back to raw command execution
                 await RyzenAdj_To_UCU.TranslateAsync(commands, appliedName: configuredName, localizeAppliedName: false);
                 return;
             }
