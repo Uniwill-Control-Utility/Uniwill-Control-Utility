@@ -591,20 +591,21 @@ namespace Uniwill_Control_Utility.Views.Pages
             Models.SkuProfileEntry? gamingProfile = Services.SkuResolver.GetProfile("gaming");
             Models.SkuProfileEntry? turboProfile = Services.SkuResolver.GetProfile("turbo");
 
-            // Build GPU tooltip text — hide Dynamic Boost when GPU Power Boost is ON
+            // Build GPU tooltip text — hide Dynamic Boost mention entirely when GPU Power Boost is ON
             static string GpuTooltip(Models.SkuProfileEntry? profile, bool boostEnabled)
             {
                 if (profile == null)
-                    return boostEnabled ? "TGP: 150W" : "TGP: 150W | Dynamic Boost: Off";
+                    return "TGP: 150W";
 
                 int tgp = profile.GpuTgp;
                 bool db = profile.DynamicBoost;
                 int dbOffset = profile.DynamicBoostOffset;
 
-                if (boostEnabled && db)
+                if (boostEnabled)
                 {
-                    // Merge TGP + DB into pure TGP
-                    tgp += dbOffset;
+                    // Merge TGP + DB into pure TGP, no DB mention
+                    if (db)
+                        tgp += dbOffset;
                     return $"TGP: {tgp}W";
                 }
 
