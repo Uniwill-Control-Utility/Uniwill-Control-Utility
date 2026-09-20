@@ -298,6 +298,29 @@ namespace Uniwill_Control_Utility.Views.Pages
             _adaptiveSnackbar = null;
         }
 
+        /// <summary>
+        /// Shows a short-lived snackbar above the bottom bar for save/clear actions.
+        /// Primary-styled, no close button, 3 second timeout.
+        /// </summary>
+        private void ShowPresetSnackbar(string title, string message)
+        {
+            SnackbarPresenter.HideCurrent();
+
+            var snackbar = new Wpf.Ui.Controls.Snackbar(SnackbarPresenter)
+            {
+                Title = title,
+                Content = message,
+                Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+                IsCloseButtonEnabled = false,
+                Timeout = TimeSpan.FromSeconds(3),
+            };
+
+            if (SnackbarPresenter.IsLoaded)
+                snackbar.Show(true);
+            else
+                SnackbarPresenter.Loaded += (s, e) => snackbar.Show(true);
+        }
+
         private void Slider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (sender == sdNvCore)
@@ -539,7 +562,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 if (boostEnabled)
                 {
-                    bottomBar.BorderBrush = (System.Windows.Media.Brush)FindResource("TextControlElevationBorderFocusedBrush");
+                    bottomBar.BorderBrush = (System.Windows.Media.Brush)FindResource("AccentFillColorDefaultBrush");
                     bottomBar.BorderThickness = new Thickness(0, 0, 0, 2);
                 }
                 else
@@ -1295,7 +1318,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void btnSave_Click(object sender, RoutedEventArgs e)
         {
             SaveCustomPreset(_customPresetSlot);
-            ToastNotification.ShowToastNotification($"Profile {_customPresetSlot + 1} Saved",
+            ShowPresetSnackbar($"Profile {_customPresetSlot + 1} Saved",
                 $"Custom preset has been saved to profile {_customPresetSlot + 1}!");
         }
 
@@ -1335,7 +1358,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             updateRadioButtonStyles();
 
             string modeSuffix = ActivePresetMode == Models.PresetMode.Boost ? " (Boost)" : "";
-            ToastNotification.ShowToastNotification($"Profile {_customPresetSlot + 1} Cleared",
+            ShowPresetSnackbar($"Profile {_customPresetSlot + 1} Cleared",
                 $"Custom preset{modeSuffix} has been cleared from profile {_customPresetSlot + 1}!");
         }
 
