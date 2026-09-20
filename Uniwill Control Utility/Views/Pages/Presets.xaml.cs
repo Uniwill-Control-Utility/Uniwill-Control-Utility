@@ -116,15 +116,21 @@ namespace Uniwill_Control_Utility.Views.Pages
                 setProfileTooltips();
                 loadSavedProfile();
 
-                // For Custom profile, restore slider values saved by Apply (Settings.Default).
+                // For Custom profile, restore slider values.
                 // Must run in OnNavigatedToAsync because Page_Loaded only fires once
                 // for scoped pages that stay in the visual tree.
-                // This runs AFTER selectProfile() which calls LoadCustomPreset from
-                // CustomPresetStore, so Settings.Default values take precedence (they
-                // are the latest saved by btnApply_Click).
+                // selectProfile() above already called LoadCustomPreset from
+                // CustomPresetStore. Only fall back to Settings.Default values
+                // if the CustomPresetStore slot is empty (legacy compatibility).
                 if (_currentProfile == "Custom")
                 {
-                    LoadCustomValues();
+                    var presets = Models.CustomPresetStore.Load(ActivePresetMode);
+                    int slot = _customPresetSlot;
+                    if (slot < 0 || slot >= presets.Length || !presets[slot].HasChanges)
+                    {
+                        // Slot empty — fall back to Settings.Default values saved by last Apply.
+                        LoadCustomValues();
+                    }
                     updateStatus();
                     updateAllLabels();
                 }
@@ -810,6 +816,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Custom: restore from CustomPresetStore slot and update labels
             if (profile == "Custom")
             {
+                // Sync slot to the active mode's saved slot before loading.
+                // This ensures the correct slot is used even on first navigation
+                // (before Page_Loaded runs which also syncs the slot).
+                _customPresetSlot = ActivePresetSlot;
+                if (_customPresetSlot < 0 || _customPresetSlot >= Models.CustomPreset.MaxSlots)
+                    _customPresetSlot = 0;
+
                 LoadCustomPreset(_customPresetSlot);
                 updateAllLabels();
                 updateRadioButtonStyles();
@@ -1319,8 +1332,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             SaveCustomPreset(_customPresetSlot);
             string modeSuffix = ActivePresetMode == Models.PresetMode.Boost ? " (Boost)" : "";
-            ShowPresetSnackbar($"Profile {_customPresetSlot + 1} Saved",
-                $"Custom preset{modeSuffix} has been saved to profile {_customPresetSlot + 1}!");
+            ShowPresetSnackbar($"Preset saved",
+                $"Custom preset{modeSuffix} has been saved to slot {_customPresetSlot + 1}!");
         }
 
         private void btnClear_Click(object sender, RoutedEventArgs e)
@@ -1360,7 +1373,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             string modeSuffix = ActivePresetMode == Models.PresetMode.Boost ? " (Boost)" : "";
             ShowPresetSnackbar($"Profile {_customPresetSlot + 1} Cleared",
-                $"Custom preset{modeSuffix} has been cleared from profile {_customPresetSlot + 1}!");
+                $"Custom preset{modeSuffix} has been cleared from slot {_customPresetSlot + 1}!");
         }
 
         private void cbApplyOnStartup_Click(object sender, RoutedEventArgs e)

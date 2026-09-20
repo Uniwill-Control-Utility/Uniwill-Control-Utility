@@ -220,14 +220,21 @@ namespace Uniwill_Control_Utility.Views.Windows
                         bool boostEnabled = Scripts.GPUs.NVIDIA.NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
                         Models.PresetMode mode = boostEnabled ? Models.PresetMode.Boost : Models.PresetMode.Normal;
                         var presets = Models.CustomPresetStore.Load(mode);
-                        // Find the first slot with saved data (slot 0 = Profile 1 is default)
-                        int slot = 0;
-                        for (int i = 0; i < presets.Length; i++)
+                        // Use the saved slot for the active mode, fall back to first slot with data.
+                        int slot = mode == Models.PresetMode.Boost
+                            ? Settings.Default.customPresetSlotBoost
+                            : Settings.Default.customPresetSlot;
+                        if (slot < 0 || slot >= presets.Length || !presets[slot].HasChanges)
                         {
-                            if (presets[i].HasChanges)
+                            // Fallback: find first slot with saved data.
+                            slot = 0;
+                            for (int i = 0; i < presets.Length; i++)
                             {
-                                slot = i;
-                                break;
+                                if (presets[i].HasChanges)
+                                {
+                                    slot = i;
+                                    break;
+                                }
                             }
                         }
 
