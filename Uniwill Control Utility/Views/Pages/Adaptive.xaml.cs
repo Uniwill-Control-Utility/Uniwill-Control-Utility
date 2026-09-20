@@ -73,8 +73,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbxLbEnabled.IsChecked = Settings.Default.AdaptiveLbEnabled;
 
             // Probe watercooler connection on a background thread.
-            // Hide the card initially; show it only if hardware is supported AND a cooler is connected.
-            sdHydroUI.Visibility = Visibility.Collapsed;
+            // Always show the card on supported hardware — the toggle and command
+            // paths already guard on _hydroConnected, so a race with TryAutoConnectAsync
+            // can't cause spurious writes.  Previously the card was hidden when the
+            // probe ran before auto-connect completed, then never re-shown because
+            // the ConnectionStateChanged subscription was never established.
             _ = Task.Run(() =>
             {
                 if (!WaterCoolerHardwareDetector.IsSupportedHardware())
@@ -88,11 +91,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                     _waterCoolerService = waterCooler;
                     _hydroConnected = connected;
 
-                    if (connected)
-                    {
-                        sdHydroUI.Visibility = Visibility.Visible;
-                        _waterCoolerService!.ConnectionStateChanged += OnWaterCoolerConnectionStateChanged;
-                    }
+                    sdHydroUI.Visibility = Visibility.Visible;
+                    _waterCoolerService!.ConnectionStateChanged += OnWaterCoolerConnectionStateChanged;
                 });
             });
 

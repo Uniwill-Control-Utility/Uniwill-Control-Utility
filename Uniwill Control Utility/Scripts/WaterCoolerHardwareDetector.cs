@@ -3,15 +3,31 @@ using System.Management;
 namespace Uniwill_Control_Utility.Scripts
 {
     /// <summary>
-    /// Detects whether the current laptop is a supported Tongfang/LCT watercooler model.
-    /// Supported brands: XMG Oasis, PC Specialist, Eluktronics, TUXEDO Aquaris.
+    /// Detects whether the current laptop is a supported TongFeng/LCT watercooler chassis.
+    ///
+    /// Instead of matching brand names (which vary per rebrand — XMG, Schenker, Mifcom,
+    /// PCSpecialist, TUXEDO, Eluktronics, etc.), this checks the baseboard product
+    /// identifier from Win32_BaseBoard. The first 4 characters uniquely identify the
+    /// TongFeng chassis and are unaffected by OEM BIOS rebranding:
+    ///
+    ///   X6FR — AMD TongFeng chassis (e.g. NB05)
+    ///   X6AR — Intel TongFeng chassis (e.g. NB02)
     /// </summary>
     public static class WaterCoolerHardwareDetector
     {
+        /// <summary>
+        /// Baseboard product prefixes that identify a TongFeng watercooler-capable chassis.
+        /// </summary>
+        private static readonly string[] SupportedBaseBoardPrefixes =
+        {
+            "X6FR", // AMD TongFeng (NB05)
+            "X6AR", // Intel TongFeng (NB02)
+        };
+
         private static bool? _hasWatercooler;
 
         /// <summary>
-        /// Returns true if the system is a known Tongfang laptop with LCT watercooler support.
+        /// Returns true if the system has a TongFeng baseboard with LCT watercooler support.
         /// Result is cached after first call.
         /// </summary>
         public static bool IsSupportedHardware()
@@ -21,39 +37,34 @@ namespace Uniwill_Control_Utility.Scripts
 
             try
             {
-                using var searcher = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM Win32_ComputerSystem");
+                using var searcher = new ManagementObjectSearcher(
+                    "root\\CIMV2",
+                    "SELECT Product FROM Win32_BaseBoard");
 
                 foreach (ManagementObject obj in searcher.Get())
                 {
-                    var manufacturer = obj["Manufacturer"]?.ToString() ?? "";
-                    var model = obj["Model"]?.ToString() ?? "";
-                    var productName = obj["Name"]?.ToString() ?? "";
+                    var product = obj["Product"]?.ToString()?.Trim();
+                    if (string.IsNullOrEmpty(product))
+                        continue;
 
-                    var combined = (manufacturer + " " + model + " " + productName).ToLower();
-
-                    // Check for known supported brands/models
-                    if (combined.Contains("tongfang") ||
-                        combined.Contains("xmg") ||
-                        combined.Contains("oasis") ||
-                        combined.Contains("schenker") ||
-                        combined.Contains("specialist") ||
-                        combined.Contains("eluktronics") ||
-                        combined.Contains("tuxedo") ||
-                        combined.Contains("aquaris"))
+                    foreach (var prefix in SupportedBaseBoardPrefixes)
                     {
-                        _hasWatercooler = true;
-                        return true;
+                        if (product.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
+                        {
+                            _hasWatercooler = true;
+                            return true;
+                        }
                     }
                 }
             }
             catch
             {
-                // WMI not available - default to showing the feature
+                // WMI not available — default to showing the feature so users can
+                // still attempt a BLE connection manually.
             }
 
-            // If we can't detect, show the feature anyway (user can override)
-            _hasWatercooler = false;
-            return false;
+            _hasWatercooler = true;
+            return true;
         }
     }
 }
