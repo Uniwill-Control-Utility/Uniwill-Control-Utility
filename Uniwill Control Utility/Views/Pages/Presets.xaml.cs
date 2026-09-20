@@ -584,11 +584,34 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool hydro = IsHydroConnected;
             string coolingLabel = hydro ? " (water)" : " (air)";
             var limits = GetPowerLimits();
+            bool gpuBoostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
 
             // Try to get SKU-specific profile data for tooltips
             Models.SkuProfileEntry? officeProfile = Services.SkuResolver.GetProfile("office");
             Models.SkuProfileEntry? gamingProfile = Services.SkuResolver.GetProfile("gaming");
             Models.SkuProfileEntry? turboProfile = Services.SkuResolver.GetProfile("turbo");
+
+            // Build GPU tooltip text — hide Dynamic Boost when GPU Power Boost is ON
+            static string GpuTooltip(Models.SkuProfileEntry? profile, bool boostEnabled)
+            {
+                if (profile == null)
+                    return boostEnabled ? "TGP: 150W" : "TGP: 150W | Dynamic Boost: Off";
+
+                int tgp = profile.GpuTgp;
+                bool db = profile.DynamicBoost;
+                int dbOffset = profile.DynamicBoostOffset;
+
+                if (boostEnabled && db)
+                {
+                    // Merge TGP + DB into pure TGP
+                    tgp += dbOffset;
+                    return $"TGP: {tgp}W";
+                }
+
+                return db
+                    ? $"TGP: {tgp}W | Dynamic Boost: On (+{dbOffset}W)"
+                    : $"TGP: {tgp}W | Dynamic Boost: Off";
+            }
 
             if (Family.TYPE == Family.ProcessorType.Amd_Apu)
             {
@@ -597,20 +620,14 @@ namespace Uniwill_Control_Utility.Views.Pages
                 string officeCpu = officeProfile != null
                     ? $"Sustained: {officeProfile.CpuPl1}W | Boost: {officeProfile.CpuPl2}W"
                     : "Sustained: 45W | Boost: 45W";
-                string officeGpu = officeProfile != null
-                    ? $"TGP: {officeProfile.GpuTgp}W | Dynamic Boost: Off"
-                    : "TGP: 95W | Dynamic Boost: Off";
+                string officeGpu = GpuTooltip(officeProfile, gpuBoostEnabled);
 
                 string gamingCpu = gamingProfile != null
                     ? $"Sustained: {gamingProfile.CpuPl1}W | Boost: {gamingProfile.CpuPl2}W"
                     : "Sustained: 75W | Boost: 85W";
-                string gamingGpu = gamingProfile != null
-                    ? $"TGP: {gamingProfile.GpuTgp}W | Dynamic Boost: Off"
-                    : "TGP: 150W | Dynamic Boost: Off";
+                string gamingGpu = GpuTooltip(gamingProfile, gpuBoostEnabled);
 
-                string turboGpu = turboProfile != null
-                    ? $"TGP: {turboProfile.GpuTgp}W | Dynamic Boost: On (+{turboProfile.DynamicBoostOffset}W)"
-                    : "TGP: 150W | Dynamic Boost: On (+25W)";
+                string turboGpu = GpuTooltip(turboProfile, gpuBoostEnabled);
 
                 btnOffice.ToolTip = CreateTooltip("Office", "CPU Power Limits", officeCpu, "GPU Power Limits", officeGpu);
                 btnGaming.ToolTip = CreateTooltip("Gaming", "CPU Power Limits", gamingCpu, "GPU Power Limits", gamingGpu);
@@ -625,23 +642,17 @@ namespace Uniwill_Control_Utility.Views.Pages
                 string officeCpu = officeProfile != null
                     ? $"PL1: {officeProfile.CpuPl1}W | PL2: {officeProfile.CpuPl2}W"
                     : "PL1: 25W | PL2: 35W";
-                string officeGpu = officeProfile != null
-                    ? $"TGP: {officeProfile.GpuTgp}W | Dynamic Boost: Off"
-                    : "TGP: 95W | Dynamic Boost: Off";
+                string officeGpu = GpuTooltip(officeProfile, gpuBoostEnabled);
 
                 string gamingCpu = gamingProfile != null
                     ? $"PL1: {gamingProfile.CpuPl1}W | PL2: {gamingProfile.CpuPl2}W"
                     : "PL1: 45W | PL2: 60W";
-                string gamingGpu = gamingProfile != null
-                    ? $"TGP: {gamingProfile.GpuTgp}W | Dynamic Boost: Off"
-                    : "TGP: 150W | Dynamic Boost: Off";
+                string gamingGpu = GpuTooltip(gamingProfile, gpuBoostEnabled);
 
                 string turboCpu = turboProfile != null
                     ? $"PL1: {turboProfile.CpuPl1}W | PL2: {turboProfile.CpuPl2}W"
                     : "PL1: 160W | PL2: 200W";
-                string turboGpu = turboProfile != null
-                    ? $"TGP: {turboProfile.GpuTgp}W | Dynamic Boost: On (+{turboProfile.DynamicBoostOffset}W)"
-                    : "TGP: 150W | Dynamic Boost: On (+25W)";
+                string turboGpu = GpuTooltip(turboProfile, gpuBoostEnabled);
 
                 btnOffice.ToolTip = CreateTooltip("Office", "CPU Power Limits", officeCpu, "GPU Power Limits", officeGpu);
                 btnGaming.ToolTip = CreateTooltip("Gaming", "CPU Power Limits", gamingCpu, "GPU Power Limits", gamingGpu);
@@ -792,17 +803,18 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             else if (profile == "Turbo")
             {
+                int gpuTgp = skuProfile?.GpuTgp ?? 150;
+                bool db = skuProfile?.DynamicBoost ?? true;
+                int dbOffset = skuProfile?.DynamicBoostOffset ?? 25;
+                if (gpuBoostEnabled && db)
+                {
+                    gpuTgp += dbOffset;
+                    db = false;
+                    dbOffset = 0;
+                }
+
                 if (Family.TYPE == Family.ProcessorType.Amd_Apu)
                 {
-                    int gpuTgp = skuProfile?.GpuTgp ?? 150;
-                    bool db = skuProfile?.DynamicBoost ?? true;
-                    int dbOffset = skuProfile?.DynamicBoostOffset ?? 25;
-                    if (gpuBoostEnabled && db)
-                    {
-                        gpuTgp += dbOffset;
-                        db = false;
-                        dbOffset = 0;
-                    }
                     setProfileValues(cpuMax, cpuMax, 95, gpuTgp, db, dbOffset);
                 }
                 else
@@ -811,6 +823,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     _profileIntelPl2 = cpuMax;
                     sdIntelPl1.Value = cpuMax;
                     sdIntelPl2.Value = cpuMax;
+                    setProfileValues(cpuMax, cpuMax, 95, gpuTgp, db, dbOffset);
                 }
             }
             // Custom: restore from CustomPresetStore slot and update labels
