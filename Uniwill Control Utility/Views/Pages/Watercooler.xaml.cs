@@ -332,6 +332,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (_waterCoolerService == null) return;
 
+            _waterCoolerService.SetUserDisconnected();
             await _waterCoolerService.DisconnectAsync();
             SetControlsEnabled(false);
         }

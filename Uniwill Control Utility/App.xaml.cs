@@ -381,6 +381,11 @@ namespace Uniwill_Control_Utility
 
         private static async Task AutoConnectDevicesAsync()
         {
+            // Wait for the Bluetooth stack to stabilize after cold boot.
+            // On restart, BLE devices may not be reachable immediately — the radio
+            // needs time to power on and start advertising.
+            await Task.Delay(2000);
+
             // Auto-connect watercooler on startup if enabled
             try
             {

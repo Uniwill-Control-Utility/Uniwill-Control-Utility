@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Management;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Uniwill_Control_Utility.Models;
@@ -32,6 +33,29 @@ namespace Uniwill_Control_Utility.Services
         // SessionStatus == Closed before reconnecting, otherwise we get a zombie link.
         private TaskCompletionSource<bool>? _sessionClosedTcs;
 
+        /* ------------------------------------------------------------------ */
+        /*  Background reconnect loop (THRM-style exponential backoff)           */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>
+        /// Exponential backoff delays for reconnect attempts.
+        /// 2s, 5s, 10s, 15s, 20s, 30s, 30s, 60s, 60s, 60s.
+        /// After exhausting all delays, the loop exits and restarts on next disconnect.
+        /// </summary>
+        private static readonly int[] ReconnectDelaysMs =
+        {
+            2000, 5000, 10000, 15000, 20000,
+            30000, 30000, 60000, 60000, 60000
+        };
+
+        private CancellationTokenSource? _reconnectCts;
+        private Thread? _reconnectThread;
+        private readonly object _reconnectLock = new();
+        private ManualResetEvent? _reconnectWakeEvent;
+        private int _connectGeneration; // Incremented on user disconnect to invalidate stale attempts
+
+        private bool _userDisconnected;
+
         public event EventHandler<WatercoolerConnectionState>? ConnectionStateChanged;
         public event EventHandler<string>? StatusChanged;
 
@@ -58,6 +82,16 @@ namespace Uniwill_Control_Utility.Services
         public WaterCoolerService()
         {
             LoadSettings();
+
+            // Auto-connect on app startup (like THRM does after a brief delay).
+            // Only connects if AutoConnect is enabled in settings.
+            // The 2-second delay allows the Bluetooth stack to stabilize after cold boot.
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2000, CancellationToken.None);
+                if (_settings.AutoConnect)
+                    await TryAutoConnectAsync();
+            });
         }
 
         #region Settings Persistence
@@ -266,6 +300,7 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public async Task<bool> ConnectAsync(string deviceAddress)
         {
+            ClearUserDisconnected();
             const int maxRetries = 3;
 
             // If somehow still connected, disconnect first to avoid stacking connections.
@@ -340,6 +375,9 @@ namespace Uniwill_Control_Utility.Services
                         // Store last connected device for auto-connect
                         _settings.LastDeviceAddress = deviceAddress;
                         SaveSettings();
+
+                        // Stop any background reconnection loop — we're connected now.
+                        StopReconnectLoop();
 
                         ConnectionStateChanged?.Invoke(this, WatercoolerConnectionState.Connected);
                         return true;
@@ -497,7 +535,179 @@ namespace Uniwill_Control_Utility.Services
             ConnectedDeviceName = string.Empty;
 
             ConnectionStateChanged?.Invoke(this, WatercoolerConnectionState.Disconnected);
+
+            // Start background reconnection loop if this wasn't a user-initiated disconnect.
+            // This handles cases where the BLE link drops unexpectedly (e.g., Bluetooth
+            // off→on, device goes out of range then returns).
+            if (!_userDisconnected && _settings.AutoConnect)
+            {
+                _connectGeneration++; // Invalidate any in-flight connection attempt
+                StartReconnectLoop();
+            }
         }
+
+        /// <summary>
+        /// User-initiated disconnect. This prevents all auto-reconnect logic
+        /// from firing until the user explicitly connects again.
+        /// </summary>
+        public void SetUserDisconnected()
+        {
+            _connectGeneration++; // Invalidate any in-flight reconnect
+            _userDisconnected = true;
+            StopReconnectLoop();
+        }
+
+        /// <summary>
+        /// Clears the user-disconnected flag. Called when the user initiates a new connect.
+        /// </summary>
+        private void ClearUserDisconnected()
+        {
+            _userDisconnected = false;
+        }
+
+        #region Background Reconnect Loop
+
+        /// <summary>
+        /// Starts a reconnect thread that runs exponential backoff attempts.
+        /// </summary>
+        private void StartReconnectLoop()
+        {
+            lock (_reconnectLock)
+            {
+                if (_reconnectCts != null)
+                    return; // Already running
+
+                _reconnectCts = new CancellationTokenSource();
+                _reconnectWakeEvent = new ManualResetEvent(false);
+                var token = _reconnectCts.Token;
+                int generation = _connectGeneration;
+
+                _reconnectThread = new Thread(() =>
+                {
+                    try
+                    {
+                        Debug.WriteLine($"[WaterCooler] Reconnect loop started (generation={generation}, {ReconnectDelaysMs.Length} delays)");
+
+                        for (int i = 0; i < ReconnectDelaysMs.Length; i++)
+                        {
+                            if (token.IsCancellationRequested)
+                            {
+                                Debug.WriteLine("[WaterCooler] Reconnect loop cancelled");
+                                return;
+                            }
+
+                            if (IsConnected || _userDisconnected)
+                            {
+                                Debug.WriteLine(
+                                    "[WaterCooler] Reconnect loop stopping (already connected or user disconnected)");
+                                return;
+                            }
+
+                            // Check if a newer generation has started a fresh reconnect
+                            if (generation != _connectGeneration)
+                            {
+                                Debug.WriteLine(
+                                    $"[WaterCooler] Reconnect loop stale (generation {generation} vs {_connectGeneration}), stopping");
+                                return;
+                            }
+
+                            int delayMs = ReconnectDelaysMs[i];
+
+                            Debug.WriteLine(
+                                $"[WaterCooler] Waiting {delayMs}ms before reconnect attempt {i + 1}/{ReconnectDelaysMs.Length}");
+
+                            var waitResult = WaitHandle.WaitAny(
+                                new[] {
+                                    _reconnectCts.Token.WaitHandle,
+                                    _reconnectWakeEvent
+                                },
+                                delayMs);
+
+                            if (waitResult == 0) // Cancelled
+                            {
+                                Debug.WriteLine("[WaterCooler] Reconnect loop cancelled during wait");
+                                return;
+                            }
+
+                            // Clear wake event if triggered
+                            if (waitResult == 1)
+                                _reconnectWakeEvent.Reset();
+
+                            // Attempt reconnect
+                            try
+                            {
+                                Task.Run(async () =>
+                                {
+                                    bool ok = await TryAutoConnectAsync();
+                                    if (ok)
+                                    {
+                                        Debug.WriteLine(
+                                            $"[WaterCooler] Reconnected on attempt {i + 1}");
+                                    }
+                                }).GetAwaiter().GetResult();
+                            }
+                            catch
+                            {
+                                // Non-critical: reconnect attempt failed, will retry
+                            }
+                        }
+
+                        Debug.WriteLine(
+                            "[WaterCooler] Reconnect loop exhausted all delays");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[WaterCooler] Reconnect loop error: {ex.Message}");
+                    }
+                })
+                {
+                    IsBackground = true,
+                    Name = "WaterCoolerReconnectLoop"
+                };
+                _reconnectThread.Start();
+            }
+        }
+
+        /// <summary>
+        /// Stops the background reconnection loop.
+        /// </summary>
+        private void StopReconnectLoop()
+        {
+            lock (_reconnectLock)
+            {
+                try
+                {
+                    _reconnectCts?.Cancel();
+                }
+                catch { /* Non-critical */ }
+
+                _reconnectThread?.Join(2000);
+
+                _reconnectCts?.Dispose();
+                _reconnectCts = null;
+                _reconnectThread = null;
+                _reconnectWakeEvent?.Dispose();
+                _reconnectWakeEvent = null;
+            }
+        }
+
+        /// <summary>
+        /// Wakes the reconnect loop early. Returns true if a loop was running.
+        /// </summary>
+        private bool WakeReconnect()
+        {
+            lock (_reconnectLock)
+            {
+                if (_reconnectCts != null)
+                {
+                    _reconnectWakeEvent?.Set();
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        #endregion
 
         /// <summary>
         /// Sends pump voltage command to the device.
@@ -596,6 +806,9 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public async Task<bool> TryAutoConnectAsync()
         {
+            if (IsConnected)
+                return true;
+
             if (!_settings.AutoConnect || string.IsNullOrEmpty(_settings.LastDeviceAddress))
                 return false;
 
@@ -794,6 +1007,8 @@ namespace Uniwill_Control_Utility.Services
 
         public void Dispose()
         {
+            StopReconnectLoop();
+
             // Fire-and-forget disconnect to avoid deadlock on UI thread
             _ = DisconnectAsync().ContinueWith(t =>
             {
