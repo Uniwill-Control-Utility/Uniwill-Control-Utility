@@ -115,8 +115,10 @@ public sealed class FanIconElement : IconElement
             Stretch = Stretch.Uniform,
             Width = 20,
             Height = 20,
-            SnapsToDevicePixels = true
+            SnapsToDevicePixels = true,
+            RenderTransform = new ScaleTransform(-1, 1)
         };
+        _path.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
     }
 
     protected override UIElement InitializeChildren()
