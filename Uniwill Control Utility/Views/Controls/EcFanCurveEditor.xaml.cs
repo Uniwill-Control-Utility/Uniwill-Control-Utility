@@ -23,6 +23,7 @@ namespace Uniwill_Control_Utility.Views.Controls
 
         private readonly List<Slider> _sliders = new();
         private int[] _temperatures = EcFanCurve.CpuTemperatures;
+        private bool _isReadOnly;
 
         /// <summary>
         /// Sets the temperature labels displayed on the X-axis and in tooltips.
@@ -40,13 +41,15 @@ namespace Uniwill_Control_Utility.Views.Controls
         }
 
         /// <summary>
-        /// When true, all sliders are disabled and the curve is read-only (default presets).
+        /// When true, sliders 1-10 are read-only (stock presets).
         /// When false, sliders are editable (Custom preset).
+        /// Zone 0 is always disabled regardless of this flag.
         /// </summary>
         public bool IsReadOnly
         {
             set
             {
+                _isReadOnly = value;
                 foreach (var slider in _sliders)
                 {
                     // Zone 0 is always disabled regardless.
@@ -54,22 +57,22 @@ namespace Uniwill_Control_Utility.Views.Controls
                         continue;
                     if (value)
                     {
-                        // Keep sliders enabled so tooltips work, but block interaction.
-                        slider.PreviewMouseDown += ReadOnly_PreviewMouseDown;
                         slider.Foreground = Application.Current.Resources["TextFillColorSecondaryBrush"] as Brush;
                     }
                     else
                     {
-                        slider.PreviewMouseDown -= ReadOnly_PreviewMouseDown;
                         slider.Foreground = null;
                     }
                 }
             }
         }
 
-        private void ReadOnly_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        private void Slider_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
-            e.Handled = true;
+            if (_isReadOnly)
+            {
+                e.Handled = true;
+            }
         }
 
         public EcFanCurveEditor()
@@ -101,6 +104,7 @@ namespace Uniwill_Control_Utility.Views.Controls
                     slider.Foreground = Application.Current.Resources["TextFillColorDisabledBrush"] as Brush;
                 }
 
+                slider.PreviewMouseDown += Slider_PreviewMouseDown;
                 slider.MouseMove += Slider_MouseMove;
                 slider.ValueChanged += Slider_OnValueChanged;
                 Grid.SetColumn(slider, i);
