@@ -559,7 +559,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (lblPresetMode != null)
             {
-                lblPresetMode.Text = boostEnabled ? "Boost" : "";
+                lblPresetMode.Text = boostEnabled ? "GPU Boost ON" : "";
                 lblPresetMode.Visibility = boostEnabled ? Visibility.Visible : Visibility.Collapsed;
             }
 

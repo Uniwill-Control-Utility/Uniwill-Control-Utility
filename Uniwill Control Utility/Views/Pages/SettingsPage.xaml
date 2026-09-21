@@ -422,7 +422,7 @@
                                     <ui:TextBlock Margin="0,2,0,2"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Allows GPU power limit to reach 250W. Disables Dynamic Boost control. Use only if you have installed the required mod" />
+                                                   Text="Allows GPU power limit to reach 250W. Disables Dynamic Boost control. Use only if you have installed the required mod." />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="cbGpuPowerBoost"
                                                  Grid.Column="1"

@@ -623,7 +623,7 @@
                                     </StackPanel>
                                 </Grid>
                             </StackPanel>
-                        </StackPanel>
+                         </StackPanel>
                     </ui:CardExpander>
 
                     <!-- Hydro UI - only visible on supported hardware -->
@@ -1745,11 +1745,17 @@
                 </ScrollViewer>
 
         <!-- Row 1: Bottom bar -->
-        <ui:Card Grid.Row="1" MaxWidth="1080" HorizontalAlignment="Stretch" Margin="12,8,16,12" Padding="12,8">
+        <ui:Card x:Name="AdpBottomBar"
+                 Grid.Row="1"
+                 MaxWidth="1080"
+                 HorizontalAlignment="Stretch"
+                 Margin="12,8,16,12"
+                 Padding="12,8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
                 <!-- Left: Games/Apps selector -->
@@ -1759,14 +1765,24 @@
                     <ui:Button Name="btnReloadApps" ToolTip="Updates dropdown list with games/apps" Click="btnReloadApps_Click">
                         <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE777;" FontSize="16"/>
                     </ui:Button>
-                    <CheckBox Name="cbExcludeFromSwitching" Content="Exclude from switching" VerticalAlignment="Center" Margin="12,0,0,0" FontSize="13"/>
                 </StackPanel>
 
+                <!-- Center: Boost mode label (hidden by default) -->
+                <ui:TextBlock x:Name="lblAdpPresetMode"
+                               Grid.Column="1"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Center"
+                               FontSize="13"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource AccentFillColorDefaultBrush}"
+                               Visibility="Collapsed" />
+
                 <!-- Right: Controls -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <TextBlock Text="Polling Rate" VerticalAlignment="Center" FontSize="13" Margin="0,0,8,0" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Visibility="Collapsed"/>
                     <ui:NumberBox x:Name="nudPolling" Minimum="1" Maximum="8" Value="2" SmallChange="0.05" MaxDecimalPlaces="2" Margin="0,0,12,0" Visibility="Collapsed"/>
                     <CheckBox Name="cbAutoSwitch" Content="Auto switch app profile" VerticalAlignment="Center" Click="cbAutoSwitch_Click" Margin="0,0,12,0" Visibility="Collapsed"/>
+                    <CheckBox Name="cbExcludeFromSwitching" Content="Exclude from switching" VerticalAlignment="Center" FontSize="13" Margin="0,0,12,0"/>
                     <ui:Button Width="50" 
                                Name="btnSave" 
                                ToolTip="Save current settings" 
