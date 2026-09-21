@@ -596,169 +596,168 @@ namespace Uniwill_Control_Utility.Views.Windows
         }
 
         static string lastAppliedState = "";
-        private async void HandlePowerModeChange(object sender, PowerModeChangedEventArgs e)
+      private async void HandlePowerModeChange(object sender, PowerModeChangedEventArgs e)
         {
             try
             {
-                if (Settings.Default.isAdaptiveModeRunning == false)
+                if (e.Mode == PowerModes.StatusChange && Settings.Default.isAdaptiveModeRunning == false)
                 {
-                    if (e.Mode == PowerModes.StatusChange)
+                    await Task.Run(() => GetBatteryStatus());
+
+                    if (statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
+                        || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery)
                     {
-                        await Task.Run(() => GetBatteryStatus());
-
-                        if (statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
-                            || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery)
+                        if (Settings.Default.acPreset != "None" && !string.IsNullOrEmpty(Settings.Default.acPreset))
                         {
-                            if (Settings.Default.acPreset != "None" && !string.IsNullOrEmpty(Settings.Default.acPreset))
-                            {
-                                Settings.Default.acCommandString = PresetProfileApplier.BuildCommandString(
-                                    ResolveAutomationProfile(Settings.Default.acPreset));
-                                Settings.Default.CommandString = Settings.Default.acCommandString;
-                                Settings.Default.Save();
-                                await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset);
+                            Settings.Default.acCommandString = PresetProfileApplier.BuildCommandString(
+                                ResolveAutomationProfile(Settings.Default.acPreset));
+                            Settings.Default.CommandString = Settings.Default.acCommandString;
+                            Settings.Default.Save();
+                            await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset);
 
-                                if (lastAppliedState != "ac") ToastNotification.ShowToastNotification("Charge Preset Applied!", $"Your charge preset settings have been applied!");
-                                lastAppliedState = "ac";
-                            }
-                        }
-                        else
-                        {
-                            if (Settings.Default.dcPreset != "None" && !string.IsNullOrEmpty(Settings.Default.dcPreset))
-                            {
-                                Settings.Default.dcCommandString = PresetProfileApplier.BuildCommandString(
-                                    ResolveAutomationProfile(Settings.Default.dcPreset));
-                                Settings.Default.CommandString = Settings.Default.dcCommandString;
-                                Settings.Default.Save();
-                                await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset);
-
-                                if (lastAppliedState != "dc") ToastNotification.ShowToastNotification("Discharge Preset Applied!", $"Your discharge preset settings have been applied!");
-                                lastAppliedState = "dc";
-                            }
+                            if (lastAppliedState != "ac") ToastNotification.ShowToastNotification("Charge Preset Applied!", $"Your charge preset settings have been applied!");
+                            lastAppliedState = "ac";
                         }
                     }
-
-                    if (e.Mode == PowerModes.Resume)
+                    else
                     {
-                        if (Settings.Default.resumePreset != "None" && !string.IsNullOrEmpty(Settings.Default.resumePreset))
+                        if (Settings.Default.dcPreset != "None" && !string.IsNullOrEmpty(Settings.Default.dcPreset))
                         {
-                            Settings.Default.resumeCommandString = PresetProfileApplier.BuildCommandString(
-                                ResolveAutomationProfile(Settings.Default.resumePreset));
-                            Settings.Default.CommandString = Settings.Default.resumeCommandString;
+                            Settings.Default.dcCommandString = PresetProfileApplier.BuildCommandString(
+                                ResolveAutomationProfile(Settings.Default.dcPreset));
+                            Settings.Default.CommandString = Settings.Default.dcCommandString;
                             Settings.Default.Save();
-                            _ = TranslatePresetAsync(Settings.Default.resumeCommandString, Settings.Default.resumePreset);
+                            await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset);
 
-                            if (lastAppliedState != "resume") ToastNotification.ShowToastNotification("Resume Preset Applied!", $"Your resume preset settings have been applied!");
-                            lastAppliedState = "resume";
+                            if (lastAppliedState != "dc") ToastNotification.ShowToastNotification("Discharge Preset Applied!", $"Your discharge preset settings have been applied!");
+                            lastAppliedState = "dc";
                         }
+                    }
+                }
 
-                        // Re-apply settings that are lost after hibernate/sleep:
-                        // - Keyboard RGB (HID device loses state)
-                        // - Light Bar (HID device loses state)
-                        // - Battery charge limit (EC may revert)
-                        // - Fan Control EC duties (EC may revert)
-                        _ = Task.Run(async () =>
+                if (e.Mode == PowerModes.Resume)
+                {
+                    // Always re-apply the current active preset after sleep/hibernation.
+                    // The EC and GPU revert to BIOS defaults (low power state) on suspend.
+                    _ = Task.Run(async () =>
+                    {
+                        try
                         {
+                            // Give the system a moment to reinitialize after resume
+                            await Task.Delay(1500);
+
+                            // Re-apply the current active preset (power limits, V-F curve, etc.)
+                            // This covers both Adaptive Mode and regular preset mode.
+                            string activeProfile = Settings.Default.presetProfile;
+                            if (!string.IsNullOrEmpty(activeProfile))
+                            {
+                                try
+                                {
+                                    await PresetProfileApplier.ApplyProfileAsync(activeProfile, PresetProfileApplier.DisplayName(activeProfile));
+                                    Debug.WriteLine($"[Resume] Preset '{activeProfile}' re-applied");
+                                    ToastNotification.ShowToastNotification("Resume Preset Applied!", $"Your preset settings have been re-applied after resume.");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"[Resume] Preset re-apply failed: {ex.Message}");
+                                }
+                            }
+
+                            // Re-apply Keyboard RGB
                             try
                             {
-                                // Give the system a moment to reinitialize after resume
-                                await Task.Delay(1500);
+                                ApplyKeyboardOnResume();
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[Resume] Keyboard re-apply failed: {ex.Message}");
+                            }
 
-                                // Re-apply Keyboard RGB
-                                try
-                                {
-                                    ApplyKeyboardOnResume();
-                                }
-                                catch (Exception ex)
-                                {
-                                    Debug.WriteLine($"[Resume] Keyboard re-apply failed: {ex.Message}");
-                                }
+                            // Re-apply Light Bar
+                            try
+                            {
+                                ApplyLightBarOnResume();
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[Resume] Light Bar re-apply failed: {ex.Message}");
+                            }
 
-                                // Re-apply Light Bar
-                                try
+                            // Re-apply Battery charge limit
+                            try
+                            {
+                                var ecService = App.GetService<UniwillECService>();
+                                if (ecService != null && ecService.Initialize())
                                 {
-                                    ApplyLightBarOnResume();
-                                }
-                                catch (Exception ex)
-                                {
-                                    Debug.WriteLine($"[Resume] Light Bar re-apply failed: {ex.Message}");
-                                }
-
-                                // Re-apply Battery charge limit
-                                try
-                                {
-                                    var ecService = App.GetService<UniwillECService>();
-                                    if (ecService != null && ecService.Initialize())
+                                    int savedMode = Settings.Default.BatteryMode;
+                                    int currentMode = ecService.GetBatteryMode();
+                                    if (savedMode != currentMode)
                                     {
-                                        int savedMode = Settings.Default.BatteryMode;
-                                        int currentMode = ecService.GetBatteryMode();
-                                        if (savedMode != currentMode)
-                                        {
-                                            ecService.SetBatteryMode(savedMode);
-                                            Debug.WriteLine($"[Resume] Battery mode reverted from {currentMode} to saved {savedMode}");
-                                        }
+                                        ecService.SetBatteryMode(savedMode);
+                                        Debug.WriteLine($"[Resume] Battery mode reverted from {currentMode} to saved {savedMode}");
                                     }
-                                }
-                                catch (Exception ex)
-                                {
-                                    Debug.WriteLine($"[Resume] Battery re-apply failed: {ex.Message}");
-                                }
-
-                                // Re-apply Fan Control EC duties
-                                try
-                                {
-                                    var ecService = App.GetService<UniwillECService>();
-                                    if (ecService != null)
-                                    {
-                                        var fanSettings = FanControlSettingsService.Load();
-                                        EcFanCurve cpuCurve;
-                                        EcFanCurve gpuCurve;
-
-                                        if (fanSettings.UnifiedMode)
-                                        {
-                                            cpuCurve = GetFanPresetCurve(fanSettings.UnifiedPreset);
-                                            gpuCurve = cpuCurve;
-                                        }
-                                        else
-                                        {
-                                            cpuCurve = GetFanPresetCurve(fanSettings.CpuPreset);
-                                            gpuCurve = GetFanPresetCurve(fanSettings.GpuPreset);
-                                        }
-
-                                        ecService.ApplyFanCurve(cpuCurve, gpuCurve,
-                                            fanSettings.CpuTempThresholds ?? EcFanCurve.CpuTemperatures,
-                                            fanSettings.GpuTempThresholds ?? EcFanCurve.GpuTemperatures);
-                                        Debug.WriteLine("[Resume] Fan Control EC duties re-applied");
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    Debug.WriteLine($"[Resume] Fan Control re-apply failed: {ex.Message}");
-                                }
-
-                                // Auto-reconnect Hydro UI watercooler.
-                                var waterCoolerService = App.GetService<WaterCoolerService>();
-                                if (waterCoolerService != null)
-                                {
-                                    // If the service still thinks it's connected, the BLE link is a
-                                    // zombie - force a disconnect before attempting reconnect.
-                                    if (waterCoolerService.IsConnected)
-                                    {
-                                        Debug.WriteLine("[WaterCooler] Resuming from sleep - disconnecting zombie BLE link");
-                                        await waterCoolerService.DisconnectAsync();
-                                        await Task.Delay(500);
-                                    }
-
-                                    bool connected = await waterCoolerService.TryAutoConnectAsync();
-                                    if (connected)
-                                        Debug.WriteLine("[WaterCooler] Auto-reconnected after system resume");
                                 }
                             }
                             catch (Exception ex)
                             {
-                                Debug.WriteLine($"[Resume] Auto-reapply failed: {ex.Message}");
+                                Debug.WriteLine($"[Resume] Battery re-apply failed: {ex.Message}");
                             }
-                        });
-                    }
+
+                            // Re-apply Fan Control EC duties
+                            try
+                            {
+                                var ecService = App.GetService<UniwillECService>();
+                                if (ecService != null)
+                                {
+                                    var fanSettings = FanControlSettingsService.Load();
+                                    EcFanCurve cpuCurve;
+                                    EcFanCurve gpuCurve;
+
+                                    if (fanSettings.UnifiedMode)
+                                    {
+                                        cpuCurve = GetFanPresetCurve(fanSettings.UnifiedPreset);
+                                        gpuCurve = cpuCurve;
+                                    }
+                                    else
+                                    {
+                                        cpuCurve = GetFanPresetCurve(fanSettings.CpuPreset);
+                                        gpuCurve = GetFanPresetCurve(fanSettings.GpuPreset);
+                                    }
+
+                                    ecService.ApplyFanCurve(cpuCurve, gpuCurve,
+                                        fanSettings.CpuTempThresholds ?? EcFanCurve.CpuTemperatures,
+                                        fanSettings.GpuTempThresholds ?? EcFanCurve.GpuTemperatures);
+                                    Debug.WriteLine("[Resume] Fan Control EC duties re-applied");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[Resume] Fan Control re-apply failed: {ex.Message}");
+                            }
+
+                            // Auto-reconnect Hydro UI watercooler.
+                            var waterCoolerService = App.GetService<WaterCoolerService>();
+                            if (waterCoolerService != null)
+                            {
+                                // If the service still thinks it's connected, the BLE link is a
+                                // zombie - force a disconnect before attempting reconnect.
+                                if (waterCoolerService.IsConnected)
+                                {
+                                    Debug.WriteLine("[WaterCooler] Resuming from sleep - disconnecting zombie BLE link");
+                                    await waterCoolerService.DisconnectAsync();
+                                    await Task.Delay(500);
+                                }
+
+                                bool connected = await waterCoolerService.TryAutoConnectAsync();
+                                if (connected)
+                                    Debug.WriteLine("[WaterCooler] Auto-reconnected after system resume");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[Resume] Auto-reapply failed: {ex.Message}");
+                        }
+                    });
                 }
             }
             catch (Exception ex)
