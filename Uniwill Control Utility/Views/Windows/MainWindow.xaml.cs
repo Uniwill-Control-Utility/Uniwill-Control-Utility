@@ -646,8 +646,21 @@ namespace Uniwill_Control_Utility.Views.Windows
                             // Give the system a moment to reinitialize after resume
                             await Task.Delay(1500);
 
+                            // Invalidate Adaptive page diff-tracking so next timer tick
+                            // force-applies everything (hardware reverted to BIOS defaults).
+                            try
+                            {
+                                var adaptivePage = App.GetService<Views.Pages.Adaptive>();
+                                adaptivePage.InvalidateAllLastValues();
+                                Debug.WriteLine("[Resume] Adaptive page diff-tracking invalidated");
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[Resume] Adaptive invalidate failed: {ex.Message}");
+                            }
+
                             // Re-apply the current active preset (power limits, V-F curve, etc.)
-                            // This covers both Adaptive Mode and regular preset mode.
+                            // This covers regular preset mode (non-Adaptive).
                             string activeProfile = Settings.Default.presetProfile;
                             if (!string.IsNullOrEmpty(activeProfile))
                             {
@@ -751,6 +764,52 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 bool connected = await waterCoolerService.TryAutoConnectAsync();
                                 if (connected)
                                     Debug.WriteLine("[WaterCooler] Auto-reconnected after system resume");
+                            }
+
+                            // Resume Flydigi cooler (HID) background services.
+                            var flydigiService = App.GetService<FlydigiCoolerHidService>();
+                            if (flydigiService != null)
+                            {
+                                try
+                                {
+                                    // If the service still thinks it's connected, the HID link
+                                    // may be stale after hibernate — reconnect.
+                                    if (flydigiService.IsConnected)
+                                    {
+                                        Debug.WriteLine("[Flydigi] Resuming from sleep - disconnecting stale HID link");
+                                        flydigiService.DisconnectAsync();
+                                        Task.Delay(500).Wait();
+                                    }
+
+                                    flydigiService.ResumeBackgroundServices();
+                                    Debug.WriteLine("[Flydigi] Background services resumed after system resume");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"[Flydigi] Resume failed: {ex.Message}");
+                                }
+                            }
+
+                            // Resume BS1 cooler (BLE) background services.
+                            var bs1Service = App.GetService<FlydigiCoolerBleService>();
+                            if (bs1Service != null)
+                            {
+                                try
+                                {
+                                    if (bs1Service.IsConnected)
+                                    {
+                                        Debug.WriteLine("[BS1] Resuming from sleep - disconnecting zombie BLE link");
+                                        bs1Service.DisconnectAsync();
+                                        await Task.Delay(500);
+                                    }
+
+                                    bs1Service.ResumeBackgroundServices();
+                                    Debug.WriteLine("[BS1] Background services resumed after system resume");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"[BS1] Resume failed: {ex.Message}");
+                                }
                             }
                         }
                         catch (Exception ex)

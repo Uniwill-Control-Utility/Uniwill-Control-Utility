@@ -3511,5 +3511,75 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             return ((uint)((ccd << 8) | core) << 20) | (uint)offset20;
         }
+
+        /// <summary>
+        /// Resets all diff-tracking variables so the next update() tick will
+        /// force-apply everything. Call after system resume from sleep/hibernation
+        /// because the hardware reverts to BIOS defaults while our cached values
+        /// still believe they're applied.
+        /// </summary>
+        public void InvalidateAllLastValues()
+        {
+            ResetGpuLastValues();
+            // Reset CPU last values
+            lastCpuSustained = 0;
+            lastCpuBoost = 0;
+            lastCpuTjMax = 0;
+            lastCpuCoUnified = true;
+            lastCpuCoUnifiedValue = 0;
+            lastCpuCoCcd0 = 0;
+            lastCpuCoCcd1 = 0;
+            lastCpuPl1 = 0;
+            lastCpuPl2 = 0;
+            lastCpuUndervolt = 0;
+            // Reset watercooler last values
+            lastWcPump = PumpVoltage.Off;
+            lastWcFan = FanSpeed.Off;
+            lastWcRgbMode = RgbState.Off;
+            lastWcRgbColor = RgbColor.Red;
+            // Reset BS2 Pro last values
+            lastBs2ProFanModeText = string.Empty;
+            lastBs2ProGear = null;
+            lastBs2ProRpm = null;
+            lastBs2ProRgbMode = string.Empty;
+            lastBs2ProRgbR = 0;
+            lastBs2ProRgbG = 0;
+            lastBs2ProRgbB = 0;
+            lastBs2ProBrightness = 0;
+            lastBs2ProSpeed = "Medium";
+            // Reset keyboard last values
+            lastKbPerKeyMode = false;
+            lastKbBrightness = 0;
+            lastKbEffectMode = string.Empty;
+            lastKbEffectSpeed = 0;
+            lastKbColorR = 0;
+            lastKbColorG = 0;
+            lastKbColorB = 0;
+            lastKbMultiColors = string.Empty;
+            lastKbDirection = string.Empty;
+            // Reset light bar last values
+            lastLbPower = false;
+            lastLbColorR = 0;
+            lastLbColorG = 0;
+            lastLbColorB = 0;
+            lastLbBrightness = 0;
+            lastLbEffect = 0;
+            lastLbSpeed = 0;
+            // Reset EC fan last values
+            lastEcFanUnifiedMode = false;
+            lastEcFanPreset = string.Empty;
+            lastEcFanCpuPreset = string.Empty;
+            lastEcFanGpuPreset = string.Empty;
+        }
+
+        private void ResetGpuLastValues()
+        {
+            lastGpuTgp = 0;
+            lastGpuDynamicBoost = false;
+            lastGpuDbOffset = 0;
+            lastGpuCoreClock = 0;
+            lastGpuMemClock = 0;
+            lastGpuVfCurveCount = -1;
+        }
     }
 }
