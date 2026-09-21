@@ -335,13 +335,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                             CpuPl1 = 45,
                             CpuPl2 = 60,
                             CpuUndervolt = 0,
-                            // GPU defaults
-                            GpuTgp = 150,
-                            GpuDynamicBoost = false,
-                            GpuDbOffset = 5,
-                            GpuCoreClock = 0,
-                            GpuMemClock = 0,
-                            GpuVfCurveName = string.Empty,
+                            // GPU defaults — mode-aware (GpuNormal and GpuBoost are auto-initialized by the model)
                             // Light Bar defaults
                             LbEnabled = false,
                             LbPower = true,
@@ -632,6 +626,36 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Hide Dynamic Boost controls when GPU Power Boost is ON
                 bool dbVisible = !boostEnabled;
                 AdpDynamicBoostPanel.Visibility = dbVisible ? Visibility.Visible : Visibility.Collapsed;
+
+                // Update bottom bar boost indicator
+                UpdateAdpPresetModeLabel(boostEnabled);
+            }
+        }
+
+        /// <summary>
+        /// Updates the preset mode label in the bottom bar and the boost accent stroke.
+        /// </summary>
+        private void UpdateAdpPresetModeLabel(bool boostEnabled)
+        {
+            if (lblAdpPresetMode != null)
+            {
+                lblAdpPresetMode.Text = boostEnabled ? "GPU Boost ON" : "";
+                lblAdpPresetMode.Visibility = boostEnabled ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            // Show/hide bottom bar accent stroke
+            if (AdpBottomBar != null)
+            {
+                if (boostEnabled)
+                {
+                    AdpBottomBar.BorderBrush = (System.Windows.Media.Brush)FindResource("AccentFillColorDefaultBrush");
+                    AdpBottomBar.BorderThickness = new Thickness(0, 0, 0, 2);
+                }
+                else
+                {
+                    AdpBottomBar.BorderBrush = null;
+                    AdpBottomBar.BorderThickness = new Thickness(0);
+                }
             }
         }
 
@@ -788,19 +812,44 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (sdGpuSettings.Visibility == Visibility.Visible)
             {
-                AdpSdNvPower.Value = Math.Clamp(preset.GpuTgp, 0, NvTuning.MaxPowerLimitWatts);
-                AdpTogDynamicBoost.IsChecked = preset.GpuDynamicBoost;
-                AdpSdNvDbOffset.Value = Math.Clamp(preset.GpuDbOffset, 0, 25);
-                AdpSdNvCore.Value = Math.Clamp(preset.GpuCoreClock, -1000, 1000);
-                AdpSdNvMem.Value = Math.Clamp(preset.GpuMemClock, -1000, 2000);
+                var gpu = GetActiveGpuSettings(preset);
+                AdpSdNvPower.Value = Math.Clamp(gpu.Tgp, 0, NvTuning.MaxPowerLimitWatts);
+                AdpTogDynamicBoost.IsChecked = gpu.DynamicBoost;
+                AdpSdNvDbOffset.Value = Math.Clamp(gpu.DbOffset, 0, 25);
+                AdpSdNvCore.Value = Math.Clamp(gpu.CoreClock, -1000, 1000);
+                AdpSdNvMem.Value = Math.Clamp(gpu.MemClock, -1000, 3000);
                 // Show/hide Dynamic Boost offset based on toggle
-                AdpSpNvDbOffset.Visibility = preset.GpuDynamicBoost ? Visibility.Visible : Visibility.Collapsed;
+                AdpSpNvDbOffset.Visibility = gpu.DynamicBoost ? Visibility.Visible : Visibility.Collapsed;
                 // Reset user-touched flag when loading preset — start fresh
                 _adpUserTouchedCoreSlider = false;
-                // Gap 4: Track which curve this profile wants (apply deferred to update() loop)
-                _adpActiveCurveName = preset.GpuVfCurveName;
+                // Gap 4: Load per-game V-F curve offsets
+                _adpVfCurveOffsets = new Dictionary<int, int>(gpu.VfCurveOffsets);
                 updateAdpCoreLabel();
             }
+        }
+
+        /// <summary>
+        /// Returns the GPU settings for the currently active mode (Normal or Boost).
+        /// </summary>
+        private static AdaptiveGpuSettings GetActiveGpuSettings(AdaptivePreset preset)
+        {
+            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+            return boostEnabled ? preset.GpuBoost : preset.GpuNormal;
+        }
+
+        /// <summary>
+        /// Captures the current UI GPU slider values into the active mode's settings.
+        /// </summary>
+        private void CaptureGpuToPreset(AdaptivePreset preset)
+        {
+            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+            var gpu = boostEnabled ? preset.GpuBoost : preset.GpuNormal;
+            gpu.Tgp = (int)AdpSdNvPower.Value;
+            gpu.DynamicBoost = AdpTogDynamicBoost.IsChecked == true;
+            gpu.DbOffset = (int)AdpSdNvDbOffset.Value;
+            gpu.CoreClock = (int)AdpSdNvCore.Value;
+            gpu.MemClock = (int)AdpSdNvMem.Value;
+            gpu.VfCurveOffsets = new Dictionary<int, int>(_adpVfCurveOffsets);
         }
 
         private void LoadLightBarToUI(AdaptivePreset preset)
@@ -895,7 +944,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             lastGpuDbOffset = 0;
             lastGpuCoreClock = 0;
             lastGpuMemClock = 0;
-            lastGpuVfCurveName = string.Empty;
+            lastGpuVfCurveCount = -1;
 
             // Light Bar tracking
             lastLbPower = false;
@@ -958,6 +1007,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             try
             {
+                // Load existing preset to preserve the other mode's GPU settings
+                AdaptivePreset? existing = adaptivePresetManager.GetPreset(presetName);
+
                 AdaptivePreset preset = new AdaptivePreset
                 {
                     WcEnabled = cbxWcEnabled.IsChecked ?? false,
@@ -1017,15 +1069,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                     CpuPl1 = (int)AdpSdIntelPl1.Value,
                     CpuPl2 = (int)AdpSdIntelPl2.Value,
                     CpuUndervolt = (int)AdpSdIntelUndervolt.Value,
-                    // GPU
+                    // GPU — enabled flag only; mode-specific settings captured below
                     GpuEnabled = sdGpuSettings.Visibility == Visibility.Visible && (cbxGpuEnabled.IsChecked ?? false),
-                    GpuTgp = (int)AdpSdNvPower.Value,
-                    GpuDynamicBoost = AdpTogDynamicBoost.IsChecked == true,
-                    GpuDbOffset = (int)AdpSdNvDbOffset.Value,
-                    GpuCoreClock = (int)AdpSdNvCore.Value,
-                    GpuMemClock = (int)AdpSdNvMem.Value,
-                    // Gap 4: Save GPU V-F curve preset name per-game
-                    GpuVfCurveName = GetActiveVfCurveName(),
+                    // Preserve both mode variants from existing preset, then overwrite the active one
+                    GpuNormal = existing?.GpuNormal ?? new AdaptiveGpuSettings(),
+                    GpuBoost = existing?.GpuBoost ?? new AdaptiveGpuSettings(boostDefaults: true),
                     // Light Bar
                     LbEnabled = sdLightBar.Visibility == Visibility.Visible && (cbxLbEnabled.IsChecked ?? false),
                     LbPower = AdpTsLightBarPower.IsChecked == true,
@@ -1036,6 +1084,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                     LbEffect = AdpLbEffect.SelectedIndex,
                     LbSpeed = (int)AdpLbSpeedSlider.Value
                 };
+
+                // Capture current UI GPU values into the active mode's settings
+                if (sdGpuSettings.Visibility == Visibility.Visible)
+                    CaptureGpuToPreset(preset);
+
                 adaptivePresetManager.SavePreset(presetName, preset);
             }
             catch (Exception ex)
@@ -1251,7 +1304,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private int lastGpuDbOffset = 0;
         private int lastGpuCoreClock = 0;
         private int lastGpuMemClock = 0;
-        private string lastGpuVfCurveName = string.Empty;
+        private int lastGpuVfCurveCount = -1;
         // Light Bar diff-tracking
         private bool lastLbPower = false;
         private byte lastLbColorR = 0;
@@ -1264,8 +1317,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         private Views.Windows.VfCurveEditorWindow? _vfEditorWindow;
         // True when user manually changes the core clock slider — curve label is suppressed
         private bool _adpUserTouchedCoreSlider;
-        // Name of the V-F curve loaded by the current per-game profile (empty = no curve)
-        private string _adpActiveCurveName = string.Empty;
+        // Per-game V-F curve offsets: pointIndex → frequencyOffsetMHz
+        private Dictionary<int, int> _adpVfCurveOffsets = new();
         // KeyboardHidService for Light Bar control
         private KeyboardHidService? _hidService;
         private SemaphoreSlim _updateSemaphore = new(1, 1);
@@ -1735,10 +1788,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             // Apply V-F curve if it changed (only when Adaptive Mode running + GPU enabled)
-            if (_adpActiveCurveName != lastGpuVfCurveName)
+            int curveCount = _adpVfCurveOffsets.Count;
+            if (curveCount != lastGpuVfCurveCount)
             {
                 ApplyActiveVfCurveToGpu();
-                lastGpuVfCurveName = _adpActiveCurveName;
+                lastGpuVfCurveCount = curveCount;
             }
         }
 
@@ -1824,8 +1878,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Refresh CPU voltage control visibility so setting changes from Settings page take effect
             UpdateAdpCpuUI();
 
-            // Apply dynamic power limit max to SPL/FPL sliders based on CPU SKU
+            // Refresh GPU clock control visibility so setting changes from Settings page take effect
+            AdpGpuClockControlsPanel.Visibility = Settings.Default.EnableGpuClockControl
+                ? Visibility.Visible : Visibility.Collapsed;
+
+            // Apply dynamic power limit max and update GPU boost indicator
             ApplyAdpPowerLimitMax();
+
+            // Update bottom bar boost mode label
+            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+            UpdateAdpPresetModeLabel(boostEnabled);
 
             // Defer preset loading to after the first frame renders so the page
             // appears immediately and control updates happen in a second pass.
@@ -3140,7 +3202,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 lastGpuDbOffset = 0;
                 lastGpuCoreClock = 0;
                 lastGpuMemClock = 0;
-                lastGpuVfCurveName = string.Empty;
+                lastGpuVfCurveCount = -1;
             }
         }
 
@@ -3192,26 +3254,24 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
             }
 
-            // Reload presets from disk — editor auto-saves independently
-            var presets = Uniwill_Control_Utility.Models.VfCurvePresetStore.Load();
-
-            // Find active preset (first with changes)
-            Dictionary<int, int>? offsets = null;
-            foreach (var preset in presets)
-            {
-                if (!string.IsNullOrEmpty(preset.Name) && preset.HasChanges)
-                {
-                    offsets = preset.Offsets;
-                    break;
-                }
-            }
+            // Load per-game curve offsets
+            var offsets = _adpVfCurveOffsets.Count > 0 ? new Dictionary<int, int>(_adpVfCurveOffsets) : null;
 
             // Open non-modal curve editor window
             _vfEditorWindow = new Views.Windows.VfCurveEditorWindow(offsets);
             _vfEditorWindow.Owner = Application.Current.MainWindow;
-            _vfEditorWindow.Closed += (_, _) => _vfEditorWindow = null;
+            _vfEditorWindow.Closed += (_, _) =>
+            {
+                // Capture current offsets from editor back to per-game profile before closing
+                _adpVfCurveOffsets = new Dictionary<int, int>(_vfEditorWindow!.GetOffsets());
+                _vfEditorWindow = null;
+                _adpUserTouchedCoreSlider = false;
+                updateAdpCoreLabel();
+            };
             _vfEditorWindow.CurveChanged += (_, _) =>
             {
+                // Capture live offsets from editor to per-game profile
+                _adpVfCurveOffsets = new Dictionary<int, int>(_vfEditorWindow!.GetOffsets());
                 _adpUserTouchedCoreSlider = false; // User went back to curve — reclaim from slider
                 updateAdpCoreLabel();
                 // Only apply to hardware if Adaptive Mode is running AND GPU Settings is enabled
@@ -3342,24 +3402,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         #region Per-game profile helpers (gaps)
 
         /// <summary>True when the currently loaded per-game profile has a V-F curve with changes.</summary>
-        private bool AdpVfCurveActive
-        {
-            get
-            {
-                if (string.IsNullOrEmpty(_adpActiveCurveName))
-                    return false;
-                try
-                {
-                    var presets = Uniwill_Control_Utility.Models.VfCurvePresetStore.Load();
-                    var target = presets.FirstOrDefault(p => p.Name == _adpActiveCurveName);
-                    return target != null && target.HasChanges;
-                }
-                catch
-                {
-                    return false;
-                }
-            }
-        }
+        private bool AdpVfCurveActive => _adpVfCurveOffsets.Count > 0;
 
         /// <summary>Updates the core clock label to show "Curve" when active, or slider value otherwise.</summary>
         private void updateAdpCoreLabel()
@@ -3369,17 +3412,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                 : $"{AdpSdNvCore.Value:F0} MHz";
         }
 
-        /// <summary>Applies the active V-F curve preset to the GPU hardware. Used by Adaptive page (no Apply button).</summary>
+        /// <summary>Applies the active per-game V-F curve to the GPU hardware. Used by Adaptive page (no Apply button).</summary>
         private void ApplyActiveVfCurveToGpu()
         {
             try
             {
-                if (string.IsNullOrEmpty(_adpActiveCurveName))
-                    return;
-
-                var presets = Uniwill_Control_Utility.Models.VfCurvePresetStore.Load();
-                var target = presets.FirstOrDefault(p => p.Name == _adpActiveCurveName);
-                if (target == null || !target.HasChanges)
+                if (_adpVfCurveOffsets.Count == 0)
                     return;
 
                 // Apply EC power limit BEFORE the curve write (same as Presets page).
@@ -3390,7 +3428,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 int dbOffset = dbEnabled ? (int)AdpSdNvDbOffset.Value : 0;
                 NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
 
-                NvTuning.ApplyVfCurveOffsets_ClockBoostTable(target.Offsets);
+                NvTuning.ApplyVfCurveOffsets_ClockBoostTable(_adpVfCurveOffsets);
 
                 // Re-apply power limit after in case the driver overrides the EC ceiling.
                 NvTuning.SetPowerLimit(tgp + dbOffset, dbOffset);
@@ -3467,26 +3505,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        /// <summary>Gap 4: Returns the name of the currently active V-F curve preset, or empty string if none.</summary>
-        private static string GetActiveVfCurveName()
-        {
-            try
-            {
-                var presets = Uniwill_Control_Utility.Models.VfCurvePresetStore.Load();
-                foreach (var preset in presets)
-                {
-                    if (!string.IsNullOrEmpty(preset.Name) && preset.HasChanges)
-                        return preset.Name;
-                }
-            }
-            catch (Exception ex)
-            {
-                DiagnosticLogger.LogError(ex, "Failed to get active V-F curve name");
-            }
-            return string.Empty;
-        }
-
-        #endregion
+     #endregion
 
         private static uint BuildCoperArg(int ccd, int core, int offset20)
         {

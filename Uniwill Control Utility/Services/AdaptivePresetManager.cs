@@ -75,14 +75,10 @@ namespace Uniwill_Control_Utility.Services
         public int CpuPl2 { get; set; } = 60;          // 5-400W (Intel only)
         public int CpuUndervolt { get; set; } = 0;     // -150 to 0 (Intel only)
 
-        // GPU per-game settings (Presets-style)
+        // GPU per-game settings (Presets-style) ? mode-aware
         public bool GpuEnabled { get; set; } = false;
-        public int GpuTgp { get; set; } = 150;         // 0-150W
-        public bool GpuDynamicBoost { get; set; } = false;
-        public int GpuDbOffset { get; set; } = 5;      // 0-25W
-        public int GpuCoreClock { get; set; } = 0;     // -1000 to 1000 MHz
-        public int GpuMemClock { get; set; } = 0;      // -1000 to 2000 MHz
-        public string GpuVfCurveName { get; set; } = string.Empty; // Active V-F curve preset name (slot 1-5)
+        public AdaptiveGpuSettings GpuNormal { get; set; } = new();
+        public AdaptiveGpuSettings GpuBoost { get; set; } = new(boostDefaults: true);
 
 
         // Light Bar per-game settings
@@ -98,6 +94,34 @@ namespace Uniwill_Control_Utility.Services
         [DefaultValue(true)]
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]
         public bool isAutoSwitch { get; set; }
+    }
+
+    /// <summary>
+    /// GPU settings for a single mode (Normal or Boost) within an adaptive per-game profile.
+    /// </summary>
+    public class AdaptiveGpuSettings
+    {
+        public int Tgp { get; set; } = 150;            // 0-150W (Normal) / 0-250W (Boost)
+        public bool DynamicBoost { get; set; } = false;
+        public int DbOffset { get; set; } = 5;         // 0-25W
+        public int CoreClock { get; set; } = 0;        // -1000 to 1000 MHz
+        public int MemClock { get; set; } = 0;         // -1000 to 3000 MHz
+
+        /// <summary>
+        /// Per-game V-F curve offsets: pointIndex ? frequencyOffsetMHz.
+        /// Stores true per-profile curve data (not a reference to a global preset).
+        /// </summary>
+        public Dictionary<int, int> VfCurveOffsets { get; set; } = new();
+
+        /// <summary>
+        /// Constructs a new instance. When <paramref name="boostDefaults"/> is true,
+        /// the Tgp defaults to 200W (typical Boost-mode starting point).
+        /// </summary>
+        public AdaptiveGpuSettings(bool boostDefaults = false)
+        {
+            if (boostDefaults)
+                Tgp = 200;
+        }
     }
 
     public class AdaptivePresetManager
@@ -139,13 +163,90 @@ namespace Uniwill_Control_Utility.Services
             if (File.Exists(_filePath))
             {
                 string json = File.ReadAllText(_filePath, Encoding.UTF8);
-                _presets = JsonConvert.DeserializeObject<Dictionary<string, AdaptivePreset>>(json)
+                string migrated = MigrateGpuFieldsToJson(json);
+                _presets = JsonConvert.DeserializeObject<Dictionary<string, AdaptivePreset>>(migrated)
                     ?? new Dictionary<string, AdaptivePreset>();
+
+                // If migration rewrites happened, persist the new format back to disk
+                if (migrated != json)
+                    SavePresets();
             }
             else
             {
                 _presets = new Dictionary<string, AdaptivePreset>();
             }
+        }
+
+        /// <summary>
+        /// Migrates old flat GPU fields (GpuTgp, GpuDynamicBoost, etc.) to the new
+        /// mode-aware GpuNormal/GpuBoost structure in the raw JSON before deserialization.
+        /// </summary>
+        private static string MigrateGpuFieldsToJson(string json)
+        {
+            // Quick check: if the JSON already has GpuNormal, it's already migrated
+            if (json.Contains("\"GpuNormal\""))
+                return json;
+
+            // Check if there are any old-format GPU fields to migrate
+            if (!json.Contains("\"GpuTgp\""))
+                return json;
+
+            var tokens = JsonConvert.DeserializeObject<Newtonsoft.Json.Linq.JObject>(json);
+            if (tokens == null)
+                return json;
+
+            bool changed = false;
+
+            foreach (var property in tokens.Properties())
+            {
+                var preset = property.Value as Newtonsoft.Json.Linq.JObject;
+                if (preset == null)
+                    continue;
+
+                var gpuTgp = preset["GpuTgp"];
+                if (gpuTgp == null)
+                    continue;
+
+                // Build GpuNormal from old flat fields - migrate VfCurveName to empty VfCurveOffsets dict
+                var gpuNormal = new Newtonsoft.Json.Linq.JObject
+                {
+                    ["Tgp"] = preset["GpuTgp"] ?? new Newtonsoft.Json.Linq.JValue(150),
+                    ["DynamicBoost"] = preset["GpuDynamicBoost"] ?? false,
+                    ["DbOffset"] = preset["GpuDbOffset"] ?? 5,
+                    ["CoreClock"] = preset["GpuCoreClock"] ?? 0,
+                    ["MemClock"] = preset["GpuMemClock"] ?? 0,
+                    ["VfCurveOffsets"] = new Newtonsoft.Json.Linq.JObject()
+                };
+
+                // GpuBoost starts with defaults (Tgp=200, no DB)
+                var gpuBoost = new Newtonsoft.Json.Linq.JObject
+                {
+                    ["Tgp"] = new Newtonsoft.Json.Linq.JValue(200),
+                    ["DynamicBoost"] = false,
+                    ["DbOffset"] = new Newtonsoft.Json.Linq.JValue(0),
+                    ["CoreClock"] = new Newtonsoft.Json.Linq.JValue(0),
+                    ["MemClock"] = new Newtonsoft.Json.Linq.JValue(0),
+                    ["VfCurveOffsets"] = new Newtonsoft.Json.Linq.JObject()
+                };
+
+                // Remove old flat fields
+                preset.Remove("GpuTgp");
+                preset.Remove("GpuDynamicBoost");
+                preset.Remove("GpuDbOffset");
+                preset.Remove("GpuCoreClock");
+                preset.Remove("GpuMemClock");
+                preset.Remove("GpuVfCurveName");
+
+                // Add new mode-aware fields
+                preset["GpuNormal"] = gpuNormal;
+                preset["GpuBoost"] = gpuBoost;
+                changed = true;
+            }
+
+            if (!changed)
+                return json;
+
+            return JsonConvert.SerializeObject(tokens, Newtonsoft.Json.Formatting.Indented);
         }
 
 

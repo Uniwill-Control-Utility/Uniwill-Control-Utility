@@ -18,6 +18,9 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// <summary> Fired when the curve changes (auto-save). Allows the owner page to refresh labels. </summary>
         public event EventHandler? CurveChanged;
 
+        /// <summary> Returns the current V-F curve offsets from the editor. </summary>
+        public Dictionary<int, int> GetOffsets() => _editor.GetOffsets();
+
         private readonly int _activePresetSlot;
         private readonly Models.PresetMode _presetMode;
 
