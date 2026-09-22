@@ -716,7 +716,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 Debug.WriteLine($"[Resume] Battery re-apply failed: {ex.Message}");
                             }
 
-                            // Re-apply Fan Control EC duties
+                            // Re-apply Fan Control EC duties or restart Smart Fan Mode
                             try
                             {
                                 var ecService = App.GetService<UniwillECService>();
@@ -737,10 +737,31 @@ namespace Uniwill_Control_Utility.Views.Windows
                                         gpuCurve = GetFanPresetCurve(fanSettings.GpuPreset);
                                     }
 
-                                    ecService.ApplyFanCurve(cpuCurve, gpuCurve,
-                                        fanSettings.CpuTempThresholds ?? EcFanCurve.CpuTemperatures,
-                                        fanSettings.GpuTempThresholds ?? EcFanCurve.GpuTemperatures);
-                                    Debug.WriteLine("[Resume] Fan Control EC duties re-applied");
+                                    var cpuTemps = fanSettings.UnifiedMode
+                                        ? (fanSettings.UnifiedTempThresholds ?? EcFanCurve.CpuTemperatures)
+                                        : (fanSettings.CpuTempThresholds ?? EcFanCurve.CpuTemperatures);
+                                    var gpuTemps = fanSettings.UnifiedMode
+                                        ? cpuTemps
+                                        : (fanSettings.GpuTempThresholds ?? EcFanCurve.GpuTemperatures);
+
+                                    if (fanSettings.EcSmartFanMode)
+                                    {
+                                        // Restart Smart Fan Mode after resume
+                                        var tempProvider = new Models.FlydigiTemperatureProvider();
+                                        var smartFan = Uniwill_Control_Utility.Services.EcSmartFanControl.Recreate(
+                                            ecService,
+                                            tempProvider,
+                                            fanSettings,
+                                            cpuCurve,
+                                            cpuTemps);
+                                        smartFan.Start();
+                                        Debug.WriteLine("[Resume] Smart Fan Mode re-started");
+                                    }
+                                    else
+                                    {
+                                        ecService.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                                        Debug.WriteLine("[Resume] Fan Control EC duties re-applied");
+                                    }
                                 }
                             }
                             catch (Exception ex)

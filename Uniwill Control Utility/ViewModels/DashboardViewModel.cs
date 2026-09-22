@@ -324,8 +324,35 @@ namespace Uniwill_Control_Utility.ViewModels
                         ? cpuTemps
                         : (settings.GpuTempThresholds ?? Models.EcFanCurve.GpuTemperatures);
 
-                    _uniwillEc.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
-                    Debug.WriteLine("INFO | DashboardViewModel: Fan curve auto-applied on startup");
+                    // If Smart Fan Mode is enabled, start it instead of applying
+                    // the normal curve — the smart fan loop will write its own
+                    // flat duty tables to the EC on each tick.
+                    if (settings.EcSmartFanMode)
+                    {
+                        try
+                        {
+                            var tempProvider = new Models.FlydigiTemperatureProvider();
+                            var smartFan = Uniwill_Control_Utility.Services.EcSmartFanControl.GetOrCreate(
+                                _uniwillEc,
+                                tempProvider,
+                                settings,
+                                cpuCurve,
+                                cpuTemps);
+                            smartFan.Start();
+                            Debug.WriteLine("INFO | DashboardViewModel: Smart Fan Mode auto-started on startup");
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"WARN | DashboardViewModel: Smart Fan Mode auto-start failed: {ex.Message}");
+                            // Fallback to normal curve apply if smart fan fails
+                            _uniwillEc.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                        }
+                    }
+                    else
+                    {
+                        _uniwillEc.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                        Debug.WriteLine("INFO | DashboardViewModel: Fan curve auto-applied on startup");
+                    }
                 }
                 catch (Exception ex)
                 {

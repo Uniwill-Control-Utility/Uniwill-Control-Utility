@@ -575,6 +575,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tsUnifiedCurve.IsChecked = true;
                 UnifiedCard.IsExpanded = true;
                 SplitCurvePanel.Visibility = Visibility.Collapsed;
+                UnifiedTempsCard.Visibility = Visibility.Visible;
                 SmartFanCard.Visibility = Visibility.Visible;
                 LoadPresetIntoEditor(FanCurveEditor, cbPreset, settings.UnifiedPreset, settings.UnifiedDuties);
             }
@@ -583,6 +584,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tsUnifiedCurve.IsChecked = false;
                 UnifiedCard.IsExpanded = false;
                 SplitCurvePanel.Visibility = Visibility.Visible;
+                UnifiedTempsCard.Visibility = Visibility.Collapsed;
                 SmartFanCard.Visibility = Visibility.Collapsed;
                 LoadPresetIntoEditor(CpuFanCurveEditor, cbCpuPreset, settings.CpuPreset, settings.CpuDuties);
                 LoadPresetIntoEditor(GpuFanCurveEditor, cbGpuPreset, settings.GpuPreset, settings.GpuDuties);
@@ -954,9 +956,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Load unified preset into the unified editor
                 LoadPresetIntoEditor(FanCurveEditor, cbPreset, settings.UnifiedPreset, settings.UnifiedDuties);
 
-                // Expand the card, hide split panel, show smart fan card
+                // Expand the card, hide split panel, show unified temps and smart fan card
                 UnifiedCard.IsExpanded = true;
                 SplitCurvePanel.Visibility = Visibility.Collapsed;
+                UnifiedTempsCard.Visibility = Visibility.Visible;
                 SmartFanCard.Visibility = Visibility.Visible;
             }
             finally
@@ -1004,9 +1007,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 LoadPresetIntoEditor(CpuFanCurveEditor, cbCpuPreset, settings.CpuPreset, settings.CpuDuties);
                 LoadPresetIntoEditor(GpuFanCurveEditor, cbGpuPreset, settings.GpuPreset, settings.GpuDuties);
 
-                // Collapse the card, show split panel, hide smart fan card
+                // Collapse the card, show split panel, hide unified temps and smart fan card
                 UnifiedCard.IsExpanded = false;
                 SplitCurvePanel.Visibility = Visibility.Visible;
+                UnifiedTempsCard.Visibility = Visibility.Collapsed;
                 SmartFanCard.Visibility = Visibility.Collapsed;
             }
             finally
@@ -1034,6 +1038,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 var cpuCurve = CpuFanCurveEditor.GetCurve();
                 FanCurveEditor.SetCurve(cpuCurve);
                 SplitCurvePanel.Visibility = Visibility.Collapsed;
+                UnifiedTempsCard.Visibility = Visibility.Visible;
                 SmartFanCard.Visibility = Visibility.Visible;
             }
         }
@@ -1050,6 +1055,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 var unifiedCurve = FanCurveEditor.GetCurve();
                 CpuFanCurveEditor.SetCurve(unifiedCurve);
                 SplitCurvePanel.Visibility = Visibility.Visible;
+                UnifiedTempsCard.Visibility = Visibility.Collapsed;
                 SmartFanCard.Visibility = Visibility.Collapsed;
             }
         }
@@ -1394,19 +1400,26 @@ namespace Uniwill_Control_Utility.Views.Pages
             settings.EcSmartFanMode = true;
             FanControlSettingsService.Save(settings);
 
-            // Create and start the smart fan control if not already running
-            if (_smartFanControl == null)
-            {
-                _smartFanTempProvider = new FlydigiTemperatureProvider();
-                var curve = GetActiveCurve();
-                var temps = GetActiveTemperatures();
-                _smartFanControl = new EcSmartFanControl(
-                    _uniwillEc,
-                    _smartFanTempProvider,
-                    settings,
-                    curve,
-                    temps);
+            // Use the app-scoped singleton — may already be running from
+            // DashboardViewModel startup or MainWindow resume.
+            var curve = GetActiveCurve();
+            var temps = GetActiveTemperatures();
 
+            // If no provider yet, create one (needed for first call to GetOrCreate)
+            if (_smartFanTempProvider == null)
+                _smartFanTempProvider = new FlydigiTemperatureProvider();
+
+            _smartFanControl = EcSmartFanControl.GetOrCreate(
+                _uniwillEc,
+                _smartFanTempProvider,
+                settings,
+                curve,
+                temps);
+
+            // Subscribe to temperature updates (safe to add multiple times,
+            // but we only want one subscription per page lifetime)
+            if (!_smartFanControl.HasTemperatureSubscribers)
+            {
                 _smartFanControl.TemperatureUpdated += (s, ev) =>
                 {
                     Dispatcher.Invoke(() =>
@@ -1417,7 +1430,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 };
             }
 
-            // Update curve and settings
+            // Update curve and settings, then start (idempotent if already running)
             _smartFanControl.UpdateCurve(GetActiveCurve(), GetActiveTemperatures());
             _smartFanControl.UpdateSettings(settings);
             _smartFanControl.Start();
@@ -1440,8 +1453,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             settings.EcSmartFanMode = false;
             FanControlSettingsService.Save(settings);
 
-            // Stop the smart fan control
-            _smartFanControl?.Stop();
+            // Stop the smart fan control loop and clear the singleton
+            EcSmartFanControl.ClearInstance();
+            _smartFanControl = null;
+
+            // Re-apply the normal fan curves so the EC stops using the flat
+            // smart fan tables and returns to the user's active curve.
+            ApplyCurveNow();
 
             SetStatusText("Smart Fan Mode disabled");
         }
@@ -1684,18 +1702,23 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Restart Smart Fan Mode if it was active before navigation away.
             if (settings.EcSmartFanMode && _uniwillEc is not null)
             {
-                if (_smartFanControl == null)
-                {
+                // If no provider yet, create one
+                if (_smartFanTempProvider == null)
                     _smartFanTempProvider = new FlydigiTemperatureProvider();
-                    var curve = GetActiveCurve();
-                    var temps = GetActiveTemperatures();
-                    _smartFanControl = new EcSmartFanControl(
-                        _uniwillEc,
-                        _smartFanTempProvider,
-                        settings,
-                        curve,
-                        temps);
 
+                var curve = GetActiveCurve();
+                var temps = GetActiveTemperatures();
+
+                _smartFanControl = EcSmartFanControl.GetOrCreate(
+                    _uniwillEc,
+                    _smartFanTempProvider,
+                    settings,
+                    curve,
+                    temps);
+
+                // Subscribe to temperature updates if not already subscribed
+                if (!_smartFanControl.HasTemperatureSubscribers)
+                {
                     _smartFanControl.TemperatureUpdated += (s, ev) =>
                     {
                         Dispatcher.Invoke(() =>
@@ -1710,9 +1733,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _smartFanControl.UpdateSettings(settings);
                 _smartFanControl.Start();
 
-                // Restore toggle state
+                // Restore toggle state and expand the card
                 _loadingSettings = true;
                 tsSmartFanMode.IsChecked = true;
+                SmartFanCard.IsExpanded = true;
                 _loadingSettings = false;
             }
         }

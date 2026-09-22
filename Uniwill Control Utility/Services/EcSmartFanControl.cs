@@ -21,6 +21,82 @@ namespace Uniwill_Control_Utility.Services
     /// </summary>
     public sealed class EcSmartFanControl : IDisposable
     {
+        /* ------------------------------------------------------------------ */
+        /*  App-scoped singleton — ensures only one control loop runs at a    */
+        /*  time.  DashboardViewModel starts it on app launch, MainWindow     */
+        /*  restarts it on resume, and the FanControl page reuses it.        */
+        /* ------------------------------------------------------------------ */
+
+        private static EcSmartFanControl? _instance;
+        private static readonly object _instanceLock = new();
+
+        /// <summary>
+        /// Returns the current app-scoped instance, or null if not started.
+        /// </summary>
+        public static EcSmartFanControl? CurrentInstance => _instance;
+
+        /// <summary>
+        /// Creates or returns the app-scoped singleton instance.
+        /// If an instance already exists and is active, it updates the curve
+        /// and settings instead of creating a new one.
+        /// </summary>
+        public static EcSmartFanControl GetOrCreate(
+            UniwillECService ec,
+            FlydigiTemperatureProvider temperatureProvider,
+            FanControlSettings settings,
+            EcFanCurve curve,
+            int[] temperatures)
+        {
+            lock (_instanceLock)
+            {
+                if (_instance != null && _instance.IsActive)
+                {
+                    // Instance already running — update curve/settings in place
+                    _instance.UpdateCurve(curve, temperatures);
+                    _instance.UpdateSettings(settings);
+                    return _instance;
+                }
+
+                // Create new instance
+                _instance = new EcSmartFanControl(ec, temperatureProvider, settings, curve, temperatures);
+                return _instance;
+            }
+        }
+
+        /// <summary>
+        /// Stops and clears the app-scoped singleton instance.
+        /// </summary>
+        public static void ClearInstance()
+        {
+            lock (_instanceLock)
+            {
+                if (_instance != null)
+                {
+                    _instance.Stop();
+                    _instance = null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Stops the singleton if it exists, then creates and starts a fresh instance.
+        /// Useful after resume from sleep/hibernation when the EC needs re-initialization.
+        /// </summary>
+        public static EcSmartFanControl Recreate(
+            UniwillECService ec,
+            FlydigiTemperatureProvider temperatureProvider,
+            FanControlSettings settings,
+            EcFanCurve curve,
+            int[] temperatures)
+        {
+            lock (_instanceLock)
+            {
+                _instance?.Stop();
+                _instance = new EcSmartFanControl(ec, temperatureProvider, settings, curve, temperatures);
+                return _instance;
+            }
+        }
+
         private readonly UniwillECService _ec;
         private readonly FlydigiTemperatureProvider _temperatureProvider;
         private Timer? _timer;
@@ -99,6 +175,12 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public event EventHandler<(double? Temp, int? Duty)>? TemperatureUpdated;
 
+        /// <summary>
+        /// Whether any subscriber has registered for TemperatureUpdated.
+        /// Used by callers to avoid duplicate subscriptions on the singleton.
+        /// </summary>
+        public bool HasTemperatureSubscribers => TemperatureUpdated != null;
+
         /* ------------------------------------------------------------------ */
         /*  Constructor                                                        */
         /* ------------------------------------------------------------------ */
@@ -159,12 +241,20 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// Stops the control loop and disposes the timer.
+        /// Also clears the app-scoped singleton so callers know it's stopped.
         /// </summary>
         public void Stop()
         {
             IsActive = false;
             _timer?.Dispose();
             _timer = null;
+
+            // Clear singleton reference so GetOrCreate creates a fresh instance next time
+            lock (_instanceLock)
+            {
+                if (_instance == this)
+                    _instance = null;
+            }
         }
 
         /* ------------------------------------------------------------------ */

@@ -161,44 +161,56 @@
                                 <Border Height="1" Margin="-58,12,-46,12"
         Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                                 <controls:EcFanCurveEditor x:Name="FanCurveEditor" Margin="0,8,4,0" />
+                        </StackPanel>
+                    </ui:CardExpander>
 
-                            <!-- Unified temperature thresholds editor -->
-                            <ui:CardExpander Margin="0,8,0,0"
-                                             Header="Thermal Thresholds"
-                                             IsExpanded="False">
-                                <ui:CardExpander.Icon>
-                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C3;" FontSize="16" Margin="4,0,6,0" />
-                                </ui:CardExpander.Icon>
-                                <StackPanel>
-                                    <TextBlock FontSize="11"
-                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Set the temperature (°C) at which each fan speed zone activates. Index 0 is the OFF threshold."
-                                               TextWrapping="Wrap"
-                                               Margin="0,0,0,8" />
-                                    <UniformGrid x:Name="ugUnifiedTemps"
-                                                 Columns="11" Rows="1"
-                                                 Margin="0,0,0,4">
-                                        <!-- Row of zone labels -->
-                                    </UniformGrid>
-                                    <UniformGrid x:Name="ugUnifiedTempInputs"
-                                                 Columns="11" Rows="1" />
-                                            <ui:Button Margin="0,12,0,0"
-                                                       HorizontalAlignment="Right"
-                                                       Appearance="Transparent"
-                                                       Click="btnResetUnifiedTemps_Click">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" Margin="0,0,4,0" />
-                                                    <TextBlock Text="Reset to Default" />
-                                                </StackPanel>
-                                            </ui:Button>
+                    <!-- Unified temperature thresholds editor (standalone) -->
+                    <ui:CardExpander x:Name="UnifiedTempsCard"
+                                     Margin="0,0,0,8"
+                                     Visibility="Collapsed"
+                                     IsExpanded="False">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C3;" FontSize="20" Margin="6,0,6,0" />
+                        </ui:CardExpander.Icon>
+                            <ui:CardExpander.Header>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <ui:TextBlock FontTypography="Body" Text="Thermal thresholds" />
+                                        <ui:TextBlock FontTypography="Caption"
+                       Text="Set the temperature (°C) at which each fan speed zone activates."
+                       TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    
+                                </Grid>
+                            </ui:CardExpander.Header>
+                            <StackPanel>
+
+                            <UniformGrid x:Name="ugUnifiedTemps"
+                                         Columns="11" Rows="1"
+                                         Margin="0,12,0,12">
+                                <!-- Row of zone labels -->
+                            </UniformGrid>
+                            <UniformGrid x:Name="ugUnifiedTempInputs"
+                                         Columns="11" Rows="1" />
+                            <ui:Button Margin="0,16,0,0"
+                                       HorizontalAlignment="Right"
+                                       Appearance="Transparent"
+                                       Click="btnResetUnifiedTemps_Click">
+                                <StackPanel Orientation="Horizontal">
+                                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7A7;" Margin="0,0,12,0" />
+                                    <TextBlock Text="Reset to Default" />
                                 </StackPanel>
-                            </ui:CardExpander>
+                            </ui:Button>
                         </StackPanel>
                     </ui:CardExpander>
 
                     <!-- Smart Fan Mode toggle with expander (below Unified Fan Curve) -->
                     <ui:CardExpander x:Name="SmartFanCard"
-                                     Margin="0,8,0,0"
+                                     Margin="0,0,0,8"
                                      Visibility="Collapsed"
                                      IsExpanded="False"
                                      Expanded="SmartFanCard_Expanded"
@@ -417,7 +429,7 @@
                                                        Appearance="Transparent"
                                                        Click="btnResetCpuTemps_Click">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" Margin="0,0,4,0" />
+                                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7A7;" Margin="0,0,12,0" />
                                                     <TextBlock Text="Reset to Default" />
                                                 </StackPanel>
                                             </ui:Button>
@@ -446,7 +458,7 @@
                                                        Appearance="Transparent"
                                                        Click="btnResetGpuTemps_Click">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" Margin="0,0,4,0" />
+                                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7A7;" Margin="0,0,12,0" />
                                                     <TextBlock Text="Reset to Default" />
                                                 </StackPanel>
                                             </ui:Button>
@@ -544,7 +556,7 @@
                            Click="btnResetFanState_Click"
                            ToolTip="Force fans to 100% and reset the EC fan controller. Use if fans are stuck or behaving erratically.">
                     <StackPanel Orientation="Horizontal">
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" Margin="0,0,12,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7A7;" Margin="0,0,12,0" />
                         <TextBlock Text="Reset Fan State" />
                     </StackPanel>
                 </ui:Button>
