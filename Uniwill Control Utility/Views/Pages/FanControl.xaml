@@ -90,7 +90,8 @@
                                 </Style>
                             </ui:InfoBar.Resources>
                         </ui:InfoBar>
-                        <!-- Unified curve toggle with expander -->
+
+                    <!-- Unified curve toggle with expander -->
                     <ui:CardExpander x:Name="UnifiedCard"
                                      Margin="0,0,0,8"
                                      IsExpanded="False"
@@ -192,6 +193,70 @@
                                             </ui:Button>
                                 </StackPanel>
                             </ui:CardExpander>
+                        </StackPanel>
+                    </ui:CardExpander>
+
+                    <!-- Smart Fan Mode toggle with expander (below Unified Fan Curve) -->
+                    <ui:CardExpander x:Name="SmartFanCard"
+                                     Margin="0,8,0,0"
+                                     Visibility="Collapsed"
+                                     IsExpanded="False"
+                                     Expanded="SmartFanCard_Expanded"
+                                     Collapsed="SmartFanCard_Collapsed"
+                                     Loaded="SmartFanCard_Loaded">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7EC;" FontSize="20" Margin="4,0,6,0"/>
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <ui:TextBlock FontTypography="Body" Text="Smart Fan Mode" />
+                                    <ui:TextBlock FontTypography="Caption"
+                                               Text="Both fans react to a single temperature source."
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="tsSmartFanMode"
+                                                 Grid.Column="1"
+                                                 Margin="0,0,9,0"
+                                                 IsChecked="False"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="tsSmartFanMode_Checked"
+                                                 Unchecked="tsSmartFanMode_Unchecked" />
+                            </Grid>
+                        </ui:CardExpander.Header>
+
+                        <!-- Smart Fan Mode content (expander body) -->
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Temperature Source" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Select which sensor drives both fans." />
+                                </StackPanel>
+                                <ComboBox x:Name="cbxSmartFanTempSource"
+                                          Grid.Column="1"
+                                          Width="120"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          FontSize="12"
+                                          SelectionChanged="cbxSmartFanTempSource_SelectionChanged">
+                                    <ComboBoxItem Content="Max" />
+                                    <ComboBoxItem Content="CPU" />
+                                    <ComboBoxItem Content="GPU" />
+                                </ComboBox>
+                            </Grid>
                         </StackPanel>
                     </ui:CardExpander>
 

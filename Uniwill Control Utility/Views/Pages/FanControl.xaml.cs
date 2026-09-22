@@ -31,6 +31,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         private System.Timers.Timer? _applyDebounceTimer;
         private Wpf.Ui.Controls.Snackbar? _adaptiveSnackbar;
 
+        // Smart Fan Mode (cross-sensor polling loop)
+        private EcSmartFanControl? _smartFanControl;
+        private FlydigiTemperatureProvider? _smartFanTempProvider;
+
         // Concurrency: serialize all EC access to prevent AccessViolationException
         // from concurrent native I/O on the same handle.
         private readonly SemaphoreSlim _ecSemaphore = new(1, 1);
@@ -61,18 +65,21 @@ namespace Uniwill_Control_Utility.Views.Pages
                 UpdateBanner();
                 SaveCurrentSettings();
                 ScheduleAutoApply();
+                UpdateSmartFanCurve();
             };
             CpuFanCurveEditor.CurveChanged += (s, e) =>
             {
                 UpdateBanner();
                 SaveCurrentSettings();
                 ScheduleAutoApply();
+                UpdateSmartFanCurve();
             };
-            GpuFanCurveEditor.CurveChanged += (s, e) =>
+           GpuFanCurveEditor.CurveChanged += (s, e) =>
             {
                 UpdateBanner();
                 SaveCurrentSettings();
                 ScheduleAutoApply();
+                UpdateSmartFanCurve();
             };
 
             // Update banner when Flydigi connection state changes (affects cooler name)
@@ -259,6 +266,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
 
                 UpdateBanner();
+                // Update smart fan control with the new curve
+                UpdateSmartFanCurve();
             }
             finally
             {
@@ -566,6 +575,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tsUnifiedCurve.IsChecked = true;
                 UnifiedCard.IsExpanded = true;
                 SplitCurvePanel.Visibility = Visibility.Collapsed;
+                SmartFanCard.Visibility = Visibility.Visible;
                 LoadPresetIntoEditor(FanCurveEditor, cbPreset, settings.UnifiedPreset, settings.UnifiedDuties);
             }
             else
@@ -573,9 +583,19 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tsUnifiedCurve.IsChecked = false;
                 UnifiedCard.IsExpanded = false;
                 SplitCurvePanel.Visibility = Visibility.Visible;
+                SmartFanCard.Visibility = Visibility.Collapsed;
                 LoadPresetIntoEditor(CpuFanCurveEditor, cbCpuPreset, settings.CpuPreset, settings.CpuDuties);
                 LoadPresetIntoEditor(GpuFanCurveEditor, cbGpuPreset, settings.GpuPreset, settings.GpuDuties);
             }
+
+            // Restore Smart Fan Mode UI state
+            int tempSourceIndex = settings.EcSmartFanTempSource.ToLowerInvariant() switch
+            {
+                "cpu" => 1,
+                "gpu" => 2,
+                _ => 0 // "max"
+            };
+            cbxSmartFanTempSource.SelectedIndex = tempSourceIndex;
         }
 
         private void InitializeTempThresholdInputs()
@@ -803,6 +823,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             settings.GpuTempThresholds = GpuFanCurveEditor.Temperatures;
             settings.UnifiedTempThresholds = FanCurveEditor.Temperatures;
 
+            // Save Smart Fan Mode state
+            settings.EcSmartFanMode = tsSmartFanMode.IsChecked == true;
+            settings.EcSmartFanTempSource = _smartFanControl?.TempSource ?? settings.EcSmartFanTempSource;
+
             FanControlSettingsService.Save(settings);
         }
 
@@ -930,9 +954,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Load unified preset into the unified editor
                 LoadPresetIntoEditor(FanCurveEditor, cbPreset, settings.UnifiedPreset, settings.UnifiedDuties);
 
-                // Expand the card, hide split panel
+                // Expand the card, hide split panel, show smart fan card
                 UnifiedCard.IsExpanded = true;
                 SplitCurvePanel.Visibility = Visibility.Collapsed;
+                SmartFanCard.Visibility = Visibility.Visible;
             }
             finally
             {
@@ -952,6 +977,19 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Skip if triggered by ApplySettings during startup
             if (_loadingSettings) return;
 
+            // Disable Smart Fan Mode if active (requires unified mode)
+            _smartFanControl?.Stop();
+            if (tsSmartFanMode.IsChecked == true)
+            {
+                _loadingSettings = true;
+                tsSmartFanMode.IsChecked = false;
+                _loadingSettings = false;
+
+                var smartSettings = FanControlSettingsService.Load();
+                smartSettings.EcSmartFanMode = false;
+                FanControlSettingsService.Save(smartSettings);
+            }
+
             // Read settings once, save unified state, then restore CPU/GPU.
             var settings = FanControlSettingsService.Load();
             settings.UnifiedPreset = GetSelectedPresetName(cbPreset);
@@ -966,9 +1004,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 LoadPresetIntoEditor(CpuFanCurveEditor, cbCpuPreset, settings.CpuPreset, settings.CpuDuties);
                 LoadPresetIntoEditor(GpuFanCurveEditor, cbGpuPreset, settings.GpuPreset, settings.GpuDuties);
 
-                // Collapse the card, show split panel
+                // Collapse the card, show split panel, hide smart fan card
                 UnifiedCard.IsExpanded = false;
                 SplitCurvePanel.Visibility = Visibility.Visible;
+                SmartFanCard.Visibility = Visibility.Collapsed;
             }
             finally
             {
@@ -995,6 +1034,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 var cpuCurve = CpuFanCurveEditor.GetCurve();
                 FanCurveEditor.SetCurve(cpuCurve);
                 SplitCurvePanel.Visibility = Visibility.Collapsed;
+                SmartFanCard.Visibility = Visibility.Visible;
             }
         }
 
@@ -1010,6 +1050,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 var unifiedCurve = FanCurveEditor.GetCurve();
                 CpuFanCurveEditor.SetCurve(unifiedCurve);
                 SplitCurvePanel.Visibility = Visibility.Visible;
+                SmartFanCard.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -1028,6 +1069,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 SetStatusText("EC not available");
                 return;
             }
+
+            // Skip static curve apply when Smart Fan Mode is active — the polling
+            // loop manages the EC curve tables and would be overwritten.
+            if (_smartFanControl?.IsActive == true)
+                return;
 
             // Capture the curve data on the UI thread, then send to EC in the background.
             EcFanCurve cpuCurve;
@@ -1180,6 +1226,19 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (_uniwillEc is null) return;
 
+            // Stop smart fan mode if active — turbo and smart fan are mutually exclusive
+            _smartFanControl?.Stop();
+            if (tsSmartFanMode.IsChecked == true)
+            {
+                _loadingSettings = true;
+                tsSmartFanMode.IsChecked = false;
+                _loadingSettings = false;
+
+                var settings = FanControlSettingsService.Load();
+                settings.EcSmartFanMode = false;
+                FanControlSettingsService.Save(settings);
+            }
+
             SetStatusText(LocalizationService.Get("Enabling turbo mode..."));
             SetTurboSwitchColor(true);
 
@@ -1222,6 +1281,41 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void tsTurbo_Unchecked(object sender, RoutedEventArgs e)
         {
             if (_uniwillEc is null) return;
+
+            // Restart smart fan mode if it was active before turbo
+            var settings = FanControlSettingsService.Load();
+            if (settings.EcSmartFanMode)
+            {
+                _loadingSettings = true;
+                tsSmartFanMode.IsChecked = true;
+                _loadingSettings = false;
+
+                if (_smartFanControl == null)
+                {
+                    _smartFanTempProvider = new FlydigiTemperatureProvider();
+                    var curve = GetActiveCurve();
+                    var temps = GetActiveTemperatures();
+                    _smartFanControl = new EcSmartFanControl(
+                        _uniwillEc,
+                        _smartFanTempProvider,
+                        settings,
+                        curve,
+                        temps);
+
+                    _smartFanControl.TemperatureUpdated += (s, ev) =>
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            if (!_isUnloaded && ev.Temp.HasValue && ev.Duty.HasValue)
+                                SetStatusText($"Smart Fan: {ev.Temp.Value:F1}°C ? {Math.Round(ev.Duty.Value * 100.0 / 200.0)}%");
+                        });
+                    };
+                }
+
+                _smartFanControl.UpdateCurve(GetActiveCurve(), GetActiveTemperatures());
+                _smartFanControl.UpdateSettings(settings);
+                _smartFanControl.Start();
+            }
 
             SetStatusText(LocalizationService.Get("Disabling turbo mode..."));
 
@@ -1277,6 +1371,177 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 tsTurbo.Foreground = null; // Reset to theme default
             }
+        }
+
+        #endregion
+
+       #region Smart Fan Mode
+
+        private void tsSmartFanMode_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_uniwillEc is null) return;
+
+            // Skip if triggered by ApplySettings during startup
+            if (_loadingSettings) return;
+
+            // Stop turbo mode if active — smart fan mode and turbo are mutually exclusive
+            if (tsTurbo.IsChecked == true)
+            {
+                tsTurbo.IsChecked = false;
+            }
+
+            var settings = FanControlSettingsService.Load();
+            settings.EcSmartFanMode = true;
+            FanControlSettingsService.Save(settings);
+
+            // Create and start the smart fan control if not already running
+            if (_smartFanControl == null)
+            {
+                _smartFanTempProvider = new FlydigiTemperatureProvider();
+                var curve = GetActiveCurve();
+                var temps = GetActiveTemperatures();
+                _smartFanControl = new EcSmartFanControl(
+                    _uniwillEc,
+                    _smartFanTempProvider,
+                    settings,
+                    curve,
+                    temps);
+
+                _smartFanControl.TemperatureUpdated += (s, ev) =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        if (!_isUnloaded && ev.Temp.HasValue && ev.Duty.HasValue)
+                            SetStatusText($"Smart Fan: {ev.Temp.Value:F1}°C ? {Math.Round(ev.Duty.Value * 100.0 / 200.0)}%");
+                    });
+                };
+            }
+
+            // Update curve and settings
+            _smartFanControl.UpdateCurve(GetActiveCurve(), GetActiveTemperatures());
+            _smartFanControl.UpdateSettings(settings);
+            _smartFanControl.Start();
+
+            // Expand the card
+            SmartFanCard.IsExpanded = true;
+
+            SetStatusText("Smart Fan Mode enabled");
+        }
+
+        private void tsSmartFanMode_Unchecked(object sender, RoutedEventArgs e)
+        {
+            // Skip if triggered by ApplySettings during startup
+            if (_loadingSettings) return;
+
+            // Collapse the card
+            SmartFanCard.IsExpanded = false;
+
+            var settings = FanControlSettingsService.Load();
+            settings.EcSmartFanMode = false;
+            FanControlSettingsService.Save(settings);
+
+            // Stop the smart fan control
+            _smartFanControl?.Stop();
+
+            SetStatusText("Smart Fan Mode disabled");
+        }
+
+        private void cbxSmartFanTempSource_SelectionChanged(object sender, EventArgs e)
+        {
+            if (cbxSmartFanTempSource.SelectedItem is not System.Windows.Controls.ComboBoxItem item)
+                return;
+
+            var source = item.Content?.ToString()?.ToLowerInvariant() switch
+            {
+                "cpu" => "cpu",
+                "gpu" => "gpu",
+                _ => "max"
+            };
+
+            var settings = FanControlSettingsService.Load();
+            settings.EcSmartFanTempSource = source;
+            FanControlSettingsService.Save(settings);
+
+            // Update smart control if active
+            if (_smartFanControl != null)
+            {
+                _smartFanControl.TempSource = source;
+                _smartFanControl.UpdateSettings(settings);
+            }
+        }
+
+        /// <summary>
+        /// If the user clicked the chevron (not the toggle), sync the toggle to match.
+        /// </summary>
+        private void SmartFanCard_Expanded(object sender, RoutedEventArgs e)
+        {
+            if (tsSmartFanMode.IsChecked != true)
+            {
+                tsSmartFanMode.IsChecked = true;
+            }
+        }
+
+        /// <summary>
+        /// If the user clicked the chevron (not the toggle), sync the toggle to match.
+        /// </summary>
+        private void SmartFanCard_Collapsed(object sender, RoutedEventArgs e)
+        {
+            if (tsSmartFanMode.IsChecked != false)
+            {
+                tsSmartFanMode.IsChecked = false;
+            }
+        }
+
+        private void SmartFanCard_Loaded(object sender, RoutedEventArgs e)
+        {
+            // Hide the chevron so clicking the header still toggles but the arrow is invisible (same pattern as UnifiedCard)
+            Application.Current.Dispatcher.BeginInvoke(
+                (Action)(() =>
+                {
+                    var toggle = SmartFanCard.Template?.FindName("ExpanderToggleButton", SmartFanCard) as ToggleButton;
+                    if (toggle?.Template is not null)
+                    {
+                        var chevronGrid = toggle.Template.FindName("ChevronGrid", toggle) as FrameworkElement;
+                        if (chevronGrid is not null)
+                        {
+                            chevronGrid.Visibility = Visibility.Collapsed;
+                            return;
+                        }
+                    }
+
+                    WalkAndHideChevron(SmartFanCard);
+                }),
+                DispatcherPriority.Loaded);
+        }
+
+        /// <summary>
+        /// Updates the smart fan control with the current curve when the user edits it.
+        /// Safe to call when smart fan mode is inactive (no-op).
+        /// </summary>
+        private void UpdateSmartFanCurve()
+        {
+            _smartFanControl?.UpdateCurve(GetActiveCurve(), GetActiveTemperatures());
+        }
+
+        /// <summary>
+        /// Gets the currently active curve based on unified/split mode.
+        /// </summary>
+        private EcFanCurve GetActiveCurve()
+        {
+            if (tsUnifiedCurve.IsChecked == true)
+                return FanCurveEditor.GetCurve();
+            // In split mode, use the CPU curve as the base for smart fan mode
+            return CpuFanCurveEditor.GetCurve();
+        }
+
+        /// <summary>
+        /// Gets the currently active temperature thresholds based on unified/split mode.
+        /// </summary>
+        private int[] GetActiveTemperatures()
+        {
+            if (tsUnifiedCurve.IsChecked == true)
+                return FanCurveEditor.Temperatures;
+            return CpuFanCurveEditor.Temperatures;
         }
 
         #endregion
@@ -1415,6 +1680,41 @@ namespace Uniwill_Control_Utility.Views.Pages
                         HardwareMonitoringCategory.Gpu);
                 });
             }
+
+            // Restart Smart Fan Mode if it was active before navigation away.
+            if (settings.EcSmartFanMode && _uniwillEc is not null)
+            {
+                if (_smartFanControl == null)
+                {
+                    _smartFanTempProvider = new FlydigiTemperatureProvider();
+                    var curve = GetActiveCurve();
+                    var temps = GetActiveTemperatures();
+                    _smartFanControl = new EcSmartFanControl(
+                        _uniwillEc,
+                        _smartFanTempProvider,
+                        settings,
+                        curve,
+                        temps);
+
+                    _smartFanControl.TemperatureUpdated += (s, ev) =>
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            if (!_isUnloaded && ev.Temp.HasValue && ev.Duty.HasValue)
+                                SetStatusText($"Smart Fan: {ev.Temp.Value:F1}°C ? {Math.Round(ev.Duty.Value * 100.0 / 200.0)}%");
+                        });
+                    };
+                }
+
+                _smartFanControl.UpdateCurve(GetActiveCurve(), GetActiveTemperatures());
+                _smartFanControl.UpdateSettings(settings);
+                _smartFanControl.Start();
+
+                // Restore toggle state
+                _loadingSettings = true;
+                tsSmartFanMode.IsChecked = true;
+                _loadingSettings = false;
+            }
         }
 
         private void Page_Unloaded(object? sender, EventArgs e)
@@ -1429,6 +1729,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Hide adaptive snackbar
             HideAdaptiveSnackbar();
+
+            // Stop Smart Fan Mode polling loop (EC tables remain as safety net)
+            _smartFanControl?.Stop();
 
             // Keep the hardware monitoring lease alive. Disposing it closes the
             // LibreHardwareMonitor Computer instance, forcing a full hardware re-probe

@@ -1105,6 +1105,27 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
+        /// Sets or clears USER mode (bit 7 of 0x0751).
+        /// When USER mode is set, the EC stops its auto fan loop and respects
+        /// direct PWM writes to 0x75B/0x75C. When cleared, the EC resumes
+        /// auto fan control from the curve tables.
+        /// </summary>
+        public void SetUserFanMode(bool enable)
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                byte fanCtrl = ReadECRegister(REG_MANUAL_FAN_CTRL);
+                if (enable)
+                    fanCtrl |= FAN_MODE_USER;
+                else
+                    fanCtrl &= unchecked((byte)~FAN_MODE_USER);
+                WriteECRegister(REG_MANUAL_FAN_CTRL, fanCtrl);
+                DebugLog($"[DIAG] UniwillEC: {(enable ? "Set" : "Cleared")} MANUAL_FAN_CTRL USER mode (0x{fanCtrl:X2})");
+            }
+        }
+
+        /// <summary>
         /// Sets both fans to a specific duty (0-200) by writing directly to the PWM registers.
         /// </summary>
         public void SetFanPwmBothDirect(int duty)
@@ -1132,12 +1153,70 @@ namespace Uniwill_Control_Utility.Services
         {
             rpm = Math.Clamp(rpm, 100, 12700);
 
-            // fanSwitchSpeed is a u16 â€” write low byte then high byte
+            // fanSwitchSpeed is a u16 — write low byte then high byte
             byte lo = (byte)(rpm & 0xFF);
             byte hi = (byte)((rpm >> 8) & 0xFF);
 
             WriteECRegister(REG_FAN_SWITCH_SPEED, lo);
+            WriteECRegister((ushort)(REG_FAN_SWITCH_SPEED + 1), hi);
             DebugLog($"[DIAG] UniwillEC: Set fanSwitchSpeed(0x787) = {rpm} (0x{rpm:X4})");
+        }
+
+        /// <summary>
+        /// Applies pre-built fan curves to both CPU and GPU. Uses the same
+        /// activation sequence as ApplyFanCurve (which works for normal curves):
+        ///   1. Ensure SPLIT_TABLES is set
+        ///   2. Clear boost mode
+        ///   3. Write CPU tables (tempUp, tempDown, duty)
+        ///   4. Write GPU tables (tempUp, tempDown, duty)
+        ///   5. Toggle ENABLE_UNIVERSAL_FAN_CTRL to force EC to re-read tables
+        /// </summary>
+        public void ApplySmartFanCurve(byte[] cpuTempUp, byte[] cpuTempDown, byte[] cpuDuty,
+            byte[] gpuTempUp, byte[] gpuTempDown, byte[] gpuDuty)
+        {
+            // Step 1: Ensure SPLIT is set (same as ApplyFanCurve)
+            byte ufCtrl = ReadECRegister(REG_UNIVERSAL_FAN_CTRL);
+            if ((ufCtrl & SPLIT_TABLES) == 0)
+            {
+                ufCtrl = (byte)(ufCtrl | SPLIT_TABLES);
+                WriteECRegister(REG_UNIVERSAL_FAN_CTRL, ufCtrl);
+                Thread.Sleep(50);
+            }
+
+            // Step 2: Clear boost mode (same as ApplyFanCurve)
+            byte fanCtrl = ReadECRegister(REG_MANUAL_FAN_CTRL);
+            fanCtrl = (byte)(fanCtrl & ~FAN_MODE_BOOST);
+            WriteECRegister(REG_MANUAL_FAN_CTRL, fanCtrl);
+
+            // Step 3: Write CPU tables
+            WriteECRegisters(REG_CPU_TEMP_END_TABLE, cpuTempUp);
+            WriteECRegisters(REG_CPU_TEMP_START_TABLE, cpuTempDown);
+            WriteECRegisters(REG_CPU_FAN_SPEED_TABLE, cpuDuty);
+
+            Thread.Sleep(150);
+
+            // Step 4: Write GPU tables
+            WriteECRegisters(REG_GPU_TEMP_END_TABLE, gpuTempUp);
+            WriteECRegisters(REG_GPU_TEMP_START_TABLE, gpuTempDown);
+            WriteECRegisters(REG_GPU_FAN_SPEED_TABLE, gpuDuty);
+
+            Thread.Sleep(150);
+
+            // Step 5: Toggle ENABLE_UNIVERSAL_FAN_CTRL to force EC re-read
+            byte apOem6 = ReadECRegister(REG_AP_OEM_6);
+            apOem6 = (byte)(apOem6 & ~ENABLE_UNIVERSAL_FAN_CTRL);
+            WriteECRegister(REG_AP_OEM_6, apOem6);
+            Thread.Sleep(150);
+            apOem6 = ReadECRegister(REG_AP_OEM_6);
+            apOem6 |= ENABLE_UNIVERSAL_FAN_CTRL;
+            WriteECRegister(REG_AP_OEM_6, apOem6);
+            Thread.Sleep(150);
+
+            // Verify: read back the duty tables to confirm they stuck
+            byte[] cpuDutyVerify = ReadECRegisters(REG_CPU_FAN_SPEED_TABLE, 16);
+            byte[] gpuDutyVerify = ReadECRegisters(REG_GPU_FAN_SPEED_TABLE, 16);
+            DebugLog($"[DIAG] UniwillEC: Applied smart fan curves - CPU duty: [{string.Join(", ", cpuDuty[1..11])}] | GPU duty: [{string.Join(", ", gpuDuty[1..11])}]");
+            DebugLog($"[DIAG] UniwillEC: Verify readback - CPU duty: [{string.Join(", ", cpuDutyVerify[1..11])}] | GPU duty: [{string.Join(", ", gpuDutyVerify[1..11])}]");
         }
 
         #endregion

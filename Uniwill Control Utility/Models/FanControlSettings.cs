@@ -65,5 +65,18 @@ namespace Uniwill_Control_Utility.Models
         /// Used when UnifiedMode is true. Null means use defaults from EcFanCurve.CpuTemperatures.
         /// </summary>
         public int[]? UnifiedTempThresholds { get; set; }
+
+        /// <summary>
+        /// Whether Smart Fan Mode is enabled (software polling loop that drives both fans
+        /// from a single temperature source). When true, both fans react to the same sensor
+        /// as defined by EcSmartFanTempSource.
+        /// </summary>
+        public bool EcSmartFanMode { get; set; }
+
+        /// <summary>
+        /// Temperature source for Smart Fan Mode: "cpu", "gpu", or "max" (highest of both).
+        /// Only meaningful when EcSmartFanMode is true.
+        /// </summary>
+        public string EcSmartFanTempSource { get; set; } = "max";
     }
 }

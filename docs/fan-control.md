@@ -19,6 +19,7 @@ The approach used by UXTU reads from and writes to EC registers through `ACPIDri
 - [Recovering from EC Lockup](#recovering-from-ec-lockup)
 - [Pitfalls and Gotchas](#pitfalls-and-gotchas)
 - [Reference Implementation](#reference-implementation)
+- [See Also](#see-also)
 
 ---
 
@@ -365,3 +366,9 @@ UXTU's `UniwillECService` provides a complete C# implementation of all EC operat
 | `WriteECRegister(address, value)` | Raw write to any EC register |
 
 The `EcFanCurve` model class provides preset curves (Silent, Balanced, Performance, Full Speed, Off) and handles 0–100% → 0–200 duty conversion with 16-byte padding.
+
+---
+
+## See Also
+
+- [smart-fan-control.md](smart-fan-control.md) — Smart Fan Control (cross-sensor fan linking) feature documentation
