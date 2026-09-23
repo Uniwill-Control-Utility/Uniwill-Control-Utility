@@ -167,8 +167,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             var fanSpeed = settings.GetFanSpeed();
             cbxFanSpeed.SelectedIndex = GetFanSpeedIndex(fanSpeed);
 
-            // Restore RGB mode selection
+            // Restore RGB toggle and mode/color selection
             var rgbMode = settings.GetRgbMode();
+            tsRgbEnabled.IsChecked = settings.RgbEnabled && rgbMode != RgbState.Off;
             cbxRgbMode.SelectedIndex = GetRgbModeIndex(rgbMode);
 
             // Restore RGB color selection
@@ -177,6 +178,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Update color picker visibility based on loaded mode
             UpdateRgbColorVisibility();
+
+            // Expand/collapse RGB card based on enabled state
+            RgbCardExpander.IsExpanded = tsRgbEnabled.IsChecked == true;
 
             // Restore auto-connect toggle
             tsAutoConnect.IsChecked = settings.AutoConnect;
@@ -223,11 +227,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private static int GetRgbModeIndex(RgbState mode) => mode switch
         {
-            RgbState.Off => 0,
-            RgbState.Static => 1,
-            RgbState.Breathe => 2,
-            RgbState.Colorful => 3,
-            RgbState.BreatheColor => 4,
+            RgbState.Static => 0,
+            RgbState.Breathe => 1,
+            RgbState.Colorful => 2,
+            RgbState.BreatheColor => 3,
             _ => 0
         };
 
@@ -269,10 +272,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             return (cbxRgbMode.SelectedIndex + 1) switch
             {
-                1 => RgbState.Off,
-                2 => RgbState.Static,
-                3 => RgbState.Breathe,
-                4 => RgbState.Colorful,
+                1 => RgbState.Static,
+                2 => RgbState.Breathe,
+                3 => RgbState.Colorful,
                 _ => RgbState.BreatheColor
             };
         }
@@ -420,14 +422,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             _waterCoolerService.UpdateRgbMode(mode);
         }
 
-        /// <summary>Show the color row only for modes that accept a custom color (Static, Breathe).</summary>
+        /// <summary>Show the color row (and divider) only for modes that accept a custom color (Static, Breathe).</summary>
         private void UpdateRgbColorVisibility()
         {
-            // Off=0, Static=1, Breathe=2, Colorful=3, Breathe Color=4
-            bool showColor = cbxRgbMode.SelectedIndex is 1 or 2;
+            // Static=0, Breathe=1, Colorful=2, Breathe Color=3
+            bool showColor = cbxRgbMode.SelectedIndex is 0 or 1;
+            RgbDivider.Visibility = showColor ? Visibility.Visible : Visibility.Collapsed;
             RgbColorRow.Visibility = showColor ? Visibility.Visible : Visibility.Collapsed;
-            // Collapse the content area when no color row is visible, hiding the divider too.
-            RgbCardExpander.IsExpanded = showColor;
         }
 
         private async void cbxRgbColor_SelectionChanged(object sender, EventArgs e)
@@ -441,40 +442,37 @@ namespace Uniwill_Control_Utility.Views.Pages
             _waterCoolerService.UpdateRgbColor(color);
         }
 
-        /// <summary>Hide the RGB CardExpander chevron so the card stays non-collapsible by arrow.</summary>
-        private void RgbCardExpander_Loaded(object sender, RoutedEventArgs e)
+       private void tsRgbEnabled_Checked(object sender, RoutedEventArgs e)
         {
-            Application.Current.Dispatcher.BeginInvoke(
-                (Action)(() =>
-                {
-                    var toggle = RgbCardExpander.Template?.FindName("ExpanderToggleButton", RgbCardExpander) as ToggleButton;
-                    if (toggle?.Template is not null)
-                    {
-                        var chevronGrid = toggle.Template.FindName("ChevronGrid", toggle) as FrameworkElement;
-                        if (chevronGrid is not null)
-                        {
-                            chevronGrid.Visibility = Visibility.Collapsed;
-                            return;
-                        }
-                    }
+            if (_waterCoolerService == null) return;
+            var settings = _waterCoolerService.GetSettings();
+            settings.RgbEnabled = true;
+            _waterCoolerService.SaveSettings();
 
-                    WalkAndHideChevron(RgbCardExpander);
-                }),
-                DispatcherPriority.Loaded);
+            RgbCardExpander.IsExpanded = true;
+
+            // Apply current effect/color to device
+            if (_waterCoolerService.IsConnected && !_isSyncingFromPreset)
+            {
+                var mode = GetSelectedRgbMode();
+                var color = GetSelectedRgbColor();
+                _ = _waterCoolerService.WriteRgbModeAsync(mode, color);
+            }
         }
 
-        private void WalkAndHideChevron(DependencyObject parent)
+        private async void tsRgbEnabled_Unchecked(object sender, RoutedEventArgs e)
         {
-            int count = VisualTreeHelper.GetChildrenCount(parent);
-            for (int i = 0; i < count; i++)
+            if (_waterCoolerService == null) return;
+            var settings = _waterCoolerService.GetSettings();
+            settings.RgbEnabled = false;
+            _waterCoolerService.SaveSettings();
+
+            RgbCardExpander.IsExpanded = false;
+
+            // Turn off RGB on device
+            if (_waterCoolerService.IsConnected && !_isSyncingFromPreset)
             {
-                var child = VisualTreeHelper.GetChild(parent, i);
-                if (child is Wpf.Ui.Controls.SymbolIcon)
-                {
-                    ((FrameworkElement)child).Visibility = Visibility.Collapsed;
-                    return;
-                }
-                WalkAndHideChevron(child);
+                await _waterCoolerService.WriteRgbModeAsync(RgbState.Off, RgbColor.Red);
             }
         }
 
@@ -938,8 +936,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 cbxPumpVoltage.SelectedIndex = GetPumpVoltageIndex(settings.GetPumpVoltage());
                 cbxFanSpeed.SelectedIndex = GetFanSpeedIndex(settings.GetFanSpeed());
-                cbxRgbMode.SelectedIndex = GetRgbModeIndex(settings.GetRgbMode());
+                var rgbMode = settings.GetRgbMode();
+                tsRgbEnabled.IsChecked = settings.RgbEnabled && rgbMode != RgbState.Off;
+                cbxRgbMode.SelectedIndex = GetRgbModeIndex(rgbMode);
                 cbxRgbColor.SelectedIndex = GetRgbColorIndex(settings.GetRgbColor());
+                UpdateRgbColorVisibility();
+                RgbCardExpander.IsExpanded = tsRgbEnabled.IsChecked == true;
             }
             finally
             {
@@ -1002,17 +1004,13 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             cbxPumpVoltage.SelectedIndex = GetPumpVoltageIndex(e.PumpVoltage);
             cbxFanSpeed.SelectedIndex = GetFanSpeedIndex(e.FanSpeed);
+            tsRgbEnabled.IsChecked = e.RgbMode != RgbState.Off;
             cbxRgbMode.SelectedIndex = GetRgbModeIndex(e.RgbMode);
             cbxRgbColor.SelectedIndex = GetRgbColorIndex(e.RgbColor);
             UpdateRgbColorVisibility();
+            RgbCardExpander.IsExpanded = tsRgbEnabled.IsChecked == true;
         }
 
-        /* ------------------------------------------------------------------ */
-        /*  RGB CardExpander Chevron Hide                                      */
-        /* ------------------------------------------------------------------ */
-
-        /// <summary>Hide the CardExpander chevron so the card stays always-expanded.</summary>
- 
         /* ------------------------------------------------------------------ */
         /*  Device Glow                                                        */
         /* ------------------------------------------------------------------ */

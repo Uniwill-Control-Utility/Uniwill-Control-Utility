@@ -451,10 +451,9 @@
                     <!-- RGB Effect -->
                     <ui:CardExpander x:Name="RgbCardExpander"
                                      Margin="0,0,0,8"
-                                     IsExpanded="True"
-                                     Loaded="RgbCardExpander_Loaded">
+                                     IsExpanded="False">
                         <ui:CardExpander.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -465,27 +464,49 @@
                                 <StackPanel Grid.Column="0">
                                     <ui:TextBlock FontTypography="Body" Text="RGB Effect" />
                                     <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Configure RGB lighting effects and colors." />
+                                       FontTypography="Caption"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       Text="Configure RGB lighting effects and colors." />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="tsRgbEnabled"
+                                  Grid.Column="1"
+                                  Margin="24,0,14,0"
+                                  HorizontalAlignment="Right"
+                                  VerticalAlignment="Center"
+                                  LabelPosition="Left"
+                                  OnContent="On"
+                                  OffContent="Off"
+                                  Checked="tsRgbEnabled_Checked"
+                                  Unchecked="tsRgbEnabled_Unchecked" />
+                            </Grid>
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <!-- Effect mode -->
+                            <Grid Margin="0,0,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Effect" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                       FontTypography="Caption"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       Text="Choose an RGB lighting effect." />
                                 </StackPanel>
                                 <ComboBox x:Name="cbxRgbMode"
                                           Grid.Column="1"
-                                          Width="160"
-                                          Margin="24,0,14,0"
-                                          HorizontalAlignment="Right"
-                                          VerticalAlignment="Center"
-                                          SelectionChanged="cbxRgbMode_SelectionChanged"
-                                          >
-                                    <ComboBoxItem Content="Off"/>
+                                          MinWidth="160"
+                                          Margin="4,0,0,0"
+                                          SelectionChanged="cbxRgbMode_SelectionChanged">
                                     <ComboBoxItem Content="Static"/>
                                     <ComboBoxItem Content="Breathe"/>
                                     <ComboBoxItem Content="Colorful"/>
                                     <ComboBoxItem Content="Breathe Color"/>
                                 </ComboBox>
                             </Grid>
-                        </ui:CardExpander.Header>
-                        <StackPanel>
+                            <Border x:Name="RgbDivider" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Color (only for Static and Breathe) -->
                             <Grid x:Name="RgbColorRow">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -494,9 +515,9 @@
                                 <StackPanel Grid.Column="0">
                                     <ui:TextBlock FontTypography="Body" Text="Color" />
                                     <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Pick the color for the selected RGB mode." />
+                                       FontTypography="Caption"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       Text="Pick the color for the selected RGB mode." />
                                 </StackPanel>
                                 <ComboBox x:Name="cbxRgbColor"
                                           Grid.Column="1"
