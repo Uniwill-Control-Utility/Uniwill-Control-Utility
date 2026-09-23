@@ -663,62 +663,74 @@
                             </Grid>
                         </ui:CardExpander.Header>
                         <StackPanel>
-                            <!-- Row: Pump Voltage -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Pump Voltage" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Select the pump voltage for this game. Higher voltage = more cooling." />
-                                </StackPanel>
-                                <ComboBox Name="cbxWcPumpVoltage"
-                                          Grid.Column="1"
-                                          MinWidth="160"
-                                          Margin="4,0,0,0"
-                                          SelectedIndex="1">
-                                    <ComboBoxItem>Off</ComboBoxItem>
-                                    <ComboBoxItem>7V</ComboBoxItem>
-                                    <ComboBoxItem>8V</ComboBoxItem>
-                                    <ComboBoxItem>11V</ComboBoxItem>
-                                </ComboBox>
+                            <!-- Smart Mode ON badge (shown when Smart Mode is active) -->
+                            <Grid x:Name="spWcSmartModeBadge" Visibility="Collapsed" Margin="0,0,0,4">
+                                <TextBlock Text="Smart Mode ON"
+                                           FontWeight="Bold"
+                                           FontSize="14"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource AccentFillColorDefaultBrush}" />
                             </Grid>
-                            <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                            <!-- Row: Fan Speed -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Fan Speed" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Select the fan duty cycle for this game. Higher = more airflow, more noise." />
-                                </StackPanel>
-                                <ComboBox Name="cbxWcFanSpeed"
-                                          Grid.Column="1"
-                                          MinWidth="160"
-                                          Margin="4,0,0,0"
-                                          SelectedIndex="2">
-                                    <ComboBoxItem>Off</ComboBoxItem>
-                                    <ComboBoxItem>25%</ComboBoxItem>
-                                    <ComboBoxItem>50%</ComboBoxItem>
-                                    <ComboBoxItem>75%</ComboBoxItem>
-                                    <ComboBoxItem>90%</ComboBoxItem>
-                                    <ComboBoxItem>95%</ComboBoxItem>
-                                    <ComboBoxItem>100%</ComboBoxItem>
-                                </ComboBox>
-                            </Grid>
-                            <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
+                            <!-- Pump & Fan controls (hidden when Smart Mode is active) -->
+                            <StackPanel x:Name="spWcPumpFan">
+                                <!-- Row: Pump Voltage -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Pump Voltage" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Select the pump voltage for this game. Higher voltage = more cooling." />
+                                    </StackPanel>
+                                    <ComboBox Name="cbxWcPumpVoltage"
+                                              Grid.Column="1"
+                                              MinWidth="160"
+                                              Margin="4,0,0,0"
+                                              SelectedIndex="1">
+                                        <ComboBoxItem>Off</ComboBoxItem>
+                                        <ComboBoxItem>7V</ComboBoxItem>
+                                        <ComboBoxItem>8V</ComboBoxItem>
+                                        <ComboBoxItem>11V</ComboBoxItem>
+                                    </ComboBox>
+                                </Grid>
+                                <!-- Divider -->
+                                <Border Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <!-- Row: Fan Speed -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Fan Speed" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Select the fan duty cycle for this game. Higher = more airflow, more noise." />
+                                    </StackPanel>
+                                    <ComboBox Name="cbxWcFanSpeed"
+                                              Grid.Column="1"
+                                              MinWidth="160"
+                                              Margin="4,0,0,0"
+                                              SelectedIndex="2">
+                                        <ComboBoxItem>Off</ComboBoxItem>
+                                        <ComboBoxItem>25%</ComboBoxItem>
+                                        <ComboBoxItem>50%</ComboBoxItem>
+                                        <ComboBoxItem>75%</ComboBoxItem>
+                                        <ComboBoxItem>90%</ComboBoxItem>
+                                        <ComboBoxItem>95%</ComboBoxItem>
+                                        <ComboBoxItem>100%</ComboBoxItem>
+                                    </ComboBox>
+                                </Grid>
+                            </StackPanel>
+                            <!-- Divider before RGB (always shown) -->
+                            <Border x:Name="WcPumpFanRgbDivider" Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                             <!-- Row: RGB Mode -->
                             <Grid>

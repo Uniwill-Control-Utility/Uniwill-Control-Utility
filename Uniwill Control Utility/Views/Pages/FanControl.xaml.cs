@@ -468,10 +468,6 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private BannerState GetBannerState()
         {
-            // Skip temperature warnings when a Flydigi cooler is connected — it handles its own cooling.
-            if (_flydigiService.IsConnected || _bs1Service.IsConnected)
-                return BannerState.Info;
-
             // Check if any active preset is "Off"
             bool hasOffProfile = false;
 
@@ -1310,11 +1306,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                     _smartFanControl.TemperatureUpdated += (s, ev) =>
                     {
-                        Dispatcher.Invoke(() =>
-                        {
-                            if (!_isUnloaded && ev.Temp.HasValue && ev.Duty.HasValue)
-                                SetStatusText($"Smart Fan: {ev.Temp.Value:F1}°C ? {Math.Round(ev.Duty.Value * 100.0 / 200.0)}%");
-                        });
+                        // Status text update removed — keep the "Smart Fan Mode enabled"
+                        // message static instead of spamming temperature/duty updates.
                     };
                 }
 
@@ -1422,11 +1415,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 _smartFanControl.TemperatureUpdated += (s, ev) =>
                 {
-                    Dispatcher.Invoke(() =>
-                    {
-                        if (!_isUnloaded && ev.Temp.HasValue && ev.Duty.HasValue)
-                            SetStatusText($"Smart Fan: {ev.Temp.Value:F1}°C ? {Math.Round(ev.Duty.Value * 100.0 / 200.0)}%");
-                    });
+                    // Status text update removed — keep the "Smart Fan Mode enabled"
+                    // message static instead of spamming temperature/duty updates.
                 };
             }
 
@@ -1721,11 +1711,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     _smartFanControl.TemperatureUpdated += (s, ev) =>
                     {
-                        Dispatcher.Invoke(() =>
-                        {
-                            if (!_isUnloaded && ev.Temp.HasValue && ev.Duty.HasValue)
-                                SetStatusText($"Smart Fan: {ev.Temp.Value:F1}°C ? {Math.Round(ev.Duty.Value * 100.0 / 200.0)}%");
-                        });
+                        // Status text update removed — keep the "Smart Fan Mode enabled"
+                        // message static instead of spamming temperature/duty updates.
                     };
                 }
 

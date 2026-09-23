@@ -134,7 +134,7 @@
                                 </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
                                         <ui:TextBlock FontTypography="Body" Text="Fan Curve Profile" />
-                                        <ui:TextBlock Margin="0,2,0,0"
+                                        <ui:TextBlock Margin="0,2,0,2"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                Text="Choose between one of the default curves or create your own one." />
@@ -199,10 +199,11 @@
                             <ui:Button Margin="0,16,0,0"
                                        HorizontalAlignment="Right"
                                        Appearance="Transparent"
-                                       Click="btnResetUnifiedTemps_Click">
+                                       Click="btnResetUnifiedTemps_Click"
+                                       Padding="8">
                                 <StackPanel Orientation="Horizontal">
-                                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7A7;" Margin="0,0,12,0" />
-                                    <TextBlock Text="Reset to Default" />
+                                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7A7;" Margin="4,0,12,0" />
+                                    <TextBlock Text="Reset to Default" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </ui:Button>
                         </StackPanel>
@@ -421,13 +422,14 @@
                                                        Margin="0,0,0,8" />
                                             <UniformGrid x:Name="ugCpuTemps"
                                                          Columns="11" Rows="1"
-                                                         Margin="0,0,0,2" />
+                                                         Margin="0,12,0,2" />
                                             <UniformGrid x:Name="ugCpuTempInputs"
                                                          Columns="11" Rows="1"
-                                                         Margin="0,0,0,8" />
+                                                         Margin="0,12,0,12" />
                                             <ui:Button HorizontalAlignment="Right"
                                                        Appearance="Transparent"
-                                                       Click="btnResetCpuTemps_Click">
+                                                       Click="btnResetCpuTemps_Click"
+                                                       Padding="8">
                                                 <StackPanel Orientation="Horizontal">
                                                             <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7A7;" Margin="0,0,12,0" />
                                                     <TextBlock Text="Reset to Default" />
@@ -450,18 +452,19 @@
                                                        Margin="0,0,0,8" />
                                             <UniformGrid x:Name="ugGpuTemps"
                                                          Columns="11" Rows="1"
-                                                         Margin="0,0,0,2" />
+                                                         Margin="0,12,0,2" />
                                             <UniformGrid x:Name="ugGpuTempInputs"
                                                          Columns="11" Rows="1"
-                                                         Margin="0,0,0,8" />
+                                                         Margin="0,12,0,12" />
                                             <ui:Button HorizontalAlignment="Right"
                                                        Appearance="Transparent"
-                                                       Click="btnResetGpuTemps_Click">
-                                                <StackPanel Orientation="Horizontal">
-                                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7A7;" Margin="0,0,12,0" />
-                                                    <TextBlock Text="Reset to Default" />
-                                                </StackPanel>
-                                            </ui:Button>
+                                                       Click="btnResetGpuTemps_Click"
+                                                       Padding="8">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7A7;" Margin="4,0,12,0" />
+                                                            <TextBlock Text="Reset to Default" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </ui:Button>
                                         </StackPanel>
                                     </Border>
                                 </Grid>
@@ -472,7 +475,7 @@
 
                     <!-- Fan Turbo toggle -->
                     <ui:CardControl Margin="0,0,0,0"
-                                    Background="{DynamicResource SystemFillColorCriticalBackgroundBrush}">
+                                    Background="{DynamicResource SystemFillColorCautionBackgroundBrush}">
                         <ui:CardControl.Icon>
                             <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xECAD;" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>

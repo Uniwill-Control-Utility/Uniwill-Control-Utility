@@ -36,6 +36,77 @@ namespace Uniwill_Control_Utility.Models
         [JsonProperty("lastDeviceAddress")]
         public string LastDeviceAddress { get; set; } = "";
 
+        /* ------------------------------------------------------------------ */
+        /*  Smart Mode — temperature-linked pump and fan speed                   */
+        /* ------------------------------------------------------------------ */
+
+        [JsonProperty("smartModeEnabled")]
+        public bool SmartModeEnabled { get; set; }
+
+        /// <summary>Temperature source: "cpu", "gpu", or "max" (highest of the two).</summary>
+        [JsonProperty("smartModeTempSource")]
+        public string SmartModeTempSource { get; set; } = "max";
+
+        /// <summary>Low threshold (°C) — below this, pump/fan run at IdleSpeed.</summary>
+        [JsonProperty("smartModeLowThreshold")]
+        public int SmartModeLowThreshold { get; set; } = 50;
+
+        /// <summary>High threshold (°C) — above this, pump/fan run at BoostSpeed.</summary>
+        [JsonProperty("smartModeHighThreshold")]
+        public int SmartModeHighThreshold { get; set; } = 70;
+
+        /// <summary>
+        /// Hysteresis deadzone in °C — fixed at 10°C to prevent oscillation.
+        /// The actual hysteresis is provided by the gap between low and high thresholds.
+        /// This field is persisted but no longer exposed in the UI.
+        /// </summary>
+        [JsonProperty("smartModeHysteresis")]
+        public int SmartModeHysteresis { get; set; } = 10;
+
+        /// <summary>Pump voltage when temperature is below the low threshold.</summary>
+        [JsonProperty("smartModeIdlePump")]
+        public string SmartModeIdlePump { get; set; } = "V7";
+
+        /// <summary>Pump voltage when temperature is above the high threshold.</summary>
+        [JsonProperty("smartModeBoostPump")]
+        public string SmartModeBoostPump { get; set; } = "V11";
+
+        /// <summary>Fan speed when temperature is below the low threshold.</summary>
+        [JsonProperty("smartModeIdleFan")]
+        public string SmartModeIdleFan { get; set; } = "Percent50";
+
+        /// <summary>Fan speed when temperature is above the high threshold.</summary>
+        [JsonProperty("smartModeBoostFan")]
+        public string SmartModeBoostFan { get; set; } = "Percent100";
+
+        /// <summary>Returns the enum value for the stored idle pump speed in Smart Mode.</summary>
+        public PumpVoltage GetSmartModeIdlePump()
+        {
+            return Enum.TryParse<PumpVoltage>(SmartModeIdlePump, true, out var v)
+                ? v : Models.PumpVoltage.V7;
+        }
+
+        /// <summary>Returns the enum value for the stored boost pump speed in Smart Mode.</summary>
+        public PumpVoltage GetSmartModeBoostPump()
+        {
+            return Enum.TryParse<PumpVoltage>(SmartModeBoostPump, true, out var v)
+                ? v : Models.PumpVoltage.V11;
+        }
+
+        /// <summary>Returns the enum value for the stored idle fan speed in Smart Mode.</summary>
+        public FanSpeed GetSmartModeIdleFan()
+        {
+            return Enum.TryParse<FanSpeed>(SmartModeIdleFan, true, out var f)
+                ? f : Models.FanSpeed.Percent50;
+        }
+
+        /// <summary>Returns the enum value for the stored boost fan speed in Smart Mode.</summary>
+        public FanSpeed GetSmartModeBoostFan()
+        {
+            return Enum.TryParse<FanSpeed>(SmartModeBoostFan, true, out var f)
+                ? f : Models.FanSpeed.Percent100;
+        }
+
         /// <summary>
         /// Returns the enum value for the stored pump voltage setting.
         /// </summary>

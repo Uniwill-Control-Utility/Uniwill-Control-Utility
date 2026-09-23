@@ -55,9 +55,12 @@ namespace Uniwill_Control_Utility.Services
         private int _connectGeneration; // Incremented on user disconnect to invalidate stale attempts
 
         private bool _userDisconnected;
+        private int _isDisconnectingInt; // 0 = not disconnecting, 1 = in progress (for Interlocked.Exchange)
+        private bool _isConnecting; // True while ConnectAsync is in flight — prevents GATT callback from triggering cleanup
 
         public event EventHandler<WatercoolerConnectionState>? ConnectionStateChanged;
         public event EventHandler<string>? StatusChanged;
+        public event EventHandler<bool>? SmartModeStateChanged;
 
         /// <summary>
         /// Raised when a status response is received from the device.
@@ -82,16 +85,6 @@ namespace Uniwill_Control_Utility.Services
         public WaterCoolerService()
         {
             LoadSettings();
-
-            // Auto-connect on app startup (like THRM does after a brief delay).
-            // Only connects if AutoConnect is enabled in settings.
-            // The 2-second delay allows the Bluetooth stack to stabilize after cold boot.
-            _ = Task.Run(async () =>
-            {
-                await Task.Delay(2000, CancellationToken.None);
-                if (_settings.AutoConnect)
-                    await TryAutoConnectAsync();
-            });
         }
 
         #region Settings Persistence
@@ -300,6 +293,19 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public async Task<bool> ConnectAsync(string deviceAddress)
         {
+            _isConnecting = true;
+            try
+            {
+                return await ConnectAsyncCore(deviceAddress);
+            }
+            finally
+            {
+                _isConnecting = false;
+            }
+        }
+
+        private async Task<bool> ConnectAsyncCore(string deviceAddress)
+        {
             ClearUserDisconnected();
             const int maxRetries = 3;
 
@@ -451,6 +457,13 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public async Task DisconnectAsync()
         {
+            // Prevent concurrent disconnect calls (e.g., user click + GATT session callback).
+            if (System.Threading.Interlocked.Exchange(ref _isDisconnectingInt, 1) == 1)
+            {
+                Debug.WriteLine("[WaterCooler] DisconnectAsync already in progress — skipping");
+                return;
+            }
+
             Debug.WriteLine("[WaterCooler] DisconnectAsync called");
 
             // --- Step 1: Send reset command (matches Python reference) ---
@@ -544,6 +557,12 @@ namespace Uniwill_Control_Utility.Services
                 _connectGeneration++; // Invalidate any in-flight connection attempt
                 StartReconnectLoop();
             }
+
+            // Stop Smart Mode on disconnect — it can't operate without a live link.
+            StopSmartMode();
+
+            // Allow future disconnect calls now that this one has completed.
+            _isDisconnectingInt = 0;
         }
 
         /// <summary>
@@ -708,6 +727,204 @@ namespace Uniwill_Control_Utility.Services
         }
 
         #endregion
+
+        /* ------------------------------------------------------------------ */
+        /*  Smart Mode — temperature-linked pump and fan speed                   */
+        /* ------------------------------------------------------------------ */
+
+        private System.Threading.Timer? _smartModeTimer;
+        private PumpVoltage _smartModeCurrentPump;
+        private FanSpeed _smartModeCurrentFan;
+        private double _smartModeFilteredTemp;
+        private bool _smartModeLastWasBoost; // For hysteresis direction tracking
+
+        /// <summary>
+        /// Starts the Smart Mode control loop.
+        /// Reads temperatures at 2-second intervals and adjusts pump voltage
+        /// and fan speed based on thresholds with hysteresis to prevent oscillation.
+        /// </summary>
+        public void StartSmartMode()
+        {
+            StopSmartMode();
+
+            var settings = _settings;
+            _smartModeCurrentPump = settings.GetSmartModeIdlePump();
+            _smartModeCurrentFan = settings.GetSmartModeIdleFan();
+            _smartModeLastWasBoost = false;
+
+            // Initialize filtered temperature to current reading so the first tick
+            // doesn't treat the initial EWMA state as a temperature change.
+            try
+            {
+                var temp = ReadTemperatureForSource(settings.SmartModeTempSource);
+                if (temp.HasValue)
+                    _smartModeFilteredTemp = temp.Value;
+            }
+            catch { /* temperature unavailable at startup — first tick will initialize */ }
+
+            _smartModeTimer = new System.Threading.Timer(async _ =>
+            {
+                try
+                {
+                    await SmartModeTick();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[WaterCooler] Smart mode tick error: {ex.Message}");
+                }
+            }, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+
+            Debug.WriteLine("[WaterCooler] Smart Mode started");
+            SmartModeStateChanged?.Invoke(this, true);
+        }
+
+        /// <summary>
+        /// Stops the Smart Mode control loop.
+        /// </summary>
+        public void StopSmartMode()
+        {
+            var timer = _smartModeTimer;
+            _smartModeTimer = null;
+            timer?.Dispose();
+            Debug.WriteLine("[WaterCooler] Smart Mode stopped");
+            SmartModeStateChanged?.Invoke(this, false);
+        }
+
+        /// <summary>True when Smart Mode is currently running.</summary>
+        public bool IsSmartModeActive => _smartModeTimer != null;
+
+        private async Task SmartModeTick()
+        {
+            if (!IsConnected) return;
+
+            var settings = _settings;
+            double? rawTemp = ReadTemperatureForSource(settings.SmartModeTempSource);
+
+            if (!rawTemp.HasValue)
+                return; // No temperature available — skip this tick
+
+            // EWMA filter (alpha = 0.5) to smooth transient spikes
+            double filtered = _smartModeFilteredTemp * 0.5 + rawTemp.Value * 0.5;
+            _smartModeFilteredTemp = filtered;
+
+            int lowThreshold = settings.SmartModeLowThreshold;
+            int highThreshold = settings.SmartModeHighThreshold;
+
+            // Two-zone hysteresis:
+            //   - below lowThreshold → idle speed
+            //   - above highThreshold → boost speed
+            //   - between them → keep current state (the gap IS the hysteresis deadzone)
+            // This prevents oscillation: once in idle, temp must exceed highThreshold to
+            // switch to boost. Once in boost, temp must drop below lowThreshold to switch back.
+            PumpVoltage targetPump;
+            FanSpeed targetFan;
+
+            if (_smartModeLastWasBoost)
+            {
+                // Currently in boost — switch to idle when temp drops below lowThreshold
+                if (filtered < lowThreshold)
+                {
+                    targetPump = settings.GetSmartModeIdlePump();
+                    targetFan = settings.GetSmartModeIdleFan();
+                    _smartModeLastWasBoost = false;
+                }
+                else
+                {
+                    targetPump = settings.GetSmartModeBoostPump();
+                    targetFan = settings.GetSmartModeBoostFan();
+                }
+            }
+            else
+            {
+                // Currently in idle — switch to boost when temp rises above highThreshold
+                if (filtered > highThreshold)
+                {
+                    targetPump = settings.GetSmartModeBoostPump();
+                    targetFan = settings.GetSmartModeBoostFan();
+                    _smartModeLastWasBoost = true;
+                }
+                else
+                {
+                    targetPump = settings.GetSmartModeIdlePump();
+                    targetFan = settings.GetSmartModeIdleFan();
+                }
+            }
+
+            // Only write if the target differs from current — avoids unnecessary BLE traffic.
+            bool pumpChanged = targetPump != _smartModeCurrentPump;
+            bool fanChanged = targetFan != _smartModeCurrentFan;
+
+            if (pumpChanged)
+            {
+                _smartModeCurrentPump = targetPump;
+
+                // If transitioning from Off to an active speed, use a gentler ramp
+                // to avoid the pump maxing out on startup.
+                if (targetPump != PumpVoltage.Off)
+                {
+                    await WritePumpModeRampedAsync(targetPump);
+                }
+                else
+                {
+                    await WritePumpModeAsync(targetPump);
+                }
+            }
+
+            if (fanChanged)
+            {
+                _smartModeCurrentFan = targetFan;
+                await WriteFanModeAsync(targetFan);
+            }
+
+            if (pumpChanged || fanChanged)
+                Debug.WriteLine($"[WaterCooler] Smart mode: {rawTemp.Value:F1}°C → pump {targetPump}, fan {targetFan}");
+        }
+
+        /// <summary>
+        /// Reads the current temperature for the configured temperature source.
+        /// Returns CPU, GPU, or max of the two depending on settings.
+        /// Returns null if no temperature is available.
+        /// </summary>
+        private double? ReadTemperatureForSource(string tempSource)
+        {
+            try
+            {
+                var provider = new Models.FlydigiTemperatureProvider();
+                double? temp = tempSource switch
+                {
+                    "cpu" => provider.GetCpuTemperature(),
+                    "gpu" => provider.GetGpuTemperature(),
+                    _ => provider.GetMaxTemperature(), // "max" or unknown
+                };
+                provider.Dispose();
+                return temp;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Sends a pump command with a gentler ramp to avoid the pump maxing out
+        /// when transitioning from Off to an active speed.
+        /// Strategy: send at 30% duty cycle first, then ramp to 60% after a brief delay.
+        /// </summary>
+        private async Task WritePumpModeRampedAsync(PumpVoltage voltage)
+        {
+            if (!IsConnected) return;
+
+            byte voltageCode = (byte)voltage;
+
+            // Phase 1: Send at reduced duty cycle (30%) to let the pump start gently
+            var frameLow = BuildFrame(WaterCoolerCommand.Pump, true, 30, voltageCode, WaterCoolerCommand.Disabled);
+            await WriteFrameAsync(frameLow);
+            await Task.Delay(300);
+
+            // Phase 2: Ramp to normal duty cycle (60%)
+            var frameNormal = BuildFrame(WaterCoolerCommand.Pump, true, 60, voltageCode, WaterCoolerCommand.Disabled);
+            await WriteFrameAsync(frameNormal);
+        }
 
         /// <summary>
         /// Sends pump voltage command to the device.
@@ -941,6 +1158,9 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>
         /// Fires when the OS-level GATT session status changes.
         /// We use this to know when the radio link truly closes before reconnecting.
+        /// When the session closes unexpectedly (BLE drops while the user is on another
+        /// page), this triggers cleanup and starts the background reconnect loop so the
+        /// user sees the correct state on next navigation to the Hydro UI page.
         /// </summary>
         private void OnGattSessionStatusChanged(GattSession sender, GattSessionStatusChangedEventArgs args)
         {
@@ -950,6 +1170,33 @@ namespace Uniwill_Control_Utility.Services
             {
                 // Signal that the OS-level session has truly closed.
                 _sessionClosedTcs.TrySetResult(true);
+            }
+
+            if (args.Status == GattSessionStatus.Closed)
+            {
+                // If we still hold a device AND tx characteristic reference, and we're NOT
+                // in the middle of ConnectAsync or DisconnectAsync, this is an unexpected
+                // disconnect (e.g., BLE radio dropped the link while user was on another page).
+                // A Closed event during ConnectAsync is part of normal session lifecycle.
+                // A Closed event during DisconnectAsync is expected (we're disposing the session).
+                bool isConnected = _device != null && _txCharacteristic != null;
+                bool isConnecting = _isConnecting;
+                bool isDisconnecting = _isDisconnectingInt == 1;
+                if (isConnected && !isConnecting && !isDisconnecting)
+                {
+                    Debug.WriteLine("[WaterCooler] Unexpected GATT session close — cleaning up and reconnecting");
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await DisconnectAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[WaterCooler] Unexpected disconnect cleanup failed: {ex.Message}");
+                        }
+                    });
+                }
             }
         }
 
@@ -1007,6 +1254,7 @@ namespace Uniwill_Control_Utility.Services
 
         public void Dispose()
         {
+            StopSmartMode();
             StopReconnectLoop();
 
             // Fire-and-forget disconnect to avoid deadlock on UI thread

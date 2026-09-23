@@ -5,6 +5,7 @@
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:local="clr-namespace:Uniwill_Control_Utility.Views.Pages"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
       mc:Ignorable="d"
       d:DataContext="{d:DesignInstance local:Watercooler, IsDesignTimeCreatable=False}"
       d:Background="{DynamicResource ApplicationBackgroundBrush}"
@@ -106,6 +107,23 @@
                                            Source="pack://application:,,,/Assets/HydroUI/mk2.png"
                                            RenderOptions.BitmapScalingMode="HighQuality"/>
                             </Grid>
+                            <!-- Temperature metrics -->
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                                    <TextBlock Text="CPU Temp" FontWeight="SemiBold" HorizontalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                    <TextBlock x:Name="tbCpuTemp" Text="--" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                </StackPanel>
+                                <Rectangle Grid.Column="1" Height="30" Width="1" Fill="{DynamicResource ControlFillColorSecondaryBrush}" Margin="12,4"/>
+                                <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                                    <TextBlock Text="GPU Temp" FontWeight="SemiBold" HorizontalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                    <TextBlock x:Name="tbGpuTemp" Text="--" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
 
                         <!-- Column 2: Status + action -->
@@ -202,6 +220,199 @@
                         </ComboBox>
                     </ui:CardControl>
 
+                    <!-- Smart Mode -->
+                    <ui:CardExpander x:Name="SmartModeCardExpander"
+                                     Margin="0,0,0,8"
+                                     IsExpanded="False">
+                        <ui:CardExpander.Header>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <iconPacks:PackIconLucide Grid.Column="0"
+                                                           Kind="BrainCircuit"
+                                                           Width="20"
+                                                          Height="20"
+                                                           Margin="4,0,20,0"
+                                                           VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1">
+                                    <ui:TextBlock FontTypography="Body" Text="Smart Mode" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Automatically adjust pump and fan based on temperature." />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="tsSmartMode"
+                                                  Grid.Column="2"
+                                                  Margin="24,0,14,0"
+                                                  HorizontalAlignment="Right"
+                                                  VerticalAlignment="Center"
+                                                  LabelPosition="Left"
+                                                  OnContent="On"
+                                                  OffContent="Off"
+                                                  Checked="tsSmartMode_Checked"
+                                                  Unchecked="tsSmartMode_Unchecked" />
+                            </Grid>
+                        </ui:CardExpander.Header>
+                        <StackPanel>
+                            <!-- Temperature source -->
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Temperature Source" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Which temperature to monitor for control." />
+                                </StackPanel>
+                                <ComboBox x:Name="cbxSmartModeTempSource"
+                                          Grid.Column="1"
+                                          MinWidth="160"
+                                          Margin="4,0,0,0"
+                                          SelectionChanged="cbxSmartModeTempSource_SelectionChanged">
+                                    <ComboBoxItem Content="Highest (CPU/GPU)"/>
+                                    <ComboBoxItem Content="CPU"/>
+                                    <ComboBoxItem Content="GPU"/>
+                                </ComboBox>
+                            </Grid>
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Thresholds -->
+                            <Grid Margin="0,4,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Thresholds" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Low = idle speed, High = boost speed. The gap prevents oscillation." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center"
+                                            Margin="4,0,0,0">
+                                    <TextBox x:Name="tbSmartModeLow"
+                                             Width="50"
+                                             Margin="0,0,4,0"
+                                             HorizontalAlignment="Right"
+                                             Text="50"
+                                             PreviewTextInput="TextBox_NumericOnly"
+                                             LostFocus="tbSmartModeThresholds_LostFocus" />
+                                    <TextBlock VerticalAlignment="Center"
+                                               Margin="4,0,4,0"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                               Text="°C → " />
+                                    <TextBox x:Name="tbSmartModeHigh"
+                                             Width="50"
+                                             Margin="0,0,4,0"
+                                             HorizontalAlignment="Right"
+                                             Text="70"
+                                             PreviewTextInput="TextBox_NumericOnly"
+                                             LostFocus="tbSmartModeThresholds_LostFocus" />
+                                    <TextBlock VerticalAlignment="Center"
+                                               Margin="4,0,0,0"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                               Text="°C" />
+                                </StackPanel>
+                            </Grid>
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Pump speed selection -->
+                            <Grid Margin="0,4,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Pump Speeds" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Idle (low temp) and Boost (high temp) pump voltages." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center"
+                                            Margin="4,0,0,0">
+                                    <ComboBox x:Name="cbxSmartModeIdlePump"
+                                              Width="80"
+                                              Margin="0,0,8,0"
+                                              SelectionChanged="cbxSmartModeSpeed_SelectionChanged">
+                                        <ComboBoxItem Content="Off"/>
+                                        <ComboBoxItem Content="7 V"/>
+                                        <ComboBoxItem Content="8 V"/>
+                                        <ComboBoxItem Content="11 V"/>
+                                    </ComboBox>
+                                    <TextBlock VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                               Text="→" />
+                                    <ComboBox x:Name="cbxSmartModeBoostPump"
+                                              Width="80"
+                                              SelectionChanged="cbxSmartModeSpeed_SelectionChanged">
+                                        <ComboBoxItem Content="Off"/>
+                                        <ComboBoxItem Content="7 V"/>
+                                        <ComboBoxItem Content="8 V"/>
+                                        <ComboBoxItem Content="11 V"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+                            <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <!-- Fan speed selection -->
+                            <Grid Margin="0,4,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Fan Speeds" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Idle (low temp) and Boost (high temp) fan duty cycles." />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center"
+                                            Margin="4,0,0,0">
+                                    <ComboBox x:Name="cbxSmartModeIdleFan"
+                                              Width="80"
+                                              Margin="0,0,8,0"
+                                              SelectionChanged="cbxSmartModeSpeed_SelectionChanged">
+                                        <ComboBoxItem Content="Off"/>
+                                        <ComboBoxItem Content="25%"/>
+                                        <ComboBoxItem Content="50%"/>
+                                        <ComboBoxItem Content="75%"/>
+                                        <ComboBoxItem Content="90%"/>
+                                        <ComboBoxItem Content="95%"/>
+                                        <ComboBoxItem Content="100%"/>
+                                    </ComboBox>
+                                    <TextBlock VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                               Text="→" />
+                                    <ComboBox x:Name="cbxSmartModeBoostFan"
+                                              Width="80"
+                                              SelectionChanged="cbxSmartModeSpeed_SelectionChanged">
+                                        <ComboBoxItem Content="Off"/>
+                                        <ComboBoxItem Content="25%"/>
+                                        <ComboBoxItem Content="50%"/>
+                                        <ComboBoxItem Content="75%"/>
+                                        <ComboBoxItem Content="90%"/>
+                                        <ComboBoxItem Content="95%"/>
+                                        <ComboBoxItem Content="100%"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </ui:CardExpander>
+
                     <!-- Fan Control -->
                     <ui:CardControl Margin="0,0,0,8">
                         <ui:CardControl.Icon>
@@ -230,7 +441,8 @@
                     <!-- RGB Effect -->
                     <ui:CardExpander x:Name="RgbCardExpander"
                                      Margin="0,0,0,8"
-                                     IsExpanded="True">
+                                     IsExpanded="True"
+                                     Loaded="RgbCardExpander_Loaded">
                         <ui:CardExpander.Icon>
                                 <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardExpander.Icon>

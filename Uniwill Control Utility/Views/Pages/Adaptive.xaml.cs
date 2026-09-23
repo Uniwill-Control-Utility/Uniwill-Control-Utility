@@ -93,6 +93,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                     sdHydroUI.Visibility = Visibility.Visible;
                     _waterCoolerService!.ConnectionStateChanged += OnWaterCoolerConnectionStateChanged;
+                    _waterCoolerService.SmartModeStateChanged += OnSmartModeStateChanged;
                 });
             });
 
@@ -1875,6 +1876,19 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Recheck Flydigi card visibility on navigation (device may have connected/disconnected)
             UpdateFlydigiCardVisibility();
 
+            // Apply Smart Mode state on navigation
+            bool smartModeActive = _waterCoolerService?.IsSmartModeActive == true;
+            if (smartModeActive)
+            {
+                spWcPumpFan.Visibility = Visibility.Collapsed;
+                spWcSmartModeBadge.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                spWcPumpFan.Visibility = Visibility.Visible;
+                spWcSmartModeBadge.Visibility = Visibility.Collapsed;
+            }
+
             // Refresh CPU voltage control visibility so setting changes from Settings page take effect
             UpdateAdpCpuUI();
 
@@ -1942,6 +1956,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     Debug.WriteLine($"[Adaptive] Page_Unloaded save failed: {ex.Message}");
                 }
+            }
+
+            // Unsubscribe from WaterCoolerService events to allow this scoped instance to be GC'd.
+            if (_waterCoolerService != null)
+            {
+                _waterCoolerService.ConnectionStateChanged -= OnWaterCoolerConnectionStateChanged;
+                _waterCoolerService.SmartModeStateChanged -= OnSmartModeStateChanged;
             }
         }
 
@@ -2139,6 +2160,23 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                     if (start && _deviceApplier?.IsWatercoolerOverridden == true)
                         _ = _deviceApplier.DisableWatercoolerOverrideAsync();
+                }
+            });
+        }
+
+        private void OnSmartModeStateChanged(object? sender, bool isActive)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (isActive)
+                {
+                    spWcPumpFan.Visibility = Visibility.Collapsed;
+                    spWcSmartModeBadge.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    spWcPumpFan.Visibility = Visibility.Visible;
+                    spWcSmartModeBadge.Visibility = Visibility.Collapsed;
                 }
             });
         }

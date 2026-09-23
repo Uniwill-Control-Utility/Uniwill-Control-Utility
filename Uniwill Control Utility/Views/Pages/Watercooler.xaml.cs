@@ -1,9 +1,13 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Uniwill_Control_Utility.Models;
@@ -28,6 +32,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool _glowPulseDirection;
         private volatile bool _glowActive;
 
+        // Temperature update timer
+        private System.Threading.Timer? _tempUpdateTimer;
+
         /// <summary>True while OnWatercoolerPresetApplied is updating UI controls. Suppresses selection-changed side effects.</summary>
         private bool _isSyncingFromPreset;
 
@@ -36,6 +43,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             InitializeComponent();
             InitializePage();
             Loaded += Watercooler_Loaded;
+            IsVisibleChanged += Watercooler_IsVisibleChanged;
         }
 
         private void InitializePage()
@@ -110,6 +118,38 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
+       /// <summary>
+        /// Re-syncs UI state on every navigation back to this page.
+        /// Page.Loaded only fires once (WPF-UI caches scoped page instances),
+        /// so IsVisibleChanged is the reliable hook for per-navigation logic.
+        /// </summary>
+        private void Watercooler_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (!this.IsVisible || _waterCoolerService == null) return;
+
+            // Re-sync connection state in case it changed while this page was hidden.
+            // The event-driven OnConnectionStateChanged handles live changes, but if
+            // a state transition occurred and completed while we were away, we need
+            // to reflect the current state on return.
+            if (_waterCoolerService.IsConnected)
+            {
+                OnConnectionStateChanged(null, WaterCoolerService.WatercoolerConnectionState.Connected);
+            }
+            else
+            {
+                OnConnectionStateChanged(null, WaterCoolerService.WatercoolerConnectionState.Disconnected);
+            }
+
+            // Re-apply override state (Adaptive Mode may have been toggled while away)
+            bool isOverridden = _deviceApplier?.IsWatercoolerOverridden == true;
+            ApplyOverrideState(isOverridden);
+
+            if (isOverridden && _deviceApplier?.LastAppliedWatercoolerPreset is { } preset)
+            {
+                SyncUiFromPreset(preset);
+            }
+        }
+
         private void LoadSettings()
         {
             if (_waterCoolerService == null) return;
@@ -152,6 +192,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 SetControlsEnabled(false);
             }
+
+            // Load Smart Mode settings
+            LoadSmartModeSettings();
         }
 
         private static int GetPumpVoltageIndex(PumpVoltage voltage) => voltage switch
@@ -395,6 +438,43 @@ namespace Uniwill_Control_Utility.Views.Pages
             _waterCoolerService.UpdateRgbColor(color);
         }
 
+        /// <summary>Hide the RGB CardExpander chevron so the card stays non-collapsible by arrow.</summary>
+        private void RgbCardExpander_Loaded(object sender, RoutedEventArgs e)
+        {
+            Application.Current.Dispatcher.BeginInvoke(
+                (Action)(() =>
+                {
+                    var toggle = RgbCardExpander.Template?.FindName("ExpanderToggleButton", RgbCardExpander) as ToggleButton;
+                    if (toggle?.Template is not null)
+                    {
+                        var chevronGrid = toggle.Template.FindName("ChevronGrid", toggle) as FrameworkElement;
+                        if (chevronGrid is not null)
+                        {
+                            chevronGrid.Visibility = Visibility.Collapsed;
+                            return;
+                        }
+                    }
+
+                    WalkAndHideChevron(RgbCardExpander);
+                }),
+                DispatcherPriority.Loaded);
+        }
+
+        private void WalkAndHideChevron(DependencyObject parent)
+        {
+            int count = VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is Wpf.Ui.Controls.SymbolIcon)
+                {
+                    ((FrameworkElement)child).Visibility = Visibility.Collapsed;
+                    return;
+                }
+                WalkAndHideChevron(child);
+            }
+        }
+
         private void tsAutoConnect_Checked(object sender, RoutedEventArgs e)
         {
             if (_waterCoolerService != null)
@@ -406,6 +486,209 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (_waterCoolerService != null)
                 _waterCoolerService.UpdateAutoConnect(false);
         }
+
+        #region Smart Mode Handlers
+
+        private void tsSmartMode_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_waterCoolerService == null) return;
+
+            var settings = _waterCoolerService.GetSettings();
+            settings.SmartModeEnabled = true;
+            SaveSmartModeSettings();
+
+            _waterCoolerService.StartSmartMode();
+            // Disable manual pump and fan control while smart mode is active
+            cbxPumpVoltage.IsEnabled = false;
+            cbxFanSpeed.IsEnabled = false;
+        }
+
+        private async void tsSmartMode_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_waterCoolerService == null) return;
+
+            var settings = _waterCoolerService.GetSettings();
+            settings.SmartModeEnabled = false;
+            _waterCoolerService.SaveSettings();
+
+            _waterCoolerService.StopSmartMode();
+            cbxPumpVoltage.IsEnabled = true;
+            cbxFanSpeed.IsEnabled = true;
+
+            // Re-apply the current combobox values so pump/fan don't stay at the
+            // last smart-mode speed after disabling.
+            if (_waterCoolerService.IsConnected)
+            {
+                var voltage = GetSelectedPumpVoltage();
+                var fan = GetSelectedFanSpeed();
+                try
+                {
+                    if (voltage != PumpVoltage.Off)
+                        await _waterCoolerService.WritePumpModeAsync(voltage);
+                    if (fan != FanSpeed.Off)
+                        await _waterCoolerService.WriteFanModeAsync(fan);
+                }
+                catch { /* non-critical — device may have disconnected */ }
+            }
+        }
+
+        private void cbxSmartModeTempSource_SelectionChanged(object sender, EventArgs e)
+        {
+            SaveSmartModeSettings();
+        }
+
+        private void cbxSmartModeSpeed_SelectionChanged(object sender, EventArgs e)
+        {
+            SaveSmartModeSettings();
+        }
+
+        private void tbSmartModeThresholds_LostFocus(object sender, RoutedEventArgs e)
+        {
+            SaveSmartModeSettings();
+        }
+
+        private void TextBox_NumericOnly(object sender, TextCompositionEventArgs e)
+        {
+            e.Handled = !Regex.IsMatch(e.Text, @"^\d+$");
+        }
+
+        private void SaveSmartModeSettings()
+        {
+            if (_waterCoolerService == null) return;
+            var settings = _waterCoolerService.GetSettings();
+
+            // Temperature source: 0=max, 1=cpu, 2=gpu
+            settings.SmartModeTempSource = cbxSmartModeTempSource.SelectedIndex switch
+            {
+                1 => "cpu",
+                2 => "gpu",
+                _ => "max"
+            };
+
+            // Thresholds
+            if (int.TryParse(tbSmartModeLow.Text, out int low))
+                settings.SmartModeLowThreshold = Math.Clamp(low, 0, 99);
+            if (int.TryParse(tbSmartModeHigh.Text, out int high))
+                settings.SmartModeHighThreshold = Math.Clamp(high, 0, 99);
+
+            // Ensure low <= high
+            if (settings.SmartModeLowThreshold > settings.SmartModeHighThreshold)
+            {
+                (settings.SmartModeLowThreshold, settings.SmartModeHighThreshold) =
+                    (settings.SmartModeHighThreshold, settings.SmartModeLowThreshold);
+                tbSmartModeLow.Text = settings.SmartModeLowThreshold.ToString();
+                tbSmartModeHigh.Text = settings.SmartModeHighThreshold.ToString();
+            }
+
+            // Pump speeds: 0=Off, 1=V7, 2=V8, 3=V11
+            settings.SmartModeIdlePump = (cbxSmartModeIdlePump.SelectedIndex + 1) switch
+            {
+                1 => "Off",
+                2 => "V7",
+                3 => "V8",
+                _ => "V11"
+            };
+            settings.SmartModeBoostPump = (cbxSmartModeBoostPump.SelectedIndex + 1) switch
+            {
+                1 => "Off",
+                2 => "V7",
+                3 => "V8",
+                _ => "V11"
+            };
+
+            // Fan speeds: 0=Off, 1=25%, 2=50%, 3=75%, 4=90%, 5=95%, 6=100%
+            settings.SmartModeIdleFan = (cbxSmartModeIdleFan.SelectedIndex + 1) switch
+            {
+                1 => "Off",
+                2 => "Percent25",
+                3 => "Percent50",
+                4 => "Percent75",
+                5 => "Percent90",
+                6 => "Percent95",
+                _ => "Percent100"
+            };
+            settings.SmartModeBoostFan = (cbxSmartModeBoostFan.SelectedIndex + 1) switch
+            {
+                1 => "Off",
+                2 => "Percent25",
+                3 => "Percent50",
+                4 => "Percent75",
+                5 => "Percent90",
+                6 => "Percent95",
+                _ => "Percent100"
+            };
+
+            _waterCoolerService.SaveSettings();
+        }
+
+        private void LoadSmartModeSettings()
+        {
+            if (_waterCoolerService == null) return;
+            var settings = _waterCoolerService.GetSettings();
+
+            // Toggle state
+            tsSmartMode.IsChecked = settings.SmartModeEnabled;
+
+            // Temperature source
+            cbxSmartModeTempSource.SelectedIndex = settings.SmartModeTempSource switch
+            {
+                "cpu" => 1,
+                "gpu" => 2,
+                _ => 0
+            };
+
+            // Thresholds
+            tbSmartModeLow.Text = settings.SmartModeLowThreshold.ToString();
+            tbSmartModeHigh.Text = settings.SmartModeHighThreshold.ToString();
+
+            // Pump speeds
+            cbxSmartModeIdlePump.SelectedIndex = settings.GetSmartModeIdlePump() switch
+            {
+                PumpVoltage.Off => 0,
+                PumpVoltage.V7 => 1,
+                PumpVoltage.V8 => 2,
+                _ => 3
+            };
+            cbxSmartModeBoostPump.SelectedIndex = settings.GetSmartModeBoostPump() switch
+            {
+                PumpVoltage.Off => 0,
+                PumpVoltage.V7 => 1,
+                PumpVoltage.V8 => 2,
+                _ => 3
+            };
+
+            // Fan speeds
+            cbxSmartModeIdleFan.SelectedIndex = settings.GetSmartModeIdleFan() switch
+            {
+                FanSpeed.Off => 0,
+                FanSpeed.Percent25 => 1,
+                FanSpeed.Percent50 => 2,
+                FanSpeed.Percent75 => 3,
+                FanSpeed.Percent90 => 4,
+                FanSpeed.Percent95 => 5,
+                _ => 6
+            };
+            cbxSmartModeBoostFan.SelectedIndex = settings.GetSmartModeBoostFan() switch
+            {
+                FanSpeed.Off => 0,
+                FanSpeed.Percent25 => 1,
+                FanSpeed.Percent50 => 2,
+                FanSpeed.Percent75 => 3,
+                FanSpeed.Percent90 => 4,
+                FanSpeed.Percent95 => 5,
+                _ => 6
+            };
+
+            // Apply smart mode enabled state
+            if (settings.SmartModeEnabled && _waterCoolerService.IsConnected)
+            {
+                _waterCoolerService.StartSmartMode();
+                cbxPumpVoltage.IsEnabled = false;
+                cbxFanSpeed.IsEnabled = false;
+            }
+        }
+
+        #endregion
 
         #endregion
 
@@ -430,11 +713,37 @@ namespace Uniwill_Control_Utility.Views.Pages
                         StartGlowPulse();
                         ApplyAccentGlow();
 
+                        // Start temperature update timer
+                        _tempUpdateTimer = new System.Threading.Timer(_ =>
+                        {
+                            try
+                            {
+                                Application.Current.Dispatcher.Invoke(() =>
+                                {
+                                    var provider = new FlydigiTemperatureProvider();
+                                    tbCpuTemp.Text = provider.GetCpuTemperature()?.ToString("F0") + "°C" ?? "--";
+                                    tbGpuTemp.Text = provider.GetGpuTemperature()?.ToString("F0") + "°C" ?? "--";
+                                    provider.Dispose();
+                                });
+                            }
+                            catch { /* temperature unavailable */ }
+                        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(2));
+
                         // Update page title with detected device name
                         if (_waterCoolerService?.ConnectedDeviceName != null
                             && !string.IsNullOrEmpty(_waterCoolerService.ConnectedDeviceName))
                         {
                             tbPageTitle.Text = $"{_waterCoolerService.ConnectedDeviceName} Control";
+                        }
+
+                        // Restart Smart Mode if it was enabled
+                        var settings = _waterCoolerService?.GetSettings();
+                        if (settings?.SmartModeEnabled == true)
+                        {
+                            _waterCoolerService.StartSmartMode();
+                            cbxPumpVoltage.IsEnabled = false;
+                            cbxFanSpeed.IsEnabled = false;
+                            tsSmartMode.IsChecked = true;
                         }
                         break;
 
@@ -449,11 +758,20 @@ namespace Uniwill_Control_Utility.Views.Pages
                         // Stop glow effect on disconnect
                         StopGlowPulse();
 
+                        // Stop temperature update timer
+                        _tempUpdateTimer?.Dispose();
+                        _tempUpdateTimer = null;
+                        tbCpuTemp.Text = "--";
+                        tbGpuTemp.Text = "--";
+
                         // Reset device image to default (Mk1)
                         UpdateDeviceImage();
 
                         // Reset page title
                         tbPageTitle.Text = "Hydro UI";
+
+                        // Re-enable manual pump control on disconnect (smart pump is stopped by service)
+                        cbxPumpVoltage.IsEnabled = true;
                         break;
 
                     case WaterCoolerService.WatercoolerConnectionState.Scanning:
@@ -513,6 +831,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Stop glow pulse timer to prevent leaks
             StopGlowPulse();
+
+            // Stop temperature update timer
+            _tempUpdateTimer?.Dispose();
+            _tempUpdateTimer = null;
 
             // Reset snackbar state so it can show again on next page visit
             _adaptiveSnackbar = null;
