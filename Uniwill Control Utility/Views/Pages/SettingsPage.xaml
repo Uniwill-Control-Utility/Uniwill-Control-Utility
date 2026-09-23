@@ -393,10 +393,9 @@
                     </ui:CardExpander>
 
                     <!-- Advanced features -->
-                    <ui:CardExpander x:Name="GpuPowerBoostCard"
+                    <ui:CardExpander x:Name="PowerBoostCard"
                                      Margin="0,0,0,8"
-                                     IsExpanded="False"
-                                     Visibility="Collapsed">
+                                     IsExpanded="False">
                         <ui:CardExpander.Icon>
                             <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF196;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
@@ -406,31 +405,32 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="For users of custom mods"
+                                               Text="Unlocks hardware power limits"
                                                TextWrapping="Wrap" />
                             </StackPanel>
                         </ui:CardExpander.Header>
                         <StackPanel>
-                            <!-- Row: GPU Power Boost (RTX 5080/5090 only) -->
+                            <!-- Row: Power boost mode -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="GPU Power Boost" />
+                                    <ui:TextBlock FontTypography="Body" Text="Power boost mode" />
                                     <ui:TextBlock Margin="0,2,0,2"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Allows GPU power limit to reach 250W. Disables Dynamic Boost control. Use only if you have installed the required mod." />
+                                                   Text="Removes CPU power limit caps and unlocks GPU power limit to 250W on supported GPUs. Disables Dynamic Boost control."
+                                                   TextWrapping="Wrap" />
                                 </StackPanel>
-                                <ui:ToggleSwitch x:Name="cbGpuPowerBoost"
+                                <ui:ToggleSwitch x:Name="cbPowerBoostMode"
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
                                                  OffContent="Off"
-                                                 Checked="cbGpuPowerBoost_Checked"
-                                                 Unchecked="cbGpuPowerBoost_Unchecked" />
+                                                 Checked="cbPowerBoostMode_Checked"
+                                                 Unchecked="cbPowerBoostMode_Unchecked" />
                             </Grid>
                         </StackPanel>
                     </ui:CardExpander>

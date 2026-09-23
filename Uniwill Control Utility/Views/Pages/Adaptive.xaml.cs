@@ -572,6 +572,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             var waterCooler = App.GetService<WaterCoolerService>();
             bool hydro = waterCooler?.IsConnected == true;
+            bool powerBoostMode = Settings.Default.EnablePowerBoostMode;
             var limits = SkuResolver.GetPowerLimits(hydro);
 
             if (limits == null)
@@ -579,27 +580,27 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Fallback: use reasonable defaults based on CPU vendor
                 if (Family.TYPE == Family.ProcessorType.Amd_Apu)
                 {
-                    AdpSdSustained.Maximum = hydro ? 160 : 130;
-                    AdpSdBoost.Maximum = hydro ? 160 : 135;
+                    AdpSdSustained.Maximum = powerBoostMode ? 255 : (hydro ? 160 : 130);
+                    AdpSdBoost.Maximum = powerBoostMode ? 255 : (hydro ? 160 : 135);
                 }
                 else if (Family.TYPE == Family.ProcessorType.Intel)
                 {
-                    AdpSdSustained.Maximum = hydro ? 200 : 160;
-                    AdpSdBoost.Maximum = hydro ? 200 : 200;
+                    AdpSdSustained.Maximum = powerBoostMode ? 255 : (hydro ? 200 : 160);
+                    AdpSdBoost.Maximum = powerBoostMode ? 255 : (hydro ? 200 : 200);
                 }
                 return;
             }
 
             if (Family.TYPE == Family.ProcessorType.Amd_Apu)
             {
-                AdpSdSustained.Maximum = limits.CpuPl1Sustained;
-                AdpSdBoost.Maximum = limits.CpuPl2Boost;
+                AdpSdSustained.Maximum = powerBoostMode ? 255 : limits.CpuPl1Sustained;
+                AdpSdBoost.Maximum = powerBoostMode ? 255 : limits.CpuPl2Boost;
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
                 // Intel uses the same sliders for PL1/PL2
-                AdpSdSustained.Maximum = limits.CpuPl1Sustained;
-                AdpSdBoost.Maximum = limits.CpuPl2Boost;
+                AdpSdSustained.Maximum = powerBoostMode ? 255 : limits.CpuPl1Sustained;
+                AdpSdBoost.Maximum = powerBoostMode ? 255 : limits.CpuPl2Boost;
             }
 
             // Clamp current values if they exceed the new maximum
@@ -612,7 +613,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (sdGpuSettings.Visibility == Visibility.Visible)
             {
                 string gpuName = NvTuning.GetGpuName()?.ToLowerInvariant() ?? string.Empty;
-                bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+                bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
                 int gpuMax = gpuName switch
                 {
                     var n when n.Contains("rtx 5090") => boostEnabled ? 250 : 150,
@@ -624,7 +625,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (AdpSdNvPower.Value > gpuMax)
                     AdpSdNvPower.Value = gpuMax;
 
-                // Hide Dynamic Boost controls when GPU Power Boost is ON
+                // Hide Dynamic Boost controls when Power boost mode is ON
                 bool dbVisible = !boostEnabled;
                 AdpDynamicBoostPanel.Visibility = dbVisible ? Visibility.Visible : Visibility.Collapsed;
 
@@ -640,7 +641,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (lblAdpPresetMode != null)
             {
-                lblAdpPresetMode.Text = boostEnabled ? "GPU Boost ON" : "";
+                lblAdpPresetMode.Text = boostEnabled ? "Power Boost ON" : "";
                 lblAdpPresetMode.Visibility = boostEnabled ? Visibility.Visible : Visibility.Collapsed;
             }
 
@@ -834,7 +835,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private static AdaptiveGpuSettings GetActiveGpuSettings(AdaptivePreset preset)
         {
-            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
             return boostEnabled ? preset.GpuBoost : preset.GpuNormal;
         }
 
@@ -843,7 +844,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void CaptureGpuToPreset(AdaptivePreset preset)
         {
-            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
             var gpu = boostEnabled ? preset.GpuBoost : preset.GpuNormal;
             gpu.Tgp = (int)AdpSdNvPower.Value;
             gpu.DynamicBoost = AdpTogDynamicBoost.IsChecked == true;
@@ -1749,7 +1750,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
 
             int tgp = (int)AdpSdNvPower.Value;
-            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
             bool dbEnabled = !boostEnabled && AdpTogDynamicBoost.IsChecked == true;
             int dbOffset = dbEnabled ? (int)AdpSdNvDbOffset.Value : 0;
             bool gpuClockDisabled = !Settings.Default.EnableGpuClockControl;
@@ -1900,7 +1901,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             ApplyAdpPowerLimitMax();
 
             // Update bottom bar boost mode label
-            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
             UpdateAdpPresetModeLabel(boostEnabled);
 
             // Defer preset loading to after the first frame renders so the page

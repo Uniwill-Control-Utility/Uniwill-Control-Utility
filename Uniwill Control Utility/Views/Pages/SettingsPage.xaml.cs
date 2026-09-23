@@ -99,7 +99,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbMinimizeClose.IsChecked = Settings.Default.MinimizeClose;
             cbAutoCheck.IsChecked = Settings.Default.UpdateCheck;
             cbAdaptive.IsChecked = Settings.Default.isStartAdpative;
-            cbGpuPowerBoost.IsChecked = Settings.Default.EnableGpuPowerBoost;
+            cbPowerBoostMode.IsChecked = Settings.Default.EnablePowerBoostMode;
             cbHideFlydigi.IsChecked = Settings.Default.EnableFlydigi;
             cbDisableCpuVoltageControl.IsChecked = Settings.Default.EnableCpuVoltageControl;
             cbDisableGpuClockControl.IsChecked = Settings.Default.EnableGpuClockControl;
@@ -107,12 +107,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbxLogLevel.SelectedIndex = Settings.Default.DiagnosticLogLevel;
 
             tbAppVerion.Text = $"Uniwill Control Utility - {GetAssemblyVersion()}";
-
-            // Show GPU Power Boost toggle only for RTX 5080/5090
-            if (Scripts.GPUs.NVIDIA.NvTuning.IsBlackwellHighEnd())
-            {
-                GpuPowerBoostCard.Visibility = Visibility.Visible;
-            }
 
             _ = checkUpdate();
         }
@@ -394,15 +388,15 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.Save();
         }
 
-       private void cbGpuPowerBoost_Checked(object sender, RoutedEventArgs e)
+       private void cbPowerBoostMode_Checked(object sender, RoutedEventArgs e)
         {
-            Settings.Default.EnableGpuPowerBoost = true;
+            Settings.Default.EnablePowerBoostMode = true;
             Settings.Default.Save();
         }
 
-        private void cbGpuPowerBoost_Unchecked(object sender, RoutedEventArgs e)
+        private void cbPowerBoostMode_Unchecked(object sender, RoutedEventArgs e)
         {
-            Settings.Default.EnableGpuPowerBoost = false;
+            Settings.Default.EnablePowerBoostMode = false;
             Settings.Default.Save();
         }
 
@@ -567,13 +561,23 @@ namespace Uniwill_Control_Utility.Views.Pages
             sdCPU.Visibility = Visibility.Collapsed;
             sdRAM.Visibility = Visibility.Collapsed;
 
-            // Offload all heavy WMI queries and processing to a background thread
-            await System.Threading.Tasks.Task.Run(() =>
+            // Load from pre-fetched cache populated at app startup.
+            // Falls back to live WMI query if cache is empty (first navigation before startup completes).
+            bool cacheReady = !string.IsNullOrEmpty(CachedSystemInfo.CpuName);
+
+            if (!cacheReady)
             {
-                getDeviceInfo();
-                getCPUInfoSync();
-                getRAMInfoSync();
-            });
+                await System.Threading.Tasks.Task.Run(() =>
+                {
+                    getDeviceInfo();
+                    getCPUInfoSync();
+                    getRAMInfoSync();
+                });
+            }
+            else
+            {
+                loadFromCache();
+            }
 
             // Update UI on the dispatcher thread
             await this.Dispatcher.InvokeAsync(() =>
@@ -582,6 +586,34 @@ namespace Uniwill_Control_Utility.Views.Pages
                 applyCPUInfo();
                 applyRAMInfo();
             });
+        }
+
+        private void loadFromCache()
+        {
+            _deviceName = CachedSystemInfo.DeviceName;
+            _deviceModel = CachedSystemInfo.DeviceModel;
+            _deviceProducer = CachedSystemInfo.DeviceProducer;
+
+            _cpuName = CachedSystemInfo.CpuName;
+            _cpuDescription = CachedSystemInfo.CpuDescription;
+            _cpuManufacturer = CachedSystemInfo.CpuManufacturer;
+            _cpuCodeName = CachedSystemInfo.CpuCodeName;
+            _cpuBaseClock = CachedSystemInfo.CpuBaseClock;
+            _cpuInstructions = CachedSystemInfo.CpuInstructions;
+            _cpuCores = CachedSystemInfo.CpuCores;
+            _cpuLogicalProcessors = CachedSystemInfo.CpuLogicalProcessors;
+            _cpuL2Size = CachedSystemInfo.CpuL2Size;
+            _cpuL3Size = CachedSystemInfo.CpuL3Size;
+            _cpuL1Cache = CachedSystemInfo.CpuL1Cache;
+            _cpuL2Cache = CachedSystemInfo.CpuL2Cache;
+
+            _ramCapacity = CachedSystemInfo.RamCapacity;
+            _ramSpeed = CachedSystemInfo.RamSpeed;
+            _ramType = CachedSystemInfo.RamType;
+            _ramWidth = CachedSystemInfo.RamWidth;
+            _ramSlots = CachedSystemInfo.RamSlots;
+            _ramProducer = CachedSystemInfo.RamProducer;
+            _ramModel = CachedSystemInfo.RamModel;
         }
 
         private void btnStressTest_Click(object sender, RoutedEventArgs e)

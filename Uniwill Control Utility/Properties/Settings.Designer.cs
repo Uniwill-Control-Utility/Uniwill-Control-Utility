@@ -802,9 +802,9 @@ namespace Uniwill_Control_Utility.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool EnableGpuPowerBoost {
-            get { return ((bool)(this["EnableGpuPowerBoost"])); }
-            set { this["EnableGpuPowerBoost"] = value; }
+        public bool EnablePowerBoostMode {
+            get { return ((bool)(this["EnablePowerBoostMode"])); }
+            set { this["EnablePowerBoostMode"] = value; }
         }
 
         [global::System.Configuration.UserScopedSettingAttribute()]

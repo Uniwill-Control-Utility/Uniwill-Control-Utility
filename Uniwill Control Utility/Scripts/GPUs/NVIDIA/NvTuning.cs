@@ -39,13 +39,13 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         /// RTX 5080/5090 with boost enabled: 250W. Otherwise: 175W.
         /// </summary>
         public static int MaxPowerLimitWatts =>
-            IsBlackwellHighEnd() && Properties.Settings.Default.EnableGpuPowerBoost
+            IsBlackwellHighEnd() && Properties.Settings.Default.EnablePowerBoostMode
                 ? MaxPowerLimitWattsBoost
                 : MaxPowerLimitWattsDefault;
 
         /// <summary>
         /// Returns true if the detected GPU is an RTX 5080 or 5090 Laptop GPU.
-        /// Used to gate features (e.g., GPU power boost toggle visibility) to Blackwell flagship GPUs only.
+        /// Used to gate GPU-specific power boost features (250W unlock) to Blackwell flagship GPUs.
         /// </summary>
         public static bool IsBlackwellHighEnd()
         {

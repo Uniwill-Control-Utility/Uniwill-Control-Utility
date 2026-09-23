@@ -589,7 +589,7 @@
                                         <Slider x:Name="sdNvPower" Width="140" Maximum="175" Minimum="50" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
-                                <!-- Dynamic Boost Controls (hidden when GPU Power Boost is ON) -->
+                                <!-- Dynamic Boost Controls (hidden when Power boost mode is ON) -->
                                 <StackPanel x:Name="DynamicBoostPanel">
                                     <!-- Divider -->
                                     <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />

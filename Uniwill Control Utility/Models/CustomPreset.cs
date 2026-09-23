@@ -7,7 +7,7 @@ using System.Text.Json;
 namespace Uniwill_Control_Utility.Models
 {
     /// <summary>
-    /// Which preset slot pool to use — Normal (Dynamic Boost available) or Boost (GPU Power Boost ON, pure TGP).
+    /// Which preset slot pool to use — Normal (Dynamic Boost available) or Boost (Power boost mode ON, pure TGP).
     /// </summary>
     public enum PresetMode
     {
@@ -82,7 +82,7 @@ namespace Uniwill_Control_Utility.Models
 
     /// <summary>
     /// Persists 5 Custom preset slots to a JSON file in the user's AppData folder.
-    /// Maintains two separate pools — Normal (Dynamic Boost available) and Boost (GPU Power Boost ON, pure TGP).
+    /// Maintains two separate pools — Normal (Dynamic Boost available) and Boost (Power boost mode ON, pure TGP).
     /// </summary>
     public static class CustomPresetStore
     {

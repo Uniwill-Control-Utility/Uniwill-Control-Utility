@@ -10,6 +10,7 @@ using System;
 using System.Configuration;
 using System.Diagnostics;
 using System.IO;
+using System.Management;
 using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -365,6 +366,9 @@ namespace Uniwill_Control_Utility
                     LaptopDetector.Initialize();
                     HasMiniLEDPanel = PanelDatabase.IsMiniLED();
                     SkuResolver.Initialize();
+
+                    // Pre-fetch Settings System Info data so the page loads instantly.
+                    PrefetchSystemInfo();
                 });
 
                 // Notify subscribers on the UI thread that hardware detection is done.
@@ -376,6 +380,81 @@ namespace Uniwill_Control_Utility
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to detect hardware");
+            }
+        }
+
+        /// <summary>
+        /// Runs all WMI queries needed by the Settings System Info section on a background thread.
+        /// Must be called from a background thread (not the UI dispatcher).
+        /// </summary>
+        private static void PrefetchSystemInfo()
+        {
+            try
+            {
+                // Device info
+                CachedSystemInfo.DeviceName = GetSystemInfo.SystemName;
+                CachedSystemInfo.DeviceModel = GetSystemInfo.Product;
+                CachedSystemInfo.DeviceProducer = GetSystemInfo.Manufacturer;
+
+                // CPU info
+                using (var searcher = new ManagementObjectSearcher(@"root\CIMV2", "SELECT * FROM Win32_Processor"))
+                {
+                    foreach (ManagementBaseObject obj in searcher.Get())
+                    {
+                        CachedSystemInfo.CpuName = (obj["Name"] as string ?? string.Empty).Trim();
+                        CachedSystemInfo.CpuDescription = (obj["Description"] as string ?? string.Empty).Trim();
+                        CachedSystemInfo.CpuManufacturer = (obj["Manufacturer"] as string ?? string.Empty).Trim();
+                        CachedSystemInfo.CpuCores = Convert.ToInt32(obj["NumberOfCores"]);
+                        CachedSystemInfo.CpuLogicalProcessors = Convert.ToInt32(obj["NumberOfLogicalProcessors"]);
+                        CachedSystemInfo.CpuL2Size = Convert.ToDouble(obj["L2CacheSize"]) / 1024;
+                        CachedSystemInfo.CpuL3Size = Convert.ToDouble(obj["L3CacheSize"]) / 1024;
+                        CachedSystemInfo.CpuBaseClock = obj["MaxClockSpeed"] as string ?? string.Empty;
+                    }
+                }
+
+                CachedSystemInfo.CpuCodeName = GetSystemInfo.Codename() ?? string.Empty;
+
+                uint sum = 0u;
+                foreach (uint n in GetSystemInfo.GetCacheSizes(GetSystemInfo.CacheLevel.Level1))
+                    sum += n;
+                CachedSystemInfo.CpuL1Cache = (decimal)(sum / 1024u);
+
+                sum = 0u;
+                foreach (uint n in GetSystemInfo.GetCacheSizes(GetSystemInfo.CacheLevel.Level2))
+                    sum += n;
+                CachedSystemInfo.CpuL2Cache = (decimal)(sum / 1024u);
+
+                CachedSystemInfo.CpuInstructions = GetSystemInfo.InstructionSets();
+
+                // RAM info
+                using (var ramSearcher = new ManagementObjectSearcher(@"root\CIMV2", "SELECT * FROM Win32_PhysicalMemory"))
+                {
+                    foreach (ManagementBaseObject obj in ramSearcher.Get())
+                    {
+                        string manufacturer = obj["Manufacturer"] as string ?? string.Empty;
+                        string partNumber = obj["PartNumber"] as string ?? string.Empty;
+
+                        if (CachedSystemInfo.RamProducer == "") CachedSystemInfo.RamProducer = manufacturer;
+                        else if (!CachedSystemInfo.RamProducer.Contains(manufacturer))
+                            CachedSystemInfo.RamProducer = $"{CachedSystemInfo.RamProducer}/{manufacturer}";
+
+                        if (CachedSystemInfo.RamModel == "") CachedSystemInfo.RamModel = partNumber;
+                        else if (!CachedSystemInfo.RamModel.Contains(partNumber))
+                            CachedSystemInfo.RamModel = $"{CachedSystemInfo.RamModel}/{partNumber}";
+
+                        CachedSystemInfo.RamCapacity += Convert.ToDouble(obj["Capacity"]);
+                        CachedSystemInfo.RamSpeed = Convert.ToInt32(obj["ConfiguredClockSpeed"]);
+                        CachedSystemInfo.RamType = Convert.ToInt32(obj["SMBIOSMemoryType"]);
+                        CachedSystemInfo.RamWidth += Convert.ToInt32(obj["DataWidth"]);
+                        CachedSystemInfo.RamSlots++;
+                    }
+                }
+
+                CachedSystemInfo.RamCapacity /= 1024 * 1024 * 1024;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to prefetch system info");
             }
         }
 

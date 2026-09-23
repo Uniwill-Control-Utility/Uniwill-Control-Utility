@@ -665,7 +665,7 @@
                         <StackPanel>
                             <!-- Smart Mode ON badge (shown when Smart Mode is active) -->
                             <Grid x:Name="spWcSmartModeBadge" Visibility="Collapsed" Margin="0,0,0,4">
-                                <TextBlock Text="Smart Mode ON, pump/fan speed cannot be overridden"
+                                <TextBlock Text="Smart Mode ON, pump/fan speed cannot be overriden"
                                            FontWeight="Bold"
                                            FontSize="14"
                                            HorizontalAlignment="Center"

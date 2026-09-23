@@ -1,4 +1,4 @@
-ï»¿using Accord.Math.Distances;
+using Accord.Math.Distances;
 using DuoVia.FuzzyStrings;
 using GameLib.Plugin.RiotGames.Model;
 using Gma.System.MouseKeyHook;
@@ -216,8 +216,8 @@ namespace Uniwill_Control_Utility.Views.Windows
                     {
                         await Task.Run(() => GetBatteryStatus());
 
-                        // Determine active preset mode based on current GPU Power Boost setting
-                        bool boostEnabled = Scripts.GPUs.NVIDIA.NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+                        // Determine active preset mode based on current Power boost mode setting
+                        bool boostEnabled = Scripts.GPUs.NVIDIA.NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
                         Models.PresetMode mode = boostEnabled ? Models.PresetMode.Boost : Models.PresetMode.Normal;
                         var presets = Models.CustomPresetStore.Load(mode);
                         // Use the saved slot for the active mode, fall back to first slot with data.
@@ -794,7 +794,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 try
                                 {
                                     // If the service still thinks it's connected, the HID link
-                                    // may be stale after hibernate â€” reconnect.
+                                    // may be stale after hibernate — reconnect.
                                     if (flydigiService.IsConnected)
                                     {
                                         Debug.WriteLine("[Flydigi] Resuming from sleep - disconnecting stale HID link");
@@ -941,7 +941,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             try
             {
                 // Determine active preset mode for the "checked" indicator
-                bool boostEnabled = Scripts.GPUs.NVIDIA.NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+                bool boostEnabled = Scripts.GPUs.NVIDIA.NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
                 Models.PresetMode activeMode = boostEnabled ? Models.PresetMode.Boost : Models.PresetMode.Normal;
                 int activeSlot = activeMode == Models.PresetMode.Boost
                     ? Settings.Default.customPresetSlotBoost
@@ -992,7 +992,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private async void TrayCustomPreset_Click(object? sender, RoutedEventArgs e)
         {
-            // Legacy handler â€“ delegates to extended handler with Normal mode.
+            // Legacy handler – delegates to extended handler with Normal mode.
             if (sender is not MenuItem menuItem || menuItem.Tag is not int slot)
                 return;
             await TrayCustomPresetApplyAsync(slot, Models.PresetMode.Normal);
@@ -1051,7 +1051,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             string profileName = ResolveAutomationProfile(configuredName);
             if (string.IsNullOrEmpty(profileName))
             {
-                // Unknown profile ï¿½ fall back to raw command execution
+                // Unknown profile ? fall back to raw command execution
                 await RyzenAdj_To_UCU.TranslateAsync(commands, appliedName: configuredName, localizeAppliedName: false);
                 return;
             }

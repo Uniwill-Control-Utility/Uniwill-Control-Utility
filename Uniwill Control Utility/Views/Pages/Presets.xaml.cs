@@ -36,14 +36,14 @@ namespace Uniwill_Control_Utility.Views.Pages
         private int _customPresetSlot = 0;
 
         /// <summary>
-        /// Returns the active PresetMode based on GPU Power Boost setting.
+        /// Returns the active PresetMode based on Power boost mode setting.
         /// Only Blackwell high-end GPUs (RTX 5080/5090) support the Boost pool.
         /// </summary>
         private Models.PresetMode ActivePresetMode
         {
             get
             {
-                bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+                bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
                 return boostEnabled ? Models.PresetMode.Boost : Models.PresetMode.Normal;
             }
         }
@@ -137,7 +137,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 // Refresh preset mode label and bottom bar stroke on every navigation
                 // (handles settings changes from the Settings page).
-                bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+                bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
                 UpdatePresetModeLabel(boostEnabled);
 
                 // Update overlay based on Adaptive Mode override state
@@ -502,16 +502,23 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
 
             var pl = limits;
+            bool powerBoostMode = Settings.Default.EnablePowerBoostMode;
+
+            // When Power boost mode is ON, raise the slider cap to the water-cooling limits
+            // (same limits that Hydro UI connection would unlock), instead of the EC maximum.
+            // AMD: 160W/160W, Intel: 200W/200W — matches skus.json water values.
+            int boostPl1 = Family.TYPE == Family.ProcessorType.Amd_Apu ? 160 : 200;
+            int boostPl2 = Family.TYPE == Family.ProcessorType.Amd_Apu ? 160 : 200;
 
             if (Family.TYPE == Family.ProcessorType.Amd_Apu)
             {
-                sdSustained.Maximum = pl.CpuPl1Sustained;
-                sdBoost.Maximum = pl.CpuPl2Boost;
+                sdSustained.Maximum = powerBoostMode ? boostPl1 : pl.CpuPl1Sustained;
+                sdBoost.Maximum = powerBoostMode ? boostPl2 : pl.CpuPl2Boost;
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
-                sdIntelPl1.Maximum = pl.CpuPl1Sustained;
-                sdIntelPl2.Maximum = pl.CpuPl2Boost;
+                sdIntelPl1.Maximum = powerBoostMode ? boostPl1 : pl.CpuPl1Sustained;
+                sdIntelPl2.Maximum = powerBoostMode ? boostPl2 : pl.CpuPl2Boost;
             }
 
             // GPU TGP slider — set per-GPU min/max range
@@ -524,7 +531,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void SetGpuSliderLimits(int fallbackMax)
         {
             string gpuName = NvTuning.GetGpuName() ?? string.Empty;
-            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
             (int min, int max) = gpuName.ToLowerInvariant() switch
             {
                 var n when n.Contains("rtx 5090") => (95, boostEnabled ? 250 : 150),
@@ -536,12 +543,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             sdNvPower.Maximum = max;
 
             // Clamp current value to new range only if out of bounds.
-            // This handles the case where GPU Power Boost setting changes
+            // This handles the case where Power boost mode setting changes
             // (e.g., user disables boost, reducing the max from 250 to 150).
             if (sdNvPower.Value > max) sdNvPower.Value = max;
             if (sdNvPower.Value < min) sdNvPower.Value = min;
 
-            // Hide Dynamic Boost controls when GPU Power Boost is ON
+            // Hide Dynamic Boost controls when Power boost mode is ON
             bool dbVisible = !boostEnabled;
             DynamicBoostPanel.Visibility = dbVisible ? Visibility.Visible : Visibility.Collapsed;
             tbDbLabel.Visibility = dbVisible ? Visibility.Visible : Visibility.Collapsed;
@@ -552,14 +559,14 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         /// <summary>
         /// Updates the preset mode label in the bottom bar and the boost accent stroke.
-        /// Shows "Boost" when GPU Power Boost is ON, hides the label otherwise.
+        /// Shows "Boost" when Power boost mode is ON, hides the label otherwise.
         /// Also shows/hides the bottom bar accent stroke.
         /// </summary>
         private void UpdatePresetModeLabel(bool boostEnabled)
         {
             if (lblPresetMode != null)
             {
-                lblPresetMode.Text = boostEnabled ? "GPU Boost ON" : "";
+                lblPresetMode.Text = boostEnabled ? "Power Boost ON" : "";
                 lblPresetMode.Visibility = boostEnabled ? Visibility.Visible : Visibility.Collapsed;
             }
 
@@ -584,14 +591,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool hydro = IsHydroConnected;
             string coolingLabel = hydro ? " (water)" : " (air)";
             var limits = GetPowerLimits();
-            bool gpuBoostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+            bool gpuBoostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
 
             // Try to get SKU-specific profile data for tooltips
             Models.SkuProfileEntry? officeProfile = Services.SkuResolver.GetProfile("office");
             Models.SkuProfileEntry? gamingProfile = Services.SkuResolver.GetProfile("gaming");
             Models.SkuProfileEntry? turboProfile = Services.SkuResolver.GetProfile("turbo");
 
-            // Build GPU tooltip text — hide Dynamic Boost mention entirely when GPU Power Boost is ON
+            // Build GPU tooltip text — hide Dynamic Boost mention entirely when Power boost mode is ON
             static string GpuTooltip(Models.SkuProfileEntry? profile, bool boostEnabled)
             {
                 if (profile == null)
@@ -744,9 +751,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             string profileKey = profile.ToLowerInvariant();
             var skuProfile = Services.SkuResolver.GetProfile(profileKey);
 
-            // When GPU Power Boost is ON, merge TGP + DB offset into a single TGP value
+            // When Power boost mode is ON, merge TGP + DB offset into a single TGP value
             // and disable Dynamic Boost (the DB UI controls are hidden in boost mode).
-            bool gpuBoostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+            bool gpuBoostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
 
             if (profile == "Office")
             {
@@ -1496,7 +1503,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     int core = Settings.Default.EnableGpuClockControl ? (int)sdNvCore.Value : 0;
                     int mem = Settings.Default.EnableGpuClockControl ? (int)sdNvMem.Value : 0;
                     int tgp = (int)sdNvPower.Value;
-                    bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnableGpuPowerBoost;
+                    bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
                     bool dbEnabled = !boostEnabled && togDynamicBoost.IsChecked == true;
                     int dbOffset = dbEnabled ? (int)sdNvDbOffset.Value : 0;
                     int totalWatts = tgp + dbOffset;

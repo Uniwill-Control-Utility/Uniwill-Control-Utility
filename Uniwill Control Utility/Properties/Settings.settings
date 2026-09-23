@@ -182,7 +182,7 @@
     <Setting Name="EnableFlydigi" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
-    <Setting Name="EnableGpuPowerBoost" Type="System.Boolean" Scope="User">
+    <Setting Name="EnablePowerBoostMode" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="EnableGpuClockControl" Type="System.Boolean" Scope="User">
