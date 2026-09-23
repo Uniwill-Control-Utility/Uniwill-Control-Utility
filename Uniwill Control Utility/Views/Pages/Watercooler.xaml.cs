@@ -38,6 +38,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// <summary>True while OnWatercoolerPresetApplied is updating UI controls. Suppresses selection-changed side effects.</summary>
         private bool _isSyncingFromPreset;
 
+        /// <summary>True while LoadSmartModeSettings is populating controls. Suppresses SelectionChanged saves.</summary>
+        private bool _isSyncingSmartMode;
+
         public Watercooler()
         {
             InitializeComponent();
@@ -555,6 +558,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void SaveSmartModeSettings()
         {
             if (_waterCoolerService == null) return;
+            // Skip save if controls are being populated from loaded settings (prevents circular save).
+            if (_isSyncingSmartMode) return;
             var settings = _waterCoolerService.GetSettings();
 
             // Temperature source: 0=max, 1=cpu, 2=gpu
@@ -626,65 +631,74 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (_waterCoolerService == null) return;
             var settings = _waterCoolerService.GetSettings();
 
-            // Toggle state
-            tsSmartMode.IsChecked = settings.SmartModeEnabled;
+            // Prevent SelectionChanged handlers from saving back to disk while we populate controls.
+            _isSyncingSmartMode = true;
+            try
+            {
+                // Toggle state
+                tsSmartMode.IsChecked = settings.SmartModeEnabled;
 
-            // Temperature source
-            cbxSmartModeTempSource.SelectedIndex = settings.SmartModeTempSource switch
-            {
-                "cpu" => 1,
-                "gpu" => 2,
-                _ => 0
-            };
+                // Temperature source
+                cbxSmartModeTempSource.SelectedIndex = settings.SmartModeTempSource switch
+                {
+                    "cpu" => 1,
+                    "gpu" => 2,
+                    _ => 0
+                };
 
-            // Thresholds
-            tbSmartModeLow.Text = settings.SmartModeLowThreshold.ToString();
-            tbSmartModeHigh.Text = settings.SmartModeHighThreshold.ToString();
+                // Thresholds
+                tbSmartModeLow.Text = settings.SmartModeLowThreshold.ToString();
+                tbSmartModeHigh.Text = settings.SmartModeHighThreshold.ToString();
 
-            // Pump speeds
-            cbxSmartModeIdlePump.SelectedIndex = settings.GetSmartModeIdlePump() switch
-            {
-                PumpVoltage.Off => 0,
-                PumpVoltage.V7 => 1,
-                PumpVoltage.V8 => 2,
-                _ => 3
-            };
-            cbxSmartModeBoostPump.SelectedIndex = settings.GetSmartModeBoostPump() switch
-            {
-                PumpVoltage.Off => 0,
-                PumpVoltage.V7 => 1,
-                PumpVoltage.V8 => 2,
-                _ => 3
-            };
+                // Pump speeds
+                cbxSmartModeIdlePump.SelectedIndex = settings.GetSmartModeIdlePump() switch
+                {
+                    PumpVoltage.Off => 0,
+                    PumpVoltage.V7 => 1,
+                    PumpVoltage.V8 => 2,
+                    _ => 3
+                };
+                cbxSmartModeBoostPump.SelectedIndex = settings.GetSmartModeBoostPump() switch
+                {
+                    PumpVoltage.Off => 0,
+                    PumpVoltage.V7 => 1,
+                    PumpVoltage.V8 => 2,
+                    _ => 3
+                };
 
-            // Fan speeds
-            cbxSmartModeIdleFan.SelectedIndex = settings.GetSmartModeIdleFan() switch
-            {
-                FanSpeed.Off => 0,
-                FanSpeed.Percent25 => 1,
-                FanSpeed.Percent50 => 2,
-                FanSpeed.Percent75 => 3,
-                FanSpeed.Percent90 => 4,
-                FanSpeed.Percent95 => 5,
-                _ => 6
-            };
-            cbxSmartModeBoostFan.SelectedIndex = settings.GetSmartModeBoostFan() switch
-            {
-                FanSpeed.Off => 0,
-                FanSpeed.Percent25 => 1,
-                FanSpeed.Percent50 => 2,
-                FanSpeed.Percent75 => 3,
-                FanSpeed.Percent90 => 4,
-                FanSpeed.Percent95 => 5,
-                _ => 6
-            };
+                // Fan speeds
+                cbxSmartModeIdleFan.SelectedIndex = settings.GetSmartModeIdleFan() switch
+                {
+                    FanSpeed.Off => 0,
+                    FanSpeed.Percent25 => 1,
+                    FanSpeed.Percent50 => 2,
+                    FanSpeed.Percent75 => 3,
+                    FanSpeed.Percent90 => 4,
+                    FanSpeed.Percent95 => 5,
+                    _ => 6
+                };
+                cbxSmartModeBoostFan.SelectedIndex = settings.GetSmartModeBoostFan() switch
+                {
+                    FanSpeed.Off => 0,
+                    FanSpeed.Percent25 => 1,
+                    FanSpeed.Percent50 => 2,
+                    FanSpeed.Percent75 => 3,
+                    FanSpeed.Percent90 => 4,
+                    FanSpeed.Percent95 => 5,
+                    _ => 6
+                };
 
-            // Apply smart mode enabled state
-            if (settings.SmartModeEnabled && _waterCoolerService.IsConnected)
+                // Apply smart mode enabled state
+                if (settings.SmartModeEnabled && _waterCoolerService.IsConnected)
+                {
+                    _waterCoolerService.StartSmartMode();
+                    cbxPumpVoltage.IsEnabled = false;
+                    cbxFanSpeed.IsEnabled = false;
+                }
+            }
+            finally
             {
-                _waterCoolerService.StartSmartMode();
-                cbxPumpVoltage.IsEnabled = false;
-                cbxFanSpeed.IsEnabled = false;
+                _isSyncingSmartMode = false;
             }
         }
 
