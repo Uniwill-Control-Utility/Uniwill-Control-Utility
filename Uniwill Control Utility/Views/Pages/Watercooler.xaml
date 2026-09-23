@@ -16,11 +16,11 @@
       UseLayoutRounding="True"
       ScrollViewer.CanContentScroll="False">
 
-    <!-- Root Grid with single row: full-height ScrollViewer for centered max-width layout.
-         The scrollbar is glued to the absolute right edge and spans the entire window vertically. -->
+    <!-- Root Grid with two rows: scrollable content + bottom bar -->
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Row 0: Full-height ScrollViewer -->
@@ -448,7 +448,7 @@
                         </ComboBox>
                     </ui:CardControl>
 
-                    <!-- RGB Effect -->
+                    <!-- RGB Lighting -->
                     <ui:CardExpander x:Name="RgbCardExpander"
                                      Margin="0,0,0,8"
                                      IsExpanded="False">
@@ -462,7 +462,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="RGB Effect" />
+                                    <ui:TextBlock FontTypography="Body" Text="RGB Lighting" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                        FontTypography="Caption"
                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
@@ -561,6 +561,95 @@
             </StackPanel>
             </Grid>
         </ScrollViewer>
+
+        <!-- Row 1: Bottom bar — flow status + firmware (left), actions (right) -->
+        <ui:Card x:Name="bottomBar"
+                 Grid.Row="1"
+                 MaxWidth="1080"
+                 HorizontalAlignment="Stretch"
+                 Margin="12,8,16,12"
+                 Padding="12,8"
+                 Visibility="Collapsed">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Status indicators (left) -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <!-- Flow status -->
+                    <Border Padding="12,8"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}"
+                            CornerRadius="4"
+                            VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+
+                            <iconPacks:PackIconLucide
+                                x:Name="FlowStatusIcon"
+                                Kind="Waves"
+                                VerticalAlignment="Center"
+                                Width="14"
+                                Height="14"
+                                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                Margin="0,0,12,0"/>
+                            <TextBlock x:Name="FlowStatusText"
+                                       VerticalAlignment="Center"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                       Text="Flow: Off" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Firmware version -->
+                    <Border x:Name="FirmwareBadge"
+                            Margin="12,0,0,0"
+                            Padding="12,8"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource ControlFillColorSecondaryBrush}"
+                            CornerRadius="4"
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed">
+                        <TextBlock x:Name="FirmwareText"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </Border>
+                </StackPanel>
+
+                <!-- Action buttons (right) -->
+                <WrapPanel Grid.Column="1"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center">
+                    <ui:Button x:Name="btnWaterFill"
+                               MinWidth="120"
+                               Margin="0,0,8,0"
+                               Click="btnWaterFill_Click"
+                               ToolTip="Run the water filling cycle. Connect the hose before starting.">
+                        <StackPanel Orientation="Horizontal">
+                            <iconPacks:PackIconLucide Kind="Fuel" Margin="0,0,12,0" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Water Fill" />
+                        </StackPanel>
+                    </ui:Button>
+                    <ui:Button x:Name="btnStandby"
+                               MinWidth="110"
+                               Click="btnStandby_Click"
+                               ToolTip="Pause all outputs while keeping BLE connected.">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:FontIcon 
+                                x:Name="StandbyIcon" 
+                                FontFamily="Segoe Fluent Icons" 
+                                Glyph="&#xE769;" 
+                                Margin="0,1,12,0" 
+                                VerticalAlignment="Center" 
+                                HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="StandbyText" Text="Standby" />
+                        </StackPanel>
+                    </ui:Button>
+                </WrapPanel>
+            </Grid>
+        </ui:Card>
 
         <!-- Dark overlay to block input when Adaptive Mode override is active -->
         <Border x:Name="overlayAdaptiveWarning"

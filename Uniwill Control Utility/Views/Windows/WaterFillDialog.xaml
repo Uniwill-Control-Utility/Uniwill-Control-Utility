@@ -1,0 +1,119 @@
+<ui:FluentWindow x:Class="Uniwill_Control_Utility.Views.Windows.WaterFillDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    Title="Water Filling Cycle"
+    Width="420"
+    SizeToContent="Height"
+    WindowStartupLocation="CenterOwner"
+    ResizeMode="NoResize"
+    WindowBackdropType="Mica"
+    WindowCornerPreference="Round"
+    ExtendsContentIntoTitleBar="True"
+    SnapsToDevicePixels="True"
+    UseLayoutRounding="True">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0"
+                     Title="Water Filling Mode"
+                     Icon="pack://application:,,,/Assets/applicationIcon-256.png"
+                     CanMaximize="False"
+                     ShowMaximize="False"
+                     ShowMinimize="False"
+                     ShowClose="False" />
+
+        <StackPanel Grid.Row="1"
+                    Margin="18">
+
+            <!-- Warning -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8" HorizontalAlignment="Center">
+                <ui:FontIcon x:Name="WarningIcon"
+                             FontFamily="Segoe Fluent Icons"
+                             Glyph="&#xE7BA;"
+                             FontSize="48"
+                             Margin="24,0,10,0"
+                             VerticalAlignment="Center"
+                             Foreground="#FF8C00" />
+                <TextBlock FontSize="14"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Text="Prepare the Cooler" />
+            </StackPanel>
+
+            <TextBlock Margin="30,24,0,16"
+                       FontSize="13"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       TextWrapping="Wrap"
+                       VerticalAlignment="Center"
+                       Text="Fill the reservoir with coolant, then connect the laptop and liquid cooler with provided tubing before starting. The filling cycle runs for approximately 70 seconds." />
+
+            <!-- Progress (initially hidden) -->
+            <StackPanel x:Name="ProgressPanel" Visibility="Collapsed">
+                <Grid Margin="18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <ProgressBar x:Name="PrimingProgressBar"
+                                 Height="8"
+                                 Minimum="0"
+                                 Maximum="8"
+                                 Value="0"
+                                 Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+
+                    <TextBlock x:Name="CycleText"
+                               Grid.Column="1"
+                               Margin="12,0,0,0"
+                               VerticalAlignment="Center"
+                               FontSize="13"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="Cycle 0/8" />
+                </Grid>
+
+                <TextBlock x:Name="StatusText"
+                           Margin="18,4"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           TextWrapping="Wrap"
+                           Text="Starting..." 
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Buttons row with card background -->
+        <Grid Grid.Row="2"
+              Background="{DynamicResource SmokeFillColorDefaultBrush}"
+              Margin="0,0,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <ui:Button x:Name="btnCancel"
+                       Grid.Column="1"
+                       Width="150"
+                       Height="34"
+                       Click="btnCancel_Click"
+                       Content="Cancel"
+                       Margin="0,24"/>
+
+            <ui:Button x:Name="btnStart"
+                       Grid.Column="3"
+                       Width="150"
+                       Height="34"
+                       Appearance="Primary"
+                       Click="btnStart_Click"
+                       Content="Continue" />
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

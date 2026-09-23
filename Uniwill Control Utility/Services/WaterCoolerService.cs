@@ -67,7 +67,29 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public event EventHandler<(byte PumpStatus, ushort FanRpm, byte Temperature)>? StatusReceived;
 
+        /// <summary>
+        /// Raised when the flow meter status changes.
+        /// </summary>
+        public event EventHandler<FlowStatus>? FlowStatusChanged;
+
+        /// <summary>
+        /// Raised when the firmware version is received from the device.
+        /// </summary>
+        public event EventHandler<string>? FirmwareVersionReceived;
+
         private WaterCoolerSettings _settings = new();
+
+        /// <summary>Firmware version string reported by the device on connect.</summary>
+        public string? FirmwareVersion { get; private set; }
+
+        /// <summary>Current flow meter status.</summary>
+        public FlowStatus FlowStatus { get; private set; }
+
+        /// <summary>True when Standby mode is active (all outputs stopped, BLE connected).</summary>
+        public bool IsStandby { get; private set; }
+
+        /// <summary>Detected device model for the current connection (LCT21001, LCT22002, or null).</summary>
+        public string? ConnectedModel { get; private set; }
 
         public bool IsConnected => _device != null && _txCharacteristic != null;
 
@@ -379,12 +401,28 @@ namespace Uniwill_Control_Utility.Services
                         string bleName = _device.Name ?? string.Empty;
                         ConnectedDeviceName = ResolveDeviceName(bleName);
 
+                        // Store detected device model
+                        ConnectedModel = DetectModelFromBleName(bleName);
+
                         // Store last connected device for auto-connect
                         _settings.LastDeviceAddress = deviceAddress;
                         SaveSettings();
 
                         // Stop any background reconnection loop — we're connected now.
                         StopReconnectLoop();
+
+                        // Query firmware version (raw "sw" bytes, no framing)
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await QueryFirmwareVersionAsync();
+                            }
+                            catch { /* non-critical — older firmware may not respond */ }
+                        });
+
+                        // Start flow meter polling (every 15s)
+                        StartMeterPolling();
 
                         ConnectionStateChanged?.Invoke(this, WatercoolerConnectionState.Connected);
                         return true;
@@ -547,6 +585,13 @@ namespace Uniwill_Control_Utility.Services
             _rxCharacteristic = null;
             _txCharacteristic = null;
             ConnectedDeviceName = string.Empty;
+            ConnectedModel = null;
+            FirmwareVersion = null;
+            FlowStatus = FlowStatus.Off;
+            IsStandby = false;
+
+            // Stop meter polling on disconnect
+            StopMeterPolling();
 
             ConnectionStateChanged?.Invoke(this, WatercoolerConnectionState.Disconnected);
 
@@ -973,6 +1018,9 @@ namespace Uniwill_Control_Utility.Services
                 frame = BuildFrame(WaterCoolerCommand.Pump, true, dutyCyclePercent, (byte)voltage, WaterCoolerCommand.Disabled);
             }
 
+            // Track pump state for flow meter grace period
+            OnPumpStateChanged(voltage != PumpVoltage.Off);
+
             StatusChanged?.Invoke(this, $"Sending pump command: {string.Join(" ", frame.Select(b => b.ToString("X2")))}");
             return await WriteFrameAsync(frame);
         }
@@ -1042,9 +1090,296 @@ namespace Uniwill_Control_Utility.Services
                 };
             }
 
-            Debug.WriteLine($"[WaterCooler] RGB frame: {string.Join(" ", frame.Select(b => b.ToString("X2")))}");
+           Debug.WriteLine($"[WaterCooler] RGB frame: {string.Join(" ", frame.Select(b => b.ToString("X2")))}");
             StatusChanged?.Invoke(this, $"Sending RGB command: mode={mode}, color={color}");
-            return await WriteFrameAsync(frame);
+
+            await WriteFrameAsync(frame);
+            return true;
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Firmware version query                                               */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>
+        /// Sends raw "sw" bytes to query firmware version.
+        /// The device responds with a UTF-8 string such as "MCU F/W Version: 2.0.0.4".
+        /// </summary>
+        private async Task QueryFirmwareVersionAsync()
+        {
+            if (_txCharacteristic == null) return;
+
+            byte[] sw = new byte[] { 0x73, 0x77 }; // "sw"
+            var status = await _txCharacteristic.WriteValueAsync(
+                sw.AsBuffer(), GattWriteOption.WriteWithoutResponse);
+
+            if (status == GattCommunicationStatus.Success)
+                Debug.WriteLine("[WaterCooler] Firmware version query sent");
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Flow meter polling                                                   */
+        /* ------------------------------------------------------------------ */
+
+        private System.Threading.Timer? _meterPollTimer;
+        private byte? _lastMeterState;
+        private DateTime _flowStartGraceEnd;
+        private bool _pumpRunning;
+
+        private void StartMeterPolling()
+        {
+            StopMeterPolling();
+            _pumpRunning = false;
+            _lastMeterState = null;
+            FlowStatus = FlowStatus.Off;
+
+            // Initial query immediately, then every 15s
+            _ = Task.Run(async () =>
+            {
+                try { await QueryMeterAsync(); }
+                catch { /* non-critical */ }
+            });
+
+            _meterPollTimer = new System.Threading.Timer(_ =>
+            {
+                _ = Task.Run(async () =>
+                {
+                    try { await QueryMeterAsync(); }
+                    catch { /* non-critical — meter polling is best-effort */ }
+                });
+            }, null, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
+
+            Debug.WriteLine("[WaterCooler] Meter polling started");
+        }
+
+        private void StopMeterPolling()
+        {
+            var timer = _meterPollTimer;
+            _meterPollTimer = null;
+            timer?.Dispose();
+        }
+
+        /// <summary>
+        /// Sends QUERY_METER (0x32) to poll for flow status.
+        /// </summary>
+        public async Task QueryMeterAsync()
+        {
+            if (!IsConnected) return;
+
+            byte[] frame = new byte[]
+            {
+                WaterCoolerCommand.FrameStart,
+                WaterCoolerCommand.QueryMeter,
+                WaterCoolerCommand.Disabled,
+                0x00, 0x00, 0x00, 0x00,
+                WaterCoolerCommand.FrameEnd
+            };
+            await WriteFrameAsync(frame);
+        }
+
+        /// <summary>
+        /// Updates flow status based on the latest meter state byte.
+        /// Call from OnRxValueChanged when a meter response arrives.
+        /// </summary>
+        private void UpdateFlowStatus(byte meterState)
+        {
+            _lastMeterState = meterState;
+
+            if (!_pumpRunning)
+            {
+                // Pump is off — keep FlowStatus.Off set by OnPumpStateChanged.
+                // Do not override to Unknown; the meter may still report stale state.
+                return;
+            }
+
+            // State byte 2 = flow OK
+            if (meterState == 2)
+            {
+                _flowStartGraceEnd = DateTime.MinValue;
+                SetFlowStatus(FlowStatus.Ok);
+                return;
+            }
+
+            // Within 5-second grace period after pump start → "starting"
+            if (DateTime.UtcNow < _flowStartGraceEnd)
+            {
+                SetFlowStatus(FlowStatus.Starting);
+                return;
+            }
+
+            // Pump running but meter reports no flow (state 1 or other)
+            if (_lastMeterState is null)
+            {
+                SetFlowStatus(FlowStatus.Unknown);
+            }
+            else
+            {
+                SetFlowStatus(FlowStatus.Fault);
+            }
+        }
+
+        private void SetFlowStatus(FlowStatus status)
+        {
+            if (FlowStatus == status) return;
+            FlowStatus = status;
+            Debug.WriteLine($"[WaterCooler] Flow status: {status}");
+            FlowStatusChanged?.Invoke(this, status);
+        }
+
+        /// <summary>
+        /// Called when pump state changes (on/off) to track grace period for flow detection.
+        /// </summary>
+        private void OnPumpStateChanged(bool running)
+        {
+            if (running && !_pumpRunning)
+            {
+                // Pump just started — 5 second grace period before fault detection
+                _flowStartGraceEnd = DateTime.UtcNow.AddSeconds(5);
+                _lastMeterState = null;
+                SetFlowStatus(FlowStatus.Starting);
+            }
+            else if (!running)
+            {
+                SetFlowStatus(FlowStatus.Off);
+            }
+            _pumpRunning = running;
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Standby / Resume                                                     */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>
+        /// Enters standby mode — stops all outputs while keeping BLE connected.
+        /// Frame: FE 19 00 01 00 00 00 EF (SYSTEM_MODE sleep)
+        /// </summary>
+        public async Task EnterStandbyAsync()
+        {
+            if (!IsConnected) throw new InvalidOperationException("Not connected");
+
+            byte[] frame = new byte[]
+            {
+                WaterCoolerCommand.FrameStart,
+                WaterCoolerCommand.Reset,
+                WaterCoolerCommand.Disabled,
+                0x01, 0x00, 0x00, 0x00,
+                WaterCoolerCommand.FrameEnd
+            };
+            await WriteFrameAsync(frame);
+            IsStandby = true;
+            _pumpRunning = false;
+            SetFlowStatus(FlowStatus.Off);
+            Debug.WriteLine("[WaterCooler] Standby mode entered");
+        }
+
+        /// <summary>
+        /// Exits standby mode — re-applies saved settings to the device.
+        /// </summary>
+        public async Task ExitStandbyAsync()
+        {
+            if (!IsConnected) throw new InvalidOperationException("Not connected");
+
+            IsStandby = false;
+
+            try
+            {
+                // Brief pause to let the device wake from sleep before accepting commands
+                await Task.Delay(200);
+
+                var settings = _settings;
+
+                // Re-apply pump
+                var pumpVoltage = settings.GetPumpVoltage();
+                if (pumpVoltage != PumpVoltage.Off)
+                    await WritePumpModeAsync(pumpVoltage);
+
+                // Re-apply fan
+                var fanSpeed = settings.GetFanSpeed();
+                if (fanSpeed != FanSpeed.Off)
+                    await WriteFanModeAsync(fanSpeed);
+
+                // Re-apply RGB
+                var rgbMode = settings.GetRgbMode();
+                var rgbColor = settings.GetRgbColor();
+                if (settings.RgbEnabled && rgbMode != RgbState.Off)
+                    await WriteRgbModeAsync(rgbMode, rgbColor);
+
+                Debug.WriteLine("[WaterCooler] Standby mode exited — settings restored");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[WaterCooler] Standby exit error: {ex.Message}");
+            }
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Priming (water filling cycle)                                        */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>
+        /// Starts or stops the OEM priming (water filling) cycle.
+        /// Start: FE 19 01 04 50 00 00 EF
+        /// Stop:  FE 19 00 04 00 00 00 EF
+        /// </summary>
+        public async Task WritePrimingAsync(bool enabled)
+        {
+            if (!IsConnected) throw new InvalidOperationException("Not connected");
+
+            byte[] frame = new byte[]
+            {
+                WaterCoolerCommand.FrameStart,
+                WaterCoolerCommand.Reset,
+                enabled ? WaterCoolerCommand.Enabled : WaterCoolerCommand.Disabled,
+                0x04,
+                enabled ? (byte)0x50 : WaterCoolerCommand.Disabled,
+                0x00, 0x00,
+                WaterCoolerCommand.FrameEnd
+            };
+            await WriteFrameAsync(frame);
+            Debug.WriteLine($"[WaterCooler] Priming: {(enabled ? "started" : "stopped")}");
+        }
+
+        /// <summary>
+        /// Runs the full 8-cycle water filling sequence.
+        /// Each cycle: pump off 500ms → pump on (V8, 100%) 5.5s → pump off 2.5s.
+        /// Fan runs at 50% during the entire cycle.
+        /// </summary>
+        /// <param name="cancellationToken">Cancel the cycle early.</param>
+        /// <param name="onProgress">Callback for each completed cycle (1-8).</param>
+        public async Task RunPrimingCycleAsync(
+            CancellationToken cancellationToken = default,
+            System.Action<int>? onProgress = null)
+        {
+            if (!IsConnected) throw new InvalidOperationException("Not connected");
+
+            try
+            {
+                await WritePrimingAsync(true);
+                await WriteFanModeAsync(FanSpeed.Percent50);
+
+                for (int cycle = 1; cycle <= 8; cycle++)
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                        break;
+
+                    onProgress?.Invoke(cycle);
+
+                    await WritePumpModeAsync(PumpVoltage.Off);
+                    await Task.Delay(500, cancellationToken);
+
+                    await WritePumpModeAsync(PumpVoltage.V8, 100);
+                    await Task.Delay(5500, cancellationToken);
+
+                    await WritePumpModeAsync(PumpVoltage.Off);
+                    await Task.Delay(2500, cancellationToken);
+                }
+            }
+            finally
+            {
+                // Always stop priming mode, even on cancellation
+                try { await WritePrimingAsync(false); }
+                catch { /* non-critical teardown */ }
+            }
         }
 
         /// <summary>
@@ -1154,41 +1489,75 @@ namespace Uniwill_Control_Utility.Services
         private void OnRxValueChanged(GattCharacteristic sender, GattValueChangedEventArgs args)
         {
             var data = args.CharacteristicValue.ToArray();
-            if (data.Length < 4) return; // Minimum frame: FE cmd enable EF
+            if (data.Length < 2) return;
 
-            // Parse frame: FE [cmd] [enable] [payload...] [checksum] EF
-            if (data[0] != WaterCoolerCommand.FrameStart || data[^1] != WaterCoolerCommand.FrameEnd)
-                return;
-
-            byte command = data[1];
-
-            // Extract payload (between enable byte and checksum)
-            int payloadStart = 3;
-            int payloadLength = data.Length - 5; // minus FE, cmd, enable, checksum, EF
-            if (payloadLength < 0) return;
-
-            byte[] payload = new byte[payloadLength];
-            Array.Copy(data, payloadStart, payload, 0, payloadLength);
-
-            switch (command)
+            // Check for framed protocol message (FE ... EF)
+            if (data[0] == WaterCoolerCommand.FrameStart && data[^1] == WaterCoolerCommand.FrameEnd && data.Length >= 4)
             {
-                case WaterCoolerCommand.Status:
-                    // Status response: pump_status(1), fan_rpm_low(1), fan_rpm_high(1), temperature(1)
-                    if (payload.Length >= 4)
-                    {
-                        byte pumpStatus = payload[0];
-                        ushort fanRpm = (ushort)((payload[2] << 8) | payload[1]);
-                        byte temperature = payload[3];
-                        StatusReceived?.Invoke(this, (pumpStatus, fanRpm, temperature));
-                    }
-                    break;
+                byte command = data[1];
 
-                case WaterCoolerCommand.Pump:
-                case WaterCoolerCommand.Fan:
-                case WaterCoolerCommand.Rgb:
-                    // Command acknowledgment — could be used for confirmation UI
-                    StatusChanged?.Invoke(this, $"Command 0x{command:X2} acknowledged");
-                    break;
+                // Extract payload (between enable byte and checksum)
+                int payloadStart = 3;
+                int payloadLength = data.Length - 5; // minus FE, cmd, enable, checksum, EF
+                if (payloadLength >= 0)
+                {
+                    byte[] payload = new byte[payloadLength];
+                    Array.Copy(data, payloadStart, payload, 0, payloadLength);
+
+                    switch (command)
+                    {
+                        case WaterCoolerCommand.Status:
+                            // Status response: pump_status(1), fan_rpm_low(1), fan_rpm_high(1), temperature(1)
+                            if (payload.Length >= 4)
+                            {
+                                byte pumpStatus = payload[0];
+                                ushort fanRpm = (ushort)((payload[2] << 8) | payload[1]);
+                                byte temperature = payload[3];
+                                StatusReceived?.Invoke(this, (pumpStatus, fanRpm, temperature));
+                            }
+                            break;
+
+                        case WaterCoolerCommand.MeterPush:
+                        case WaterCoolerCommand.QueryMeter:
+                            // Meter response: compact 5-byte frame FE 31/32 [?] [state] EF
+                            // data[3] is the state byte (2 = flow OK, 1 = fault)
+                            if (data.Length >= 4)
+                            {
+                                byte stateByte = data[3];
+                                Debug.WriteLine($"[WaterCooler] Meter response cmd=0x{command:X2}, state={stateByte}, frame={{ {string.Join(" ", data.Select(b => b.ToString("X2"))) } }}");
+                                UpdateFlowStatus(stateByte);
+                            }
+                            break;
+
+                        case WaterCoolerCommand.Pump:
+                            // Track pump state for flow grace period
+                            bool pumpOn = data.Length >= 3 && data[2] == WaterCoolerCommand.Enabled;
+                            OnPumpStateChanged(pumpOn);
+                            StatusChanged?.Invoke(this, $"Command 0x{command:X2} acknowledged");
+                            break;
+
+                        case WaterCoolerCommand.Fan:
+                        case WaterCoolerCommand.Rgb:
+                            // Command acknowledgment
+                            StatusChanged?.Invoke(this, $"Command 0x{command:X2} acknowledged");
+                            break;
+                    }
+                }
+            }
+            else
+            {
+                // Unframed text message — firmware version response
+                try
+                {
+                    string text = System.Text.Encoding.UTF8.GetString(data).Trim('\0', '\r', '\n', ' ');
+                    if (!string.IsNullOrEmpty(text) && (text.Contains("FW") || text.Contains("F/W") || text.Contains("Version")))
+                    {
+                        FirmwareVersion = text;
+                        Debug.WriteLine($"[WaterCooler] Firmware version: {text}");
+                        FirmwareVersionReceived?.Invoke(this, text);
+                    }
+                }
+                catch { /* not a UTF-8 string — ignore */ }
             }
         }
 

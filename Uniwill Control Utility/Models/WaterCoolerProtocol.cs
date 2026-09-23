@@ -13,6 +13,23 @@ namespace Uniwill_Control_Utility.Models
     }
 
     /// <summary>
+    /// Flow meter status reported by the device.
+    /// </summary>
+    public enum FlowStatus
+    {
+        /// <summary>Pump is off — no flow expected.</summary>
+        Off,
+        /// <summary>No data yet — pump state unknown.</summary>
+        Unknown,
+        /// <summary>Pump just started — grace period before fault detection.</summary>
+        Starting,
+        /// <summary>Coolant flow detected — normal operation.</summary>
+        Ok,
+        /// <summary>Pump running but no flow — possible leak or blockage.</summary>
+        Fault
+    }
+
+    /// <summary>
     /// Pump voltage settings for LCT water coolers.
     /// </summary>
     public enum PumpVoltage : byte
@@ -69,6 +86,12 @@ namespace Uniwill_Control_Utility.Models
         public const byte Fan = 0x1B;
         public const byte Pump = 0x1C;
         public const byte Rgb = 0x1E;
+        /// <summary>Device-initiated flow meter notification (inbound only).</summary>
+        public const byte MeterPush = 0x31;
+        /// <summary>Poll device for flow meter status.</summary>
+        public const byte QueryMeter = 0x32;
+        /// <summary>OEM line-off command.</summary>
+        public const byte LineOff = 0x38;
 
         /// <summary>Frame start marker</summary>
         public const byte FrameStart = 0xFE;

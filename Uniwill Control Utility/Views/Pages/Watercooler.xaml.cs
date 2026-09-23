@@ -71,6 +71,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // even before it's navigated to (e.g., auto-connect at startup).
                 _waterCoolerService.ConnectionStateChanged += OnConnectionStateChanged;
                 _waterCoolerService.StatusChanged += OnStatusChanged;
+                _waterCoolerService.FlowStatusChanged += OnFlowStatusChanged;
+                _waterCoolerService.FirmwareVersionReceived += OnFirmwareVersionReceived;
 
                 // Get DeviceApplier for centralized device commands and override management
                 _deviceApplier = App.GetService<DeviceApplier>();
@@ -270,12 +272,14 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private RgbState GetSelectedRgbMode()
         {
-            return (cbxRgbMode.SelectedIndex + 1) switch
+            // ComboBox indices: 0=Static, 1=Breathe, 2=Colorful, 3=Breathe Color
+            return cbxRgbMode.SelectedIndex switch
             {
-                1 => RgbState.Static,
-                2 => RgbState.Breathe,
-                3 => RgbState.Colorful,
-                _ => RgbState.BreatheColor
+                0 => RgbState.Static,
+                1 => RgbState.Breathe,
+                2 => RgbState.Colorful,
+                3 => RgbState.BreatheColor,
+                _ => RgbState.Static
             };
         }
 
@@ -425,7 +429,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// <summary>Show the color row (and divider) only for modes that accept a custom color (Static, Breathe).</summary>
         private void UpdateRgbColorVisibility()
         {
-            // Static=0, Breathe=1, Colorful=2, Breathe Color=3
+            // Static=0, Breathe=1 accept color; Colorful=2, BreatheColor=3 do not
             bool showColor = cbxRgbMode.SelectedIndex is 0 or 1;
             RgbDivider.Visibility = showColor ? Visibility.Visible : Visibility.Collapsed;
             RgbColorRow.Visibility = showColor ? Visibility.Visible : Visibility.Collapsed;
@@ -757,6 +761,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                             FanSpeedCard.Visibility = Visibility.Collapsed;
                             tsSmartMode.IsChecked = true;
                         }
+
+                        // Show bottom bar on connect
+                        bottomBar.Visibility = Visibility.Visible;
+
+                        // Reset standby button state
+                        UpdateStandbyButton(false);
                         break;
 
                     case WaterCoolerService.WatercoolerConnectionState.Disconnected:
@@ -785,6 +795,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                         // Re-show manual pump and fan control on disconnect (smart mode is stopped by service)
                         PumpVoltageCard.Visibility = Visibility.Visible;
                         FanSpeedCard.Visibility = Visibility.Visible;
+
+                        // Hide bottom bar on disconnect
+                        bottomBar.Visibility = Visibility.Collapsed;
                         break;
 
                     case WaterCoolerService.WatercoolerConnectionState.Scanning:
@@ -833,6 +846,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 _waterCoolerService.ConnectionStateChanged -= OnConnectionStateChanged;
                 _waterCoolerService.StatusChanged -= OnStatusChanged;
+                _waterCoolerService.FlowStatusChanged -= OnFlowStatusChanged;
+                _waterCoolerService.FirmwareVersionReceived -= OnFirmwareVersionReceived;
             }
 
             // Unsubscribe from DeviceApplier events.
@@ -1009,6 +1024,115 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbxRgbColor.SelectedIndex = GetRgbColorIndex(e.RgbColor);
             UpdateRgbColorVisibility();
             RgbCardExpander.IsExpanded = tsRgbEnabled.IsChecked == true;
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Flow Status                                                        */
+        /* ------------------------------------------------------------------ */
+
+        private void OnFlowStatusChanged(object? sender, FlowStatus status)
+        {
+            Application.Current.Dispatcher.Invoke(() => UpdateFlowStatusUi(status));
+        }
+
+        private void UpdateFlowStatusUi(FlowStatus status)
+        {
+            MahApps.Metro.IconPacks.PackIconLucideKind kind;
+            string text;
+            Brush foreground;
+
+            (kind, text, foreground) = status switch
+            {
+                FlowStatus.Ok => (MahApps.Metro.IconPacks.PackIconLucideKind.CircleCheck, "Flow: OK",
+                    new SolidColorBrush(Color.FromRgb(0, 0x9A, 0x00))),
+                FlowStatus.Fault => (MahApps.Metro.IconPacks.PackIconLucideKind.CircleAlert, "Flow: Fault",
+                    new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00))),
+                FlowStatus.Starting => (MahApps.Metro.IconPacks.PackIconLucideKind.Loader, "Flow: Starting...",
+                    new SolidColorBrush(Color.FromRgb(0xFF, 0x8C, 0x00))),
+                FlowStatus.Off => (MahApps.Metro.IconPacks.PackIconLucideKind.DropletOff, "Flow: Off",
+                    new SolidColorBrush((Color)(Application.Current.FindResource("TextFillColorSecondaryBrush") is SolidColorBrush b ? b.Color : Colors.Gray))),
+                _ => (MahApps.Metro.IconPacks.PackIconLucideKind.Waves, "Flow: Unknown",
+                    new SolidColorBrush((Color)(Application.Current.FindResource("TextFillColorSecondaryBrush") is SolidColorBrush b ? b.Color : Colors.Gray)))
+            };
+
+            FlowStatusIcon.Kind = kind;
+            FlowStatusText.Text = text;
+            FlowStatusIcon.Foreground = foreground;
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Firmware Version                                                   */
+        /* ------------------------------------------------------------------ */
+
+        private void OnFirmwareVersionReceived(object? sender, string version)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                // Extract version number from "MCU F/W Version: 2.0.0.4" or "CoolingSystem FW V2.0.0.4"
+                string display = version;
+                var colonIdx = version.LastIndexOf(':');
+                if (colonIdx >= 0 && colonIdx < version.Length - 1)
+                    display = version[(colonIdx + 1)..].Trim();
+                else if (version.IndexOf('V', StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    var vIdx = version.LastIndexOf('V');
+                    if (vIdx >= 0 && vIdx < version.Length - 1)
+                        display = "V" + version[(vIdx + 1)..].Trim();
+                }
+
+                FirmwareText.Text = "FW " + display;
+                FirmwareBadge.Visibility = Visibility.Visible;
+            });
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Standby / Resume                                                   */
+        /* ------------------------------------------------------------------ */
+
+        private async void btnStandby_Click(object sender, RoutedEventArgs e)
+        {
+            if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
+
+            if (_waterCoolerService.IsStandby)
+            {
+                // Resume
+                await _waterCoolerService.ExitStandbyAsync();
+                UpdateStandbyButton(false);
+            }
+            else
+            {
+                // Enter standby
+                await _waterCoolerService.EnterStandbyAsync();
+                UpdateStandbyButton(true);
+            }
+        }
+
+        private void UpdateStandbyButton(bool isStandby)
+        {
+            if (isStandby)
+            {
+                StandbyIcon.Glyph = "\uE768"; // Sun/Resume
+                StandbyText.Text = "Resume";
+                btnStandby.ToolTip = "Resume all outputs.";
+            }
+            else
+            {
+                StandbyIcon.Glyph = "\uE769"; // Power
+                StandbyText.Text = "Standby";
+                btnStandby.ToolTip = "Pause all outputs while keeping BLE connected.";
+            }
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Water Filling Cycle                                                */
+        /* ------------------------------------------------------------------ */
+
+        private void btnWaterFill_Click(object sender, RoutedEventArgs e)
+        {
+            if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
+
+            var dialog = new Views.Windows.WaterFillDialog(_waterCoolerService);
+            dialog.ShowDialog();
         }
 
         /* ------------------------------------------------------------------ */
