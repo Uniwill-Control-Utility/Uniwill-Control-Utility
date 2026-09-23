@@ -116,38 +116,32 @@ namespace Uniwill_Control_Utility.Models
         /// <summary>
         /// Migrates legacy Smart Pump Mode settings to Smart Mode if the new fields
         /// have not been populated (i.e., the settings file still uses old JSON keys).
+        /// Only migrates individual fields when the new field is still at its default value,
+        /// so user-set Smart Mode values are never overwritten by stale legacy data.
         /// Call once after deserialization.
         /// </summary>
         public void MigrateLegacySettings()
         {
-            bool needsMigration = _legacySmartPumpEnabled.HasValue
-                || _legacySmartPumpTempSource != null
-                || _legacySmartPumpLowThreshold.HasValue
-                || _legacySmartPumpHighThreshold.HasValue
-                || _legacySmartPumpIdleSpeed != null
-                || _legacySmartPumpBoostSpeed != null;
+            // SmartModeEnabled default is false — legacy could also be false, so only
+            // migrate when the legacy value is explicitly true (user had it enabled).
+            if (_legacySmartPumpEnabled == true && SmartModeEnabled == false)
+                SmartModeEnabled = true;
 
-            if (!needsMigration)
-                return;
-
-            // Only migrate if the new field is still at its default (hasn't been set yet).
-            // This avoids overwriting user's new Smart Mode settings.
-            if (_legacySmartPumpEnabled.HasValue)
-                SmartModeEnabled = _legacySmartPumpEnabled.Value;
-
-            if (_legacySmartPumpTempSource != null)
+            // String fields have non-null defaults ("max", "V7", "V11") — only migrate
+            // when the new field is still at its default, meaning it wasn't written to disk yet.
+            if (_legacySmartPumpTempSource != null && SmartModeTempSource == "max")
                 SmartModeTempSource = _legacySmartPumpTempSource;
 
-            if (_legacySmartPumpLowThreshold.HasValue)
+            if (_legacySmartPumpLowThreshold.HasValue && SmartModeLowThreshold == 50)
                 SmartModeLowThreshold = _legacySmartPumpLowThreshold.Value;
 
-            if (_legacySmartPumpHighThreshold.HasValue)
+            if (_legacySmartPumpHighThreshold.HasValue && SmartModeHighThreshold == 70)
                 SmartModeHighThreshold = _legacySmartPumpHighThreshold.Value;
 
-            if (_legacySmartPumpIdleSpeed != null)
+            if (_legacySmartPumpIdleSpeed != null && SmartModeIdlePump == "V7")
                 SmartModeIdlePump = _legacySmartPumpIdleSpeed;
 
-            if (_legacySmartPumpBoostSpeed != null)
+            if (_legacySmartPumpBoostSpeed != null && SmartModeBoostPump == "V11")
                 SmartModeBoostPump = _legacySmartPumpBoostSpeed;
         }
 
