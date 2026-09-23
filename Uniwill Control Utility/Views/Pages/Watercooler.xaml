@@ -200,8 +200,8 @@
 
                         <!-- Smart Mode -->
                         <ui:CardExpander x:Name="SmartModeCardExpander"
-                 Margin="0,0,0,8"
-                 IsExpanded="False">
+                            Margin="0,0,0,8"
+                            IsExpanded="False">        
                             <ui:CardExpander.Header>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -392,7 +392,7 @@
                         </ui:CardExpander>
 
                         <!-- Pump Control -->
-                        <ui:CardControl Margin="0,0,0,8">
+                        <ui:CardControl x:Name="PumpVoltageCard" Margin="0,0,0,8">
                             <ui:CardControl.Icon>
                                 <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE945;" FontSize="20" Margin="4,0,6,0" />
                             </ui:CardControl.Icon>
@@ -414,19 +414,29 @@
                         </ui:CardControl>
 
                         <!-- Fan Control -->
-                    <ui:CardControl Margin="0,0,0,8">
-                        <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEC4A;" FontSize="20" Margin="4,0,6,0" />
-                        </ui:CardControl.Icon>
-                        <ui:CardControl.Header>
-                            <StackPanel>
-                                <ui:TextBlock FontTypography="Body" Text="Fan Speed" />
-                                <ui:TextBlock Margin="0,2,0,0"
-                                               FontTypography="Caption"
-                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Select fan duty cycle. Higher = more airflow, more noise." />
-                            </StackPanel>
-                        </ui:CardControl.Header>
+                        <ui:CardControl x:Name="FanSpeedCard" Margin="0,0,0,8">
+                            <ui:CardControl.Header>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <iconPacks:PackIconLucide 
+                                        Grid.Column="0"
+                                        Kind="Fan"
+                                        Width="20"
+                                        Height="20"
+                                        Margin="4,0,20,0"
+                                        VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1">
+                                        <ui:TextBlock FontTypography="Body" Text="Fan Speed" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Select fan duty cycle. Higher = more airflow, more noise." />
+                                    </StackPanel>
+                                </Grid>
+                            </ui:CardControl.Header>
                         <ComboBox x:Name="cbxFanSpeed" MinWidth="160" SelectionChanged="cbxFanSpeed_SelectionChanged">
                             <ComboBoxItem Content="Off"/>
                             <ComboBoxItem Content="25%"/>

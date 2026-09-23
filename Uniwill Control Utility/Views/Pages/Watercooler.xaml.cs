@@ -501,9 +501,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             SaveSmartModeSettings();
 
             _waterCoolerService.StartSmartMode();
-            // Disable manual pump and fan control while smart mode is active
-            cbxPumpVoltage.IsEnabled = false;
-            cbxFanSpeed.IsEnabled = false;
+            // Hide manual pump and fan control while smart mode is active
+            PumpVoltageCard.Visibility = Visibility.Collapsed;
+            FanSpeedCard.Visibility = Visibility.Collapsed;
         }
 
         private async void tsSmartMode_Unchecked(object sender, RoutedEventArgs e)
@@ -515,8 +515,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             _waterCoolerService.SaveSettings();
 
             _waterCoolerService.StopSmartMode();
-            cbxPumpVoltage.IsEnabled = true;
-            cbxFanSpeed.IsEnabled = true;
+            PumpVoltageCard.Visibility = Visibility.Visible;
+            FanSpeedCard.Visibility = Visibility.Visible;
 
             // Re-apply the current combobox values so pump/fan don't stay at the
             // last smart-mode speed after disabling.
@@ -692,8 +692,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (settings.SmartModeEnabled && _waterCoolerService.IsConnected)
                 {
                     _waterCoolerService.StartSmartMode();
-                    cbxPumpVoltage.IsEnabled = false;
-                    cbxFanSpeed.IsEnabled = false;
+                    PumpVoltageCard.Visibility = Visibility.Collapsed;
+                    FanSpeedCard.Visibility = Visibility.Collapsed;
                 }
             }
             finally
@@ -755,8 +755,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                         if (settings?.SmartModeEnabled == true)
                         {
                             _waterCoolerService.StartSmartMode();
-                            cbxPumpVoltage.IsEnabled = false;
-                            cbxFanSpeed.IsEnabled = false;
+                            PumpVoltageCard.Visibility = Visibility.Collapsed;
+                            FanSpeedCard.Visibility = Visibility.Collapsed;
                             tsSmartMode.IsChecked = true;
                         }
                         break;
@@ -784,8 +784,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                         // Reset page title
                         tbPageTitle.Text = "Hydro UI";
 
-                        // Re-enable manual pump control on disconnect (smart pump is stopped by service)
-                        cbxPumpVoltage.IsEnabled = true;
+                        // Re-show manual pump and fan control on disconnect (smart mode is stopped by service)
+                        PumpVoltageCard.Visibility = Visibility.Visible;
+                        FanSpeedCard.Visibility = Visibility.Visible;
                         break;
 
                     case WaterCoolerService.WatercoolerConnectionState.Scanning:
