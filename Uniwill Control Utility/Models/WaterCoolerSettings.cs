@@ -40,19 +40,19 @@ namespace Uniwill_Control_Utility.Models
         /*  Smart Mode — temperature-linked pump and fan speed                   */
         /* ------------------------------------------------------------------ */
 
-        [JsonProperty("smartModeEnabled")]
+        [JsonProperty("smartModeEnabled", NullValueHandling = NullValueHandling.Ignore)]
         public bool SmartModeEnabled { get; set; }
 
         /// <summary>Temperature source: "cpu", "gpu", or "max" (highest of the two).</summary>
-        [JsonProperty("smartModeTempSource")]
+        [JsonProperty("smartModeTempSource", NullValueHandling = NullValueHandling.Ignore)]
         public string SmartModeTempSource { get; set; } = "max";
 
         /// <summary>Low threshold (°C) — below this, pump/fan run at IdleSpeed.</summary>
-        [JsonProperty("smartModeLowThreshold")]
+        [JsonProperty("smartModeLowThreshold", NullValueHandling = NullValueHandling.Ignore)]
         public int SmartModeLowThreshold { get; set; } = 50;
 
         /// <summary>High threshold (°C) — above this, pump/fan run at BoostSpeed.</summary>
-        [JsonProperty("smartModeHighThreshold")]
+        [JsonProperty("smartModeHighThreshold", NullValueHandling = NullValueHandling.Ignore)]
         public int SmartModeHighThreshold { get; set; } = 70;
 
         /// <summary>
@@ -60,24 +60,96 @@ namespace Uniwill_Control_Utility.Models
         /// The actual hysteresis is provided by the gap between low and high thresholds.
         /// This field is persisted but no longer exposed in the UI.
         /// </summary>
-        [JsonProperty("smartModeHysteresis")]
+        [JsonProperty("smartModeHysteresis", NullValueHandling = NullValueHandling.Ignore)]
         public int SmartModeHysteresis { get; set; } = 10;
 
         /// <summary>Pump voltage when temperature is below the low threshold.</summary>
-        [JsonProperty("smartModeIdlePump")]
+        [JsonProperty("smartModeIdlePump", NullValueHandling = NullValueHandling.Ignore)]
         public string SmartModeIdlePump { get; set; } = "V7";
 
         /// <summary>Pump voltage when temperature is above the high threshold.</summary>
-        [JsonProperty("smartModeBoostPump")]
+        [JsonProperty("smartModeBoostPump", NullValueHandling = NullValueHandling.Ignore)]
         public string SmartModeBoostPump { get; set; } = "V11";
 
         /// <summary>Fan speed when temperature is below the low threshold.</summary>
-        [JsonProperty("smartModeIdleFan")]
+        [JsonProperty("smartModeIdleFan", NullValueHandling = NullValueHandling.Ignore)]
         public string SmartModeIdleFan { get; set; } = "Percent50";
 
         /// <summary>Fan speed when temperature is above the high threshold.</summary>
-        [JsonProperty("smartModeBoostFan")]
+        [JsonProperty("smartModeBoostFan", NullValueHandling = NullValueHandling.Ignore)]
         public string SmartModeBoostFan { get; set; } = "Percent100";
+
+        /* -- Obsolete legacy properties (Smart Pump Mode) -- */
+        // These are deserialized from old settings files so we can migrate them.
+        // They are NOT written back to disk (Ignore = True on serialize).
+
+        [JsonProperty("smartPumpEnabled", DefaultValueHandling = DefaultValueHandling.Ignore,
+                       NullValueHandling = NullValueHandling.Ignore)]
+        [Obsolete("Migrated to SmartModeEnabled")]
+        private bool? _legacySmartPumpEnabled { get; set; }
+
+        [JsonProperty("smartPumpTempSource", DefaultValueHandling = DefaultValueHandling.Ignore,
+                       NullValueHandling = NullValueHandling.Ignore)]
+        [Obsolete("Migrated to SmartModeTempSource")]
+        private string? _legacySmartPumpTempSource { get; set; }
+
+        [JsonProperty("smartPumpLowThreshold", DefaultValueHandling = DefaultValueHandling.Ignore,
+                       NullValueHandling = NullValueHandling.Ignore)]
+        [Obsolete("Migrated to SmartModeLowThreshold")]
+        private int? _legacySmartPumpLowThreshold { get; set; }
+
+        [JsonProperty("smartPumpHighThreshold", DefaultValueHandling = DefaultValueHandling.Ignore,
+                       NullValueHandling = NullValueHandling.Ignore)]
+        [Obsolete("Migrated to SmartModeHighThreshold")]
+        private int? _legacySmartPumpHighThreshold { get; set; }
+
+        [JsonProperty("smartPumpIdleSpeed", DefaultValueHandling = DefaultValueHandling.Ignore,
+                       NullValueHandling = NullValueHandling.Ignore)]
+        [Obsolete("Migrated to SmartModeIdlePump")]
+        private string? _legacySmartPumpIdleSpeed { get; set; }
+
+        [JsonProperty("smartPumpBoostSpeed", DefaultValueHandling = DefaultValueHandling.Ignore,
+                       NullValueHandling = NullValueHandling.Ignore)]
+        [Obsolete("Migrated to SmartModeBoostPump")]
+        private string? _legacySmartPumpBoostSpeed { get; set; }
+
+        /// <summary>
+        /// Migrates legacy Smart Pump Mode settings to Smart Mode if the new fields
+        /// have not been populated (i.e., the settings file still uses old JSON keys).
+        /// Call once after deserialization.
+        /// </summary>
+        public void MigrateLegacySettings()
+        {
+            bool needsMigration = _legacySmartPumpEnabled.HasValue
+                || _legacySmartPumpTempSource != null
+                || _legacySmartPumpLowThreshold.HasValue
+                || _legacySmartPumpHighThreshold.HasValue
+                || _legacySmartPumpIdleSpeed != null
+                || _legacySmartPumpBoostSpeed != null;
+
+            if (!needsMigration)
+                return;
+
+            // Only migrate if the new field is still at its default (hasn't been set yet).
+            // This avoids overwriting user's new Smart Mode settings.
+            if (_legacySmartPumpEnabled.HasValue)
+                SmartModeEnabled = _legacySmartPumpEnabled.Value;
+
+            if (_legacySmartPumpTempSource != null)
+                SmartModeTempSource = _legacySmartPumpTempSource;
+
+            if (_legacySmartPumpLowThreshold.HasValue)
+                SmartModeLowThreshold = _legacySmartPumpLowThreshold.Value;
+
+            if (_legacySmartPumpHighThreshold.HasValue)
+                SmartModeHighThreshold = _legacySmartPumpHighThreshold.Value;
+
+            if (_legacySmartPumpIdleSpeed != null)
+                SmartModeIdlePump = _legacySmartPumpIdleSpeed;
+
+            if (_legacySmartPumpBoostSpeed != null)
+                SmartModeBoostPump = _legacySmartPumpBoostSpeed;
+        }
 
         /// <summary>Returns the enum value for the stored idle pump speed in Smart Mode.</summary>
         public PumpVoltage GetSmartModeIdlePump()

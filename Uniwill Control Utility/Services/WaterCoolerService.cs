@@ -102,6 +102,7 @@ namespace Uniwill_Control_Utility.Services
                 {
                     var json = File.ReadAllText(filePath);
                     _settings = JsonConvert.DeserializeObject<WaterCoolerSettings>(json) ?? new WaterCoolerSettings();
+                    _settings.MigrateLegacySettings();
                 }
             }
             catch
@@ -748,8 +749,6 @@ namespace Uniwill_Control_Utility.Services
             StopSmartMode();
 
             var settings = _settings;
-            _smartModeCurrentPump = settings.GetSmartModeIdlePump();
-            _smartModeCurrentFan = settings.GetSmartModeIdleFan();
             _smartModeLastWasBoost = false;
 
             // Initialize filtered temperature to current reading so the first tick
@@ -761,6 +760,36 @@ namespace Uniwill_Control_Utility.Services
                     _smartModeFilteredTemp = temp.Value;
             }
             catch { /* temperature unavailable at startup — first tick will initialize */ }
+
+            // Immediately apply idle speeds so the device is in the correct state.
+            // This is necessary because the tick loop only writes when the target
+            // differs from the tracked current speed, and on start we don't know
+            // what the device's actual pump/fan speed is.
+            _smartModeCurrentPump = settings.GetSmartModeIdlePump();
+            _smartModeCurrentFan = settings.GetSmartModeIdleFan();
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    if (IsConnected)
+                    {
+                        if (_smartModeCurrentPump != PumpVoltage.Off)
+                            await WritePumpModeRampedAsync(_smartModeCurrentPump);
+                        else
+                            await WritePumpModeAsync(PumpVoltage.Off);
+
+                        if (_smartModeCurrentFan != FanSpeed.Off)
+                            await WriteFanModeAsync(_smartModeCurrentFan);
+
+                        Debug.WriteLine($"[WaterCooler] Smart mode initial: pump {_smartModeCurrentPump}, fan {_smartModeCurrentFan}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[WaterCooler] Smart mode initial apply error: {ex.Message}");
+                }
+            });
 
             _smartModeTimer = new System.Threading.Timer(async _ =>
             {
@@ -1042,15 +1071,19 @@ namespace Uniwill_Control_Utility.Services
                 // Restore saved settings to device.
                 // WriteWithResponse ensures each command is acknowledged before the next fires,
                 // so no artificial inter-command delays are needed (matches Python reference).
+                // If Smart Mode is enabled, skip pump/fan restore — Smart Mode will apply them.
                 try
                 {
-                    var pumpVoltage = _settings.GetPumpVoltage();
-                    if (pumpVoltage != PumpVoltage.Off)
-                        await WritePumpModeAsync(pumpVoltage);
+                    if (!_settings.SmartModeEnabled)
+                    {
+                        var pumpVoltage = _settings.GetPumpVoltage();
+                        if (pumpVoltage != PumpVoltage.Off)
+                            await WritePumpModeAsync(pumpVoltage);
 
-                    var fanSpeed = _settings.GetFanSpeed();
-                    if (fanSpeed != FanSpeed.Off)
-                        await WriteFanModeAsync(fanSpeed);
+                        var fanSpeed = _settings.GetFanSpeed();
+                        if (fanSpeed != FanSpeed.Off)
+                            await WriteFanModeAsync(fanSpeed);
+                    }
 
                     var rgbMode = _settings.GetRgbMode();
                     var rgbColor = _settings.GetRgbColor();
@@ -1061,6 +1094,10 @@ namespace Uniwill_Control_Utility.Services
                 {
                     // Non-critical: failed to restore settings during auto-connect
                 }
+
+                // Re-start Smart Mode if it was enabled
+                if (_settings.SmartModeEnabled)
+                    StartSmartMode();
 
                 StatusChanged?.Invoke(this, "Auto-connected successfully");
             }
