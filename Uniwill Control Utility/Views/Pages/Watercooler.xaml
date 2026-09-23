@@ -360,7 +360,7 @@
                         VerticalAlignment="Center"
                         Margin="4,0,0,0">
                                         <ComboBox x:Name="cbxSmartModeIdleFan"
-                          Width="80"
+                          Width="85"
                           Margin="0,0,8,0"
                           SelectionChanged="cbxSmartModeSpeed_SelectionChanged">
                                             <ComboBoxItem Content="Off"/>
@@ -376,7 +376,7 @@
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                            Text="→" />
                                         <ComboBox x:Name="cbxSmartModeBoostFan"
-                          Width="80"
+                          Width="85"
                           SelectionChanged="cbxSmartModeSpeed_SelectionChanged">
                                             <ComboBoxItem Content="Off"/>
                                             <ComboBoxItem Content="25%"/>
@@ -507,7 +507,7 @@
                             </Grid>
                             <Border x:Name="RgbDivider" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                             <!-- Color (only for Static and Breathe) -->
-                            <Grid x:Name="RgbColorRow">
+                            <Grid x:Name="RgbColorRow" Margin="0,4,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
