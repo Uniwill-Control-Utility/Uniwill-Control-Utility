@@ -1363,17 +1363,21 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (!_hydroConnected || !(cbxWcEnabled.IsChecked ?? false))
                 return;
 
-            PumpVoltage curPump = GetPumpVoltageFromIndex(cbxWcPumpVoltage.SelectedIndex);
-            FanSpeed curFan = GetFanSpeedFromIndex(cbxWcFanSpeed.SelectedIndex);
+            bool smartModeActive = _waterCoolerService?.IsSmartModeActive == true;
+
+            // When Smart Mode is active, skip pump voltage and fan speed overrides
+            // — Smart Mode controls them internally. RGB still applies.
+            PumpVoltage? curPump = smartModeActive ? null : (PumpVoltage?)GetPumpVoltageFromIndex(cbxWcPumpVoltage.SelectedIndex);
+            FanSpeed? curFan = smartModeActive ? null : GetFanSpeedFromIndex(cbxWcFanSpeed.SelectedIndex);
             RgbState curRgbMode = GetRgbModeFromIndex(cbxWcRgbMode.SelectedIndex);
             RgbColor curRgbColor = GetRgbColorFromIndex(cbxWcRgbColor.SelectedIndex);
 
             if (curPump != lastWcPump || curFan != lastWcFan ||
                 curRgbMode != lastWcRgbMode || curRgbColor != lastWcRgbColor)
             {
-                await _deviceApplier.ApplyWatercoolerFromPresetAsync(curPump, curFan, curRgbMode, curRgbColor);
-                lastWcPump = curPump;
-                lastWcFan = curFan;
+                await _deviceApplier.ApplyWatercoolerAsync(curPump, curFan, curRgbMode, curRgbColor);
+                lastWcPump = curPump ?? default;
+                lastWcFan = curFan ?? default;
                 lastWcRgbMode = curRgbMode;
                 lastWcRgbColor = curRgbColor;
             }
@@ -2182,6 +2186,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                     spWcPumpFan.Visibility = Visibility.Visible;
                     spWcSmartModeBadge.Visibility = Visibility.Collapsed;
                 }
+
+                // Reset pump/fan tracking so the next update() tick picks up the
+                // correct state (null when Smart Mode is active, profile values
+                // when inactive).
+                lastWcPump = PumpVoltage.Off;
+                lastWcFan = FanSpeed.Off;
             });
         }
 
