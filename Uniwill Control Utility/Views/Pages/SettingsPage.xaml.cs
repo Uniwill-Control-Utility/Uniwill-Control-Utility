@@ -238,6 +238,13 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void applyRAMInfo()
         {
+            if (_ramSlots <= 0)
+            {
+                // No RAM modules detected; hide the expander instead of showing partial data.
+                sdRAM.Visibility = Visibility.Collapsed;
+                return;
+            }
+
             string DDRType = _ramType switch
             {
                 20 => "DDR",
@@ -562,8 +569,21 @@ namespace Uniwill_Control_Utility.Views.Pages
             sdRAM.Visibility = Visibility.Collapsed;
 
             // Load from pre-fetched cache populated at app startup.
-            // Falls back to live WMI query if cache is empty (first navigation before startup completes).
-            bool cacheReady = !string.IsNullOrEmpty(CachedSystemInfo.CpuName);
+            // If the cache isn't ready yet (startup still running), wait with retries
+            // before falling back to a live WMI query.
+            int[] retryDelays = { 100, 250, 500 }; // ms between attempts
+            bool cacheReady = false;
+
+            for (int i = 0; i < retryDelays.Length; i++)
+            {
+                if (!string.IsNullOrEmpty(CachedSystemInfo.CpuName))
+                {
+                    cacheReady = true;
+                    break;
+                }
+
+                await System.Threading.Tasks.Task.Delay(retryDelays[i]);
+            }
 
             if (!cacheReady)
             {
