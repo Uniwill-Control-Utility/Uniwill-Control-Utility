@@ -136,6 +136,7 @@ namespace Uniwill_Control_Utility.Services
                     _window.HasPendingShow())
                 {
                     _window.SetPendingShow(false);
+                    _window.SetUserWantsVisible(true);
                     _window.PositionRelativeToForegroundWindow();
                     _window.Show();
                     _viewModel?.StartMonitoring();
@@ -191,6 +192,7 @@ namespace Uniwill_Control_Utility.Services
                     return;
                 }
 
+                _window.SetUserWantsVisible(true);
                 _window.PositionRelativeToForegroundWindow();
                 _window.Show();
             });
@@ -205,6 +207,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 _userShowIntent = false;
                 StopMonitoring();
+                _window?.ClearUserWantsVisible();
                 _window?.Hide();
             });
         }
@@ -242,9 +245,11 @@ namespace Uniwill_Control_Utility.Services
                         !_viewModel!.GameActive)
                     {
                         _window!.SetPendingShow(true);
+                        _window!.SetUserWantsVisible(true);
                     }
                     else
                     {
+                        _window!.SetUserWantsVisible(true);
                         _window!.PositionRelativeToForegroundWindow();
                         _window!.Show();
                     }

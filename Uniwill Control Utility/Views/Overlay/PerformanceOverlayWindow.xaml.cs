@@ -29,6 +29,12 @@ namespace Uniwill_Control_Utility.Views.Overlay
         private double _relativeTop;
         private bool _hasRelativePosition;
 
+        // Drag detection: track the target window's last known bounds to spot movement.
+        private IntPtr _lastTargetWindow;
+        private RECT _lastTargetBounds;
+        private bool _userWantsVisible; // true while the user has asked for the overlay to show
+        private bool _wasMovingLastTick;  // true if the window moved on the previous tick
+
         public PerformanceOverlayWindow(PerformanceOverlayViewModel viewModel)
         {
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
@@ -85,13 +91,17 @@ namespace Uniwill_Control_Utility.Views.Overlay
         private void HandleGameActiveChanged()
         {
             if (!_viewModel.HideWhenNoGame)
+            {
+                _userWantsVisible = false;
                 return;
+            }
 
             if (_viewModel.GameActive)
             {
                 if (!IsVisible)
                 {
                     _pendingShow = false;
+                    _userWantsVisible = true;
                     PositionRelativeToForegroundWindow();
                     Show();
                 }
@@ -99,16 +109,82 @@ namespace Uniwill_Control_Utility.Views.Overlay
             else
             {
                 if (IsVisible && !_pendingShow)
+                {
+                    _userWantsVisible = false;
                     Hide();
+                }
             }
         }
 
         private void OnMetricsUpdated(object? sender, EventArgs e)
         {
-            if (_viewModel.HideWhenNoGame && IsVisible && _viewModel.GameActive)
+            if (!_viewModel.HideWhenNoGame || !_viewModel.GameActive)
+                return;
+
+            bool moving = IsTargetWindowMoving();
+
+            // Hide immediately when movement is detected.
+            if (IsVisible && moving)
             {
-                PositionRelativeToForegroundWindow();
+                _wasMovingLastTick = true;
+                Hide();
+                return;
             }
+
+            // Only re-show after the window has been stable for one full tick
+            // (moving just stopped on this tick). This prevents the overlay from
+            // flickering while the user is still dragging.
+            if (!IsVisible && _userWantsVisible)
+            {
+                if (_wasMovingLastTick && moving)
+                {
+                    // Still moving — keep hidden.
+                    return;
+                }
+
+                // Window has settled (was stable this tick, and either was stable
+                // last tick or we just transitioned from moving→stable).
+                _wasMovingLastTick = false;
+                PositionRelativeToForegroundWindow();
+                Show();
+                return;
+            }
+
+            _wasMovingLastTick = moving;
+            PositionRelativeToForegroundWindow();
+        }
+
+        // Returns true if the target game window's bounds changed since the last check.
+        private bool IsTargetWindowMoving()
+        {
+            IntPtr target = GetForegroundWindow();
+            if (target == IntPtr.Zero)
+                return false;
+
+            IntPtr ownHandle = new WindowInteropHelper(this).Handle;
+            while (target == ownHandle)
+            {
+                target = GetNextWindow(target, GW_HWNDPREV);
+                if (target == IntPtr.Zero)
+                    return false;
+            }
+
+            // New target window — count as stable (switching apps isn't "dragging").
+            if (target != _lastTargetWindow)
+            {
+                _lastTargetWindow = target;
+                if (!GetWindowRect(target, out RECT initialBounds))
+                    return false;
+                _lastTargetBounds = initialBounds;
+                return false;
+            }
+
+            if (!GetWindowRect(target, out RECT currentBounds))
+                return false;
+
+            bool boundsChanged = !currentBounds.Equals(_lastTargetBounds);
+            _lastTargetBounds = currentBounds;
+            return boundsChanged;
         }
 
         public void SetPendingShow(bool value)
@@ -119,6 +195,16 @@ namespace Uniwill_Control_Utility.Views.Overlay
         public bool HasPendingShow()
         {
             return _pendingShow;
+        }
+
+        public void ClearUserWantsVisible()
+        {
+            _userWantsVisible = false;
+        }
+
+        public void SetUserWantsVisible(bool value)
+        {
+            _userWantsVisible = value;
         }
 
         private void QueueSizeUpdate()
@@ -279,30 +365,30 @@ namespace Uniwill_Control_Utility.Views.Overlay
                     return;
             }
 
-            // Get the target window's bounds.
-            if (!GetWindowRect(target, out RECT targetRect))
+            // Get the target window's outer bounds (for fullscreen detection).
+            if (!GetWindowRect(target, out RECT outerRect))
                 return;
 
             bool targetFullscreen = IsZoomed(target);
 
             if (!targetFullscreen &&
-                (targetRect.right - targetRect.left > 0) &&
-                (targetRect.bottom - targetRect.top > 0))
+                (outerRect.right - outerRect.left > 0) &&
+                (outerRect.bottom - outerRect.top > 0))
             {
-                // Windowed mode — position relative to the target window.
+                // Windowed mode — map the client-area top-left corner to screen
+                // coordinates so the overlay renders below the title bar.
+                POINT clientOrigin = new(0, 0);
+                ClientToScreen(target, ref clientOrigin);
+
                 if (_hasRelativePosition)
                 {
-                    // Re-apply saved offset from the target window's origin.
-                    Left = targetRect.left + _relativeLeft;
-                    Top = targetRect.top + _relativeTop;
+                    Left = clientOrigin.x + _relativeLeft;
+                    Top = clientOrigin.y + _relativeTop;
                 }
                 else
                 {
-                    // First time in windowed mode — use a fixed offset inside the window.
-                    // Do NOT derive the offset from the saved absolute screen position
-                    // (that position was for a different game window or monitor layout).
-                    Left = targetRect.left + 10;
-                    Top = targetRect.top + 10;
+                    Left = clientOrigin.x + 10;
+                    Top = clientOrigin.y + 10;
                     _relativeLeft = 10;
                     _relativeTop = 10;
                     _hasRelativePosition = true;
@@ -323,6 +409,19 @@ namespace Uniwill_Control_Utility.Views.Overlay
             public int bottom;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int x;
+            public int y;
+
+            public POINT(int x, int y)
+            {
+                this.x = x;
+                this.y = y;
+            }
+        }
+
         private const uint GW_HWNDPREV = 3;
 
         [LibraryImport("user32.dll")]
@@ -334,6 +433,10 @@ namespace Uniwill_Control_Utility.Views.Overlay
         [LibraryImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static partial bool GetWindowRect(IntPtr window, out RECT rect);
+
+        [LibraryImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static partial bool ClientToScreen(IntPtr window, ref POINT point);
 
         [LibraryImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
