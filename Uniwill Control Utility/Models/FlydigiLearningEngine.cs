@@ -6,12 +6,15 @@ namespace Uniwill_Control_Utility.Models
     /// <summary>
     /// Observes steady-state temperatures and adjusts fan curve offsets automatically.
     /// Uses exponential moving average to learn heat and cool offsets per fan-gear index.
+    /// All public methods are thread-safe.
     /// </summary>
     public class FlydigiLearningEngine
     {
         /* ------------------------------------------------------------------ */
         /*  Configuration                                                      */
         /* ------------------------------------------------------------------ */
+
+        private readonly object _lock = new();
 
         /// <summary>
         /// Whether learning is active. When false, <see cref="FeedObservation"/> is a no-op.
@@ -78,47 +81,50 @@ namespace Uniwill_Control_Utility.Models
         /// <param name="currentRpm">Current fan RPM (used for stability gating).</param>
         public void FeedObservation(int gearIndex, double observedTemp, double targetTemp, ushort currentRpm)
         {
-            if (!IsLearningEnabled)
-                return;
-
-            double delta = observedTemp - targetTemp;
-
-            // Track RPM stability
-            if (_lastRpm.TryGetValue(gearIndex, out ushort lastRpm))
+            lock (_lock)
             {
-                if (lastRpm != currentRpm)
+                if (!IsLearningEnabled)
+                    return;
+
+                double delta = observedTemp - targetTemp;
+
+                // Track RPM stability
+                if (_lastRpm.TryGetValue(gearIndex, out ushort lastRpm))
                 {
-                    // RPM changed — reset stability timer
+                    if (lastRpm != currentRpm)
+                    {
+                        // RPM changed — reset stability timer
+                        _stableSince[gearIndex] = DateTime.UtcNow;
+                    }
+                }
+                else
+                {
+                    _lastRpm[gearIndex] = currentRpm;
                     _stableSince[gearIndex] = DateTime.UtcNow;
                 }
-            }
-            else
-            {
+
                 _lastRpm[gearIndex] = currentRpm;
-                _stableSince[gearIndex] = DateTime.UtcNow;
-            }
 
-            _lastRpm[gearIndex] = currentRpm;
+                // Gate on stability: only learn if RPM has been stable long enough
+                if (!HasStabilized(gearIndex))
+                    return;
 
-            // Gate on stability: only learn if RPM has been stable long enough
-            if (!HasStabilized(gearIndex))
-                return;
+                // Skip zero-delta observations (nothing to learn)
+                if (delta == 0.0)
+                    return;
 
-            // Skip zero-delta observations (nothing to learn)
-            if (delta == 0.0)
-                return;
-
-            if (delta > 0)
-            {
-                // Running hot — update heat offset
-                double alpha = GetAlpha(true);
-                UpdateOffset(HeatOffsets, gearIndex, delta, alpha);
-            }
-            else
-            {
-                // Running cool — update cool offset with absolute delta
-                double alpha = GetAlpha(false);
-                UpdateOffset(CoolOffsets, gearIndex, Math.Abs(delta), alpha);
+                if (delta > 0)
+                {
+                    // Running hot — update heat offset
+                    double alpha = GetAlpha(true);
+                    UpdateOffset(HeatOffsets, gearIndex, delta, alpha);
+                }
+                else
+                {
+                    // Running cool — update cool offset with absolute delta
+                    double alpha = GetAlpha(false);
+                    UpdateOffset(CoolOffsets, gearIndex, Math.Abs(delta), alpha);
+                }
             }
         }
 
@@ -128,17 +134,20 @@ namespace Uniwill_Control_Utility.Models
         /// </summary>
         public double GetEffectiveOffset(int gearIndex)
         {
-            bool hasHeat = HeatOffsets.TryGetValue(gearIndex, out double heatVal);
-            bool hasCool = CoolOffsets.TryGetValue(gearIndex, out double coolVal);
+            lock (_lock)
+            {
+                bool hasHeat = HeatOffsets.TryGetValue(gearIndex, out double heatVal);
+                bool hasCool = CoolOffsets.TryGetValue(gearIndex, out double coolVal);
 
-            if (hasHeat && hasCool)
-                return (heatVal + coolVal) / 2.0;
-            if (hasHeat)
-                return heatVal;
-            if (hasCool)
-                return coolVal;
+                if (hasHeat && hasCool)
+                    return (heatVal + coolVal) / 2.0;
+                if (hasHeat)
+                    return heatVal;
+                if (hasCool)
+                    return coolVal;
 
-            return 0.0;
+                return 0.0;
+            }
         }
 
         /// <summary>
@@ -146,10 +155,13 @@ namespace Uniwill_Control_Utility.Models
         /// </summary>
         public void Reset()
         {
-            HeatOffsets.Clear();
-            CoolOffsets.Clear();
-            _lastRpm.Clear();
-            _stableSince.Clear();
+            lock (_lock)
+            {
+                HeatOffsets.Clear();
+                CoolOffsets.Clear();
+                _lastRpm.Clear();
+                _stableSince.Clear();
+            }
         }
 
         /* ------------------------------------------------------------------ */
