@@ -509,13 +509,13 @@
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <ui:Button Margin="0,0,8,0" Click="PreviewButton_Click">
                         <StackPanel Orientation="Horizontal">
-                            <ui:SymbolIcon Symbol="Eye20" FontSize="24" Margin="0,0,8,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE890;"  Margin="0,0,12,0"/>
                             <TextBlock Text="Show" VerticalAlignment="Center" />
                         </StackPanel>
                     </ui:Button>
                     <ui:Button Click="HideButton_Click">
                         <StackPanel Orientation="Horizontal">
-                            <ui:SymbolIcon Symbol="EyeOff20" FontSize="24" Margin="0,0,8,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xED1A;"  Margin="0,0,12,0"/>
                             <TextBlock Text="Hide" VerticalAlignment="Center" />
                         </StackPanel>
                     </ui:Button>
