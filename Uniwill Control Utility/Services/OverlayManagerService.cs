@@ -124,7 +124,21 @@ namespace Uniwill_Control_Utility.Services
                 if (!normalisedOptions.Enabled)
                 {
                     StopMonitoring();
+                    _window?.SetPendingShow(false);
                     _window?.Hide();
+                    return;
+                }
+
+                // If HideWhenNoGame was turned off, flush any pending show.
+                if (!normalisedOptions.HideWhenNoGame &&
+                    _window is not null &&
+                    !_window.IsVisible &&
+                    _window.HasPendingShow())
+                {
+                    _window.SetPendingShow(false);
+                    _window.PositionRelativeToForegroundWindow();
+                    _window.Show();
+                    _viewModel?.StartMonitoring();
                     return;
                 }
 
@@ -166,6 +180,18 @@ namespace Uniwill_Control_Utility.Services
                     return;
                 }
 
+                // When HideWhenNoGame is enabled, defer the initial Show() until the
+                // first FPS sample confirms a game is active — this prevents the
+                // overlay from flashing briefly then disappearing when no game is
+                // currently in the foreground.
+                if (options.HideWhenNoGame &&
+                    !_viewModel.GameActive)
+                {
+                    _window.SetPendingShow(true);
+                    return;
+                }
+
+                _window.PositionRelativeToForegroundWindow();
                 _window.Show();
             });
         }
@@ -211,7 +237,18 @@ namespace Uniwill_Control_Utility.Services
                 EnsureWindow();
 
                 if (_window?.IsVisible != true)
-                    _window!.Show();
+                {
+                    if (options.HideWhenNoGame &&
+                        !_viewModel!.GameActive)
+                    {
+                        _window!.SetPendingShow(true);
+                    }
+                    else
+                    {
+                        _window!.PositionRelativeToForegroundWindow();
+                        _window!.Show();
+                    }
+                }
 
                 _contentsVisible = !_contentsVisible;
 

@@ -39,8 +39,10 @@ namespace Uniwill_Control_Utility.ViewModels
         private int _isUpdating;
         private bool _disposed;
 
+        public event EventHandler? MetricsUpdated;
+
         [ObservableProperty] private Visibility _contentVisibility = Visibility.Visible;
-        [ObservableProperty] private bool _gameActive = true;
+        [ObservableProperty] private bool _gameActive;
         [ObservableProperty] private double _windowWidth = BaseDesignWidth;
         [ObservableProperty] private double _windowHeight = BaseDesignHeight;
         [ObservableProperty] private double _backgroundOpacity = 0.95;
@@ -373,6 +375,7 @@ namespace Uniwill_Control_Utility.ViewModels
             finally
             {
                 Interlocked.Exchange(ref _isUpdating, 0);
+                MetricsUpdated?.Invoke(this, EventArgs.Empty);
             }
         }
 
