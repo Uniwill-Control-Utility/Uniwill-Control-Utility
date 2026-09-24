@@ -125,6 +125,12 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private KeyboardSettings? _savedKeyboardSettings;
 
+        /// <summary>
+        /// Saved user Light Bar settings, captured when override is enabled.
+        /// Restored when override is lifted.
+        /// </summary>
+        private (byte R, byte G, byte B, int Brightness, int EffectIndex, int Speed, bool Enabled)? _savedLightBarSettings;
+
         public DeviceApplier(FlydigiCoolerHidService flydigiService, FlydigiCoolerBleService? bs1Service, WaterCoolerService waterCoolerService, UniwillECService? uniwillEc = null)
         {
             _flydigiService = flydigiService;
@@ -473,11 +479,23 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// Enables Adaptive Mode override for the Light Bar.
+        /// Captures the current user settings so they can be restored later.
         /// </summary>
         public void EnableLightBarOverride()
         {
             if (IsLightBarOverridden)
                 return;
+
+            // Capture current user settings before overriding
+            _savedLightBarSettings = (
+                R: Properties.Settings.Default.LightBarR,
+                G: Properties.Settings.Default.LightBarG,
+                B: Properties.Settings.Default.LightBarB,
+                Brightness: Properties.Settings.Default.LightBarBrightness,
+                EffectIndex: Properties.Settings.Default.LightBarEffectIndex,
+                Speed: Properties.Settings.Default.LightBarSpeed,
+                Enabled: Properties.Settings.Default.LightBarEnabled
+            );
 
             IsLightBarOverridden = true;
             LightBarOverrideChanged?.Invoke(this, true);
@@ -485,6 +503,7 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// Disables Adaptive Mode override for the Light Bar.
+        /// Restores the previously saved user settings and re-applies them to the device.
         /// </summary>
         public void DisableLightBarOverride()
         {
@@ -492,7 +511,126 @@ namespace Uniwill_Control_Utility.Services
                 return;
 
             IsLightBarOverridden = false;
+
+            var saved = _savedLightBarSettings;
+            if (saved.HasValue)
+            {
+                var s = saved.Value;
+                Properties.Settings.Default.LightBarR = s.R;
+                Properties.Settings.Default.LightBarG = s.G;
+                Properties.Settings.Default.LightBarB = s.B;
+                Properties.Settings.Default.LightBarBrightness = s.Brightness;
+                Properties.Settings.Default.LightBarEffectIndex = s.EffectIndex;
+                Properties.Settings.Default.LightBarSpeed = s.Speed;
+                Properties.Settings.Default.LightBarEnabled = s.Enabled;
+                Properties.Settings.Default.Save();
+                _savedLightBarSettings = null;
+
+                // Re-apply restored settings to the device immediately.
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        var hid = new KeyboardHidService();
+                        try
+                        {
+                            if (hid.Open() && hid.IsLightBarAvailable)
+                            {
+                                if (s.Enabled)
+                                {
+                                    byte[] effectValues = new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 };
+                                    int effectIndex = Math.Clamp(s.EffectIndex, 0, 5);
+                                    int speed = Math.Clamp(s.Speed, 0, 11);
+                                    byte effect = effectValues[effectIndex];
+                                    byte hidSpeed = (byte)(11 - speed);
+
+                                    hid.LightBarTurnOn(s.R, s.G, s.B, s.Brightness);
+                                    hid.LightBarSetEffect(effect, hidSpeed, s.Brightness);
+                                }
+                                else
+                                {
+                                    hid.LightBarTurnOff();
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            hid.Dispose();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to re-apply user Light Bar settings on override-lift");
+                    }
+                });
+            }
+
             LightBarOverrideChanged?.Invoke(this, false);
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  CPU / GPU Override                                                 */
+        /* ------------------------------------------------------------------ */
+
+        /// <summary>
+        /// Enables Adaptive Mode override for CPU/GPU power settings.
+        /// Captures the currently active Presets page profile so it can be
+        /// re-applied when the override is lifted.
+        /// </summary>
+        public void EnableCpuGpuOverride()
+        {
+            // No capture needed — DisableCpuGpuOverride re-applies the last
+            // known preset profile from Settings.
+        }
+
+        /// <summary>
+        /// Disables Adaptive Mode override for CPU/GPU power settings.
+        /// Re-applies the last active Presets page profile so the hardware
+        /// doesn't stay on the Adaptive Mode profile's override values.
+        /// </summary>
+        public async Task DisableCpuGpuOverrideAsync()
+        {
+            string? profile = Properties.Settings.Default.presetProfile;
+            if (string.IsNullOrEmpty(profile) || profile.Equals("None", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            string command = PresetProfileApplier.BuildCommandString(profile);
+            if (string.IsNullOrWhiteSpace(command))
+                return;
+
+            try
+            {
+                // 1. RyzenAdj / SMU commands
+                await Scripts.RyzenAdj_To_UCU.TranslateAsync(command);
+
+                // 2. EC CPU power limits (AMD APU only)
+                if (Scripts.Family.TYPE == Scripts.Family.ProcessorType.Amd_Apu)
+                {
+                    var ec = Scripts.RyzenAdj_To_UCU.EcService;
+                    if (ec != null)
+                    {
+                        // Extract PL1/PL2 from the command string or current preset values
+                        // The command string contains --slow-limit=X and --fast-limit=Y (in milliwatts)
+                        foreach (var arg in command.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            if (arg.StartsWith("--slow-limit="))
+                            {
+                                if (int.TryParse(arg.Substring("--slow-limit=".Length), out int slow))
+                                    ec.SetPl1(slow / 1000);
+                            }
+                            else if (arg.StartsWith("--fast-limit="))
+                            {
+                                if (int.TryParse(arg.Substring("--fast-limit=".Length), out int fast))
+                                    ec.SetPl2(fast / 1000);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to re-apply CPU/GPU preset on override-lift");
+            }
         }
 
         /// <summary>

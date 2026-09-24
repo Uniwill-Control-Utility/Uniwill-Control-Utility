@@ -481,6 +481,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         _deviceApplier.DisableEcFanOverride();
                         _deviceApplier.DisableKeyboardOverride();
                         _deviceApplier.DisableLightBarOverride();
+                        _ = _deviceApplier.DisableCpuGpuOverrideAsync();
                     }
 
                 }
@@ -517,6 +518,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                             _deviceApplier.EnableKeyboardOverride();
                         if ((cbxLbEnabled.IsChecked ?? false) && sdLightBar.Visibility == Visibility.Visible && !_deviceApplier.IsLightBarOverridden)
                             _deviceApplier.EnableLightBarOverride();
+                        if ((cbxCpuEnabled.IsChecked ?? false) || (cbxGpuEnabled.IsChecked ?? false))
+                            _deviceApplier.EnableCpuGpuOverride();
                     }
                 }
             }
@@ -3185,9 +3188,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Only reset tracking when Adaptive Mode is running
             if (!start) return;
 
-            // Reset tracking so the next update() tick force-applies CPU settings
             if (enabled)
             {
+                _deviceApplier?.EnableCpuGpuOverride();
+                // Reset tracking so the next update() tick force-applies CPU settings
                 lastCpuSustained = 0;
                 lastCpuBoost = 0;
                 lastCpuTjMax = 0;
@@ -3198,6 +3202,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 lastCpuPl1 = 0;
                 lastCpuPl2 = 0;
                 lastCpuUndervolt = 0;
+            }
+            else
+            {
+                _ = _deviceApplier?.DisableCpuGpuOverrideAsync();
             }
         }
 
@@ -3233,15 +3241,20 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Only reset tracking when Adaptive Mode is running
             if (!start) return;
 
-            // Reset tracking so the next update() tick force-applies GPU settings
             if (enabled)
             {
+                _deviceApplier?.EnableCpuGpuOverride();
+                // Reset tracking so the next update() tick force-applies GPU settings
                 lastGpuTgp = 0;
                 lastGpuDynamicBoost = false;
                 lastGpuDbOffset = 0;
                 lastGpuCoreClock = 0;
                 lastGpuMemClock = 0;
                 lastGpuVfCurveCount = -1;
+            }
+            else
+            {
+                _ = _deviceApplier?.DisableCpuGpuOverrideAsync();
             }
         }
 
