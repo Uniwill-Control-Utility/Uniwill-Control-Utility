@@ -104,7 +104,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                            FontTypography="Caption"
                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                           Text="Enable per-key color control instead of animation effects." />
+                           Text="Enable per-key color control instead of animation effects" />
                                 </StackPanel>
                             </ui:CardControl.Header>
                             <ui:ToggleSwitch x:Name="ModeToggle"
@@ -136,7 +136,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                FontTypography="Caption"
                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               Text="Automatically turn off the keyboard backlight after a period of inactivity."
+                               Text="Automatically turn off the keyboard backlight after a period of inactivity"
                                TextWrapping="Wrap" />
                                     </StackPanel>
                                     <ui:ToggleSwitch x:Name="tsIdleTimer"
@@ -161,7 +161,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                            FontTypography="Caption"
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                           Text="Time of inactivity before the keyboard turns off." />
+                                           Text="Time of inactivity before the keyboard turns off" />
                                     </StackPanel>
                                     <ComboBox x:Name="cmbIdleTimer"
                                       Grid.Column="1"
@@ -188,7 +188,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                FontTypography="Caption"
                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               Text="Turn the keyboard backlight on or off." />
+                               Text="Turn the keyboard backlight on or off" />
                                     </StackPanel>
                                 </ui:CardControl.Header>
                                 <ui:ToggleSwitch x:Name="tsKeyboardPower"
@@ -218,7 +218,7 @@
                                             <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Choose between various keyboard lighting effects."
+                                               Text="Choose between various keyboard lighting effects"
                                                TextWrapping="Wrap" />
                                         </StackPanel>
                                         <ComboBox x:Name="cmbEffect"
@@ -244,7 +244,7 @@
                                             <ui:TextBlock Margin="0,2,0,0"
                                    FontTypography="Caption"
                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                   Text="Adjust the backlight brightness level." />
+                                   Text="Adjust the backlight brightness level" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -285,7 +285,7 @@
                                             <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Single color for Static mode." />
+                                               Text="Single color for Static mode" />
                                         </StackPanel>
                                         <controls:ColorPickerControl x:Name="ColorPicker"
                                              Grid.Column="1"
@@ -310,7 +310,7 @@
                                                 FontTypography="Caption"
                                                 x:Name="MultiColorSubtitle"
                                                 Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                Text="7 colors required for this effect. Click a swatch to edit." />
+                                                Text="7 colors required for this effect - click a swatch to edit" />
                                         </StackPanel>
                                         <controls:KeyboardMultiColorPickerControl x:Name="MultiColorPicker"
                                                           Grid.Column="1"
@@ -335,7 +335,7 @@
                                             <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Control the animation speed." />
+                                                   Text="Control the animation speed" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -375,7 +375,7 @@
                                             <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Effect triggers on keypress instead of running automatically." />
+                                               Text="Effect triggers on keypress instead of running automatically" />
                                         </StackPanel>
                                         <ui:ToggleSwitch x:Name="tsTouchReactive"
                                              Grid.Column="1"
@@ -402,7 +402,7 @@
                                             <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Control the animation direction (verified on Wave)." />
+                                               Text="Control the animation direction" />
                                         </StackPanel>
                                         <!-- Single row of direction toggle buttons -->
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,4,0,0">
@@ -450,7 +450,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                FontTypography="Caption"
                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               Text="Adjust the backlight brightness level." />
+                               Text="Adjust the backlight brightness level" />
                                     </StackPanel>
                                 </ui:CardControl.Header>
                                 <StackPanel Orientation="Horizontal"

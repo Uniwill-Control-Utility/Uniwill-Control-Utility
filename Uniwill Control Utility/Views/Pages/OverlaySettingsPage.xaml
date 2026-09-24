@@ -72,7 +72,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Control when the overlay appears and configure global shortcuts." />
+                                               Text="Control when the overlay appears and configure global shortcuts" />
                             </StackPanel>
                         </ui:CardExpander.Header>
                         <StackPanel>
@@ -87,7 +87,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Enable the game overlay and global shortcuts." />
+                                                   Text="Enable the game overlay and global shortcuts" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="EnabledCheckBox"
                                                  Grid.Column="1"
@@ -111,7 +111,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Show the overlay when UCU starts." />
+                                                   Text="Show the overlay when UCU starts" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="StartupCheckBox"
                                                  Grid.Column="1"
@@ -135,7 +135,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Click the box and press the shortcut you want."
+                                                   Text="Click the box and press the shortcut you want"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <TextBox x:Name="ToggleOverlayHotkeyTextBox"
@@ -162,7 +162,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Keeps the overlay window ready without polling sensors."
+                                                   Text="Keeps the overlay window ready without polling sensors"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <TextBox x:Name="ToggleContentsHotkeyTextBox"
@@ -188,7 +188,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Choose which sensor tiles appear in the overlay." />
+                                               Text="Choose which sensor tiles appear in the overlay" />
                             </StackPanel>
                         </ui:CardExpander.Header>
                         <StackPanel>
@@ -338,7 +338,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Adjust the overlay scale, opacity, and polling interval." />
+                                               Text="Adjust the overlay scale, opacity, and polling interval" />
                             </StackPanel>
                         </ui:CardExpander.Header>
                         <StackPanel>
@@ -353,7 +353,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Scale the overlay from 50% to 200%." />
+                                                   Text="Scale the overlay from 50% to 200%" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                     <TextBlock x:Name="ScaleValueText"
@@ -384,7 +384,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Adjust the card panel background transparency." />
+                                                   Text="Adjust the card panel background transparency" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                     <TextBlock x:Name="BackgroundOpacityValueText"
@@ -415,7 +415,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Adjust the text and graph transparency." />
+                                                   Text="Adjust the text and graph transparency" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                     <TextBlock x:Name="ContentOpacityValueText"
@@ -446,7 +446,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Longer intervals reduce monitoring overhead."
+                                                   Text="Longer intervals reduce monitoring overhead"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ui:NumberBox x:Name="RefreshIntervalNumberBox"
@@ -483,7 +483,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Automatically hide the overlay when no game is detected."
+                                                   Text="Automatically hide the overlay when no game is detected"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="HideWhenNoGameCheckBox"

@@ -111,7 +111,7 @@
                                 <StackPanel>
                                     <ui:TextBlock FontTypography="Body" Text="Unified Fan Curve" />
                                     <ui:TextBlock FontTypography="Caption"
-                                               Text="When enabled, a single curve controls both CPU and GPU fans."
+                                               Text="When enabled, a single curve controls both CPU and GPU fans"
                                                TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="tsUnifiedCurve"
@@ -138,7 +138,7 @@
                                         <ui:TextBlock Margin="0,2,0,2"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Choose between one of the default curves or create your own one." />
+                                               Text="Choose between one of the default curves or create your own one" />
                                     </StackPanel>
                                     <Grid Grid.Column="1">
                                         <Grid.ColumnDefinitions>
@@ -182,7 +182,7 @@
                                     <StackPanel>
                                         <ui:TextBlock FontTypography="Body" Text="Thermal thresholds" />
                                         <ui:TextBlock FontTypography="Caption"
-                       Text="Set the temperature (°C) at which each fan speed zone activates."
+                       Text="Set the temperature (°C) at which each fan speed zone activates"
                        TextWrapping="Wrap" />
                                     </StackPanel>
                                     
@@ -234,7 +234,7 @@
                                     <StackPanel Grid.Column="1">
                                         <ui:TextBlock FontTypography="Body" Text="Smart Fan Mode" />
                                         <ui:TextBlock FontTypography="Caption"
-                                           Text="Both fans react to a single temperature source."
+                                           Text="Both fans react to a single temperature source"
                                            TextWrapping="Wrap" />
                                     </StackPanel>
                                     <ui:ToggleSwitch
@@ -261,7 +261,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Select which sensor drives both fans." />
+                                               Text="Select which sensor drives both fans" />
                                 </StackPanel>
                                 <ComboBox x:Name="cbxSmartFanTempSource"
                                           Grid.Column="1"
@@ -493,7 +493,7 @@
                                 <StackPanel>
                                     <ui:TextBlock FontTypography="Body" Text="Fan Turbo" />
                                     <ui:TextBlock FontTypography="Caption"
-                                               Text="Force fans to maximum speed. Toggle off to restore previous settings."
+                                               Text="Force fans to maximum speed (avoid prolonged use)"
                                                TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="tsTurbo"

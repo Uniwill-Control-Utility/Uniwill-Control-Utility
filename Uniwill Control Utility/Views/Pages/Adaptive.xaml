@@ -97,7 +97,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Per-game CPU power, thermal, and voltage tuning."
+                                                   Text="Per-game CPU power, thermal, and voltage tuning"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
@@ -429,7 +429,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Per-game GPU power, clock offsets, and curve editing."
+                                                   Text="Per-game GPU power, clock offsets, and curve editing"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
@@ -646,7 +646,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Per-game pump voltage, fan speed, and RGB for the LCT watercooler." />
+                                                   Text="Per-game pump voltage, fan speed, and RGB for the LCT watercooler" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -685,7 +685,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Select the pump voltage for this game. Higher voltage = more cooling." />
+                                                       Text="Select the pump voltage for this game. Higher voltage = more cooling" />
                                     </StackPanel>
                                     <ComboBox Name="cbxWcPumpVoltage"
                                               Grid.Column="1"
@@ -712,7 +712,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Select the fan duty cycle for this game. Higher = more airflow, more noise." />
+                                                       Text="Select the fan duty cycle for this game. Higher = more airflow, more noise" />
                                     </StackPanel>
                                     <ComboBox Name="cbxWcFanSpeed"
                                               Grid.Column="1"
@@ -743,7 +743,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Select the RGB lighting mode for this game." />
+                                                   Text="Select the RGB lighting mode for this game" />
                                 </StackPanel>
                                 <ComboBox Name="cbxWcRgbMode"
                                           Grid.Column="1"
@@ -774,7 +774,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Select the RGB color for this game." />
+                                                   Text="Select the RGB color for this game" />
                                 </StackPanel>
                                 <ComboBox Name="cbxWcRgbColor"
                                           Grid.Column="1"
@@ -812,7 +812,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Per-game fan control for the Flydigi cooling pad."
+                                                   Text="Per-game fan control for the Flydigi cooling pad"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
@@ -842,7 +842,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Select the fan control mode for this game."
+                                                   Text="Select the fan control mode for this game"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ComboBox x:Name="cbxBs2ProFanMode"
@@ -873,7 +873,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Select a preset gear level."
+                                                   Text="Select a preset gear level"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ComboBox x:Name="cbxBs2ProGear"
@@ -900,7 +900,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Set fan speed between 1300 and 4000 RPM."
+                                                   Text="Set fan speed between 1300 and 4000 RPM"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
@@ -939,7 +939,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Select a temperature-to-RPM fan curve."
+                                                   Text="Select a temperature-to-RPM fan curve"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ComboBox x:Name="cbxBs2ProCurve"
@@ -988,7 +988,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Configure RGB lighting effects and colors."
+                                                   Text="Configure RGB lighting effects and colors"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ComboBox x:Name="cbxBs2ProRgbMode"
@@ -1021,7 +1021,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="No customization available while RGB effects are turned off."
+                                                   Text="No customization available while RGB effects are turned off"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                             </Grid>
@@ -1037,7 +1037,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Smart-Temp automatically adjusts colors based on device temperature and has no additional controls."
+                                                   Text="Smart-Temp automatically adjusts colors based on device temperature and has no additional controls"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                             </Grid>
@@ -1053,7 +1053,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Pick a color for this effect." />
+                                                   Text="Pick a color for this effect" />
                                 </StackPanel>
                                 <controls:ColorPickerControl x:Name="Bs2ProRgbColorPicker"
                                                              Grid.Column="1"
@@ -1087,7 +1087,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Adjust the brightness level." />
+                                                   Text="Adjust the brightness level" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -1125,7 +1125,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Control the flowing animation speed." />
+                                                   Text="Control the flowing animation speed" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -1185,7 +1185,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                FontTypography="Caption"
                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               Text="Per-game fan curve control for the EC fan controller."
+                               Text="Per-game fan curve control for the EC fan controller"
                                TextWrapping="Wrap" />
                                     </StackPanel>
                                 </Grid>
@@ -1220,7 +1220,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Unified uses a single curve; Split allows separate CPU and GPU curves." />
+                                                   Text="Unified uses a single curve, while Split allows separate CPU and GPU curves" />
                                 </StackPanel>
                                 <ComboBox Name="cbxEcFanMode" Grid.Column="1" Width="180" HorizontalAlignment="Right" VerticalAlignment="Center" SelectedIndex="0" SelectionChanged="cbxEcFanMode_SelectionChanged">
                                     <ComboBoxItem>Unified</ComboBoxItem>
@@ -1246,7 +1246,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Preset or custom fan curve applied to both CPU and GPU." />
+                                                       Text="Preset or custom fan curve applied to both CPU and GPU" />
                                     </StackPanel>
                                     <ComboBox Name="cbxEcFanPreset" Grid.Column="1" Width="180" HorizontalAlignment="Right" VerticalAlignment="Center" SelectedIndex="1">
                                         <ComboBoxItem>Silent</ComboBoxItem>
@@ -1274,7 +1274,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Fan curve driven by CPU temperature." />
+                                                       Text="Fan curve driven by CPU temperature" />
                                     </StackPanel>
                                     <ComboBox Name="cbxEcFanCpuPreset" Grid.Column="1" Width="180" HorizontalAlignment="Right" VerticalAlignment="Center" SelectedIndex="1">
                                         <ComboBoxItem>Silent</ComboBoxItem>
@@ -1298,7 +1298,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Fan curve driven by GPU temperature." />
+                                                       Text="Fan curve driven by GPU temperature" />
                                     </StackPanel>
                                     <ComboBox Name="cbxEcFanGpuPreset" Grid.Column="1" Width="180" HorizontalAlignment="Right" VerticalAlignment="Center" SelectedIndex="1">
                                         <ComboBoxItem>Silent</ComboBoxItem>
@@ -1359,7 +1359,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Choose between animation effects or per-key color control." />
+                                                   Text="Choose between animation effects or per-key color control" />
                                 </StackPanel>
                                 <ComboBox Name="cbxKbMode" Grid.Column="1" Width="180" HorizontalAlignment="Right" VerticalAlignment="Center" SelectedIndex="0" SelectionChanged="cbxKbMode_SelectionChanged">
                                     <ComboBoxItem>Effects</ComboBoxItem>
@@ -1383,7 +1383,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Choose an animation effect." />
+                                                       Text="Choose an animation effect" />
                                     </StackPanel>
                                     <ComboBox Name="cbxKbEffect" Grid.Column="1" Width="180" HorizontalAlignment="Right" VerticalAlignment="Center" SelectedIndex="0" SelectionChanged="cbxKbEffect_SelectionChanged">
                                         <ComboBoxItem>Static</ComboBoxItem>
@@ -1417,7 +1417,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Single color for static and single-color effects." />
+                                                       Text="Single color for static and single-color effects" />
                                     </StackPanel>
                                     <controls:ColorPickerControl x:Name="KbColorPicker" Grid.Column="1"
                                                                      HorizontalAlignment="Right"
@@ -1437,7 +1437,7 @@
                                         <ui:TextBlock x:Name="tbKbMultiColorSubtitle" Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="7 colors required for this effect." />
+                                                       Text="7 colors required for this effect" />
                                     </StackPanel>
                                     <controls:KeyboardMultiColorPickerControl x:Name="KbMultiColorPicker" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" ColorsChanged="KbMultiColorPicker_ColorsChanged"/>
                                 </Grid>
@@ -1456,7 +1456,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Animation direction for Wave effect." />
+                                                       Text="Animation direction for Wave effect" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <ui:Button x:Name="btnKbDirLeftRight" Width="40" Height="36" Margin="0,0,4,0"
@@ -1500,7 +1500,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Animation speed (1=fastest, 10=slowest)." />
+                                                       Text="Animation speed (1=fastest, 10=slowest)" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <TextBlock Name="tbKbSpeedValue" Width="30" HorizontalAlignment="Center" Margin="0,0,8,0" Text="5" />
@@ -1524,7 +1524,7 @@
                                         <ui:TextBlock Margin="0,2,0,4"
                                             FontTypography="Caption"
                                             Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                            Text="Configure individual key colors for this profile."
+                                            Text="Configure individual key colors for this profile"
                                             TextWrapping="Wrap" />
                                     </StackPanel>
                                     <ui:Button Name="btnKbEditPerKey"
@@ -1550,7 +1550,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Backlight brightness level 1-7." />
+                                                   Text="Backlight brightness level 1-7" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                     <TextBlock Name="tbKbBrightnessValue" Width="30" HorizontalAlignment="Center" Margin="0,0,8,0" Text="5" />
@@ -1580,7 +1580,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Per-game front light bar control."
+                                                   Text="Per-game front light bar control"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
@@ -1609,7 +1609,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Turn the front light bar on or off." />
+                                                   Text="Turn the front light bar on or off" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="AdpTsLightBarPower"
                                                  Grid.Column="1"
@@ -1633,7 +1633,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Choose the light bar color." />
+                                                   Text="Choose the light bar color" />
                                 </StackPanel>
                                 <controls:ColorPickerControl x:Name="AdpLbColorPicker"
                                                              HorizontalAlignment="Right"
@@ -1654,7 +1654,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Adjust the light bar brightness level." />
+                                                   Text="Adjust the light bar brightness level" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -1690,7 +1690,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Select a lighting effect for the light bar." />
+                                                   Text="Select a lighting effect for the light bar" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -1725,7 +1725,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Control the animation speed." />
+                                                       Text="Control the animation speed" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1"
                                                 Orientation="Horizontal"

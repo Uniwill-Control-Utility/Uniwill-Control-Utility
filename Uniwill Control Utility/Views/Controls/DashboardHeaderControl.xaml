@@ -101,7 +101,7 @@
                FontWeight="Regular"
                LineHeight="16"
                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-               Text="Unified laptop and ecosystem control."
+               Text="Unified laptop and ecosystem control"
                TextWrapping="Wrap" />
             </StackPanel>
 

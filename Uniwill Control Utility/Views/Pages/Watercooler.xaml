@@ -220,7 +220,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                FontTypography="Caption"
                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               Text="Automatically adjust pump and fan based on temperature." />
+                               Text="Automatically adjust pump and fan based on temperature" />
                                     </StackPanel>
                                     <ui:ToggleSwitch x:Name="tsSmartMode"
                               Grid.Column="2"
@@ -246,7 +246,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                FontTypography="Caption"
                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               Text="Which temperature to monitor for control." />
+                               Text="Which temperature to monitor for control" />
                                     </StackPanel>
                                     <ComboBox x:Name="cbxSmartModeTempSource"
                       Grid.Column="1"
@@ -270,7 +270,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                FontTypography="Caption"
                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               Text="Low = idle speed, High = boost speed. The gap prevents oscillation." />
+                               Text="Low = idle speed, High = boost speed - the gap prevents oscillation" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
@@ -312,7 +312,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                FontTypography="Caption"
                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               Text="Idle (low temp) and Boost (high temp) pump voltages." />
+                               Text="Idle (low temp) and Boost (high temp) pump voltages" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
@@ -353,7 +353,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                FontTypography="Caption"
                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               Text="Idle (low temp) and Boost (high temp) fan duty cycles." />
+                               Text="Idle (low temp) and Boost (high temp) fan duty cycles" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
@@ -402,7 +402,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Select pump voltage level. Higher voltage = more cooling." />
+                                               Text="Select pump voltage level - Higher voltage = more cooling" />
                                 </StackPanel>
                             </ui:CardControl.Header>
                             <ComboBox x:Name="cbxPumpVoltage" MinWidth="160" SelectionChanged="cbxPumpVoltage_SelectionChanged">
@@ -433,7 +433,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                            FontTypography="Caption"
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                           Text="Select fan duty cycle. Higher = more airflow, more noise." />
+                                           Text="Select fan duty cycle - Higher = more airflow, more noise." />
                                     </StackPanel>
                                 </Grid>
                             </ui:CardControl.Header>
@@ -466,7 +466,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                        FontTypography="Caption"
                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                       Text="Configure RGB lighting effects and colors." />
+                                       Text="Configure RGB lighting effects and colors" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="tsRgbEnabled"
                                   Grid.Column="1"
@@ -492,7 +492,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                        FontTypography="Caption"
                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                       Text="Choose an RGB lighting effect." />
+                                       Text="Choose an RGB lighting effect" />
                                 </StackPanel>
                                 <ComboBox x:Name="cbxRgbMode"
                                           Grid.Column="1"
@@ -517,7 +517,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                        FontTypography="Caption"
                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                       Text="Pick the color for the selected RGB mode." />
+                                       Text="Pick the color for the selected RGB mode" />
                                 </StackPanel>
                                 <ComboBox x:Name="cbxRgbColor"
                                           Grid.Column="1"
@@ -544,7 +544,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Automatically connect to the last known device on startup." />
+                                               Text="Automatically connect to the last known device on startup" />
                             </StackPanel>
                         </ui:CardControl.Header>
                         <ui:ToggleSwitch x:Name="tsAutoConnect"

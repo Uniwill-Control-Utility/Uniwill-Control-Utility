@@ -93,7 +93,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Turn the front light bar on or off." />
+                                               Text="Turn the front light bar on or off" />
                             </StackPanel>
                         </ui:CardControl.Header>
                         <ui:ToggleSwitch x:Name="tsLightBarPower"
@@ -116,7 +116,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Choose the light bar color." />
+                                               Text="Choose the light bar color" />
                             </StackPanel>
                         </ui:CardControl.Header>
                         <controls:ColorPickerControl x:Name="ColorPicker"
@@ -137,7 +137,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Adjust the light bar brightness level." />
+                                               Text="Adjust the light bar brightness level" />
                             </StackPanel>
                         </ui:CardControl.Header>
                         <StackPanel Orientation="Horizontal"
@@ -172,7 +172,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Select a lighting effect for the light bar." />
+                                               Text="Select a lighting effect for the light bar" />
                             </StackPanel>
                         </ui:CardControl.Header>
                         <StackPanel Orientation="Horizontal"
@@ -198,7 +198,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Control the animation speed." />
+                                               Text="Control the animation speed" />
                             </StackPanel>
                         </ui:CardControl.Header>
                         <StackPanel Orientation="Horizontal"

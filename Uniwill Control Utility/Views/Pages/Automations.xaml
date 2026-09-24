@@ -92,7 +92,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                            FontTypography="Caption"
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                           Text="Apply a preset whenever the battery begins charging."
+                                           Text="Apply a preset whenever the battery begins charging"
                                            TextWrapping="Wrap" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -130,7 +130,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                            FontTypography="Caption"
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                           Text="Apply a preset whenever the system begins running from battery power."
+                                           Text="Apply a preset whenever the system begins running from battery power"
                                            TextWrapping="Wrap" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -168,7 +168,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                            FontTypography="Caption"
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                           Text="Apply a preset after the system resumes from sleep or hibernation."
+                                           Text="Apply a preset after the system resumes from sleep or hibernation"
                                            TextWrapping="Wrap" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">

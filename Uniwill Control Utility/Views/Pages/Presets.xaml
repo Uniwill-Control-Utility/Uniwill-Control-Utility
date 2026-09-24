@@ -206,7 +206,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Direct SMU power limits via PCI config space." />
+                                                   Text="Direct SMU power limits via PCI config space" />
                                 </StackPanel>
                             </ui:CardExpander.Header>
                             <StackPanel>
@@ -444,7 +444,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="MSR-based power, voltage, and ratio controls." />
+                                                   Text="MSR-based power, voltage, and ratio controls" />
                                 </StackPanel>
                             </ui:CardExpander.Header>
                             <StackPanel>
@@ -559,7 +559,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="GPU power limit, core and memory clock offsets." />
+                                                   Text="GPU power limit, core and memory clock offsets" />
                                 </StackPanel>
                             </ui:CardExpander.Header>
                             <StackPanel>

@@ -66,7 +66,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Battery management is not available on this device." />
+                                               Text="Battery management is not available on this device" />
                             </StackPanel>
                         </ui:CardControl.Header>
                     </ui:CardControl>
@@ -85,7 +85,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Limit the maximum charge level to extend battery lifespan." />
+                                                   Text="Limit the maximum charge level to extend battery lifespan" />
                                 </StackPanel>
                             </ui:CardControl.Header>
                             <ComboBox x:Name="cbChargingLimit"
@@ -111,7 +111,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Live battery metrics from the EC." />
+                                                   Text="Live battery metrics from the EC" />
                                 </StackPanel>
                             </ui:CardExpander.Header>
                             <StackPanel>
@@ -127,7 +127,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Active charging limit from the EC." />
+                                                       Text="Active charging limit from the EC" />
                                     </StackPanel>
                                     <TextBlock x:Name="tbChargeLimit"
                                                Grid.Column="1"
@@ -152,7 +152,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Current power input state." />
+                                                       Text="Current power input state" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1"
                                                 Orientation="Horizontal"
@@ -185,7 +185,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Current battery charge percentage." />
+                                                       Text="Current battery charge percentage" />
                                     </StackPanel>
                                     <TextBlock x:Name="tbStateOfCharge"
                                                Grid.Column="1"
@@ -210,7 +210,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Remaining capacity relative to design." />
+                                                       Text="Remaining capacity relative to design" />
                                     </StackPanel>
                                     <TextBlock x:Name="tbHealth"
                                                Grid.Column="1"
@@ -235,7 +235,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Internal battery temperature." />
+                                                       Text="Internal battery temperature" />
                                     </StackPanel>
                                     <TextBlock x:Name="tbTemperature"
                                                Grid.Column="1"
@@ -260,7 +260,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Number of full charge/discharge cycles." />
+                                                       Text="Number of full charge/discharge cycles" />
                                     </StackPanel>
                                     <TextBlock x:Name="tbCycleCount"
                                                Grid.Column="1"
@@ -285,7 +285,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Current battery voltage." />
+                                                       Text="Current battery voltage" />
                                     </StackPanel>
                                     <TextBlock x:Name="tbVoltage"
                                                Grid.Column="1"
@@ -310,7 +310,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
                                                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Current charge or discharge current." />
+                                                       Text="Current charge or discharge current" />
                                     </StackPanel>
                                     <TextBlock x:Name="tbChargeRate"
                                                Grid.Column="1"

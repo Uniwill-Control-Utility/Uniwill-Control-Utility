@@ -241,7 +241,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Adjust fan speed, presets, and auto curve profiles."
+                                                   Text="Adjust fan speed, presets, and auto curve profiles"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ComboBox x:Name="cbxFanMode"
@@ -271,7 +271,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Set fan speed between 1300 and 4000 RPM." />
+                                                   Text="Set fan speed between 1300 and 4000 RPM" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -305,7 +305,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Select a preset gear level." />
+                                                   Text="Select a preset gear level" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             HorizontalAlignment="Right"
@@ -339,7 +339,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Select a temperature-to-RPM fan curve." />
+                                                   Text="Select a temperature-to-RPM fan curve" />
                                 </StackPanel>
                                 <ComboBox Name="cbxCurveProfile"
                                           Grid.Column="1"
@@ -383,7 +383,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Configure RGB lighting effects and colors."
+                                                   Text="Configure RGB lighting effects and colors"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ComboBox x:Name="cbxRgbMode"
@@ -416,7 +416,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="No customization available while RGB effects are turned off."
+                                                   Text="No customization available while RGB effects are turned off"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                             </Grid>
@@ -432,7 +432,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Smart-Temp automatically adjusts colors based on device temperature and has no additional controls."
+                                                   Text="Smart-Temp automatically adjusts colors based on device temperature and has no additional controls"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                             </Grid>
@@ -448,7 +448,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Pick a color for this effect." />
+                                                   Text="Pick a color for this effect" />
                                 </StackPanel>
                                 <controls:ColorPickerControl x:Name="RgbColorPicker"
                                                              Grid.Column="1"
@@ -482,7 +482,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Adjust the brightness level." />
+                                                   Text="Adjust the brightness level" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -520,7 +520,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Control the flowing animation speed." />
+                                                   Text="Control the flowing animation speed" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -555,7 +555,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Set individual colors for Rotation mode." />
+                                                   Text="Set individual colors for Rotation mode" />
                                 </StackPanel>
                                 <StackPanel x:Name="mcRotationColorsHost"
                                             Grid.Column="1"
@@ -579,7 +579,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Control the rotation animation speed." />
+                                                   Text="Control the rotation animation speed" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -619,7 +619,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Adjust the rotation brightness level." />
+                                                   Text="Adjust the rotation brightness level" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -659,7 +659,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Connection, device behavior, and advanced control options."
+                                               Text="Connection, device behavior, and advanced control options"
                                                TextWrapping="Wrap" />
                             </StackPanel>
                         </ui:CardExpander.Header>
@@ -676,7 +676,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Automatically connect to the cooler on application launch." />
+                                                   Text="Automatically connect to the cooler on application launch" />
                                 </StackPanel>
                                 <ui:ToggleSwitch Name="tsAutoConnect"
                                                  Grid.Column="1"
@@ -702,7 +702,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Start the fan automatically when the device powers on." />
+                                                   Text="Start the fan automatically when the device powers on" />
                                 </StackPanel>
                                 <ui:ToggleSwitch Name="tsPowerOnStart"
                                                  Grid.Column="1"
@@ -728,7 +728,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Automatically start or stop the fan based on temperature." />
+                                                   Text="Automatically start or stop the fan based on temperature" />
                                 </StackPanel>
                                 <ComboBox Name="cbxSmartStartStop"
                                           Grid.Column="1"
@@ -758,7 +758,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Show an LED indicator for the current gear level." />
+                                                   Text="Show an LED indicator for the current gear level" />
                                 </StackPanel>
                                 <ui:ToggleSwitch Name="tsGearLight"
                                                  Grid.Column="1"
@@ -784,7 +784,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                         FontTypography="Caption"
                                         Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                        Text="Select which temperature sensor to use for auto control." />
+                                        Text="Select which temperature sensor to use for auto control" />
                                 </StackPanel>
                                 <ComboBox Name="cbxTempSource"
                                       Grid.Column="1"
@@ -814,7 +814,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Skip over a range of RPMs to avoid resonance." />
+                                                   Text="Skip over a range of RPMs to avoid resonance" />
                                 </StackPanel>
                                 <ui:ToggleSwitch Name="tsAvoidance"
                                                  Grid.Column="1"
@@ -841,7 +841,7 @@
                                         <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="RPM range to skip when avoidance is enabled." />
+                                                   Text="RPM range to skip when avoidance is enabled" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1"
                                             Orientation="Horizontal"
@@ -877,7 +877,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Auto-switch fan curve profiles based on time of day." />
+                                                   Text="Auto-switch fan curve profiles based on time of day" />
                                 </StackPanel>
                                 <ui:ToggleSwitch Name="tsTimeSchedule"
                                                  Grid.Column="1"
@@ -904,7 +904,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Each entry activates a curve profile during the time window shown." />
+                                                   Text="Each entry activates a curve profile during the time window shown" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"
                                             HorizontalAlignment="Right"
@@ -996,7 +996,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Auto-adjust curve offsets based on temperature observations." />
+                                                   Text="Auto-adjust curve offsets based on temperature observations" />
                                 </StackPanel>
                                 <ui:ToggleSwitch Name="tsLearning"
                                                  Grid.Column="1"
@@ -1023,7 +1023,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Balanced = equal, Cooling = favors heat prevention, Quiet = favors staying quiet." />
+                                                   Text="Balanced = equal, Cooling = favors heat prevention, Quiet = favors staying quiet" />
                                 </StackPanel>
                                 <ComboBox Name="cbxLearningBias"
                                           Grid.Column="1"
