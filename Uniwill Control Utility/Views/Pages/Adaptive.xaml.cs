@@ -740,11 +740,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private void LoadEcFanToUI(AdaptivePreset preset)
+        private void LoadEcFanToUI(AdaptivePreset preset, bool resetTracking = true)
         {
             if (sdEcFan.Visibility == Visibility.Visible)
             {
-                cbxEcFanEnabled.IsChecked = preset.EcFanEnabled;
+                // Only restore the enabled toggle from the saved preset on full reloads.
+                // When resetTracking is false (Page_Loaded navigation-back, game detection),
+                // keep the current UI toggle state so unsaved enable/disable changes persist.
+                if (resetTracking)
+                    cbxEcFanEnabled.IsChecked = preset.EcFanEnabled;
+
                 cbxEcFanMode.SelectedIndex = preset.EcFanUnifiedMode ? 0 : 1;
                 cbxEcFanPreset.SelectedIndex = GetEcFanPresetIndex(preset.EcFanPreset);
                 cbxEcFanCpuPreset.SelectedIndex = GetEcFanPresetIndex(preset.EcFanCpuPreset);
@@ -983,7 +988,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 LoadWatercoolerToUI(preset);
                 LoadBs2ProToUI(preset);
-                LoadEcFanToUI(preset);
+                LoadEcFanToUI(preset, resetTracking);
                 LoadKeyboardToUI(preset);
                 LoadCpuToUI(preset);
                 LoadGpuToUI(preset);
@@ -1364,11 +1369,19 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
 
             bool smartModeActive = _waterCoolerService?.IsSmartModeActive == true;
+            // Also check if Smart Mode is configured in the service settings.
+            // At startup there is a gap between BLE connection and Smart Mode timer
+            // starting — during that window IsSmartModeActive is false even though
+            // Smart Mode will take over pump/fan control shortly. Checking the
+            // configured flag prevents Adaptive from applying a one-shot preset
+            // pump voltage that Smart Mode would immediately overwrite.
+            bool smartModeConfigured = _waterCoolerService?.GetSettings().SmartModeEnabled == true;
+            bool skipPumpFan = smartModeActive || smartModeConfigured;
 
-            // When Smart Mode is active, skip pump voltage and fan speed overrides
+            // When Smart Mode is active or configured, skip pump voltage and fan speed overrides
             // — Smart Mode controls them internally. RGB still applies.
-            PumpVoltage? curPump = smartModeActive ? null : (PumpVoltage?)GetPumpVoltageFromIndex(cbxWcPumpVoltage.SelectedIndex);
-            FanSpeed? curFan = smartModeActive ? null : GetFanSpeedFromIndex(cbxWcFanSpeed.SelectedIndex);
+            PumpVoltage? curPump = skipPumpFan ? null : (PumpVoltage?)GetPumpVoltageFromIndex(cbxWcPumpVoltage.SelectedIndex);
+            FanSpeed? curFan = skipPumpFan ? null : GetFanSpeedFromIndex(cbxWcFanSpeed.SelectedIndex);
             RgbState curRgbMode = GetRgbModeFromIndex(cbxWcRgbMode.SelectedIndex);
             RgbColor curRgbColor = GetRgbColorFromIndex(cbxWcRgbColor.SelectedIndex);
 

@@ -243,11 +243,16 @@ namespace Uniwill_Control_Utility.Services
                 _savedWatercoolerSettings = null;
 
                 // Re-apply restored settings to the device immediately.
+                // When Smart Mode is configured, skip pump and fan writes — Smart Mode
+                // controls them and would fight with a one-shot restore.
                 if (_waterCoolerService.IsConnected)
                 {
                     try
                     {
-                        await ApplyWatercoolerAsync(saved.GetPumpVoltage(), saved.GetFanSpeed(), saved.GetRgbMode(), saved.GetRgbColor());
+                        bool smartModeConfigured = currentSettings.SmartModeEnabled;
+                        PumpVoltage? pump = smartModeConfigured ? (PumpVoltage?)null : saved.GetPumpVoltage();
+                        FanSpeed? fan = smartModeConfigured ? (FanSpeed?)null : saved.GetFanSpeed();
+                        await ApplyWatercoolerAsync(pump, fan, saved.GetRgbMode(), saved.GetRgbColor());
                     }
                     catch (Exception ex)
                     {

@@ -875,7 +875,7 @@
                 CornerRadius="4,0,0,0"
                 IsHitTestVisible="True"/>
         <!-- SnackbarPresenter for Adaptive Mode override warning and preset save/clear feedback -->
-        <ui:SnackbarPresenter x:Name="SnackbarPresenter" Grid.Row="0" Panel.ZIndex="11" MaxWidth="1080"
+        <ui:SnackbarPresenter x:Name="SnackbarPresenter" Grid.Row="0" Grid.RowSpan="2" Panel.ZIndex="11" MaxWidth="1080"
                               HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="0,0,0,0"/>
     </Grid>
 </Page>

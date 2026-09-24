@@ -653,6 +653,9 @@
 
         <!-- Dark overlay to block input when Adaptive Mode override is active -->
         <Border x:Name="overlayAdaptiveWarning"
+                Grid.Row="0"
+                Grid.RowSpan="2"
+                Panel.ZIndex="10"
                 Visibility="Collapsed"
                 Background="{DynamicResource SmokeFillColorDefaultBrush}"
                 CornerRadius="4,0,0,0"
@@ -660,6 +663,7 @@
 
         <!-- SnackbarPresenter for Adaptive Mode override warning -->
         <ui:SnackbarPresenter x:Name="SnackbarPresenter"
-                              Panel.ZIndex="11"  MaxWidth="1080"/>
+                              Grid.Row="0" Grid.RowSpan="2"
+                              Panel.ZIndex="11" MaxWidth="1080"/>
     </Grid>
 </Page>
