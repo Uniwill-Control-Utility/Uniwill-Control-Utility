@@ -78,6 +78,7 @@ namespace Uniwill_Control_Utility.Services
     public interface IHardwareMonitoringService
     {
         IDisposable Acquire(HardwareMonitoringCategory categories);
+        void AcquirePersistent(HardwareMonitoringCategory categories);
         HardwareMetricsSnapshot ReadSnapshot();
         float ReadSensor(HardwareType hardwareType, SensorType sensorType, string sensorName);
     }
@@ -97,6 +98,24 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>When the last UpdateHardware failure occurred.</summary>
         private DateTime _lastUpdateFailureUtc = DateTime.MinValue;
+
+        /// <summary>
+        /// Acquires a persistent lease that is never automatically released.
+        /// Used during startup to keep the Computer instance alive from pre-UI
+        /// detection through dashboard navigation, avoiding a costly re-probe.
+        /// </summary>
+        public void AcquirePersistent(HardwareMonitoringCategory categories)
+        {
+            if (categories == HardwareMonitoringCategory.None)
+                return;
+
+            lock (_sync)
+            {
+                ThrowIfDisposed();
+                _leases[long.MinValue] = categories; // persistent lease id
+                ApplyRequestedCategoriesLocked();
+            }
+        }
 
         public IDisposable Acquire(HardwareMonitoringCategory categories)
         {

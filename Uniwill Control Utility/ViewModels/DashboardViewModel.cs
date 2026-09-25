@@ -259,7 +259,7 @@ namespace Uniwill_Control_Utility.ViewModels
                 $"INFO | {nameof(DashboardViewModel)} navigated to.");
 
             // Phase 1 (fast): acquire the LHM lease on a background thread so the
-            // UI never freezes, then immediately start the metrics timer.
+            // UI never freezes, then start the metrics timer.
             _ = System.Threading.Tasks.Task.Run(() =>
             {
                 _lease = _hardwareMonitoring.Acquire(
@@ -268,12 +268,14 @@ namespace Uniwill_Control_Utility.ViewModels
                     HardwareMonitoringCategory.Memory |
                     HardwareMonitoringCategory.Battery);
 
-                // Start polling as soon as LHM is ready — don't wait for EC.
+                // Enable the timers on the UI thread but don't call OnRefreshTimerTick
+                // inline — let the first timer tick fire naturally after ~1s. Calling
+                // UpdateHardware() on the UI thread during startup blocks WPF's layout
+                // pass and delays the dashboard page from rendering.
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     _refreshTimer.IsEnabled = true;
                     _batteryEcTimer.IsEnabled = true;
-                    OnRefreshTimerTick(null, EventArgs.Empty);
                 });
             });
 

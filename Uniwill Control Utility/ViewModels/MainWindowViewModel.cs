@@ -72,8 +72,10 @@ namespace Uniwill_Control_Utility.ViewModels
                 NavigationFooter.Add(CreateFlydigiNavItem());
             }
 
-            // Fan Control, Keyboard, Light Bar, Battery, CPU Temp Limit in footer for Uniwill EC hardware (XMG / TUXEDO)
-            if (_uniwillEc is not null && _uniwillEc.Initialize())
+            // Fan Control, Keyboard, Light Bar, Battery in nav for Uniwill EC hardware (XMG / TUXEDO).
+            // EC initialization runs asynchronously in DashboardViewModel.OnNavigatedToAsync(),
+            // so we don't block MainWindow construction waiting for the EC handshake.
+            if (_uniwillEc is not null)
             {
                 NavigationItems.Add(CreateFanControlNavItem());
 

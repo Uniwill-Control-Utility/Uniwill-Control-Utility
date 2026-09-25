@@ -378,7 +378,10 @@ namespace Uniwill_Control_Utility
                 {
                     try
                     {
-                        monitoring.Acquire(
+                        // Use AcquirePersistent to keep the Computer instance alive
+                        // through dashboard navigation. This avoids a costly re-probe
+                        // when DashboardViewModel acquires its own lease later.
+                        monitoring.AcquirePersistent(
                             HardwareMonitoringCategory.Cpu |
                             HardwareMonitoringCategory.Gpu |
                             HardwareMonitoringCategory.Memory |
