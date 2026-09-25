@@ -583,7 +583,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 ColorRow.Visibility = Visibility.Collapsed;
                 MultiColorRow.Visibility = Visibility.Visible;
                 MultiColorTitle.Text = "Effect Colors";
-                MultiColorSubtitle.Text = "7 colors required for this effect. Click a swatch to edit.";
+                MultiColorSubtitle.Text = "7 colors required for this effect";
                 MultiColorPicker.SetColors(MultiColorPicker.GetColors(), 7);
             }
             else if (s_multiColor4Effects.Contains(effect))
@@ -591,7 +591,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 ColorRow.Visibility = Visibility.Collapsed;
                 MultiColorRow.Visibility = Visibility.Visible;
                 MultiColorTitle.Text = "WASD & Arrow Keys";
-                MultiColorSubtitle.Text = "4 colors for gaming keys. Click a swatch to edit.";
+                MultiColorSubtitle.Text = "4 colors for gaming keys";
                 MultiColorPicker.SetColors(MultiColorPicker.GetColors(), 4);
             }
             else
