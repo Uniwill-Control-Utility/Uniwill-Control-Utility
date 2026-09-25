@@ -74,8 +74,10 @@ namespace Uniwill_Control_Utility
         internal static bool HasMiniLEDPanel { get; private set; }
 
         /// <summary>
-        /// Fired when background hardware detection (WMI queries, NVML) completes.
+        /// Fired when hardware detection (WMI queries) completes.
         /// Subscribers can use this to populate UI that depends on Family.* statics.
+        /// Detection now runs synchronously before the UI is built, so this event
+        /// fires during page construction rather than as a late callback.
         /// </summary>
         internal static event Action? HardwareDetectionCompleted;
 
@@ -314,9 +316,10 @@ namespace Uniwill_Control_Utility
                 if (File.Exists("C:\\Uniwill.Control.Utility.msi"))
                     File.Delete("C:\\Uniwill.Control.Utility.msi");
 
-                // Run slow hardware detection (WMI queries, NVML) on a background
-                // thread so the window can appear immediately.
-                SafeFireAndForget(DetectHardwareAsync());
+                // Run hardware detection and LHM init before building the UI.
+                // Both run in parallel on background threads so the total wait
+                // is max(WMI, LHM) — the window only shows when all data is ready.
+                await DetectHardwareAsync(_host.Services.GetRequiredService<IHardwareMonitoringService>());
 
                 string? entryLocation = System.Reflection.Assembly.GetEntryAssembly()?.Location;
                 string path = System.IO.Path.GetDirectoryName(entryLocation)!;
@@ -356,26 +359,42 @@ namespace Uniwill_Control_Utility
             }
         }
 
-        private static async Task DetectHardwareAsync()
+        private static async Task DetectHardwareAsync(IHardwareMonitoringService monitoring)
         {
             try
             {
-                await Task.Run(() =>
+                // Run WMI detection and LHM init in parallel so the total wait
+                // is max(WMI, LHM) rather than their sum.
+                var wmiTask = Task.Run(() =>
                 {
                     Family.setCpuFamily();
                     LaptopDetector.Initialize();
                     HasMiniLEDPanel = PanelDatabase.IsMiniLED();
                     SkuResolver.Initialize();
-
-                    // Pre-fetch Settings System Info data so the page loads instantly.
                     PrefetchSystemInfo();
                 });
 
-                // Notify subscribers on the UI thread that hardware detection is done.
-                Application.Current.Dispatcher.Invoke(() =>
+                var lhmTask = Task.Run(() =>
                 {
-                    HardwareDetectionCompleted?.Invoke();
+                    try
+                    {
+                        monitoring.Acquire(
+                            HardwareMonitoringCategory.Cpu |
+                            HardwareMonitoringCategory.Gpu |
+                            HardwareMonitoringCategory.Memory |
+                            HardwareMonitoringCategory.Battery);
+                    }
+                    catch
+                    {
+                        // LHM initialization failed — the dashboard will retry
+                        // when it acquires its own lease in OnNavigatedToAsync.
+                    }
                 });
+
+                await Task.WhenAll(wmiTask, lhmTask);
+
+                // Notify subscribers that hardware detection is done.
+                HardwareDetectionCompleted?.Invoke();
             }
             catch (Exception ex)
             {

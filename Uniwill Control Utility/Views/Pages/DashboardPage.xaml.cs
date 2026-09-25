@@ -54,16 +54,14 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void InitializeDeviceInfo()
         {
-            // Hardware detection may still be running on a background thread.
-            // Subscribe to the completion event so we populate the header as soon
-            // as the data is ready, without blocking page construction.
+            // Hardware detection runs before the UI is built, so Family.* statics
+            // are already populated by the time the page constructor runs.
+            // The event subscription is kept for safety (e.g. if detection is
+            // re-run or called from a different path).
             App.HardwareDetectionCompleted += OnHardwareDetectionCompleted;
 
-            // If detection already finished (e.g. app was already running), populate now.
             if (!string.IsNullOrEmpty(Family.CPUName))
-            {
                 OnHardwareDetectionCompleted();
-            }
         }
 
         private void OnHardwareDetectionCompleted()

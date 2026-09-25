@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -107,7 +108,7 @@ namespace Uniwill_Control_Utility.Services
                 ThrowIfDisposed();
                 long id = ++_nextLeaseId;
                 _leases[id] = categories;
-                ApplyRequestedCategories();
+                ApplyRequestedCategoriesLocked();
                 return new MonitoringLease(this, id);
             }
         }
@@ -177,11 +178,12 @@ namespace Uniwill_Control_Utility.Services
                 if (_disposed || !_leases.Remove(id))
                     return;
 
-                ApplyRequestedCategories();
+                ApplyRequestedCategoriesLocked();
             }
         }
 
-        private void ApplyRequestedCategories()
+        /// <summary>Must be called while holding _sync.</summary>
+        private void ApplyRequestedCategoriesLocked()
         {
             HardwareMonitoringCategory requested = HardwareMonitoringCategory.None;
             foreach (HardwareMonitoringCategory lease in _leases.Values)
@@ -198,7 +200,9 @@ namespace Uniwill_Control_Utility.Services
             if (requested == HardwareMonitoringCategory.None)
                 return;
 
-            _computer = new Computer
+            // Build the Computer under lock but open it outside to avoid
+            // blocking other Acquire() callers during driver initialization.
+            var computer = new Computer
             {
                 IsCpuEnabled = requested.HasFlag(HardwareMonitoringCategory.Cpu),
                 IsMemoryEnabled = requested.HasFlag(HardwareMonitoringCategory.Memory),
@@ -208,7 +212,25 @@ namespace Uniwill_Control_Utility.Services
                 IsStorageEnabled = true,
                 IsControllerEnabled = true
             };
-            _computer.Open();
+
+            // Open outside the lock — this probes hardware drivers and can take
+            // 1-2 seconds on first call (NVML, ADL, WMI provider initialization).
+            Monitor.Exit(_sync);
+            try
+            {
+                computer.Open();
+            }
+            finally
+            {
+                Monitor.Enter(_sync);
+            }
+
+            // Another caller may have changed _activeCategories while we held
+            // the lock open. Only assign if our categories are still current.
+            if (_activeCategories == requested)
+                _computer = computer;
+            else
+                computer.Close();
         }
 
         private void UpdateHardware()
