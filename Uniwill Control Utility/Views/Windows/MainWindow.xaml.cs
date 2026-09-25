@@ -190,12 +190,15 @@ namespace Uniwill_Control_Utility.Views.Windows
         private void OnNavigationSelectionChanged(INavigationView sender, RoutedEventArgs e)
         {
             bool isDashboard = IsPageSelected(typeof(Views.Pages.DashboardPage));
-            ModelNameText.Visibility = isDashboard ? Visibility.Collapsed : Visibility.Visible;
+            Visibility visibility = isDashboard ? Visibility.Collapsed : Visibility.Visible;
+            ModelNameText.Visibility = visibility;
+            LaptopNameCard.Visibility = visibility;
         }
 
         private void SetupUI()
         {
             ModelNameText.Text = "Uniwill Control Utility";
+            LaptopNameText.Text = LaptopDetector.GetDisplayName().ToUpperInvariant();
 
             tbMain.Title = "Uniwill Control Utility";
 
@@ -853,8 +856,10 @@ namespace Uniwill_Control_Utility.Views.Windows
         public bool Navigate(Type pageType)
         {
             bool result = RootNavigation.Navigate(pageType);
-            ModelNameText.Visibility = pageType == typeof(Views.Pages.DashboardPage)
+            Visibility visibility = pageType == typeof(Views.Pages.DashboardPage)
                 ? Visibility.Collapsed : Visibility.Visible;
+            ModelNameText.Visibility = visibility;
+            LaptopNameCard.Visibility = visibility;
             return result;
         }
 

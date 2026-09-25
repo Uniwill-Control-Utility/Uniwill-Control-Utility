@@ -67,6 +67,27 @@
                    Margin="4,0,0,0"
                    Text="Uniwill Control Utility" />
             </ui:TitleBar.Header>
+
+            <ui:TitleBar.TrailingContent>
+                <ui:Card x:Name="LaptopNameCard"
+                 Margin="4,4,4,4"
+                 Padding="4,4,8,4"
+                 Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ui:FontIcon Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                           FontFamily="Segoe Fluent Icons"
+                           FontSize="16"
+                           Glyph="&#xE7F8;"
+                           Margin="4,0,8,0"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock x:Name="LaptopNameText"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                           VerticalAlignment="Center"/>
+                    </StackPanel>
+                </ui:Card>
+            </ui:TitleBar.TrailingContent>
         </ui:TitleBar>
 
         <ui:NavigationView x:Name="RootNavigation"
