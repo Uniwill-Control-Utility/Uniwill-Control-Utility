@@ -177,7 +177,7 @@ namespace Uniwill_Control_Utility.ViewModels
         /// </summary>
         public static NavigationViewItem CreateFanControlNavItem()
         {
-            return new NavigationViewItem("Fan Control", SymbolRegular.Empty, typeof(Views.Pages.FanControl))
+            return new NavigationViewItem("Fans", SymbolRegular.Empty, typeof(Views.Pages.FanControl))
             {
                 TargetPageTag = "fancontrol",
                 Icon = new Views.Controls.FanIconElement()
