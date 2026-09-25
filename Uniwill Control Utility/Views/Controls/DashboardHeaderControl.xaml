@@ -118,7 +118,8 @@
                        Stretch="Uniform"
                        StretchDirection="DownOnly"
                        VerticalAlignment="Bottom"
-                       Margin="0,0,12,0" />
+                       Margin="0,0,12,0" 
+                       Source="pack://application:,,,/Assets/Laptops/Uniwill/IDY.png"/>
                 <StackPanel x:Name="LaptopInfoPanel"
                             Orientation="Vertical"
                             VerticalAlignment="Center">
@@ -126,7 +127,7 @@
                                FontSize="18"
                                FontWeight="Bold"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                               Text="DESKTOP SYSTEM"
+                               Text="Uniwill IDY"
                                Margin="0,0,0,4" />
                     <TextBlock x:Name="LaptopCPUNameText"
                                FontSize="12"
