@@ -49,7 +49,7 @@
     <PackageReference Include="FuzzyStrings.NetStandard" Version="1.0.1" />
     <PackageReference Include="GameLib.NET" Version="1.4.1" />
     <PackageReference Include="hidlibrary" Version="3.3.40" />
-    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.7-pre731" />
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.7-pre744" />
     <PackageReference Include="LLT.NvAPIWrapper.Net" Version="1.1.9-pre.21" />
     <PackageReference Include="MahApps.Metro.IconPacks" Version="6.2.1" />
     <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />

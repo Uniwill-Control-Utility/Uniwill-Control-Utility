@@ -91,6 +91,12 @@ namespace Uniwill_Control_Utility.Services
         private long _nextLeaseId;
         private bool _disposed;
 
+        /// <summary>Consecutive UpdateHardware failures (reset on success).</summary>
+        private int _updateFailureCount;
+
+        /// <summary>When the last UpdateHardware failure occurred.</summary>
+        private DateTime _lastUpdateFailureUtc = DateTime.MinValue;
+
         public IDisposable Acquire(HardwareMonitoringCategory categories)
         {
             if (categories == HardwareMonitoringCategory.None)
@@ -210,10 +216,63 @@ namespace Uniwill_Control_Utility.Services
             if (_computer is null || DateTime.UtcNow - _lastUpdateUtc < TimeSpan.FromMilliseconds(250))
                 return;
 
-            foreach (IHardware hardware in _computer.Hardware)
-                UpdateHardwareTree(hardware);
+            try
+            {
+                foreach (IHardware hardware in _computer.Hardware)
+                    UpdateHardwareTree(hardware);
 
-            _lastUpdateUtc = DateTime.UtcNow;
+                _lastUpdateUtc = DateTime.UtcNow;
+                _updateFailureCount = 0;
+            }
+            catch (Exception ex)
+            {
+                /*
+                 * LHM's hardware.Update() calls into GPU driver interop (NVML for Nvidia,
+                 * ADL/AMDL for AMD). When a display topology changes (e.g. monitor hotplug),
+                 * the GPU driver can invalidate those handles, causing ExecutionEngineException
+                 * or other fatal interop failures. Catch everything here to prevent the timer
+                 * thread from taking down the process, then reopen the Computer to get fresh
+                 * driver handles.
+                 *
+                 * We also rate-limit resets to avoid tight loops if the driver stays broken.
+                 */
+                _updateFailureCount++;
+                _lastUpdateFailureUtc = DateTime.UtcNow;
+
+                try { Serilog.Log.Warning(ex, "[LHM] UpdateHardware failed (failure #{Count}) — attempting Computer reset", _updateFailureCount); } catch { /* Serilog may not be ready */ }
+
+                // Only attempt a reset if at least 2 seconds have passed since the last failure
+                // to avoid tight loops during sustained driver issues.
+                if (DateTime.UtcNow - _lastUpdateFailureUtc > TimeSpan.FromSeconds(2) || _updateFailureCount <= 3)
+                {
+                    try
+                    {
+                        _computer?.Close();
+                        _computer = null;
+
+                        // Reopen with the currently active categories
+                        if (_activeCategories != HardwareMonitoringCategory.None)
+                        {
+                            _computer = new Computer
+                            {
+                                IsCpuEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Cpu),
+                                IsMemoryEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Memory),
+                                IsGpuEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Gpu),
+                                IsBatteryEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Battery),
+                                IsMotherboardEnabled = true,
+                                IsStorageEnabled = true,
+                                IsControllerEnabled = true
+                            };
+                            _computer.Open();
+                        }
+                    }
+                    catch
+                    {
+                        // If reopening also fails, give up and let the next tick retry later.
+                        _computer = null;
+                    }
+                }
+            }
         }
 
         private static void UpdateHardwareTree(IHardware hardware)
