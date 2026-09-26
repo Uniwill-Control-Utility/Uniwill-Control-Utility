@@ -41,6 +41,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// <summary>True while LoadSmartModeSettings is populating controls. Suppresses SelectionChanged saves.</summary>
         private bool _isSyncingSmartMode;
 
+        /// <summary>True while syncing UI from external settings change (tray menu). Suppresses SelectionChanged saves.</summary>
+        private bool _isSyncingFromExternal;
+
         public Watercooler()
         {
             InitializeComponent();
@@ -73,6 +76,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _waterCoolerService.StatusChanged += OnStatusChanged;
                 _waterCoolerService.FlowStatusChanged += OnFlowStatusChanged;
                 _waterCoolerService.FirmwareVersionReceived += OnFirmwareVersionReceived;
+                _waterCoolerService.SettingsChanged += OnWaterCoolerSettingsChanged;
 
                 // Get DeviceApplier for centralized device commands and override management
                 _deviceApplier = App.GetService<DeviceApplier>();
@@ -395,7 +399,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async void cbxPumpVoltage_SelectionChanged(object sender, EventArgs e)
         {
-            if (_isSyncingFromPreset) return;
+            if (_isSyncingFromPreset || _isSyncingFromExternal) return;
             if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
 
             var voltage = GetSelectedPumpVoltage();
@@ -405,7 +409,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async void cbxFanSpeed_SelectionChanged(object sender, EventArgs e)
         {
-            if (_isSyncingFromPreset) return;
+            if (_isSyncingFromPreset || _isSyncingFromExternal) return;
             if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
 
             var speed = GetSelectedFanSpeed();
@@ -417,7 +421,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             UpdateRgbColorVisibility();
 
-            if (_isSyncingFromPreset) return;
+            if (_isSyncingFromPreset || _isSyncingFromExternal) return;
             if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
 
             var mode = GetSelectedRgbMode();
@@ -437,7 +441,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async void cbxRgbColor_SelectionChanged(object sender, EventArgs e)
         {
-            if (_isSyncingFromPreset) return;
+            if (_isSyncingFromPreset || _isSyncingFromExternal) return;
             if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
 
             var mode = GetSelectedRgbMode();
@@ -448,6 +452,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
        private void tsRgbEnabled_Checked(object sender, RoutedEventArgs e)
         {
+            if (_isSyncingFromPreset || _isSyncingFromExternal) return;
             if (_waterCoolerService == null) return;
             var settings = _waterCoolerService.GetSettings();
             settings.RgbEnabled = true;
@@ -456,7 +461,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             RgbCardExpander.IsExpanded = true;
 
             // Apply current effect/color to device
-            if (_waterCoolerService.IsConnected && !_isSyncingFromPreset)
+            if (_waterCoolerService.IsConnected)
             {
                 var mode = GetSelectedRgbMode();
                 var color = GetSelectedRgbColor();
@@ -466,6 +471,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async void tsRgbEnabled_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (_isSyncingFromPreset || _isSyncingFromExternal) return;
             if (_waterCoolerService == null) return;
             var settings = _waterCoolerService.GetSettings();
             settings.RgbEnabled = false;
@@ -474,7 +480,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             RgbCardExpander.IsExpanded = false;
 
             // Turn off RGB on device
-            if (_waterCoolerService.IsConnected && !_isSyncingFromPreset)
+            if (_waterCoolerService.IsConnected)
             {
                 await _waterCoolerService.WriteRgbModeAsync(RgbState.Off, RgbColor.Red);
             }
@@ -496,6 +502,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void tsSmartMode_Checked(object sender, RoutedEventArgs e)
         {
+            if (_isSyncingFromPreset || _isSyncingFromExternal) return;
             if (_waterCoolerService == null) return;
 
             var settings = _waterCoolerService.GetSettings();
@@ -510,6 +517,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async void tsSmartMode_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (_isSyncingFromPreset || _isSyncingFromExternal) return;
             if (_waterCoolerService == null) return;
 
             var settings = _waterCoolerService.GetSettings();
@@ -810,6 +818,64 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             // Status messages are transient (e.g. "Sending pump command..."),
             // so we don't overwrite the connection state display.
+        }
+
+        /// <summary>
+        /// Syncs page UI when settings change from external callers (e.g., tray menu).
+        /// </summary>
+        private void OnWaterCoolerSettingsChanged(object? sender, EventArgs e)
+        {
+            if (_waterCoolerService == null) return;
+
+            this.Dispatcher.Invoke(() =>
+            {
+                _isSyncingFromExternal = true;
+                try
+                {
+                    var settings = _waterCoolerService.GetSettings();
+
+                    // Pump voltage
+                    var pumpVoltage = settings.GetPumpVoltage();
+                    cbxPumpVoltage.SelectedIndex = GetPumpVoltageIndex(pumpVoltage);
+
+                    // Fan speed
+                    var fanSpeed = settings.GetFanSpeed();
+                    cbxFanSpeed.SelectedIndex = GetFanSpeedIndex(fanSpeed);
+
+                    // RGB mode
+                    var rgbMode = settings.GetRgbMode();
+                    cbxRgbMode.SelectedIndex = GetRgbModeIndex(rgbMode);
+
+                    // RGB color
+                    var rgbColor = settings.GetRgbColor();
+                    cbxRgbColor.SelectedIndex = GetRgbColorIndex(rgbColor);
+
+                    // RGB enabled toggle
+                    tsRgbEnabled.IsChecked = settings.RgbEnabled && rgbMode != RgbState.Off;
+
+                    // Smart Mode toggle
+                    tsSmartMode.IsChecked = settings.SmartModeEnabled;
+
+                    // Update UI visibility based on Smart Mode state
+                    if (settings.SmartModeEnabled)
+                    {
+                        PumpVoltageCard.Visibility = Visibility.Collapsed;
+                        FanSpeedCard.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        PumpVoltageCard.Visibility = Visibility.Visible;
+                        FanSpeedCard.Visibility = Visibility.Visible;
+                    }
+
+                    // Update color picker visibility based on loaded mode
+                    UpdateRgbColorVisibility();
+                }
+                finally
+                {
+                    _isSyncingFromExternal = false;
+                }
+            });
         }
 
         /// <summary>

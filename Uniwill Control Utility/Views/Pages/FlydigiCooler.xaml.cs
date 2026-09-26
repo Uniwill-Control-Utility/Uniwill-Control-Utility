@@ -153,6 +153,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                     _deviceApplier.FlydigiPresetApplied += OnFlydigiPresetApplied;
                 }
 
+                // Subscribe to settings changed events so the page responds to changes
+                // from external callers (e.g., tray menu).
+                if (_coolerService != null)
+                    _coolerService.SettingsChanged += OnFlydigiSettingsChanged;
+                if (_bs1Service != null)
+                    _bs1Service.SettingsChanged += OnFlydigiSettingsChanged;
+
                 // Reflect any already-connected state (auto-connect may have fired before page load)
                 bool bs1Connected = _bs1Service?.IsConnected == true;
                 bool hidConnected = _coolerService?.IsConnected == true;
@@ -887,10 +894,43 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>
-        /// Event handler for <see cref="DeviceApplier.FlydigiPresetApplied"/>.
-        /// Syncs the Flydigi page's UI controls to reflect the profile's values.
-        /// Uses _isSyncingFromPreset flag to suppress selection-changed side effects.
+        /// Syncs page UI when settings change from external callers (e.g., tray menu).
         /// </summary>
+        private void OnFlydigiSettingsChanged(object? sender, EventArgs e)
+        {
+            this.Dispatcher.Invoke(() =>
+            {
+                if (_isSyncingFromPreset) return;
+
+                _isSyncingFromPreset = true;
+                try
+                {
+                    if (_isBs1Device && _bs1Service != null)
+                    {
+                        var settings = _bs1Service.GetSettings();
+                        cbxFanMode.SelectedIndex = settings.FanMode;
+                        // BS1 has no RGB — skip RGB sync
+                    }
+                    else if (_coolerService != null)
+                    {
+                        var settings = _coolerService.GetSettings();
+                        cbxFanMode.SelectedIndex = settings.FanMode;
+                        cbxRgbMode.SelectedIndex = GetRgbModeIndex(settings.RgbMode);
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+                finally
+                {
+                    _isSyncingFromPreset = false;
+                }
+
+                UpdateFanModeUI();
+            });
+        }
+
         private void OnFlydigiPresetApplied(object? sender, FlydigiPresetAppliedEventArgs e)
         {
             _isSyncingFromPreset = true;

@@ -73,6 +73,12 @@ namespace Uniwill_Control_Utility.Services
         public event EventHandler<FlowStatus>? FlowStatusChanged;
 
         /// <summary>
+        /// Raised whenever settings are saved. Used by the Watercooler page to
+        /// sync its UI when changes come from external callers (e.g., tray menu).
+        /// </summary>
+        public event EventHandler? SettingsChanged;
+
+        /// <summary>
         /// Raised when the firmware version is received from the device.
         /// </summary>
         public event EventHandler<string>? FirmwareVersionReceived;
@@ -143,6 +149,7 @@ namespace Uniwill_Control_Utility.Services
 
                 var json = JsonConvert.SerializeObject(_settings, Newtonsoft.Json.Formatting.Indented);
                 File.WriteAllText(filePath, json);
+                SettingsChanged?.Invoke(this, EventArgs.Empty);
             }
             catch
             {

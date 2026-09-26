@@ -283,6 +283,12 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public event EventHandler<Bs2ProDeviceSettings>? DeviceSettingsUpdated;
 
+        /// <summary>
+        /// Raised whenever settings are saved. Used by the FlydigiCooler page to
+        /// sync its UI when changes come from external callers (e.g., tray menu).
+        /// </summary>
+        public event EventHandler? SettingsChanged;
+
         /// <summary>Last known device settings from query or notifications.</summary>
         public Bs2ProDeviceSettings? DeviceSettings { get; private set; }
 
@@ -392,6 +398,7 @@ namespace Uniwill_Control_Utility.Services
 
                 var json = JsonConvert.SerializeObject(_settings, Formatting.Indented);
                 File.WriteAllText(filePath, json);
+                SettingsChanged?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {

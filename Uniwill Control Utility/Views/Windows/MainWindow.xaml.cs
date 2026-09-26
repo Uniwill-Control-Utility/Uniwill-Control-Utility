@@ -1488,6 +1488,31 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         #endregion
 
+        private void TrayHydroSmartMode_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem item)
+                return;
+
+            bool enabled = item.IsChecked == true;
+            var wc = App.GetService<WaterCoolerService>();
+            if (wc == null)
+                return;
+
+            var settings = wc.GetSettings();
+            settings.SmartModeEnabled = enabled;
+            wc.SaveSettings();
+
+            if (enabled)
+            {
+                if (wc.IsConnected)
+                    wc.StartSmartMode();
+            }
+            else
+            {
+                wc.StopSmartMode();
+            }
+        }
+
         #region Flydigi Tray Handlers
 
         private async void TrayFlydigiFan_Click(object? sender, RoutedEventArgs e)
@@ -1646,18 +1671,23 @@ namespace Uniwill_Control_Utility.Views.Windows
             switch (tag)
             {
                 case "Off":
+                    settings.RgbMode = "Off";
                     await fc.WriteRgbOffAsync();
                     break;
                 case "SmartTemp":
+                    settings.RgbMode = "SmartTemp";
                     await fc.WriteRgbSmartTempAsync();
                     break;
                 case "Static":
+                    settings.RgbMode = "Static";
                     await fc.WriteRgbStaticAsync(settings.R, settings.G, settings.B, settings.Brightness);
                     break;
                 case "Flowing":
+                    settings.RgbMode = "Flowing";
                     await fc.WriteRgbFlowingAsync();
                     break;
                 case "Breathing":
+                    settings.RgbMode = "Breathing";
                     await fc.WriteRgbBreathingAsync(settings.R, settings.G, settings.B, settings.Brightness);
                     break;
             }
@@ -1916,6 +1946,9 @@ namespace Uniwill_Control_Utility.Views.Windows
                 {
                     mi.IsChecked = mi.Tag?.ToString() == settings.RgbMode;
                 }
+
+                // Smart Mode toggle
+                miHydroSmartMode.IsChecked = settings.SmartModeEnabled;
             }
             catch { /* Non-critical: failing to sync Hydro tray checkmarks only affects visual state */ }
         }

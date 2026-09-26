@@ -86,6 +86,12 @@ namespace Uniwill_Control_Utility.Services
         public event EventHandler<string>? StatusChanged;
         public event EventHandler<FanRpmData>? FanDataReceived;
 
+        /// <summary>
+        /// Raised whenever settings are saved. Used by the FlydigiCooler page to
+        /// sync its UI when changes come from external callers (e.g., tray menu).
+        /// </summary>
+        public event EventHandler? SettingsChanged;
+
         /// <summary>Latest RPM data known to the service.</summary>
         public FanRpmData? FanRpmData { get; private set; }
 
@@ -216,6 +222,7 @@ namespace Uniwill_Control_Utility.Services
                 var filePath = Path.Combine(settingsFolder, SettingsFileName);
                 var json = JsonConvert.SerializeObject(_settings, Newtonsoft.Json.Formatting.Indented);
                 File.WriteAllText(filePath, json);
+                SettingsChanged?.Invoke(this, EventArgs.Empty);
                 Log($"{LogPrefix} Settings saved: FanMode={_settings.FanMode}, Profile={_settings.SelectedCurveProfile}");
             }
             catch

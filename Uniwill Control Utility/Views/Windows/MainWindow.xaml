@@ -200,6 +200,11 @@
                             <MenuItem Header="Colorful" Tag="Colorful" IsCheckable="True" Click="TrayHydroRgb_Click" />
                             <MenuItem Header="Breathe Color" Tag="BreatheColor" IsCheckable="True" Click="TrayHydroRgb_Click" />
                         </MenuItem>
+                        <!-- Smart Mode toggle -->
+                        <MenuItem x:Name="miHydroSmartMode"
+                                  Header="Smart Mode"
+                                  IsCheckable="True"
+                                  Click="TrayHydroSmartMode_Click" />
                     </MenuItem>
 
                     <!-- ═══════════════════════════════════════════
