@@ -41,6 +41,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         private CancellationTokenSource _pageCts = new();
         private bool _isUnloaded;
 
+        // Tracks whether Smart Fan Mode was active before Turbo was enabled,
+        // so we can restore it when Turbo is disabled.
+        private bool _smartFanWasActiveBeforeTurbo;
+
         public FanControl(
             IHardwareMonitoringService hardwareMonitoring,
             DeviceApplier deviceApplier,
@@ -58,6 +62,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Subscribe to DeviceApplier override events
             _deviceApplier.EcFanOverrideChanged += OnEcFanOverrideChanged;
             _deviceApplier.EcFanPresetApplied += OnEcFanPresetApplied;
+
+            // Subscribe to settings changes from external callers (e.g., tray menu)
+            // so the page UI stays in sync when the user changes settings from niTray.
+            FanControlSettingsService.SettingsChanged += OnFanSettingsChanged;
 
             // Subscribe to curve changes for banner updates and auto-apply debounce
             FanCurveEditor.CurveChanged += (s, e) =>
@@ -176,6 +184,86 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void OnEcFanOverrideChanged(object? sender, bool isOverridden)
         {
             ApplyOverrideState(isOverridden);
+        }
+
+        /// <summary>
+        /// Called when Fan Control settings change from external sources (e.g., tray menu).
+        /// Syncs the page UI to match the new persisted state without re-applying the
+        /// curve to the EC (the external caller already did that).
+        /// </summary>
+        private void OnFanSettingsChanged(object? sender, EventArgs e)
+        {
+            // Skip if the page is not currently visible — Page_Loaded will reload.
+            if (_isUnloaded) return;
+
+            // Skip if we're currently loading settings (avoid feedback loop from
+            // our own SaveCurrentSettings calls which also fire this event).
+            if (_loadingSettings) return;
+
+            Dispatcher.Invoke(() =>
+            {
+                try
+                {
+                    var settings = FanControlSettingsService.Load();
+
+                    // Sync Smart Fan Mode toggle
+                    _loadingSettings = true;
+                    bool smartFanWasChecked = tsSmartFanMode.IsChecked == true;
+                    tsSmartFanMode.IsChecked = settings.EcSmartFanMode;
+
+                    // If Smart Fan Mode was toggled from the tray, update the control loop.
+                    if (smartFanWasChecked != settings.EcSmartFanMode && _uniwillEc is not null)
+                    {
+                        if (settings.EcSmartFanMode)
+                        {
+                            // Enable Smart Fan Mode
+                            if (_smartFanTempProvider == null)
+                                _smartFanTempProvider = new FlydigiTemperatureProvider();
+
+                            _smartFanControl = EcSmartFanControl.GetOrCreate(
+                                _uniwillEc,
+                                _smartFanTempProvider,
+                                settings,
+                                GetActiveCurve(),
+                                GetActiveTemperatures());
+
+                            if (!_smartFanControl.HasTemperatureSubscribers)
+                            {
+                                _smartFanControl.TemperatureUpdated += (s, ev) => { };
+                            }
+
+                            _smartFanControl.UpdateCurve(GetActiveCurve(), GetActiveTemperatures());
+                            _smartFanControl.UpdateSettings(settings);
+                            _smartFanControl.Start();
+                            SmartFanCard.IsExpanded = true;
+                        }
+                        else
+                        {
+                            // Disable Smart Fan Mode
+                            EcSmartFanControl.ClearInstance();
+                            _smartFanControl = null;
+                            SmartFanCard.IsExpanded = false;
+                            // No need to ApplyCurveNow() — the tray handler already
+                            // applied the normal fan curve when it stopped Smart Fan.
+                        }
+                    }
+
+                    // Sync temp source dropdown
+                    int tempSourceIndex = settings.EcSmartFanTempSource.ToLowerInvariant() switch
+                    {
+                        "cpu" => 1,
+                        "gpu" => 2,
+                        _ => 0
+                    };
+                    if (cbxSmartFanTempSource.SelectedIndex != tempSourceIndex)
+                    {
+                        cbxSmartFanTempSource.SelectedIndex = tempSourceIndex;
+                    }
+
+                    _loadingSettings = false;
+                }
+                catch { /* Non-critical: tray sync failure shouldn't crash the page */ }
+            });
         }
 
         private void OnEcFanPresetApplied(object? sender, EcFanPresetAppliedEventArgs e)
@@ -1228,17 +1316,21 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (_uniwillEc is null) return;
 
+            // Remember whether Smart Fan Mode was active so we can restore it
+            // when Turbo is disabled. Do NOT overwrite the persisted setting —
+            // only track in-memory so the toggle survives the Turbo session.
+            _smartFanWasActiveBeforeTurbo = tsSmartFanMode.IsChecked == true;
+
             // Stop smart fan mode if active — turbo and smart fan are mutually exclusive
             _smartFanControl?.Stop();
-            if (tsSmartFanMode.IsChecked == true)
+            if (_smartFanWasActiveBeforeTurbo)
             {
                 _loadingSettings = true;
                 tsSmartFanMode.IsChecked = false;
                 _loadingSettings = false;
 
-                var settings = FanControlSettingsService.Load();
-                settings.EcSmartFanMode = false;
-                FanControlSettingsService.Save(settings);
+                // Do NOT persist EcSmartFanMode = false — we want to restore it
+                // when Turbo is disabled. Just stop the control loop in-memory.
             }
 
             SetStatusText(LocalizationService.Get("Enabling turbo mode..."));
@@ -1284,13 +1376,17 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (_uniwillEc is null) return;
 
-            // Restart smart fan mode if it was active before turbo
-            var settings = FanControlSettingsService.Load();
-            if (settings.EcSmartFanMode)
+            // Restart smart fan mode if it was active before turbo was enabled.
+            // Use the in-memory flag instead of persisted settings because Turbo
+            // no longer overwrites EcSmartFanMode to false.
+            if (_smartFanWasActiveBeforeTurbo)
             {
                 _loadingSettings = true;
                 tsSmartFanMode.IsChecked = true;
                 _loadingSettings = false;
+                _smartFanWasActiveBeforeTurbo = false;
+
+                var settings = FanControlSettingsService.Load();
 
                 if (_smartFanControl == null)
                 {
@@ -1368,7 +1464,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             else
             {
-                tsTurbo.Foreground = null; // Reset to theme default
+                // ClearValue removes the local value so the XAML DynamicResource
+                // binding kicks back in. Setting to null doesn't work — it falls
+                // through to the parent's inherited Foreground (black).
+                tsTurbo.ClearValue(Control.ForegroundProperty);
             }
         }
 

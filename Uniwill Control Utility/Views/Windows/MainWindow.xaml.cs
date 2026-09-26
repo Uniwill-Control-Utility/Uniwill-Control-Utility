@@ -1695,6 +1695,9 @@ namespace Uniwill_Control_Utility.Views.Windows
                     ec.ApplyFanCurve(cpuCurve, gpuCurve, EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
                 }
             }
+
+            // Update visibility of Smart Mode + Profile/CPU/GPU submenus
+            UpdateTrayFanProfileVisibility();
         }
 
         private void TrayFanProfile_Click(object? sender, RoutedEventArgs e)
@@ -1709,7 +1712,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             };
 
             foreach (MenuItem mi in miFanCurveProfile.Items)
-                mi.IsChecked = mi.Header.ToString() == (tag == "FullSpeed" ? "Full Speed" : tag);
+                mi.IsChecked = mi.Header?.ToString() == presetName;
 
             var settings = FanControlSettingsService.Load();
             settings.UnifiedPreset = presetName;
@@ -1723,7 +1726,9 @@ namespace Uniwill_Control_Utility.Views.Windows
             var ec = App.GetService<UniwillECService>();
             if (ec != null)
             {
-                var curve = GetFanPresetCurve(presetName);
+                Models.EcFanCurve curve = presetName == "Custom"
+                    ? GetFanCustomCurve(settings.UnifiedDuties)
+                    : GetFanPresetCurve(presetName);
                 if (settings.UnifiedMode)
                 {
                     ec.ApplyFanCurve(curve, curve, EcFanCurve.CpuTemperatures, EcFanCurve.CpuTemperatures);
@@ -1756,8 +1761,12 @@ namespace Uniwill_Control_Utility.Views.Windows
             var ec = App.GetService<UniwillECService>();
             if (ec != null)
             {
-                var cpuCurve = GetFanPresetCurve(presetName);
-                var gpuCurve = GetFanPresetCurve(settings.GpuPreset);
+                Models.EcFanCurve cpuCurve = presetName == "Custom"
+                    ? GetFanCustomCurve(settings.CpuDuties)
+                    : GetFanPresetCurve(presetName);
+                Models.EcFanCurve gpuCurve = settings.GpuPreset == "Custom"
+                    ? GetFanCustomCurve(settings.GpuDuties)
+                    : GetFanPresetCurve(settings.GpuPreset);
                 ec.ApplyFanCurve(cpuCurve, gpuCurve, EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
             }
         }
@@ -1783,8 +1792,12 @@ namespace Uniwill_Control_Utility.Views.Windows
             var ec = App.GetService<UniwillECService>();
             if (ec != null)
             {
-                var cpuCurve = GetFanPresetCurve(settings.CpuPreset);
-                var gpuCurve = GetFanPresetCurve(presetName);
+                Models.EcFanCurve cpuCurve = settings.CpuPreset == "Custom"
+                    ? GetFanCustomCurve(settings.CpuDuties)
+                    : GetFanPresetCurve(settings.CpuPreset);
+                Models.EcFanCurve gpuCurve = presetName == "Custom"
+                    ? GetFanCustomCurve(settings.GpuDuties)
+                    : GetFanPresetCurve(presetName);
                 ec.ApplyFanCurve(cpuCurve, gpuCurve, EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
             }
         }
@@ -1801,6 +1814,72 @@ namespace Uniwill_Control_Utility.Views.Windows
             "Off" => EcFanCurve.CreateOff(),
             _ => EcFanCurve.CreateBalanced()
         };
+
+        /// <summary>
+        /// Builds a Custom fan curve from saved duty values, or falls back to Performance.
+        /// </summary>
+        private static EcFanCurve GetFanCustomCurve(int[]? duties)
+        {
+            if (duties != null && duties.Length == 11)
+            {
+                var curve = new EcFanCurve { Name = "Custom" };
+                curve.Duties.Clear();
+                foreach (var d in duties)
+                    curve.Duties.Add(Math.Clamp(d, 0, 100));
+                return curve;
+            }
+            return EcFanCurve.CreatePerformance();
+        }
+
+        private void TrayFanSmartMode_Click(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem item)
+                return;
+
+            bool enabled = item.IsChecked == true;
+            var settings = FanControlSettingsService.Load();
+            settings.EcSmartFanMode = enabled;
+            FanControlSettingsService.Save(settings);
+
+            var ec = App.GetService<UniwillECService>();
+            if (ec == null)
+                return;
+
+            if (enabled)
+            {
+                // Start Smart Fan Mode
+                var cpuCurve = settings.UnifiedMode
+                    ? (settings.UnifiedPreset == "Custom" ? GetFanCustomCurve(settings.UnifiedDuties) : GetFanPresetCurve(settings.UnifiedPreset))
+                    : (settings.CpuPreset == "Custom" ? GetFanCustomCurve(settings.CpuDuties) : GetFanPresetCurve(settings.CpuPreset));
+                var temps = settings.UnifiedMode
+                    ? (settings.UnifiedTempThresholds ?? EcFanCurve.CpuTemperatures)
+                    : (settings.CpuTempThresholds ?? EcFanCurve.CpuTemperatures);
+
+                var tempProvider = new Models.FlydigiTemperatureProvider();
+                var smartFan = Services.EcSmartFanControl.GetOrCreate(ec, tempProvider, settings, cpuCurve, temps);
+                smartFan.Start();
+            }
+            else
+            {
+                // Stop Smart Fan Mode and re-apply the normal fan curve
+                Services.EcSmartFanControl.ClearInstance();
+
+                var cpuCurve = settings.UnifiedMode
+                    ? (settings.UnifiedPreset == "Custom" ? GetFanCustomCurve(settings.UnifiedDuties) : GetFanPresetCurve(settings.UnifiedPreset))
+                    : (settings.CpuPreset == "Custom" ? GetFanCustomCurve(settings.CpuDuties) : GetFanPresetCurve(settings.CpuPreset));
+                var gpuCurve = settings.UnifiedMode
+                    ? cpuCurve
+                    : (settings.GpuPreset == "Custom" ? GetFanCustomCurve(settings.GpuDuties) : GetFanPresetCurve(settings.GpuPreset));
+                var cpuTemps = settings.UnifiedMode
+                    ? (settings.UnifiedTempThresholds ?? EcFanCurve.CpuTemperatures)
+                    : (settings.CpuTempThresholds ?? EcFanCurve.CpuTemperatures);
+                var gpuTemps = settings.UnifiedMode
+                    ? cpuTemps
+                    : (settings.GpuTempThresholds ?? EcFanCurve.GpuTemperatures);
+
+                ec.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+            }
+        }
 
         #endregion
 
@@ -1949,9 +2028,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                 // Unified Curve toggle
                 miFanUnified.IsChecked = settings.UnifiedMode;
 
+                // Smart Fan Mode toggle (only visible in unified mode)
+                miFanSmartMode.IsChecked = settings.EcSmartFanMode;
+
                 if (settings.UnifiedMode)
                 {
-                    // Unified mode: show Profile, hide CPU/GPU Profile
+                    // Unified mode: show Profile + Smart Mode, hide CPU/GPU Profile
                     string presetName = settings.UnifiedPreset switch
                     {
                         "Full Speed" => "FullSpeed",
@@ -1984,6 +2066,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         /// <summary>
         /// Toggles visibility of Profile vs CPU/GPU Profile based on Unified mode.
+        /// Smart Fan Mode is only available in unified mode.
         /// </summary>
         private void UpdateTrayFanProfileVisibility()
         {
@@ -1992,12 +2075,14 @@ namespace Uniwill_Control_Utility.Views.Windows
                 var settings = FanControlSettingsService.Load();
                 if (settings.UnifiedMode)
                 {
+                    miFanSmartMode.Visibility = Visibility.Visible;
                     miFanCurveProfile.Visibility = Visibility.Visible;
                     miFanCpuProfile.Visibility = Visibility.Collapsed;
                     miFanGpuProfile.Visibility = Visibility.Collapsed;
                 }
                 else
                 {
+                    miFanSmartMode.Visibility = Visibility.Collapsed;
                     miFanCurveProfile.Visibility = Visibility.Collapsed;
                     miFanCpuProfile.Visibility = Visibility.Visible;
                     miFanGpuProfile.Visibility = Visibility.Visible;

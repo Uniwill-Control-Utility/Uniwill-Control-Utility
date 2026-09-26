@@ -15,6 +15,12 @@ namespace Uniwill_Control_Utility.Services
 
         private static readonly string SettingsFile = Path.Combine(SettingsFolder, "fancontrol_settings.json");
 
+        /// <summary>
+        /// Raised whenever settings are saved. Used by the Fan Control page to
+        /// sync its UI when changes come from external callers (e.g., tray menu).
+        /// </summary>
+        public static event EventHandler? SettingsChanged;
+
         public static FanControlSettings Load()
         {
             try
@@ -39,6 +45,7 @@ namespace Uniwill_Control_Utility.Services
                 Directory.CreateDirectory(SettingsFolder);
                 var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
                 File.WriteAllText(SettingsFile, json);
+                SettingsChanged?.Invoke(null, EventArgs.Empty);
             }
             catch (Exception ex)
             {

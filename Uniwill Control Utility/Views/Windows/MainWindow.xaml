@@ -211,6 +211,11 @@
                                   Header="Unified Curve"
                                   IsCheckable="True"
                                   Click="TrayFanUnified_Click" />
+                        <!-- Smart Fan Mode toggle -->
+                        <MenuItem x:Name="miFanSmartMode"
+                                  Header="Smart Fan Mode"
+                                  IsCheckable="True"
+                                  Click="TrayFanSmartMode_Click" />
                         <!-- Profile (shown when Unified is ON) -->
                         <MenuItem x:Name="miFanCurveProfile" Header="Profile">
                             <MenuItem Header="Silent" Tag="Silent" IsCheckable="True" Click="TrayFanProfile_Click" />
@@ -218,6 +223,7 @@
                             <MenuItem Header="Performance" Tag="Performance" IsCheckable="True" Click="TrayFanProfile_Click" />
                             <MenuItem Header="Full Speed" Tag="FullSpeed" IsCheckable="True" Click="TrayFanProfile_Click" />
                             <MenuItem Header="Off" Tag="Off" IsCheckable="True" Click="TrayFanProfile_Click" />
+                            <MenuItem Header="Custom" Tag="Custom" IsCheckable="True" Click="TrayFanProfile_Click" />
                         </MenuItem>
                         <!-- CPU Profile (shown when Unified is OFF) -->
                         <MenuItem x:Name="miFanCpuProfile" Header="CPU Profile" Visibility="Collapsed">
@@ -226,6 +232,7 @@
                             <MenuItem Header="Performance" Tag="Performance" IsCheckable="True" Click="TrayFanCpuProfile_Click" />
                             <MenuItem Header="Full Speed" Tag="FullSpeed" IsCheckable="True" Click="TrayFanCpuProfile_Click" />
                             <MenuItem Header="Off" Tag="Off" IsCheckable="True" Click="TrayFanCpuProfile_Click" />
+                            <MenuItem Header="Custom" Tag="Custom" IsCheckable="True" Click="TrayFanCpuProfile_Click" />
                         </MenuItem>
                         <!-- GPU Profile (shown when Unified is OFF) -->
                         <MenuItem x:Name="miFanGpuProfile" Header="GPU Profile" Visibility="Collapsed">
@@ -234,6 +241,7 @@
                             <MenuItem Header="Performance" Tag="Performance" IsCheckable="True" Click="TrayFanGpuProfile_Click" />
                             <MenuItem Header="Full Speed" Tag="FullSpeed" IsCheckable="True" Click="TrayFanGpuProfile_Click" />
                             <MenuItem Header="Off" Tag="Off" IsCheckable="True" Click="TrayFanGpuProfile_Click" />
+                            <MenuItem Header="Custom" Tag="Custom" IsCheckable="True" Click="TrayFanGpuProfile_Click" />
                         </MenuItem>
                     </MenuItem>
 
