@@ -236,7 +236,7 @@
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0"
                                                    Text="75 W" />
-                                        <Slider x:Name="sdSustained" Width="140" Maximum="160" Minimum="45" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
+                                        <Slider x:Name="sdSustained" Width="140" Maximum="160" Minimum="35" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <!-- Divider -->
@@ -267,7 +267,7 @@
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0"
                                                    Text="85 W" />
-                                        <Slider x:Name="sdBoost" Width="140" Maximum="160" Minimum="45" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
+                                        <Slider x:Name="sdBoost" Width="140" Maximum="160" Minimum="35" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <!-- Divider -->

@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Media;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
+using Microsoft.Win32;
 
 namespace Uniwill_Control_Utility.Views.Windows
 {
@@ -80,6 +83,82 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             // Notify parent page so labels refresh and slider flag resets.
             CurveChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void btnExport_Click(object sender, RoutedEventArgs e)
+        {
+            var offsets = _editor.GetAllOffsets();
+            if (offsets.Count == 0)
+            {
+                System.Windows.MessageBox.Show("No V-F curve data to export.", "Export", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                return;
+            }
+
+            var dialog = new SaveFileDialog
+            {
+                AddExtension = true,
+                DefaultExt = ".json",
+                FileName = "UCU-VF-Curve.json",
+                Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*"
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            try
+            {
+                var json = JsonSerializer.Serialize(offsets, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(dialog.FileName, json);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"Failed to export V-F curve:\n{ex.Message}", "Export Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
+        }
+
+        private void btnImport_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new OpenFileDialog
+            {
+                CheckFileExists = true,
+                DefaultExt = ".json",
+                Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*"
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            try
+            {
+                var json = File.ReadAllText(dialog.FileName);
+                var offsets = JsonSerializer.Deserialize<Dictionary<int, int>>(json);
+
+                if (offsets == null)
+                {
+                    System.Windows.MessageBox.Show("The selected file does not contain valid V-F curve data.", "Import Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                    return;
+                }
+
+                _editor.LoadCurve(offsets);
+
+                // Save imported curve to the active preset slot.
+                var customPresets = Models.CustomPresetStore.Load(_presetMode);
+                if (_activePresetSlot < customPresets.Length)
+                {
+                    customPresets[_activePresetSlot].VfCurveOffsets = _editor.GetOffsets();
+                    Models.CustomPresetStore.Save(customPresets, _presetMode);
+                }
+
+                CurveChanged?.Invoke(this, EventArgs.Empty);
+            }
+            catch (JsonException)
+            {
+                System.Windows.MessageBox.Show("The selected file is not a valid V-F curve JSON file.", "Import Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"Failed to import V-F curve:\n{ex.Message}", "Import Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
         }
     }
 }

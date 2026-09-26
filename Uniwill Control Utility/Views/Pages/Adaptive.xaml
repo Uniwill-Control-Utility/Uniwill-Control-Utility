@@ -138,7 +138,7 @@
                                                VerticalAlignment="Center"
                                                Margin="0,0,8,0"
                                                Text="75 W" />
-                                    <Slider x:Name="AdpSdSustained" Width="140" Maximum="255" Minimum="45" Value="75" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                    <Slider x:Name="AdpSdSustained" Width="140" Maximum="255" Minimum="35" Value="75" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
                             <!-- Divider -->
@@ -166,7 +166,7 @@
                                                VerticalAlignment="Center"
                                                Margin="0,0,8,0"
                                                Text="85 W" />
-                                    <Slider x:Name="AdpSdBoost" Width="140" Maximum="255" Minimum="45" Value="85" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
+                                    <Slider x:Name="AdpSdBoost" Width="140" Maximum="255" Minimum="35" Value="85" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
                             <!-- Divider -->

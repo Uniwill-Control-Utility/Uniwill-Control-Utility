@@ -506,9 +506,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // When Power boost mode is ON, raise the slider cap to the water-cooling limits
             // (same limits that Hydro UI connection would unlock), instead of the EC maximum.
-            // AMD: 160W/160W, Intel: 200W/200W — matches skus.json water values.
-            int boostPl1 = Family.TYPE == Family.ProcessorType.Amd_Apu ? 160 : 200;
-            int boostPl2 = Family.TYPE == Family.ProcessorType.Amd_Apu ? 160 : 200;
+            // AMD: 160W/160W, Intel: 255W/255W.
+            int boostPl1 = Family.TYPE == Family.ProcessorType.Amd_Apu ? 160 : 255;
+            int boostPl2 = Family.TYPE == Family.ProcessorType.Amd_Apu ? 160 : 255;
 
             if (Family.TYPE == Family.ProcessorType.Amd_Apu)
             {
