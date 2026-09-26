@@ -299,8 +299,8 @@ namespace Uniwill_Control_Utility.Views.Windows
                     }
                 }
 
-                // Apply keyboard RGB settings on startup (runs on background thread)
-                Task.Run(ApplyKeyboardOnStart);
+                // Keyboard RGB startup apply moved to mainWindow_Loaded (AsyncApplyKeyboardOnStart)
+                // so it fires regardless of whether the app starts minimized to tray.
             }
             catch (Exception ex)
             {
@@ -438,6 +438,106 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
         }
 
+        /// <summary>
+        /// Applies keyboard RGB settings on startup with a delay and retries.
+        /// The ITE HID controller may not be discoverable immediately on cold boot,
+        /// and the app may start minimized to tray (before Dashboard navigation fires).
+        /// </summary>
+        private async void AsyncApplyKeyboardOnStart()
+        {
+            // Wait for the system to settle after boot. The HID controller needs
+            // time to become discoverable — especially on cold startup.
+            await Task.Delay(1000);
+
+            KeyboardHidService? hidService = null;
+
+            try
+            {
+                // Retry HID open up to 10 times with 500ms delays.
+                for (int attempt = 0; attempt < 10; attempt++)
+                {
+                    if (attempt > 0)
+                        await Task.Delay(500);
+
+                    hidService = new KeyboardHidService();
+                    if (hidService.Open())
+                        break;
+
+                    hidService.Dispose();
+                    hidService = null;
+                }
+
+                if (hidService == null || !hidService.IsAvailable)
+                {
+                    System.Diagnostics.Debug.WriteLine("[KBD] Startup apply: HID keyboard not available after retries");
+                    return;
+                }
+
+                ApplyKeyboardOnStartWithService(hidService);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[KBD] Startup apply failed: {ex.Message}");
+            }
+            finally
+            {
+                hidService?.Dispose();
+            }
+        }
+
+        /// <summary>Applies persisted keyboard RGB settings at app startup using a pre-opened HID service.</summary>
+        private void ApplyKeyboardOnStartWithService(KeyboardHidService hidService)
+        {
+            var settings = KeyboardSettingsService.Load();
+
+            if (settings.PowerOn)
+            {
+                if (settings.PerKeyMode)
+                {
+                    System.Threading.Thread.Sleep(200);
+                    int brightnessPercent = (settings.Brightness * 100) / 7;
+                    hidService.SetPerKeyBrightness(brightnessPercent);
+                    var colors = settings.GetPerKeyColors();
+                    hidService.SendAllPerKeyColorsFromDict(colors);
+                    System.Diagnostics.Debug.WriteLine("[KBD] Startup apply: per-key mode");
+                }
+                else
+                {
+                    int brightnessPercent = (settings.Brightness * 100) / 7;
+                    byte speed = (byte)Math.Clamp((int)settings.Speed, 0, 11);
+
+                    if (settings.Direction != KeyboardDirection.LeftRight)
+                        System.Threading.Thread.Sleep(500);
+
+                    hidService.TurnOnWithEffect(settings.ColorR, settings.ColorG, settings.ColorB,
+                        brightnessPercent, settings.EffectMode, speed, settings.Direction, settings.TouchReactive);
+
+                    if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor7Effect(settings.EffectMode))
+                    {
+                        var colors = ParseKeyboardColorString(settings.MultiColors, 7);
+                        if (colors.Count > 0)
+                        {
+                            if (settings.EffectMode == Uniwill_Control_Utility.Models.KeyboardEffect.Marquee)
+                                colors = colors.AsEnumerable().Reverse().ToList();
+                            hidService.SetMultiColor(colors);
+                        }
+                    }
+                    else if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor4Effect(settings.EffectMode))
+                    {
+                        var colors = ParseKeyboardColorString(settings.MultiColors, 4);
+                        if (colors.Count > 0)
+                            hidService.SetMultiColor(colors);
+                    }
+                    System.Diagnostics.Debug.WriteLine($"[KBD] Startup apply: effect {settings.EffectMode}");
+                }
+            }
+            else
+            {
+                hidService.TurnOff();
+                System.Diagnostics.Debug.WriteLine("[KBD] Startup apply: keyboard OFF");
+            }
+        }
+
         /// <summary>Applies persisted keyboard RGB settings at app startup.</summary>
         private void ApplyKeyboardOnStart()
         {
@@ -515,6 +615,121 @@ namespace Uniwill_Control_Utility.Views.Windows
             {
                 System.Diagnostics.Debug.WriteLine($"[KBD] Startup apply failed: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Applies EC fan curve and battery charge limit at app startup.
+        /// Runs once from mainWindow_Loaded — not on every Dashboard navigation.
+        /// </summary>
+        private void ApplyEcSettingsOnStart()
+        {
+            var ec = App.GetService<UniwillECService>();
+            if (ec is null)
+                return;
+
+            try
+            {
+                ec.Initialize();
+            }
+            catch { /* EC not available on this hardware */ }
+
+            // Auto-apply the saved fan curve on startup.
+            try
+            {
+                var settings = FanControlSettingsService.Load();
+                Models.EcFanCurve cpuCurve;
+                Models.EcFanCurve gpuCurve;
+
+                if (settings.UnifiedMode)
+                {
+                    var unifiedCurve = settings.UnifiedPreset == "Custom" && settings.UnifiedDuties?.Length == 11
+                        ? BuildCustomEcCurve(settings.UnifiedDuties)
+                        : GetPresetEcCurve(settings.UnifiedPreset);
+                    cpuCurve = unifiedCurve;
+                    gpuCurve = unifiedCurve;
+                }
+                else
+                {
+                    cpuCurve = settings.CpuPreset == "Custom" && settings.CpuDuties?.Length == 11
+                        ? BuildCustomEcCurve(settings.CpuDuties)
+                        : GetPresetEcCurve(settings.CpuPreset);
+                    gpuCurve = settings.GpuPreset == "Custom" && settings.GpuDuties?.Length == 11
+                        ? BuildCustomEcCurve(settings.GpuDuties)
+                        : GetPresetEcCurve(settings.GpuPreset);
+                }
+
+                var cpuTemps = settings.UnifiedMode
+                    ? (settings.UnifiedTempThresholds ?? Models.EcFanCurve.CpuTemperatures)
+                    : (settings.CpuTempThresholds ?? Models.EcFanCurve.CpuTemperatures);
+                var gpuTemps = settings.UnifiedMode
+                    ? cpuTemps
+                    : (settings.GpuTempThresholds ?? Models.EcFanCurve.GpuTemperatures);
+
+                // If Smart Fan Mode is enabled, start it instead of applying
+                // the normal curve.
+                if (settings.EcSmartFanMode)
+                {
+                    try
+                    {
+                        var tempProvider = new Models.FlydigiTemperatureProvider();
+                        var smartFan = Uniwill_Control_Utility.Services.EcSmartFanControl.GetOrCreate(
+                            ec,
+                            tempProvider,
+                            settings,
+                            cpuCurve,
+                            cpuTemps);
+                        smartFan.Start();
+                        System.Diagnostics.Debug.WriteLine("INFO | MainWindow: Smart Fan Mode auto-started on startup");
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"WARN | MainWindow: Smart Fan Mode auto-start failed: {ex.Message}");
+                        ec.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                    }
+                }
+                else
+                {
+                    ec.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                    System.Diagnostics.Debug.WriteLine("INFO | MainWindow: Fan curve auto-applied on startup");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"WARN | MainWindow: Fan curve auto-apply failed: {ex.Message}");
+            }
+
+            // Re-apply the saved battery charge limit on startup. The EC resets
+            // to BIOS default (100%) on every cold boot.
+            try
+            {
+                int savedMode = Properties.Settings.Default.BatteryMode;
+                int currentMode = ec.GetBatteryMode();
+                if (savedMode != currentMode)
+                {
+                    ec.SetBatteryMode(savedMode);
+                    System.Diagnostics.Debug.WriteLine($"INFO | MainWindow: Restored battery charge limit to mode {savedMode} (was {currentMode})");
+                }
+            }
+            catch { /* EC read failed */ }
+        }
+
+        private static Models.EcFanCurve GetPresetEcCurve(string? name) => name switch
+        {
+            "Silent" => Models.EcFanCurve.CreateSilent(),
+            "Balanced" => Models.EcFanCurve.CreateBalanced(),
+            "Performance" => Models.EcFanCurve.CreatePerformance(),
+            "Full Speed" => Models.EcFanCurve.CreateFullSpeed(),
+            "Off" => Models.EcFanCurve.CreateOff(),
+            _ => Models.EcFanCurve.CreateBalanced()
+        };
+
+        private static Models.EcFanCurve BuildCustomEcCurve(int[] duties)
+        {
+            var curve = new Models.EcFanCurve { Name = "Custom" };
+            curve.Duties.Clear();
+            foreach (var d in duties)
+                curve.Duties.Add(Math.Clamp(d, 0, 100));
+            return curve;
         }
 
         /// <summary>Parses a comma-separated hex color string, padded to the requested count.</summary>
@@ -1141,6 +1356,18 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
 
             _ = Task.Run(PremadePresets.SetPremadePresets);
+
+            // Apply keyboard RGB settings on startup. Runs from mainWindow_Loaded so it
+            // fires regardless of whether the app starts minimized to tray (in which case
+            // DashboardViewModel.OnNavigatedToAsync may not run yet). Uses a delay and
+            // retries because the ITE HID controller may not be discoverable on cold boot.
+            _ = Task.Run(AsyncApplyKeyboardOnStart);
+
+            // Apply EC fan curve and battery charge limit on startup. Runs here instead
+            // of DashboardViewModel.OnNavigatedToAsync so it only fires once at app
+            // launch — not every time the user navigates to the Dashboard page. This
+            // prevents the saved fan curve from overwriting live changes (e.g., Fan Turbo).
+            _ = Task.Run(ApplyEcSettingsOnStart);
 
             // Eagerly instantiate the Adaptive page so its constructor runs (starts the
             // sensor polling timer and auto-starts Adaptive Mode if isStartAdpative is set).

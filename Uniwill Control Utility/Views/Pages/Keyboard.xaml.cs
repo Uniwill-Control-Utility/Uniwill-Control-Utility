@@ -29,7 +29,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         private KeyboardDirection _currentDirection = KeyboardDirection.LeftRight;
 
         // Static flag to prevent re-applying HID settings on every page navigation.
-        // The MainWindow's ApplyKeyboardOnStart handles the initial startup apply.
+        // The MainWindow's AsyncApplyKeyboardOnStart (from mainWindow_Loaded) handles
+        // the initial startup apply with delay and retries for HID device discovery.
         // This only applies on the very first Page_Loaded after that.
         private static bool s_hasAppliedOnce;
 
@@ -200,8 +201,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Apply the current mode to HID on background thread.
             // Skip when Adaptive Mode override is active — the Adaptive Mode update()
             // loop is the authority and will re-apply the preset if we overwrite it.
-            // Also skip on re-navigation: the MainWindow's ApplyKeyboardOnStart already
-            // applied settings at app launch, and the user hasn't changed anything.
+            // Also skip on re-navigation: the MainWindow's AsyncApplyKeyboardOnStart
+            // already applied settings at app launch, and the user hasn't changed anything.
             bool isOverrideActive = deviceApplier?.IsKeyboardOverridden == true;
             if (!isOverrideActive && !s_hasAppliedOnce)
             {

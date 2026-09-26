@@ -279,9 +279,11 @@ namespace Uniwill_Control_Utility.ViewModels
                 });
             });
 
-            // Phase 2 (slow): EC handshake and fan-curve auto-apply run in parallel
-            // on a separate background thread.  The EC data (fan PWM, battery telemetry)
+            // Phase 2 (slow): EC handshake and battery telemetry read run in parallel
+            // on a separate background thread. The EC data (fan PWM, battery telemetry)
             // enriches snapshots on subsequent ticks but is not required for core metrics.
+            // Fan curve and battery charge limit apply moved to MainWindow.mainWindow_Loaded
+            // so they only fire once at app launch, not on every Dashboard navigation.
             _ = System.Threading.Tasks.Task.Run(() =>
             {
                 if (_uniwillEc is null)
@@ -292,74 +294,6 @@ namespace Uniwill_Control_Utility.ViewModels
                     _uniwillEc.Initialize();
                 }
                 catch { /* EC not available on this hardware */ }
-
-                // Auto-apply the saved fan curve on startup. The app always launches
-                // on Dashboard, so this is the right place to apply the last saved curve.
-                try
-                {
-                    var settings = FanControlSettingsService.Load();
-                    Models.EcFanCurve cpuCurve;
-                    Models.EcFanCurve gpuCurve;
-
-                    if (settings.UnifiedMode)
-                    {
-                        var unifiedCurve = settings.UnifiedPreset == "Custom" && settings.UnifiedDuties?.Length == 11
-                            ? BuildCustomCurve(settings.UnifiedDuties)
-                            : GetPresetCurve(settings.UnifiedPreset);
-                        cpuCurve = unifiedCurve;
-                        gpuCurve = unifiedCurve;
-                    }
-                    else
-                    {
-                        cpuCurve = settings.CpuPreset == "Custom" && settings.CpuDuties?.Length == 11
-                            ? BuildCustomCurve(settings.CpuDuties)
-                            : GetPresetCurve(settings.CpuPreset);
-                        gpuCurve = settings.GpuPreset == "Custom" && settings.GpuDuties?.Length == 11
-                            ? BuildCustomCurve(settings.GpuDuties)
-                            : GetPresetCurve(settings.GpuPreset);
-                    }
-
-                    var cpuTemps = settings.UnifiedMode
-                        ? (settings.UnifiedTempThresholds ?? Models.EcFanCurve.CpuTemperatures)
-                        : (settings.CpuTempThresholds ?? Models.EcFanCurve.CpuTemperatures);
-                    var gpuTemps = settings.UnifiedMode
-                        ? cpuTemps
-                        : (settings.GpuTempThresholds ?? Models.EcFanCurve.GpuTemperatures);
-
-                    // If Smart Fan Mode is enabled, start it instead of applying
-                    // the normal curve — the smart fan loop will write its own
-                    // flat duty tables to the EC on each tick.
-                    if (settings.EcSmartFanMode)
-                    {
-                        try
-                        {
-                            var tempProvider = new Models.FlydigiTemperatureProvider();
-                            var smartFan = Uniwill_Control_Utility.Services.EcSmartFanControl.GetOrCreate(
-                                _uniwillEc,
-                                tempProvider,
-                                settings,
-                                cpuCurve,
-                                cpuTemps);
-                            smartFan.Start();
-                            Debug.WriteLine("INFO | DashboardViewModel: Smart Fan Mode auto-started on startup");
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"WARN | DashboardViewModel: Smart Fan Mode auto-start failed: {ex.Message}");
-                            // Fallback to normal curve apply if smart fan fails
-                            _uniwillEc.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
-                        }
-                    }
-                    else
-                    {
-                        _uniwillEc.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
-                        Debug.WriteLine("INFO | DashboardViewModel: Fan curve auto-applied on startup");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"WARN | DashboardViewModel: Fan curve auto-apply failed: {ex.Message}");
-                }
 
                 // Fetch static battery data (health, charge limit) once on navigation.
                 // Temperature is refreshed on the timer below.
@@ -374,22 +308,13 @@ namespace Uniwill_Control_Utility.ViewModels
                 }
                 catch { /* EC read failed */ }
 
-                // Re-apply the saved battery charge limit on startup. The EC resets
-                // to BIOS default (100%) on every cold boot, so we always write the
-                // user's saved preference back.
+                // Cache the saved battery charge limit for display on the dashboard.
+                // (The actual EC write happens in MainWindow.mainWindow_Loaded.)
                 try
                 {
-                    int savedMode = Properties.Settings.Default.BatteryMode;
-                    int currentMode = _uniwillEc.GetBatteryMode();
-                    if (savedMode != currentMode)
-                    {
-                        _uniwillEc.SetBatteryMode(savedMode);
-                        Debug.WriteLine($"INFO | DashboardViewModel: Restored battery charge limit to mode {savedMode} (was {currentMode})");
-                    }
-
-                    _batteryChargeLimit = savedMode;
+                    _batteryChargeLimit = Properties.Settings.Default.BatteryMode;
                 }
-                catch { /* EC read failed */ }
+                catch { /* settings read failed */ }
             });
 
             return Task.CompletedTask;
@@ -446,28 +371,5 @@ namespace Uniwill_Control_Utility.ViewModels
                     $"Could not open '{url}': {exception}");
             }
         }
-
-        #region Fan Curve Startup Helpers
-
-        private static Models.EcFanCurve GetPresetCurve(string? name) => name switch
-        {
-            "Silent" => Models.EcFanCurve.CreateSilent(),
-            "Balanced" => Models.EcFanCurve.CreateBalanced(),
-            "Performance" => Models.EcFanCurve.CreatePerformance(),
-            "Full Speed" => Models.EcFanCurve.CreateFullSpeed(),
-            "Off" => Models.EcFanCurve.CreateOff(),
-            _ => Models.EcFanCurve.CreateBalanced()
-        };
-
-        private static Models.EcFanCurve BuildCustomCurve(int[] duties)
-        {
-            var curve = new Models.EcFanCurve { Name = "Custom" };
-            curve.Duties.Clear();
-            foreach (var d in duties)
-                curve.Duties.Add(Math.Clamp(d, 0, 100));
-            return curve;
-        }
-
-        #endregion
     }
 }
