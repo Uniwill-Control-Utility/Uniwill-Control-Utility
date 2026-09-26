@@ -17,12 +17,6 @@ namespace Uniwill_Control_Utility.Services
     public static class LaptopDetector
     {
         /// <summary>
-        /// Number of leading characters from Win32_BaseBoard.Product used for matching.
-        /// E.g. "X6FR559Y" → "X6FR" (AMD TongFeng chassis), "X6AR558Y" → "X6AR" (Intel variant).
-        /// </summary>
-        private const int BaseBoardPrefixLength = 4;
-
-        /// <summary>
         /// Catalog of known laptop models. Ordered by brand; each entry maps a
         /// (SystemManufacturer, BaseBoardProductPrefix) pair to display metadata.
         /// Add new entries here when supporting additional laptop brands that share
@@ -82,6 +76,22 @@ namespace Uniwill_Control_Utility.Services
                 BaseBoardProductPrefix: "X6AR",
                 ImagePath: "pack://application:,,,/Assets/Laptops/TuxedoComputers/Stellaris-16-Gen7.png"),
 
+            // --- MECHREVO ---
+            // Mechrevo baseboard products use "YAOSHI Series-X6FR..." / "YAOSHI Series-X6AR..."
+            // The chassis code (X6FR/X6AR) appears after the "YAOSHI Series-" prefix.
+            // Matching is substring-based, so "X6FR" and "X6AR" match anywhere in the string.
+            new LaptopModelInfo(
+                DisplayName: "Mechrevo Dragon 16 Ultra",
+                SystemManufacturer: "MECHREVO",
+                BaseBoardProductPrefix: "X6FR",
+                ImagePath: "pack://application:,,,/Assets/Laptops/Mechrevo/Dragon-16-Ultra.png"),
+
+            new LaptopModelInfo(
+                DisplayName: "Mechrevo Aurora 16 Ultra",
+                SystemManufacturer: "MECHREVO",
+                BaseBoardProductPrefix: "X6AR",
+                ImagePath: "pack://application:,,,/Assets/Laptops/Mechrevo/Aurora-16-Ultra.png"),
+
             // --- TUXEDO ---
             // TUXEDO computers use the same TongFeng chassis. Add entries when images are available.
             // e.g. new LaptopModelInfo("TUXEDO Pulse 15", "TUXEDO", "X6FR", "..."),
@@ -130,12 +140,10 @@ namespace Uniwill_Control_Utility.Services
                 if (string.IsNullOrEmpty(baseBoardProduct))
                     return;
 
-                string prefix = baseBoardProduct.Length >= BaseBoardPrefixLength
-                    ? baseBoardProduct.Substring(0, BaseBoardPrefixLength)
-                    : baseBoardProduct;
-
                 // Check for any TongFeng chassis prefix (X6FR = AMD, X6AR = Intel).
-                _isTongFengChassis = prefix.StartsWith("X6", StringComparison.OrdinalIgnoreCase);
+                // The chassis code may appear at position 0 (e.g. "X6AR558Y") or
+                // embedded in the string (e.g. Mechrevo "YAOSHI Series-X6AR55xY").
+                _isTongFengChassis = baseBoardProduct.IndexOf("X6", StringComparison.OrdinalIgnoreCase) >= 0;
 
                 if (string.IsNullOrEmpty(manufacturer))
                     return;
@@ -143,7 +151,7 @@ namespace Uniwill_Control_Utility.Services
                 _detectedModel = Catalog
                     .FirstOrDefault(m =>
                         m.SystemManufacturer.Equals(manufacturer, StringComparison.OrdinalIgnoreCase) &&
-                        m.BaseBoardProductPrefix.Equals(prefix, StringComparison.OrdinalIgnoreCase));
+                        baseBoardProduct.Contains(m.BaseBoardProductPrefix, StringComparison.OrdinalIgnoreCase));
             }
             catch (System.Runtime.InteropServices.COMException)
             {

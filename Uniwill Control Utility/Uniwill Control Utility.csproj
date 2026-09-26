@@ -81,6 +81,8 @@
     <None Remove="Assets\Flydigi\bs3-pro.png" />
     <None Remove="Assets\HydroUI\mk1.png" />
     <None Remove="Assets\HydroUI\mk2.png" />
+	<None Remove="Assets\Laptops\Mechrevo\Aurora-16-Ultra.png" />
+	<None Remove="Assets\Laptops\Mechrevo\Dragon-16-Ultra.png" />
     <None Remove="Assets\Laptops\Mifcom\16.png" />
     <None Remove="Assets\Laptops\PCSpecialist\Recoil-3-16-AMD.png" />
 	<None Remove="Assets\Laptops\TuxedoComputers\Stellaris-16-Gen7.png" />
@@ -123,7 +125,9 @@
     <Resource Include="Assets\HydroUI\mk1.png" />
     <Resource Include="Assets\HydroUI\mk2.png" />
     <Resource Include="Assets\config.png" />
-    <Resource Include="Assets\Laptops\Mifcom\16.png" />
+	<Resource Include="Assets\Laptops\Mechrevo\Aurora-16-Ultra.png" />
+    <Resource Include="Assets\Laptops\Mechrevo\Dragon-16-Ultra.png" />
+	<Resource Include="Assets\Laptops\Mifcom\16.png" />
     <Resource Include="Assets\Laptops\PCSpecialist\Recoil-3-16-AMD.png" />
     <Resource Include="Assets\Laptops\PCSpecialist\Recoil-3-16-Intel.png" />
 	<Resource Include="Assets\Laptops\TuxedoComputers\Stellaris-16-Gen7.png" />
