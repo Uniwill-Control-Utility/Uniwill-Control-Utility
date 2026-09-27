@@ -457,7 +457,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     start = false;
                     btnStart.Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary;
-                    btnStart.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uE768", FontSize = 16 }; // Play icon
+                    btnStart.Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.Play16, FontSize = 16 };
                     btnStart.ToolTip = LocalizationService.Get("Start Adaptive Mode");
                     GetSensor.CloseSensor();
                     Settings.Default.isAdaptiveModeRunning = false;
@@ -489,7 +489,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     start = true;
                     btnStart.Appearance = Wpf.Ui.Controls.ControlAppearance.Primary;
-                    btnStart.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uE71A", FontSize = 16 }; // Stop icon
+                    btnStart.Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.Stop16, FontSize = 16 };
                     btnStart.ToolTip = LocalizationService.Get("Stop Adaptive Mode");
                     // Set synchronously before async work so RestoreAdaptiveButtonState()
                     // can read it if the user navigates away and back before OpenSensor finishes.
@@ -554,14 +554,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 start = true;
                 btnStart.Appearance = Wpf.Ui.Controls.ControlAppearance.Primary;
-                btnStart.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uE71A", FontSize = 16 };
+                btnStart.Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.Stop16, FontSize = 16 };
                 btnStart.ToolTip = LocalizationService.Get("Stop Adaptive Mode");
             }
             else
             {
                 start = false;
                 btnStart.Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary;
-                btnStart.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uE768", FontSize = 16 };
+                btnStart.Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.Play16, FontSize = 16 };
                 btnStart.ToolTip = LocalizationService.Get("Start Adaptive Mode");
             }
         }

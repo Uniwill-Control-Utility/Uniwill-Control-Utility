@@ -90,10 +90,9 @@ VerticalAlignment="Center"/>
                      Padding="4,4,8,4"
                      Visibility="Collapsed">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <ui:FontIcon Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                               FontFamily="Segoe Fluent Icons"
+                            <ui:SymbolIcon Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                FontSize="16"
-                               Glyph="&#xE7F8;"
+                               Symbol="Info20"
                                Margin="4,0,8,0"
                                        VerticalAlignment="Center"/>
                             <TextBlock x:Name="LaptopNameText"

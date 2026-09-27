@@ -62,9 +62,8 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <ui:FontIcon Grid.Column="0"
-                                         FontFamily="Segoe Fluent Icons"
-                                         Glyph="&#xE7A7;"
+                            <ui:SymbolIcon Grid.Column="0"
+                                         Symbol="Warning20"
                                          FontSize="16"
                                          Margin="0,0,10,0"
                                          Foreground="{DynamicResource TextFillColorPrimaryBrush}"
@@ -85,7 +84,7 @@
                     <!-- Power toggle -->
                     <ui:CardControl Margin="0,0,0,8">
                         <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7E8;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:SymbolIcon Symbol="Lightbulb20" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>
                         <ui:CardControl.Header>
                             <StackPanel>
@@ -108,7 +107,7 @@
                     <!-- Color (single) -->
                     <ui:CardControl x:Name="ColorCard" Margin="0,0,0,8">
                         <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:SymbolIcon Symbol="Color20" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>
                         <ui:CardControl.Header>
                             <StackPanel>
@@ -129,7 +128,7 @@
                     <!-- Brightness -->
                     <ui:CardControl Margin="0,0,0,8">
                         <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE706;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:SymbolIcon Symbol="BrightnessHigh20" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>
                         <ui:CardControl.Header>
                             <StackPanel>
@@ -164,7 +163,7 @@
                     <!-- Effect selector -->
                     <ui:CardControl Margin="0,0,0,8">
                         <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:SymbolIcon Symbol="Color20" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>
                         <ui:CardControl.Header>
                             <StackPanel>
@@ -190,7 +189,7 @@
                     <!-- Speed (hidden for Static) -->
                     <ui:CardControl x:Name="SpeedCard" Margin="0,0,0,8" Visibility="Collapsed">
                         <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEB9D;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:SymbolIcon Symbol="TopSpeed20" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>
                         <ui:CardControl.Header>
                             <StackPanel>

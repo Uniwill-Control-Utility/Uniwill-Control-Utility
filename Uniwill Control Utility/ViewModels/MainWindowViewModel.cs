@@ -53,17 +53,17 @@ namespace Uniwill_Control_Utility.ViewModels
 
             NavigationItems = new ObservableCollection<object> { };
 
-            createNavItem("Home", "dashboard", "\uE80F", typeof(Views.Pages.DashboardPage), false);
+            createNavItem("Home", "dashboard", SymbolRegular.Home24, typeof(Views.Pages.DashboardPage), false);
 
-            createNavItem("Presets", "presets", "\uEF58", typeof(Views.Pages.Presets), false);
+            createNavItem("Presets", "presets", SymbolRegular.Predictions24, typeof(Views.Pages.Presets), false);
 
-            createNavItem("Adaptive", "adaptive", "\uEB44", typeof(Views.Pages.Adaptive), false);
+            createNavItem("Adaptive", "adaptive", SymbolRegular.Radar20, typeof(Views.Pages.Adaptive), false);
 
 
             // Hydro UI in footer for supported watercooler hardware
             if (WaterCoolerHardwareDetector.IsSupportedHardware())
             {
-                createNavItem("Hydro UI", "watercooler", "\uEB42", typeof(Views.Pages.Watercooler), false);
+                createNavItem("Hydro UI", "watercooler", SymbolRegular.Water24, typeof(Views.Pages.Watercooler), false);
             }
 
             // Flydigi cooler in footer (hidden if user has disabled it in Settings)
@@ -79,22 +79,22 @@ namespace Uniwill_Control_Utility.ViewModels
             {
                 NavigationItems.Add(CreateFanControlNavItem());
 
-                createNavItem("Keyboard", "keyboard", "\uE765", typeof(Views.Pages.Keyboard), false);
+                createNavItem("Keyboard", "keyboard", SymbolRegular.Keyboard24, typeof(Views.Pages.Keyboard), false);
 
-                createNavItem("Light Bar", "lightbar", "\uED39", typeof(Views.Pages.LightBar), false);
+                createNavItem("Light Bar", "lightbar", SymbolRegular.Lightbulb24, typeof(Views.Pages.LightBar), false);
 
-                createNavItem("Battery", "battery", "\uEBC0", typeof(Views.Pages.Battery), false);
+                createNavItem("Battery", "battery", SymbolRegular.BatteryCharge24, typeof(Views.Pages.Battery), false);
             }
 
-            createNavItem("Overlay", "overlay", "\uE81E", typeof(Views.Pages.OverlaySettingsPage), false);
+            createNavItem("Overlay", "overlay", SymbolRegular.DesktopPulse24, typeof(Views.Pages.OverlaySettingsPage), false);
 
-            createNavItem("Auto", "auto", "\uF277", typeof(Views.Pages.Automations), false);
+            createNavItem("Auto", "auto", SymbolRegular.Transmission24, typeof(Views.Pages.Automations), false);
 
             // About in footer, above Settings
-            createNavItem("About", "about", "\uE946", typeof(Views.Pages.AboutPage), true);
+            createNavItem("About", "about", SymbolRegular.Info24, typeof(Views.Pages.AboutPage), true);
 
             // Settings at the bottom of footer
-            createNavItem("Settings", "settings", "\uE713", typeof(Views.Pages.SettingsPage), true);
+            createNavItem("Settings", "settings", SymbolRegular.Settings24, typeof(Views.Pages.SettingsPage), true);
         }
 
         private static NavigationViewItem CreateNavigationItem(string content, string tag, SymbolRegular icon, Type pageType) =>
@@ -113,7 +113,10 @@ namespace Uniwill_Control_Utility.ViewModels
                     "auto" => SymbolRegular.Transmission24,
                     "fancontrol" => SymbolRegular.Empty, // uses FanIconElement, not SymbolIcon
                     "keyboard" => SymbolRegular.Keyboard24,
-                    "battery" => SymbolRegular.Empty, // uses FontIcon, not SymbolIcon
+                    "lightbar" => SymbolRegular.Lightbulb24,
+                    "battery" => SymbolRegular.BatteryCharge24,
+                    "watercooler" => SymbolRegular.Water24,
+                    "about" => SymbolRegular.Info24,
                     "settings" => SymbolRegular.Settings24,
                     _ => SymbolRegular.Empty
                 };
@@ -187,10 +190,9 @@ namespace Uniwill_Control_Utility.ViewModels
             };
         }
 
-        private void createNavItem(String title, String tag, String iconGlyph, Type pageType, Boolean isFooterItem)
+        private void createNavItem(String title, String tag, SymbolRegular icon, Type pageType, Boolean isFooterItem)
         {
-            var navItem = CreateNavigationItem(title, tag, SymbolRegular.Empty, pageType);
-            navItem.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = iconGlyph, FontSize = 20 };
+            var navItem = CreateNavigationItem(title, tag, icon, pageType);
             if (isFooterItem)
             {
                 NavigationFooter.Add(navItem);

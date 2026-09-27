@@ -133,8 +133,8 @@
 
                             <!-- Connected state -->
                             <StackPanel x:Name="spConnectedState" Visibility="Collapsed">
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons"
-                                                 Glyph="&#xE73E;"
+                                <ui:SymbolIcon
+                                                 Symbol="CheckmarkCircle20"
                                                  FontSize="24"
                                                  Foreground="Green"
                                                  HorizontalAlignment="Center"
@@ -152,8 +152,8 @@
 
                             <!-- Disconnected state -->
                             <StackPanel x:Name="spDisconnectedState">
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons"
-                                                 Glyph="&#xE711;"
+                                <ui:SymbolIcon
+                                                 Symbol="DismissCircle20"
                                                  FontSize="24"
                                                  Foreground="Red"
                                                  HorizontalAlignment="Center"
@@ -394,7 +394,7 @@
                         <!-- Pump Control -->
                         <ui:CardControl x:Name="PumpVoltageCard" Margin="0,0,0,8">
                             <ui:CardControl.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE945;" FontSize="20" Margin="4,0,6,0" />
+                                <ui:SymbolIcon Symbol="Flash20" FontSize="20" Margin="4,0,6,0" />
                             </ui:CardControl.Icon>
                             <ui:CardControl.Header>
                                 <StackPanel>
@@ -453,7 +453,7 @@
                                      Margin="0,0,0,8"
                                      IsExpanded="False">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:SymbolIcon Symbol="Color20" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -536,7 +536,7 @@
                     <!-- Auto-Connect -->
                     <ui:CardControl Margin="0,0,0,8">
                         <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE777;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:SymbolIcon Symbol="ArrowSync20" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>
                         <ui:CardControl.Header>
                             <StackPanel>
@@ -637,10 +637,9 @@
                                Click="btnStandby_Click"
                                ToolTip="Pause all outputs while keeping BLE connected.">
                         <StackPanel Orientation="Horizontal">
-                            <ui:FontIcon 
+                            <ui:SymbolIcon
                                 x:Name="StandbyIcon" 
-                                FontFamily="Segoe Fluent Icons" 
-                                Glyph="&#xE769;" 
+                                Symbol="Power20"
                                 Margin="0,1,12,0" 
                                 VerticalAlignment="Center" 
                                 HorizontalAlignment="Center"/>

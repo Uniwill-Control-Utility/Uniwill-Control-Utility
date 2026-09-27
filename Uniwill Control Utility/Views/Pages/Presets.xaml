@@ -94,25 +94,25 @@
                         <UniformGrid Columns="4" Rows="1">
                             <Button x:Name="btnOffice" Style="{StaticResource ProfileButtonStyle}" Click="btnOffice_Click">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8BE;" FontSize="20" Margin="0,0,8,0" />
+                                    <ui:SymbolIcon Symbol="Briefcase20" FontSize="20" Margin="0,0,8,0" />
                                     <TextBlock VerticalAlignment="Center" Text="Office" />
                                 </StackPanel>
                             </Button>
                             <Button x:Name="btnGaming" Style="{StaticResource ProfileButtonStyle}" Click="btnGaming_Click">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE967;" FontSize="20" Margin="0,0,8,0" />
+                                    <ui:SymbolIcon Symbol="Games20" FontSize="20" Margin="0,0,8,0" />
                                     <TextBlock VerticalAlignment="Center" Text="Gaming" />
                                 </StackPanel>
                             </Button>
                             <Button x:Name="btnTurbo" Style="{StaticResource ProfileButtonStyle}" Click="btnTurbo_Click">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE945;" FontSize="20" Margin="0,0,8,0" />
+                                    <ui:SymbolIcon Symbol="Flash20" FontSize="20" Margin="0,0,8,0" />
                                     <TextBlock VerticalAlignment="Center" Text="Turbo" />
                                 </StackPanel>
                             </Button>
                             <Button x:Name="btnCustom" Style="{StaticResource ProfileButtonStyle}" Click="btnCustom_Click">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE713;" FontSize="20" Margin="0,0,8,0" />
+                                    <ui:SymbolIcon Symbol="Wrench20" FontSize="20" Margin="0,0,8,0" />
                                     <TextBlock VerticalAlignment="Center" Text="Custom" />
                                 </StackPanel>
                             </Button>
@@ -198,7 +198,7 @@
                                         IsEnabled="True"
                                         IsExpanded="False">
                             <ui:CardExpander.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE950;" FontSize="20" Margin="4,0,6,0" />
+                                <ui:SymbolIcon Symbol="Board20" FontSize="20" Margin="4,0,6,0" />
                             </ui:CardExpander.Icon>
                             <ui:CardExpander.Header>
                                 <StackPanel>
@@ -219,7 +219,7 @@
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="Sustained (SPL)" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Slow Power Limit - sustained power ceiling via SMU" VerticalAlignment="Center" />
+                                            <ui:SymbolIcon Symbol="Info20" FontSize="14" Margin="6,2,0,0" ToolTip="Slow Power Limit - sustained power ceiling via SMU" VerticalAlignment="Center" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
@@ -250,7 +250,7 @@
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="Boost (FPL)" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Fast Power Limit - short burst ceiling via SMU" VerticalAlignment="Center" />
+                                            <ui:SymbolIcon Symbol="Info20" FontSize="14" Margin="6,2,0,0" ToolTip="Fast Power Limit - short burst ceiling via SMU" VerticalAlignment="Center" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
@@ -281,7 +281,7 @@
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="TjMax" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Maximum CPU temperature before thermal throttling" VerticalAlignment="Center" />
+                                            <ui:SymbolIcon Symbol="Info20" FontSize="14" Margin="6,2,0,0" ToolTip="Maximum CPU temperature before thermal throttling" VerticalAlignment="Center" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
@@ -355,7 +355,7 @@
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="Offset" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="~3-5 mV per 1 point" VerticalAlignment="Center" />
+                                            <ui:SymbolIcon Symbol="Info20" FontSize="14" Margin="6,2,0,0" ToolTip="~3-5 mV per 1 point" VerticalAlignment="Center" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
@@ -383,7 +383,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Orientation="Horizontal">
                                         <ui:TextBlock FontTypography="Body" Text="CCD 0 Offset" VerticalAlignment="Center"/>
-                                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="~3-5 mV per 1 point" VerticalAlignment="Center" />
+                                        <ui:SymbolIcon Symbol="Info20" FontSize="14" Margin="6,2,0,0" ToolTip="~3-5 mV per 1 point" VerticalAlignment="Center" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1"
                                                 Orientation="Horizontal"
@@ -409,7 +409,7 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Orientation="Horizontal">
                                         <ui:TextBlock FontTypography="Body" Text="CCD 1 Offset" VerticalAlignment="Center"/>
-                                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="~3-5 mV per 1 point" VerticalAlignment="Center" />
+                                        <ui:SymbolIcon Symbol="Info20" FontSize="14" Margin="6,2,0,0" ToolTip="~3-5 mV per 1 point" VerticalAlignment="Center" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1"
                                                 Orientation="Horizontal"
@@ -436,7 +436,7 @@
                                         IsEnabled="True"
                                         IsExpanded="False">
                             <ui:CardExpander.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE950;" FontSize="20" Margin="4,0,6,0" />
+                                <ui:SymbolIcon Symbol="Board20" FontSize="20" Margin="4,0,6,0" />
                             </ui:CardExpander.Icon>
                             <ui:CardExpander.Header>
                                 <StackPanel>
@@ -457,7 +457,7 @@
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="PL1" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Intel sustained power limit (MSR 0x610)" VerticalAlignment="Center" />
+                                            <ui:SymbolIcon Symbol="Info20" FontSize="14" Margin="6,2,0,0" ToolTip="Intel sustained power limit (MSR 0x610)" VerticalAlignment="Center" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
@@ -488,7 +488,7 @@
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="PL2" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Intel boost power limit (MSR 0x610)" VerticalAlignment="Center" />
+                                            <ui:SymbolIcon Symbol="Info20" FontSize="14" Margin="6,2,0,0" ToolTip="Intel boost power limit (MSR 0x610)" VerticalAlignment="Center" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
@@ -521,7 +521,7 @@
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="Offset" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="CPU voltage offset (MSR 0x150 plane 0)" VerticalAlignment="Center" />
+                                            <ui:SymbolIcon Symbol="Info20" FontSize="14" Margin="6,2,0,0" ToolTip="CPU voltage offset (MSR 0x150 plane 0)" VerticalAlignment="Center" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
@@ -551,7 +551,7 @@
                                         IsEnabled="True"
                                         IsExpanded="False">
                             <ui:CardExpander.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF211;" FontSize="20" Margin="4,0,6,0" />
+                                <ui:SymbolIcon Symbol="VideoClip20" FontSize="20" Margin="4,0,6,0" />
                             </ui:CardExpander.Icon>
                             <ui:CardExpander.Header>
                                 <StackPanel>
@@ -602,7 +602,7 @@
                                         <StackPanel Grid.Column="0">
                                             <StackPanel Orientation="Horizontal">
                                                 <ui:TextBlock FontTypography="Body" Text="Dynamic Boost" />
-                                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="14" Margin="6,2,0,0" ToolTip="Allow GPU to borrow power from CPU" VerticalAlignment="Center" />
+                                                <ui:SymbolIcon Symbol="Info20" FontSize="14" Margin="6,2,0,0" ToolTip="Allow GPU to borrow power from CPU" VerticalAlignment="Center" />
                                             </StackPanel>
                                             <ui:TextBlock Margin="0,2,0,0"
                                                            FontTypography="Caption"
@@ -836,7 +836,7 @@
                            Height="36"
                            Padding="16,0">
                     <StackPanel Orientation="Horizontal">
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" FontSize="16" Margin="0,0,12,0" />
+                            <ui:SymbolIcon Symbol="Delete16" FontSize="16" Margin="0,0,12,0" />
                         <TextBlock Text="Clear" />
                     </StackPanel>
                 </ui:Button>
@@ -847,7 +847,7 @@
                            Height="36"
                            Padding="16,0">
                     <StackPanel Orientation="Horizontal">
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74E;" FontSize="16" Margin="0,0,12,0" />
+                            <ui:SymbolIcon Symbol="Save16" FontSize="16" Margin="0,0,12,0" />
                         <TextBlock Text="Save" />
                     </StackPanel>
                 </ui:Button>
@@ -857,7 +857,7 @@
                            Height="36"
                            Padding="16,0">
                     <StackPanel Orientation="Horizontal">
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE73E;" FontSize="16" Margin="0,0,12,0" />
+                            <ui:SymbolIcon Symbol="CheckmarkCircle20" FontSize="16" Margin="0,0,12,0" />
                         <TextBlock Text="Apply" />
                     </StackPanel>
                 </ui:Button>

@@ -123,7 +123,7 @@
                                     Content="Want to support the project?"
                                     NavigateUri="https://www.paypal.com/paypalme/Gudec" >
                                     <ui:HyperlinkButton.Icon>
-                                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEB51;" FontSize="12" Margin="4,0,4,0" />
+                                        <ui:SymbolIcon Symbol="Heart20" FontSize="12" Margin="4,0,4,0" />
                                     </ui:HyperlinkButton.Icon>
                                 </ui:HyperlinkButton>
                                 
@@ -135,7 +135,7 @@
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="True">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE721;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:SymbolIcon Symbol="Link20" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>
@@ -222,7 +222,7 @@
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="False">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8F1;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:SymbolIcon Symbol="Code20" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>
@@ -490,7 +490,7 @@
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="False">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8B7;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:SymbolIcon Symbol="FolderOpen20" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>

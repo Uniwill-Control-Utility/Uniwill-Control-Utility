@@ -64,7 +64,7 @@
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="True">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF156;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:SymbolIcon Symbol="WindowApps20" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>
@@ -180,7 +180,7 @@
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="True">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF167;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:SymbolIcon Symbol="Info20" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>
@@ -330,7 +330,7 @@
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="True">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF404;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:SymbolIcon Symbol="Gauge20" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>
@@ -465,7 +465,7 @@
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="True">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C5;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:SymbolIcon Symbol="Eye20" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>
@@ -503,19 +503,19 @@
         <ui:Card Grid.Row="1" MaxWidth="1080" HorizontalAlignment="Stretch" Margin="12,8,16,12" Padding="12,8" SnapsToDevicePixels="True">
             <Grid>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                    <ui:FontIcon x:Name="RtssStatusIcon" FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="16" VerticalAlignment="Center" Margin="4,0,12,0" Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
+                    <ui:SymbolIcon x:Name="RtssStatusIcon" Symbol="Info20" FontSize="16" VerticalAlignment="Center" Margin="4,0,12,0" Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
                     <TextBlock x:Name="RtssStatusText" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <ui:Button Margin="0,0,8,0" Click="PreviewButton_Click">
                         <StackPanel Orientation="Horizontal">
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE890;"  Margin="0,0,12,0"/>
+                            <ui:SymbolIcon Symbol="Eye20"  Margin="0,0,12,0"/>
                             <TextBlock Text="Show" VerticalAlignment="Center" />
                         </StackPanel>
                     </ui:Button>
                     <ui:Button Click="HideButton_Click">
                         <StackPanel Orientation="Horizontal">
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xED1A;"  Margin="0,0,12,0"/>
+                            <ui:SymbolIcon Symbol="EyeOff20"  Margin="0,0,12,0"/>
                             <TextBlock Text="Hide" VerticalAlignment="Center" />
                         </StackPanel>
                     </ui:Button>

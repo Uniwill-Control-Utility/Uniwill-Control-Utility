@@ -204,12 +204,12 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (telemetry.IsAcPowered)
             {
-                iconPowerSource.Glyph = "\xE9A3"; // plug
+                iconPowerSource.Symbol = Wpf.Ui.Controls.SymbolRegular.PlugConnected20;
                 tbPowerSource.Text = "AC Power";
             }
             else
             {
-                iconPowerSource.Glyph = "\xF2BF"; // battery
+                iconPowerSource.Symbol = Wpf.Ui.Controls.SymbolRegular.Battery020;
                 tbPowerSource.Text = "Battery";
             }
 

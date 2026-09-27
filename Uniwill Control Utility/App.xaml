@@ -506,7 +506,7 @@
 
           <!-- Global CardExpander: align expanded content with the header's text area.
                  Header layout (inside ToggleButton Padding=14,16,16,16):
-                   ContentControl margin 0,0,14,0 + FontIcon margin 4,0,6,0 + FontSize 20
+                   ContentControl margin 0,0,14,0 + SymbolIcon margin 4,0,6,0 + FontSize 20
                    Left  = 14 (base) + 0 (CC left) + 4 (icon left) + 20 (icon) + 14 (CC right) + 6 (icon right) = 58px
                    Right = 46 (unchanged - chevron area) -->
             <Style TargetType="{x:Type ui:CardExpander}"

@@ -1041,7 +1041,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Title = "Adaptive Mode Override",
                 Content = "Adaptive Mode is currently controlling the watercooler. Controls on this page are disabled.",
                 Appearance = Wpf.Ui.Controls.ControlAppearance.Info,
-                Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = "\uF167", FontSize = 16, Margin = new System.Windows.Thickness(0, 0, 10, 0) },
+                Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.Info16, FontSize = 16, Margin = new System.Windows.Thickness(0, 0, 10, 0) },
                 IsCloseButtonEnabled = false,
                 Timeout = TimeSpan.FromHours(1), // effectively infinite — dismissed on page Unloaded
             };
@@ -1177,13 +1177,13 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (isStandby)
             {
-                StandbyIcon.Glyph = "\uE768"; // Sun/Resume
+                StandbyIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Play20;
                 StandbyText.Text = "Resume";
                 btnStandby.ToolTip = "Resume all outputs.";
             }
             else
             {
-                StandbyIcon.Glyph = "\uE769"; // Power
+                StandbyIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Power20;
                 StandbyText.Text = "Standby";
                 btnStandby.ToolTip = "Pause all outputs while keeping BLE connected.";
             }

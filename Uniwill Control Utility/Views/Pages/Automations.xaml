@@ -79,7 +79,7 @@
                 <!-- Preset on Battery Charge -->
                 <ui:CardControl Margin="0,0,0,8">
                     <ui:CardControl.Icon>
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE897;" FontSize="20" Margin="4,0,6,0" />
+                        <ui:SymbolIcon Symbol="PlugConnected20" FontSize="20" Margin="4,0,6,0" />
                     </ui:CardControl.Icon>
                     <ui:CardControl.Header>
                         <Grid>
@@ -117,7 +117,7 @@
                 <!-- Preset on Battery Discharge -->
                 <ui:CardControl Margin="0,0,0,8">
                     <ui:CardControl.Icon>
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE97E;" FontSize="20" Margin="4,0,6,0" />
+                        <ui:SymbolIcon Symbol="BatterySaver20" FontSize="20" Margin="4,0,6,0" />
                     </ui:CardControl.Icon>
                     <ui:CardControl.Header>
                         <Grid>
@@ -155,7 +155,7 @@
                 <!-- Preset on System Resume -->
                 <ui:CardControl Margin="0,0,0,8">
                     <ui:CardControl.Icon>
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C5;" FontSize="20" Margin="4,0,6,0" />
+                        <ui:SymbolIcon Symbol="Sleep20" FontSize="20" Margin="4,0,6,0" />
                     </ui:CardControl.Icon>
                     <ui:CardControl.Header>
                         <Grid>

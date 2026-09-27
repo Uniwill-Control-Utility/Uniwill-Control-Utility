@@ -83,11 +83,10 @@
                     <ColumnDefinition Width="70" />
                 </Grid.ColumnDefinitions>
 
-                <ui:FontIcon x:Name="_statusIcon"
+                <ui:SymbolIcon x:Name="_statusIcon"
                              Grid.Column="0"
                              VerticalAlignment="Center"
-                             FontFamily="Segoe Fluent Icons"
-                             Glyph="&#xE711;"
+                             Symbol="DismissCircle20"
                              FontSize="16"
                              Foreground="Red" />
 

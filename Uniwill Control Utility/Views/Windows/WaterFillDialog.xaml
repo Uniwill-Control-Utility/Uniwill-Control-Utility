@@ -33,9 +33,8 @@
 
             <!-- Warning -->
             <StackPanel Orientation="Horizontal" Margin="0,0,0,8" HorizontalAlignment="Center">
-                <ui:FontIcon x:Name="WarningIcon"
-                             FontFamily="Segoe Fluent Icons"
-                             Glyph="&#xE7BA;"
+                <ui:SymbolIcon x:Name="WarningIcon"
+                             Symbol="Warning20"
                              FontSize="48"
                              Margin="24,0,10,0"
                              VerticalAlignment="Center"
