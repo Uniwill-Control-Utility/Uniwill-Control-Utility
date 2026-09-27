@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
@@ -20,6 +21,7 @@ namespace Uniwill_Control_Utility.ViewModels
 
         private readonly INavigationService _navigationService;
         private readonly IHardwareMonitoringService _hardwareMonitoring;
+        private readonly EcTelemetryService _ecTelemetry;
         private readonly UniwillECService? _uniwillEc;
         private readonly WaterCoolerService _waterCoolerService;
         private readonly FlydigiCoolerHidService _flydigiService;
@@ -30,10 +32,12 @@ namespace Uniwill_Control_Utility.ViewModels
         private int _batteryHealthPercent;
         private int _batteryTemperatureC;
         private int _batteryChargeLimit;
+        private int _batteryRefreshInProgress;
 
         public DashboardViewModel(
             INavigationService navigationService,
             IHardwareMonitoringService hardwareMonitoring,
+            EcTelemetryService ecTelemetry,
             UniwillECService? uniwillEc,
             WaterCoolerService waterCoolerService,
             FlydigiCoolerHidService flydigiService,
@@ -43,6 +47,8 @@ namespace Uniwill_Control_Utility.ViewModels
                 ?? throw new ArgumentNullException(nameof(navigationService));
             _hardwareMonitoring = hardwareMonitoring
                 ?? throw new ArgumentNullException(nameof(hardwareMonitoring));
+            _ecTelemetry = ecTelemetry
+                ?? throw new ArgumentNullException(nameof(ecTelemetry));
             _uniwillEc = uniwillEc;
             _waterCoolerService = waterCoolerService;
             _flydigiService = flydigiService;
@@ -77,17 +83,12 @@ namespace Uniwill_Control_Utility.ViewModels
                 // Enrich with EC fan speed data if available
                 if (_uniwillEc is not null)
                 {
-                    try
+                    EcFanDutySnapshot ecSnapshot = _ecTelemetry.ReadFanDuty();
+                    snapshot = snapshot with
                     {
-                        int cpuPwm = _uniwillEc.GetFanPwm(0);
-                        int gpuPwm = _uniwillEc.GetFanPwm(1);
-                        snapshot = snapshot with
-                        {
-                            CpuFanSpeed = (int)Math.Round(cpuPwm * 100.0 / 200.0),
-                            GpuFanSpeed = (int)Math.Round(gpuPwm * 100.0 / 200.0)
-                        };
-                    }
-                    catch { /* EC read failed, fan speed stays 0 */ }
+                        CpuFanSpeed = ecSnapshot.CpuFanPercent,
+                        GpuFanSpeed = ecSnapshot.GpuFanPercent
+                    };
                 }
 
                 // Enrich with cached battery EC data (refreshed every 10s)
@@ -116,7 +117,7 @@ namespace Uniwill_Control_Utility.ViewModels
             }
         }
 
-        private void OnBatteryEcTimerTick(object? sender, EventArgs e)
+        private async void OnBatteryEcTimerTick(object? sender, EventArgs e)
         {
             // Skip polling when the app is minimized.
             if (Application.Current.MainWindow?.WindowState == WindowState.Minimized)
@@ -125,14 +126,21 @@ namespace Uniwill_Control_Utility.ViewModels
             if (_uniwillEc is null)
                 return;
 
+            if (Interlocked.Exchange(ref _batteryRefreshInProgress, 1) != 0)
+                return;
+
             // Only refresh temperature on the timer; health and charge limit
             // are fetched once on navigation and cached.
             try
             {
-                int temp = _uniwillEc.ReadBatteryTemperatureC();
+                int temp = await Task.Run(_uniwillEc.ReadBatteryTemperatureC);
                 _batteryTemperatureC = temp;
             }
             catch { /* EC read failed, keep cached value */ }
+            finally
+            {
+                Volatile.Write(ref _batteryRefreshInProgress, 0);
+            }
         }
 
         public event EventHandler<HardwareMetricsSnapshot>? MetricsUpdated;

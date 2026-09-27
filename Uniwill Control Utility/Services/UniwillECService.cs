@@ -607,6 +607,23 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
+        /// Captures the EC fan-duty values displayed by the dashboard and fan-control page
+        /// under one native-I/O lock. Callers should normally use
+        /// <see cref="EcTelemetryService"/> so this work stays off the UI thread.
+        /// </summary>
+        public EcFanDutySnapshot ReadFanDutyTelemetry()
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                int cpuFanDuty = ReadECRaw(REG_PWM_1);
+                int gpuFanDuty = ReadECRaw(REG_PWM_2);
+
+                return new EcFanDutySnapshot(cpuFanDuty, gpuFanDuty);
+            }
+        }
+
+        /// <summary>
         /// The OEM default duty values (10 active zones) that the EC expects as a valid
         /// gradient. We scale these proportionally when the user requests a different speed.
         /// </summary>
@@ -1153,7 +1170,7 @@ namespace Uniwill_Control_Utility.Services
         {
             rpm = Math.Clamp(rpm, 100, 12700);
 
-            // fanSwitchSpeed is a u16 — write low byte then high byte
+            // fanSwitchSpeed is a u16 â€” write low byte then high byte
             byte lo = (byte)(rpm & 0xFF);
             byte hi = (byte)((rpm >> 8) & 0xFF);
 
@@ -1804,7 +1821,7 @@ namespace Uniwill_Control_Utility.Services
                 // Cycle count: LE u16 at 0x4A6
                 int cycleCount = ReadEcUInt16(REG_BATTERY_CYCLE_COUNT_LO);
 
-                // Temperature: LE u16 at 0x4A2, value is Kelvin×10
+                // Temperature: LE u16 at 0x4A2, value is KelvinÃ—10
                 int tempKelvinX10 = ReadEcUInt16(REG_BATTERY_TEMP_LO);
                 int temperatureC = (int)(tempKelvinX10 / 10.0 - 273.15);
 
@@ -1814,7 +1831,7 @@ namespace Uniwill_Control_Utility.Services
                 // Charge rate: LE u16 at 0x434 (mA)
                 int chargeRateMa = ReadEcUInt16(REG_BATTERY_CHARGE_RATE_LO);
 
-                // Health: FullChargeCapacity / DesignCapacity × 100
+                // Health: FullChargeCapacity / DesignCapacity Ã— 100
                 int designCapacityMah = ReadEcUInt16(REG_BATTERY_DESIGN_CAP_LO);
                 int fullChargeCapacityMah = ReadEcUInt16(REG_BATTERY_FULL_CHARGE_CAP_LO);
                 int healthPercent = designCapacityMah > 0
@@ -1832,7 +1849,7 @@ namespace Uniwill_Control_Utility.Services
                     ChargeRateMa = chargeRateMa
                 };
 
-                Debug.WriteLine($"[EC] [Battery] ReadBatteryTelemetry: AC={(isAcPowered ? "plugged" : "unplugged")}, SoC={stateOfCharge}%, Health={healthPercent}%, Temp={temperatureC}°C, Cycles={cycleCount}, Voltage={presentVoltageMv}mV, ChargeRate={chargeRateMa}mA");
+                Debug.WriteLine($"[EC] [Battery] ReadBatteryTelemetry: AC={(isAcPowered ? "plugged" : "unplugged")}, SoC={stateOfCharge}%, Health={healthPercent}%, Temp={temperatureC}Â°C, Cycles={cycleCount}, Voltage={presentVoltageMv}mV, ChargeRate={chargeRateMa}mA");
                 return telemetry;
             }
             catch
@@ -1842,8 +1859,8 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
-        /// Reads only the battery temperature from the EC (Kelvin×10 at 0x4A2).
-        /// Lightweight — reads a single register pair, no full telemetry.
+        /// Reads only the battery temperature from the EC (KelvinÃ—10 at 0x4A2).
+        /// Lightweight â€” reads a single register pair, no full telemetry.
         /// </summary>
         public int ReadBatteryTemperatureC()
         {

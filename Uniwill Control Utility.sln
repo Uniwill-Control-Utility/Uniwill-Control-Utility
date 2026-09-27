@@ -5,6 +5,8 @@ VisualStudioVersion = 18.7.11925.98
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Uniwill Control Utility", "Uniwill Control Utility\Uniwill Control Utility.csproj", "{484C4929-613C-41F5-A95F-918C1EFC8702}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Uniwill Control Utility.Tests", "Uniwill Control Utility.Tests\Uniwill Control Utility.Tests.csproj", "{6209452F-DFB7-47B6-9621-7926F2766D10}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +41,26 @@ Global
 		{484C4929-613C-41F5-A95F-918C1EFC8702}.Release|x64.Build.0 = Release|x64
 		{484C4929-613C-41F5-A95F-918C1EFC8702}.Release|x86.ActiveCfg = Release|x64
 		{484C4929-613C-41F5-A95F-918C1EFC8702}.Release|x86.Build.0 = Release|x64
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Debug|ARM.ActiveCfg = Debug|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Debug|ARM.Build.0 = Debug|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Debug|x64.Build.0 = Debug|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Debug|x86.Build.0 = Debug|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Release|ARM.ActiveCfg = Release|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Release|ARM.Build.0 = Release|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Release|ARM64.Build.0 = Release|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Release|x64.ActiveCfg = Release|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Release|x64.Build.0 = Release|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Release|x86.ActiveCfg = Release|Any CPU
+		{6209452F-DFB7-47B6-9621-7926F2766D10}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

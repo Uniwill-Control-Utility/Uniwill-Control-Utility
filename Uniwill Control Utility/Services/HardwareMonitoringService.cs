@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -75,6 +76,35 @@ namespace Uniwill_Control_Utility.Services
         public int BatteryChargeLimit { get; init; } // 0 = 100%, 1 = 80%, 2 = 60%
     }
 
+    internal readonly record struct HardwareSensorReading(
+        HardwareType HardwareType,
+        SensorType SensorType,
+        string Name,
+        float Value);
+
+    internal sealed record HardwareMonitoringState(
+        HardwareMetricsSnapshot Metrics,
+        IReadOnlyList<HardwareSensorReading> Sensors)
+    {
+        public static HardwareMonitoringState Empty { get; } =
+            new(new HardwareMetricsSnapshot(), Array.Empty<HardwareSensorReading>());
+
+        public float ReadSensor(HardwareType hardwareType, SensorType sensorType, string sensorName)
+        {
+            foreach (HardwareSensorReading sensor in Sensors)
+            {
+                if (sensor.HardwareType == hardwareType &&
+                    sensor.SensorType == sensorType &&
+                    sensor.Name.Contains(sensorName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return sensor.Value;
+                }
+            }
+
+            return 0;
+        }
+    }
+
     public interface IHardwareMonitoringService
     {
         IDisposable Acquire(HardwareMonitoringCategory categories);
@@ -85,8 +115,10 @@ namespace Uniwill_Control_Utility.Services
 
     public sealed partial class HardwareMonitoringService : IHardwareMonitoringService, IDisposable
     {
+        private static readonly TimeSpan SnapshotMaxAge = TimeSpan.FromSeconds(1);
         private readonly object _sync = new();
         private readonly Dictionary<long, HardwareMonitoringCategory> _leases = new();
+        private readonly StaleWhileRevalidateCache<HardwareMonitoringState> _stateCache;
         private Computer? _computer;
         private HardwareMonitoringCategory _activeCategories;
         private DateTime _lastUpdateUtc = DateTime.MinValue;
@@ -99,6 +131,19 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>When the last UpdateHardware failure occurred.</summary>
         private DateTime _lastUpdateFailureUtc = DateTime.MinValue;
 
+        public HardwareMonitoringService()
+        {
+            _stateCache = new StaleWhileRevalidateCache<HardwareMonitoringState>(
+                HardwareMonitoringState.Empty,
+                SnapshotMaxAge,
+                _ => Task.FromResult(CaptureState()),
+                onRefreshError: ex =>
+                {
+                    try { Serilog.Log.Warning(ex, "[LHM] Background snapshot refresh failed"); }
+                    catch { /* Serilog may not be ready */ }
+                });
+        }
+
         /// <summary>
         /// Acquires a persistent lease that is never automatically released.
         /// Used during startup to keep the Computer instance alive from pre-UI
@@ -109,12 +154,20 @@ namespace Uniwill_Control_Utility.Services
             if (categories == HardwareMonitoringCategory.None)
                 return;
 
+            bool categoriesChanged;
             lock (_sync)
             {
                 ThrowIfDisposed();
                 _leases[long.MinValue] = categories; // persistent lease id
-                ApplyRequestedCategoriesLocked();
+                categoriesChanged = ApplyRequestedCategoriesLocked();
             }
+
+            if (categoriesChanged)
+                _stateCache.Invalidate();
+
+            // Startup invokes this method from a worker thread and waits for it.
+            // Warm the first snapshot there so the first UI read already has data.
+            _stateCache.RefreshAsync().GetAwaiter().GetResult();
         }
 
         public IDisposable Acquire(HardwareMonitoringCategory categories)
@@ -122,94 +175,53 @@ namespace Uniwill_Control_Utility.Services
             if (categories == HardwareMonitoringCategory.None)
                 return EmptyLease.Instance;
 
+            bool categoriesChanged;
+            MonitoringLease lease;
             lock (_sync)
             {
                 ThrowIfDisposed();
                 long id = ++_nextLeaseId;
                 _leases[id] = categories;
-                ApplyRequestedCategoriesLocked();
-                return new MonitoringLease(this, id);
+                categoriesChanged = ApplyRequestedCategoriesLocked();
+                lease = new MonitoringLease(this, id);
             }
+
+            if (categoriesChanged)
+                _stateCache.Invalidate();
+
+            _ = _stateCache.RefreshAsync();
+            return lease;
         }
 
-        public HardwareMetricsSnapshot ReadSnapshot()
-        {
-            lock (_sync)
-            {
-                ThrowIfDisposed();
-                UpdateHardware();
+        public HardwareMetricsSnapshot ReadSnapshot() => _stateCache.Read().Metrics;
 
-                IHardware? cpu = FindHardware(HardwareType.Cpu);
-                IHardware? gpu = FindPreferredGpu();
-                IHardware? battery = FindHardware(HardwareType.Battery);
-                GetSystemPowerStatus(out SystemPowerStatus powerStatus);
-
-                double gpuMemoryUsedMb = ReadFirstValue(gpu, SensorType.SmallData, "GPU Memory Used", "D3D Dedicated Memory Used");
-                double gpuMemoryTotalMb = ReadFirstValue(gpu, SensorType.SmallData, "GPU Memory Total", "D3D Dedicated Memory Total");
-                var (memoryUsed, memoryTotal, memoryCommitted, pagefileTotal) = ReadPhysicalMemory();
-
-                (int memTemp0, int memTemp1) = ReadMemoryTemperatures();
-                int storageTemp = ReadStorageTemperature();
-
-                return new HardwareMetricsSnapshot
-                {
-                    CpuTemperature = Round(ReadFirstValue(cpu, SensorType.Temperature, "Core Average", "CPU Package", "Core")),
-                    CpuUsage = Round(ReadFirstValue(cpu, SensorType.Load, "CPU Total", "Total")),
-                    CpuPowerWatts = Round(ReadFirstValue(cpu, SensorType.Power, "CPU Package", "Package")),
-                    CpuClockMhz = Round(ReadAverage(cpu, SensorType.Clock, "Core")),
-                    GpuTemperature = Round(ReadFirstValue(gpu, SensorType.Temperature, "GPU Core", "Core")),
-                    GpuUsage = Round(ReadFirstValue(gpu, SensorType.Load, "GPU Core", "Core")),
-                    GpuPowerWatts = Round(ReadFirstValue(gpu, SensorType.Power, "GPU Package", "GPU Power", "Core")),
-                    GpuClockMhz = Round(ReadFirstValue(gpu, SensorType.Clock, "GPU Core", "Core")),
-                    GpuMemoryUsedGb = gpuMemoryUsedMb / 1024d,
-                    GpuMemoryTotalGb = gpuMemoryTotalMb / 1024d,
-                    SystemMemoryUsedGb = memoryUsed,
-                    SystemMemoryTotalGb = memoryTotal,
-                    SystemMemoryCommittedGb = memoryCommitted,
-                    SystemMemoryPagefileTotalGb = pagefileTotal,
-                    MemoryTemperature0 = memTemp0,
-                    MemoryTemperature1 = memTemp1,
-                    StorageTemperatureCelsius = storageTemp,
-                    HasBattery = powerStatus.BatteryFlag != 128 && powerStatus.BatteryLifePercent <= 100,
-                    BatteryPercent = powerStatus.BatteryLifePercent <= 100 ? powerStatus.BatteryLifePercent : 0,
-                    IsBatteryCharging = (powerStatus.BatteryFlag & 8) != 0,
-                    IsBatteryFullyCharged = powerStatus.BatteryLifePercent == 100 && powerStatus.ACLineStatus == 1,
-                    BatteryPowerWatts = Math.Abs(ReadFirstValue(battery, SensorType.Power, "Charge Rate", "Discharge Rate", "Power")),
-                    BatteryTimeRemainingMinutes = powerStatus.BatteryLifeTime > 0 ? powerStatus.BatteryLifeTime / 60 : 0
-                };
-            }
-        }
-
-        public float ReadSensor(HardwareType hardwareType, SensorType sensorType, string sensorName)
-        {
-            lock (_sync)
-            {
-                ThrowIfDisposed();
-                UpdateHardware();
-                return (float)ReadValue(FindHardware(hardwareType), sensorType, sensorName);
-            }
-        }
+        public float ReadSensor(HardwareType hardwareType, SensorType sensorType, string sensorName) =>
+            _stateCache.Read().ReadSensor(hardwareType, sensorType, sensorName);
 
         private void Release(long id)
         {
+            bool categoriesChanged;
             lock (_sync)
             {
                 if (_disposed || !_leases.Remove(id))
                     return;
 
-                ApplyRequestedCategoriesLocked();
+                categoriesChanged = ApplyRequestedCategoriesLocked();
             }
+
+            if (categoriesChanged)
+                _stateCache.Invalidate();
         }
 
         /// <summary>Must be called while holding _sync.</summary>
-        private void ApplyRequestedCategoriesLocked()
+        private bool ApplyRequestedCategoriesLocked()
         {
             HardwareMonitoringCategory requested = HardwareMonitoringCategory.None;
             foreach (HardwareMonitoringCategory lease in _leases.Values)
                 requested |= lease;
 
             if (requested == _activeCategories)
-                return;
+                return false;
 
             _computer?.Close();
             _computer = null;
@@ -217,7 +229,7 @@ namespace Uniwill_Control_Utility.Services
             _lastUpdateUtc = DateTime.MinValue;
 
             if (requested == HardwareMonitoringCategory.None)
-                return;
+                return true;
 
             // Build the Computer under lock but open it outside to avoid
             // blocking other Acquire() callers during driver initialization.
@@ -250,6 +262,85 @@ namespace Uniwill_Control_Utility.Services
                 _computer = computer;
             else
                 computer.Close();
+
+            return true;
+        }
+
+        private HardwareMonitoringState CaptureState()
+        {
+            lock (_sync)
+            {
+                ThrowIfDisposed();
+                UpdateHardware();
+                return new HardwareMonitoringState(BuildMetricsSnapshot(), CaptureSensorReadings());
+            }
+        }
+
+        /// <summary>Must be called while holding _sync.</summary>
+        private HardwareMetricsSnapshot BuildMetricsSnapshot()
+        {
+            IHardware? cpu = FindHardware(HardwareType.Cpu);
+            IHardware? gpu = FindPreferredGpu();
+            IHardware? battery = FindHardware(HardwareType.Battery);
+            GetSystemPowerStatus(out SystemPowerStatus powerStatus);
+
+            double gpuMemoryUsedMb = ReadFirstValue(gpu, SensorType.SmallData, "GPU Memory Used", "D3D Dedicated Memory Used");
+            double gpuMemoryTotalMb = ReadFirstValue(gpu, SensorType.SmallData, "GPU Memory Total", "D3D Dedicated Memory Total");
+            var (memoryUsed, memoryTotal, memoryCommitted, pagefileTotal) = ReadPhysicalMemory();
+            (int memTemp0, int memTemp1) = ReadMemoryTemperatures();
+            int storageTemp = ReadStorageTemperature();
+
+            return new HardwareMetricsSnapshot
+            {
+                CpuTemperature = Round(ReadFirstValue(cpu, SensorType.Temperature, "Core Average", "CPU Package", "Core")),
+                CpuUsage = Round(ReadFirstValue(cpu, SensorType.Load, "CPU Total", "Total")),
+                CpuPowerWatts = Round(ReadFirstValue(cpu, SensorType.Power, "CPU Package", "Package")),
+                CpuClockMhz = Round(ReadAverage(cpu, SensorType.Clock, "Core")),
+                GpuTemperature = Round(ReadFirstValue(gpu, SensorType.Temperature, "GPU Core", "Core")),
+                GpuUsage = Round(ReadFirstValue(gpu, SensorType.Load, "GPU Core", "Core")),
+                GpuPowerWatts = Round(ReadFirstValue(gpu, SensorType.Power, "GPU Package", "GPU Power", "Core")),
+                GpuClockMhz = Round(ReadFirstValue(gpu, SensorType.Clock, "GPU Core", "Core")),
+                GpuMemoryUsedGb = gpuMemoryUsedMb / 1024d,
+                GpuMemoryTotalGb = gpuMemoryTotalMb / 1024d,
+                SystemMemoryUsedGb = memoryUsed,
+                SystemMemoryTotalGb = memoryTotal,
+                SystemMemoryCommittedGb = memoryCommitted,
+                SystemMemoryPagefileTotalGb = pagefileTotal,
+                MemoryTemperature0 = memTemp0,
+                MemoryTemperature1 = memTemp1,
+                StorageTemperatureCelsius = storageTemp,
+                HasBattery = powerStatus.BatteryFlag != 128 && powerStatus.BatteryLifePercent <= 100,
+                BatteryPercent = powerStatus.BatteryLifePercent <= 100 ? powerStatus.BatteryLifePercent : 0,
+                IsBatteryCharging = (powerStatus.BatteryFlag & 8) != 0,
+                IsBatteryFullyCharged = powerStatus.BatteryLifePercent == 100 && powerStatus.ACLineStatus == 1,
+                BatteryPowerWatts = Math.Abs(ReadFirstValue(battery, SensorType.Power, "Charge Rate", "Discharge Rate", "Power")),
+                BatteryTimeRemainingMinutes = powerStatus.BatteryLifeTime > 0 ? powerStatus.BatteryLifeTime / 60 : 0
+            };
+        }
+
+        /// <summary>Must be called while holding _sync.</summary>
+        private IReadOnlyList<HardwareSensorReading> CaptureSensorReadings()
+        {
+            if (_computer is null)
+                return Array.Empty<HardwareSensorReading>();
+
+            var readings = new List<HardwareSensorReading>();
+            foreach (IHardware hardware in _computer.Hardware)
+            {
+                foreach (ISensor sensor in EnumerateSensors(hardware))
+                {
+                    if (sensor.Value.HasValue)
+                    {
+                        readings.Add(new HardwareSensorReading(
+                            hardware.HardwareType,
+                            sensor.SensorType,
+                            sensor.Name,
+                            sensor.Value.Value));
+                    }
+                }
+            }
+
+            return readings.ToArray();
         }
 
         private void UpdateHardware()
@@ -401,6 +492,8 @@ namespace Uniwill_Control_Utility.Services
                 _leases.Clear();
                 _disposed = true;
             }
+
+            _stateCache.Dispose();
         }
 
         private sealed class MonitoringLease : IDisposable

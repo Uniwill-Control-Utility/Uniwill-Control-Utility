@@ -21,6 +21,7 @@ namespace Uniwill_Control_Utility.Views.Pages
     {
  
         private readonly IHardwareMonitoringService _hardwareMonitoring;
+        private readonly EcTelemetryService _ecTelemetry;
         private readonly UniwillECService? _uniwillEc;
         private readonly FlydigiCoolerHidService _flydigiService;
         private readonly FlydigiCoolerBleService _bs1Service;
@@ -48,12 +49,14 @@ namespace Uniwill_Control_Utility.Views.Pages
         public FanControl(
             IHardwareMonitoringService hardwareMonitoring,
             DeviceApplier deviceApplier,
+            EcTelemetryService ecTelemetry,
             UniwillECService? uniwillEc = null,
             FlydigiCoolerHidService? flydigiService = null,
             FlydigiCoolerBleService? bs1Service = null)
         {
             _hardwareMonitoring = hardwareMonitoring;
             _deviceApplier = deviceApplier;
+            _ecTelemetry = ecTelemetry;
             _uniwillEc = uniwillEc;
             _flydigiService = flydigiService;
             _bs1Service = bs1Service;
@@ -175,7 +178,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Cancel any pending debounced apply so we don't get a duplicate
             _applyDebounceTimer?.Stop();
 
-            // Apply directly — the caller has already updated all UI state.
+            // Apply directly â€” the caller has already updated all UI state.
             ApplyCurveInBackground();
         }
 
@@ -193,7 +196,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void OnFanSettingsChanged(object? sender, EventArgs e)
         {
-            // Skip if the page is not currently visible — Page_Loaded will reload.
+            // Skip if the page is not currently visible â€” Page_Loaded will reload.
             if (_isUnloaded) return;
 
             // Skip if we're currently loading settings (avoid feedback loop from
@@ -243,7 +246,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                             EcSmartFanControl.ClearInstance();
                             _smartFanControl = null;
                             SmartFanCard.IsExpanded = false;
-                            // No need to ApplyCurveNow() — the tray handler already
+                            // No need to ApplyCurveNow() â€” the tray handler already
                             // applied the normal fan curve when it stopped Smart Fan.
                         }
                     }
@@ -269,7 +272,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void OnEcFanPresetApplied(object? sender, EcFanPresetAppliedEventArgs e)
         {
             // Only update UI if the page is currently loaded and visible.
-            // If the page is unloaded (user navigated away), skip — the next
+            // If the page is unloaded (user navigated away), skip â€” the next
             // navigation will load settings from disk via ApplySettings.
             if (_isUnloaded) return;
 
@@ -423,25 +426,15 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         #endregion
 
-        private void ReadFanRpm()
+        private async void ReadFanRpm()
         {
             try
             {
                 if (_uniwillEc is null) return;
 
-                // Try to acquire the semaphore with a short timeout to avoid blocking the UI.
-                // Reads are non-critical — skip if an EC operation is in progress.
-                if (!_ecSemaphore.Wait(500)) return;
-                try
-                {
-                    int rpm = _uniwillEc.GetMainFanRpm();
-                    if (rpm > 0)
-                        SetStatusText($"{rpm} RPM");
-                }
-                finally
-                {
-                    _ecSemaphore.Release();
-                }
+                int rpm = await _ecTelemetry.RefreshMainFanRpmAsync();
+                if (!_isUnloaded && rpm > 0)
+                    SetStatusText($"{rpm} RPM");
             }
             catch (Exception ex)
             {
@@ -451,7 +444,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void StatusTimer_Tick(object? sender, EventArgs e)
         {
-            // Skip polling when the app is minimized — no point reading hardware
+            // Skip polling when the app is minimized â€” no point reading hardware
             // while the user isn't looking at the UI.
             if (Application.Current.MainWindow?.WindowState == WindowState.Minimized)
                 return;
@@ -461,25 +454,16 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Get metrics from hardware monitoring (temp, usage, power, clock)
                 var snapshot = _hardwareMonitoring.ReadSnapshot();
 
-                // Enrich with EC fan speed data if available.
-                // Try to acquire the semaphore with a short timeout — reads are non-critical.
-                if (_uniwillEc is not null && _ecSemaphore.Wait(500))
+                // Enrich with the shared EC cache. Native EC reads run on a worker
+                // and never block this DispatcherTimer callback.
+                if (_uniwillEc is not null)
                 {
-                    try
+                    EcFanDutySnapshot ecSnapshot = _ecTelemetry.ReadFanDuty();
+                    snapshot = snapshot with
                     {
-                        int cpuPwm = _uniwillEc.GetFanPwm(0);
-                        int gpuPwm = _uniwillEc.GetFanPwm(1);
-                        snapshot = snapshot with
-                        {
-                            CpuFanSpeed = (int)Math.Round(cpuPwm * 100.0 / 200.0),
-                            GpuFanSpeed = (int)Math.Round(gpuPwm * 100.0 / 200.0)
-                        };
-                    }
-                    catch { /* EC read failed, fan speed stays 0 */ }
-                    finally
-                    {
-                        _ecSemaphore.Release();
-                    }
+                        CpuFanSpeed = ecSnapshot.CpuFanPercent,
+                        GpuFanSpeed = ecSnapshot.GpuFanPercent
+                    };
                 }
 
                 // Update both controls from the single enriched snapshot
@@ -531,7 +515,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     break;
             }
 
-            // Only refresh if something actually changed — avoids unnecessary re-render.
+            // Only refresh if something actually changed â€” avoids unnecessary re-render.
             if (InfoBanner.Severity == newSeverity && InfoBanner.Message == newMessage)
                 return;
 
@@ -1054,7 +1038,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             settings.UnifiedMode = true;
             FanControlSettingsService.Save(settings);
 
-            // Apply immediately — user expects instant feedback on toggle
+            // Apply immediately â€” user expects instant feedback on toggle
             ApplyCurveNow();
             UpdateBanner();
         }
@@ -1105,7 +1089,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             settings.UnifiedMode = false;
             FanControlSettingsService.Save(settings);
 
-            // Apply immediately — user expects instant feedback on toggle
+            // Apply immediately â€” user expects instant feedback on toggle
             ApplyCurveNow();
             UpdateBanner();
         }
@@ -1117,7 +1101,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (tsUnifiedCurve.IsChecked != true)
             {
-                // Chevron was clicked — sync toggle and apply unified logic
+                // Chevron was clicked â€” sync toggle and apply unified logic
                 tsUnifiedCurve.IsChecked = true;
                 var cpuCurve = CpuFanCurveEditor.GetCurve();
                 FanCurveEditor.SetCurve(cpuCurve);
@@ -1134,7 +1118,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (tsUnifiedCurve.IsChecked != false)
             {
-                // Chevron was clicked — sync toggle and apply split logic
+                // Chevron was clicked â€” sync toggle and apply split logic
                 tsUnifiedCurve.IsChecked = false;
                 var unifiedCurve = FanCurveEditor.GetCurve();
                 CpuFanCurveEditor.SetCurve(unifiedCurve);
@@ -1150,7 +1134,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         /// <summary>
         /// Captures the current curve state and applies it to the EC in the background.
-        /// Returns immediately — the UI never blocks.
+        /// Returns immediately â€” the UI never blocks.
         /// </summary>
         private void ApplyCurveInBackground()
         {
@@ -1160,7 +1144,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
             }
 
-            // Skip static curve apply when Smart Fan Mode is active — the polling
+            // Skip static curve apply when Smart Fan Mode is active â€” the polling
             // loop manages the EC curve tables and would be overwritten.
             if (_smartFanControl?.IsActive == true)
                 return;
@@ -1317,11 +1301,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (_uniwillEc is null) return;
 
             // Remember whether Smart Fan Mode was active so we can restore it
-            // when Turbo is disabled. Do NOT overwrite the persisted setting —
+            // when Turbo is disabled. Do NOT overwrite the persisted setting â€”
             // only track in-memory so the toggle survives the Turbo session.
             _smartFanWasActiveBeforeTurbo = tsSmartFanMode.IsChecked == true;
 
-            // Stop smart fan mode if active — turbo and smart fan are mutually exclusive
+            // Stop smart fan mode if active â€” turbo and smart fan are mutually exclusive
             _smartFanControl?.Stop();
             if (_smartFanWasActiveBeforeTurbo)
             {
@@ -1329,7 +1313,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tsSmartFanMode.IsChecked = false;
                 _loadingSettings = false;
 
-                // Do NOT persist EcSmartFanMode = false — we want to restore it
+                // Do NOT persist EcSmartFanMode = false â€” we want to restore it
                 // when Turbo is disabled. Just stop the control loop in-memory.
             }
 
@@ -1366,7 +1350,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Dispatcher.Invoke(() =>
                 {
                     if (_isUnloaded) return;
-                    SetStatusText(LocalizationService.Get("Turbo mode ENABLED — fans at max duty"));
+                    SetStatusText(LocalizationService.Get("Turbo mode ENABLED â€” fans at max duty"));
                     ReadFanRpm();
                 });
             });
@@ -1402,7 +1386,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                     _smartFanControl.TemperatureUpdated += (s, ev) =>
                     {
-                        // Status text update removed — keep the "Smart Fan Mode enabled"
+                        // Status text update removed â€” keep the "Smart Fan Mode enabled"
                         // message static instead of spamming temperature/duty updates.
                     };
                 }
@@ -1444,7 +1428,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Dispatcher.Invoke(() =>
                 {
                     if (_isUnloaded) return;
-                    SetStatusText(LocalizationService.Get("Turbo mode DISABLED — previous settings restored"));
+                    SetStatusText(LocalizationService.Get("Turbo mode DISABLED â€” previous settings restored"));
                     SetTurboSwitchColor(false);
                     ReadFanRpm();
                 });
@@ -1465,7 +1449,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             else
             {
                 // ClearValue removes the local value so the XAML DynamicResource
-                // binding kicks back in. Setting to null doesn't work — it falls
+                // binding kicks back in. Setting to null doesn't work â€” it falls
                 // through to the parent's inherited Foreground (black).
                 tsTurbo.ClearValue(Control.ForegroundProperty);
             }
@@ -1482,7 +1466,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Skip if triggered by ApplySettings during startup
             if (_loadingSettings) return;
 
-            // Stop turbo mode if active — smart fan mode and turbo are mutually exclusive
+            // Stop turbo mode if active â€” smart fan mode and turbo are mutually exclusive
             if (tsTurbo.IsChecked == true)
             {
                 tsTurbo.IsChecked = false;
@@ -1492,7 +1476,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             settings.EcSmartFanMode = true;
             FanControlSettingsService.Save(settings);
 
-            // Use the app-scoped singleton — may already be running from
+            // Use the app-scoped singleton â€” may already be running from
             // DashboardViewModel startup or MainWindow resume.
             var curve = GetActiveCurve();
             var temps = GetActiveTemperatures();
@@ -1514,7 +1498,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 _smartFanControl.TemperatureUpdated += (s, ev) =>
                 {
-                    // Status text update removed — keep the "Smart Fan Mode enabled"
+                    // Status text update removed â€” keep the "Smart Fan Mode enabled"
                     // message static instead of spamming temperature/duty updates.
                 };
             }
@@ -1691,7 +1675,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         SetTurboSwitchColor(false);
                     }
 
-                    SetStatusText(LocalizationService.Get("Fan state reset — fans at 100%"));
+                    SetStatusText(LocalizationService.Get("Fan state reset â€” fans at 100%"));
                     ReadFanRpm();
                 });
             });
@@ -1750,7 +1734,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             _pageCts.Dispose();
             _pageCts = new CancellationTokenSource();
 
-            // Reload settings from disk — the Presets page may have changed
+            // Reload settings from disk â€” the Presets page may have changed
             // the fan curve while we were unloaded (e.g., applying a power
             // profile maps to a fan preset). Reloading keeps the UI in sync.
             var settings = FanControlSettingsService.Load();
@@ -1771,11 +1755,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // NOTE: Fan curve auto-apply is handled in DashboardViewModel.OnNavigatedToAsync
             // (the app always launches on Dashboard). This page does not auto-apply on
-            // navigation — the user explicitly applies via the 5s debounce timer.
+            // navigation â€” the user explicitly applies via the 5s debounce timer.
 
             // Acquire hardware monitoring lease on a background thread to avoid
             // blocking the UI while LibreHardwareMonitor probes hardware.
-            // NOTE: Do NOT hold _ecSemaphore during Acquire — it probes hardware
+            // NOTE: Do NOT hold _ecSemaphore during Acquire â€” it probes hardware
             // sensors (not the EC) and can block for seconds, which would deadlock
             // all fan control operations waiting on the semaphore.
             if (_monitoringLease is null)
@@ -1810,7 +1794,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     _smartFanControl.TemperatureUpdated += (s, ev) =>
                     {
-                        // Status text update removed — keep the "Smart Fan Mode enabled"
+                        // Status text update removed â€” keep the "Smart Fan Mode enabled"
                         // message static instead of spamming temperature/duty updates.
                     };
                 }

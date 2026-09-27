@@ -43,6 +43,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Uniwill Control Utility.Tests</_Parameter1>
+    </AssemblyAttribute>
     <EmbeddedResource Include="Localization\*.json" />
     <PackageReference Include="Accord.Math" Version="3.8.0" />
     <PackageReference Include="craftersmine.SteamGridDB.Net" Version="1.1.7" />

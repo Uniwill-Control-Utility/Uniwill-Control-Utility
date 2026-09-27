@@ -251,6 +251,7 @@ namespace Uniwill_Control_Utility
                             }
                             return new UniwillECService(dllPath);
                         });
+                        services.AddSingleton<EcTelemetryService>();
 
                         // Centralized device applier (singleton)
                         services.AddSingleton<DeviceApplier>();
