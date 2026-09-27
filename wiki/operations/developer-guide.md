@@ -115,4 +115,3 @@ For EC, HID, BLE, SMU, MSR, NVAPI, or WMI changes:
 The repository does not currently define an `.editorconfig`, formatter command, analyzer ruleset, or build-warning policy. Preserve the local style of touched files and keep formatting-only edits separate from behavior changes.
 
 [Back to documentation index](../README.md)
-

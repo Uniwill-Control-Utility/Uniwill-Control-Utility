@@ -156,4 +156,3 @@ Shutdown is best-effort in several device paths: exceptions are suppressed so pr
 - Many hardware discovery paths intentionally fall back to unavailable/unsupported state instead of aborting the application.
 
 [Back to documentation index](../README.md)
-

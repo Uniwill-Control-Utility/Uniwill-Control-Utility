@@ -125,4 +125,3 @@ Hardware adapters generally follow a degraded-operation model:
 The exact wire formats are maintained under [`wiki/protocols`](../protocols/device-communication-protocols.md).
 
 [Back to documentation index](../README.md)
-

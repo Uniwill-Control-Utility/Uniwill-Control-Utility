@@ -101,4 +101,3 @@ Add a machine-readable manifest with one record per non-NuGet payload:
 CI should compare publish output against the manifest and fail on missing, unexpected, or hash-mismatched payloads.
 
 [Back to documentation index](../README.md)
-

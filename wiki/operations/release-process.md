@@ -136,4 +136,3 @@ flowchart LR
 At minimum, continuous integration should restore, build x64 Release, validate Markdown links/Mermaid blocks, and run unit tests on every pull request. Hardware approval remains a separate maintainership gate.
 
 [Back to documentation index](../README.md)
-

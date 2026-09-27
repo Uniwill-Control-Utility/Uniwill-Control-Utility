@@ -153,4 +153,3 @@ When adding a new Adaptive-controlled domain:
 6. Add tests at the storage, ownership, diff-tracking, and hardware-adapter boundaries described in [Testing Strategy](../project/testing-strategy.md).
 
 [Back to documentation index](../README.md)
-

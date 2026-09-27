@@ -84,4 +84,3 @@ Do not mix generated build output or local logs with source commits. Native depe
 - Release notes are supplied for user-visible changes.
 
 [Back to documentation index](../README.md)
-

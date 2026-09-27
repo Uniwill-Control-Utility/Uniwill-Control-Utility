@@ -121,4 +121,3 @@ When adding a durable setting:
 7. Update this page.
 
 [Back to documentation index](../README.md)
-

@@ -80,4 +80,3 @@ Flydigi BS1 uses retry delays around GATT creation, responsiveness verification,
 9. Include the loop in process-exit and long-run soak scenarios.
 
 [Back to documentation index](../README.md)
-
