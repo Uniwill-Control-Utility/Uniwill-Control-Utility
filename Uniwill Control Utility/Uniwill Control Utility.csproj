@@ -15,7 +15,7 @@
     <Authors>jgudec</Authors>
     <UseWindowsForms>True</UseWindowsForms>
     <SignAssembly>False</SignAssembly>
-	<Copyright>© 2020-2026 UXTU Team, 2026 jgudec</Copyright>    
+	<Copyright>© 2020-2026 UXTU Team, 2026 UCU Team</Copyright>    
 	<AssemblyVersion>0.9.4.1</AssemblyVersion>
     <FileVersion>0.9.4.1</FileVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

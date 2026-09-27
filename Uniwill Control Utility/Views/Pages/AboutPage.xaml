@@ -165,7 +165,7 @@
                                            Content="Open"
                                            VerticalAlignment="Center"
                                            Click="OpenLink_Click"
-                                           Tag="https://github.com/jgudec/UCU" />
+                                           Tag="https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility" />
                             </Grid>
 
                             <!-- Divider -->
@@ -189,7 +189,7 @@
                                            Content="Open"
                                            VerticalAlignment="Center"
                                            Click="OpenLink_Click"
-                                           Tag="https://github.com/jgudec/UCU/releases/latest" />
+                                           Tag="https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility/releases/latest" />
                             </Grid>
 
                             <!-- Divider -->
