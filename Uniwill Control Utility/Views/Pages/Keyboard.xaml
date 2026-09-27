@@ -74,7 +74,7 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <ui:FontIcon Grid.Column="0"
-                                     FontFamily="Segoe Fluent Icons"
+                                     FontFamily="{StaticResource SegoeFluentIconsFontFamily}"
                                      Glyph="&#xE7A7;"
                                      FontSize="16"
                                      Margin="0,0,10,0"
@@ -96,7 +96,7 @@
                         <!-- Mode toggle: Effects / Per-Key -->
                         <ui:CardControl Margin="0,0,0,8">
                             <ui:CardControl.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8D3;" FontSize="20" Margin="4,0,6,0" />
+                                <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE8D3;" FontSize="20" Margin="4,0,6,0" />
                             </ui:CardControl.Icon>
                             <ui:CardControl.Header>
                                 <StackPanel>
@@ -123,7 +123,7 @@
                              Expanded="IdleTimerCard_Expanded"
                              Collapsed="IdleTimerCard_Collapsed">
                             <ui:CardExpander.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE916;" FontSize="20" Margin="4,0,6,0" />
+                                <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE916;" FontSize="20" Margin="4,0,6,0" />
                             </ui:CardExpander.Icon>
                             <ui:CardExpander.Header>
                                 <Grid>
@@ -180,7 +180,7 @@
                             <!-- Keyboard power toggle -->
                             <ui:CardControl Margin="0,0,0,8">
                                 <ui:CardControl.Icon>
-                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xED39;" FontSize="20" Margin="4,0,6,0" />
+                                    <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xED39;" FontSize="20" Margin="4,0,6,0" />
                                 </ui:CardControl.Icon>
                                 <ui:CardControl.Header>
                                     <StackPanel>
@@ -205,7 +205,7 @@
                                  Margin="0,0,0,0"
                                  IsExpanded="True">
                                 <ui:CardExpander.Icon>
-                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
+                                    <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
                                 </ui:CardExpander.Icon>
                                 <ui:CardExpander.Header>
                                     <Grid>
@@ -442,7 +442,7 @@
                             <!-- Brightness (per-key mode) -->
                             <ui:CardControl Margin="0,0,0,8">
                                 <ui:CardControl.Icon>
-                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE706;" FontSize="20" Margin="4,0,6,0" />
+                                    <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE706;" FontSize="20" Margin="4,0,6,0" />
                                 </ui:CardControl.Icon>
                                 <ui:CardControl.Header>
                                     <StackPanel>

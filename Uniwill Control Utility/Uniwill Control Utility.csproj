@@ -75,6 +75,7 @@
 
   <ItemGroup>
     <None Remove="Assets\BuiltInScaleModels.json" />
+    <None Remove="Assets\Fonts\Segoe Fluent Icons.ttf" />
     <None Remove="Assets\config.png" />
     <None Remove="Assets\icon.png" />
     <None Remove="Assets\Flydigi\bs1.png" />
@@ -114,6 +115,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Resource Include="Assets\Fonts\Segoe Fluent Icons.ttf" />
     <Resource Include="Assets\icon.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Resource>

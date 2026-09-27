@@ -86,7 +86,7 @@
                 <ui:FontIcon x:Name="_statusIcon"
                              Grid.Column="0"
                              VerticalAlignment="Center"
-                             FontFamily="Segoe Fluent Icons"
+                             FontFamily="{StaticResource SegoeFluentIconsFontFamily}"
                              Glyph="&#xE711;"
                              FontSize="16"
                              Foreground="Red" />

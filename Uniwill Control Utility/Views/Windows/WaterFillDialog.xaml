@@ -34,7 +34,7 @@
             <!-- Warning -->
             <StackPanel Orientation="Horizontal" Margin="0,0,0,8" HorizontalAlignment="Center">
                 <ui:FontIcon x:Name="WarningIcon"
-                             FontFamily="Segoe Fluent Icons"
+                             FontFamily="{StaticResource SegoeFluentIconsFontFamily}"
                              Glyph="&#xE7BA;"
                              FontSize="48"
                              Margin="24,0,10,0"

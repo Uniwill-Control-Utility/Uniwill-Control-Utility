@@ -14,6 +14,8 @@
                 <ui:ControlsDictionary />
             </ResourceDictionary.MergedDictionaries>
 
+            <FontFamily x:Key="SegoeFluentIconsFontFamily">/Uniwill-Control-Utility;component/Assets/Fonts/#Segoe Fluent Icons</FontFamily>
+
             <!-- Slider thumb: identical to WPF UI default, no margin change.
                  The track background in the Slider templates below is shortened by
                  4px on each end so the strip doesn't peek past the thumb at min/max. -->

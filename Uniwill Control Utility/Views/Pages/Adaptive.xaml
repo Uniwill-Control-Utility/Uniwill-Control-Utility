@@ -84,7 +84,7 @@
                                     IsExpanded="False"
                                     Margin="0,0,0,8">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE950;" FontSize="20" Margin="6,0,6,0" />
+                            <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE950;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -416,7 +416,7 @@
                                     IsExpanded="False"
                                     Margin="0,0,0,8">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF211;" FontSize="20" Margin="6,0,6,0" />
+                            <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xF211;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -633,7 +633,7 @@
                                      IsExpanded="False"
                                      Margin="0,0,0,8">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEB42;" FontSize="20" Margin="6,0,6,0" />
+                            <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xEB42;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -1215,7 +1215,7 @@
                                 <StackPanel Grid.Column="0">
                                     <StackPanel Orientation="Horizontal">
                                         <ui:TextBlock FontTypography="Body" Text="Fan Curve Mode" />
-                                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="16" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select Unified (single curve) or Split (separate CPU/GPU curves)." VerticalAlignment="Bottom" />
+                                        <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE946;" FontSize="16" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select Unified (single curve) or Split (separate CPU/GPU curves)." VerticalAlignment="Bottom" />
                                     </StackPanel>
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
@@ -1241,7 +1241,7 @@
                                     <StackPanel Grid.Column="0">
                                         <StackPanel Orientation="Horizontal">
                                             <ui:TextBlock FontTypography="Body" Text="Fan Curve Profile" />
-                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="16" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select a fan curve profile for this game." VerticalAlignment="Bottom" />
+                                            <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE946;" FontSize="16" Margin="6,0,0,-2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" ToolTip="Select a fan curve profile for this game." VerticalAlignment="Bottom" />
                                         </StackPanel>
                                         <ui:TextBlock Margin="0,2,0,0"
                                                        FontTypography="Caption"
@@ -1320,7 +1320,7 @@
                         Margin="0,0,0,8"
                         Expanded="sdKeyboard_Expanded">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE92E;" FontSize="20" Margin="6,0,6,0" />
+                            <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE92E;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -1567,7 +1567,7 @@
                                     IsExpanded="False"
                                     Margin="0,0,0,8">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xED39;" FontSize="20" Margin="6,0,6,0" />
+                            <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xED39;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -1775,7 +1775,7 @@
                     <TextBlock Text="Games/Apps:" VerticalAlignment="Center" FontSize="13" FontWeight="Medium" Margin="2,0,12,0"/>
                     <ComboBox Width="225" Name="cbxPowerPreset" SelectionChanged="cbxPowerPreset_SelectionChanged" Height="37" Margin="0,0,9,0"/>
                     <ui:Button Name="btnReloadApps" ToolTip="Updates dropdown list with games/apps" Click="btnReloadApps_Click">
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE777;" FontSize="16"/>
+                        <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE777;" FontSize="16"/>
                     </ui:Button>
                 </StackPanel>
 
@@ -1800,11 +1800,21 @@
                                ToolTip="Save current settings" 
                                Click="btnSave_Click" 
                                IsEnabled="False" 
-                               Margin="0,0,8,0"
-                               Icon="{ui:FontIcon FontFamily='Segoe Fluent Icons', Glyph='&#xE74E;', FontSize=16}"/>
+                               Margin="0,0,8,0">
+                        <ui:Button.Icon>
+                            <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}"
+                                         Glyph="&#xE74E;"
+                                         FontSize="16" />
+                        </ui:Button.Icon>
+                    </ui:Button>
                     <ui:Button Name="btnStart" Click="btnStart_Click" IsEnabled="False"
-                        ToolTip="Start Adaptive Mode"
-                        Icon="{ui:FontIcon FontFamily='Segoe Fluent Icons', Glyph='&#xE768;', FontSize=16}"/>
+                               ToolTip="Start Adaptive Mode">
+                        <ui:Button.Icon>
+                            <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}"
+                                         Glyph="&#xE768;"
+                                         FontSize="16" />
+                        </ui:Button.Icon>
+                    </ui:Button>
                 </StackPanel>
             </Grid>
         </ui:Card>

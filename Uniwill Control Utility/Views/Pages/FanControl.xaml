@@ -100,7 +100,7 @@
                                      Collapsed="UnifiedCard_Collapsed"
                                      Loaded="UnifiedCard_Loaded">
                         <ui:CardExpander.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEA3C;" FontSize="20" Margin="4,0,6,0"/>
+                                <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xEA3C;" FontSize="20" Margin="4,0,6,0"/>
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -171,7 +171,7 @@
                                      Visibility="Collapsed"
                                      IsExpanded="False">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C3;" FontSize="20" Margin="6,0,6,0" />
+                            <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE7C3;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                             <ui:CardExpander.Header>
                                 <Grid>
@@ -203,7 +203,7 @@
                                        Click="btnResetUnifiedTemps_Click"
                                        Padding="8">
                                 <StackPanel Orientation="Horizontal">
-                                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7A7;" Margin="4,0,12,0" />
+                                        <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE7A7;" Margin="4,0,12,0" />
                                     <TextBlock Text="Reset to Default" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </ui:Button>
@@ -307,7 +307,7 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <ui:FontIcon Grid.Column="0"
-                                                     FontFamily="Segoe Fluent Icons"
+                                                     FontFamily="{StaticResource SegoeFluentIconsFontFamily}"
                                                      Glyph="&#xEEA1;"
                                                      FontSize="20"
                                                      Margin="4,0,22,0"
@@ -356,7 +356,7 @@
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
                                                 <ui:FontIcon Grid.Column="0"
-                                                     FontFamily="Segoe Fluent Icons"
+                                                     FontFamily="{StaticResource SegoeFluentIconsFontFamily}"
                                                      Glyph="&#xF211;"
                                                      FontSize="20"
                                                      Margin="4,0,22,0"
@@ -396,7 +396,7 @@
                                          Header="Thermal Thresholds"
                                          IsExpanded="False">
                             <ui:CardExpander.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C3;" FontSize="20" Margin="6,0,6,0"/>
+                                <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE7C3;" FontSize="20" Margin="6,0,6,0"/>
                             </ui:CardExpander.Icon>
                             <StackPanel>
                                 <TextBlock FontSize="11"
@@ -436,7 +436,7 @@
                                                        Click="btnResetCpuTemps_Click"
                                                        Padding="8">
                                                 <StackPanel Orientation="Horizontal">
-                                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7A7;" Margin="0,0,12,0" />
+                                                            <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE7A7;" Margin="0,0,12,0" />
                                                     <TextBlock Text="Reset to Default" />
                                                 </StackPanel>
                                             </ui:Button>
@@ -466,7 +466,7 @@
                                                        Click="btnResetGpuTemps_Click"
                                                        Padding="8">
                                                         <StackPanel Orientation="Horizontal">
-                                                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7A7;" Margin="4,0,12,0" />
+                                                            <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE7A7;" Margin="4,0,12,0" />
                                                             <TextBlock Text="Reset to Default" VerticalAlignment="Center"/>
                                                         </StackPanel>
                                                     </ui:Button>
@@ -482,7 +482,7 @@
                     <ui:CardControl Margin="0,0,0,0"
                                     Background="{DynamicResource SystemFillColorCautionBackgroundBrush}">
                         <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xECAD;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xECAD;" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>
                         <ui:CardControl.Header>
                             <Grid>
@@ -514,7 +514,7 @@
                                 Margin="0,0,0,0"
                                 Visibility="Collapsed">
                     <ui:CardControl.Icon>
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BA;" FontSize="20" />
+                        <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE7BA;" FontSize="20" />
                     </ui:CardControl.Icon>
                     <ui:CardControl.Header>
                         <TextBlock Foreground="{DynamicResource TextFillColorSecondaryBrush}"
@@ -542,7 +542,7 @@
                         CornerRadius="4"
                         VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;"
+                        <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE946;"
                                      Margin="0,0,12,0"
                                      VerticalAlignment="Center" />
                         <TextBlock x:Name="StatusText"
@@ -564,7 +564,7 @@
                            Click="btnResetFanState_Click"
                            ToolTip="Force fans to 100% and reset the EC fan controller. Use if fans are stuck or behaving erratically.">
                     <StackPanel Orientation="Horizontal">
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7A7;" Margin="0,0,12,0" />
+                            <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE7A7;" Margin="0,0,12,0" />
                         <TextBlock Text="Reset Fan State" />
                     </StackPanel>
                 </ui:Button>
@@ -574,7 +574,7 @@
                            Click="btnRestore_Click"
                            ToolTip="Undo all custom fan curves and let the system manage fan speeds automatically.">
                     <StackPanel Orientation="Horizontal">
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE777;" Margin="0,0,12,0" />
+                        <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE777;" Margin="0,0,12,0" />
                         <TextBlock Text="Restore Auto" />
                     </StackPanel>
                 </ui:Button>

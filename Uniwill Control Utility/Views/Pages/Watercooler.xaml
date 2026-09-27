@@ -133,7 +133,7 @@
 
                             <!-- Connected state -->
                             <StackPanel x:Name="spConnectedState" Visibility="Collapsed">
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}"
                                                  Glyph="&#xE73E;"
                                                  FontSize="24"
                                                  Foreground="Green"
@@ -152,7 +152,7 @@
 
                             <!-- Disconnected state -->
                             <StackPanel x:Name="spDisconnectedState">
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}"
                                                  Glyph="&#xE711;"
                                                  FontSize="24"
                                                  Foreground="Red"
@@ -394,7 +394,7 @@
                         <!-- Pump Control -->
                         <ui:CardControl x:Name="PumpVoltageCard" Margin="0,0,0,8">
                             <ui:CardControl.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE945;" FontSize="20" Margin="4,0,6,0" />
+                                <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE945;" FontSize="20" Margin="4,0,6,0" />
                             </ui:CardControl.Icon>
                             <ui:CardControl.Header>
                                 <StackPanel>
@@ -453,7 +453,7 @@
                                      Margin="0,0,0,8"
                                      IsExpanded="False">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <Grid>
@@ -536,7 +536,7 @@
                     <!-- Auto-Connect -->
                     <ui:CardControl Margin="0,0,0,8">
                         <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE777;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="{StaticResource SegoeFluentIconsFontFamily}" Glyph="&#xE777;" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>
                         <ui:CardControl.Header>
                             <StackPanel>
@@ -639,7 +639,7 @@
                         <StackPanel Orientation="Horizontal">
                             <ui:FontIcon 
                                 x:Name="StandbyIcon" 
-                                FontFamily="Segoe Fluent Icons" 
+                                FontFamily="{StaticResource SegoeFluentIconsFontFamily}"
                                 Glyph="&#xE769;" 
                                 Margin="0,1,12,0" 
                                 VerticalAlignment="Center" 

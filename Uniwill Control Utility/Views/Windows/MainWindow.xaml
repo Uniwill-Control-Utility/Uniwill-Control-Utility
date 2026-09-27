@@ -91,7 +91,7 @@ VerticalAlignment="Center"/>
                      Visibility="Collapsed">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <ui:FontIcon Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                               FontFamily="Segoe Fluent Icons"
+                               FontFamily="{StaticResource SegoeFluentIconsFontFamily}"
                                FontSize="16"
                                Glyph="&#xE7F8;"
                                Margin="4,0,8,0"

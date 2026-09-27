@@ -190,7 +190,7 @@ namespace Uniwill_Control_Utility.ViewModels
         private void createNavItem(String title, String tag, String iconGlyph, Type pageType, Boolean isFooterItem)
         {
             var navItem = CreateNavigationItem(title, tag, SymbolRegular.Empty, pageType);
-            navItem.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = iconGlyph, FontSize = 20 };
+            navItem.Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = Uniwill_Control_Utility.Scripts.AppFonts.SegoeFluentIcons, Glyph = iconGlyph, FontSize = 20 };
             if (isFooterItem)
             {
                 NavigationFooter.Add(navItem);
