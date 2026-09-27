@@ -121,6 +121,23 @@ public sealed class StaleWhileRevalidateCacheTests
         Assert.Equal(2, cache.Read());
     }
 
+    [Fact]
+    public async Task Immediately_completed_refresh_can_be_invalidated_and_restarted()
+    {
+        int refreshCount = 0;
+        using var cache = new StaleWhileRevalidateCache<int>(
+            initialValue: 0,
+            maxAge: TimeSpan.FromMinutes(1),
+            refresh: _ => Task.FromResult(Interlocked.Increment(ref refreshCount)));
+
+        for (int expected = 1; expected <= 100; expected++)
+        {
+            cache.Invalidate();
+            await cache.RefreshAsync();
+            Assert.Equal(expected, cache.Read());
+        }
+    }
+
     private sealed class ManualTimeProvider : TimeProvider
     {
         private DateTimeOffset _utcNow;

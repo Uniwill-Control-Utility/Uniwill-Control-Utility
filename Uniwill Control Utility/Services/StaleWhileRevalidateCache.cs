@@ -61,7 +61,14 @@ namespace Uniwill_Control_Utility.Services
                 if (_timeProvider.GetUtcNow() - entry.RefreshedAt < _maxAge)
                     return Task.CompletedTask;
 
-                return _refreshTask = RunRefreshAsync();
+                Task refreshTask = RunRefreshAsync();
+                _refreshTask = refreshTask;
+                _ = refreshTask.ContinueWith(
+                    completedTask => ClearRefresh(completedTask),
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+                return refreshTask;
             }
         }
 
@@ -104,11 +111,16 @@ namespace Uniwill_Control_Utility.Services
             }
             catch (Exception ex)
             {
-                _onRefreshError?.Invoke(ex);
+                try { _onRefreshError?.Invoke(ex); }
+                catch { /* A diagnostic callback must not fault the refresh task. */ }
             }
-            finally
+        }
+
+        private void ClearRefresh(Task completedTask)
+        {
+            lock (_refreshSync)
             {
-                lock (_refreshSync)
+                if (ReferenceEquals(_refreshTask, completedTask))
                     _refreshTask = null;
             }
         }
