@@ -2,7 +2,7 @@
 
 ## Product purpose
 
-UCU is a hardware-control and telemetry application focused on Uniwill/Tongfang laptop platforms. It is intended to replace or supplement OEM control-center software while exposing a common interface for performance profiles, cooling, lighting, battery behavior, peripherals, and game-aware automation.
+UCU is a hardware-control and telemetry application focused on Uniwill/Tongfang laptop platforms. The implemented surfaces expose performance profiles, cooling, lighting, battery behavior, peripherals, telemetry, and game-aware automation.
 
 The current product is a single Windows desktop process. It owns the UI, background monitoring loops, profile state, hardware sessions, persistence, update checks, and notification-area controls.
 
@@ -53,11 +53,10 @@ There are no separate class-library, integration-test, unit-test, installer, or 
 
 ## External context
 
-The README credits UXTU, G-Helper, WPF UI, Magpie, ADLX wrappers, THRM, watercooler-manager, UCC, tuxedo-drivers, LenovoLegionToolkit, MechControl, and XMG Control Center research. The codebase therefore combines original work, inherited UXTU design, documented open protocols, and behavior derived from interoperability research.
+Source comments and protocol documents reference UXTU, PawnIO/ZenStates, THRM, watercooler-manager, UCC, tuxedo-drivers, MechControl, XMG Control Center, NVAPI/NVML, LibreHardwareMonitor, and RTSS. These references explain implementation lineage; they are not evidence that every referenced device path has been exercised in the current revision.
 
 ## Repository identity transition
 
 The clone origin is the `Uniwill-Control-Utility/Uniwill-Control-Utility` organization repository. Some runtime and README links still point to `jgudec/Uniwill-Control-Utility`, including update checks and release links. Release ownership must be decided before publication or reliance on automatic update discovery.
 
 [Back to documentation index](../README.md)
-
