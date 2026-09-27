@@ -159,5 +159,6 @@ A release candidate is qualified only when:
 - Upgrade and in-app update paths succeed from the previous release.
 - Results are attached to the release commit.
 
-[Back to documentation index](../README.md)
+The data-validation stage is immediately actionable: the current `zh-CN.json` fails parsing at line 389, while the other catalogues parse. CI should prevent another invalid embedded catalogue from reaching a release branch.
 
+[Back to documentation index](../README.md)

@@ -26,6 +26,7 @@ This verdict is narrower than “the application does not work.” The code cont
 | Maintainability | 36 files over 500 lines; 18 over 1,000; large code-behind and service classes | Review and regression scope is concentrated. |
 | Error observability | Serilog file/console logging and diagnostic levels exist | Core observability exists, but many hardware fallbacks suppress or only debug-log exceptions. |
 | Data evolution | Multiple explicit migrations and versioned backup format | Compatibility work exists; stores remain fragmented. |
+| Localization data | 21 catalogues parse; `zh-CN.json` has an orphan key at line 389 and fails JSON parsing | Selecting Simplified Chinese can fail catalogue loading during startup/culture change. |
 
 ## Implemented capability versus verified capability
 
@@ -99,6 +100,10 @@ Broad catches are common in hardware/discovery code to keep unsupported systems 
 
 State spans `.NET user.config`, roaming JSON, local JSON, and application-directory JSON. Backup/import covers most but not all transient/legacy behavior. Application-directory writes and logs also make deployment layout part of runtime behavior.
 
+### One embedded localization catalogue is invalid
+
+Static parsing found that `Localization/zh-CN.json` line 389 contains a string key without a colon/value, immediately followed by the complete key/value entry on line 390. `LocalizationService.LoadCatalogue` calls `System.Text.Json.JsonSerializer.Deserialize` without handling a catalogue parse failure. English and the other 20 non-Chinese catalogues parsed successfully in this assessment. This is a confirmed source defect, not a readiness inference.
+
 ## Actual maturity by subsystem
 
 | Subsystem | Code status | Repository-verifiable maturity |
@@ -124,8 +129,8 @@ State spans `.NET user.config`, roaming JSON, local JSON, and application-direct
 6. Cold start, second instance, AC/DC, sleep/resume, reconnect, Adaptive ownership, and exit soak runs.
 7. Update test from the previous released version using the actual GitHub owner and asset.
 8. Triage of build warnings and high-value swallowed-error paths.
+9. Correct `zh-CN.json` and make catalogue validation a build gate.
 
 Until these exist, describe features as **implemented in code** or **observed on a named run**, not simply “supported.”
 
 [Back to documentation index](../README.md)
-

@@ -60,6 +60,8 @@ For a useful incident report, capture:
 
 Check the VC++ runtime prompt and registry detection. Confirm all extracted DLLs remain beside the executable. Review the log for host-composition or native-library load errors.
 
+If the saved language is `zh-CN`, the current source catalogue contains invalid JSON at line 389. Catalogue loading occurs before the normal startup logging/exception setup, so this can prevent normal initialization. Reset the saved language to a valid catalogue or correct the JSON in a development build.
+
 ### A second launch does nothing visible
 
 The first instance should receive `UniwillControlUtility.Show`. Check whether an existing process is hidden in the notification area. If the process is present but cannot surface, collect its log before terminating it.

@@ -153,6 +153,7 @@ flowchart LR
 - [Startup and lifecycle](startup-and-lifecycle.md)
 - [Preset and Adaptive Mode pipelines](preset-and-adaptive-pipelines.md)
 - [Hardware integration](hardware-integration.md)
+- [Dependency inventory](dependency-inventory.md)
+- [Background processing](background-processing.md)
 - [Configuration and data](../operations/configuration-and-data.md)
 - [Codebase map](codebase-map.md)
-

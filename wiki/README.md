@@ -23,6 +23,8 @@ Statements labelled **Current state** describe observed code and repository cont
 - [Startup and lifecycle](architecture/startup-and-lifecycle.md)
 - [Preset and Adaptive Mode pipelines](architecture/preset-and-adaptive-pipelines.md)
 - [Hardware integration](architecture/hardware-integration.md)
+- [Dependency inventory](architecture/dependency-inventory.md)
+- [Background processing](architecture/background-processing.md)
 
 ### Engineering and operations
 
@@ -83,4 +85,3 @@ flowchart LR
 - Code: https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility
 - License: https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility/blob/master/LICENSE
 - Main README: https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility/blob/master/README.md
-
