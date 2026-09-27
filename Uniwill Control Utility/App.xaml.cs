@@ -56,7 +56,7 @@ namespace Uniwill_Control_Utility
             return _host?.Services.GetService(typeof(T)) as T;
         }
 
-        internal static readonly string version = "0.9.4.1";
+        internal static readonly string version = "0.9.4.2";
         private Mutex? mutex;
         private const string MutexName = "UniwillControlUtility";
 
@@ -498,8 +498,10 @@ namespace Uniwill_Control_Utility
         {
             // Wait for the Bluetooth stack to stabilize after cold boot.
             // On restart, BLE devices may not be reachable immediately — the radio
-            // needs time to power on and start advertising.
-            await Task.Delay(2000);
+            // needs time to power on and start advertising. The watercooler's
+            // TryAutoConnectAsync also runs a BLE scan and retries, so this
+            // initial delay gives the system time before discovery begins.
+            await Task.Delay(3000);
 
             // Auto-connect watercooler on startup if enabled
             try
