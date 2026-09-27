@@ -59,34 +59,51 @@
             </ui:TitleBar.Icon>
 
             <ui:TitleBar.Header>
-                <TextBlock x:Name="ModelNameText"
-                   FontSize="11"
-                   FontWeight="Bold"
-                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                   VerticalAlignment="Center"
-                   Margin="4,0,0,0"
-                   Text="Uniwill Control Utility" />
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="ModelNameText"
+        FontSize="11"
+        FontWeight="Bold"
+        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+        VerticalAlignment="Center"
+        Margin="4,0,0,0"
+        Text="Uniwill Control Utility" />
+                    <!-- Version card -->
+                    <ui:Card x:Name="VersionCard"
+          Margin="4,4,0,4"
+          Padding="8,4,8,4">
+                        <TextBlock x:Name="VersionText"
+FontSize="12"
+FontWeight="SemiBold"
+Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+VerticalAlignment="Center"/>
+                    </ui:Card>
+                </StackPanel>
             </ui:TitleBar.Header>
 
             <ui:TitleBar.TrailingContent>
-                <ui:Card x:Name="LaptopNameCard"
-                 Margin="4,4,4,4"
-                 Padding="4,4,8,4"
-                 Visibility="Collapsed">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <ui:FontIcon Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                           FontFamily="Segoe Fluent Icons"
-                           FontSize="16"
-                           Glyph="&#xE7F8;"
-                           Margin="4,0,8,0"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock x:Name="LaptopNameText"
-                           FontSize="12"
-                           FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                           VerticalAlignment="Center"/>
-                    </StackPanel>
-                </ui:Card>
+                <StackPanel Orientation="Horizontal">
+                    
+
+                    <!-- Laptop name card -->
+                    <ui:Card x:Name="LaptopNameCard"
+                     Margin="4,4,4,4"
+                     Padding="4,4,8,4"
+                     Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:FontIcon Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               FontFamily="Segoe Fluent Icons"
+                               FontSize="16"
+                               Glyph="&#xE7F8;"
+                               Margin="4,0,8,0"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock x:Name="LaptopNameText"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ui:Card>
+                </StackPanel>
             </ui:TitleBar.TrailingContent>
         </ui:TitleBar>
 

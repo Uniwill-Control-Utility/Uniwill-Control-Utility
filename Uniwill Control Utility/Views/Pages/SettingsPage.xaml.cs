@@ -124,11 +124,67 @@ namespace Uniwill_Control_Utility.Views.Pages
             _deviceProducer = GetSystemInfo.Manufacturer;
         }
 
+        private static string? GetNvidiaGpuName()
+        {
+            var gpuName = Family.GPUName;
+            if (string.IsNullOrEmpty(gpuName))
+                return null;
+
+            // Family.GPUName may contain multiple GPUs separated by " / "
+            // Filter to only the NVIDIA GPU
+            foreach (var part in gpuName.Split(new[] { " / " }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var trimmed = part.Trim();
+                if (trimmed.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.Contains("GeForce", StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.Contains("RTX", StringComparison.OrdinalIgnoreCase))
+                {
+                    return trimmed;
+                }
+            }
+
+            return null;
+        }
+
+        private void BtnOpenDrivers_Click(object sender, RoutedEventArgs e)
+        {
+            var url = LaptopDetector.GetDriverUrl();
+            if (url != null)
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+        }
+
         private void applyDeviceInfo()
         {
-            tbDeviceName.Text = _deviceName;
-            tbDeviceModel.Text = _deviceModel;
-            tbDeviceProducer.Text = _deviceProducer;
+            // System Identity card
+            var model = LaptopDetector.Detected;
+
+            tbDisplayName.Text = model?.DisplayName ?? "Unknown";
+            tbManufacturer.Text = model?.SystemManufacturer ?? _deviceProducer ?? "Unknown";
+            tbBaseboardProduct.Text = string.IsNullOrWhiteSpace(CachedSystemInfo.BaseboardProduct) ? "Unknown" : CachedSystemInfo.BaseboardProduct;
+            tbSystemSku.Text = string.IsNullOrWhiteSpace(LaptopDetector.SystemSkuNumber) ? "N/A" : LaptopDetector.SystemSkuNumber;
+            tbCpuName.Text = _cpuName;
+            tbGpuName.Text = GetNvidiaGpuName() ?? "N/A";
+
+            // RAM fields
+            if (_ramSlots > 0)
+            {
+                tbRamManufacturer.Text = _ramProducer;
+                tbRamCapacity.Text = $"{_ramCapacity:0.##} GB";
+                tbRamSpeed.Text = $"{_ramSpeed} MT/s";
+                tbRamModel.Text = _ramModel.Replace(" ", string.Empty);
+            }
+            else
+            {
+                tbRamManufacturer.Text = "N/A";
+                tbRamCapacity.Text = "N/A";
+                tbRamSpeed.Text = "N/A";
+                tbRamModel.Text = "N/A";
+            }
+
+            // Drivers card visibility
+            CardDrivers.Visibility = LaptopDetector.HasDriverPage ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void getCPUInfoSync()
@@ -170,35 +226,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private void applyCPUInfo()
-        {
-            tbProcessor.Text = _cpuName;
-            tbCaption.Text = _cpuDescription;
-
-            if (_cpuCodeName != "")
-            {
-                tbCodename.Text = _cpuCodeName;
-            }
-            else
-            {
-                CodenameRow.Visibility = Visibility.Collapsed;
-                CodenameDivider.Visibility = Visibility.Collapsed;
-            }
-
-            tbProducer.Text = _cpuManufacturer;
-            if (_cpuLogicalProcessors == _cpuCores)
-                tbCores.Text = _cpuCores.ToString();
-            else
-                tbCores.Text = GetSystemInfo.getBigLITTLE(_cpuCores, _cpuL2Size);
-            tbThreads.Text = _cpuLogicalProcessors.ToString();
-            tbL3Cache.Text = $"{_cpuL3Size.ToString("0.##")} MB";
-            tbL1Cache.Text = $"{_cpuL1Cache.ToString("0.##")} MB";
-            tbL2Cache.Text = $"{_cpuL2Cache.ToString("0.##")} MB";
-            tbBaseClock.Text = $"{_cpuBaseClock} MHz";
-            tbInstructions.Text = _cpuInstructions;
-            sdCPU.Visibility = Visibility.Visible;
-        }
-
         private void getRAMInfoSync()
         {
             try
@@ -234,35 +261,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                     // Non-critical: the page renders fine without RAM details.
                     _logger.LogDebug(ex, "Failed to query RAM info via WMI");
                 }
-        }
-
-        private void applyRAMInfo()
-        {
-            if (_ramSlots <= 0)
-            {
-                // No RAM modules detected; hide the expander instead of showing partial data.
-                sdRAM.Visibility = Visibility.Collapsed;
-                return;
-            }
-
-            string DDRType = _ramType switch
-            {
-                20 => "DDR",
-                21 => "DDR2",
-                24 => "DDR3",
-                26 => "DDR4",
-                30 => "LPDDR4",
-                34 => "DDR5",
-                35 => "LPDDR5",
-                _ => $"Unknown ({_ramType})"
-            };
-
-            tbRAM.Text = $"{_ramCapacity} GB {DDRType} @ {_ramSpeed} MT/s";
-            tbRAMProducer.Text = _ramProducer;
-            tbRAMModel.Text = _ramModel.Replace(" ", string.Empty);
-            tbWidth.Text = $"{_ramWidth} bit";
-            tbSlots.Text = $"{_ramSlots} * {_ramWidth / _ramSlots} bit";
-            sdRAM.Visibility = Visibility.Visible;
         }
 
         #endregion
@@ -564,10 +562,6 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async System.Threading.Tasks.Task LoadSystemInfoAsync()
         {
-            // Hide expanders immediately so the page renders clean
-            sdCPU.Visibility = Visibility.Collapsed;
-            sdRAM.Visibility = Visibility.Collapsed;
-
             // Load from pre-fetched cache populated at app startup.
             // If the cache isn't ready yet (startup still running), wait with retries
             // before falling back to a live WMI query.
@@ -603,8 +597,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             await this.Dispatcher.InvokeAsync(() =>
             {
                 applyDeviceInfo();
-                applyCPUInfo();
-                applyRAMInfo();
             });
         }
 

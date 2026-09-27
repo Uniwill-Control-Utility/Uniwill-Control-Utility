@@ -1,0 +1,553 @@
+<Page x:Class="Uniwill_Control_Utility.Views.Pages.AboutPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:Uniwill_Control_Utility.Views.Pages"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="About"
+      d:DataContext="{d:DesignInstance local:AboutPage, IsDesignTimeCreatable=False}"
+      d:DesignHeight="850"
+      d:DesignWidth="800"
+      d:Background="{DynamicResource ApplicationBackgroundBrush}"
+      Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+      ScrollViewer.CanContentScroll="False"
+      mc:Ignorable="d"
+      SnapsToDevicePixels="True"
+      UseLayoutRounding="True">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Row 0: Scrollable content -->
+        <ScrollViewer Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      CanContentScroll="False"
+                      PanningMode="VerticalOnly"
+                      IsDeferredScrollingEnabled="False">
+            <ScrollViewer.Style>
+                <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource {x:Type ScrollViewer}}">
+                    <Setter Property="Padding" Value="0" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ComputedVerticalScrollBarVisibility, RelativeSource={RelativeSource Self}}"
+                                     Value="Visible">
+                            <Setter Property="Padding" Value="0,0,8,0" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </ScrollViewer.Style>
+
+            <Grid MaxWidth="1080" HorizontalAlignment="Stretch">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Page title block -->
+                <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,16,0,0">
+                    <TextBlock FontSize="26"
+                               FontWeight="Medium"
+                               Margin="12,0,16,0"
+                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                               Text="About" />
+                    <TextBlock Margin="12,8,16,12"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="Application info, third-party libraries, and supporting resources"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+
+                <!-- Content cards -->
+                <StackPanel Grid.Row="1" Margin="12,16,16,18">
+
+                    <!-- App info card -->
+                    <ui:Card Margin="0,0,0,8" Padding="16">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!-- App icon -->
+                            <ui:ImageIcon Grid.Column="0"
+                                          Grid.Row="0"
+                                          Grid.RowSpan="2"
+                                          Source="pack://application:,,,/Assets/applicationIcon-256.png"
+                                          Width="48"
+                                          Height="48"
+                                          Margin="0,0,16,0"
+                                          VerticalAlignment="Center"
+                                          RenderOptions.BitmapScalingMode="HighQuality" />
+
+                            <!-- App name, version, copyright -->
+                            <StackPanel Grid.Column="1" Grid.Row="0" VerticalAlignment="Center" Grid.RowSpan="2" Margin="0,0,0,0">
+                                <TextBlock x:Name="tbAppName"
+                                           FontSize="16"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                           Text="Uniwill Control Utility" />
+                                <TextBlock x:Name="tbVersion"
+                                           Margin="0,4,0,0"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBlock x:Name="tbCopyright"
+                                           Margin="0,2,0,0"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                            </StackPanel>
+
+                            <!-- App name, version, copyright -->
+                            <StackPanel Grid.Column="2" 
+                                        Grid.Row="0" 
+                                        VerticalAlignment="Center" 
+                                        Grid.RowSpan="2" 
+                                        Margin="0,0,0,0" 
+                                        Orientation="Horizontal">
+                                <TextBlock x:Name="tbDonate"
+                                   Margin="0,0,16,0"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text=""
+                                           VerticalAlignment="Center"
+                                           />
+                                <ui:HyperlinkButton
+                                    Grid.Column="0"
+                                    Content="Want to support the project?"
+                                    NavigateUri="https://www.paypal.com/paypalme/Gudec" >
+                                    <ui:HyperlinkButton.Icon>
+                                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEB51;" FontSize="12" Margin="4,0,4,0" />
+                                    </ui:HyperlinkButton.Icon>
+                                </ui:HyperlinkButton>
+                                
+                            </StackPanel>
+                        </Grid>
+                    </ui:Card>
+
+                    <!-- Links -->
+                    <ui:CardExpander Margin="0,0,0,8"
+                                     IsExpanded="True">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE721;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Links" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Project pages, documentation, and community" />
+                            </StackPanel>
+                        </ui:CardExpander.Header>
+
+                        <StackPanel>
+                            <!-- GitHub Repository -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="GitHub Repository" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Source code, issues, and project documentation" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1"
+                                           Content="Open"
+                                           VerticalAlignment="Center"
+                                           Click="OpenLink_Click"
+                                           Tag="https://github.com/jgudec/UCU" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+
+                            <!-- GitHub Releases -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Latest Release" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Download the latest version and release notes" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1"
+                                           Content="Open"
+                                           VerticalAlignment="Center"
+                                           Click="OpenLink_Click"
+                                           Tag="https://github.com/jgudec/UCU/releases/latest" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultBrush}" Visibility="Collapsed"/>
+
+                            <!-- Discord -->
+                            <Grid Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Discord Server" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Community discussions, support, and announcements" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1"
+                                           Content="Join"
+                                           VerticalAlignment="Center"
+                                           Click="OpenLink_Click"
+                                           Tag="https://discord.gg/universal-control-utility-1147364244419310526" />
+                            </Grid>
+                        </StackPanel>
+                    </ui:CardExpander>
+
+                    <!-- Third-party libraries -->
+                    <ui:CardExpander Margin="0,0,0,8"
+                                     IsExpanded="False">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8F1;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Third-party libraries" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Open-source projects used in this application" />
+                            </StackPanel>
+                        </ui:CardExpander.Header>
+
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="CommunityToolkit.Mvvm" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="MVVM helpers, observables, and source generators" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1"
+                                           Content="View"
+                                           VerticalAlignment="Center"
+                                           Click="OpenLink_Click"
+                                           Tag="https://github.com/CommunityToolkit/dotnet" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="WPF-UI" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Fluent Design UI controls for WPF" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1"
+                                           Content="View"
+                                           VerticalAlignment="Center"
+                                           Click="OpenLink_Click"
+                                           Tag="https://github.com/lepoco/wpfui" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="LibreHardwareMonitorLib" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Hardware sensor monitoring library" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1"
+                                           Content="View"
+                                           VerticalAlignment="Center"
+                                           Click="OpenLink_Click"
+                                           Tag="https://github.com/LibreHardwareMonitor/LibreHardwareMonitor" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="LLT.NvAPIWrapper.Net" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="NVIDIA NvAPI wrapper for GPU control" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1"
+                                           Content="View"
+                                           VerticalAlignment="Center"
+                                           Click="OpenLink_Click"
+                                           Tag="https://github.com/LenovoLegionToolkit-Team/NvAPIWrapper.Net" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Octokit" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="GitHub API client library" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1"
+                                           Content="View"
+                                           VerticalAlignment="Center"
+                                           Click="OpenLink_Click"
+                                           Tag="https://github.com/octokit/octokit.net" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Newtonsoft.Json" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Popular JSON serialization library" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1"
+                                           Content="View"
+                                           VerticalAlignment="Center"
+                                           Click="OpenLink_Click"
+                                           Tag="https://github.com/JamesNK/Newtonsoft.Json" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="TaskScheduler" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Windows Task Scheduler managed wrapper" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1"
+                                           Content="View"
+                                           VerticalAlignment="Center"
+                                           Click="OpenLink_Click"
+                                           Tag="https://github.com/dahall/TaskScheduler" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="hidlibrary" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Human Interface Device library for USB device communication" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1"
+                                           Content="View"
+                                           VerticalAlignment="Center"
+                                           Click="OpenLink_Click"
+                                           Tag="https://github.com/mikepierce/hidlibrary" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="MahApps.Metro.IconPacks" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Icon packs for WPF applications" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1"
+                                           Content="View"
+                                           VerticalAlignment="Center"
+                                           Click="OpenLink_Click"
+                                           Tag="https://github.com/MahApps/MahApps.Metro.IconPacks" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Serilog" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Structured logging library" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1"
+                                           Content="View"
+                                           VerticalAlignment="Center"
+                                           Click="OpenLink_Click"
+                                           Tag="https://github.com/serilog/serilog" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="PixiEditor.ColorPicker" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Color picker control for WPF" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1"
+                                           Content="View"
+                                           VerticalAlignment="Center"
+                                           Click="OpenLink_Click"
+                                           Tag="https://github.com/PixiEditor/ColorPicker" />
+                            </Grid>
+                        </StackPanel>
+                    </ui:CardExpander>
+
+                    <!-- Application folders -->
+                    <ui:CardExpander Margin="0,0,0,8"
+                                     IsExpanded="False">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8B7;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Application folders" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Open the folders used by this application" />
+                            </StackPanel>
+                        </ui:CardExpander.Header>
+
+                        <StackPanel>
+                            <!-- App Data folder -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="App Data" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Settings and persistent application data" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1"
+                                           Content="Open"
+                                           VerticalAlignment="Center"
+                                           Click="OpenAppDataFolder_Click" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+
+                            <!-- Logs folder -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Logs" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Application log files for diagnostics" />
+                                </StackPanel>
+                                <ui:Button Grid.Column="1"
+                                           Content="Open"
+                                           VerticalAlignment="Center"
+                                           Click="OpenLogFolder_Click" />
+                            </Grid>
+                        </StackPanel>
+                    </ui:CardExpander>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</Page>

@@ -11,6 +11,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         public static string DeviceName = "";
         public static string DeviceModel = "";
         public static string DeviceProducer = "";
+        public static string BaseboardProduct = "";
 
         // CPU info
         public static string CpuName = "";

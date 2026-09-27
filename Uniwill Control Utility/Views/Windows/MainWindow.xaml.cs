@@ -15,6 +15,7 @@ using System.Linq;
 using System.Management;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -192,6 +193,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             bool isDashboard = IsPageSelected(typeof(Views.Pages.DashboardPage));
             Visibility visibility = isDashboard ? Visibility.Collapsed : Visibility.Visible;
             ModelNameText.Visibility = visibility;
+            VersionCard.Visibility = visibility;
             LaptopNameCard.Visibility = visibility;
         }
 
@@ -199,6 +201,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             ModelNameText.Text = "Uniwill Control Utility";
             LaptopNameText.Text = LaptopDetector.GetDisplayName().ToUpperInvariant();
+            VersionText.Text = GetVersionString();
 
             tbMain.Title = "Uniwill Control Utility";
 
@@ -206,6 +209,12 @@ namespace Uniwill_Control_Utility.Views.Windows
             Models.CustomPresetStore.MigrateLegacyFile();
 
              Wpf.Ui.Appearance.SystemThemeWatcher.Watch(this, WindowBackdropType.Mica, true);
+        }
+
+        private static string GetVersionString()
+        {
+            var version = Assembly.GetEntryAssembly()?.GetName().Version;
+            return version != null ? $"v{version}" : string.Empty;
         }
 
         private async void ApplyOnStart()

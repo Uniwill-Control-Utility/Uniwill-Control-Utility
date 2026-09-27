@@ -69,7 +69,7 @@ namespace Uniwill_Control_Utility.ViewModels
             // Flydigi cooler in footer (hidden if user has disabled it in Settings)
             if (Settings.Default.EnableFlydigi)
             {
-                NavigationFooter.Add(CreateFlydigiNavItem());
+                NavigationItems.Add(CreateFlydigiNavItem());
             }
 
             // Fan Control, Keyboard, Light Bar, Battery in nav for Uniwill EC hardware (XMG / TUXEDO).
@@ -89,6 +89,9 @@ namespace Uniwill_Control_Utility.ViewModels
             createNavItem("Overlay", "overlay", "\uE81E", typeof(Views.Pages.OverlaySettingsPage), false);
 
             createNavItem("Auto", "auto", "\uF277", typeof(Views.Pages.Automations), false);
+
+            // About in footer, above Settings
+            createNavItem("About", "about", "\uE946", typeof(Views.Pages.AboutPage), true);
 
             // Settings at the bottom of footer
             createNavItem("Settings", "settings", "\uE713", typeof(Views.Pages.SettingsPage), true);

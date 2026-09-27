@@ -654,8 +654,30 @@
                                Text="Review detailed device, processor, memory and battery information"
                                TextWrapping="Wrap" />
 
+                    <!-- Drivers card (conditionally visible for XMG / PCSpecialist) -->
+                    <ui:CardControl x:Name="CardDrivers"
+                                    Margin="0,12,0,8"
+                                    Visibility="Collapsed">
+                        <ui:CardControl.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEC7A;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardControl.Icon>
+                        <ui:CardControl.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Official Driver Download Page" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Open the manufacturer's driver download page for your laptop model" />
+                            </StackPanel>
+                        </ui:CardControl.Header>
+                        <ui:Button x:Name="btnOpenDrivers"
+                                   Content="Open"
+                                   Click="BtnOpenDrivers_Click" />
+                    </ui:CardControl>
+
+                    <!-- System Identity card -->
                     <ui:CardExpander x:Name="sdWindows"
-                                     Margin="0,12,0,0"
+                                     Margin="0,0,0,0"
                                      IsEnabled="True"
                                      IsExpanded="False">
                         <ui:CardExpander.Icon>
@@ -663,29 +685,29 @@
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>
-                                <ui:TextBlock FontTypography="Body" Text="Laptop Information" />
+                                <ui:TextBlock FontTypography="Body" Text="System Identity" />
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="System name, manufacturer, and model" />
+                                               Text="Laptop model, hardware identifiers, CPU, GPU, and memory details" />
                             </StackPanel>
                         </ui:CardExpander.Header>
 
                         <StackPanel>
-                            <!-- Name -->
+                            <!-- Display Name -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Name" />
+                                    <ui:TextBlock FontTypography="Body" Text="Display Name" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Computer name on the network" />
+                                                   Text="Detected laptop model name" />
                                 </StackPanel>
-                                <TextBlock x:Name="tbDeviceName"
+                                <TextBlock x:Name="tbDisplayName"
                                            Grid.Column="1"
                                            VerticalAlignment="Center"
                                            FontSize="13"
@@ -697,20 +719,20 @@
                             <Border Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                            <!-- Producer -->
+                            <!-- Manufacturer -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Producer" />
+                                    <ui:TextBlock FontTypography="Body" Text="Manufacturer" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Hardware manufacturer" />
+                                                   Text="System manufacturer from WMI" />
                                 </StackPanel>
-                                <TextBlock x:Name="tbDeviceProducer"
+                                <TextBlock x:Name="tbManufacturer"
                                            Grid.Column="1"
                                            VerticalAlignment="Center"
                                            FontSize="13"
@@ -722,61 +744,70 @@
                             <Border Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                            <!-- Model -->
+                            <!-- Baseboard Product -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Model" />
+                                    <ui:TextBlock FontTypography="Body" Text="Baseboard Product" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Device model identifier" />
+                                                   Text="Baseboard product identifier from WMI" />
                                 </StackPanel>
-                                <TextBlock x:Name="tbDeviceModel"
+                                <TextBlock x:Name="tbBaseboardProduct"
                                            Grid.Column="1"
                                            VerticalAlignment="Center"
                                            FontSize="13"
                                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                            TextWrapping="Wrap" />
                             </Grid>
-                        </StackPanel>
-                    </ui:CardExpander>
 
-                    <ui:CardExpander x:Name="sdCPU"
-                                     Margin="0,8,0,0"
-                                     IsEnabled="True"
-                                     IsExpanded="False">
-                        <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEEA1;" FontSize="20" Margin="4,0,6,0" />
-                        </ui:CardExpander.Icon>
-                        <ui:CardExpander.Header>
-                            <StackPanel>
-                                <ui:TextBlock FontTypography="Body" Text="Processor Information" />
-                                <ui:TextBlock Margin="0,2,0,0"
-                                               FontTypography="Caption"
-                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="CPU specifications and capabilities" />
-                            </StackPanel>
-                        </ui:CardExpander.Header>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                        <StackPanel>
-                            <!-- Processor -->
+                            <!-- System SKU -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Processor" />
+                                    <ui:TextBlock FontTypography="Body" Text="System SKU" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="System SKU number from WMI" />
+                                </StackPanel>
+                                <TextBlock x:Name="tbSystemSku"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- CPU -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="CPU" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                    Text="Processor name" />
                                 </StackPanel>
-                                <TextBlock x:Name="tbProcessor"
+                                <TextBlock x:Name="tbCpuName"
                                            Grid.Column="1"
                                            VerticalAlignment="Center"
                                            FontSize="13"
@@ -788,46 +819,20 @@
                             <Border Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                            <!-- Producer -->
+                            <!-- GPU -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Producer" />
+                                    <ui:TextBlock FontTypography="Body" Text="GPU" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="CPU manufacturer" />
+                                                   Text="Graphics processor name" />
                                 </StackPanel>
-                                <TextBlock x:Name="tbProducer"
-                                           Grid.Column="1"
-                                           VerticalAlignment="Center"
-                                           FontSize="13"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                                           TextWrapping="Wrap" />
-                            </Grid>
-
-                            <!-- Divider -->
-                            <Border x:Name="CodenameDivider"
-                                    Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- Codename -->
-                            <Grid x:Name="CodenameRow">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Codename" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Processor codename" />
-                                </StackPanel>
-                                <TextBlock x:Name="tbCodename"
+                                <TextBlock x:Name="tbGpuName"
                                            Grid.Column="1"
                                            VerticalAlignment="Center"
                                            FontSize="13"
@@ -839,255 +844,20 @@
                             <Border Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                            <!-- Caption -->
+                            <!-- RAM Manufacturer -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Description" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Processor description" />
-                                </StackPanel>
-                                <TextBlock x:Name="tbCaption"
-                                           Grid.Column="1"
-                                           VerticalAlignment="Center"
-                                           FontSize="13"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                                           TextWrapping="Wrap" />
-                            </Grid>
-
-                            <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- Cores -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Cores" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Physical core count" />
-                                </StackPanel>
-                                <TextBlock x:Name="tbCores"
-                                           Grid.Column="1"
-                                           VerticalAlignment="Center"
-                                           FontSize="13"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                            </Grid>
-
-                            <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- Threads -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Threads" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Logical processor count" />
-                                </StackPanel>
-                                <TextBlock x:Name="tbThreads"
-                                           Grid.Column="1"
-                                           VerticalAlignment="Center"
-                                           FontSize="13"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                            </Grid>
-
-                            <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- Base Clock -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Base Clock" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Maximum base clock speed" />
-                                </StackPanel>
-                                <TextBlock x:Name="tbBaseClock"
-                                           Grid.Column="1"
-                                           VerticalAlignment="Center"
-                                           FontSize="13"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                            </Grid>
-
-                            <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- L1 Cache -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="L1 Cache" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Level 1 cache size" />
-                                </StackPanel>
-                                <TextBlock x:Name="tbL1Cache"
-                                           Grid.Column="1"
-                                           VerticalAlignment="Center"
-                                           FontSize="13"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                            </Grid>
-
-                            <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- L2 Cache -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="L2 Cache" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Level 2 cache size" />
-                                </StackPanel>
-                                <TextBlock x:Name="tbL2Cache"
-                                           Grid.Column="1"
-                                           VerticalAlignment="Center"
-                                           FontSize="13"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                            </Grid>
-
-                            <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- L3 Cache -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="L3 Cache" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Level 3 cache size" />
-                                </StackPanel>
-                                <TextBlock x:Name="tbL3Cache"
-                                           Grid.Column="1"
-                                           VerticalAlignment="Center"
-                                           FontSize="13"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                            </Grid>
-
-                            <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- Instructions -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Instructions" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Supported instruction sets" />
-                                </StackPanel>
-                                <TextBlock x:Name="tbInstructions"
-                                           Grid.Column="1"
-                                           VerticalAlignment="Center"
-                                           FontSize="13"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                                           TextWrapping="Wrap" />
-                            </Grid>
-                        </StackPanel>
-                    </ui:CardExpander>
-
-                    <ui:CardExpander x:Name="sdRAM"
-                                     Margin="0,8,0,0"
-                                     IsEnabled="True"
-                                     IsExpanded="False">
-                        <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEEA0;" FontSize="20" Margin="4,0,6,0" />
-                        </ui:CardExpander.Icon>
-                        <ui:CardExpander.Header>
-                            <StackPanel>
-                                <ui:TextBlock FontTypography="Body" Text="Memory Information" />
-                                <ui:TextBlock Margin="0,2,0,0"
-                                               FontTypography="Caption"
-                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="RAM capacity, speed, and module details" />
-                            </StackPanel>
-                        </ui:CardExpander.Header>
-
-                        <StackPanel>
-                            <!-- Memory -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Memory" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Total capacity, type, and speed" />
-                                </StackPanel>
-                                <TextBlock x:Name="tbRAM"
-                                           Grid.Column="1"
-                                           VerticalAlignment="Center"
-                                           FontSize="13"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                                           TextWrapping="Wrap" />
-                            </Grid>
-
-                            <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- Producer -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Producer" />
+                                    <ui:TextBlock FontTypography="Body" Text="RAM Manufacturer" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                    Text="Memory module manufacturer" />
                                 </StackPanel>
-                                <TextBlock x:Name="tbRAMProducer"
+                                <TextBlock x:Name="tbRamManufacturer"
                                            Grid.Column="1"
                                            VerticalAlignment="Center"
                                            FontSize="13"
@@ -1099,73 +869,73 @@
                             <Border Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                            <!-- Model -->
+                            <!-- RAM Capacity -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Model" />
+                                    <ui:TextBlock FontTypography="Body" Text="RAM Capacity" />
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Module part number" />
+                                                   Text="Total memory capacity" />
                                 </StackPanel>
-                                <TextBlock x:Name="tbRAMModel"
+                                <TextBlock x:Name="tbRamCapacity"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- RAM Speed -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="RAM Speed" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Configured memory speed" />
+                                </StackPanel>
+                                <TextBlock x:Name="tbRamSpeed"
+                                           Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- RAM Model -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="RAM Model" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Memory module part number" />
+                                </StackPanel>
+                                <TextBlock x:Name="tbRamModel"
                                            Grid.Column="1"
                                            VerticalAlignment="Center"
                                            FontSize="13"
                                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                            TextWrapping="Wrap" />
-                            </Grid>
-
-                            <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- Width -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Width" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Total memory bus width" />
-                                </StackPanel>
-                                <TextBlock x:Name="tbWidth"
-                                           Grid.Column="1"
-                                           VerticalAlignment="Center"
-                                           FontSize="13"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                            </Grid>
-
-                            <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- Modules -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Modules" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Installed module count and width per module" />
-                                </StackPanel>
-                                <TextBlock x:Name="tbSlots"
-                                           Grid.Column="1"
-                                           VerticalAlignment="Center"
-                                           FontSize="13"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                             </Grid>
                         </StackPanel>
                     </ui:CardExpander>

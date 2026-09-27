@@ -56,7 +56,7 @@ namespace Uniwill_Control_Utility
             return _host?.Services.GetService(typeof(T)) as T;
         }
 
-        internal static readonly string version = "26.2.2";
+        internal static readonly string version = "0.9.4.1";
         private Mutex? mutex;
         private const string MutexName = "UniwillControlUtility";
 
@@ -207,6 +207,7 @@ namespace Uniwill_Control_Utility
                         services.AddScoped<Views.Pages.SettingsPage>();
                         services.AddScoped<ViewModels.SettingsViewModel>();
                         services.AddScoped<Views.Pages.OverlaySettingsPage>();
+                        services.AddScoped<Views.Pages.AboutPage>();
 
                         // Watercooler service (singleton for auto-connect)
                         services.AddScoped<Views.Pages.Watercooler>();
@@ -417,6 +418,19 @@ namespace Uniwill_Control_Utility
                 CachedSystemInfo.DeviceName = GetSystemInfo.SystemName;
                 CachedSystemInfo.DeviceModel = GetSystemInfo.Product;
                 CachedSystemInfo.DeviceProducer = GetSystemInfo.Manufacturer;
+
+                // Baseboard product (for System Identity card)
+                try
+                {
+                    using (var bbSearcher = new ManagementObjectSearcher(@"root\CIMV2", "SELECT Product FROM Win32_BaseBoard"))
+                    {
+                        foreach (ManagementBaseObject obj in bbSearcher.Get())
+                        {
+                            CachedSystemInfo.BaseboardProduct = obj["Product"]?.ToString()?.Trim() ?? string.Empty;
+                        }
+                    }
+                }
+                catch (System.Runtime.InteropServices.COMException) { }
 
                 // CPU info
                 using (var searcher = new ManagementObjectSearcher(@"root\CIMV2", "SELECT * FROM Win32_Processor"))

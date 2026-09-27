@@ -17,6 +17,68 @@ namespace Uniwill_Control_Utility.Services
     public static class LaptopDetector
     {
         /// <summary>
+        /// Brands that support driver page URLs.
+        /// XMG uses a fixed download URL by model, PCSpecialist requires the System SKU number.
+        /// </summary>
+        private static readonly HashSet<string> DriverSupportedManufacturers = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "SchenkerTechnologiesGmbH",
+            "PCSpecialist"
+        };
+
+        private static string? _systemSkuNumber;
+
+        /// <summary>
+        /// The Win32_ComputerSystem.SystemSKUNumber value, or null if not available.
+        /// Used for PCSpecialist driver URLs.
+        /// </summary>
+        public static string? SystemSkuNumber => _systemSkuNumber;
+
+        /// <summary>
+        /// True when the detected laptop is one of the brands that has a known driver download page.
+        /// Returns false for "unicorn" PCSpecialist machines (custom BIOS with cleared identifiers)
+        /// and for unsupported brands.
+        /// </summary>
+        public static bool HasDriverPage => Detected != null && DriverSupportedManufacturers.Contains(Detected.SystemManufacturer);
+
+        /// <summary>
+        /// Builds the driver download URL for the detected laptop.
+        /// Returns null if the laptop doesn't have a supported driver page.
+        ///
+        /// XMG Neo 16 A25: https://download.schenker-tech.de/package/xmg-neo-16-a25-xne16a25/
+        /// XMG Neo 16 E25: https://download.schenker-tech.de/package/xmg-neo-16-e25-xne16e25/
+        /// PCSpecialist Recoil III: https://www.pcspecialist.ie/drivers/{SkuNumber}/w11/
+        /// </summary>
+        public static string? GetDriverUrl()
+        {
+            var model = Detected;
+            if (model == null || !DriverSupportedManufacturers.Contains(model.SystemManufacturer))
+                return null;
+
+            // XMG / Schenker — fixed URL by model name
+            if (model.SystemManufacturer.Equals("SchenkerTechnologiesGmbH", StringComparison.OrdinalIgnoreCase))
+            {
+                if (model.DisplayName.Contains("A25", StringComparison.OrdinalIgnoreCase))
+                    return "https://download.schenker-tech.de/package/xmg-neo-16-a25-xne16a25/";
+                if (model.DisplayName.Contains("E25", StringComparison.OrdinalIgnoreCase))
+                    return "https://download.schenker-tech.de/package/xmg-neo-16-e25-xne16e25/";
+                return null;
+            }
+
+            // PCSpecialist — requires System SKU number from WMI
+            if (model.SystemManufacturer.Equals("PCSpecialist", StringComparison.OrdinalIgnoreCase))
+            {
+                var sku = _systemSkuNumber?.Trim();
+                if (string.IsNullOrEmpty(sku))
+                    return null; // Unicorn BIOS with cleared SKU — can't build URL
+
+                return $"https://www.pcspecialist.ie/drivers/{sku}/w11/";
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Catalog of known laptop models. Ordered by brand; each entry maps a
         /// (SystemManufacturer, BaseBoardProductPrefix) pair to display metadata.
         /// Add new entries here when supporting additional laptop brands that share
@@ -157,6 +219,11 @@ namespace Uniwill_Control_Utility.Services
             {
                 // WMI not available — detection fails silently.
             }
+
+            // SystemSKUNumber is optional (used for PCSpecialist driver URLs) — read separately
+            // so a failure here doesn't break main laptop detection.
+            try { _systemSkuNumber = GetWmiStringValue("Win32_ComputerSystem", "SystemSKUNumber"); }
+            catch (System.Runtime.InteropServices.COMException) { }
         }
 
         /// <summary>
