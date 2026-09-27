@@ -83,7 +83,7 @@ namespace Uniwill_Control_Utility.ViewModels
                 // Enrich with EC fan speed data if available
                 if (_uniwillEc is not null)
                 {
-                    EcTelemetrySnapshot ecSnapshot = _ecTelemetry.Read();
+                    EcFanDutySnapshot ecSnapshot = _ecTelemetry.ReadFanDuty();
                     snapshot = snapshot with
                     {
                         CpuFanSpeed = ecSnapshot.CpuFanPercent,

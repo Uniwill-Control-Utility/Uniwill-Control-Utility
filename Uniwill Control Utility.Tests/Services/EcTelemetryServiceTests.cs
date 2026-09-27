@@ -14,27 +14,27 @@ public sealed class EcTelemetryServiceTests
         int captureCount = 0;
 
         using var service = new EcTelemetryService(
-            capture: () =>
+            fanDutyCapture: () =>
             {
                 Interlocked.Increment(ref captureCount);
                 captureStarted.SetResult();
                 releaseCapture.Task.GetAwaiter().GetResult();
-                return new EcTelemetrySnapshot(70, 64, 2400, 2100, 100, 80);
+                return new EcFanDutySnapshot(100, 80);
             },
+            mainFanRpmCapture: () => 0,
             maxAge: TimeSpan.FromSeconds(1));
 
-        EcTelemetrySnapshot first = service.Read();
+        EcFanDutySnapshot first = service.ReadFanDuty();
         await captureStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        EcTelemetrySnapshot second = service.Read();
+        EcFanDutySnapshot second = service.ReadFanDuty();
 
-        Assert.Equal(EcTelemetrySnapshot.Empty, first);
-        Assert.Equal(EcTelemetrySnapshot.Empty, second);
+        Assert.Equal(EcFanDutySnapshot.Empty, first);
+        Assert.Equal(EcFanDutySnapshot.Empty, second);
         Assert.Equal(1, Volatile.Read(ref captureCount));
 
         releaseCapture.SetResult();
-        EcTelemetrySnapshot refreshed = await WaitForSnapshotAsync(service);
+        EcFanDutySnapshot refreshed = await WaitForSnapshotAsync(service);
 
-        Assert.Equal(2400, refreshed.MainFanRpm);
         Assert.Equal(50, refreshed.CpuFanPercent);
         Assert.Equal(40, refreshed.GpuFanPercent);
     }
@@ -47,7 +47,7 @@ public sealed class EcTelemetryServiceTests
     [InlineData(250, 100)]
     public void FanPercent_ClampsEcDutyToDisplayRange(int duty, int expected)
     {
-        var snapshot = new EcTelemetrySnapshot(0, 0, 0, 0, duty, duty);
+        var snapshot = new EcFanDutySnapshot(duty, duty);
 
         Assert.Equal(expected, snapshot.CpuFanPercent);
         Assert.Equal(expected, snapshot.GpuFanPercent);
@@ -58,20 +58,15 @@ public sealed class EcTelemetryServiceTests
     {
         int captureCount = 0;
         using var service = new EcTelemetryService(
-            capture: () => new EcTelemetrySnapshot(
-                0,
-                0,
-                Interlocked.Increment(ref captureCount) * 1000,
-                0,
-                0,
-                0),
+            fanDutyCapture: () => EcFanDutySnapshot.Empty,
+            mainFanRpmCapture: () => Interlocked.Increment(ref captureCount) * 1000,
             maxAge: TimeSpan.FromMinutes(1));
 
-        EcTelemetrySnapshot first = await service.RefreshAsync();
-        EcTelemetrySnapshot second = await service.RefreshAsync();
+        int first = await service.RefreshMainFanRpmAsync();
+        int second = await service.RefreshMainFanRpmAsync();
 
-        Assert.Equal(1000, first.MainFanRpm);
-        Assert.Equal(2000, second.MainFanRpm);
+        Assert.Equal(1000, first);
+        Assert.Equal(2000, second);
     }
 
     [Fact]
@@ -83,7 +78,8 @@ public sealed class EcTelemetryServiceTests
             TaskCreationOptions.RunContinuationsAsynchronously);
         int captureCount = 0;
         using var service = new EcTelemetryService(
-            capture: () =>
+            fanDutyCapture: () => EcFanDutySnapshot.Empty,
+            mainFanRpmCapture: () =>
             {
                 int capture = Interlocked.Increment(ref captureCount);
                 if (capture == 1)
@@ -92,29 +88,29 @@ public sealed class EcTelemetryServiceTests
                     releaseFirstCapture.Task.GetAwaiter().GetResult();
                 }
 
-                return new EcTelemetrySnapshot(0, 0, capture * 1000, 0, 0, 0);
+                return capture * 1000;
             },
             maxAge: TimeSpan.FromMinutes(1));
 
-        _ = service.Read();
+        _ = service.ReadMainFanRpm();
         await firstCaptureStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        Task<EcTelemetrySnapshot> refresh = service.RefreshAsync();
+        Task<int> refresh = service.RefreshMainFanRpmAsync();
         releaseFirstCapture.SetResult();
 
-        EcTelemetrySnapshot result = await refresh.WaitAsync(TimeSpan.FromSeconds(5));
+        int result = await refresh.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.Equal(2000, result.MainFanRpm);
+        Assert.Equal(2000, result);
         Assert.Equal(2, Volatile.Read(ref captureCount));
     }
 
-    private static async Task<EcTelemetrySnapshot> WaitForSnapshotAsync(
+    private static async Task<EcFanDutySnapshot> WaitForSnapshotAsync(
         EcTelemetryService service)
     {
         DateTime deadline = DateTime.UtcNow.AddSeconds(5);
         while (DateTime.UtcNow < deadline)
         {
-            EcTelemetrySnapshot snapshot = service.Read();
-            if (snapshot.MainFanRpm == 2400)
+            EcFanDutySnapshot snapshot = service.ReadFanDuty();
+            if (snapshot.CpuFanDuty == 100)
                 return snapshot;
 
             await Task.Delay(10);

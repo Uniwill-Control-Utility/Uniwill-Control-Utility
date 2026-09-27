@@ -3,15 +3,11 @@ using System.Threading.Tasks;
 
 namespace Uniwill_Control_Utility.Services
 {
-    public readonly record struct EcTelemetrySnapshot(
-        int CpuTemperatureC,
-        int GpuTemperatureC,
-        int MainFanRpm,
-        int SecondFanRpm,
+    public readonly record struct EcFanDutySnapshot(
         int CpuFanDuty,
         int GpuFanDuty)
     {
-        public static EcTelemetrySnapshot Empty { get; } = new();
+        public static EcFanDutySnapshot Empty { get; } = new();
 
         public int CpuFanPercent => DutyToPercent(CpuFanDuty);
         public int GpuFanPercent => DutyToPercent(GpuFanDuty);
@@ -27,24 +23,68 @@ namespace Uniwill_Control_Utility.Services
     public sealed class EcTelemetryService : IDisposable
     {
         private static readonly TimeSpan DefaultMaxAge = TimeSpan.FromSeconds(1);
-        private readonly StaleWhileRevalidateCache<EcTelemetrySnapshot> _cache;
+        private readonly StaleWhileRevalidateCache<EcFanDutySnapshot> _fanDutyCache;
+        private readonly StaleWhileRevalidateCache<int> _mainFanRpmCache;
 
         public EcTelemetryService(UniwillECService ecService)
-            : this(CreateCapture(ecService), DefaultMaxAge)
+            : this(CreateCaptures(ecService), DefaultMaxAge)
         {
         }
 
         internal EcTelemetryService(
-            Func<EcTelemetrySnapshot> capture,
+            Func<EcFanDutySnapshot> fanDutyCapture,
+            Func<int> mainFanRpmCapture,
             TimeSpan maxAge,
             TimeProvider? timeProvider = null)
         {
-            ArgumentNullException.ThrowIfNull(capture);
+            ArgumentNullException.ThrowIfNull(fanDutyCapture);
+            ArgumentNullException.ThrowIfNull(mainFanRpmCapture);
 
-            _cache = new StaleWhileRevalidateCache<EcTelemetrySnapshot>(
-                EcTelemetrySnapshot.Empty,
+            _fanDutyCache = CreateCache(
+                EcFanDutySnapshot.Empty,
+                fanDutyCapture,
                 maxAge,
-                _ => System.Threading.Tasks.Task.FromResult(capture()),
+                timeProvider);
+            _mainFanRpmCache = CreateCache(0, mainFanRpmCapture, maxAge, timeProvider);
+        }
+
+        private EcTelemetryService(
+            (Func<EcFanDutySnapshot> fanDuty, Func<int> mainFanRpm) captures,
+            TimeSpan maxAge)
+            : this(captures.fanDuty, captures.mainFanRpm, maxAge)
+        {
+        }
+
+        public EcFanDutySnapshot ReadFanDuty() => _fanDutyCache.Read();
+
+        public async Task<int> RefreshMainFanRpmAsync()
+        {
+            _mainFanRpmCache.Invalidate();
+            await _mainFanRpmCache.RefreshAsync().ConfigureAwait(false);
+            // If invalidation joined an older in-flight refresh, that generation is
+            // discarded. A second call then captures the requested generation.
+            await _mainFanRpmCache.RefreshAsync().ConfigureAwait(false);
+            return _mainFanRpmCache.Read();
+        }
+
+        internal int ReadMainFanRpm() => _mainFanRpmCache.Read();
+
+        public void Dispose()
+        {
+            _fanDutyCache.Dispose();
+            _mainFanRpmCache.Dispose();
+        }
+
+        private static StaleWhileRevalidateCache<T> CreateCache<T>(
+            T initialValue,
+            Func<T> capture,
+            TimeSpan maxAge,
+            TimeProvider? timeProvider)
+        {
+            return new StaleWhileRevalidateCache<T>(
+                initialValue,
+                maxAge,
+                _ => Task.FromResult(capture()),
                 timeProvider,
                 ex =>
                 {
@@ -53,38 +93,19 @@ namespace Uniwill_Control_Utility.Services
                 });
         }
 
-        public EcTelemetrySnapshot Read() => _cache.Read();
-
-        public async Task<EcTelemetrySnapshot> RefreshAsync()
-        {
-            _cache.Invalidate();
-            await _cache.RefreshAsync().ConfigureAwait(false);
-            // If invalidation joined an older in-flight refresh, that generation is
-            // discarded. A second call then captures the requested generation.
-            await _cache.RefreshAsync().ConfigureAwait(false);
-            return _cache.Read();
-        }
-
-        public void Dispose() => _cache.Dispose();
-
-        private static Func<EcTelemetrySnapshot> CreateCapture(UniwillECService ecService)
+        private static (Func<EcFanDutySnapshot> fanDuty, Func<int> mainFanRpm)
+            CreateCaptures(UniwillECService ecService)
         {
             ArgumentNullException.ThrowIfNull(ecService);
-            bool initializationAttempted = false;
-            bool available = false;
+            var available = new Lazy<bool>(
+                ecService.Initialize,
+                System.Threading.LazyThreadSafetyMode.ExecutionAndPublication);
 
-            return () =>
-            {
-                if (!initializationAttempted)
-                {
-                    available = ecService.Initialize();
-                    initializationAttempted = true;
-                }
-
-                return available
-                    ? ecService.ReadFanTelemetry()
-                    : EcTelemetrySnapshot.Empty;
-            };
+            return (
+                () => available.Value
+                    ? ecService.ReadFanDutyTelemetry()
+                    : EcFanDutySnapshot.Empty,
+                () => available.Value ? ecService.GetMainFanRpm() : 0);
         }
     }
 }

@@ -607,33 +607,19 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
-        /// Captures the EC values displayed by the dashboard and fan-control page
+        /// Captures the EC fan-duty values displayed by the dashboard and fan-control page
         /// under one native-I/O lock. Callers should normally use
         /// <see cref="EcTelemetryService"/> so this work stays off the UI thread.
         /// </summary>
-        public EcTelemetrySnapshot ReadFanTelemetry()
+        public EcFanDutySnapshot ReadFanDutyTelemetry()
         {
             EnsureInitialized();
             lock (_lock)
             {
-                int cpuTemperature = ReadECRaw(REG_CPU_TEMP);
-                int gpuTemperature = ReadECRaw(REG_GPU_TEMP);
-                int mainFanRpm =
-                    (ReadECRaw(REG_MAIN_FAN_RPM_LO) << 8) |
-                    ReadECRaw(REG_MAIN_FAN_RPM_HI);
-                int secondFanRpm =
-                    (ReadECRaw(REG_SECOND_FAN_RPM_HI) << 8) |
-                    ReadECRaw(REG_SECOND_FAN_RPM_LO);
                 int cpuFanDuty = ReadECRaw(REG_PWM_1);
                 int gpuFanDuty = ReadECRaw(REG_PWM_2);
 
-                return new EcTelemetrySnapshot(
-                    cpuTemperature,
-                    gpuTemperature,
-                    mainFanRpm,
-                    secondFanRpm,
-                    cpuFanDuty,
-                    gpuFanDuty);
+                return new EcFanDutySnapshot(cpuFanDuty, gpuFanDuty);
             }
         }
 

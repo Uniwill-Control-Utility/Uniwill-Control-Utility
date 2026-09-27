@@ -432,7 +432,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 if (_uniwillEc is null) return;
 
-                int rpm = (await _ecTelemetry.RefreshAsync()).MainFanRpm;
+                int rpm = await _ecTelemetry.RefreshMainFanRpmAsync();
                 if (!_isUnloaded && rpm > 0)
                     SetStatusText($"{rpm} RPM");
             }
@@ -458,7 +458,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // and never block this DispatcherTimer callback.
                 if (_uniwillEc is not null)
                 {
-                    EcTelemetrySnapshot ecSnapshot = _ecTelemetry.Read();
+                    EcFanDutySnapshot ecSnapshot = _ecTelemetry.ReadFanDuty();
                     snapshot = snapshot with
                     {
                         CpuFanSpeed = ecSnapshot.CpuFanPercent,
