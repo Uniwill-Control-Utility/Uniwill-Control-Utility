@@ -197,6 +197,8 @@ namespace Uniwill_Control_Utility.Services
         public async Task<List<WaterCoolerDeviceInfo>> DiscoverDevicesAsync(int timeoutMs = 10000)
         {
             var devices = new List<WaterCoolerDeviceInfo>();
+            var foundAddresses = new HashSet<string>();
+            var completed = new TaskCompletionSource<bool>();
 
             var watcher = new BluetoothLEAdvertisementWatcher();
             watcher.Received += (s, e) =>
@@ -209,21 +211,35 @@ namespace Uniwill_Control_Utility.Services
                     name.Contains("be quiet!", StringComparison.OrdinalIgnoreCase) ||
                     name.Contains("oasis", StringComparison.OrdinalIgnoreCase))
                 {
+                    var address = e.BluetoothAddress.ToString();
                     lock (devices)
                     {
-                        devices.Add(new WaterCoolerDeviceInfo
+                        if (foundAddresses.Add(address))
                         {
-                            Address = e.BluetoothAddress.ToString(),
-                            Name = name,
-                            Rssi = e.RawSignalStrengthInDBm,
-                            Model = DetectModelFromBleName(name)
-                        });
+                            devices.Add(new WaterCoolerDeviceInfo
+                            {
+                                Address = address,
+                                Name = name,
+                                Rssi = e.RawSignalStrengthInDBm,
+                                Model = DetectModelFromBleName(name)
+                            });
+
+                            // Stop scanning once we found at least one device.
+                            // The caller can re-scan if they need more results.
+                            watcher.Stop();
+                            completed.TrySetResult(true);
+                        }
                     }
                 }
             };
 
             watcher.Start();
-            await Task.Delay(timeoutMs);
+
+            // Wait for either a device to be found (watcher.Stop above) or the timeout.
+            await Task.WhenAny(
+                completed.Task,
+                Task.Delay(timeoutMs));
+
             watcher.Stop();
             _watchers.Remove(watcher);
 
@@ -1391,6 +1407,10 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// Attempts to auto-connect to the last known device on startup.
+        /// Runs a BLE scan before each connection attempt so the device is in the
+        /// Windows BLE cache (FromBluetoothAddressAsync can fail on cold boot
+        /// without a prior scan). Retries up to 3 times with a delay between attempts
+        /// to allow the cooler's BLE radio time to power on after cold boot.
         /// </summary>
         public async Task<bool> TryAutoConnectAsync()
         {
@@ -1401,7 +1421,39 @@ namespace Uniwill_Control_Utility.Services
                 return false;
 
             StatusChanged?.Invoke(this, "Attempting auto-connect...");
-            var connected = await ConnectAsync(_settings.LastDeviceAddress);
+
+            bool autoConnected = false;
+            const int maxAttempts = 3;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                // Scan for BLE devices before connecting. On cold boot, FromBluetoothAddressAsync
+                // fails if the Windows BLE stack hasn't discovered the device yet. A short scan
+                // populates the device cache so the connection attempt can succeed.
+                try
+                {
+                    await DiscoverDevicesAsync(5000);
+                }
+                catch
+                {
+                    // Non-critical: scan failed, proceed with direct connection anyway.
+                }
+
+                if (await ConnectAsync(_settings.LastDeviceAddress))
+                {
+                    autoConnected = true;
+                    break;
+                }
+
+                // If connection failed and retries remain, wait before trying again.
+                // The cooler's BLE radio may need time to start advertising after cold boot.
+                if (attempt < maxAttempts)
+                {
+                    StatusChanged?.Invoke(this, $"Auto-connect attempt {attempt} failed, retrying...");
+                    await Task.Delay(3000);
+                }
+            }
+
+            var connected = autoConnected;
 
             if (connected)
             {
