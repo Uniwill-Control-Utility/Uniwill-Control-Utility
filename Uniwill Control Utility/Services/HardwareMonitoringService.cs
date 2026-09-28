@@ -31,6 +31,8 @@ namespace Uniwill_Control_Utility.Services
         public int HydroUiFanSpeed { get; init; }
         /// <summary>Current fan RPM from device status (0 if unknown).</summary>
         public int HydroUiFanRpm { get; init; }
+        /// <summary>Whether Smart Mode is currently active on the watercooler.</summary>
+        public bool HydroUiSmartModeActive { get; init; }
 
         /// <summary>Whether a Flydigi cooler is connected.</summary>
         public bool FlydigiConnected { get; init; }

@@ -12,20 +12,20 @@
             BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
             CornerRadius="8"
-            Padding="20"
-            MinHeight="286"
+            Padding="16"
+            Height="300"
             SnapsToDevicePixels="True">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="1" />
-                <RowDefinition Height="18" />
-                <RowDefinition Height="112" />
+                <RowDefinition Height="10" />
+                <RowDefinition Height="100" />
                 <RowDefinition Height="18" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" Margin="0,0,0,14">
+            <Grid Grid.Row="0" Margin="0,0,0,16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="12" />
@@ -33,55 +33,64 @@
                     <ColumnDefinition Width="16" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF211;" FontSize="22" />
-                <TextBlock Grid.Column="2" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="22" FontWeight="SemiBold" Text="GPU" />
+                <ui:FontIcon 
+                    FontFamily="Segoe Fluent Icons" 
+                    Glyph="&#xF211;" 
+                    FontSize="20" 
+                    Margin="4,0,2,0"/>
+                <TextBlock Grid.Column="2" 
+                           FontFamily="Segoe UI Variable Display, Segoe UI" 
+                           FontSize="20" 
+                           FontWeight="SemiBold" 
+                           Text="GPU"/>
                 <TextBlock x:Name="_hardwareName"
                            Grid.Column="4"
                            VerticalAlignment="Center"
                            HorizontalAlignment="Right"
                            FontSize="12"
+                           Margin="0,0,4,0"
                            TextTrimming="CharacterEllipsis"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
             </Grid>
             <Border Grid.Row="1" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
 
-            <Grid Grid.Row="3">
+            <Grid Grid.Row="3" >
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="132" />
                     <ColumnDefinition Width="1" />
-                    <ColumnDefinition Width="104" />
+                    <ColumnDefinition Width="120" />
                     <ColumnDefinition Width="1" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock x:Name="_gpuTempHero" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="44" FontWeight="SemiBold" Text="--" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                    <TextBlock Margin="1,-2,0,0" FontSize="13" Text="Temperature" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" >
+                    <TextBlock x:Name="_gpuTempHero" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="36" FontWeight="SemiBold" Text="--" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                    <TextBlock Margin="1,-2,0,0" FontSize="12" Text="Temperature" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
 
                 <Border Grid.Column="1" Margin="0,8" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
 
-                <StackPanel Grid.Column="2" Margin="20,0,0,0" VerticalAlignment="Center">
-                    <TextBlock x:Name="_gpuUsageHero" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="38" FontWeight="SemiBold" Text="--" />
-                    <TextBlock Margin="1,0,0,0" FontSize="13" Text="Utilization" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <StackPanel Grid.Column="2" Margin="16,0,16,0" VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock x:Name="_gpuUsageHero" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="36" FontWeight="SemiBold" Text="--" />
+                    <TextBlock Margin="1,0,0,0" FontSize="12" Text="Utilization" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
 
                 <Border Grid.Column="3" Margin="0,8" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
 
-                <Grid Grid.Column="4" Margin="20,0,0,0">
+                <Grid Grid.Column="4" Margin="20,0,0,8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="8" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <TextBlock FontSize="12" Text="60s temperature" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                     <Grid Grid.Row="2">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="34" />
                         </Grid.ColumnDefinitions>
-                        <controls:DashboardSparkline x:Name="_temperatureSeries" Margin="0,2,8,2" Minimum="20" Maximum="100" Stroke="{DynamicResource AccentFillColorDefaultBrush}" />
-                        <Grid Grid.Column="1">
+                        <controls:DashboardSparkline x:Name="_temperatureSeries" Margin="0,0,8,12" Minimum="20" Maximum="100" Stroke="{DynamicResource AccentFillColorDefaultBrush}" />
+                        <TextBlock FontSize="12" Text="60s temperature" Foreground="{DynamicResource TextFillColorTertiaryBrush}" VerticalAlignment="Bottom"/>
+                        <Grid Grid.Column="1" Margin="-10,0,0,0">
                             <TextBlock VerticalAlignment="Top" FontSize="10" Text="100°" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
                             <TextBlock VerticalAlignment="Bottom" FontSize="10" Text="20°" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
                         </Grid>
@@ -89,7 +98,7 @@
                 </Grid>
             </Grid>
 
-            <Grid Grid.Row="5">
+            <Grid Grid.Row="5" Margin="6,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="82" />
                     <ColumnDefinition Width="*" />

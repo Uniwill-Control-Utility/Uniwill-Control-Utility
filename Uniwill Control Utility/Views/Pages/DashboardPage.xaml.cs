@@ -284,7 +284,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Both visible — side by side.
                 _deviceRow.Visibility = Visibility.Visible;
                 _deviceRow.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
-                _deviceRow.ColumnDefinitions[1].Width = new GridLength(12);
+                _deviceRow.ColumnDefinitions[1].Width = new GridLength(8);
                 _deviceRow.ColumnDefinitions[2].Width = new GridLength(1, GridUnitType.Star);
                 _hydroUi.HorizontalAlignment = HorizontalAlignment.Stretch;
                 _hydroUi.MinWidth = 0;

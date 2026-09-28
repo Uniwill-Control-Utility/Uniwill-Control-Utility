@@ -29,4 +29,21 @@ public sealed class DashboardMemoryInfoFormatterTests
     {
         Assert.Equal(expected, DashboardMemoryInfoFormatter.FormatSpeed(speed));
     }
+
+    [Theory]
+    [InlineData("SK hynix", "HMCG88AGBSA095N", "SK hynix")]
+    [InlineData("", "HMCG88AGBSA095N", "HMCG88AGBSA095N")]
+    [InlineData("Crucial", "Crucial CT16G56C46S5", "Crucial")]
+    [InlineData("Kingston/Crucial", "Kingston KF564S38-16/Crucial CT16G56C46S5", "Kingston / Crucial")]
+    [InlineData("Kingston/Crucial", "KF564S38-16/CT16G56C46S5", "Kingston / Crucial")]
+    [InlineData("", "", "Not available")]
+    public void FormatModelShortShowsManufacturerOrModelFallback(
+        string manufacturer,
+        string model,
+        string expected)
+    {
+        string actual = DashboardMemoryInfoFormatter.FormatModelShort(manufacturer, model);
+
+        Assert.Equal(expected, actual);
+    }
 }
