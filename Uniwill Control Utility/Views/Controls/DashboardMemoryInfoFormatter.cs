@@ -21,22 +21,19 @@ internal static class DashboardMemoryInfoFormatter
                 ? string.Join(" / ", models)
                 : $"{manufacturers[0]} · {string.Join(" / ", models)}";
 
-        string[] identities = new string[models.Length];
-        for (int index = 0; index < models.Length; index++)
+        bool everyModelIdentifiesItsManufacturer = true;
+        foreach (string moduleModel in models)
         {
-            string modelIdentity = models[index];
-            if (ContainsManufacturer(new[] { modelIdentity }, manufacturers))
+            if (!ContainsManufacturer(new[] { moduleModel }, manufacturers))
             {
-                identities[index] = modelIdentity;
-                continue;
+                everyModelIdentifiesItsManufacturer = false;
+                break;
             }
-
-            identities[index] = index < manufacturers.Length
-                ? $"{manufacturers[index]} {modelIdentity}"
-                : modelIdentity;
         }
 
-        return string.Join(" / ", identities);
+        return everyModelIdentifiesItsManufacturer
+            ? string.Join(" / ", models)
+            : $"{string.Join(" / ", manufacturers)} · {string.Join(" / ", models)}";
     }
 
     public static string FormatSpeed(int speed)

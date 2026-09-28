@@ -46,4 +46,19 @@ public sealed class DashboardMetricSeriesTests
         Assert.Equal(3, series.Samples.Count);
         Assert.All(series.Samples, sample => Assert.True(double.IsNaN(sample)));
     }
+
+    [Fact]
+    public void AddClearsOldTimelineAfterPollingPause()
+    {
+        var series = new DashboardMetricSeries(
+            capacity: 60,
+            maximumSampleInterval: TimeSpan.FromSeconds(3));
+        DateTimeOffset firstTick = new(2026, 9, 28, 12, 0, 0, TimeSpan.Zero);
+
+        series.Add(38, firstTick);
+        series.Add(39, firstTick.AddSeconds(1));
+        series.Add(40, firstTick.AddMinutes(5));
+
+        Assert.Equal([40d], series.Samples);
+    }
 }
