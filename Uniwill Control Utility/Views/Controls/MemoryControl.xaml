@@ -33,7 +33,7 @@
                     <ColumnDefinition Width="12" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <ui:SymbolIcon Symbol="Ram20" FontSize="22" />
+                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEEA0;" FontSize="22" />
                 <TextBlock Grid.Column="2" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="22" FontWeight="SemiBold" Text="Memory" />
             </Grid>
             <Border Grid.Row="1" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />

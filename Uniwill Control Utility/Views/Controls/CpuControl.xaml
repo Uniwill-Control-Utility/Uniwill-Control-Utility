@@ -33,7 +33,7 @@
                     <ColumnDefinition Width="16" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <ui:SymbolIcon Symbol="DeveloperBoard24" FontSize="22" />
+                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEEA1;" FontSize="22" />
                 <TextBlock Grid.Column="2" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="22" FontWeight="SemiBold" Text="CPU" />
                 <TextBlock x:Name="_hardwareName"
                            Grid.Column="4"

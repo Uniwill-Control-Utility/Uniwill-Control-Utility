@@ -30,7 +30,7 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <ui:SymbolIcon Symbol="Gauge24" FontSize="23" />
+                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEC4A;" FontSize="23" />
                 <TextBlock x:Name="_titleText" Grid.Column="2" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="22" FontWeight="SemiBold" Text="Flydigi Cooler" />
                 <Border Grid.Column="3" Height="32" Padding="14,0" CornerRadius="16" BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Background="{DynamicResource ControlFillColorSecondaryBrush}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
