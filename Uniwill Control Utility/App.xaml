@@ -14,6 +14,47 @@
                 <ui:ControlsDictionary />
             </ResourceDictionary.MergedDictionaries>
 
+            <!-- Overlay used by interactive Home cards. Opacity animation keeps the
+                 card geometry fixed while the accent stroke fades in and out. -->
+            <Style x:Key="DashboardInteractiveCardHoverBorderStyle"
+                   TargetType="{x:Type Border}">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="2" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="IsHitTestVisible" Value="False" />
+                <Setter Property="Opacity" Value="0" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                                 Value="True">
+                        <DataTrigger.EnterActions>
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                     To="0.9"
+                                                     Duration="0:0:0.16"
+                                                     DecelerationRatio="0.65" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </DataTrigger.EnterActions>
+                        <DataTrigger.ExitActions>
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                     To="0"
+                                                     Duration="0:0:0.22"
+                                                     DecelerationRatio="0.5" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </DataTrigger.ExitActions>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                                 Value="True">
+                        <Setter Property="Opacity" Value="0.9" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
             <!-- Slider thumb: identical to WPF UI default, no margin change.
                  The track background in the Slider templates below is shortened by
                  4px on each end so the strip doesn't peek past the thumb at min/max. -->
