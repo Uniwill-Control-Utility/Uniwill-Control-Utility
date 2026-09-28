@@ -50,16 +50,16 @@ namespace Uniwill_Control_Utility.Views.Controls
 
                 if (snapshot.FlydigiFanRpm > 0)
                 {
-                    _fanLabel.Content = $"{snapshot.FlydigiFanRpm} RPM";
+                    _fanLabel.Text = $"{snapshot.FlydigiFanRpm} RPM";
                     _fanBar.Value = snapshot.FlydigiFanRpm;
                 }
                 else
                 {
-                    _fanLabel.Content = "Off";
-                    _fanBar.Value = _fanBar.Minimum;
+                    _fanLabel.Text = "Off";
+                    _fanBar.Value = 0;
                 }
 
-                _rgbLabel.Content = string.IsNullOrEmpty(snapshot.FlydigiRgbMode)
+                _rgbLabel.Text = string.IsNullOrEmpty(snapshot.FlydigiRgbMode)
                     ? "--"
                     : snapshot.FlydigiRgbMode;
             }

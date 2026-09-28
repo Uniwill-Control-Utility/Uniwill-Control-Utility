@@ -1,82 +1,79 @@
 <UserControl x:Class="Uniwill_Control_Utility.Views.Controls.BatteryControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Uniwill_Control_Utility.Views.Controls"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-             FlowDirection="LeftToRight">
+             FlowDirection="LeftToRight"
+             FontFamily="Segoe UI Variable Text, Segoe UI"
+             Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+             UseLayoutRounding="True">
 
     <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
             BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
-            CornerRadius="7.2"
-            Padding="16"
-            RenderOptions.EdgeMode="Aliased"
+            CornerRadius="8"
+            Padding="20"
+            MinHeight="250"
             SnapsToDevicePixels="True">
         <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="70" />
-            </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
+                <RowDefinition Height="1" />
+                <RowDefinition Height="20" />
+                <RowDefinition Height="92" />
+                <RowDefinition Height="20" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0" Grid.Column="0"
-                       Margin="0,0,0,16"
-                       FontSize="18"
-                       FontWeight="Medium"
-                       Text="Battery"
-                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Grid Grid.Row="0" Margin="0,0,0,14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEBC0;" FontSize="22" />
+                <TextBlock Grid.Column="2" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="22" FontWeight="SemiBold" Text="Battery" />
+            </Grid>
+            <Border Grid.Row="1" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
 
-            <Label Grid.Row="1" Grid.Column="0"
-                   VerticalContentAlignment="Center"
-                   Content="Health"
-                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-            <ProgressBar x:Name="_batteryHealthBar"
-                         Grid.Row="1" Grid.Column="1"
-                         Margin="16,0,16,0"
-                         Minimum="0" Maximum="100" Value="0" />
-            <Label x:Name="_batteryHealthLabel"
-                   Grid.Row="1" Grid.Column="2"
-                   HorizontalContentAlignment="Right"
-                   VerticalContentAlignment="Center"
-                   Content="--"
-                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Grid Grid.Row="3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="1" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="132" />
+                </Grid.ColumnDefinitions>
 
-            <Label Grid.Row="2" Grid.Column="0"
-                   VerticalContentAlignment="Center"
-                   Content="Charge Limit"
-                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-            <ProgressBar x:Name="_batteryChargeLimitBar"
-                         Grid.Row="2" Grid.Column="1"
-                         Margin="16,0,16,0"
-                         Minimum="0" Maximum="100" Value="0" />
-            <Label x:Name="_batteryChargeLimitLabel"
-                   Grid.Row="2" Grid.Column="2"
-                   HorizontalContentAlignment="Right"
-                   VerticalContentAlignment="Center"
-                   Content="--"
-                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="_batteryHealthHero" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="38" FontWeight="SemiBold" Text="--" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                    <TextBlock Margin="1,-1,0,0" FontSize="13" Text="Health" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
 
-            <Label Grid.Row="3" 
-                   Grid.Column="0"
-                   VerticalContentAlignment="Center"
-                   Content="Temperature"
-                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-            <ProgressBar x:Name="_batteryTempBar"
-                 Grid.Row="3" Grid.Column="1"
-                 Margin="16,0,16,0"
-                 Minimum="0" Maximum="100" Value="0" />
-            <Label x:Name="_batteryTempLabel"
-                   Grid.Row="3" Grid.Column="2"
-                   HorizontalContentAlignment="Right"
-                   VerticalContentAlignment="Center"
-                   Content="--"
-                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Border Grid.Column="1" Margin="0,6" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
 
+                <StackPanel Grid.Column="2" Margin="22,0,0,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="_chargeLimitHero" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="38" FontWeight="SemiBold" Text="--" />
+                    <TextBlock Margin="1,-1,0,0" FontSize="13" Text="Charge Limit" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+
+                <Border x:Name="_healthPill" Grid.Column="3" Height="38" Padding="14,0" CornerRadius="19" BorderThickness="1" VerticalAlignment="Center" HorizontalAlignment="Right" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ui:FontIcon x:Name="_healthIcon" FontFamily="Segoe Fluent Icons" Glyph="&#xEB51;" FontSize="16" />
+                        <TextBlock x:Name="_healthState" Margin="8,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Grid Grid.Row="5">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="90" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="52" />
+                </Grid.ColumnDefinitions>
+                <TextBlock VerticalAlignment="Center" Text="Temperature" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <controls:DashboardSegmentedBar x:Name="_batteryTempBar" Grid.Column="1" Height="10" Margin="12,0" Maximum="100" Segments="18" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                <TextBlock x:Name="_batteryTempLabel" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="Medium" Text="--" />
+            </Grid>
         </Grid>
     </Border>
 </UserControl>

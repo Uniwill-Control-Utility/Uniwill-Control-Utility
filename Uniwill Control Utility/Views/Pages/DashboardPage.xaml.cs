@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
+using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
 using Uniwill_Control_Utility.ViewModels;
 using Wpf.Ui;
@@ -93,9 +94,19 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Set laptop display name from the detector (or fallback to "DESKTOP SYSTEM")
             _header.LaptopName = LaptopDetector.GetDisplayName().ToUpperInvariant();
             _header.LaptopCPUName = CleanCpuName(cpuName);
+            _cpu.HardwareName = CleanCpuName(cpuName);
 
             if (!string.IsNullOrEmpty(gpuName))
-                _header.LaptopGPUName = FilterGpuName(gpuName);
+            {
+                string displayGpuName = FilterGpuName(gpuName);
+                _header.LaptopGPUName = displayGpuName;
+                _gpu.HardwareName = displayGpuName;
+            }
+
+            _memory.UpdateModuleInfo(
+                CachedSystemInfo.RamProducer,
+                CachedSystemInfo.RamModel,
+                CachedSystemInfo.RamSpeed);
 
             // Run the slower SystemSpecs WMI queries on a background thread so they
             // don't block the UI. These are cosmetic (display/RAM/storage specs).
@@ -248,30 +259,32 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             else if (hydroVisible && !flydigiVisible)
             {
-                // Only Hydro UI — center it.
+                // Only Hydro UI — let the modular card use the full row.
                 _deviceRow.Visibility = Visibility.Visible;
-                _deviceRow.ColumnDefinitions[1].Width = GridLength.Auto;
-                _deviceRow.ColumnDefinitions[2].Width = GridLength.Auto;
-                _hydroUi.HorizontalAlignment = HorizontalAlignment.Center;
-                _hydroUi.MinWidth = 536;
-                _hydroUi.MaxWidth = 536;
+                _deviceRow.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
+                _deviceRow.ColumnDefinitions[1].Width = new GridLength(0);
+                _deviceRow.ColumnDefinitions[2].Width = new GridLength(0);
+                _hydroUi.HorizontalAlignment = HorizontalAlignment.Stretch;
+                _hydroUi.MinWidth = 0;
+                _hydroUi.MaxWidth = double.MaxValue;
             }
             else if (!hydroVisible && flydigiVisible)
             {
-                // Only Flydigi — center it.
+                // Only Flydigi — let the modular card use the full row.
                 _deviceRow.Visibility = Visibility.Visible;
-                _deviceRow.ColumnDefinitions[0].Width = GridLength.Auto;
-                _deviceRow.ColumnDefinitions[1].Width = GridLength.Auto;
-                _flydigi.HorizontalAlignment = HorizontalAlignment.Center;
-                _flydigi.MinWidth = 536;
-                _flydigi.MaxWidth = 536;
+                _deviceRow.ColumnDefinitions[0].Width = new GridLength(0);
+                _deviceRow.ColumnDefinitions[1].Width = new GridLength(0);
+                _deviceRow.ColumnDefinitions[2].Width = new GridLength(1, GridUnitType.Star);
+                _flydigi.HorizontalAlignment = HorizontalAlignment.Stretch;
+                _flydigi.MinWidth = 0;
+                _flydigi.MaxWidth = double.MaxValue;
             }
             else
             {
                 // Both visible — side by side.
                 _deviceRow.Visibility = Visibility.Visible;
                 _deviceRow.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
-                _deviceRow.ColumnDefinitions[1].Width = new GridLength(8);
+                _deviceRow.ColumnDefinitions[1].Width = new GridLength(12);
                 _deviceRow.ColumnDefinitions[2].Width = new GridLength(1, GridUnitType.Star);
                 _hydroUi.HorizontalAlignment = HorizontalAlignment.Stretch;
                 _hydroUi.MinWidth = 0;
