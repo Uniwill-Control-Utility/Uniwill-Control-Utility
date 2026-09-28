@@ -60,6 +60,35 @@ namespace Uniwill_Control_Utility.ViewModels
         }
 
         /// <summary>
+        /// Restores service-level state after a feature's navigation toggle is switched ON.
+        /// Call this from SettingsPage when a feature toggle is switched ON so that
+        /// internal service state (e.g. keyboard hooks) is re-enabled.
+        /// </summary>
+        internal void EnableFeature(OptionalNavigationFeature feature)
+        {
+            switch (feature)
+            {
+                case OptionalNavigationFeature.Overlay:
+                    // Re-enable the overlay: reinstalls the keyboard hook.
+                    var overlayService = App.GetService<OverlayManagerService>();
+                    if (overlayService != null)
+                    {
+                        var options = overlayService.CurrentOptions with { Enabled = true };
+                        overlayService.ApplyOptions(options);
+                    }
+                    break;
+
+                case OptionalNavigationFeature.Adaptive:
+                case OptionalNavigationFeature.HydroUi:
+                case OptionalNavigationFeature.LightBar:
+                case OptionalNavigationFeature.Auto:
+                    // No re-enable action needed — these features don't hold
+                    // internal "enabled" state that gets cleared on disable.
+                    break;
+            }
+        }
+
+        /// <summary>
         /// Performs service-level cleanup before hiding a feature's navigation item.
         /// Call this from SettingsPage when a feature toggle is switched OFF.
         /// </summary>

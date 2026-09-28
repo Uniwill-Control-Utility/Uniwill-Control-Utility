@@ -554,10 +554,15 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
             }
 
-            // When disabling a feature, perform service-level cleanup first
-            // (stop running state, lift overrides, disconnect hardware).
-            if (!isVisible)
+            if (isVisible)
             {
+                // Restore service-level state (e.g. reinstall keyboard hooks).
+                _mainWindowViewModel.EnableFeature(feature);
+            }
+            else
+            {
+                // When disabling a feature, perform service-level cleanup first
+                // (stop running state, lift overrides, disconnect hardware).
                 await _mainWindowViewModel.DisableFeature(feature);
             }
 
