@@ -59,6 +59,64 @@ namespace Uniwill_Control_Utility.ViewModels
             createNavItem("Settings", "settings", "\uE713", typeof(Views.Pages.SettingsPage), true);
         }
 
+        /// <summary>
+        /// Performs service-level cleanup before hiding a feature's navigation item.
+        /// Call this from SettingsPage when a feature toggle is switched OFF.
+        /// </summary>
+        internal async Task DisableFeature(OptionalNavigationFeature feature)
+        {
+            switch (feature)
+            {
+                case OptionalNavigationFeature.Adaptive:
+                    // Lift all DeviceApplier overrides so the device pages regain control.
+                    // This also restores user settings to hardware immediately.
+                    var deviceApplier = App.GetService<DeviceApplier>();
+                    if (deviceApplier != null)
+                    {
+                        if (deviceApplier.IsFlydigiOverridden)
+                            _ = deviceApplier.DisableFlydigiOverrideAsync();
+                        if (deviceApplier.IsWatercoolerOverridden)
+                            _ = deviceApplier.DisableWatercoolerOverrideAsync();
+                        if (deviceApplier.IsEcFanOverridden)
+                            deviceApplier.DisableEcFanOverride();
+                        if (deviceApplier.IsKeyboardOverridden)
+                            deviceApplier.DisableKeyboardOverride();
+                        if (deviceApplier.IsLightBarOverridden)
+                            deviceApplier.DisableLightBarOverride();
+                        // CPU/GPU override has no IsOverridden flag; Disable is idempotent
+                        // (re-applies the last active preset profile from Settings).
+                        _ = deviceApplier.DisableCpuGpuOverrideAsync();
+                    }
+                    break;
+
+                case OptionalNavigationFeature.HydroUi:
+                    // Disconnect the watercooler if connected.
+                    var waterCoolerService = App.GetService<WaterCoolerService>();
+                    if (waterCoolerService?.IsConnected == true)
+                    {
+                        waterCoolerService.SetUserDisconnected();
+                        await waterCoolerService.DisconnectAsync();
+                    }
+                    break;
+
+                case OptionalNavigationFeature.Overlay:
+                    // Disable the overlay: removes keyboard hook, stops monitoring, hides window.
+                    var overlayService = App.GetService<OverlayManagerService>();
+                    if (overlayService != null)
+                    {
+                        var options = overlayService.CurrentOptions with { Enabled = false };
+                        overlayService.ApplyOptions(options);
+                    }
+                    break;
+
+                case OptionalNavigationFeature.LightBar:
+                case OptionalNavigationFeature.Auto:
+                    // Light Bar: HID handle is intentionally kept open; no cleanup needed.
+                    // Auto: pure config page; guard is in MainWindow automation triggers.
+                    break;
+            }
+        }
+
         public void RefreshNavigationItems()
         {
             var preferences = new FeatureNavigationPreferences(

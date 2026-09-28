@@ -510,13 +510,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                     {
                         if (Settings.Default.EnableFlydigi && (cbxBs2ProEnabled.IsChecked ?? false) && !_deviceApplier.IsFlydigiOverridden)
                             _deviceApplier.EnableFlydigiOverride();
-                        if (_hydroConnected && (cbxWcEnabled.IsChecked ?? false) && !_deviceApplier.IsWatercoolerOverridden)
+                        if (Settings.Default.EnableHydroUiNavigation && _hydroConnected && (cbxWcEnabled.IsChecked ?? false) && !_deviceApplier.IsWatercoolerOverridden)
                             _deviceApplier.EnableWatercoolerOverride();
                         if ((cbxEcFanEnabled.IsChecked ?? false) && !_deviceApplier.IsEcFanOverridden)
                             _deviceApplier.EnableEcFanOverride();
                         if ((cbxKbEnabled.IsChecked ?? false) && !_deviceApplier.IsKeyboardOverridden)
                             _deviceApplier.EnableKeyboardOverride();
-                        if ((cbxLbEnabled.IsChecked ?? false) && sdLightBar.Visibility == Visibility.Visible && !_deviceApplier.IsLightBarOverridden)
+                        if (Settings.Default.EnableLightBarNavigation && (cbxLbEnabled.IsChecked ?? false) && sdLightBar.Visibility == Visibility.Visible && !_deviceApplier.IsLightBarOverridden)
                             _deviceApplier.EnableLightBarOverride();
                         if ((cbxCpuEnabled.IsChecked ?? false) || (cbxGpuEnabled.IsChecked ?? false))
                             _deviceApplier.EnableCpuGpuOverride();
@@ -1168,6 +1168,13 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbxWcEnabled_Toggled(object sender, RoutedEventArgs e)
         {
+            // Prevent enabling if Hydro UI navigation is disabled in Settings.
+            if ((cbxWcEnabled.IsChecked ?? false) && !Settings.Default.EnableHydroUiNavigation)
+            {
+                cbxWcEnabled.IsChecked = false;
+                return;
+            }
+
             // Prevent enabling if no watercooler is connected.
             if ((cbxWcEnabled.IsChecked ?? false) && !_hydroConnected)
             {
@@ -1365,7 +1372,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async Task ApplyWatercoolerIfNeeded()
         {
-            if (!_hydroConnected || !(cbxWcEnabled.IsChecked ?? false))
+            if (!Settings.Default.EnableHydroUiNavigation || !_hydroConnected || !(cbxWcEnabled.IsChecked ?? false))
                 return;
 
             bool smartModeActive = _waterCoolerService?.IsSmartModeActive == true;
@@ -1820,7 +1827,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void ApplyLightBarIfNeeded()
         {
-            if (!(cbxLbEnabled.IsChecked ?? false) ||
+            if (!Settings.Default.EnableLightBarNavigation ||
+                !(cbxLbEnabled.IsChecked ?? false) ||
                 sdLightBar.Visibility != Visibility.Visible ||
                 _hidService == null)
                 return;
@@ -3283,6 +3291,13 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbxLbEnabled_Toggled(object sender, RoutedEventArgs e)
         {
+            // Prevent enabling if Light Bar navigation is disabled in Settings.
+            if ((cbxLbEnabled.IsChecked ?? false) && !Settings.Default.EnableLightBarNavigation)
+            {
+                cbxLbEnabled.IsChecked = false;
+                return;
+            }
+
             bool enabled = cbxLbEnabled.IsChecked ?? false;
             Settings.Default.AdaptiveLbEnabled = enabled;
             Settings.Default.Save();

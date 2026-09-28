@@ -485,40 +485,80 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         private void cbShowAdaptiveNavigation_Checked(object sender, RoutedEventArgs e) =>
-            SetFeatureNavigationVisibility(value => Settings.Default.EnableAdaptiveNavigation = value, true);
+            SetFeatureNavigationVisibility(
+                ViewModels.OptionalNavigationFeature.Adaptive,
+                value => Settings.Default.EnableAdaptiveNavigation = value,
+                true);
 
         private void cbShowAdaptiveNavigation_Unchecked(object sender, RoutedEventArgs e) =>
-            SetFeatureNavigationVisibility(value => Settings.Default.EnableAdaptiveNavigation = value, false);
+            SetFeatureNavigationVisibility(
+                ViewModels.OptionalNavigationFeature.Adaptive,
+                value => Settings.Default.EnableAdaptiveNavigation = value,
+                false);
 
         private void cbShowHydroUiNavigation_Checked(object sender, RoutedEventArgs e) =>
-            SetFeatureNavigationVisibility(value => Settings.Default.EnableHydroUiNavigation = value, true);
+            SetFeatureNavigationVisibility(
+                ViewModels.OptionalNavigationFeature.HydroUi,
+                value => Settings.Default.EnableHydroUiNavigation = value,
+                true);
 
         private void cbShowHydroUiNavigation_Unchecked(object sender, RoutedEventArgs e) =>
-            SetFeatureNavigationVisibility(value => Settings.Default.EnableHydroUiNavigation = value, false);
+            SetFeatureNavigationVisibility(
+                ViewModels.OptionalNavigationFeature.HydroUi,
+                value => Settings.Default.EnableHydroUiNavigation = value,
+                false);
 
         private void cbShowLightBarNavigation_Checked(object sender, RoutedEventArgs e) =>
-            SetFeatureNavigationVisibility(value => Settings.Default.EnableLightBarNavigation = value, true);
+            SetFeatureNavigationVisibility(
+                ViewModels.OptionalNavigationFeature.LightBar,
+                value => Settings.Default.EnableLightBarNavigation = value,
+                true);
 
         private void cbShowLightBarNavigation_Unchecked(object sender, RoutedEventArgs e) =>
-            SetFeatureNavigationVisibility(value => Settings.Default.EnableLightBarNavigation = value, false);
+            SetFeatureNavigationVisibility(
+                ViewModels.OptionalNavigationFeature.LightBar,
+                value => Settings.Default.EnableLightBarNavigation = value,
+                false);
 
         private void cbShowOverlayNavigation_Checked(object sender, RoutedEventArgs e) =>
-            SetFeatureNavigationVisibility(value => Settings.Default.EnableOverlayNavigation = value, true);
+            SetFeatureNavigationVisibility(
+                ViewModels.OptionalNavigationFeature.Overlay,
+                value => Settings.Default.EnableOverlayNavigation = value,
+                true);
 
         private void cbShowOverlayNavigation_Unchecked(object sender, RoutedEventArgs e) =>
-            SetFeatureNavigationVisibility(value => Settings.Default.EnableOverlayNavigation = value, false);
+            SetFeatureNavigationVisibility(
+                ViewModels.OptionalNavigationFeature.Overlay,
+                value => Settings.Default.EnableOverlayNavigation = value,
+                false);
 
         private void cbShowAutoNavigation_Checked(object sender, RoutedEventArgs e) =>
-            SetFeatureNavigationVisibility(value => Settings.Default.EnableAutoNavigation = value, true);
+            SetFeatureNavigationVisibility(
+                ViewModels.OptionalNavigationFeature.Auto,
+                value => Settings.Default.EnableAutoNavigation = value,
+                true);
 
         private void cbShowAutoNavigation_Unchecked(object sender, RoutedEventArgs e) =>
-            SetFeatureNavigationVisibility(value => Settings.Default.EnableAutoNavigation = value, false);
+            SetFeatureNavigationVisibility(
+                ViewModels.OptionalNavigationFeature.Auto,
+                value => Settings.Default.EnableAutoNavigation = value,
+                false);
 
-        private void SetFeatureNavigationVisibility(Action<bool> updateSetting, bool isVisible)
+        private async void SetFeatureNavigationVisibility(
+            ViewModels.OptionalNavigationFeature feature,
+            Action<bool> updateSetting,
+            bool isVisible)
         {
             if (!_featureNavigationControlsReady)
             {
                 return;
+            }
+
+            // When disabling a feature, perform service-level cleanup first
+            // (stop running state, lift overrides, disconnect hardware).
+            if (!isVisible)
+            {
+                await _mainWindowViewModel.DisableFeature(feature);
             }
 
             updateSetting(isVisible);
