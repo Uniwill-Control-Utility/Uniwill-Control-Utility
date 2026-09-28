@@ -2,7 +2,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using Uniwill_Control_Utility.Properties;
@@ -126,28 +125,6 @@ namespace Uniwill_Control_Utility.ViewModels
 
         private void OnCultureChanged(object? sender, EventArgs e)
         {
-            foreach (var item in NavigationItems.Concat(NavigationFooter).OfType<NavigationViewItem>())
-            {
-                var symbol = item.TargetPageTag switch
-                {
-                    "dashboard" => SymbolRegular.Home24,
-                    "presets" => SymbolRegular.Predictions24,
-                    "adaptive" => SymbolRegular.Radar20,
-                    "overlay" => SymbolRegular.DesktopPulse24,
-                    "auto" => SymbolRegular.Transmission24,
-                    "fancontrol" => SymbolRegular.Empty, // uses FanIconElement, not SymbolIcon
-                    "keyboard" => SymbolRegular.Keyboard24,
-                    "battery" => SymbolRegular.Empty, // uses FontIcon, not SymbolIcon
-                    "settings" => SymbolRegular.Settings24,
-                    _ => SymbolRegular.Empty
-                };
-
-                if (symbol != SymbolRegular.Empty)
-                {
-                    item.Icon = new SymbolIcon { Symbol = symbol };
-                }
-            }
-
             RefreshLastAppliedSettings();
         }
 
