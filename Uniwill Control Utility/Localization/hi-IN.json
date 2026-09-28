@@ -603,5 +603,19 @@
   "Watercooler service is not available.\nPlease restart the application.": "वाटरकूलर सेवा उपलब्ध नहीं है।\nकृपया एप्लिकेशन को फिर से शुरू करें।",
   "When enabled, a single curve controls both CPU and GPU fans.": "सक्षम होने पर, एक सिंगल कर्व CPU और GPU दोनों पंखों को नियंत्रित करता है।",
   "White": "सफेद",
-  "Width": "चौड़ाई"
+  "Width": "चौड़ाई",
+  "Initializing application": "एप्लिकेशन प्रारंभ किया जा रहा है",
+  "Checking environment": "परिवेश की जाँच की जा रही है",
+  "Loading settings": "सेटिंग्स लोड की जा रही हैं",
+  "Detecting hardware": "हार्डवेयर का पता लगाया जा रहा है",
+  "Starting services": "सेवाएँ शुरू की जा रही हैं",
+  "Preparing interface": "इंटरफ़ेस तैयार किया जा रहा है",
+  "Preparing diagnostics": "निदान तैयार किया जा रहा है",
+  "Checking prerequisites": "आवश्यक घटकों की जाँच की जा रही है",
+  "Reading system profile": "सिस्टम प्रोफ़ाइल पढ़ी जा रही है",
+  "Configuring services": "सेवाएँ कॉन्फ़िगर की जा रही हैं",
+  "Initializing sensors": "सेंसर प्रारंभ किए जा रहे हैं",
+  "Applying startup settings": "स्टार्टअप सेटिंग्स लागू की जा रही हैं",
+  "Opening dashboard": "डैशबोर्ड खोला जा रहा है",
+  "Ready": "तैयार"
 }

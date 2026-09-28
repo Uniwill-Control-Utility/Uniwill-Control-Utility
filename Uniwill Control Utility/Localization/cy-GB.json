@@ -603,5 +603,19 @@
   "Watercooler service is not available.\nPlease restart the application.": "Nid yw'r gwasanaeth oerach dŵr ar gael.\nAilgychwynnwch y rhaglen, os gwelwch yn dda.",
   "When enabled, a single curve controls both CPU and GPU fans.": "Pan wedi'i alluogi, mae un gromlin yn rheoli gwyntyllau'r CPU a'r GPU.",
   "White": "Gwyn",
-  "Width": "Lled"
+  "Width": "Lled",
+  "Initializing application": "Yn ymgychwyn y rhaglen",
+  "Checking environment": "Yn gwirio'r amgylchedd",
+  "Loading settings": "Yn llwytho gosodiadau",
+  "Detecting hardware": "Yn canfod caledwedd",
+  "Starting services": "Yn cychwyn gwasanaethau",
+  "Preparing interface": "Yn paratoi'r rhyngwyneb",
+  "Preparing diagnostics": "Yn paratoi diagnosteg",
+  "Checking prerequisites": "Yn gwirio rhagofynion",
+  "Reading system profile": "Yn darllen proffil y system",
+  "Configuring services": "Yn ffurfweddu gwasanaethau",
+  "Initializing sensors": "Yn ymgychwyn synwyryddion",
+  "Applying startup settings": "Yn cymhwyso gosodiadau cychwyn",
+  "Opening dashboard": "Yn agor y dangosfwrdd",
+  "Ready": "Yn barod"
 }

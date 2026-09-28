@@ -603,5 +603,19 @@
   "Watercooler service is not available.\nPlease restart the application.": "Wasserkühlungsdienst ist nicht verfügbar.\nBitte starten Sie die Anwendung neu.",
   "When enabled, a single curve controls both CPU and GPU fans.": "Wenn aktiviert, steuert eine einzige Kurve sowohl die CPU- als auch die GPU-Lüfter.",
   "White": "Weiß",
-  "Width": "Breite"
+  "Width": "Breite",
+  "Initializing application": "Anwendung wird initialisiert",
+  "Checking environment": "Umgebung wird überprüft",
+  "Loading settings": "Einstellungen werden geladen",
+  "Detecting hardware": "Hardware wird erkannt",
+  "Starting services": "Dienste werden gestartet",
+  "Preparing interface": "Benutzeroberfläche wird vorbereitet",
+  "Preparing diagnostics": "Diagnose wird vorbereitet",
+  "Checking prerequisites": "Voraussetzungen werden geprüft",
+  "Reading system profile": "Systemprofil wird gelesen",
+  "Configuring services": "Dienste werden konfiguriert",
+  "Initializing sensors": "Sensoren werden initialisiert",
+  "Applying startup settings": "Starteinstellungen werden angewendet",
+  "Opening dashboard": "Dashboard wird geöffnet",
+  "Ready": "Bereit"
 }

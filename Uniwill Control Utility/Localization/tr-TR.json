@@ -603,5 +603,19 @@
   "Watercooler service is not available.\nPlease restart the application.": "Sıvı soğutma hizmeti kullanılamıyor.\nLütfen uygulamayı yeniden başlatın.",
   "When enabled, a single curve controls both CPU and GPU fans.": "Etkinleştirildiğinde, tek bir eğri hem CPU hem de GPU fanlarını kontrol eder.",
   "White": "Beyaz",
-  "Width": "Genişlik"
+  "Width": "Genişlik",
+  "Initializing application": "Uygulama başlatılıyor",
+  "Checking environment": "Ortam denetleniyor",
+  "Loading settings": "Ayarlar yükleniyor",
+  "Detecting hardware": "Donanım algılanıyor",
+  "Starting services": "Hizmetler başlatılıyor",
+  "Preparing interface": "Arayüz hazırlanıyor",
+  "Preparing diagnostics": "Tanılama hazırlanıyor",
+  "Checking prerequisites": "Ön koşullar denetleniyor",
+  "Reading system profile": "Sistem profili okunuyor",
+  "Configuring services": "Hizmetler yapılandırılıyor",
+  "Initializing sensors": "Sensörler başlatılıyor",
+  "Applying startup settings": "Başlangıç ayarları uygulanıyor",
+  "Opening dashboard": "Ana panel açılıyor",
+  "Ready": "Hazır"
 }

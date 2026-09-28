@@ -86,51 +86,67 @@ namespace Uniwill_Control_Utility
         /// </summary>
         private async void OnStartup(object sender, StartupEventArgs e)
         {
+            StartupProgressWindow? startupWindow = null;
+            StartupProgressReporter? startupProgressReporter = null;
+
             Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
             LocalizationService.Initialize(Settings.Default.Language);
 
-            // Ensure logs directory exists before configuring the logger
-            if (!Directory.Exists(LOGS_FOLDER))
-                Directory.CreateDirectory(LOGS_FOLDER);
-
-            Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.ControlledBy(Scripts.Misc.DiagnosticLogger.LevelSwitch)
-                .WriteTo.Console(theme: AnsiConsoleTheme.Code, applyThemeToRedirectedOutput: true)
-                .WriteTo.File(LOGS_FOLDER + "ucu_log.txt",
-                    fileSizeLimitBytes: 8 * 1024 * 1024, // 8MB
-                    rollingInterval: RollingInterval.Day
-                )
-                .CreateLogger();
-
-            Log.Information("Logger initialized");
-
-            Scripts.Misc.DiagnosticLogger.ApplySettingsLevel();
-
-            // Catch unhandled exceptions from all threads (not just the UI thread)
-            AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
-
-            Log.Information("About to check VC Redist");
-
-            if (!IsVcRedistInstalled("x64") && !IsVcRedistInstalled("x86"))
-            {
-                var downloadVcRedist = MessageBox.Show(LocalizationService.Get("Microsoft Visual C++ Redistributable is not installed.\nWould you like to download it now?"),
-                    LocalizationService.Get("Missing VC Redistributable"),
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Warning);
-                if (downloadVcRedist == MessageBoxResult.Yes)
-                {
-                    Process.Start(
-                        new ProcessStartInfo("https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist")
-                            { UseShellExecute = true });
-                }
-
-                Shutdown();
-                return;
-            }
+            startupWindow = new StartupProgressWindow();
+            startupWindow.Show();
+            var displayedStartupWindow = startupWindow;
+            startupProgressReporter = new StartupProgressReporter(
+                stage => ReportStartupProgressAsync(displayedStartupWindow, stage));
 
             try
             {
+                await startupProgressReporter.ReportAsync(StartupStage.InitializingApplication);
+
+                await startupProgressReporter.ReportAsync(StartupStage.PreparingDiagnostics);
+
+                // Ensure logs directory exists before configuring the logger
+                if (!Directory.Exists(LOGS_FOLDER))
+                    Directory.CreateDirectory(LOGS_FOLDER);
+
+                Log.Logger = new LoggerConfiguration()
+                    .MinimumLevel.ControlledBy(Scripts.Misc.DiagnosticLogger.LevelSwitch)
+                    .WriteTo.Console(theme: AnsiConsoleTheme.Code, applyThemeToRedirectedOutput: true)
+                    .WriteTo.File(LOGS_FOLDER + "ucu_log.txt",
+                        fileSizeLimitBytes: 8 * 1024 * 1024, // 8MB
+                        rollingInterval: RollingInterval.Day
+                    )
+                    .CreateLogger();
+
+                Log.Information("Logger initialized");
+
+                Scripts.Misc.DiagnosticLogger.ApplySettingsLevel();
+
+                // Catch unhandled exceptions from all threads (not just the UI thread)
+                AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
+
+                await startupProgressReporter.ReportAsync(StartupStage.CheckingPrerequisites);
+                Log.Information("About to check VC Redist");
+
+                if (!IsVcRedistInstalled("x64") && !IsVcRedistInstalled("x86"))
+                {
+                    var downloadVcRedist = MessageBox.Show(LocalizationService.Get("Microsoft Visual C++ Redistributable is not installed.\nWould you like to download it now?"),
+                        LocalizationService.Get("Missing VC Redistributable"),
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning);
+                    if (downloadVcRedist == MessageBoxResult.Yes)
+                    {
+                        Process.Start(
+                            new ProcessStartInfo("https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist")
+                                { UseShellExecute = true });
+                    }
+
+                    Shutdown();
+                    return;
+                }
+
+                await startupProgressReporter.ReportAsync(StartupStage.ReadingSystemProfile);
+
                 try
                 {
                     product = GetSystemInfo.Product;
@@ -155,6 +171,8 @@ namespace Uniwill_Control_Utility
                     Log.Logger.Error(ex, "Failed to setup product and display refresh rates");
                 }
 
+                await startupProgressReporter.ReportAsync(StartupStage.ConfiguringServices);
+
            _host = Host
                     .CreateDefaultBuilder()
                     .ConfigureAppConfiguration(c =>
@@ -170,6 +188,7 @@ namespace Uniwill_Control_Utility
                     {
                         // App Host
                         services.AddHostedService<ApplicationHostService>();
+                        services.AddSingleton(startupProgressReporter);
 
                         // Page resolver service
                         services.AddSingleton<INavigationViewPageProvider, PageService>();
@@ -262,6 +281,7 @@ namespace Uniwill_Control_Utility
 
                 _logger = _host.Services.GetRequiredService<ILogger<App>>();
 
+                await startupProgressReporter.ReportAsync(StartupStage.LoadingSettings);
                 _ = Tablet.TabletDevices;
                 bool firstBoot = false;
                 try
@@ -321,7 +341,11 @@ namespace Uniwill_Control_Utility
                 // Run hardware detection and LHM init before building the UI.
                 // Both run in parallel on background threads so the total wait
                 // is max(WMI, LHM) — the window only shows when all data is ready.
+                await startupProgressReporter.ReportAsync(StartupStage.DetectingHardware);
+                await startupProgressReporter.ReportAsync(StartupStage.InitializingSensors);
                 await DetectHardwareAsync(_host.Services.GetRequiredService<IHardwareMonitoringService>());
+
+                await startupProgressReporter.ReportAsync(StartupStage.ApplyingStartupSettings);
 
                 string? entryLocation = System.Reflection.Assembly.GetEntryAssembly()?.Location;
                 string path = System.IO.Path.GetDirectoryName(entryLocation)!;
@@ -344,6 +368,12 @@ namespace Uniwill_Control_Utility
 
                 await _host.StartAsync(CancellationToken.None);
 
+                await startupProgressReporter.ReportAsync(StartupStage.Complete);
+                await startupWindow.WaitForProgressPlaybackAsync();
+                startupWindow.Close();
+                startupWindow = null;
+                startupProgressReporter.Detach();
+
                 // Kick off device auto-connects in parallel so they don't block
                 // the dashboard from appearing.  The dashboard's device cards
                 // already handle late-arriving connections (they toggle visibility).
@@ -357,8 +387,21 @@ namespace Uniwill_Control_Utility
             catch (Exception ex)
             {
                 Log.Logger.Fatal(ex, "Failed to build and start a host");
+                startupProgressReporter?.Detach();
+                startupWindow?.Hide();
                 MessageBox.Show(ex.Message);
+                Shutdown(-1);
             }
+        }
+
+        private static async Task ReportStartupProgressAsync(
+            StartupProgressWindow startupWindow,
+            StartupStage stage)
+        {
+            startupWindow.QueueProgress(StartupProgress.For(stage));
+            await startupWindow.Dispatcher.InvokeAsync(
+                static () => { },
+                DispatcherPriority.Render);
         }
 
         private static async Task DetectHardwareAsync(IHardwareMonitoringService monitoring)

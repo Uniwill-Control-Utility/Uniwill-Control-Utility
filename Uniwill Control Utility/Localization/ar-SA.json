@@ -603,5 +603,19 @@
   "Watercooler service is not available.\nPlease restart the application.": "خدمة المبرد المائي غير متوفرة.\nيرجى إعادة تشغيل التطبيق.",
   "When enabled, a single curve controls both CPU and GPU fans.": "عند التمكين، يتحكم منحنى واحد في مراوح CPU و GPU.",
   "White": "أبيض",
-  "Width": "العرض"
+  "Width": "العرض",
+  "Initializing application": "جارٍ تهيئة التطبيق",
+  "Checking environment": "جارٍ التحقق من البيئة",
+  "Loading settings": "جارٍ تحميل الإعدادات",
+  "Detecting hardware": "جارٍ اكتشاف الأجهزة",
+  "Starting services": "جارٍ بدء الخدمات",
+  "Preparing interface": "جارٍ إعداد الواجهة",
+  "Preparing diagnostics": "جارٍ إعداد التشخيصات",
+  "Checking prerequisites": "جارٍ التحقق من المتطلبات",
+  "Reading system profile": "جارٍ قراءة ملف تعريف النظام",
+  "Configuring services": "جارٍ تكوين الخدمات",
+  "Initializing sensors": "جارٍ تهيئة المستشعرات",
+  "Applying startup settings": "جارٍ تطبيق إعدادات بدء التشغيل",
+  "Opening dashboard": "جارٍ فتح لوحة المعلومات",
+  "Ready": "جاهز"
 }

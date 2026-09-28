@@ -603,5 +603,19 @@
   "Watercooler service is not available.\nPlease restart the application.": "Hindi available ang serbisyo ng watercooler.\nPakisubukang i-restart ang application.",
   "When enabled, a single curve controls both CPU and GPU fans.": "Kapag pinagana, iisang curve lamang ang kokontrol sa parehong fan ng CPU at GPU.",
   "White": "Puti",
-  "Width": "Lapad"
+  "Width": "Lapad",
+  "Initializing application": "Sinisimulan ang application",
+  "Checking environment": "Sinusuri ang environment",
+  "Loading settings": "Nilo-load ang mga setting",
+  "Detecting hardware": "Tinutukoy ang hardware",
+  "Starting services": "Sinisimulan ang mga serbisyo",
+  "Preparing interface": "Inihahanda ang interface",
+  "Preparing diagnostics": "Inihahanda ang diagnostics",
+  "Checking prerequisites": "Sinusuri ang mga kinakailangan",
+  "Reading system profile": "Binabasa ang system profile",
+  "Configuring services": "Kino-configure ang mga serbisyo",
+  "Initializing sensors": "Sinisimulan ang mga sensor",
+  "Applying startup settings": "Inilalapat ang mga startup setting",
+  "Opening dashboard": "Binubuksan ang dashboard",
+  "Ready": "Handa na"
 }

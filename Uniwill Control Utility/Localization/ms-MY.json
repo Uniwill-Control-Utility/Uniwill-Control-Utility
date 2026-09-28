@@ -603,5 +603,19 @@
   "Watercooler service is not available.\nPlease restart the application.": "Perkhidmatan penyejuk cecair tidak tersedia.\nSila mulakan semula aplikasi.",
   "When enabled, a single curve controls both CPU and GPU fans.": "Apabila didayakan, satu lengkung tunggal mengawal kedua-dua kipas CPU dan GPU.",
   "White": "Putih",
-  "Width": "Lebar"
+  "Width": "Lebar",
+  "Initializing application": "Memulakan aplikasi",
+  "Checking environment": "Memeriksa persekitaran",
+  "Loading settings": "Memuatkan tetapan",
+  "Detecting hardware": "Mengesan perkakasan",
+  "Starting services": "Memulakan perkhidmatan",
+  "Preparing interface": "Menyediakan antara muka",
+  "Preparing diagnostics": "Menyediakan diagnostik",
+  "Checking prerequisites": "Memeriksa prasyarat",
+  "Reading system profile": "Membaca profil sistem",
+  "Configuring services": "Mengkonfigurasi perkhidmatan",
+  "Initializing sensors": "Memulakan penderia",
+  "Applying startup settings": "Menggunakan tetapan permulaan",
+  "Opening dashboard": "Membuka papan pemuka",
+  "Ready": "Sedia"
 }

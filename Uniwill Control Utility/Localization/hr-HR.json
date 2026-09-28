@@ -603,5 +603,19 @@
   "Watercooler service is not available.\nPlease restart the application.": "Usluga vodenog hlađenja nije dostupna.\nMolimo ponovno pokrenite aplikaciju.",
   "When enabled, a single curve controls both CPU and GPU fans.": "Kada je omogućeno, jedna krivulja kontrolira i CPU i GPU ventilatore.",
   "White": "Bijela",
-  "Width": "Širina"
+  "Width": "Širina",
+  "Initializing application": "Inicijalizacija aplikacije",
+  "Checking environment": "Provjera okruženja",
+  "Loading settings": "Učitavanje postavki",
+  "Detecting hardware": "Otkrivanje hardvera",
+  "Starting services": "Pokretanje usluga",
+  "Preparing interface": "Priprema sučelja",
+  "Preparing diagnostics": "Priprema dijagnostike",
+  "Checking prerequisites": "Provjera preduvjeta",
+  "Reading system profile": "Čitanje profila sustava",
+  "Configuring services": "Konfiguriranje usluga",
+  "Initializing sensors": "Inicijalizacija senzora",
+  "Applying startup settings": "Primjena postavki pokretanja",
+  "Opening dashboard": "Otvaranje nadzorne ploče",
+  "Ready": "Spremno"
 }
