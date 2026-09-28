@@ -10,9 +10,10 @@ namespace Uniwill_Control_Utility.Services
     /// <summary>
     /// Temperature-driven smart fan control for the Uniwill EC.
     ///
-    /// Reads temperatures on a timer, evaluates a fan curve, and dynamically
-    /// rebuilds both CPU and GPU fan curve tables so that both fans respond
-    /// to a single temperature source. This follows the same approach as
+    /// Reads temperatures on a timer, evaluates a fan curve, and updates the
+    /// CPU and GPU duty tables so both fans respond to a single temperature
+    /// source. Temperature tables are configured once when the loop starts.
+    /// This follows the same approach as
     /// MechControl's "Link Fans" feature — curve table updates instead of
     /// direct PWM writes, which the EC respects for both fans.
     ///
@@ -99,8 +100,10 @@ namespace Uniwill_Control_Utility.Services
 
         private readonly UniwillECService _ec;
         private readonly FlydigiTemperatureProvider _temperatureProvider;
+        private readonly EcSmartFanCycleGate _cycleGate = new();
         private Timer? _timer;
         private bool _disposed;
+        private bool _curveTablesInitialized;
 
         /// <summary>EWMA-filtered temperature carried across ticks.</summary>
         private double? _filteredTemperature;
@@ -147,8 +150,8 @@ namespace Uniwill_Control_Utility.Services
         /*  Configuration                                                      */
         /* ------------------------------------------------------------------ */
 
-        /// <summary>How often (ms) to read temperature and update fan speed. Default 1000.</summary>
-        public int PollIntervalMs { get; set; } = 1000;
+        /// <summary>How often (ms) to read temperature and update fan speed.</summary>
+        public int PollIntervalMs => (int)_cycleGate.PollInterval.TotalMilliseconds;
 
         /// <summary>Maximum duty change allowed per cycle (ramp limiter). Default 20 (10%).</summary>
         public int MaxDutyChangePerCycle { get; set; } = 20;
@@ -235,6 +238,7 @@ namespace Uniwill_Control_Utility.Services
 
             Stop();
 
+            _curveTablesInitialized = false;
             IsActive = true;
             _timer = new Timer(Tick, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(PollIntervalMs));
         }
@@ -263,48 +267,57 @@ namespace Uniwill_Control_Utility.Services
 
         private void Tick(object? state)
         {
-            // 1. Read temperature based on TempSource
-            double? rawTemp = ReadTemperature();
-            if (!rawTemp.HasValue)
-            {
-                Log.Warning("[DIAG] EcSmartFanControl: No temperature reading available");
+            DateTimeOffset cycleStarted = DateTimeOffset.UtcNow;
+            if (!_cycleGate.TryEnter(cycleStarted))
                 return;
-            }
 
-            // 2. EWMA filtering
-            double filtered = ApplyEwmaFilter(rawTemp.Value);
+            bool cycleCompleted = false;
+            bool writeSucceeded = false;
 
-            // 3. Critical temperature overrides (always evaluate, even through hysteresis)
-            int targetDuty = EvaluateCurve(filtered);
-            targetDuty = ApplyCriticalTempOverride(targetDuty, filtered);
-
-            // 4. Hysteresis deadzone check — skip curve re-evaluation if temp
-            // hasn't changed meaningfully, but still allow duty writes to go through.
-            bool hysteresisBlocked = _filteredTemperature.HasValue
-                && Math.Abs(filtered - _filteredTemperature.Value) < HysteresisDeadzone;
-
-            if (hysteresisBlocked)
-            {
-                // Still update the displayed temperature but skip curve evaluation.
-                // The last computed targetDuty is still valid.
-                CurrentTemperature = filtered;
-                TemperatureUpdated?.Invoke(this, (filtered, LastDuty));
-                return;
-            }
-
-            _filteredTemperature = filtered;
-
-            // 5. Ramp limiting
-            targetDuty = ApplyRampLimit(targetDuty);
-
-            // 6. Build and apply curve tables to both fans.
-            // The EC reads its own internal temperature sensor to decide which zone
-            // to activate. We write a flat duty table so that regardless of which
-            // zone the EC picks, it gets the targetDuty (with a safety ramp to 100%
-            // at the highest temperature zones).
-            // Only write when duty changes by >= 2% to avoid EC spam.
             try
             {
+                if (!IsActive)
+                {
+                    _cycleGate.CompleteWithoutWrite();
+                    cycleCompleted = true;
+                    return;
+                }
+
+                // 1. Read temperature based on TempSource
+                double? rawTemp = ReadTemperature();
+                if (!rawTemp.HasValue)
+                {
+                    Log.Warning("[DIAG] EcSmartFanControl: No temperature reading available");
+                    _cycleGate.CompleteWithoutWrite();
+                    cycleCompleted = true;
+                    return;
+                }
+
+                // 2. EWMA filtering
+                double filtered = ApplyEwmaFilter(rawTemp.Value);
+
+                // 3. Critical temperature overrides (always evaluate, even through hysteresis)
+                int targetDuty = EvaluateCurve(filtered);
+                targetDuty = ApplyCriticalTempOverride(targetDuty, filtered);
+
+                // 4. Hysteresis deadzone check. A failed write clears the filter state,
+                // ensuring the desired duty is retried after the backoff period.
+                bool hysteresisBlocked = _filteredTemperature.HasValue
+                    && Math.Abs(filtered - _filteredTemperature.Value) < HysteresisDeadzone;
+
+                if (hysteresisBlocked)
+                {
+                    CurrentTemperature = filtered;
+                    TemperatureUpdated?.Invoke(this, (filtered, LastDuty));
+                    _cycleGate.CompleteWithoutWrite();
+                    cycleCompleted = true;
+                    return;
+                }
+
+                // 5. Ramp limiting
+                targetDuty = ApplyRampLimit(targetDuty);
+
+                // 6. Write only when duty changes by >= 2% to avoid EC spam.
                 bool shouldWrite = !_lastDuty.HasValue
                     || Math.Abs(targetDuty - _lastDuty.Value) >= 4; // 4/200 = 2%
 
@@ -313,27 +326,65 @@ namespace Uniwill_Control_Utility.Services
 
                 if (shouldWrite)
                 {
-                    byte[] tempUp = BuildTempUpTable();
-                    byte[] tempDown = BuildTempDownTable();
                     byte[] cpuDutyTable = BuildFlatDutyTable(targetDuty);
                     byte[] gpuDutyTable = BuildFlatDutyTable(targetDuty);
 
-                    _ec.ApplySmartFanCurve(tempUp, tempDown, cpuDutyTable,
-                        tempUp, tempDown, gpuDutyTable);
+                    try
+                    {
+                        if (!_curveTablesInitialized)
+                        {
+                            byte[] tempUp = BuildTempUpTable();
+                            byte[] tempDown = BuildTempDownTable();
+                            _ec.ApplySmartFanCurve(tempUp, tempDown, cpuDutyTable,
+                                tempUp, tempDown, gpuDutyTable);
+                            _curveTablesInitialized = true;
+                        }
+                        else
+                        {
+                            _ec.ApplySmartFanDuty(cpuDutyTable, gpuDutyTable);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _filteredTemperature = null;
+                        _lastDuty = null;
+                        _cycleGate.CompleteFailure(DateTimeOffset.UtcNow);
+                        cycleCompleted = true;
+                        Log.Warning(ex, "[DIAG] EcSmartFanControl: Curve apply failed; repeated failures trigger a 5 second pause");
+                        return;
+                    }
 
                     _lastDuty = targetDuty;
+                    writeSucceeded = true;
                 }
 
+                _filteredTemperature = filtered;
                 LastDuty = targetDuty;
+
+                // 7. Update properties and raise event
+                CurrentTemperature = filtered;
+                TemperatureUpdated?.Invoke(this, (filtered, targetDuty));
+
+                if (writeSucceeded)
+                    _cycleGate.CompleteSuccess();
+                else
+                    _cycleGate.CompleteWithoutWrite();
+                cycleCompleted = true;
             }
             catch (Exception ex)
             {
-                Log.Warning(ex, "[DIAG] EcSmartFanControl: Curve apply failed");
+                if (writeSucceeded)
+                    _cycleGate.CompleteSuccess();
+                else
+                    _cycleGate.CompleteWithoutWrite();
+                cycleCompleted = true;
+                Log.Warning(ex, "[DIAG] EcSmartFanControl: Control cycle failed");
             }
-
-            // 7. Update properties and raise event
-            CurrentTemperature = filtered;
-            TemperatureUpdated?.Invoke(this, (filtered, targetDuty));
+            finally
+            {
+                if (!cycleCompleted)
+                    _cycleGate.CompleteWithoutWrite();
+            }
         }
 
         /// <summary>
