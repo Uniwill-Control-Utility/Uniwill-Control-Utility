@@ -94,6 +94,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                     sdHydroUI.Visibility = Visibility.Visible;
                     _waterCoolerService!.ConnectionStateChanged += OnWaterCoolerConnectionStateChanged;
                     _waterCoolerService.SmartModeStateChanged += OnSmartModeStateChanged;
+
+                    ApplyFeatureVisibilityGates();
                 });
             });
 
@@ -142,6 +144,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                     {
                         if (lbAvailable)
                             sdLightBar.Visibility = Visibility.Visible;
+
+                        ApplyFeatureVisibilityGates();
                     });
                 }
                 catch (Exception) { /* HID not available */ }
@@ -224,6 +228,31 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Bs2ProRgbFlowingSpeedDivider.Visibility = Visibility.Collapsed;
             if (spBs2ProRgbSpeed is not null)
                 spBs2ProRgbSpeed.Visibility = Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Hides Hydro UI and Light Bar override cards when the corresponding
+        /// feature toggle is OFF in Settings. Only collapses — hardware availability
+        /// controls the initial Visible state, so we never re-show here.
+        /// Call from constructor (after hardware probes) and Page_Loaded.
+        /// </summary>
+        private void ApplyFeatureVisibilityGates()
+        {
+            if (!Settings.Default.EnableHydroUiNavigation && sdHydroUI.Visibility == Visibility.Visible)
+            {
+                sdHydroUI.Visibility = Visibility.Collapsed;
+                cbxWcEnabled.IsChecked = false;
+                Settings.Default.AdaptiveWcEnabled = false;
+                Settings.Default.Save();
+            }
+
+            if (!Settings.Default.EnableLightBarNavigation && sdLightBar.Visibility == Visibility.Visible)
+            {
+                sdLightBar.Visibility = Visibility.Collapsed;
+                cbxLbEnabled.IsChecked = false;
+                Settings.Default.AdaptiveLbEnabled = false;
+                Settings.Default.Save();
+            }
         }
 
         // Named constants for repeated magic strings
@@ -1925,6 +1954,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             AdpGpuClockControlsPanel.Visibility = Settings.Default.EnableGpuClockControl
                 ? Visibility.Visible : Visibility.Collapsed;
 
+            // Re-apply feature visibility gates so cards hide when Settings toggle is OFF
+            ApplyFeatureVisibilityGates();
+
             // Apply dynamic power limit max and update GPU boost indicator
             ApplyAdpPowerLimitMax();
 
@@ -2176,8 +2208,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 if (_hydroConnected && !wasConnected)
                 {
-                    // Cooler just connected — show the card.
+                    // Cooler just connected — show the card (respecting Settings gate).
                     sdHydroUI.Visibility = Visibility.Visible;
+                    ApplyFeatureVisibilityGates();
                 }
                 else if (!_hydroConnected && wasConnected)
                 {
