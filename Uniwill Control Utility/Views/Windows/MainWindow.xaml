@@ -9,7 +9,7 @@
       x:Name="mainWindow"
     Title="{Binding ViewModel.ApplicationTitle, Mode=OneWay}"
     Width="1080"
-    Height="817"
+    Height="1080"
     MinWidth="1000"
     MinHeight="614"
     d:DataContext="{d:DesignInstance local:MainWindow, IsDesignTimeCreatable=True}"
