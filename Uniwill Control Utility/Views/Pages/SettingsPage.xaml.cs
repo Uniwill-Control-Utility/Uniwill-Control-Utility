@@ -40,7 +40,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         private const string MsiInstallFlag = "/i ";
 
         private readonly ILogger<SettingsPage> _logger;
+        private readonly ViewModels.MainWindowViewModel _mainWindowViewModel;
         private bool _languageSelectionReady;
+        private bool _featureNavigationControlsReady;
 
         // Backing fields for async system info
         private string _deviceName = "", _deviceModel = "", _deviceProducer = "";
@@ -73,9 +75,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             get;
         }
 
-        public SettingsPage(ViewModels.SettingsViewModel viewModel, ILogger<SettingsPage> logger)
+        public SettingsPage(
+            ViewModels.SettingsViewModel viewModel,
+            ViewModels.MainWindowViewModel mainWindowViewModel,
+            ILogger<SettingsPage> logger)
         {
             ViewModel = viewModel;
+            _mainWindowViewModel = mainWindowViewModel;
             _logger = logger;
 
             InitializeComponent();
@@ -103,6 +109,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbHideFlydigi.IsChecked = Settings.Default.EnableFlydigi;
             cbDisableCpuVoltageControl.IsChecked = Settings.Default.EnableCpuVoltageControl;
             cbDisableGpuClockControl.IsChecked = Settings.Default.EnableGpuClockControl;
+            cbShowAdaptiveNavigation.IsChecked = Settings.Default.EnableAdaptiveNavigation;
+            cbShowHydroUiNavigation.IsChecked = Settings.Default.EnableHydroUiNavigation;
+            cbShowLightBarNavigation.IsChecked = Settings.Default.EnableLightBarNavigation;
+            cbShowOverlayNavigation.IsChecked = Settings.Default.EnableOverlayNavigation;
+            cbShowAutoNavigation.IsChecked = Settings.Default.EnableAutoNavigation;
+            _featureNavigationControlsReady = true;
 
             cbxLogLevel.SelectedIndex = Settings.Default.DiagnosticLogLevel;
 
@@ -470,6 +482,48 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             Settings.Default.EnableGpuClockControl = false;
             Settings.Default.Save();
+        }
+
+        private void cbShowAdaptiveNavigation_Checked(object sender, RoutedEventArgs e) =>
+            SetFeatureNavigationVisibility(value => Settings.Default.EnableAdaptiveNavigation = value, true);
+
+        private void cbShowAdaptiveNavigation_Unchecked(object sender, RoutedEventArgs e) =>
+            SetFeatureNavigationVisibility(value => Settings.Default.EnableAdaptiveNavigation = value, false);
+
+        private void cbShowHydroUiNavigation_Checked(object sender, RoutedEventArgs e) =>
+            SetFeatureNavigationVisibility(value => Settings.Default.EnableHydroUiNavigation = value, true);
+
+        private void cbShowHydroUiNavigation_Unchecked(object sender, RoutedEventArgs e) =>
+            SetFeatureNavigationVisibility(value => Settings.Default.EnableHydroUiNavigation = value, false);
+
+        private void cbShowLightBarNavigation_Checked(object sender, RoutedEventArgs e) =>
+            SetFeatureNavigationVisibility(value => Settings.Default.EnableLightBarNavigation = value, true);
+
+        private void cbShowLightBarNavigation_Unchecked(object sender, RoutedEventArgs e) =>
+            SetFeatureNavigationVisibility(value => Settings.Default.EnableLightBarNavigation = value, false);
+
+        private void cbShowOverlayNavigation_Checked(object sender, RoutedEventArgs e) =>
+            SetFeatureNavigationVisibility(value => Settings.Default.EnableOverlayNavigation = value, true);
+
+        private void cbShowOverlayNavigation_Unchecked(object sender, RoutedEventArgs e) =>
+            SetFeatureNavigationVisibility(value => Settings.Default.EnableOverlayNavigation = value, false);
+
+        private void cbShowAutoNavigation_Checked(object sender, RoutedEventArgs e) =>
+            SetFeatureNavigationVisibility(value => Settings.Default.EnableAutoNavigation = value, true);
+
+        private void cbShowAutoNavigation_Unchecked(object sender, RoutedEventArgs e) =>
+            SetFeatureNavigationVisibility(value => Settings.Default.EnableAutoNavigation = value, false);
+
+        private void SetFeatureNavigationVisibility(Action<bool> updateSetting, bool isVisible)
+        {
+            if (!_featureNavigationControlsReady)
+            {
+                return;
+            }
+
+            updateSetting(isVisible);
+            Settings.Default.Save();
+            _mainWindowViewModel.RefreshNavigationItems();
         }
 
        #endregion

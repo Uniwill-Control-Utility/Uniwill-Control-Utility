@@ -817,6 +817,46 @@ namespace Uniwill_Control_Utility.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool EnableAdaptiveNavigation {
+            get { return ((bool)(this["EnableAdaptiveNavigation"])); }
+            set { this["EnableAdaptiveNavigation"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool EnableHydroUiNavigation {
+            get { return ((bool)(this["EnableHydroUiNavigation"])); }
+            set { this["EnableHydroUiNavigation"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool EnableLightBarNavigation {
+            get { return ((bool)(this["EnableLightBarNavigation"])); }
+            set { this["EnableLightBarNavigation"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool EnableOverlayNavigation {
+            get { return ((bool)(this["EnableOverlayNavigation"])); }
+            set { this["EnableOverlayNavigation"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool EnableAutoNavigation {
+            get { return ((bool)(this["EnableAutoNavigation"])); }
+            set { this["EnableAutoNavigation"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool DisplayLocalDimming {
             get { return ((bool)(this["DisplayLocalDimming"])); }

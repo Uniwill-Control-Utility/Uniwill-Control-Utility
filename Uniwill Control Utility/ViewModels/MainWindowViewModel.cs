@@ -2,7 +2,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using Uniwill_Control_Utility.Properties;
@@ -51,17 +50,38 @@ namespace Uniwill_Control_Utility.ViewModels
         {
             ApplicationTitle = "Uniwill Control Utility";
 
-            NavigationItems = new ObservableCollection<object> { };
+            RefreshNavigationItems();
+
+            // About in footer, above Settings
+            createNavItem("About", "about", "\uE946", typeof(Views.Pages.AboutPage), true);
+
+            // Settings at the bottom of footer
+            createNavItem("Settings", "settings", "\uE713", typeof(Views.Pages.SettingsPage), true);
+        }
+
+        public void RefreshNavigationItems()
+        {
+            var preferences = new FeatureNavigationPreferences(
+                Settings.Default.EnableAdaptiveNavigation,
+                Settings.Default.EnableHydroUiNavigation,
+                Settings.Default.EnableLightBarNavigation,
+                Settings.Default.EnableOverlayNavigation,
+                Settings.Default.EnableAutoNavigation);
+            bool hydroUiAvailable = WaterCoolerHardwareDetector.IsSupportedHardware();
+            bool lightBarAvailable = _uniwillEc is not null;
+
+            NavigationItems.Clear();
 
             createNavItem("Home", "dashboard", "\uE80F", typeof(Views.Pages.DashboardPage), false);
 
             createNavItem("Presets", "presets", "\uEF58", typeof(Views.Pages.Presets), false);
 
-            createNavItem("Adaptive", "adaptive", "\uEB44", typeof(Views.Pages.Adaptive), false);
+            if (FeatureNavigationPolicy.IsVisible(OptionalNavigationFeature.Adaptive, preferences, hydroUiAvailable, lightBarAvailable))
+            {
+                createNavItem("Adaptive", "adaptive", "\uEB44", typeof(Views.Pages.Adaptive), false);
+            }
 
-
-            // Hydro UI in footer for supported watercooler hardware
-            if (WaterCoolerHardwareDetector.IsSupportedHardware())
+            if (FeatureNavigationPolicy.IsVisible(OptionalNavigationFeature.HydroUi, preferences, hydroUiAvailable, lightBarAvailable))
             {
                 createNavItem("Hydro UI", "watercooler", "\uEB42", typeof(Views.Pages.Watercooler), false);
             }
@@ -81,20 +101,23 @@ namespace Uniwill_Control_Utility.ViewModels
 
                 createNavItem("Keyboard", "keyboard", "\uE765", typeof(Views.Pages.Keyboard), false);
 
-                createNavItem("Light Bar", "lightbar", "\uED39", typeof(Views.Pages.LightBar), false);
+                if (FeatureNavigationPolicy.IsVisible(OptionalNavigationFeature.LightBar, preferences, hydroUiAvailable, lightBarAvailable))
+                {
+                    createNavItem("Light Bar", "lightbar", "\uED39", typeof(Views.Pages.LightBar), false);
+                }
 
                 createNavItem("Battery", "battery", "\uEBC0", typeof(Views.Pages.Battery), false);
             }
 
-            createNavItem("Overlay", "overlay", "\uE81E", typeof(Views.Pages.OverlaySettingsPage), false);
+            if (FeatureNavigationPolicy.IsVisible(OptionalNavigationFeature.Overlay, preferences, hydroUiAvailable, lightBarAvailable))
+            {
+                createNavItem("Overlay", "overlay", "\uE81E", typeof(Views.Pages.OverlaySettingsPage), false);
+            }
 
-            createNavItem("Auto", "auto", "\uF277", typeof(Views.Pages.Automations), false);
-
-            // About in footer, above Settings
-            createNavItem("About", "about", "\uE946", typeof(Views.Pages.AboutPage), true);
-
-            // Settings at the bottom of footer
-            createNavItem("Settings", "settings", "\uE713", typeof(Views.Pages.SettingsPage), true);
+            if (FeatureNavigationPolicy.IsVisible(OptionalNavigationFeature.Auto, preferences, hydroUiAvailable, lightBarAvailable))
+            {
+                createNavItem("Auto", "auto", "\uF277", typeof(Views.Pages.Automations), false);
+            }
         }
 
         private static NavigationViewItem CreateNavigationItem(string content, string tag, SymbolRegular icon, Type pageType) =>
@@ -102,28 +125,6 @@ namespace Uniwill_Control_Utility.ViewModels
 
         private void OnCultureChanged(object? sender, EventArgs e)
         {
-            foreach (var item in NavigationItems.Concat(NavigationFooter).OfType<NavigationViewItem>())
-            {
-                var symbol = item.TargetPageTag switch
-                {
-                    "dashboard" => SymbolRegular.Home24,
-                    "presets" => SymbolRegular.Predictions24,
-                    "adaptive" => SymbolRegular.Radar20,
-                    "overlay" => SymbolRegular.DesktopPulse24,
-                    "auto" => SymbolRegular.Transmission24,
-                    "fancontrol" => SymbolRegular.Empty, // uses FanIconElement, not SymbolIcon
-                    "keyboard" => SymbolRegular.Keyboard24,
-                    "battery" => SymbolRegular.Empty, // uses FontIcon, not SymbolIcon
-                    "settings" => SymbolRegular.Settings24,
-                    _ => SymbolRegular.Empty
-                };
-
-                if (symbol != SymbolRegular.Empty)
-                {
-                    item.Icon = new SymbolIcon { Symbol = symbol };
-                }
-            }
-
             RefreshLastAppliedSettings();
         }
 
