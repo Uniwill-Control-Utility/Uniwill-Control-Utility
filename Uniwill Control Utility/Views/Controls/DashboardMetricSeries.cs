@@ -20,10 +20,7 @@ internal sealed class DashboardMetricSeries
 
     public void Add(double value)
     {
-        if (!double.IsFinite(value) || value <= 0)
-            return;
-
-        _samples.Add(value);
+        _samples.Add(double.IsFinite(value) && value > 0 ? value : double.NaN);
         if (_samples.Count > _capacity)
             _samples.RemoveAt(0);
     }

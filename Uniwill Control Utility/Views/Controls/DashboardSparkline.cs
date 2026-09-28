@@ -74,17 +74,28 @@ public sealed class DashboardSparkline : FrameworkElement
         var geometry = new StreamGeometry();
         using (StreamGeometryContext context = geometry.Open())
         {
+            bool figureStarted = false;
             for (int index = 0; index < _series.Samples.Count; index++)
             {
+                double sample = _series.Samples[index];
+                if (!double.IsFinite(sample))
+                {
+                    figureStarted = false;
+                    continue;
+                }
+
                 double x = index * width / Math.Max(1, _series.Samples.Count - 1);
                 double normalized = Math.Clamp(
-                    (_series.Samples[index] - Minimum) / (Maximum - Minimum),
+                    (sample - Minimum) / (Maximum - Minimum),
                     0,
                     1);
                 double y = height - (normalized * height);
 
-                if (index == 0)
+                if (!figureStarted)
+                {
                     context.BeginFigure(new Point(x, y), false, false);
+                    figureStarted = true;
+                }
                 else
                     context.LineTo(new Point(x, y), true, false);
             }

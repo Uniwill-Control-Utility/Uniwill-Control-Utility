@@ -8,6 +8,8 @@ public sealed class DashboardMemoryInfoFormatterTests
     [InlineData("SK hynix", "  HMCG88AGBSA095N  ", "SK hynix · HMCG88AGBSA095N")]
     [InlineData("", "HMCG88AGBSA095N", "HMCG88AGBSA095N")]
     [InlineData("Crucial", "Crucial CT16G56C46S5", "Crucial CT16G56C46S5")]
+    [InlineData("Kingston/Crucial", "Kingston KF564S38-16/Crucial CT16G56C46S5", "Kingston KF564S38-16 / Crucial CT16G56C46S5")]
+    [InlineData("Kingston/Crucial", "KF564S38-16/CT16G56C46S5", "Kingston KF564S38-16 / Crucial CT16G56C46S5")]
     [InlineData("", "", "Not available")]
     public void FormatModelProducesACompactModuleIdentity(
         string manufacturer,

@@ -7,16 +7,36 @@ internal static class DashboardMemoryInfoFormatter
         string cleanManufacturer = Normalize(manufacturer);
         string cleanModel = Normalize(model);
 
-        if (cleanModel.Length == 0)
-            return cleanManufacturer.Length == 0 ? "Not available" : cleanManufacturer;
+        string[] manufacturers = SplitAggregates(cleanManufacturer);
+        string[] models = SplitAggregates(cleanModel);
 
-        if (cleanManufacturer.Length == 0 ||
-            cleanModel.Contains(cleanManufacturer, System.StringComparison.OrdinalIgnoreCase))
+        if (models.Length == 0)
+            return manufacturers.Length == 0 ? "Not available" : string.Join(" / ", manufacturers);
+
+        if (manufacturers.Length == 0)
+            return string.Join(" / ", models);
+
+        if (manufacturers.Length == 1)
+            return ContainsManufacturer(models, manufacturers[0])
+                ? string.Join(" / ", models)
+                : $"{manufacturers[0]} · {string.Join(" / ", models)}";
+
+        string[] identities = new string[models.Length];
+        for (int index = 0; index < models.Length; index++)
         {
-            return cleanModel;
+            string modelIdentity = models[index];
+            if (ContainsManufacturer(new[] { modelIdentity }, manufacturers))
+            {
+                identities[index] = modelIdentity;
+                continue;
+            }
+
+            identities[index] = index < manufacturers.Length
+                ? $"{manufacturers[index]} {modelIdentity}"
+                : modelIdentity;
         }
 
-        return $"{cleanManufacturer} · {cleanModel}";
+        return string.Join(" / ", identities);
     }
 
     public static string FormatSpeed(int speed)
@@ -26,4 +46,23 @@ internal static class DashboardMemoryInfoFormatter
         => string.Join(" ", value.Split(
             (char[]?)null,
             System.StringSplitOptions.RemoveEmptyEntries));
+
+    private static string[] SplitAggregates(string value)
+        => value.Split(
+            '/',
+            System.StringSplitOptions.TrimEntries | System.StringSplitOptions.RemoveEmptyEntries);
+
+    private static bool ContainsManufacturer(string[] models, params string[] manufacturers)
+    {
+        foreach (string model in models)
+        {
+            foreach (string manufacturer in manufacturers)
+            {
+                if (model.Contains(manufacturer, System.StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+
+        return false;
+    }
 }

@@ -56,10 +56,10 @@
                     <TextBlock Margin="1,-1,0,0" FontSize="13" Text="Charge Limit" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
 
-                <Border x:Name="_healthPill" Grid.Column="3" Height="38" Padding="14,0" CornerRadius="19" BorderThickness="1" BorderBrush="#55D77D" Background="#261B7B3B" VerticalAlignment="Center" HorizontalAlignment="Right">
+                <Border x:Name="_healthPill" Grid.Column="3" Height="38" Padding="14,0" CornerRadius="19" BorderThickness="1" VerticalAlignment="Center" HorizontalAlignment="Right" Visibility="Collapsed">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <ui:SymbolIcon Symbol="Heart20" FontSize="16" Foreground="#65DE8A" />
-                        <TextBlock x:Name="_healthState" Margin="8,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="Healthy" Foreground="#7CE49A" />
+                        <ui:SymbolIcon x:Name="_healthIcon" Symbol="Heart20" FontSize="16" />
+                        <TextBlock x:Name="_healthState" Margin="8,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" />
                     </StackPanel>
                 </Border>
             </Grid>
