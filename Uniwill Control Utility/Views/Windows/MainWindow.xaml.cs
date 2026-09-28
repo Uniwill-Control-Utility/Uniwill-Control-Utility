@@ -273,7 +273,8 @@ namespace Uniwill_Control_Utility.Views.Windows
                         if (statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
                             || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery)
                         {
-                            if (Settings.Default.acPreset != "None" && !string.IsNullOrEmpty(Settings.Default.acPreset))
+                            if (Settings.Default.EnableAutoNavigation &&
+                                Settings.Default.acPreset != "None" && !string.IsNullOrEmpty(Settings.Default.acPreset))
                             {
                                 Settings.Default.acCommandString = PresetProfileApplier.BuildCommandString(
                                     ResolveAutomationProfile(Settings.Default.acPreset));
@@ -290,7 +291,8 @@ namespace Uniwill_Control_Utility.Views.Windows
                         }
                         else
                         {
-                            if (Settings.Default.dcPreset != "None" && !string.IsNullOrEmpty(Settings.Default.dcPreset))
+                            if (Settings.Default.EnableAutoNavigation &&
+                                Settings.Default.dcPreset != "None" && !string.IsNullOrEmpty(Settings.Default.dcPreset))
                             {
                                 Settings.Default.dcCommandString = PresetProfileApplier.BuildCommandString(
                                     ResolveAutomationProfile(Settings.Default.dcPreset));
@@ -834,7 +836,8 @@ namespace Uniwill_Control_Utility.Views.Windows
                     if (statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
                         || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery)
                     {
-                        if (Settings.Default.acPreset != "None" && !string.IsNullOrEmpty(Settings.Default.acPreset))
+                        if (Settings.Default.EnableAutoNavigation &&
+                            Settings.Default.acPreset != "None" && !string.IsNullOrEmpty(Settings.Default.acPreset))
                         {
                             Settings.Default.acCommandString = PresetProfileApplier.BuildCommandString(
                                 ResolveAutomationProfile(Settings.Default.acPreset));
@@ -848,7 +851,8 @@ namespace Uniwill_Control_Utility.Views.Windows
                     }
                     else
                     {
-                        if (Settings.Default.dcPreset != "None" && !string.IsNullOrEmpty(Settings.Default.dcPreset))
+                        if (Settings.Default.EnableAutoNavigation &&
+                            Settings.Default.dcPreset != "None" && !string.IsNullOrEmpty(Settings.Default.dcPreset))
                         {
                             Settings.Default.dcCommandString = PresetProfileApplier.BuildCommandString(
                                 ResolveAutomationProfile(Settings.Default.dcPreset));
