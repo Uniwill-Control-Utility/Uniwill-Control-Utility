@@ -40,20 +40,20 @@
                 <!-- Row 0: Header with top-left rounded corner, inset to match content -->
                 <controls:DashboardHeaderControl x:Name="_header"
                                                  Grid.Row="0"
-                                                 MaxWidth="1080"
-                                                 Margin="16,0,16,0" />
+                                                 MaxWidth="1200"
+                                                 Margin="20,0,20,0" />
 
                 <!-- Row 1: Centered max-width content cards -->
                 <StackPanel Grid.Row="1"
-                            MaxWidth="1080"
+                            MaxWidth="1200"
                             HorizontalAlignment="Stretch"
-                            Margin="12,16,16,18">
+                            Margin="20,18,20,24">
 
                     <!-- Hardware metrics: CPU & GPU -->
-                    <Grid Margin="0,0,0,8">
+                    <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="12" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
@@ -64,10 +64,10 @@
                     </Grid>
 
                     <!-- Memory & Battery row -->
-                    <Grid Margin="0,0,0,8">
+                    <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="12" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
@@ -79,10 +79,10 @@
 
                     <!-- Device status row: Hydro UI & Flydigi Cooler -->
                     <Grid x:Name="_deviceRow"
-                          Margin="0,0,0,8">
+                          Margin="0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="12" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 

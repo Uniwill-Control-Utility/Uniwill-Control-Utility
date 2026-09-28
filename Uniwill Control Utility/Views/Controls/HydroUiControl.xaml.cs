@@ -38,22 +38,23 @@ namespace Uniwill_Control_Utility.Views.Controls
                     11 => "11V",
                     _ => $"Unknown ({snapshot.HydroUiPumpVoltage})"
                 };
-                _pumpLabel.Content = pumpText;
+                _pumpLabel.Text = pumpText;
+                _pumpBar.Value = snapshot.HydroUiPumpVoltage;
 
                 if (snapshot.HydroUiFanRpm > 0)
                 {
                     _fanBar.Value = 100;
-                    _fanLabel.Content = $"{snapshot.HydroUiFanRpm} RPM";
+                    _fanLabel.Text = $"{snapshot.HydroUiFanRpm} RPM";
                 }
                 else if (snapshot.HydroUiFanSpeed > 0)
                 {
                     _fanBar.Value = snapshot.HydroUiFanSpeed;
-                    _fanLabel.Content = $"{snapshot.HydroUiFanSpeed}%";
+                    _fanLabel.Text = $"{snapshot.HydroUiFanSpeed}%";
                 }
                 else
                 {
                     _fanBar.Value = 0;
-                    _fanLabel.Content = "Off";
+                    _fanLabel.Text = "Off";
                 }
             }
             else

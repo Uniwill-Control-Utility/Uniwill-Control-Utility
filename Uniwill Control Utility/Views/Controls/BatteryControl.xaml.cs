@@ -24,25 +24,26 @@ namespace Uniwill_Control_Utility.Views.Controls
             // Health
             if (snapshot.BatteryHealthPercent > 0)
             {
-                _batteryHealthBar.Value = snapshot.BatteryHealthPercent;
-                _batteryHealthLabel.Content = $"{snapshot.BatteryHealthPercent}%";
+                _batteryHealthHero.Text = $"{snapshot.BatteryHealthPercent}%";
+                _healthState.Text = snapshot.BatteryHealthPercent >= 80 ? "Healthy" : "Reduced";
+                _healthPill.Visibility = Visibility.Visible;
             }
             else
             {
-                _batteryHealthBar.Value = 0;
-                _batteryHealthLabel.Content = "--";
+                _batteryHealthHero.Text = "--";
+                _healthPill.Visibility = Visibility.Collapsed;
             }
 
             // Temperature
             if (snapshot.BatteryTemperatureC >= 0)
             {
                 _batteryTempBar.Value = snapshot.BatteryTemperatureC;
-                _batteryTempLabel.Content = $"{snapshot.BatteryTemperatureC}\u00B0C";
+                _batteryTempLabel.Text = $"{snapshot.BatteryTemperatureC}\u00B0C";
             }
             else
             {
                 _batteryTempBar.Value = 0;
-                _batteryTempLabel.Content = "--";
+                _batteryTempLabel.Text = "--";
             }
 
             // Charge limit
@@ -56,13 +57,11 @@ namespace Uniwill_Control_Utility.Views.Controls
 
             if (chargeLimitValue >= 0)
             {
-                _batteryChargeLimitBar.Value = chargeLimitValue;
-                _batteryChargeLimitLabel.Content = $"{chargeLimitValue}%";
+                _chargeLimitHero.Text = $"{chargeLimitValue}%";
             }
             else
             {
-                _batteryChargeLimitBar.Value = 0;
-                _batteryChargeLimitLabel.Content = "--";
+                _chargeLimitHero.Text = "--";
             }
         }
     }

@@ -1,114 +1,118 @@
 <UserControl x:Class="Uniwill_Control_Utility.Views.Controls.CpuControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Uniwill_Control_Utility.Views.Controls"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              FlowDirection="LeftToRight"
-             >
+             FontFamily="Segoe UI Variable Text, Segoe UI"
+             Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+             UseLayoutRounding="True">
 
     <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
             BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
             CornerRadius="8"
-            Padding="16"
-            RenderOptions.EdgeMode="Aliased"
+            Padding="20"
+            MinHeight="286"
             SnapsToDevicePixels="True">
         <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="70" />
-            </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
+                <RowDefinition Height="1" />
+                <RowDefinition Height="18" />
+                <RowDefinition Height="112" />
+                <RowDefinition Height="18" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0" Grid.Column="0"
-                       Margin="0,0,0,16"
-                       FontSize="18"
-                       FontWeight="Medium"
-                       Text="CPU"
-                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Grid Grid.Row="0" Margin="0,0,0,14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <ui:SymbolIcon Symbol="DeveloperBoard24" FontSize="22" />
+                <TextBlock Grid.Column="2" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="22" FontWeight="SemiBold" Text="CPU" />
+                <TextBlock x:Name="_hardwareName"
+                           Grid.Column="4"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Right"
+                           FontSize="12"
+                           TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </Grid>
+            <Border Grid.Row="1" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
 
-            <Label Grid.Row="1" Grid.Column="0"
-                   VerticalContentAlignment="Center"
-                   Content="Utilization"
-                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-            <ProgressBar x:Name="_cpuUsageBar"
-                         Grid.Row="1" Grid.Column="1"
-                         Margin="16,0,16,0"
-                         Minimum="0" Maximum="100" Value="0" />
-            <Label x:Name="_cpuUsageLabel"
-                   Grid.Row="1" Grid.Column="2"
-                   HorizontalContentAlignment="Right"
-                   VerticalContentAlignment="Center"
-                   Content="--"
-                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Grid Grid.Row="3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="132" />
+                    <ColumnDefinition Width="1" />
+                    <ColumnDefinition Width="104" />
+                    <ColumnDefinition Width="1" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-            <Label Grid.Row="2" Grid.Column="0"
-                   VerticalContentAlignment="Center"
-                   Content="Temperature"
-                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-            <ProgressBar x:Name="_cpuTempBar"
-                         Grid.Row="2" Grid.Column="1"
-                         Margin="16,0,16,0"
-                         Minimum="0" Maximum="100" Value="0" />
-            <Label x:Name="_cpuTempLabel"
-                   Grid.Row="2" Grid.Column="2"
-                   HorizontalContentAlignment="Right"
-                   VerticalContentAlignment="Center"
-                   Content="--"
-                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="_cpuTempHero" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="44" FontWeight="SemiBold" Text="--" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                    <TextBlock Margin="1,-2,0,0" FontSize="13" Text="Temperature" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
 
-            <Label Grid.Row="3" Grid.Column="0"
-                   VerticalContentAlignment="Center"
-                   Content="Power"
-                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-            <ProgressBar x:Name="_cpuPowerBar"
-                         Grid.Row="3" Grid.Column="1"
-                         Margin="16,0,16,0"
-                         Minimum="0" Maximum="300" Value="0" />
-            <Label x:Name="_cpuPowerLabel"
-                   Grid.Row="3" Grid.Column="2"
-                   HorizontalContentAlignment="Right"
-                   VerticalContentAlignment="Center"
-                   Content="--"
-                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Border Grid.Column="1" Margin="0,8" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
 
-            <Label Grid.Row="4" Grid.Column="0"
-                   VerticalContentAlignment="Center"
-                   Content="Clock"
-                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-            <ProgressBar x:Name="_cpuClockBar"
-                         Grid.Row="4" Grid.Column="1"
-                         Margin="16,0,16,0"
-                         Minimum="0" Maximum="6000" Value="0" />
-            <Label x:Name="_cpuClockLabel"
-                   Grid.Row="4" Grid.Column="2"
-                   HorizontalContentAlignment="Right"
-                   VerticalContentAlignment="Center"
-                   Content="--"
-                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <StackPanel Grid.Column="2" Margin="20,0,0,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="_cpuUsageHero" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="38" FontWeight="SemiBold" Text="--" />
+                    <TextBlock Margin="1,0,0,0" FontSize="13" Text="Utilization" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
 
-            <Label Grid.Row="5" Grid.Column="0"
-                   VerticalContentAlignment="Center"
-                   Content="Fan Speed"
-                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-            <ProgressBar x:Name="_cpuFanBar"
-                         Grid.Row="5" Grid.Column="1"
-                         Margin="16,0,16,0"
-                         Minimum="0" Maximum="100" Value="0" />
-            <Label x:Name="_cpuFanLabel"
-                   Grid.Row="5" Grid.Column="2"
-                   HorizontalContentAlignment="Right"
-                   VerticalContentAlignment="Center"
-                   Content="--"
-                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Border Grid.Column="3" Margin="0,8" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
 
+                <Grid Grid.Column="4" Margin="20,0,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="8" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock FontSize="12" Text="60s temperature" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="34" />
+                        </Grid.ColumnDefinitions>
+                        <controls:DashboardSparkline x:Name="_temperatureSeries" Margin="0,2,8,2" Minimum="20" Maximum="100" Stroke="{DynamicResource AccentFillColorDefaultBrush}" />
+                        <Grid Grid.Column="1">
+                            <TextBlock VerticalAlignment="Top" FontSize="10" Text="100°" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                            <TextBlock VerticalAlignment="Bottom" FontSize="10" Text="20°" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            <Grid Grid.Row="5">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="82" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="82" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="30" />
+                    <RowDefinition Height="30" />
+                    <RowDefinition Height="30" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" VerticalAlignment="Center" Text="Power" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <controls:DashboardSegmentedBar x:Name="_cpuPowerBar" Grid.Row="0" Grid.Column="1" Height="9" Margin="10,0" Maximum="300" Segments="18" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                <TextBlock x:Name="_cpuPowerLabel" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="Medium" Text="--" />
+
+                <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="Clock" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <controls:DashboardSegmentedBar x:Name="_cpuClockBar" Grid.Row="1" Grid.Column="1" Height="9" Margin="10,0" Maximum="6000" Segments="18" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                <TextBlock x:Name="_cpuClockLabel" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="Medium" Text="--" />
+
+                <TextBlock Grid.Row="2" VerticalAlignment="Center" Text="Fan Speed" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <controls:DashboardSegmentedBar x:Name="_cpuFanBar" Grid.Row="2" Grid.Column="1" Height="9" Margin="10,0" Maximum="100" Segments="18" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                <TextBlock x:Name="_cpuFanLabel" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="Medium" Text="--" />
+            </Grid>
         </Grid>
     </Border>
 </UserControl>
