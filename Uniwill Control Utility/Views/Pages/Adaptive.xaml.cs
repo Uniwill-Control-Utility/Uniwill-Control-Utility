@@ -1365,7 +1365,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async Task ApplyWatercoolerIfNeeded()
         {
-            if (!_hydroConnected || !(cbxWcEnabled.IsChecked ?? false))
+            if (_deviceApplier is null || !_hydroConnected || !(cbxWcEnabled.IsChecked ?? false))
                 return;
 
             bool smartModeActive = _waterCoolerService?.IsSmartModeActive == true;
@@ -1398,7 +1398,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async Task ApplyBs2ProIfNeeded()
         {
-            if (!Settings.Default.EnableFlydigi || !(cbxBs2ProEnabled.IsChecked ?? false))
+            if (_deviceApplier is null || !Settings.Default.EnableFlydigi || !(cbxBs2ProEnabled.IsChecked ?? false))
                 return;
 
             string bs2Mode = GetBs2ProFanModeFromIndex(cbxBs2ProFanMode.SelectedIndex);

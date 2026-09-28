@@ -60,10 +60,10 @@ namespace Uniwill_Control_Utility.Views.Controls
         private int _dragStartOffset;              // Offset of dragged point at drag-start (for delta computation)
         private Dictionary<int, int> _dragStartOffsets = new(); // Per-point offsets at drag start (for range drag)
         private bool _isShiftSelecting = false;    // True during Shift+drag selection phase (no movement yet)
-        private SolidColorBrush? _fallbackBrush;
+        private readonly SolidColorBrush _fallbackBrush;
 
         /// <summary> Resolves the current system accent brush dynamically. </summary>
-        private SolidColorBrush? accentBrush =>
+        private SolidColorBrush accentBrush =>
             Application.Current.Resources["AccentFillColorDefaultBrush"] as SolidColorBrush
             ?? _fallbackBrush;
 
@@ -689,10 +689,10 @@ namespace Uniwill_Control_Utility.Views.Controls
             }
 
             // Ensure crosshair elements exist
-            var baseBrush = accentBrush!;
+            var baseBrush = accentBrush;
             var dashBrush = new SolidColorBrush(baseBrush.Color) { Opacity = 0.35 };
 
-            if (_crosshairH == null)
+            if (_crosshairH == null || _crosshairV == null || _crosshairLabel == null)
             {
                 _crosshairH = new Line
                 {
@@ -789,25 +789,27 @@ namespace Uniwill_Control_Utility.Views.Controls
             _rangeHighlight = null;
         }
 
-        private void EnsureSelectionVisuals()
+        private Rectangle EnsureSelectionVisuals()
         {
             if (_rangeHighlight == null)
             {
                 _rangeHighlight = new Rectangle
                 {
-                    Fill = new SolidColorBrush(accentBrush!.Color) { Opacity = 0.25 },
+                    Fill = new SolidColorBrush(accentBrush.Color) { Opacity = 0.25 },
                     IsHitTestVisible = false
                 };
                 _canvas.Children.Insert(0, _rangeHighlight);
             }
+
+            return _rangeHighlight;
         }
 
         private void UpdateSelectionVisuals()
         {
-            EnsureSelectionVisuals();
+            Rectangle rangeHighlight = EnsureSelectionVisuals();
 
             // Keep highlight brush in sync with current accent color (theme-reactive).
-            _rangeHighlight.Fill = new SolidColorBrush(accentBrush!.Color) { Opacity = 0.25 };
+            rangeHighlight.Fill = new SolidColorBrush(accentBrush.Color) { Opacity = 0.25 };
 
             double w = _canvas.ActualWidth;
             double h = _canvas.ActualHeight;
@@ -817,8 +819,8 @@ namespace Uniwill_Control_Utility.Views.Controls
             if (_rangeSelection != null && _rangeSelection.Count >= 2)
             {
                 // Re-add to canvas if it was removed (e.g., by DrawGraph clearing children).
-                if (!_canvas.Children.Contains(_rangeHighlight))
-                    _canvas.Children.Insert(0, _rangeHighlight);
+                if (!_canvas.Children.Contains(rangeHighlight))
+                    _canvas.Children.Insert(0, rangeHighlight);
 
                 // Show range highlight rect — edges centered on first/last selected points.
                 int minIdx = _rangeSelection.Min();
@@ -828,15 +830,15 @@ namespace Uniwill_Control_Utility.Views.Controls
                 double x2 = PointX(maxIdx, count, drawW);
 
                 // Span exactly from center of first point to center of last point.
-                _rangeHighlight.Width = Math.Abs(x2 - x1);
-                _rangeHighlight.Height = h;
-                Canvas.SetLeft(_rangeHighlight, Math.Min(x1, x2));
-                Canvas.SetTop(_rangeHighlight, 0);
-                _rangeHighlight.Visibility = Visibility.Visible;
+                rangeHighlight.Width = Math.Abs(x2 - x1);
+                rangeHighlight.Height = h;
+                Canvas.SetLeft(rangeHighlight, Math.Min(x1, x2));
+                Canvas.SetTop(rangeHighlight, 0);
+                rangeHighlight.Visibility = Visibility.Visible;
             }
             else
             {
-                _rangeHighlight.Visibility = Visibility.Collapsed;
+                rangeHighlight.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -963,7 +965,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             var pos = e.GetPosition(_canvas);
 
             /* --- Shift-selection mode (selection + transition to movement) --- */
-            if (_isShiftSelecting && _dragStartIndex.HasValue)
+            if (_isShiftSelecting && _dragStartIndex.HasValue && _dragStartPos.HasValue)
             {
                 // Check if this is a vertical drag (movement) vs horizontal drag (selection).
                 double dx = Math.Abs(pos.X - _dragStartPos.Value.X);

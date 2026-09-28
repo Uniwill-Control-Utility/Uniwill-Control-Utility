@@ -208,7 +208,6 @@ namespace Uniwill_Control_Utility.Models
             }
 
             // Find bracketing RPM points and interpolate temperature
-            FanCurvePoint? lower = null;
             for (int i = 0; i < sorted.Count - 1; i++)
             {
                 int lo = Math.Min(sorted[i].Rpm, sorted[i + 1].Rpm);

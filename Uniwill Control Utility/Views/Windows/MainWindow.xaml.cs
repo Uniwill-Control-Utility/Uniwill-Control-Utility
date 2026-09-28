@@ -50,9 +50,9 @@ namespace Uniwill_Control_Utility.Views.Windows
         DispatcherTimer Misc = new DispatcherTimer();
 
         public static bool isMini { get; private set; }
-        public static NavigationView _mainWindowNav;
+        public static NavigationView _mainWindowNav = null!;
         public static MainWindow? Instance { get; private set; }
-        private static INavigationService _navigationService;
+        private static INavigationService _navigationService = null!;
         private bool _isTrayPresetApplying;
         public static bool IsPageSelected(Type pageType) =>
             _mainWindowNav?.SelectedItem is INavigationViewItem item && item.TargetPageType == pageType;
@@ -455,7 +455,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         private async void AsyncApplyKeyboardOnStart()
         {
             // Wait for the system to settle after boot. The HID controller needs
-            // time to become discoverable — especially on cold startup.
+            // time to become discoverable â€” especially on cold startup.
             await Task.Delay(1000);
 
             KeyboardHidService? hidService = null;
@@ -628,7 +628,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         /// <summary>
         /// Applies EC fan curve and battery charge limit at app startup.
-        /// Runs once from mainWindow_Loaded — not on every Dashboard navigation.
+        /// Runs once from mainWindow_Loaded â€” not on every Dashboard navigation.
         /// </summary>
         private void ApplyEcSettingsOnStart()
         {
@@ -784,7 +784,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         }
 
 
-        private async void Misc_Tick(object sender, EventArgs e)
+        private async void Misc_Tick(object? sender, EventArgs e)
         {
             try
             {
@@ -878,8 +878,15 @@ namespace Uniwill_Control_Utility.Views.Windows
                             try
                             {
                                 var adaptivePage = App.GetService<Views.Pages.Adaptive>();
-                                adaptivePage.InvalidateAllLastValues();
-                                Debug.WriteLine("[Resume] Adaptive page diff-tracking invalidated");
+                                if (adaptivePage is not null)
+                                {
+                                    adaptivePage.InvalidateAllLastValues();
+                                    Debug.WriteLine("[Resume] Adaptive page diff-tracking invalidated");
+                                }
+                                else
+                                {
+                                    Debug.WriteLine("[Resume] Adaptive page is unavailable; diff-tracking was not invalidated");
+                                }
                             }
                             catch (Exception ex)
                             {
@@ -1021,7 +1028,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 try
                                 {
                                     // If the service still thinks it's connected, the HID link
-                                    // may be stale after hibernate — reconnect.
+                                    // may be stale after hibernate â€” reconnect.
                                     if (flydigiService.IsConnected)
                                     {
                                         Debug.WriteLine("[Flydigi] Resuming from sleep - disconnecting stale HID link");
@@ -1047,7 +1054,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                                     if (bs1Service.IsConnected)
                                     {
                                         Debug.WriteLine("[BS1] Resuming from sleep - disconnecting zombie BLE link");
-                                        bs1Service.DisconnectAsync();
+                                        await bs1Service.DisconnectAsync();
                                         await Task.Delay(500);
                                     }
 
@@ -1221,7 +1228,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private async void TrayCustomPreset_Click(object? sender, RoutedEventArgs e)
         {
-            // Legacy handler – delegates to extended handler with Normal mode.
+            // Legacy handler â€“ delegates to extended handler with Normal mode.
             if (sender is not MenuItem menuItem || menuItem.Tag is not int slot)
                 return;
             await TrayCustomPresetApplyAsync(slot, Models.PresetMode.Normal);
@@ -1374,7 +1381,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             // Apply EC fan curve and battery charge limit on startup. Runs here instead
             // of DashboardViewModel.OnNavigatedToAsync so it only fires once at app
-            // launch — not every time the user navigates to the Dashboard page. This
+            // launch â€” not every time the user navigates to the Dashboard page. This
             // prevents the saved fan curve from overwriting live changes (e.g., Fan Turbo).
             _ = Task.Run(ApplyEcSettingsOnStart);
 

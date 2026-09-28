@@ -94,14 +94,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (RtssReader.IsRunning())
             {
                 RtssStatusIcon.Glyph = "\uE930"; // Positive
-                RtssStatusIcon.Foreground = Application.Current.FindResource("SystemFillColorSuccessBrush") as System.Windows.Media.Brush;
+                RtssStatusIcon.Foreground = Application.Current.TryFindResource("SystemFillColorSuccessBrush") as System.Windows.Media.Brush
+                    ?? System.Windows.Media.Brushes.Green;
                 RtssStatusText.Text = "RTSS running";
                 RtssStatusText.Foreground = Application.Current.FindResource("TextFillColorSecondaryBrush") as System.Windows.Media.Brush;
             }
             else
             {
                 RtssStatusIcon.Glyph = "\uE7BA"; // Warning
-                RtssStatusIcon.Foreground = Application.Current.FindResource("SystemFillColorCautionBrush") as System.Windows.Media.Brush;
+                RtssStatusIcon.Foreground = Application.Current.TryFindResource("SystemFillColorCautionBrush") as System.Windows.Media.Brush
+                    ?? System.Windows.Media.Brushes.Goldenrod;
                 RtssStatusText.Text = "RTSS not running";
                 RtssStatusText.Foreground = Application.Current.FindResource("SystemFillColorCautionBrush") as System.Windows.Media.Brush;
             }

@@ -761,10 +761,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                         }
 
                         // Restart Smart Mode if it was enabled
-                        var settings = _waterCoolerService?.GetSettings();
-                        if (settings?.SmartModeEnabled == true)
+                        var waterCoolerService = _waterCoolerService;
+                        if (waterCoolerService is not null
+                            && waterCoolerService.GetSettings().SmartModeEnabled)
                         {
-                            _waterCoolerService.StartSmartMode();
+                            waterCoolerService.StartSmartMode();
                             PumpVoltageCard.Visibility = Visibility.Collapsed;
                             FanSpeedCard.Visibility = Visibility.Collapsed;
                             tsSmartMode.IsChecked = true;

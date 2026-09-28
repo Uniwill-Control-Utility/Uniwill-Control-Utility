@@ -425,7 +425,7 @@ namespace Uniwill_Control_Utility.Services
             }
         }
 
-        private static async Task<JToken> ReadFileAsJTokenAsync(string path)
+        private static async Task<JToken?> ReadFileAsJTokenAsync(string path)
         {
             if (!File.Exists(path))
             {

@@ -120,6 +120,7 @@ namespace Uniwill_Control_Utility.Models
         /// so user-set Smart Mode values are never overwritten by stale legacy data.
         /// Call once after deserialization.
         /// </summary>
+#pragma warning disable CS0618 // Legacy fields are intentionally read only during settings migration.
         public void MigrateLegacySettings()
         {
             // SmartModeEnabled default is false — legacy could also be false, so only
@@ -144,6 +145,7 @@ namespace Uniwill_Control_Utility.Models
             if (_legacySmartPumpBoostSpeed != null && SmartModeBoostPump == "V11")
                 SmartModeBoostPump = _legacySmartPumpBoostSpeed;
         }
+#pragma warning restore CS0618
 
         /// <summary>Returns the enum value for the stored idle pump speed in Smart Mode.</summary>
         public PumpVoltage GetSmartModeIdlePump()

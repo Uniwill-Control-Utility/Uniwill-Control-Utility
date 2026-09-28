@@ -171,7 +171,6 @@ namespace Uniwill_Control_Utility.Services
         private readonly string _dllPath;
         private bool _initialized;
         private bool _disposed;
-        private bool _boostActive;
         private bool _turboActive;
         private bool _ecHandshakeDone;
         private static readonly object _lock = new object();
@@ -693,7 +692,6 @@ namespace Uniwill_Control_Utility.Services
             byte fanCtrl = ReadECRegister(REG_MANUAL_FAN_CTRL);
             fanCtrl = (byte)(fanCtrl & ~FAN_MODE_BOOST);
             WriteECRegister(REG_MANUAL_FAN_CTRL, fanCtrl);
-            _boostActive = false;
 
             // Only toggle SPLIT_TABLES if it's currently False.
             // Clearing SPLIT_TABLES while the EC is in custom fan mode can cause
@@ -791,8 +789,6 @@ namespace Uniwill_Control_Utility.Services
             byte fanCtrl = ReadECRegister(REG_MANUAL_FAN_CTRL);
             fanCtrl = (byte)(fanCtrl & ~(FAN_MODE_USER | FAN_MODE_BOOST | FAN_MODE_TURBO | FAN_MODE_HIGH));
             WriteECRegister(REG_MANUAL_FAN_CTRL, fanCtrl);
-            _boostActive = false;
-
             // Also clear turbo state flag so button UI resets
             _turboActive = false;
 

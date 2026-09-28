@@ -58,8 +58,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             _deviceApplier = deviceApplier;
             _ecTelemetry = ecTelemetry;
             _uniwillEc = uniwillEc;
-            _flydigiService = flydigiService;
-            _bs1Service = bs1Service;
+            _flydigiService = flydigiService
+                ?? throw new ArgumentNullException(nameof(flydigiService));
+            _bs1Service = bs1Service
+                ?? throw new ArgumentNullException(nameof(bs1Service));
             InitializeComponent();
 
             // Subscribe to DeviceApplier override events
@@ -1336,6 +1338,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 catch (Exception ex)
                 {
+                    Debug.WriteLine($"Failed to enable turbo mode: {ex.Message}");
                 }
                 finally
                 {
@@ -1414,6 +1417,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 catch (Exception ex)
                 {
+                    Debug.WriteLine($"Failed to disable turbo mode: {ex.Message}");
                 }
                 finally
                 {

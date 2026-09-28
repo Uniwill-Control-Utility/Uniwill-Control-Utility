@@ -110,7 +110,11 @@ namespace Uniwill_Control_Utility.Services
         public void SuspendAllServices()
         {
             _userDisconnected = true;
-            DisconnectAsync();
+            _ = DisconnectAsync().ContinueWith(task =>
+            {
+                if (task.IsFaulted)
+                    Log($"{LogPrefix} Suspend disconnect failed: {task.Exception?.GetBaseException().Message}");
+            }, TaskScheduler.Default);
             StopOsLevelMonitor();
         }
 

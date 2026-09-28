@@ -807,8 +807,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                                             byte.Parse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber));
                                     return (Color?)null;
                                 })
-                                .Where(c => c.HasValue)
-                                .Select(c => c.Value)
+                                .OfType<Color>()
                                 .ToList();
                             if (colors.Count > 0)
                                 await _coolerService.WriteRgbRotationMultiAsync(colors, settings.RotationSpeed, settings.RotationBrightness);
@@ -1981,8 +1980,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                                     byte.Parse(hex.Substring(4, 2), System.Globalization.NumberStyles.HexNumber));
                             return (Color?)null;
                         })
-                        .Where(c => c.HasValue)
-                        .Select(c => c.Value)
+                        .OfType<Color>()
                         .ToList();
                     if (colors.Count > 0)
                         mcRotationColors.SetColors(colors);

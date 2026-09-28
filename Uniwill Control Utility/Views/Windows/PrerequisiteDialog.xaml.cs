@@ -31,7 +31,8 @@ namespace Uniwill_Control_Utility.Views.Windows
             bool installed = PawnIoDetectionService.IsInstalled();
 
             PawnIoStatusIcon.Symbol = installed ? SymbolRegular.CheckmarkCircle20 : SymbolRegular.Warning20;
-            PawnIoStatusIcon.Foreground = FindResource("SystemFillColor" + (installed ? "Success" : "Caution") + "Brush") as Brush;
+            PawnIoStatusIcon.Foreground = TryFindResource("SystemFillColor" + (installed ? "Success" : "Caution") + "Brush") as Brush
+                ?? (installed ? Brushes.Green : Brushes.Goldenrod);
 
             UpdateButtonContent(PawnIoButton, installed, "Installed", "Install");
         }
@@ -41,7 +42,8 @@ namespace Uniwill_Control_Utility.Views.Windows
             bool running = RtssReader.IsRunning();
 
             RtssStatusIcon.Symbol = running ? SymbolRegular.CheckmarkCircle20 : SymbolRegular.Warning20;
-            RtssStatusIcon.Foreground = FindResource("SystemFillColor" + (running ? "Success" : "Caution") + "Brush") as Brush;
+            RtssStatusIcon.Foreground = TryFindResource("SystemFillColor" + (running ? "Success" : "Caution") + "Brush") as Brush
+                ?? (running ? Brushes.Green : Brushes.Goldenrod);
 
             UpdateButtonContent(RtssButton, running, "Running", "Download");
         }
