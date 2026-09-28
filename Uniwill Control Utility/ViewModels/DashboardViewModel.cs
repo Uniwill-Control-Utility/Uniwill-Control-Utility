@@ -155,6 +155,7 @@ namespace Uniwill_Control_Utility.ViewModels
         {
             // Hydro UI (LCT watercooler)
             bool hydroConnected = _waterCoolerService.IsConnected;
+            bool hydroSmartModeActive = _waterCoolerService.IsSmartModeActive;
             int hydroPumpVoltage = 0;
             int hydroFanSpeed = 0;
             int hydroFanRpm = 0;
@@ -163,15 +164,29 @@ namespace Uniwill_Control_Utility.ViewModels
             {
                 try
                 {
-                    var wcSettings = _waterCoolerService.GetSettings();
-                    hydroPumpVoltage = wcSettings.GetPumpVoltage() switch
+                    if (hydroSmartModeActive)
                     {
-                        PumpVoltage.V7 => 7,
-                        PumpVoltage.V8 => 8,
-                        PumpVoltage.V11 => 11,
-                        _ => 0
-                    };
-                    hydroFanSpeed = (int)wcSettings.GetFanSpeed();
+                        hydroPumpVoltage = _waterCoolerService.SmartModeCurrentPump switch
+                        {
+                            PumpVoltage.V7 => 7,
+                            PumpVoltage.V8 => 8,
+                            PumpVoltage.V11 => 11,
+                            _ => 0
+                        };
+                        hydroFanSpeed = (int)_waterCoolerService.SmartModeCurrentFan;
+                    }
+                    else
+                    {
+                        var wcSettings = _waterCoolerService.GetSettings();
+                        hydroPumpVoltage = wcSettings.GetPumpVoltage() switch
+                        {
+                            PumpVoltage.V7 => 7,
+                            PumpVoltage.V8 => 8,
+                            PumpVoltage.V11 => 11,
+                            _ => 0
+                        };
+                        hydroFanSpeed = (int)wcSettings.GetFanSpeed();
+                    }
                 }
                 catch { /* non-critical */ }
             }
@@ -224,6 +239,7 @@ namespace Uniwill_Control_Utility.ViewModels
                 HydroUiPumpVoltage = hydroPumpVoltage,
                 HydroUiFanSpeed = hydroFanSpeed,
                 HydroUiFanRpm = hydroFanRpm,
+                HydroUiSmartModeActive = hydroSmartModeActive,
                 FlydigiConnected = flydigiConnected,
                 FlydigiFanRpm = flydigiFanRpm,
                 FlydigiIsBs1 = flydigiIsBs1,

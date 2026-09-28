@@ -890,6 +890,12 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>True when Smart Mode is currently running.</summary>
         public bool IsSmartModeActive => _smartModeTimer != null;
 
+        /// <summary>Current pump voltage being applied by Smart Mode (only meaningful when IsSmartModeActive is true).</summary>
+        public PumpVoltage SmartModeCurrentPump => _smartModeCurrentPump;
+
+        /// <summary>Current fan speed being applied by Smart Mode (only meaningful when IsSmartModeActive is true).</summary>
+        public FanSpeed SmartModeCurrentFan => _smartModeCurrentFan;
+
         private async Task SmartModeTick()
         {
             if (!IsConnected) return;
