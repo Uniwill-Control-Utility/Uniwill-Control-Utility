@@ -452,6 +452,34 @@ namespace Uniwill_Control_Utility.Services
             }
         }
 
+        private void WriteECRegisterChecked(ushort address, byte value)
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                int result = WriteEC(address, value);
+                Thread.Sleep(EcDelayMs);
+                if (result != 0)
+                    throw new InvalidOperationException($"EC write to 0x{address:X4} failed with code {result}.");
+            }
+        }
+
+        private void WriteECRegistersChecked(ushort startAddress, byte[] data)
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                for (int i = 0; i < data.Length; i++)
+                {
+                    ushort address = (ushort)(startAddress + i);
+                    int result = WriteEC(address, data[i]);
+                    Thread.Sleep(EcDelayMs);
+                    if (result != 0)
+                        throw new InvalidOperationException($"EC write to 0x{address:X4} failed with code {result}.");
+                }
+            }
+        }
+
         #endregion
 
         #region NVIDIA GPU Power Control (cTGP / Dynamic Boost)
@@ -1196,44 +1224,61 @@ namespace Uniwill_Control_Utility.Services
             if ((ufCtrl & SPLIT_TABLES) == 0)
             {
                 ufCtrl = (byte)(ufCtrl | SPLIT_TABLES);
-                WriteECRegister(REG_UNIVERSAL_FAN_CTRL, ufCtrl);
+                WriteECRegisterChecked(REG_UNIVERSAL_FAN_CTRL, ufCtrl);
                 Thread.Sleep(50);
             }
 
             // Step 2: Clear boost mode (same as ApplyFanCurve)
             byte fanCtrl = ReadECRegister(REG_MANUAL_FAN_CTRL);
             fanCtrl = (byte)(fanCtrl & ~FAN_MODE_BOOST);
-            WriteECRegister(REG_MANUAL_FAN_CTRL, fanCtrl);
+            WriteECRegisterChecked(REG_MANUAL_FAN_CTRL, fanCtrl);
 
             // Step 3: Write CPU tables
-            WriteECRegisters(REG_CPU_TEMP_END_TABLE, cpuTempUp);
-            WriteECRegisters(REG_CPU_TEMP_START_TABLE, cpuTempDown);
-            WriteECRegisters(REG_CPU_FAN_SPEED_TABLE, cpuDuty);
+            WriteECRegistersChecked(REG_CPU_TEMP_END_TABLE, cpuTempUp);
+            WriteECRegistersChecked(REG_CPU_TEMP_START_TABLE, cpuTempDown);
+            WriteECRegistersChecked(REG_CPU_FAN_SPEED_TABLE, cpuDuty);
 
             Thread.Sleep(150);
 
             // Step 4: Write GPU tables
-            WriteECRegisters(REG_GPU_TEMP_END_TABLE, gpuTempUp);
-            WriteECRegisters(REG_GPU_TEMP_START_TABLE, gpuTempDown);
-            WriteECRegisters(REG_GPU_FAN_SPEED_TABLE, gpuDuty);
+            WriteECRegistersChecked(REG_GPU_TEMP_END_TABLE, gpuTempUp);
+            WriteECRegistersChecked(REG_GPU_TEMP_START_TABLE, gpuTempDown);
+            WriteECRegistersChecked(REG_GPU_FAN_SPEED_TABLE, gpuDuty);
 
             Thread.Sleep(150);
 
             // Step 5: Toggle ENABLE_UNIVERSAL_FAN_CTRL to force EC re-read
             byte apOem6 = ReadECRegister(REG_AP_OEM_6);
             apOem6 = (byte)(apOem6 & ~ENABLE_UNIVERSAL_FAN_CTRL);
-            WriteECRegister(REG_AP_OEM_6, apOem6);
+            WriteECRegisterChecked(REG_AP_OEM_6, apOem6);
             Thread.Sleep(150);
             apOem6 = ReadECRegister(REG_AP_OEM_6);
             apOem6 |= ENABLE_UNIVERSAL_FAN_CTRL;
-            WriteECRegister(REG_AP_OEM_6, apOem6);
+            WriteECRegisterChecked(REG_AP_OEM_6, apOem6);
             Thread.Sleep(150);
 
-            // Verify: read back the duty tables to confirm they stuck
-            byte[] cpuDutyVerify = ReadECRegisters(REG_CPU_FAN_SPEED_TABLE, 16);
-            byte[] gpuDutyVerify = ReadECRegisters(REG_GPU_FAN_SPEED_TABLE, 16);
             DebugLog($"[DIAG] UniwillEC: Applied smart fan curves - CPU duty: [{string.Join(", ", cpuDuty[1..11])}] | GPU duty: [{string.Join(", ", gpuDuty[1..11])}]");
-            DebugLog($"[DIAG] UniwillEC: Verify readback - CPU duty: [{string.Join(", ", cpuDutyVerify[1..11])}] | GPU duty: [{string.Join(", ", gpuDutyVerify[1..11])}]");
+        }
+
+        /// <summary>
+        /// Updates only the recurring CPU and GPU duty tables. Temperature tables
+        /// and activation registers are configured by <see cref="ApplySmartFanCurve"/>
+        /// when the control loop starts.
+        /// </summary>
+        public void ApplySmartFanDuty(byte[] cpuDuty, byte[] gpuDuty)
+        {
+            var blocks = EcSmartFanWritePlan.CreateDutyUpdate(cpuDuty, gpuDuty);
+
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                EcRegisterBlock block = blocks[i];
+                WriteECRegistersChecked(block.StartAddress, block.Data);
+
+                if (i + 1 < blocks.Count)
+                    Thread.Sleep(150);
+            }
+
+            DebugLog($"[DIAG] UniwillEC: Updated smart fan duty only - CPU: [{string.Join(", ", cpuDuty[1..11])}] | GPU: [{string.Join(", ", gpuDuty[1..11])}]");
         }
 
         #endregion
