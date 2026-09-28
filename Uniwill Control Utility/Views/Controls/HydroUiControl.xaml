@@ -9,7 +9,8 @@
              Foreground="{DynamicResource TextFillColorPrimaryBrush}"
              UseLayoutRounding="True">
 
-    <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+    <Grid>
+        <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
             BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
             CornerRadius="8"
@@ -102,5 +103,7 @@
                 <TextBlock VerticalAlignment="Center" Text="Disconnected" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
             </Grid>
         </Grid>
-    </Border>
+        </Border>
+        <Border Style="{StaticResource DashboardInteractiveCardHoverBorderStyle}" />
+    </Grid>
 </UserControl>

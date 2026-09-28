@@ -8,7 +8,8 @@
              Foreground="{DynamicResource TextFillColorPrimaryBrush}"
              UseLayoutRounding="True">
 
-    <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+    <Grid>
+        <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
             BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
             CornerRadius="8"
@@ -123,5 +124,7 @@
                 <TextBlock x:Name="_cpuFanLabel" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="Medium" Text="--" />
             </Grid>
         </Grid>
-    </Border>
+        </Border>
+        <Border Style="{StaticResource DashboardInteractiveCardHoverBorderStyle}" />
+    </Grid>
 </UserControl>
