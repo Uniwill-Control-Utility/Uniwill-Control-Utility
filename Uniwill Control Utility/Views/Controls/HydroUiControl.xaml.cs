@@ -7,6 +7,8 @@ namespace Uniwill_Control_Utility.Views.Controls
 {
     public partial class HydroUiControl : UserControl
     {
+        private const string ConnectedColor = "#4BD879";
+
         private INavigationService? _navigationService;
 
         public HydroUiControl()
@@ -30,6 +32,14 @@ namespace Uniwill_Control_Utility.Views.Controls
                 spConnected.Visibility = Visibility.Visible;
                 spDisconnected.Visibility = Visibility.Collapsed;
 
+                // Connection status pill
+                _statusDot.Fill = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString(ConnectedColor)!;
+                _statusText.Text = "Connected";
+
+                // Smart mode pill
+                _smartModePill.Visibility = snapshot.HydroUiSmartModeActive ? Visibility.Visible : Visibility.Collapsed;
+
+                // Pump
                 string pumpText = snapshot.HydroUiPumpVoltage switch
                 {
                     0 => "Off",
@@ -41,6 +51,7 @@ namespace Uniwill_Control_Utility.Views.Controls
                 _pumpLabel.Text = pumpText;
                 _pumpBar.Value = snapshot.HydroUiPumpVoltage;
 
+                // Fan
                 if (snapshot.HydroUiFanRpm > 0)
                 {
                     _fanBar.Value = 100;

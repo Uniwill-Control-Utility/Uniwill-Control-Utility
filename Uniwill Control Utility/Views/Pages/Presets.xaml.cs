@@ -25,6 +25,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private readonly GpuInventoryService? _gpuInventory;
         private readonly WaterCoolerService? _waterCooler;
         private readonly DeviceApplier? _deviceApplier;
+        private readonly PresetsNavigationRequest _navigationRequest;
         private string _currentProfile = "Gaming";
 
         // V-F curve preset state (managed by CustomPresetStore now)
@@ -94,9 +95,15 @@ namespace Uniwill_Control_Utility.Views.Pages
         // are hidden and the app skips voltage-related SMU/MSR commands.
         private bool CpuVoltageEnabled => Settings.Default.EnableCpuVoltageControl;
 
-        public Presets(ILogger<Presets> logger, GpuInventoryService? gpuInventory = null, WaterCoolerService? waterCooler = null, DeviceApplier? deviceApplier = null)
+        public Presets(
+            ILogger<Presets> logger,
+            PresetsNavigationRequest navigationRequest,
+            GpuInventoryService? gpuInventory = null,
+            WaterCoolerService? waterCooler = null,
+            DeviceApplier? deviceApplier = null)
         {
             _logger = logger;
+            _navigationRequest = navigationRequest;
             _gpuInventory = gpuInventory;
             _waterCooler = waterCooler;
             _deviceApplier = deviceApplier;
@@ -142,6 +149,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 // Update overlay based on Adaptive Mode override state
                 UpdateAdaptiveOverlay();
+
+                OpenRequestedTuningSection();
             }
             catch (Exception ex)
             {
@@ -151,6 +160,31 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             return Task.CompletedTask;
+        }
+
+        private void OpenRequestedTuningSection()
+        {
+            if (!_navigationRequest.TryConsume(out PresetsTuningSection section))
+                return;
+
+            // Tuning controls live in the Custom profile. Selecting it without
+            // applying changes only reveals the editors and restores their values.
+            selectProfile("Custom", apply: false);
+
+            Wpf.Ui.Controls.CardExpander target = section switch
+            {
+                PresetsTuningSection.Cpu when Family.TYPE == Family.ProcessorType.Intel => sdIntelTuning,
+                PresetsTuningSection.Cpu => sdCpuPower,
+                _ => sdNvidia
+            };
+
+            if (target.Visibility != Visibility.Visible)
+                return;
+
+            target.IsExpanded = true;
+            Dispatcher.BeginInvoke(
+                () => target.BringIntoView(),
+                DispatcherPriority.Loaded);
         }
 
         public Task OnNavigatedFromAsync()

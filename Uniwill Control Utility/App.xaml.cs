@@ -182,6 +182,7 @@ namespace Uniwill_Control_Utility
 
                         // Service containing navigation, same as INavigationWindow... but without window
                         services.AddSingleton<INavigationService, NavigationService>();
+                        services.AddSingleton<PresetsNavigationRequest>();
 
                         services.AddSingleton<IHardwareMonitoringService, HardwareMonitoringService>();
                         services.AddSingleton<GpuInventoryService>();

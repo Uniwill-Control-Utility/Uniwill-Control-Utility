@@ -86,7 +86,7 @@ public sealed class DashboardSegmentedBar : FrameworkElement
             return 0;
 
         double normalized = Math.Clamp(value / maximum, 0, 1);
-        return Math.Clamp((int)Math.Ceiling(normalized * segments), 0, segments);
+        return Math.Clamp((int)Math.Floor(normalized * segments), 0, segments);
     }
 
     protected override void OnRender(DrawingContext drawingContext)

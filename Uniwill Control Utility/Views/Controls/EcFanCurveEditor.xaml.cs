@@ -24,6 +24,7 @@ namespace Uniwill_Control_Utility.Views.Controls
         private readonly List<Slider> _sliders = new();
         private int[] _temperatures = EcFanCurve.CpuTemperatures;
         private bool _isReadOnly;
+        private DispatcherOperation? _pendingGraphRedraw;
 
         /// <summary>
         /// Sets the temperature labels displayed on the X-axis and in tooltips.
@@ -36,7 +37,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             {
                 _temperatures = value;
                 UpdateTemperatureLabels();
-                Dispatcher.InvokeAsync(DrawGraph, DispatcherPriority.Render);
+                RequestGraphRedraw();
             }
         }
 
@@ -112,7 +113,7 @@ namespace Uniwill_Control_Utility.Views.Controls
                 _slidersGrid.Children.Add(slider);
             }
 
-            Dispatcher.InvokeAsync(DrawGraph, DispatcherPriority.Render);
+            RequestGraphRedraw();
         }
 
         private void UpdateTemperatureLabels()
@@ -151,7 +152,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             {
                 _sliders[i].Value = curve.Duties[i];
             }
-            Dispatcher.InvokeAsync(DrawGraph, DispatcherPriority.Render);
+            RequestGraphRedraw();
         }
 
         /// <summary>Read the current slider values into an EcFanCurve.</summary>
@@ -182,17 +183,36 @@ namespace Uniwill_Control_Utility.Views.Controls
             _tooltip.Content = index == 0
                 ? $"Fan OFF (below ~52°C)"
                 : $"{temp}°C → {duty}%";
+            Point pointer = e.GetPosition(_canvas);
+            Point thumbTopLeft = track.Thumb.TranslatePoint(new Point(), _canvas);
+            var thumbBounds = new Rect(
+                thumbTopLeft,
+                new Size(track.Thumb.ActualWidth, track.Thumb.ActualHeight));
             _tooltip.Placement = PlacementMode.Custom;
-            _tooltip.PlacementTarget = track.Thumb;
+            _tooltip.PlacementTarget = _canvas;
             _tooltip.CustomPopupPlacementCallback = (size, targetSize, _) =>
                 new[] { new CustomPopupPlacement(
-                    new((targetSize.Width - size.Width) * 0.5, -targetSize.Height - 8),
+                    GetTooltipPosition(pointer, thumbBounds, size, targetSize, 12),
                     PopupPrimaryAxis.Vertical) };
 
             // Force tooltip refresh
             _tooltip.HorizontalOffset += -0.1;
             _tooltip.HorizontalOffset += +0.1;
             _tooltip.IsOpen = true;
+        }
+
+        internal static Point GetTooltipPosition(
+            Point pointer,
+            Rect thumbBounds,
+            Size popupSize,
+            Size targetSize,
+            double gap)
+        {
+            double visibleGap = Math.Max(0, gap);
+            double maximumX = Math.Max(0, targetSize.Width - popupSize.Width);
+            return new Point(
+                Math.Clamp(pointer.X - popupSize.Width * 0.5, 0, maximumX),
+                Math.Min(pointer.Y, thumbBounds.Top) - popupSize.Height - visibleGap);
         }
 
         private readonly ToolTip _tooltip = new();
@@ -207,8 +227,20 @@ namespace Uniwill_Control_Utility.Views.Controls
                 return;
 
             VerifyMonotonicity(currentSlider);
-            DrawGraph();
+            RequestGraphRedraw();
             CurveChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void RequestGraphRedraw()
+        {
+            if (_pendingGraphRedraw is { Status: DispatcherOperationStatus.Pending })
+                return;
+
+            _pendingGraphRedraw = Dispatcher.InvokeAsync(() =>
+            {
+                _pendingGraphRedraw = null;
+                DrawGraph();
+            }, DispatcherPriority.Loaded);
         }
 
         private void VerifyMonotonicity(Slider currentSlider)
@@ -273,6 +305,15 @@ namespace Uniwill_Control_Utility.Views.Controls
 
         private Point GetThumbLocation(Slider slider)
         {
+            slider.ApplyTemplate();
+            if (slider.Template.FindName("PART_Track", slider) is Track track &&
+                track.Thumb is { ActualWidth: > 0, ActualHeight: > 0 } thumb)
+            {
+                return thumb.TranslatePoint(
+                    new Point(thumb.ActualWidth * 0.5, thumb.ActualHeight * 0.5),
+                    _canvas);
+            }
+
             var ratio = slider.Value / (slider.Maximum - slider.Minimum);
             var y = slider.ActualHeight - (slider.ActualHeight * ratio);
             var x = slider.ActualWidth * 0.5;
