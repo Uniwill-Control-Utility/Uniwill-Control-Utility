@@ -10,6 +10,7 @@ using Uniwill_Control_Utility.Views.Controls;
 
 namespace Uniwill_Control_Utility.Tests.UI;
 
+[Collection("WPF")]
 public sealed class EcFanCurveEditorAlignmentTests
 {
     [Fact]
