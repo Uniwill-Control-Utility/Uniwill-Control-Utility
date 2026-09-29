@@ -65,6 +65,15 @@ internal sealed class StartupProgressReporter
         _report = report;
     }
 
+    private StartupProgressReporter()
+    {
+    }
+
+    internal static StartupProgressReporter Create(
+        bool enabled,
+        Func<StartupStage, Task> report) =>
+        enabled ? new StartupProgressReporter(report) : new StartupProgressReporter();
+
     internal Task ReportAsync(StartupStage stage) =>
         _report?.Invoke(stage) ?? Task.CompletedTask;
 

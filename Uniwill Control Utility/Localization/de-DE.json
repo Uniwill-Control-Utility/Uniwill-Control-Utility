@@ -617,5 +617,7 @@
   "Initializing sensors": "Sensoren werden initialisiert",
   "Applying startup settings": "Starteinstellungen werden angewendet",
   "Opening dashboard": "Dashboard wird geöffnet",
-  "Ready": "Bereit"
+  "Ready": "Bereit",
+  "Show startup progress": "Startfortschritt anzeigen",
+  "Display the startup progress window while the application is loading": "Das Startfortschrittsfenster anzeigen, während die Anwendung geladen wird"
 }

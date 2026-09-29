@@ -617,5 +617,7 @@
   "Initializing sensors": "Inicjowanie czujników",
   "Applying startup settings": "Stosowanie ustawień uruchamiania",
   "Opening dashboard": "Otwieranie pulpitu",
-  "Ready": "Gotowe"
+  "Ready": "Gotowe",
+  "Show startup progress": "Pokaż postęp uruchamiania",
+  "Display the startup progress window while the application is loading": "Wyświetl okno postępu podczas ładowania aplikacji"
 }

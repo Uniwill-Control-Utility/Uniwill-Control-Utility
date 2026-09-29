@@ -617,5 +617,7 @@
   "Initializing sensors": "Sensörler başlatılıyor",
   "Applying startup settings": "Başlangıç ayarları uygulanıyor",
   "Opening dashboard": "Ana panel açılıyor",
-  "Ready": "Hazır"
+  "Ready": "Hazır",
+  "Show startup progress": "Başlangıç ilerlemesini göster",
+  "Display the startup progress window while the application is loading": "Uygulama yüklenirken başlangıç ilerleme penceresini göster"
 }

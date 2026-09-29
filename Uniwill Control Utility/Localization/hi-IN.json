@@ -617,5 +617,7 @@
   "Initializing sensors": "सेंसर प्रारंभ किए जा रहे हैं",
   "Applying startup settings": "स्टार्टअप सेटिंग्स लागू की जा रही हैं",
   "Opening dashboard": "डैशबोर्ड खोला जा रहा है",
-  "Ready": "तैयार"
+  "Ready": "तैयार",
+  "Show startup progress": "स्टार्टअप प्रगति दिखाएँ",
+  "Display the startup progress window while the application is loading": "एप्लिकेशन लोड होते समय स्टार्टअप प्रगति विंडो दिखाएँ"
 }

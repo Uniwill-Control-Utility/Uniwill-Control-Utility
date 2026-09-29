@@ -617,5 +617,7 @@
   "Initializing sensors": "Sinisimulan ang mga sensor",
   "Applying startup settings": "Inilalapat ang mga startup setting",
   "Opening dashboard": "Binubuksan ang dashboard",
-  "Ready": "Handa na"
+  "Ready": "Handa na",
+  "Show startup progress": "Ipakita ang progreso ng pagsisimula",
+  "Display the startup progress window while the application is loading": "Ipakita ang window ng progreso habang nilo-load ang application"
 }

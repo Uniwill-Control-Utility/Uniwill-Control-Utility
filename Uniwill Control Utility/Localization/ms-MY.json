@@ -617,5 +617,7 @@
   "Initializing sensors": "Memulakan penderia",
   "Applying startup settings": "Menggunakan tetapan permulaan",
   "Opening dashboard": "Membuka papan pemuka",
-  "Ready": "Sedia"
+  "Ready": "Sedia",
+  "Show startup progress": "Tunjukkan kemajuan permulaan",
+  "Display the startup progress window while the application is loading": "Paparkan tetingkap kemajuan permulaan semasa aplikasi dimuatkan"
 }

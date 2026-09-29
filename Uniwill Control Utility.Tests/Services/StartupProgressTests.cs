@@ -1,5 +1,7 @@
+using System.Configuration;
 using System.Reflection;
 using System.Text.Json;
+using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Services;
 
 namespace Uniwill_Control_Utility.Tests.Services;
@@ -60,11 +62,13 @@ public sealed class StartupProgressTests
     public async Task Reporter_ForwardsHostStagesInOrder()
     {
         var reported = new List<StartupStage>();
-        var reporter = new StartupProgressReporter(stage =>
-        {
-            reported.Add(stage);
-            return Task.CompletedTask;
-        });
+        var reporter = StartupProgressReporter.Create(
+            enabled: true,
+            stage =>
+            {
+                reported.Add(stage);
+                return Task.CompletedTask;
+            });
 
         await reporter.ReportAsync(StartupStage.StartingServices);
         await reporter.ReportAsync(StartupStage.PreparingInterface);
@@ -78,5 +82,64 @@ public sealed class StartupProgressTests
                 StartupStage.OpeningDashboard
             },
             reported);
+    }
+
+    [Fact]
+    public async Task Reporter_WhenDisabled_DoesNotForwardStages()
+    {
+        int reportCount = 0;
+        var reporter = StartupProgressReporter.Create(
+            enabled: false,
+            _ =>
+            {
+                reportCount++;
+                return Task.CompletedTask;
+            });
+
+        await reporter.ReportAsync(StartupStage.StartingServices);
+        await reporter.ReportAsync(StartupStage.OpeningDashboard);
+
+        Assert.Equal(0, reportCount);
+    }
+
+    [Fact]
+    public void Settings_DefinesStartupOverlayAsEnabledByDefault()
+    {
+        PropertyInfo? property = typeof(Settings).GetProperty(nameof(Settings.ShowStartupProgressOverlay));
+
+        Assert.NotNull(property);
+        DefaultSettingValueAttribute? defaultValue =
+            property.GetCustomAttribute<DefaultSettingValueAttribute>();
+        Assert.Equal(bool.TrueString, defaultValue?.Value);
+    }
+
+    [Fact]
+    public void EverySupportedCatalogue_ContainsStartupOverlaySettingsCopy()
+    {
+        string[] keys =
+        {
+            "Show startup progress",
+            "Display the startup progress window while the application is loading"
+        };
+        Assembly assembly = typeof(LocalizationService).Assembly;
+
+        foreach (LanguageOption language in LocalizationService.SupportedLanguages)
+        {
+            string resourceName = assembly.GetManifestResourceNames()
+                .Single(name => name.EndsWith(
+                    $"Localization.{language.CultureName}.json",
+                    StringComparison.Ordinal));
+            using Stream stream = Assert.IsAssignableFrom<Stream>(
+                assembly.GetManifestResourceStream(resourceName));
+            using JsonDocument document = JsonDocument.Parse(stream);
+
+            foreach (string key in keys)
+            {
+                Assert.True(
+                    document.RootElement.TryGetProperty(key, out JsonElement translation) &&
+                    !string.IsNullOrWhiteSpace(translation.GetString()),
+                    $"{language.CultureName} is missing startup overlay setting '{key}'.");
+            }
+        }
     }
 }

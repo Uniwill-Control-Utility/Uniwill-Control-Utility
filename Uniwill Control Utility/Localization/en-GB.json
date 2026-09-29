@@ -617,5 +617,7 @@
   "Initializing sensors": "Initializing sensors",
   "Applying startup settings": "Applying startup settings",
   "Opening dashboard": "Opening dashboard",
-  "Ready": "Ready"
+  "Ready": "Ready",
+  "Show startup progress": "Show startup progress",
+  "Display the startup progress window while the application is loading": "Display the startup progress window while the application is loading"
 }

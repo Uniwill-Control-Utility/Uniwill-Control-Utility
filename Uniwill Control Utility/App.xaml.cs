@@ -91,13 +91,18 @@ namespace Uniwill_Control_Utility
 
             Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
+            PrepareUserSettings();
             LocalizationService.Initialize(Settings.Default.Language);
 
-            startupWindow = new StartupProgressWindow();
-            startupWindow.Show();
-            var displayedStartupWindow = startupWindow;
-            startupProgressReporter = new StartupProgressReporter(
-                stage => ReportStartupProgressAsync(displayedStartupWindow, stage));
+            bool showStartupProgressOverlay = Settings.Default.ShowStartupProgressOverlay;
+            if (showStartupProgressOverlay)
+            {
+                startupWindow = new StartupProgressWindow();
+                startupWindow.Show();
+            }
+
+            startupProgressReporter = StartupProgressReporter.Create(showStartupProgressOverlay,
+                stage => ReportStartupProgressAsync(startupWindow!, stage));
 
             try
             {
@@ -287,20 +292,6 @@ namespace Uniwill_Control_Utility
                 bool firstBoot = false;
                 try
                 {
-                    if (Settings.Default.SettingsUpgradeRequired)
-                    {
-                        try
-                        {
-                            Settings.Default.Upgrade();
-                            Settings.Default.SettingsUpgradeRequired = false;
-                            Settings.Default.Save();
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Failed to update settings on startup");
-                        }
-                    }
-
                     firstBoot = Settings.Default.FirstBoot;
                 }
                 catch (ConfigurationErrorsException ex)
@@ -370,9 +361,12 @@ namespace Uniwill_Control_Utility
                 await _host.StartAsync(CancellationToken.None);
 
                 await startupProgressReporter.ReportAsync(StartupStage.Complete);
-                await startupWindow.WaitForProgressPlaybackAsync();
-                startupWindow.Close();
-                startupWindow = null;
+                if (startupWindow is not null)
+                {
+                    await startupWindow.WaitForProgressPlaybackAsync();
+                    startupWindow.Close();
+                    startupWindow = null;
+                }
                 startupProgressReporter.Detach();
 
                 // Kick off device auto-connects in parallel so they don't block
@@ -392,6 +386,34 @@ namespace Uniwill_Control_Utility
                 startupWindow?.Hide();
                 MessageBox.Show(ex.Message);
                 Shutdown(-1);
+            }
+        }
+
+        private static void PrepareUserSettings()
+        {
+            try
+            {
+                if (!Settings.Default.SettingsUpgradeRequired)
+                    return;
+
+                Settings.Default.Upgrade();
+                Settings.Default.SettingsUpgradeRequired = false;
+                Settings.Default.Save();
+            }
+            catch (ConfigurationErrorsException ex)
+            {
+                if (ex.InnerException is ConfigurationErrorsException innerEx &&
+                    !string.IsNullOrWhiteSpace(innerEx.Filename) &&
+                    File.Exists(innerEx.Filename))
+                {
+                    File.Delete(innerEx.Filename);
+                }
+
+                Settings.Default.Reload();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to update settings on startup: {ex}");
             }
         }
 

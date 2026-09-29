@@ -617,5 +617,7 @@
   "Initializing sensors": "กำลังเริ่มต้นเซ็นเซอร์",
   "Applying startup settings": "กำลังใช้การตั้งค่าเริ่มต้น",
   "Opening dashboard": "กำลังเปิดแดชบอร์ด",
-  "Ready": "พร้อม"
+  "Ready": "พร้อม",
+  "Show startup progress": "แสดงความคืบหน้าเมื่อเริ่มต้น",
+  "Display the startup progress window while the application is loading": "แสดงหน้าต่างความคืบหน้าขณะกำลังโหลดแอปพลิเคชัน"
 }

@@ -617,5 +617,7 @@
   "Initializing sensors": "Inicijalizacija senzora",
   "Applying startup settings": "Primjena postavki pokretanja",
   "Opening dashboard": "Otvaranje nadzorne ploče",
-  "Ready": "Spremno"
+  "Ready": "Spremno",
+  "Show startup progress": "Prikaži napredak pokretanja",
+  "Display the startup progress window while the application is loading": "Prikaži prozor napretka dok se aplikacija učitava"
 }

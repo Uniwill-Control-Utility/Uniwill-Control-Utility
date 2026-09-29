@@ -617,5 +617,7 @@
   "Initializing sensors": "Sensoren initialiseren",
   "Applying startup settings": "Opstartinstellingen toepassen",
   "Opening dashboard": "Dashboard openen",
-  "Ready": "Gereed"
+  "Ready": "Gereed",
+  "Show startup progress": "Opstartvoortgang tonen",
+  "Display the startup progress window while the application is loading": "Toon het voortgangsvenster terwijl de toepassing wordt geladen"
 }

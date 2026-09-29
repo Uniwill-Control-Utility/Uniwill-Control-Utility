@@ -617,5 +617,7 @@
   "Initializing sensors": "Initialisation des capteurs",
   "Applying startup settings": "Application des paramètres de démarrage",
   "Opening dashboard": "Ouverture du tableau de bord",
-  "Ready": "Prêt"
+  "Ready": "Prêt",
+  "Show startup progress": "Afficher la progression du démarrage",
+  "Display the startup progress window while the application is loading": "Afficher la fenêtre de progression pendant le chargement de l’application"
 }

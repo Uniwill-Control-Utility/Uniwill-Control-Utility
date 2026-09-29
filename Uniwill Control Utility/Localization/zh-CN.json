@@ -617,5 +617,7 @@
   "Initializing sensors": "正在初始化传感器",
   "Applying startup settings": "正在应用启动设置",
   "Opening dashboard": "正在打开主面板",
-  "Ready": "已就绪"
+  "Ready": "已就绪",
+  "Show startup progress": "显示启动进度",
+  "Display the startup progress window while the application is loading": "在应用程序加载时显示启动进度窗口"
 }

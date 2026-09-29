@@ -617,5 +617,7 @@
   "Initializing sensors": "جارٍ تهيئة المستشعرات",
   "Applying startup settings": "جارٍ تطبيق إعدادات بدء التشغيل",
   "Opening dashboard": "جارٍ فتح لوحة المعلومات",
-  "Ready": "جاهز"
+  "Ready": "جاهز",
+  "Show startup progress": "إظهار تقدم بدء التشغيل",
+  "Display the startup progress window while the application is loading": "عرض نافذة تقدم بدء التشغيل أثناء تحميل التطبيق"
 }

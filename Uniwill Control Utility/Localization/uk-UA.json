@@ -617,5 +617,7 @@
   "Initializing sensors": "Ініціалізація датчиків",
   "Applying startup settings": "Застосування параметрів запуску",
   "Opening dashboard": "Відкриття головної сторінки",
-  "Ready": "Готово"
+  "Ready": "Готово",
+  "Show startup progress": "Показувати перебіг запуску",
+  "Display the startup progress window while the application is loading": "Показувати вікно перебігу запуску під час завантаження програми"
 }

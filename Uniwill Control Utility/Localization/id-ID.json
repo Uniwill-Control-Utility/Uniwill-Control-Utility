@@ -617,5 +617,7 @@
   "Initializing sensors": "Menginisialisasi sensor",
   "Applying startup settings": "Menerapkan pengaturan awal",
   "Opening dashboard": "Membuka dasbor",
-  "Ready": "Siap"
+  "Ready": "Siap",
+  "Show startup progress": "Tampilkan progres startup",
+  "Display the startup progress window while the application is loading": "Tampilkan jendela progres startup saat aplikasi dimuat"
 }
