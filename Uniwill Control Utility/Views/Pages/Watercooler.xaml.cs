@@ -143,6 +143,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (_waterCoolerService.IsConnected)
             {
                 OnConnectionStateChanged(null, WaterCoolerService.WatercoolerConnectionState.Connected);
+                // Also re-sync the current flow status in case it changed while away.
+                UpdateFlowStatusUi(_waterCoolerService.FlowStatus);
             }
             else
             {
@@ -775,9 +777,16 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                         // Reset standby button state
                         UpdateStandbyButton(false);
+
+                        // Reset flow status UI to Off (matches the service's FlowStatus = FlowStatus.Off on connect)
+                        UpdateFlowStatusUi(FlowStatus.Off);
                         break;
 
                     case WaterCoolerService.WatercoolerConnectionState.Disconnected:
+                        // Reset flow status UI to Off on disconnect so the card doesn't
+                        // show stale state from the previous connection.
+                        UpdateFlowStatusUi(FlowStatus.Off);
+
                         spConnectedState.Visibility = Visibility.Collapsed;
                         spDisconnectedState.Visibility = Visibility.Visible;
                         btnConnect.Content = "Connect";
@@ -906,22 +915,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void Page_Unloaded(object sender, RoutedEventArgs e)
         {
-            // Unsubscribe from service events to allow this scoped instance to be GC'd.
-            // The next navigation creates a fresh instance whose constructor re-subscribes.
-            if (_waterCoolerService != null)
-            {
-                _waterCoolerService.ConnectionStateChanged -= OnConnectionStateChanged;
-                _waterCoolerService.StatusChanged -= OnStatusChanged;
-                _waterCoolerService.FlowStatusChanged -= OnFlowStatusChanged;
-                _waterCoolerService.FirmwareVersionReceived -= OnFirmwareVersionReceived;
-            }
-
-            // Unsubscribe from DeviceApplier events.
-            if (_deviceApplier != null)
-            {
-                _deviceApplier.WatercoolerOverrideChanged -= OnWatercoolerOverrideChanged;
-                _deviceApplier.WatercoolerPresetApplied -= OnWatercoolerPresetApplied;
-            }
+            // NOTE: Do NOT unsubscribe from service events here. WPF-UI caches scoped page
+            // instances — the constructor (and InitializePage) runs only once. Unsubscribing
+            // on Unloaded would break all live event delivery after the first navigation away
+            // and back, because the page is reused instead of recreated.
+            // The page is GC'd when the app exits and the DI container disposes.
 
             // Stop glow pulse timer to prevent leaks
             StopGlowPulse();
@@ -1096,9 +1094,27 @@ namespace Uniwill_Control_Utility.Views.Pages
         /*  Flow Status                                                        */
         /* ------------------------------------------------------------------ */
 
+        private FlowStatus _latestFlowStatus;
+        private bool _flowStatusUpdatePending;
+
         private void OnFlowStatusChanged(object? sender, FlowStatus status)
         {
-            Application.Current.Dispatcher.Invoke(() => UpdateFlowStatusUi(status));
+            // Coalesce rapid status changes: stash the latest value and queue at most
+            // one Dispatcher action. If an update is already pending, the incoming event
+            // only overwrites the cached value — the pending action will read it when it runs.
+            // This prevents icon/text desync when e.g. Off → Starting → Ok fires rapidly.
+            _latestFlowStatus = status;
+
+            if (_flowStatusUpdatePending) return;
+            _flowStatusUpdatePending = true;
+
+            Application.Current.Dispatcher.InvokeAsync(
+                (Action)(() =>
+                {
+                    UpdateFlowStatusUi(_latestFlowStatus);
+                    _flowStatusUpdatePending = false;
+                }),
+                DispatcherPriority.Normal);
         }
 
         private void UpdateFlowStatusUi(FlowStatus status)
