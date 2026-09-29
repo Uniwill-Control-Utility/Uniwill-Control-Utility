@@ -1,47 +1,20 @@
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using System.Windows;
 using System.Windows.Controls.Primitives;
-using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using Uniwill_Control_Utility.Services;
+using Wpf.Ui.Controls;
 
 namespace Uniwill_Control_Utility.Views.Windows;
 
-public partial class StartupProgressWindow : Window
+public partial class StartupProgressWindow : FluentWindow
 {
-    private const int DwmWindowCornerPreference = 33;
-    private const int DwmBorderColor = 34;
-    private const int DwmRound = 2;
-    private const uint DwmColorNone = 0xFFFFFFFE;
-
     private readonly Queue<StartupProgressState> _pendingStates = new();
     private Task _playbackTask = Task.CompletedTask;
 
     public StartupProgressWindow()
     {
         InitializeComponent();
-    }
-
-    protected override void OnSourceInitialized(System.EventArgs e)
-    {
-        base.OnSourceInitialized(e);
-
-        nint windowHandle = new WindowInteropHelper(this).Handle;
-        int cornerPreference = DwmRound;
-        _ = DwmSetWindowAttribute(
-            windowHandle,
-            DwmWindowCornerPreference,
-            ref cornerPreference,
-            Marshal.SizeOf<int>());
-
-        uint borderColor = DwmColorNone;
-        _ = DwmSetWindowAttribute(
-            windowHandle,
-            DwmBorderColor,
-            ref borderColor,
-            Marshal.SizeOf<uint>());
     }
 
     internal void QueueProgress(StartupProgressState state)
@@ -88,18 +61,4 @@ public partial class StartupProgressWindow : Window
             animation,
             HandoffBehavior.SnapshotAndReplace);
     }
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(
-        nint windowHandle,
-        int attribute,
-        ref int attributeValue,
-        int attributeSize);
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(
-        nint windowHandle,
-        int attribute,
-        ref uint attributeValue,
-        int attributeSize);
 }
