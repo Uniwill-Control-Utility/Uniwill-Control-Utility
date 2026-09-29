@@ -280,6 +280,10 @@ namespace Uniwill_Control_Utility
 
                         // Centralized device applier (singleton)
                         services.AddSingleton<DeviceApplier>();
+                        services.AddSingleton<TrayQuickControlService>();
+                        services.AddSingleton(provider => new TrayWidgetController(
+                            () => new Views.Windows.TrayWidgetWindow(
+                                provider.GetRequiredService<TrayQuickControlService>())));
 
                         // Configuration
                         services.Configure<AppConfig>(context.Configuration.GetSection(nameof(AppConfig)));
