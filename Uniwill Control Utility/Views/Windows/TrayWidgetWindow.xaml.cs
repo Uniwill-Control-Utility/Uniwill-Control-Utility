@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -59,6 +60,8 @@ namespace Uniwill_Control_Utility.Views.Windows
                 TrayQuickControlSnapshot snapshot = await Task.Run(_quickControl.GetSnapshot);
                 ApplySnapshot(snapshot);
                 ApplyTelemetry(_quickControl.GetTelemetrySnapshot());
+                UpdateLayout();
+                PositionNearTray();
                 _telemetryTimer.Start();
                 StatusText.Text = "Ready";
             }
@@ -280,14 +283,71 @@ namespace Uniwill_Control_Utility.Views.Windows
         private void PositionNearTray()
         {
             var cursor = System.Windows.Forms.Cursor.Position;
-            var workArea = Screen.FromPoint(cursor).WorkingArea;
-            var source = PresentationSource.FromVisual(this) as HwndSource;
-            var transform = source?.CompositionTarget?.TransformFromDevice ?? System.Windows.Media.Matrix.Identity;
-            Point topLeft = transform.Transform(new Point(workArea.Left, workArea.Top));
-            Point bottomRight = transform.Transform(new Point(workArea.Right, workArea.Bottom));
-            Left = Math.Max(topLeft.X + 8, bottomRight.X - ActualWidth - 10);
-            Top = Math.Max(topLeft.Y + 8, bottomRight.Y - ActualHeight - 10);
+            Screen screen = Screen.FromPoint(cursor);
+            IntPtr handle = new WindowInteropHelper(this).Handle;
+            if (handle == IntPtr.Zero || !GetWindowRect(handle, out NativeRect windowRect))
+                return;
+
+            var windowSize = new System.Drawing.Size(
+                windowRect.Right - windowRect.Left,
+                windowRect.Bottom - windowRect.Top);
+            TrayWidgetPlacementResult placement = TrayWidgetPlacement.Calculate(
+                screen.Bounds,
+                screen.WorkingArea,
+                cursor,
+                windowSize,
+                gap: 10,
+                taskbarBounds: FindTaskbarBounds(screen.Bounds));
+
+            SetWindowPos(
+                handle,
+                IntPtr.Zero,
+                placement.Location.X,
+                placement.Location.Y,
+                0,
+                0,
+                SetWindowPosFlags.NoSize |
+                SetWindowPosFlags.NoZOrder |
+                SetWindowPosFlags.NoActivate);
         }
+
+        private static System.Drawing.Rectangle? FindTaskbarBounds(
+            System.Drawing.Rectangle monitorBounds)
+        {
+            IntPtr primaryTaskbar = FindWindow("Shell_TrayWnd", null);
+            if (TryGetTaskbarBounds(primaryTaskbar, monitorBounds, out System.Drawing.Rectangle bounds))
+                return bounds;
+
+            IntPtr secondaryTaskbar = IntPtr.Zero;
+            while ((secondaryTaskbar = FindWindowEx(
+                       IntPtr.Zero,
+                       secondaryTaskbar,
+                       "Shell_SecondaryTrayWnd",
+                       null)) != IntPtr.Zero)
+            {
+                if (TryGetTaskbarBounds(secondaryTaskbar, monitorBounds, out bounds))
+                    return bounds;
+            }
+
+            return null;
+        }
+
+        private static bool TryGetTaskbarBounds(
+            IntPtr taskbar,
+            System.Drawing.Rectangle monitorBounds,
+            out System.Drawing.Rectangle bounds)
+        {
+            bounds = default;
+            if (taskbar == IntPtr.Zero || !GetWindowRect(taskbar, out NativeRect rect))
+                return false;
+
+            bounds = System.Drawing.Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);
+            System.Drawing.Rectangle intersection = System.Drawing.Rectangle.Intersect(bounds, monitorBounds);
+            return intersection.Width > 0 && intersection.Height > 0;
+        }
+
+        private void Window_DpiChanged(object sender, DpiChangedEventArgs e) =>
+            Dispatcher.BeginInvoke(PositionNearTray, DispatcherPriority.Loaded);
 
         private static bool TryReadLeadingInt(string text, out int value)
         {
@@ -328,6 +388,48 @@ namespace Uniwill_Control_Utility.Views.Windows
             mainWindow.WindowState = WindowState.Normal;
             mainWindow.Activate();
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeRect
+        {
+            internal int Left;
+            internal int Top;
+            internal int Right;
+            internal int Bottom;
+        }
+
+        [Flags]
+        private enum SetWindowPosFlags : uint
+        {
+            NoSize = 0x0001,
+            NoZOrder = 0x0004,
+            NoActivate = 0x0010
+        }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetWindowRect(IntPtr window, out NativeRect rect);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr FindWindow(string className, string? windowName);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr FindWindowEx(
+            IntPtr parent,
+            IntPtr childAfter,
+            string className,
+            string? windowName);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetWindowPos(
+            IntPtr window,
+            IntPtr insertAfter,
+            int x,
+            int y,
+            int width,
+            int height,
+            SetWindowPosFlags flags);
 
         private sealed record Option<T>(string Label, T Value);
     }

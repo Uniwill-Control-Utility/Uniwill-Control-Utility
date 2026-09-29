@@ -23,6 +23,7 @@
     Foreground="{DynamicResource TextFillColorPrimaryBrush}"
     FontFamily="Segoe UI Variable Text, Segoe UI"
     Deactivated="Window_Deactivated"
+    DpiChanged="Window_DpiChanged"
     Closed="Window_Closed"
     SnapsToDevicePixels="True"
     UseLayoutRounding="True">
