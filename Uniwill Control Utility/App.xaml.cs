@@ -96,6 +96,10 @@ namespace Uniwill_Control_Utility
                 PrepareUserSettings();
                 LocalizationService.Initialize(Settings.Default.Language);
 
+                // Apply the correct WPFUI theme before showing the startup progress window
+                // so it renders with the right brushes instead of flashing Dark first.
+                ApplySystemTheme();
+
                 bool showStartupProgressOverlay = Settings.Default.ShowStartupProgressOverlay;
                 if (showStartupProgressOverlay)
                 {
@@ -390,6 +394,29 @@ namespace Uniwill_Control_Utility
                 startupWindow?.Hide();
                 MessageBox.Show(ex.Message);
                 Shutdown(-1);
+            }
+        }
+
+        /// <summary>
+        /// Reads the Windows system light/dark theme from the registry and applies it
+        /// via WPFUI so that early windows (like the startup progress overlay) render
+        /// with the correct brushes instead of flashing Dark first.
+        /// </summary>
+        private static void ApplySystemTheme()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(
+                    @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+                bool isLight = key?.GetValue("AppsUseLightTheme") is int lightVal && lightVal == 1;
+                Wpf.Ui.Appearance.ApplicationThemeManager.Apply(
+                    isLight
+                        ? Wpf.Ui.Appearance.ApplicationTheme.Light
+                        : Wpf.Ui.Appearance.ApplicationTheme.Dark);
+            }
+            catch
+            {
+                // Fall back to the default theme from App.xaml (Dark)
             }
         }
 
