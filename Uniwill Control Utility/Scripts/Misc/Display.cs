@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Uniwill_Control_Utility.Views.Windows;
+using Uniwill_Control_Utility.Services;
 using static Uniwill_Control_Utility.Scripts.Misc.ScreenInterrogatory;
 
 namespace Uniwill_Control_Utility.Scripts.Misc
@@ -23,7 +24,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         internal static extern int ChangeDisplaySettingsEx([MarshalAs(UnmanagedType.LPWStr)] string lpszDeviceName, ref DEVMODE lpDevMode, IntPtr hwnd, uint dwflags, IntPtr lParam);
 #pragma warning restore SYSLIB1054
 
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         internal struct DISPLAY_DEVICE
         {
             public uint cb;
@@ -38,7 +39,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             public string DeviceKey;
         }
 
-        [StructLayout(LayoutKind.Sequential)]
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         internal struct DEVMODE
         {
             private const int CCHDEVICENAME = 32;
@@ -72,6 +73,14 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             public int dmPelsHeight;
             public int dmDisplayFlags;
             public int dmDisplayFrequency;
+            public int dmICMMethod;
+            public int dmICMIntent;
+            public int dmMediaType;
+            public int dmDitherType;
+            public int dmReserved1;
+            public int dmReserved2;
+            public int dmPanningWidth;
+            public int dmPanningHeight;
         }
 
         private static string? _targetDisplayName = FindLaptopScreen();
@@ -85,6 +94,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         public static void SetUpLists()
         {
+            _targetDisplayName = FindLaptopScreen();
             _uniqueRefreshRates = GetSupportedRefreshRates(_targetDisplayName ?? DefaultDevice)
                 .Distinct()
                 .OrderByDescending(x => x)
@@ -190,6 +200,22 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             }
         }
 
+        public static int GetCurrentRefreshRate()
+        {
+            _targetDisplayName = FindLaptopScreen();
+            if (string.IsNullOrEmpty(_targetDisplayName))
+                return 0;
+
+            DEVMODE devMode = new DEVMODE
+            {
+                dmSize = (short)Marshal.SizeOf<DEVMODE>()
+            };
+
+            return EnumDisplaySettings(_targetDisplayName, EnumCurrentSettings, ref devMode)
+                ? devMode.dmDisplayFrequency
+                : 0;
+        }
+
         const int DispChangeSuccessful = 0;
         internal const uint EnumCurrentSettings = 0xFFFFFFFF;
 
@@ -217,46 +243,27 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         public static string? FindLaptopScreen(bool log = false)
         {
-            string? laptopScreen = null;
             var screens = Screen.AllScreens;
             try
             {
                 var devices = GetAllDevices().ToArray();
+                int displayNum = Array.FindLastIndex(devices, device =>
+                    device.outputTechnology == DisplayConfigOutputTechnology.Internal ||
+                    device.outputTechnology == DisplayConfigOutputTechnology.DisplayportEmbedded);
 
-                int count = 0, displayNum = -1;
-
-                foreach (var device in devices)
-                {
-                    if (device.outputTechnology == DisplayConfigOutputTechnology.Internal ||
-                        device.outputTechnology == DisplayConfigOutputTechnology.DisplayportEmbedded)
-                    {
-                        displayNum = count;
-                    }
-
-                    count++;
-                }
-
-                count = 0;
-                foreach (var screen in screens)
-                {
-                    if (count == displayNum) laptopScreen = screen.DeviceName;
-                    count++;
-                }
-
-                if (displayNum > 0 && count == 0) laptopScreen = DefaultDevice;
+                return DisplayTargetSelector.Choose(
+                    displayNum,
+                    screens.Select(screen => screen.DeviceName).ToArray(),
+                    Screen.PrimaryScreen?.DeviceName ?? DefaultDevice);
             }
             catch (COMException)
             {
-                // Display enumeration failed, fall back to primary screen
-                laptopScreen = Screen.PrimaryScreen?.DeviceName;
+                return Screen.PrimaryScreen?.DeviceName ?? DefaultDevice;
             }
             catch (Exception ex) when (ex is not COMException)
             {
-                // Unexpected error during display detection
-                laptopScreen = Screen.PrimaryScreen?.DeviceName;
+                return Screen.PrimaryScreen?.DeviceName ?? DefaultDevice;
             }
-
-            return laptopScreen;
         }
     }
 }

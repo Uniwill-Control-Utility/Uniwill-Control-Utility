@@ -54,12 +54,14 @@ namespace Uniwill_Control_Utility.Views.Windows
         public static MainWindow? Instance { get; private set; }
         private static INavigationService _navigationService;
         private bool _isTrayPresetApplying;
+        private readonly TrayWidgetController _trayWidget;
         public static bool IsPageSelected(Type pageType) =>
             _mainWindowNav?.SelectedItem is INavigationViewItem item && item.TargetPageType == pageType;
 
-        public MainWindow(ViewModels.MainWindowViewModel viewModel, INavigationViewPageProvider pageProvider, INavigationService navigationService)
+        public MainWindow(ViewModels.MainWindowViewModel viewModel, INavigationViewPageProvider pageProvider, INavigationService navigationService, TrayWidgetController trayWidget)
         {
             ViewModel = viewModel;
+            _trayWidget = trayWidget;
             DataContext = this;
             InitializeComponent();
 
@@ -80,17 +82,13 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             // Ensure tray icon is visible
             niTray.Visibility = Visibility.Visible;
+
         }
 
-        /// <summary>Restores the window when the tray icon is left-clicked.</summary>
+        /// <summary>Toggles the compact quick-control widget when the tray icon is left-clicked.</summary>
         private void NotifyIcon_LeftClick(Wpf.Ui.Tray.Controls.NotifyIcon sender, RoutedEventArgs e)
         {
-            if (this.Visibility != Visibility.Visible || this.WindowState == WindowState.Minimized)
-            {
-                this.Show();
-                this.WindowState = WindowState.Normal;
-                this.Activate();
-            }
+            _ = _trayWidget.ToggleAsync();
         }
 
         private void TrayMenu_Opened(object sender, RoutedEventArgs e)
@@ -457,7 +455,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         private async void AsyncApplyKeyboardOnStart()
         {
             // Wait for the system to settle after boot. The HID controller needs
-            // time to become discoverable — especially on cold startup.
+            // time to become discoverable â€” especially on cold startup.
             await Task.Delay(1000);
 
             KeyboardHidService? hidService = null;
@@ -630,7 +628,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         /// <summary>
         /// Applies EC fan curve and battery charge limit at app startup.
-        /// Runs once from mainWindow_Loaded — not on every Dashboard navigation.
+        /// Runs once from mainWindow_Loaded â€” not on every Dashboard navigation.
         /// </summary>
         private void ApplyEcSettingsOnStart()
         {
@@ -1025,7 +1023,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 try
                                 {
                                     // If the service still thinks it's connected, the HID link
-                                    // may be stale after hibernate — reconnect.
+                                    // may be stale after hibernate â€” reconnect.
                                     if (flydigiService.IsConnected)
                                     {
                                         Debug.WriteLine("[Flydigi] Resuming from sleep - disconnecting stale HID link");
@@ -1225,7 +1223,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private async void TrayCustomPreset_Click(object? sender, RoutedEventArgs e)
         {
-            // Legacy handler – delegates to extended handler with Normal mode.
+            // Legacy handler â€“ delegates to extended handler with Normal mode.
             if (sender is not MenuItem menuItem || menuItem.Tag is not int slot)
                 return;
             await TrayCustomPresetApplyAsync(slot, Models.PresetMode.Normal);
@@ -1378,7 +1376,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             // Apply EC fan curve and battery charge limit on startup. Runs here instead
             // of DashboardViewModel.OnNavigatedToAsync so it only fires once at app
-            // launch — not every time the user navigates to the Dashboard page. This
+            // launch â€” not every time the user navigates to the Dashboard page. This
             // prevents the saved fan curve from overwriting live changes (e.g., Fan Turbo).
             _ = Task.Run(ApplyEcSettingsOnStart);
 
