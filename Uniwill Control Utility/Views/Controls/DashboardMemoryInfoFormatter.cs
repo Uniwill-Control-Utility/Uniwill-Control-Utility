@@ -36,6 +36,24 @@ internal static class DashboardMemoryInfoFormatter
             : $"{string.Join(" / ", manufacturers)} · {string.Join(" / ", models)}";
     }
 
+    /// <summary>Returns a short label (manufacturer only, or model as fallback) for compact display.</summary>
+    public static string FormatModelShort(string manufacturer, string model)
+    {
+        string cleanManufacturer = Normalize(manufacturer);
+        string cleanModel = Normalize(model);
+
+        string[] manufacturers = SplitAggregates(cleanManufacturer);
+        string[] models = SplitAggregates(cleanModel);
+
+        if (manufacturers.Length > 0)
+            return string.Join(" / ", manufacturers);
+
+        if (models.Length > 0)
+            return string.Join(" / ", models);
+
+        return "Not available";
+    }
+
     public static string FormatSpeed(int speed)
         => speed > 0 ? $"{speed} MT/s" : "Not available";
 

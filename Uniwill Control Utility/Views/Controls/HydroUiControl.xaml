@@ -3,16 +3,18 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:Uniwill_Control_Utility.Views.Controls"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              FlowDirection="LeftToRight"
              FontFamily="Segoe UI Variable Text, Segoe UI"
              Foreground="{DynamicResource TextFillColorPrimaryBrush}"
              UseLayoutRounding="True">
 
-    <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+    <Grid>
+        <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
             BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
             CornerRadius="8"
-            Padding="20"
+            Padding="16"
             MinHeight="160"
             SnapsToDevicePixels="True">
         <Grid>
@@ -23,25 +25,47 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" Margin="0,0,0,14">
+            <Grid Grid.Row="0" Margin="0,0,0,16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="12" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEB42;" FontSize="23" />
-                <TextBlock Grid.Column="2" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="22" FontWeight="SemiBold" Text="Hydro UI" />
-                <Border Grid.Column="3" Height="32" Padding="14,0" CornerRadius="16" BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Background="{DynamicResource ControlFillColorSecondaryBrush}">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Ellipse Width="9" Height="9" Fill="#4BD879" />
-                        <TextBlock Margin="8,0,0,0" VerticalAlignment="Center" FontSize="12" Text="Normal" />
-                    </StackPanel>
-                </Border>
+                <ui:FontIcon
+                    FontFamily="Segoe Fluent Icons"
+                    Glyph="&#xEB42;"
+                    FontSize="20"
+                    Margin="4,0,2,0"/>
+                <TextBlock Grid.Column="2"
+                           FontFamily="Segoe UI Variable Display, Segoe UI"
+                           FontSize="20"
+                           FontWeight="SemiBold"
+                           Text="Hydro UI"/>
+                <StackPanel Grid.Column="3" Orientation="Horizontal">
+                    <Border x:Name="_smartModePill" Padding="10,0" CornerRadius="16" BorderThickness="1"
+                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                            Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                            Margin="0,0,6,0"
+                            Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Ellipse Width="9" Height="9" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                            <TextBlock VerticalAlignment="Center" FontSize="12" Text="Smart Mode" Margin="8,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="_statusPill" Height="32" Padding="14,0" CornerRadius="16" BorderThickness="1"
+                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                            Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Ellipse x:Name="_statusDot" Width="9" Height="9" Fill="#4BD879" />
+                            <TextBlock x:Name="_statusText" Margin="8,0,0,0" VerticalAlignment="Center" FontSize="12" Text="Connected" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
             </Grid>
             <Border Grid.Row="1" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
 
-            <Grid x:Name="spConnected" Grid.Row="3">
+            <Grid x:Name="spConnected" Grid.Row="3" Margin="4,0,4,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="1" />
@@ -55,7 +79,7 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock FontSize="12" Text="Fan Speed" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        <TextBlock x:Name="_fanLabel" Margin="0,2,0,0" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="28" FontWeight="SemiBold" Text="--" />
+                        <TextBlock x:Name="_fanLabel" Margin="0,2,0,0" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="24" FontWeight="SemiBold" Text="--" />
                     </StackPanel>
                     <controls:DashboardSegmentedBar x:Name="_fanBar" Grid.Column="1" Height="10" Margin="26,0,0,0" VerticalAlignment="Center" Maximum="100" Segments="20" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
                 </Grid>
@@ -69,15 +93,17 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock FontSize="12" Text="Pump" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        <TextBlock x:Name="_pumpLabel" Margin="0,2,0,0" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="28" FontWeight="SemiBold" Text="--" />
+                        <TextBlock x:Name="_pumpLabel" Margin="0,2,0,0" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="24" FontWeight="SemiBold" Text="--" />
                     </StackPanel>
                     <controls:DashboardSegmentedBar x:Name="_pumpBar" Grid.Column="1" Height="10" Margin="26,0,0,0" VerticalAlignment="Center" Maximum="12" Segments="20" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
                 </Grid>
             </Grid>
 
-            <Grid x:Name="spDisconnected" Grid.Row="3" Visibility="Collapsed">
+            <Grid x:Name="spDisconnected" Grid.Row="3" Visibility="Collapsed" Margin="4,0,4,0">
                 <TextBlock VerticalAlignment="Center" Text="Disconnected" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
             </Grid>
         </Grid>
-    </Border>
+        </Border>
+        <Border Style="{StaticResource DashboardInteractiveCardHoverBorderStyle}" />
+    </Grid>
 </UserControl>

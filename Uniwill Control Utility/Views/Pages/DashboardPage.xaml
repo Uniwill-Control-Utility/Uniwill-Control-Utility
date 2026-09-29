@@ -6,6 +6,7 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       xmlns:controls="clr-namespace:Uniwill_Control_Utility.Views.Controls"
+      xmlns:viewModels="clr-namespace:Uniwill_Control_Utility.ViewModels"
       Title="Dashboard"
       d:DataContext="{d:DesignInstance local:DashboardPage, IsDesignTimeCreatable=False}"
       d:DesignHeight="800"
@@ -50,31 +51,46 @@
                             Margin="20,18,20,24">
 
                     <!-- Hardware metrics: CPU & GPU -->
-                    <Grid Margin="0,0,0,12">
+                    <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="8" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
                         <controls:CpuControl x:Name="_cpu"
-                                             Grid.Column="0" />
+                                             Grid.Column="0"
+                                             Cursor="Hand"
+                                             Focusable="True"
+                                             Tag="{x:Static viewModels:DashboardCard.Cpu}"
+                                             MouseLeftButtonUp="DashboardCard_MouseLeftButtonUp"
+                                             KeyDown="DashboardCard_KeyDown" />
                         <controls:GpuControl x:Name="_gpu"
-                                             Grid.Column="2" />
+                                             Grid.Column="2"
+                                             Cursor="Hand"
+                                             Focusable="True"
+                                             Tag="{x:Static viewModels:DashboardCard.Gpu}"
+                                             MouseLeftButtonUp="DashboardCard_MouseLeftButtonUp"
+                                             KeyDown="DashboardCard_KeyDown" />
                     </Grid>
 
                     <!-- Memory & Battery row -->
-                    <Grid Margin="0,0,0,12">
+                    <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="8" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
                         <controls:MemoryControl x:Name="_memory"
                                                 Grid.Column="0" />
                         <controls:BatteryControl x:Name="_battery"
-                                                 Grid.Column="2" />
+                                                 Grid.Column="2"
+                                                 Cursor="Hand"
+                                                 Focusable="True"
+                                                 Tag="{x:Static viewModels:DashboardCard.Battery}"
+                                                 MouseLeftButtonUp="DashboardCard_MouseLeftButtonUp"
+                                                 KeyDown="DashboardCard_KeyDown" />
                     </Grid>
 
                     <!-- Device status row: Hydro UI & Flydigi Cooler -->
@@ -82,12 +98,17 @@
                           Margin="0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="8" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
                         <controls:HydroUiControl x:Name="_hydroUi"
-                                                 Grid.Column="0" />
+                                                 Grid.Column="0"
+                                                 Cursor="Hand"
+                                                 Focusable="True"
+                                                 Tag="{x:Static viewModels:DashboardCard.HydroUi}"
+                                                 MouseLeftButtonUp="DashboardCard_MouseLeftButtonUp"
+                                                 KeyDown="DashboardCard_KeyDown" />
                         <controls:FlydigiControl x:Name="_flydigi"
                                                  Grid.Column="2" />
                     </Grid>

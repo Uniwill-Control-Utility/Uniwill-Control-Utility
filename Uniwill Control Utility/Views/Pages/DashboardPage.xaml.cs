@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
@@ -17,12 +18,18 @@ namespace Uniwill_Control_Utility.Views.Pages
         Page,
         INavigableView<DashboardViewModel>
     {
+        private readonly PresetsNavigationRequest _presetsNavigationRequest;
+
         public DashboardViewModel ViewModel { get; }
 
-        public DashboardPage(DashboardViewModel viewModel)
+        public DashboardPage(
+            DashboardViewModel viewModel,
+            PresetsNavigationRequest presetsNavigationRequest)
         {
             ViewModel = viewModel
                 ?? throw new ArgumentNullException(nameof(viewModel));
+            _presetsNavigationRequest = presetsNavigationRequest
+                ?? throw new ArgumentNullException(nameof(presetsNavigationRequest));
 
             DataContext = this;
 
@@ -33,6 +40,42 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             InitializeDeviceInfo();
             InitializeDeviceControls();
+        }
+
+        private void DashboardCard_MouseLeftButtonUp(
+            object sender,
+            MouseButtonEventArgs e)
+        {
+            NavigateFromDashboardCard(sender);
+            e.Handled = true;
+        }
+
+        private void DashboardCard_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key is not (Key.Enter or Key.Space))
+                return;
+
+            NavigateFromDashboardCard(sender);
+            e.Handled = true;
+        }
+
+        private void NavigateFromDashboardCard(object sender)
+        {
+            if (sender is not FrameworkElement
+                {
+                    Tag: DashboardCard card
+                } ||
+                !DashboardCardNavigation.TryResolve(
+                    card,
+                    out DashboardCardDestination destination))
+            {
+                return;
+            }
+
+            if (destination.TuningSection is PresetsTuningSection section)
+                _presetsNavigationRequest.Request(section);
+
+            ViewModel.GetNavigationService().Navigate(destination.PageTag);
         }
 
         private void InitializeDeviceControls()
@@ -284,7 +327,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Both visible — side by side.
                 _deviceRow.Visibility = Visibility.Visible;
                 _deviceRow.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
-                _deviceRow.ColumnDefinitions[1].Width = new GridLength(12);
+                _deviceRow.ColumnDefinitions[1].Width = new GridLength(8);
                 _deviceRow.ColumnDefinitions[2].Width = new GridLength(1, GridUnitType.Star);
                 _hydroUi.HorizontalAlignment = HorizontalAlignment.Stretch;
                 _hydroUi.MinWidth = 0;

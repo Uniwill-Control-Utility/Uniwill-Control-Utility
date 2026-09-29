@@ -21,6 +21,7 @@ namespace Uniwill_Control_Utility.Views.Controls
     {
         private readonly List<Slider> _sliders = new();
         private readonly InfoTooltip _customToolTip = new();
+        private DispatcherOperation? _pendingGraphRedraw;
 
         // Fixed temperature points: 0, 10, 20, ..., 100 °C (11 points)
         private static readonly int[] Temperatures = { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
@@ -69,7 +70,7 @@ namespace Uniwill_Control_Utility.Views.Controls
                 _slidersGrid.Children.Add(slider);
             }
 
-            Dispatcher.InvokeAsync(DrawGraph, DispatcherPriority.Render);
+            RequestGraphRedraw();
         }
 
         /// <summary>
@@ -143,9 +144,17 @@ namespace Uniwill_Control_Utility.Views.Controls
 
             _customToolTip.Update(temp, rpm);
 
+            Point pointer = e.GetPosition(_canvas);
+            Point thumbTopLeft = track.Thumb.TranslatePoint(new Point(), _canvas);
+            var thumbBounds = new Rect(
+                thumbTopLeft,
+                new Size(track.Thumb.ActualWidth, track.Thumb.ActualHeight));
             _customToolTip.Placement = PlacementMode.Custom;
-            _customToolTip.PlacementTarget = track.Thumb;
-            _customToolTip.CustomPopupPlacementCallback = ToolTipCustomPopupPlacementCallback;
+            _customToolTip.PlacementTarget = _canvas;
+            _customToolTip.CustomPopupPlacementCallback = (size, targetSize, _) =>
+                new[] { new CustomPopupPlacement(
+                    EcFanCurveEditor.GetTooltipPosition(pointer, thumbBounds, size, targetSize, 12),
+                    PopupPrimaryAxis.Vertical) };
 
             // Force tooltip refresh
             _customToolTip.HorizontalOffset += -0.1;
@@ -167,18 +176,20 @@ namespace Uniwill_Control_Utility.Views.Controls
                 return;
 
             VerifyMonotonicity(currentSlider);
-            DrawGraph();
+            RequestGraphRedraw();
             CurveChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        private static CustomPopupPlacement[] ToolTipCustomPopupPlacementCallback(Size size, Size targetSize, Point _)
+        private void RequestGraphRedraw()
         {
-            return new[]
+            if (_pendingGraphRedraw is { Status: DispatcherOperationStatus.Pending })
+                return;
+
+            _pendingGraphRedraw = Dispatcher.InvokeAsync(() =>
             {
-                new CustomPopupPlacement(
-                    new((targetSize.Width - size.Width) * 0.5, -targetSize.Height - size.Height + 8),
-                    PopupPrimaryAxis.Vertical)
-            };
+                _pendingGraphRedraw = null;
+                DrawGraph();
+            }, DispatcherPriority.Loaded);
         }
 
         /// <summary>
@@ -266,6 +277,15 @@ namespace Uniwill_Control_Utility.Views.Controls
 
         private Point GetThumbLocation(Slider slider)
         {
+            slider.ApplyTemplate();
+            if (slider.Template.FindName("PART_Track", slider) is Track track &&
+                track.Thumb is { ActualWidth: > 0, ActualHeight: > 0 } thumb)
+            {
+                return thumb.TranslatePoint(
+                    new Point(thumb.ActualWidth * 0.5, thumb.ActualHeight * 0.5),
+                    _canvas);
+            }
+
             var ratio = slider.Value / (slider.Maximum - slider.Minimum);
             var y = slider.ActualHeight - (slider.ActualHeight * ratio);
             var x = slider.ActualWidth * 0.5;

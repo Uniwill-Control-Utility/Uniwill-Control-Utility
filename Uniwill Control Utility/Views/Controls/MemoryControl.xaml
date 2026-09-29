@@ -12,33 +12,40 @@
             BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
             CornerRadius="8"
-            Padding="20"
-            MinHeight="250"
+            Padding="16"
+
             SnapsToDevicePixels="True">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="1" />
-                <RowDefinition Height="16" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="10" />
                 <RowDefinition Height="10" />
-                <RowDefinition Height="14" />
+                <RowDefinition Height="18" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" Margin="0,0,0,14">
+            <Grid Grid.Row="0" Margin="0,0,0,16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="12" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEEA0;" FontSize="22" />
-                <TextBlock Grid.Column="2" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="22" FontWeight="SemiBold" Text="Memory" />
+                <ui:FontIcon 
+                    FontFamily="Segoe Fluent Icons" 
+                    Glyph="&#xEEA0;" 
+                    FontSize="20" 
+                    Margin="4,0,2,0"/>
+                <TextBlock Grid.Column="2" 
+                           FontFamily="Segoe UI Variable Display, Segoe UI" 
+                           FontSize="20" 
+                           FontWeight="SemiBold" 
+                           Text="Memory"/>
             </Grid>
             <Border Grid.Row="1" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
 
-            <Grid Grid.Row="3">
+            <Grid Grid.Row="2" Margin="4,8,4,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -53,9 +60,9 @@
                 <TextBlock x:Name="_memoryPercent" Grid.Column="1" VerticalAlignment="Center" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="22" FontWeight="SemiBold" Text="--" />
             </Grid>
 
-            <controls:DashboardSegmentedBar x:Name="_memoryBar" Grid.Row="5" Height="10" Maximum="100" Segments="24" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+            <controls:DashboardSegmentedBar x:Name="_memoryBar" Margin="4,0,4,0" Grid.Row="4" Height="10" Maximum="100" Segments="24" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
 
-            <Grid Grid.Row="7">
+            <Grid Grid.Row="7" Margin="4,0,4,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="70" />
                     <ColumnDefinition Width="*" />

@@ -12,9 +12,10 @@ namespace Uniwill_Control_Utility.Views.Controls
 
         public void UpdateModuleInfo(string manufacturer, string model, int speed)
         {
-            string moduleIdentity = DashboardMemoryInfoFormatter.FormatModel(manufacturer, model);
-            _moduleModel.Text = moduleIdentity;
-            _moduleModel.ToolTip = moduleIdentity;
+            string fullIdentity = DashboardMemoryInfoFormatter.FormatModel(manufacturer, model);
+            string shortIdentity = DashboardMemoryInfoFormatter.FormatModelShort(manufacturer, model);
+            _moduleModel.Text = shortIdentity;
+            _moduleModel.ToolTip = fullIdentity;
             _moduleSpeed.Text = DashboardMemoryInfoFormatter.FormatSpeed(speed);
         }
 
