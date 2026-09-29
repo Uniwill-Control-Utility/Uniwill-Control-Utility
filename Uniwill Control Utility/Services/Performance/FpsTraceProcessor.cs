@@ -2,11 +2,12 @@ using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Session;
 using System;
 using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace Uniwill_Control_Utility.Services.Performance
 {
-    internal sealed class FpsTraceProcessor : IDisposable
+    internal sealed partial class FpsTraceProcessor : IDisposable
     {
         private static readonly Guid DxgiProvider = Guid.Parse("{CA11C036-0102-4A2D-A6AD-F03CFED5D3C9}");
         private static readonly Guid DxgKrnlProvider = Guid.Parse("{802EC45A-1E99-4B83-9920-87C98277BA9D}");
@@ -16,6 +17,7 @@ namespace Uniwill_Control_Utility.Services.Performance
         private readonly ConcurrentDictionary<int, FrameTimestampBuffer> _frames = new();
         private readonly ConcurrentDictionary<int, double> _lastTimestamp = new();
         private TraceEventSession? _session;
+        private bool _sessionStarted;
         private Thread? _traceThread;
         private int _targetProcessId;
 
@@ -34,6 +36,15 @@ namespace Uniwill_Control_Utility.Services.Performance
             if (_session is not null)
                 return;
 
+            /*
+             * ETW tracing for DXGI/DXGKrnl requires SeSystemProfilePrivilege.
+             * Even when running as Administrator, this privilege is granted but
+             * not enabled by default. Enable it before creating the session so
+             * that TraceEventSession.GetTraceLoggerHandle() succeeds instead of
+             * throwing "Access Denied".
+             */
+            TryEnableSystemProfilePrivilege();
+
             _session = new TraceEventSession($"UCU-FPS-{Environment.ProcessId}") { StopOnDispose = true };
             _session.EnableProvider(DxgiProvider, TraceEventLevel.Informational, ulong.MaxValue);
             _session.EnableProvider(DxgKrnlProvider, TraceEventLevel.Informational, DxgKrnlPresentKeyword);
@@ -46,6 +57,7 @@ namespace Uniwill_Control_Utility.Services.Performance
                 // Win32k provider may not be available on all systems; DXGKrnl is sufficient.
             }
             _session.Source.AllEvents += OnEvent;
+            _sessionStarted = true;
             _traceThread = new Thread(() =>
             {
                 try
@@ -113,12 +125,35 @@ namespace Uniwill_Control_Utility.Services.Performance
 
         public void Stop()
         {
+            bool wasStarted = Interlocked.Exchange(ref _sessionStarted, false);
             TraceEventSession? session = Interlocked.Exchange(ref _session, null);
             if (session is null)
                 return;
 
-            session.Source.AllEvents -= OnEvent;
-            session.Dispose();
+            try
+            {
+                if (wasStarted)
+                    session.Source.AllEvents -= OnEvent;
+            }
+            catch
+            {
+                // Unsubscribe must not fail cleanup.
+            }
+
+            try
+            {
+                session.Dispose();
+            }
+            catch
+            {
+                /*
+                 * Dispose may throw if the session never started successfully
+                 * (e.g. SeSystemProfilePrivilege not enabled, or ETW blocked
+                 * because RTSS already owns the kernel providers). Swallow it
+                 * so that cleanup never propagates to the caller.
+                 */
+            }
+
             Thread? traceThread = Interlocked.Exchange(ref _traceThread, null);
             if (traceThread is not null && traceThread != Thread.CurrentThread)
                 traceThread.Join(TimeSpan.FromSeconds(1));
@@ -128,5 +163,76 @@ namespace Uniwill_Control_Utility.Services.Performance
         }
 
         public void Dispose() => Stop();
+
+        /*
+         * Win32 interop for enabling SeSystemProfilePrivilege.
+         * Required for ETW consumer sessions that trace kernel-mode providers.
+         */
+
+        private static void TryEnableSystemProfilePrivilege()
+        {
+            try
+            {
+                IntPtr hToken = IntPtr.Zero;
+                if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, out hToken) == 0)
+                    return;
+
+                try
+                {
+                    if (LookupPrivilegeValue(null, "SeSystemProfilePrivilege", out LUID luid) == 0)
+                        return;
+
+                    var tp = new TOKEN_PRIVILEGES
+                    {
+                        PrivilegeCount = 1,
+                        Luid = luid,
+                        Attributes = SE_PRIVILEGE_ENABLED
+                    };
+
+                    AdjustTokenPrivileges(hToken, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+                }
+                finally
+                {
+                    CloseHandle(hToken);
+                }
+            }
+            catch
+            {
+                // Privilege adjustment is best-effort; ETW will fail gracefully if unavailable.
+            }
+        }
+
+        private const int TOKEN_ADJUST_PRIVILEGES = 32;
+        private const uint SE_PRIVILEGE_ENABLED = 0x00000002;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct LUID
+        {
+            public int LowPart;
+            public uint HighPart;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct TOKEN_PRIVILEGES
+        {
+            public int PrivilegeCount;
+            public LUID Luid;
+            public uint Attributes;
+        }
+
+        [LibraryImport("kernel32.dll")]
+        private static partial IntPtr GetCurrentProcess();
+
+        [LibraryImport("kernel32.dll")]
+        private static partial int CloseHandle(IntPtr handle);
+
+        [LibraryImport("advapi32.dll", SetLastError = true)]
+        private static partial int OpenProcessToken(IntPtr process, int desiredAccess, out IntPtr tokenHandle);
+
+        [LibraryImport("advapi32.dll", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+        private static partial int LookupPrivilegeValue(string? lpSystemName, string lpName, out LUID lpLuid);
+
+        [LibraryImport("advapi32.dll", SetLastError = true)]
+        private static partial int AdjustTokenPrivileges(IntPtr tokenHandle, [MarshalAs(UnmanagedType.Bool)] bool disableAllPrivileges, ref TOKEN_PRIVILEGES newState, int bufferLength, IntPtr previousState, IntPtr returnLength);
     }
 }

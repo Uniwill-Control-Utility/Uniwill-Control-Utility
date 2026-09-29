@@ -67,7 +67,19 @@ namespace Uniwill_Control_Utility.Services
 
             if (options.Enabled)
             {
-                EnsureHook();
+                /*
+                 * MouseKeyHook installs WH_KEYBOARD_LL / WH_MOUSE_LL hooks via
+                 * SetWindowsHookEx.  Although low-level hooks don't require a
+                 * message pump on the calling thread, the hook is scoped to the
+                 * desktop of the thread that calls SetWindowsHookEx.  When
+                 * IHostedService.StartAsync fires on a thread-pool thread the
+                 * hook may end up on a different desktop or fail silently, so
+                 * keyboard events never reach the callback.  Installing on the
+                 * UI thread (which is guaranteed to be on WinSta0\Default)
+                 * avoids this problem.
+                 */
+                RunOnUiThread(EnsureHook);
+
                 // Re-apply current options (with defaults) so the ViewModel picks up new properties.
                 RunOnUiThread(() => _viewModel?.ApplyOptions(options));
             }
@@ -85,7 +97,10 @@ namespace Uniwill_Control_Utility.Services
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            RemoveHook();
+            RunOnUiThread(() =>
+            {
+                RemoveHook();
+            });
 
             RunOnUiThread(() =>
             {
@@ -112,13 +127,13 @@ namespace Uniwill_Control_Utility.Services
 
             SaveOptionsIfChanged(normalisedOptions);
 
-            if (normalisedOptions.Enabled)
-                EnsureHook();
-            else
-                RemoveHook();
-
             RunOnUiThread(() =>
             {
+                if (normalisedOptions.Enabled)
+                    EnsureHook();
+                else
+                    RemoveHook();
+
                 _viewModel?.ApplyOptions(normalisedOptions);
 
                 if (!normalisedOptions.Enabled)
@@ -579,8 +594,7 @@ namespace Uniwill_Control_Utility.Services
 
             _disposed = true;
 
-            RemoveHook();
-
+            RunOnUiThread(RemoveHook);
             RunOnUiThread(CloseOverlayWindow);
 
             GC.SuppressFinalize(this);
