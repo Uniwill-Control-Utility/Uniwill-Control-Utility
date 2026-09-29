@@ -588,7 +588,7 @@
 
                             <iconPacks:PackIconLucide
                                 x:Name="FlowStatusIcon"
-                                Kind="Waves"
+                                Kind="DropletOff"
                                 VerticalAlignment="Center"
                                 Width="14"
                                 Height="14"
