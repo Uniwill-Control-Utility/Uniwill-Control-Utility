@@ -603,5 +603,21 @@
   "Watercooler service is not available.\nPlease restart the application.": "水冷クーラーサービスを利用できません。\nアプリケーションを再起動してください。",
   "When enabled, a single curve controls both CPU and GPU fans.": "有効にすると、単一のカーブで CPU と GPU の両方のファンを制御します。",
   "White": "白",
-  "Width": "幅"
+  "Width": "幅",
+  "Initializing application": "アプリケーションを初期化しています",
+  "Checking environment": "環境を確認しています",
+  "Loading settings": "設定を読み込んでいます",
+  "Detecting hardware": "ハードウェアを検出しています",
+  "Starting services": "サービスを開始しています",
+  "Preparing interface": "インターフェイスを準備しています",
+  "Preparing diagnostics": "診断を準備しています",
+  "Checking prerequisites": "前提条件を確認しています",
+  "Reading system profile": "システムプロファイルを読み込んでいます",
+  "Configuring services": "サービスを構成しています",
+  "Initializing sensors": "センサーを初期化しています",
+  "Applying startup settings": "起動設定を適用しています",
+  "Opening dashboard": "ダッシュボードを開いています",
+  "Ready": "準備完了",
+  "Show startup progress": "起動進行状況を表示",
+  "Display the startup progress window while the application is loading": "アプリケーションの読み込み中に起動進行状況ウィンドウを表示します"
 }

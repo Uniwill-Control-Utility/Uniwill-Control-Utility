@@ -603,5 +603,21 @@
   "Watercooler service is not available.\nPlease restart the application.": "Служба водяного охолодження недоступна.\nБудь ласка, перезапустіть програму.",
   "When enabled, a single curve controls both CPU and GPU fans.": "Якщо увімкнено, одна крива керує вентиляторами як CPU, так і GPU.",
   "White": "Білий",
-  "Width": "Ширина"
+  "Width": "Ширина",
+  "Initializing application": "Ініціалізація програми",
+  "Checking environment": "Перевірка середовища",
+  "Loading settings": "Завантаження налаштувань",
+  "Detecting hardware": "Виявлення обладнання",
+  "Starting services": "Запуск служб",
+  "Preparing interface": "Підготовка інтерфейсу",
+  "Preparing diagnostics": "Підготовка діагностики",
+  "Checking prerequisites": "Перевірка необхідних компонентів",
+  "Reading system profile": "Читання профілю системи",
+  "Configuring services": "Налаштування служб",
+  "Initializing sensors": "Ініціалізація датчиків",
+  "Applying startup settings": "Застосування параметрів запуску",
+  "Opening dashboard": "Відкриття головної сторінки",
+  "Ready": "Готово",
+  "Show startup progress": "Показувати перебіг запуску",
+  "Display the startup progress window while the application is loading": "Показувати вікно перебігу запуску під час завантаження програми"
 }

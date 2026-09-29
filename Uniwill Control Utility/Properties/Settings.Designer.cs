@@ -862,5 +862,13 @@ namespace Uniwill_Control_Utility.Properties {
             get { return ((bool)(this["DisplayLocalDimming"])); }
             set { this["DisplayLocalDimming"] = value; }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ShowStartupProgressOverlay {
+            get { return ((bool)(this["ShowStartupProgressOverlay"])); }
+            set { this["ShowStartupProgressOverlay"] = value; }
+        }
     }
 }

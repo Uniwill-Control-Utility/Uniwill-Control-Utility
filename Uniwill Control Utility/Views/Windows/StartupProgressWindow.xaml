@@ -1,0 +1,150 @@
+<Window x:Class="Uniwill_Control_Utility.Views.Windows.StartupProgressWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Uniwill Control Utility"
+        Width="376"
+        Height="286"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterScreen"
+        AllowsTransparency="True"
+        Background="Transparent"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True">
+    <Window.Resources>
+        <Style x:Key="StartupProgressBarStyle" TargetType="ProgressBar">
+            <Setter Property="Height" Value="4" />
+            <Setter Property="Background" Value="#26343D" />
+            <Setter Property="Foreground" Value="#65B8F0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid x:Name="PART_Track" ClipToBounds="True">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="2" />
+                            <Border x:Name="PART_Indicator"
+                                    HorizontalAlignment="Left"
+                                    Background="{TemplateBinding Foreground}"
+                                    CornerRadius="2" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Border Width="340"
+                Height="250"
+                Background="#F21B2024"
+                BorderBrush="#38515F"
+                BorderThickness="1"
+                CornerRadius="20">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="26"
+                                  Direction="270"
+                                  Opacity="0.52"
+                                  ShadowDepth="8"
+                                  Color="#050708" />
+            </Border.Effect>
+
+            <Grid Margin="24,17,24,18">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock HorizontalAlignment="Center"
+                           Foreground="#F4F8FA"
+                           FontFamily="Segoe UI Variable Text, Segoe UI"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Text="Uniwill Control Utility" />
+
+                <Grid Grid.Row="1"
+                      Width="94"
+                      Height="94"
+                      Margin="0,8,0,5">
+                    <Ellipse Width="86"
+                             Height="86"
+                             Stroke="#243943"
+                             StrokeThickness="2" />
+                    <Ellipse Width="86"
+                             Height="86"
+                             Stroke="#65B8F0"
+                             StrokeThickness="3"
+                             StrokeDashArray="8 5"
+                             StrokeStartLineCap="Round"
+                             StrokeEndLineCap="Round"
+                             RenderTransformOrigin="0.5,0.5">
+                        <Ellipse.RenderTransform>
+                            <RotateTransform x:Name="HaloRotation" />
+                        </Ellipse.RenderTransform>
+                        <Ellipse.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="HaloRotation"
+                                                         Storyboard.TargetProperty="Angle"
+                                                         From="0"
+                                                         To="360"
+                                                         Duration="0:0:1.65"
+                                                         RepeatBehavior="Forever" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Ellipse.Triggers>
+                    </Ellipse>
+                    <Ellipse Width="70"
+                             Height="70"
+                             Fill="#172B34">
+                        <Ellipse.Effect>
+                            <DropShadowEffect BlurRadius="18"
+                                              Opacity="0.36"
+                                              ShadowDepth="0"
+                                              Color="#59B5ED" />
+                        </Ellipse.Effect>
+                    </Ellipse>
+                    <Image Width="58"
+                           Height="58"
+                           Source="pack://application:,,,/Assets/applicationIcon-256.png"
+                           Stretch="Uniform" />
+                </Grid>
+
+                <TextBlock x:Name="StatusText"
+                           Grid.Row="2"
+                           Height="26"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Foreground="#DCE5EA"
+                           FontFamily="Segoe UI Variable Text, Segoe UI"
+                           FontSize="13"
+                           TextAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Text="Initializing application" />
+
+                <ProgressBar x:Name="StartupProgressBar"
+                             Grid.Row="3"
+                             Margin="0,8,0,0"
+                             Minimum="0"
+                             Maximum="100"
+                             Value="0"
+                             Style="{StaticResource StartupProgressBarStyle}" />
+
+                <TextBlock x:Name="PercentageText"
+                           Grid.Row="4"
+                           Margin="0,7,0,0"
+                           HorizontalAlignment="Center"
+                           Foreground="#80909A"
+                           FontFamily="Segoe UI Variable Text, Segoe UI"
+                           FontSize="11"
+                           FontWeight="SemiBold"
+                           Text="0%" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

@@ -192,6 +192,32 @@
                             <Border Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
+                            <!-- Row: Startup progress overlay -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Show startup progress" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                  FontTypography="Caption"
+                                                  Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                  Text="Display the startup progress window while the application is loading" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbShowStartupProgress"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbShowStartupProgress_Checked"
+                                                 Unchecked="cbShowStartupProgress_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
                             <!-- Row: Start minimised -->
                             <Grid>
                                 <Grid.ColumnDefinitions>

@@ -603,5 +603,21 @@
   "Watercooler service is not available.\nPlease restart the application.": "O serviço de watercooler não está disponível.\nPor favor, reinicie a aplicação.",
   "When enabled, a single curve controls both CPU and GPU fans.": "Quando ativado, uma única curva controla as ventoinhas do CPU e da GPU.",
   "White": "Branco",
-  "Width": "Largura"
+  "Width": "Largura",
+  "Initializing application": "A inicializar a aplicação",
+  "Checking environment": "A verificar o ambiente",
+  "Loading settings": "A carregar as definições",
+  "Detecting hardware": "A detetar o hardware",
+  "Starting services": "A iniciar os serviços",
+  "Preparing interface": "A preparar a interface",
+  "Preparing diagnostics": "A preparar o diagnóstico",
+  "Checking prerequisites": "A verificar os pré-requisitos",
+  "Reading system profile": "A ler o perfil do sistema",
+  "Configuring services": "A configurar os serviços",
+  "Initializing sensors": "A inicializar os sensores",
+  "Applying startup settings": "A aplicar as definições de arranque",
+  "Opening dashboard": "A abrir o painel principal",
+  "Ready": "Pronto",
+  "Show startup progress": "Mostrar progresso do arranque",
+  "Display the startup progress window while the application is loading": "Apresentar a janela de progresso enquanto a aplicação é carregada"
 }

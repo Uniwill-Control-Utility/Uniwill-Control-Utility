@@ -101,6 +101,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool bootEnabled = Settings.Default.StartOnBoot;
             StartupDelayDivider.Visibility = bootEnabled ? Visibility.Visible : Visibility.Collapsed;
             StartupDelayRow.Visibility = bootEnabled ? Visibility.Visible : Visibility.Collapsed;
+            cbShowStartupProgress.IsChecked = Settings.Default.ShowStartupProgressOverlay;
             cbStartMini.IsChecked = Settings.Default.StartMini;
             cbMinimizeClose.IsChecked = Settings.Default.MinimizeClose;
             cbAutoCheck.IsChecked = Settings.Default.UpdateCheck;
@@ -355,6 +356,18 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 UpdateScheduledTask();
             }
+        }
+
+        private void cbShowStartupProgress_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.ShowStartupProgressOverlay = true;
+            Settings.Default.Save();
+        }
+
+        private void cbShowStartupProgress_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.ShowStartupProgressOverlay = false;
+            Settings.Default.Save();
         }
 
         private void cbStartMini_Checked(object sender, RoutedEventArgs e)

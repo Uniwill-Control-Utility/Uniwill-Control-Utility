@@ -603,5 +603,21 @@
   "Watercooler service is not available.\nPlease restart the application.": "บริการชุดน้ำระบายความร้อนไม่พร้อมใช้งาน\nโปรดรีสตาร์ทแอปพลิเคชัน",
   "When enabled, a single curve controls both CPU and GPU fans.": "เมื่อเปิดใช้งาน เคิร์ฟเดี่ยวจะควบคุมทั้งพัดลม CPU และ GPU",
   "White": "ขาว",
-  "Width": "ความกว้าง"
+  "Width": "ความกว้าง",
+  "Initializing application": "กำลังเริ่มต้นแอปพลิเคชัน",
+  "Checking environment": "กำลังตรวจสอบสภาพแวดล้อม",
+  "Loading settings": "กำลังโหลดการตั้งค่า",
+  "Detecting hardware": "กำลังตรวจหาฮาร์ดแวร์",
+  "Starting services": "กำลังเริ่มบริการ",
+  "Preparing interface": "กำลังเตรียมส่วนติดต่อผู้ใช้",
+  "Preparing diagnostics": "กำลังเตรียมการวินิจฉัย",
+  "Checking prerequisites": "กำลังตรวจสอบข้อกำหนดเบื้องต้น",
+  "Reading system profile": "กำลังอ่านโปรไฟล์ระบบ",
+  "Configuring services": "กำลังกำหนดค่าบริการ",
+  "Initializing sensors": "กำลังเริ่มต้นเซ็นเซอร์",
+  "Applying startup settings": "กำลังใช้การตั้งค่าเริ่มต้น",
+  "Opening dashboard": "กำลังเปิดแดชบอร์ด",
+  "Ready": "พร้อม",
+  "Show startup progress": "แสดงความคืบหน้าเมื่อเริ่มต้น",
+  "Display the startup progress window while the application is loading": "แสดงหน้าต่างความคืบหน้าขณะกำลังโหลดแอปพลิเคชัน"
 }

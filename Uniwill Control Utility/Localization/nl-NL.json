@@ -603,5 +603,21 @@
   "Watercooler service is not available.\nPlease restart the application.": "Waterkoelerservice is niet beschikbaar.\nStart de applicatie opnieuw.",
   "When enabled, a single curve controls both CPU and GPU fans.": "Indien ingeschakeld, regelt één curve zowel de CPU- als GPU-ventilatoren.",
   "White": "Wit",
-  "Width": "Breedte"
+  "Width": "Breedte",
+  "Initializing application": "Toepassing initialiseren",
+  "Checking environment": "Omgeving controleren",
+  "Loading settings": "Instellingen laden",
+  "Detecting hardware": "Hardware detecteren",
+  "Starting services": "Services starten",
+  "Preparing interface": "Interface voorbereiden",
+  "Preparing diagnostics": "Diagnostiek voorbereiden",
+  "Checking prerequisites": "Vereisten controleren",
+  "Reading system profile": "Systeemprofiel lezen",
+  "Configuring services": "Services configureren",
+  "Initializing sensors": "Sensoren initialiseren",
+  "Applying startup settings": "Opstartinstellingen toepassen",
+  "Opening dashboard": "Dashboard openen",
+  "Ready": "Gereed",
+  "Show startup progress": "Opstartvoortgang tonen",
+  "Display the startup progress window while the application is loading": "Toon het voortgangsvenster terwijl de toepassing wordt geladen"
 }

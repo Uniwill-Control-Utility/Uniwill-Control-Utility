@@ -603,5 +603,21 @@
   "Watercooler service is not available.\nPlease restart the application.": "Layanan watercooler tidak tersedia.\nSilakan mulai ulang aplikasi.",
   "When enabled, a single curve controls both CPU and GPU fans.": "Saat diaktifkan, satu kurva tunggal mengontrol kipas CPU dan GPU.",
   "White": "Putih",
-  "Width": "Lebar"
+  "Width": "Lebar",
+  "Initializing application": "Menginisialisasi aplikasi",
+  "Checking environment": "Memeriksa lingkungan",
+  "Loading settings": "Memuat pengaturan",
+  "Detecting hardware": "Mendeteksi perangkat keras",
+  "Starting services": "Memulai layanan",
+  "Preparing interface": "Menyiapkan antarmuka",
+  "Preparing diagnostics": "Menyiapkan diagnostik",
+  "Checking prerequisites": "Memeriksa prasyarat",
+  "Reading system profile": "Membaca profil sistem",
+  "Configuring services": "Mengonfigurasi layanan",
+  "Initializing sensors": "Menginisialisasi sensor",
+  "Applying startup settings": "Menerapkan pengaturan awal",
+  "Opening dashboard": "Membuka dasbor",
+  "Ready": "Siap",
+  "Show startup progress": "Tampilkan progres startup",
+  "Display the startup progress window while the application is loading": "Tampilkan jendela progres startup saat aplikasi dimuat"
 }
