@@ -69,4 +69,41 @@ public sealed class TrayWidgetPlacementTests
         Assert.Equal(new Point(1496, 530), result.Location);
         Assert.Equal(TrayEdge.Bottom, result.Edge);
     }
+
+    [Theory]
+    [InlineData(0, 1079, 1920, 40, (int)TrayEdge.Bottom, 0, 1040, 1920, 40)]
+    [InlineData(0, -39, 1920, 40, (int)TrayEdge.Top, 0, 0, 1920, 40)]
+    [InlineData(-39, 0, 40, 1080, (int)TrayEdge.Left, 0, 0, 40, 1080)]
+    [InlineData(1919, 0, 40, 1080, (int)TrayEdge.Right, 1880, 0, 40, 1080)]
+    public void NormalizeTaskbarBounds_RestoresFullThicknessWhenTaskbarIsRetracted(
+        int taskbarX,
+        int taskbarY,
+        int taskbarWidth,
+        int taskbarHeight,
+        int edge,
+        int expectedX,
+        int expectedY,
+        int expectedWidth,
+        int expectedHeight)
+    {
+        Rectangle normalized = TrayWidgetPlacement.NormalizeTaskbarBounds(
+            new Rectangle(0, 0, 1920, 1080),
+            new Rectangle(taskbarX, taskbarY, taskbarWidth, taskbarHeight),
+            (TrayEdge)edge);
+
+        Assert.Equal(
+            new Rectangle(expectedX, expectedY, expectedWidth, expectedHeight),
+            normalized);
+    }
+
+    [Fact]
+    public void NormalizeTaskbarBounds_PreservesNegativeMonitorCoordinates()
+    {
+        Rectangle normalized = TrayWidgetPlacement.NormalizeTaskbarBounds(
+            new Rectangle(-2560, 0, 2560, 1440),
+            new Rectangle(-2560, 1439, 2560, 48),
+            TrayEdge.Bottom);
+
+        Assert.Equal(new Rectangle(-2560, 1392, 2560, 48), normalized);
+    }
 }

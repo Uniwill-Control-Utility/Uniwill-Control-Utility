@@ -55,6 +55,47 @@ internal static class TrayWidgetPlacement
         return new TrayWidgetPlacementResult(location, edge);
     }
 
+    internal static Rectangle NormalizeTaskbarBounds(
+        Rectangle monitorBounds,
+        Rectangle taskbarBounds,
+        TrayEdge edge)
+    {
+        int horizontalThickness = Math.Clamp(taskbarBounds.Height, 1, monitorBounds.Height);
+        int verticalThickness = Math.Clamp(taskbarBounds.Width, 1, monitorBounds.Width);
+
+        return edge switch
+        {
+            TrayEdge.Left => new Rectangle(
+                monitorBounds.Left,
+                monitorBounds.Top,
+                verticalThickness,
+                monitorBounds.Height),
+            TrayEdge.Top => new Rectangle(
+                monitorBounds.Left,
+                monitorBounds.Top,
+                monitorBounds.Width,
+                horizontalThickness),
+            TrayEdge.Right => new Rectangle(
+                monitorBounds.Right - verticalThickness,
+                monitorBounds.Top,
+                verticalThickness,
+                monitorBounds.Height),
+            _ => new Rectangle(
+                monitorBounds.Left,
+                monitorBounds.Bottom - horizontalThickness,
+                monitorBounds.Width,
+                horizontalThickness)
+        };
+    }
+
+    internal static Rectangle NormalizeTaskbarBounds(
+        Rectangle monitorBounds,
+        Rectangle taskbarBounds) =>
+        NormalizeTaskbarBounds(
+            monitorBounds,
+            taskbarBounds,
+            DetectTaskbarEdge(monitorBounds, taskbarBounds));
+
     private static TrayEdge DetectTaskbarEdge(Rectangle monitorBounds, Rectangle taskbarBounds)
     {
         bool horizontal = taskbarBounds.Width >= taskbarBounds.Height;

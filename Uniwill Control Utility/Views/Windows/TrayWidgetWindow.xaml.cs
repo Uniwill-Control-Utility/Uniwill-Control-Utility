@@ -25,6 +25,8 @@ namespace Uniwill_Control_Utility.Views.Windows
         private string[] _presetNames = Array.Empty<string>();
         private string _selectedPreset = "Gaming";
         private int _refreshRate;
+        private System.Drawing.Point _placementAnchor;
+        private string? _placementScreenDeviceName;
 
         public TrayWidgetWindow(TrayQuickControlService quickControl)
         {
@@ -48,6 +50,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 return;
             }
 
+            CapturePlacementAnchor();
             _loading = true;
             StatusText.Text = "Loading…";
             Show();
@@ -282,19 +285,22 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void PositionNearTray()
         {
-            var cursor = System.Windows.Forms.Cursor.Position;
-            Screen screen = Screen.FromPoint(cursor);
             IntPtr handle = new WindowInteropHelper(this).Handle;
             if (handle == IntPtr.Zero || !GetWindowRect(handle, out NativeRect windowRect))
                 return;
 
+            Screen screen = Screen.AllScreens.FirstOrDefault(candidate =>
+                string.Equals(
+                    candidate.DeviceName,
+                    _placementScreenDeviceName,
+                    StringComparison.OrdinalIgnoreCase)) ?? Screen.FromHandle(handle);
             var windowSize = new System.Drawing.Size(
                 windowRect.Right - windowRect.Left,
                 windowRect.Bottom - windowRect.Top);
             TrayWidgetPlacementResult placement = TrayWidgetPlacement.Calculate(
                 screen.Bounds,
                 screen.WorkingArea,
-                cursor,
+                _placementAnchor,
                 windowSize,
                 gap: 10,
                 taskbarBounds: FindTaskbarBounds(screen.Bounds));
@@ -311,11 +317,48 @@ namespace Uniwill_Control_Utility.Views.Windows
                 SetWindowPosFlags.NoActivate);
         }
 
+        private void CapturePlacementAnchor()
+        {
+            _placementAnchor = System.Windows.Forms.Cursor.Position;
+            _placementScreenDeviceName = Screen.FromPoint(_placementAnchor).DeviceName;
+        }
+
         private static System.Drawing.Rectangle? FindTaskbarBounds(
             System.Drawing.Rectangle monitorBounds)
         {
+            foreach (TrayEdge edge in Enum.GetValues<TrayEdge>())
+            {
+                var appBarData = new AppBarData
+                {
+                    Size = (uint)Marshal.SizeOf<AppBarData>(),
+                    Edge = (uint)edge,
+                    Bounds = new NativeRect
+                    {
+                        Left = monitorBounds.Left,
+                        Top = monitorBounds.Top,
+                        Right = monitorBounds.Right,
+                        Bottom = monitorBounds.Bottom
+                    }
+                };
+                IntPtr autoHideTaskbar = SHAppBarMessage(GetAutoHideBarEx, ref appBarData);
+                if (TryGetTaskbarBounds(
+                        autoHideTaskbar,
+                        monitorBounds,
+                        edge,
+                        requireIntersection: false,
+                        out System.Drawing.Rectangle autoHideBounds))
+                {
+                    return autoHideBounds;
+                }
+            }
+
             IntPtr primaryTaskbar = FindWindow("Shell_TrayWnd", null);
-            if (TryGetTaskbarBounds(primaryTaskbar, monitorBounds, out System.Drawing.Rectangle bounds))
+            if (TryGetTaskbarBounds(
+                    primaryTaskbar,
+                    monitorBounds,
+                    edge: null,
+                    requireIntersection: true,
+                    out System.Drawing.Rectangle bounds))
                 return bounds;
 
             IntPtr secondaryTaskbar = IntPtr.Zero;
@@ -325,7 +368,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                        "Shell_SecondaryTrayWnd",
                        null)) != IntPtr.Zero)
             {
-                if (TryGetTaskbarBounds(secondaryTaskbar, monitorBounds, out bounds))
+                if (TryGetTaskbarBounds(
+                        secondaryTaskbar,
+                        monitorBounds,
+                        edge: null,
+                        requireIntersection: true,
+                        out bounds))
                     return bounds;
             }
 
@@ -335,6 +383,8 @@ namespace Uniwill_Control_Utility.Views.Windows
         private static bool TryGetTaskbarBounds(
             IntPtr taskbar,
             System.Drawing.Rectangle monitorBounds,
+            TrayEdge? edge,
+            bool requireIntersection,
             out System.Drawing.Rectangle bounds)
         {
             bounds = default;
@@ -343,7 +393,13 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             bounds = System.Drawing.Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);
             System.Drawing.Rectangle intersection = System.Drawing.Rectangle.Intersect(bounds, monitorBounds);
-            return intersection.Width > 0 && intersection.Height > 0;
+            if (requireIntersection && (intersection.Width <= 0 || intersection.Height <= 0))
+                return false;
+
+            bounds = edge is TrayEdge knownEdge
+                ? TrayWidgetPlacement.NormalizeTaskbarBounds(monitorBounds, bounds, knownEdge)
+                : TrayWidgetPlacement.NormalizeTaskbarBounds(monitorBounds, bounds);
+            return true;
         }
 
         private void Window_DpiChanged(object sender, DpiChangedEventArgs e) =>
@@ -398,6 +454,19 @@ namespace Uniwill_Control_Utility.Views.Windows
             internal int Bottom;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct AppBarData
+        {
+            internal uint Size;
+            internal IntPtr Window;
+            internal uint CallbackMessage;
+            internal uint Edge;
+            internal NativeRect Bounds;
+            internal IntPtr Parameter;
+        }
+
+        private const uint GetAutoHideBarEx = 0x0000000B;
+
         [Flags]
         private enum SetWindowPosFlags : uint
         {
@@ -419,6 +488,9 @@ namespace Uniwill_Control_Utility.Views.Windows
             IntPtr childAfter,
             string className,
             string? windowName);
+
+        [DllImport("shell32.dll")]
+        private static extern IntPtr SHAppBarMessage(uint message, ref AppBarData data);
 
         [DllImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
