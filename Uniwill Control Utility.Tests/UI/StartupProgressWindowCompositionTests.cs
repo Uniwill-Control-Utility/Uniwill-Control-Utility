@@ -1,6 +1,5 @@
 using System.Runtime.ExceptionServices;
 using System.Threading;
-using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Uniwill_Control_Utility.Views.Windows;
@@ -15,7 +14,6 @@ public sealed class StartupProgressWindowCompositionTests
     {
         RunOnSta(() =>
         {
-            _ = Application.Current ?? new Application();
             var window = new StartupProgressWindow();
 
             Assert.False(window.AllowsTransparency);
@@ -29,6 +27,8 @@ public sealed class StartupProgressWindowCompositionTests
 
             var background = Assert.IsType<SolidColorBrush>(window.Background);
             Assert.Equal(Color.FromRgb(0x1B, 0x20, 0x24), background.Color);
+
+            window.Close();
         });
     }
 
@@ -44,10 +44,6 @@ public sealed class StartupProgressWindowCompositionTests
             catch (Exception ex)
             {
                 failure = ex;
-            }
-            finally
-            {
-                Application.Current?.Shutdown();
             }
         });
         thread.SetApartmentState(ApartmentState.STA);
