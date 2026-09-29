@@ -89,23 +89,23 @@ namespace Uniwill_Control_Utility
             StartupProgressWindow? startupWindow = null;
             StartupProgressReporter? startupProgressReporter = null;
 
-            Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory;
-
-            PrepareUserSettings();
-            LocalizationService.Initialize(Settings.Default.Language);
-
-            bool showStartupProgressOverlay = Settings.Default.ShowStartupProgressOverlay;
-            if (showStartupProgressOverlay)
-            {
-                startupWindow = new StartupProgressWindow();
-                startupWindow.Show();
-            }
-
-            startupProgressReporter = StartupProgressReporter.Create(showStartupProgressOverlay,
-                stage => ReportStartupProgressAsync(startupWindow!, stage));
-
             try
             {
+                Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory;
+
+                PrepareUserSettings();
+                LocalizationService.Initialize(Settings.Default.Language);
+
+                bool showStartupProgressOverlay = Settings.Default.ShowStartupProgressOverlay;
+                if (showStartupProgressOverlay)
+                {
+                    startupWindow = new StartupProgressWindow();
+                    startupWindow.Show();
+                }
+
+                startupProgressReporter = StartupProgressReporter.Create(showStartupProgressOverlay,
+                    stage => ReportStartupProgressAsync(startupWindow!, stage));
+
                 await startupProgressReporter.ReportAsync(StartupStage.InitializingApplication);
 
                 await startupProgressReporter.ReportAsync(StartupStage.PreparingDiagnostics);

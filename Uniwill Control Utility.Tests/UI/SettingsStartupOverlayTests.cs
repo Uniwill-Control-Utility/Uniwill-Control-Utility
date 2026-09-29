@@ -31,6 +31,10 @@ public sealed class SettingsStartupOverlayTests
             "App.xaml.cs"));
 
         int settingsUpgrade = source.IndexOf("PrepareUserSettings();", StringComparison.Ordinal);
+        int guardedStartup = source.IndexOf(
+            "try",
+            source.IndexOf("private async void OnStartup", StringComparison.Ordinal),
+            StringComparison.Ordinal);
         int preferenceRead = source.IndexOf(
             "Settings.Default.ShowStartupProgressOverlay",
             StringComparison.Ordinal);
@@ -39,6 +43,8 @@ public sealed class SettingsStartupOverlayTests
             StringComparison.Ordinal);
 
         Assert.True(settingsUpgrade >= 0, "User settings must be upgraded before startup preferences are read.");
+        Assert.True(guardedStartup >= 0 && guardedStartup < settingsUpgrade,
+            "Settings preparation and preference reads must be inside the startup exception boundary.");
         Assert.True(preferenceRead > settingsUpgrade);
         Assert.True(conditionalWindow > preferenceRead);
         Assert.Contains(
