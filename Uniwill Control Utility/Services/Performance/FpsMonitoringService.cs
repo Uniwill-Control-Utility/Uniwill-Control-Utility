@@ -67,7 +67,7 @@ namespace Uniwill_Control_Utility.Services.Performance
             }
             catch (Exception ex)
             {
-                _processor?.Dispose();
+                try { _processor?.Dispose(); } catch { /* best-effort cleanup */ }
                 _processor = null;
                 DiagnosticLogger.LogError(ex, "Failed to start the ETW FPS monitor");
             }
