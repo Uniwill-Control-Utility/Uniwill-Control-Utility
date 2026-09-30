@@ -4,6 +4,7 @@
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:helpers="clr-namespace:Uniwill_Control_Utility.Helpers"
       mc:Ignorable="d"
       d:DesignHeight="650" d:DesignWidth="900"
       Title="Battery"
@@ -12,6 +13,10 @@
       SnapsToDevicePixels="True"
       UseLayoutRounding="True"
       ScrollViewer.CanContentScroll="False">
+
+    <Page.Resources>
+        <helpers:BatteryModeConverter x:Key="BatteryModeConverter" />
+    </Page.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -134,7 +139,8 @@
                                                VerticalAlignment="Center"
                                                FontSize="13"
                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                                               Text="--%" />
+                                               Text="{Binding SelectedIndex, ElementName=cbChargingLimit,
+                                                      Converter={StaticResource BatteryModeConverter}}" />
                                 </Grid>
 
                                 <!-- Divider -->

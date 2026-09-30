@@ -1,14 +1,16 @@
 using System;
 using System.Diagnostics;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Services;
+using Wpf.Ui.Abstractions.Controls;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
-    public partial class Battery : Page
+    public partial class Battery : Page, INavigationAware
     {
         private const int RefreshIntervalSeconds = 5;
         private const int ApplyDelaySeconds = 2;
@@ -25,9 +27,18 @@ namespace Uniwill_Control_Utility.Views.Pages
         };
         private bool _isEcAvailable;
         private bool _isLoaded;
-        private DateTime _lastUserApplyTime = DateTime.MinValue;
 
-        public Battery()
+        // Delayed refresh timer created after each user change. Tracked as a field
+        // so it can be stopped on Page_Unloaded — the NavigationView caches the page,
+        // so a leaked timer would fire on the hidden page and overwrite state.
+        private DispatcherTimer? _delayTimer;
+
+        // Shared across page instances (AddScoped creates a new page on each navigation).
+        // Without this, navigating away and back resets the grace period to zero,
+        // causing the 5-second timer to read a stale EC value and overwrite the UI.
+        private static DateTime _lastUserApplyTime;
+
+     public Battery()
         {
             InitializeComponent();
 
@@ -48,7 +59,46 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private void Page_Loaded(object sender, RoutedEventArgs e)
+      /// <inheritdoc />
+        /// Only fires on the very first navigation (page creation).
+        public async Task OnNavigatedToAsync()
+        {
+            SyncFromEcAndStartTimer();
+        }
+
+        /// <inheritdoc />
+        public async Task OnNavigatedFromAsync()
+        {
+            _refreshTimer.IsEnabled = false;
+            _delayTimer?.Stop();
+            _delayTimer = null;
+            _isLoaded = false;
+        }
+
+       private void Page_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (!_isEcAvailable)
+            {
+                BatteryAvailable.Visibility = Visibility.Collapsed;
+                BatteryUnavailable.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void Page_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _refreshTimer.IsEnabled = false;
+            _delayTimer?.Stop();
+            _delayTimer = null;
+            _isLoaded = false;
+        }
+
+      /// <summary>
+        /// Syncs combo box from EC, applies startup correction, restarts timer.
+        /// Called from OnNavigatedToAsync (first navigation to this cached page).
+        /// The tbChargeLimit textblock is XAML-bound to the combo box so it always
+        /// reflects the current selection without needing separate code-behind updates.
+        /// </summary>
+        private void SyncFromEcAndStartTimer()
         {
             if (!_isEcAvailable)
             {
@@ -60,7 +110,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             BatteryAvailable.Visibility = Visibility.Visible;
             BatteryUnavailable.Visibility = Visibility.Collapsed;
 
-            // Read current mode from EC
+            // Sync combo box from EC state without triggering SelectionChanged.
             int currentMode;
             try
             {
@@ -72,16 +122,17 @@ namespace Uniwill_Control_Utility.Views.Pages
                 currentMode = Settings.Default.BatteryMode;
             }
 
-            // Set combo box to match EC state
+            cbChargingLimit.SelectionChanged -= cbChargingLimit_SelectionChanged;
             cbChargingLimit.SelectedIndex = currentMode;
+            cbChargingLimit.SelectionChanged += cbChargingLimit_SelectionChanged;
 
-            // If saved setting differs from EC, apply saved setting
+            // If saved setting differs from EC, apply saved setting.
             int savedMode = Settings.Default.BatteryMode;
             if (savedMode != currentMode)
             {
                 try
                 {
-                    _ecService!.SetBatteryMode(savedMode);
+                    _ecService.SetBatteryMode(savedMode);
                     _lastUserApplyTime = DateTime.UtcNow;
                     Debug.WriteLine($"[Battery] Startup: EC mode ({currentMode}) differed from saved ({savedMode}), applied saved");
                 }
@@ -91,14 +142,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
             }
 
+            // Sync UI and restart timer.
             RefreshAll();
             _refreshTimer.IsEnabled = true;
             _isLoaded = true;
-        }
-
-        private void Page_Unloaded(object sender, RoutedEventArgs e)
-        {
-            _refreshTimer.IsEnabled = false;
         }
 
         private void cbChargingLimit_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -119,12 +166,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Debug.WriteLine($"[Battery] Applied charging limit: {mode switch { 0 => "100%", 1 => "80%", 2 => "60%", _ => "unknown" }} (mode {mode})");
 
                 // Delay refresh to let the EC process the change (timer auto-starts and self-stops in callback).
-                var _delayTimer = new DispatcherTimer(TimeSpan.FromSeconds(ApplyDelaySeconds), DispatcherPriority.Normal, (s, e) =>
+                _delayTimer?.Stop(); // Cancel any pending delay from a previous change
+                _delayTimer = new DispatcherTimer(TimeSpan.FromSeconds(ApplyDelaySeconds), DispatcherPriority.Normal, (s, e) =>
                 {
                     RefreshAll();
                     ((DispatcherTimer)s!).Stop();
+                    _delayTimer = null;
                 }, Dispatcher);
-                _ = _delayTimer; // Keep alive until callback fires
             }
             catch (Exception ex)
             {
@@ -146,35 +194,36 @@ namespace Uniwill_Control_Utility.Views.Pages
             RefreshAll();
         }
 
-        /// <summary>
+       /// <summary>
         /// Refreshes both the charge limit (from EC) and all telemetry.
+        /// The tbChargeLimit textblock is XAML-bound to cbChargingLimit.SelectedIndex,
+        /// so we only need to sync the combo box here.
         /// </summary>
         private void RefreshAll()
         {
             if (_ecService is null) return;
 
-            // Re-read charge limit from EC. Skip syncing the combo box if the user
-            // recently changed the setting — the EC may not have committed yet.
+            // Skip syncing the combo box if the user recently changed the setting —
+            // the EC may not have committed yet.
             bool withinGrace = (DateTime.UtcNow - _lastUserApplyTime).TotalMilliseconds < ApplyGraceMs;
 
             try
             {
                 int ecMode = _ecService.GetBatteryMode();
-                Application.Current.Dispatcher.Invoke(() =>
+                if (!withinGrace)
                 {
-                    if (withinGrace)
+                    // Sync combo box to EC state without triggering SelectionChanged
+                    // (which would write the read-back value back to the EC).
+                    cbChargingLimit.SelectionChanged -= cbChargingLimit_SelectionChanged;
+                    try
                     {
-                        // Only update the display text, keep the combo box at the user's selection
-                        tbChargeLimit.Text = $"{cbChargingLimit.SelectedIndex switch { 0 => "100", 1 => "80", 2 => "60", _ => "--" }}%";
-                        Debug.WriteLine($"[Battery] RefreshAll: skipping combo box sync (within {ApplyGraceMs}ms grace, EC reports mode {ecMode})");
-                    }
-                    else
-                    {
-                        // Sync combo box to EC state
                         cbChargingLimit.SelectedIndex = ecMode;
-                        tbChargeLimit.Text = $"{ecMode switch { 0 => "100", 1 => "80", 2 => "60", _ => "--" }}%";
                     }
-                });
+                    finally
+                    {
+                        cbChargingLimit.SelectionChanged += cbChargingLimit_SelectionChanged;
+                    }
+                }
             }
             catch (Exception ex)
             {
