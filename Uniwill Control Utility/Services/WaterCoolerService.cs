@@ -811,9 +811,16 @@ namespace Uniwill_Control_Utility.Services
         /// Starts the Smart Mode control loop.
         /// Reads temperatures at 2-second intervals and adjusts pump voltage
         /// and fan speed based on thresholds with hysteresis to prevent oscillation.
+        /// Idempotent — calling while already running is a no-op (navigation re-syncs trigger this).
         /// </summary>
         public void StartSmartMode()
         {
+            // Already running — don't restart. The Watercooler page calls this on every
+            // navigation (IsVisibleChanged → OnConnectionStateChanged), which would reset
+            // hysteresis state and the EWMA filter, causing unwanted pump/fan speed changes.
+            if (_smartModeTimer != null)
+                return;
+
             StopSmartMode();
 
             var settings = _settings;
