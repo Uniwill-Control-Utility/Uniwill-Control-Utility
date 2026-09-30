@@ -1208,53 +1208,63 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
-        /// Applies pre-built fan curves to both CPU and GPU. Uses the same
-        /// activation sequence as ApplyFanCurve (which works for normal curves):
+        /// Applies pre-built fan curves to both CPU and GPU. Ensures the EC
+        /// activation handshake is complete (calls InitializeEc(), which is
+        /// idempotent). Uses the same activation sequence as ApplyFanCurve:
         ///   1. Ensure SPLIT_TABLES is set
         ///   2. Clear boost mode
         ///   3. Write CPU tables (tempUp, tempDown, duty)
         ///   4. Write GPU tables (tempUp, tempDown, duty)
         ///   5. Toggle ENABLE_UNIVERSAL_FAN_CTRL to force EC to re-read tables
+        ///
+        /// Note: Uses non-checking writes throughout. The Uniwill EC firmware on
+        /// NB05/IDY platforms returns error code 1 for all WriteEC calls (both
+        /// control registers and table writes) even when the write succeeds.
+        /// This matches the behavior of ApplyFanCurve.
         /// </summary>
         public void ApplySmartFanCurve(byte[] cpuTempUp, byte[] cpuTempDown, byte[] cpuDuty,
             byte[] gpuTempUp, byte[] gpuTempDown, byte[] gpuDuty)
         {
+            // Ensure the EC activation handshake is complete before writing tables.
+            // InitializeEc() is idempotent — it only runs once per service lifetime.
+            InitializeEc();
+
             // Step 1: Ensure SPLIT is set (same as ApplyFanCurve)
             byte ufCtrl = ReadECRegister(REG_UNIVERSAL_FAN_CTRL);
             if ((ufCtrl & SPLIT_TABLES) == 0)
             {
                 ufCtrl = (byte)(ufCtrl | SPLIT_TABLES);
-                WriteECRegisterChecked(REG_UNIVERSAL_FAN_CTRL, ufCtrl);
+                WriteECRegister(REG_UNIVERSAL_FAN_CTRL, ufCtrl);
                 Thread.Sleep(50);
             }
 
             // Step 2: Clear boost mode (same as ApplyFanCurve)
             byte fanCtrl = ReadECRegister(REG_MANUAL_FAN_CTRL);
             fanCtrl = (byte)(fanCtrl & ~FAN_MODE_BOOST);
-            WriteECRegisterChecked(REG_MANUAL_FAN_CTRL, fanCtrl);
+            WriteECRegister(REG_MANUAL_FAN_CTRL, fanCtrl);
 
             // Step 3: Write CPU tables
-            WriteECRegistersChecked(REG_CPU_TEMP_END_TABLE, cpuTempUp);
-            WriteECRegistersChecked(REG_CPU_TEMP_START_TABLE, cpuTempDown);
-            WriteECRegistersChecked(REG_CPU_FAN_SPEED_TABLE, cpuDuty);
+            WriteECRegisters(REG_CPU_TEMP_END_TABLE, cpuTempUp);
+            WriteECRegisters(REG_CPU_TEMP_START_TABLE, cpuTempDown);
+            WriteECRegisters(REG_CPU_FAN_SPEED_TABLE, cpuDuty);
 
             Thread.Sleep(150);
 
             // Step 4: Write GPU tables
-            WriteECRegistersChecked(REG_GPU_TEMP_END_TABLE, gpuTempUp);
-            WriteECRegistersChecked(REG_GPU_TEMP_START_TABLE, gpuTempDown);
-            WriteECRegistersChecked(REG_GPU_FAN_SPEED_TABLE, gpuDuty);
+            WriteECRegisters(REG_GPU_TEMP_END_TABLE, gpuTempUp);
+            WriteECRegisters(REG_GPU_TEMP_START_TABLE, gpuTempDown);
+            WriteECRegisters(REG_GPU_FAN_SPEED_TABLE, gpuDuty);
 
             Thread.Sleep(150);
 
             // Step 5: Toggle ENABLE_UNIVERSAL_FAN_CTRL to force EC re-read
             byte apOem6 = ReadECRegister(REG_AP_OEM_6);
             apOem6 = (byte)(apOem6 & ~ENABLE_UNIVERSAL_FAN_CTRL);
-            WriteECRegisterChecked(REG_AP_OEM_6, apOem6);
+            WriteECRegister(REG_AP_OEM_6, apOem6);
             Thread.Sleep(150);
             apOem6 = ReadECRegister(REG_AP_OEM_6);
             apOem6 |= ENABLE_UNIVERSAL_FAN_CTRL;
-            WriteECRegisterChecked(REG_AP_OEM_6, apOem6);
+            WriteECRegister(REG_AP_OEM_6, apOem6);
             Thread.Sleep(150);
 
             DebugLog($"[DIAG] UniwillEC: Applied smart fan curves - CPU duty: [{string.Join(", ", cpuDuty[1..11])}] | GPU duty: [{string.Join(", ", gpuDuty[1..11])}]");
@@ -1264,19 +1274,18 @@ namespace Uniwill_Control_Utility.Services
         /// Updates only the recurring CPU and GPU duty tables. Temperature tables
         /// and activation registers are configured by <see cref="ApplySmartFanCurve"/>
         /// when the control loop starts.
+        ///
+        /// Note: Uses non-checking writes — the Uniwill EC firmware returns error
+        /// code 1 for all WriteEC calls even on success.
         /// </summary>
         public void ApplySmartFanDuty(byte[] cpuDuty, byte[] gpuDuty)
         {
-            var blocks = EcSmartFanWritePlan.CreateDutyUpdate(cpuDuty, gpuDuty);
+            // Only write the duty tables — temp tables are already primed.
+            WriteECRegisters(REG_CPU_FAN_SPEED_TABLE, cpuDuty);
 
-            for (int i = 0; i < blocks.Count; i++)
-            {
-                EcRegisterBlock block = blocks[i];
-                WriteECRegistersChecked(block.StartAddress, block.Data);
+            Thread.Sleep(150);
 
-                if (i + 1 < blocks.Count)
-                    Thread.Sleep(150);
-            }
+            WriteECRegisters(REG_GPU_FAN_SPEED_TABLE, gpuDuty);
 
             DebugLog($"[DIAG] UniwillEC: Updated smart fan duty only - CPU: [{string.Join(", ", cpuDuty[1..11])}] | GPU: [{string.Join(", ", gpuDuty[1..11])}]");
         }
