@@ -8,7 +8,8 @@ namespace Uniwill_Control_Utility.ViewModels
         Gpu,
         Memory,
         Battery,
-        HydroUi
+        HydroUi,
+        Flydigi
     }
 
     public readonly record struct DashboardCardDestination(
@@ -34,6 +35,9 @@ namespace Uniwill_Control_Utility.ViewModels
                     return true;
                 case DashboardCard.HydroUi:
                     destination = new("watercooler");
+                    return true;
+                case DashboardCard.Flydigi:
+                    destination = new("flydigicooler");
                     return true;
                 default:
                     destination = default;

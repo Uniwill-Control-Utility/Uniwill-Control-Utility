@@ -110,7 +110,12 @@
                                                  MouseLeftButtonUp="DashboardCard_MouseLeftButtonUp"
                                                  KeyDown="DashboardCard_KeyDown" />
                         <controls:FlydigiControl x:Name="_flydigi"
-                                                 Grid.Column="2" />
+                                                 Grid.Column="2"
+                                                 Cursor="Hand"
+                                                 Focusable="True"
+                                                 Tag="{x:Static viewModels:DashboardCard.Flydigi}"
+                                                 MouseLeftButtonUp="DashboardCard_MouseLeftButtonUp"
+                                                 KeyDown="DashboardCard_KeyDown" />
                     </Grid>
                 </StackPanel>
             </Grid>
