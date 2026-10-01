@@ -6,7 +6,7 @@ namespace Uniwill_Control_Utility.Services
         bool PresetEnabled,
         bool TdpEnabled,
         bool TgpEnabled,
-        bool FullFanEnabled,
+        bool LocalDimmingEnabled,
         bool HydroEnabled)
     {
         public static TrayQuickControlPolicy Create(
@@ -24,9 +24,8 @@ namespace Uniwill_Control_Utility.Services
                 PresetEnabled: !adaptiveCpuEnabled && !adaptiveGpuEnabled,
                 TdpEnabled: !adaptiveCpuEnabled,
                 TgpEnabled: hasNvidiaGpu && !adaptiveGpuEnabled,
-                // Full fan is an explicit user command and remains available even
-                // while Adaptive Mode owns the normal EC fan profile.
-                FullFanEnabled: true,
+                // Local dimming is a display-level toggle, not an adaptive profile.
+                LocalDimmingEnabled: true,
                 HydroEnabled: !adaptiveWaterCoolerEnabled);
         }
     }

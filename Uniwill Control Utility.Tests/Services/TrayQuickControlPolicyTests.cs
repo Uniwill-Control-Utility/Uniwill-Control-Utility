@@ -20,11 +20,11 @@ public sealed class TrayQuickControlPolicyTests
         Assert.False(policy.ShowHydro);
         Assert.True(policy.PresetEnabled);
         Assert.True(policy.TdpEnabled);
-        Assert.True(policy.FullFanEnabled);
+        Assert.True(policy.LocalDimmingEnabled);
     }
 
     [Fact]
-    public void Create_KeepsFullFanAvailableAsAnExplicitManualOverride()
+    public void Create_KeepsLocalDimmingAvailableAsADisplayToggle()
     {
         var policy = TrayQuickControlPolicy.Create(
             hasNvidiaGpu: true,
@@ -40,7 +40,7 @@ public sealed class TrayQuickControlPolicyTests
         Assert.False(policy.PresetEnabled);
         Assert.False(policy.TdpEnabled);
         Assert.True(policy.TgpEnabled);
-        Assert.True(policy.FullFanEnabled);
+        Assert.True(policy.LocalDimmingEnabled);
         Assert.False(policy.HydroEnabled);
     }
 }
