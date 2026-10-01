@@ -9,7 +9,7 @@
     Width="360"
     MinWidth="0"
     MaxWidth="414"
-    MinHeight="0"
+    MinHeight="100"
     SizeToContent="Height"
     ResizeMode="NoResize"
     ShowInTaskbar="False"
@@ -52,8 +52,8 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- ===== HEADER (drag target, no border) ===== -->
-        <Grid Grid.Row="0" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+        <!-- ===== HEADER (no drag) ===== -->
+        <Grid Grid.Row="0">
             <Grid Margin="8,0,8,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
