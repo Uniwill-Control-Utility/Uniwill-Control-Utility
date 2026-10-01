@@ -3,9 +3,6 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -22,8 +19,6 @@ namespace Uniwill_Control_Utility.Views.Windows
         private readonly TrayQuickControlService _quickControl;
         private bool _loading;
         private bool _applying;
-        private string _selectedPreset = "Gaming";
-        private bool _isPowerBoostMode;
         private System.Drawing.Point _placementAnchor;
         private string? _placementScreenDeviceName;
 
@@ -44,7 +39,6 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             CapturePlacementAnchor();
             _loading = true;
-            StatusText.Text = "Loading…";
             Show();
             UpdateLayout();
             PositionNearTray();
@@ -56,11 +50,10 @@ namespace Uniwill_Control_Utility.Views.Windows
                 ApplySnapshot(snapshot);
                 UpdateLayout();
                 PositionNearTray();
-                StatusText.Text = "Ready";
             }
-            catch (Exception ex)
+            catch
             {
-                StatusText.Text = ex.Message;
+                // Silently fail — no status text to show
             }
             finally
             {
@@ -70,162 +63,166 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void ApplySnapshot(TrayQuickControlSnapshot snapshot)
         {
-            _selectedPreset = snapshot.SelectedPreset;
-            _isPowerBoostMode = snapshot.IsPowerBoostMode;
+            var policy = snapshot.Policy;
 
-            // Enable/disable preset controls based on policy
-            bool presetEnabled = snapshot.Policy.PresetEnabled;
-            PresetOfficeButton.IsEnabled = presetEnabled;
-            PresetGamingButton.IsEnabled = presetEnabled;
-            PresetTurboButton.IsEnabled = presetEnabled;
-
-            // Populate custom preset buttons first (so they exist when UpdatePresetButtonStates runs)
-            UpdateCustomPresetButtons(snapshot.CustomPresetNames, presetEnabled);
-
-            // Set checked states after buttons are created
-            UpdatePresetButtonStates();
-
-            UpdateHeaderContext();
+            ApplyToggle(SlotAdaptiveMode, BtnAdaptiveMode, policy.ShowAdaptiveMode, snapshot.AdaptiveModeRunning);
+            ApplyToggle(SlotHydroSmartMode, BtnHydroSmartMode, policy.ShowHydroSmartMode, snapshot.HydroSmartMode);
+            ApplyToggle(SlotHydroRgb, BtnHydroRgb, policy.ShowHydroRgb, snapshot.HydroRgbOn);
+            ApplyToggle(SlotKeyboardBacklight, BtnKeyboardBacklight, policy.ShowKeyboardBacklight, snapshot.KeyboardRgbOn);
+            ApplyToggle(SlotLightBar, BtnLightBar, policy.ShowLightBar, snapshot.LightBarOn);
+            ApplyToggle(SlotFanSmartMode, BtnFanSmartMode, policy.ShowFanSmartMode, snapshot.FanSmartMode);
+            ApplyToggle(SlotLocalDimming, BtnLocalDimming, policy.ShowLocalDimming, snapshot.LocalDimmingOn);
+            ApplyToggle(SlotOverlay, BtnOverlay, policy.ShowOverlay, snapshot.OverlayOn);
+            ApplyToggle(SlotFlydigiRgb, BtnFlydigiRgb, policy.ShowFlydigiRgb, snapshot.FlydigiRgbOn);
         }
 
-        private void UpdatePresetButtonStates()
+        private static void ApplyToggle(
+            System.Windows.Controls.Panel panel,
+            System.Windows.Controls.Primitives.ToggleButton button,
+            bool visible,
+            bool isChecked)
         {
-            PresetOfficeButton.IsChecked = _selectedPreset.Equals("Office", StringComparison.OrdinalIgnoreCase);
-            PresetGamingButton.IsChecked = _selectedPreset.Equals("Gaming", StringComparison.OrdinalIgnoreCase);
-            PresetTurboButton.IsChecked = _selectedPreset.Equals("Turbo", StringComparison.OrdinalIgnoreCase);
-
-            // Update custom preset checked states (buttons are inside UniformGrid rows inside CustomPresetsPanel)
-            foreach (UniformGrid row in CustomPresetsPanel.Children)
-            {
-                foreach (ToggleButton btn in row.Children)
-                {
-                    string? name = (string?)btn.Tag;
-                    btn.IsChecked = !string.IsNullOrEmpty(name) && _selectedPreset.Equals(name, StringComparison.OrdinalIgnoreCase);
-                }
-            }
+            panel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            button.IsChecked = isChecked;
         }
 
-        private void UpdateCustomPresetButtons(string[] customNames, bool enabled)
+        #region Toggle Handlers
+
+        private async void BtnAdaptiveMode_Click(object sender, RoutedEventArgs e)
         {
-            CustomPresetsPanel.Children.Clear();
-
-            if (customNames.Length == 0)
-            {
-                CustomPresetsPanel.Visibility = Visibility.Collapsed;
-                return;
-            }
-
-            CustomPresetsPanel.Visibility = Visibility.Visible;
-
-            // Fit up to 3 buttons per row to avoid clipping (~390px available, buttons are 100px + 24px margin)
-            int maxColumns = 3;
-            int index = 0;
-
-            while (index < customNames.Length)
-            {
-                int columns = Math.Min(maxColumns, customNames.Length - index);
-                var row = new UniformGrid
-                {
-                    Columns = columns,
-                    Rows = 1,
-                    HorizontalAlignment = HorizontalAlignment.Center
-                };
-
-                for (int j = 0; j < columns && index < customNames.Length; j++, index++)
-                {
-                    string name = customNames[index];
-                    var button = new ToggleButton
-                    {
-                        Height = 36,
-                        Width = 100,
-                        Margin = new Thickness(12),
-                        HorizontalContentAlignment = HorizontalAlignment.Center,
-                        Style = this.FindResource("PresetButtonStyle") as Style,
-                        Tag = name,
-                        IsEnabled = enabled
-                    };
-
-                    var text = new Wpf.Ui.Controls.TextBlock
-                    {
-                        VerticalAlignment = VerticalAlignment.Center,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        FontSize = 13,
-                        Text = name
-                    };
-
-                    button.Content = text;
-                    button.Click += PresetButton_Click;
-                    row.Children.Add(button);
-                }
-
-                CustomPresetsPanel.Children.Add(row);
-            }
-        }
-
-        private async void PresetButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not ToggleButton button)
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
                 return;
 
-            string presetName = ExtractButtonText(button) ?? "";
-
-            // Update checked state immediately so the previous button deselects right away
-            _selectedPreset = presetName;
-            UpdatePresetButtonStates();
-            UpdateHeaderContext();
-
-            bool applied = await ApplyAsync(() => _quickControl.ApplyPresetAsync(presetName), $"Preset: {presetName}");
-            if (!applied)
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
             {
-                // Re-apply checked state in case snapshot refresh overwrites it
-                UpdatePresetButtonStates();
-            }
+                _quickControl.SetAdaptiveMode(enabled);
+                await Task.CompletedTask;
+            });
         }
 
-        /// <summary>Extracts the preset name from a button (Tag for custom, TextBlock content for stock).</summary>
-        private static string? ExtractButtonText(ToggleButton button)
+        private async void BtnHydroSmartMode_Click(object sender, RoutedEventArgs e)
         {
-            // Custom presets store the name in Tag
-            if (button.Tag is string tag && !string.IsNullOrEmpty(tag))
-                return tag;
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
+                return;
 
-            // Stock presets have a ui:TextBlock inside a StackPanel
-            if (button.Content is System.Windows.Controls.StackPanel sp)
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
             {
-                for (int i = 0; i < sp.Children.Count; i++)
-                {
-                    if (sp.Children[i] is Wpf.Ui.Controls.TextBlock childTb)
-                        return childTb.Text;
-                }
-            }
-
-            return null;
+                await _quickControl.SetHydroSmartModeAsync(enabled);
+            });
         }
 
-        private async Task<bool> ApplyAsync(Func<Task> action, string successStatus)
+        private async void BtnHydroRgb_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
+                return;
+
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
+            {
+                await _quickControl.SetHydroRgbAsync(enabled);
+            });
+        }
+
+        private async void BtnKeyboardBacklight_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
+                return;
+
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
+            {
+                _quickControl.SetKeyboardBacklight(enabled);
+                await Task.CompletedTask;
+            });
+        }
+
+        private async void BtnLightBar_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
+                return;
+
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
+            {
+                _quickControl.SetLightBar(enabled);
+                await Task.CompletedTask;
+            });
+        }
+
+        private async void BtnFanSmartMode_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
+                return;
+
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
+            {
+                _quickControl.SetFanSmartMode(enabled);
+                await Task.CompletedTask;
+            });
+        }
+
+        private async void BtnLocalDimming_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
+                return;
+
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
+            {
+                bool success = await _quickControl.SetLocalDimmingAsync(enabled);
+                if (!success)
+                {
+                    // Revert toggle on failure
+                    Application.Current.Dispatcher.Invoke(() => btn.IsChecked = !enabled);
+                }
+            });
+        }
+
+        private async void BtnOverlay_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
+                return;
+
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
+            {
+                _quickControl.SetOverlay(enabled);
+                await Task.CompletedTask;
+            });
+        }
+
+        private async void BtnFlydigiRgb_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
+                return;
+
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
+            {
+                await _quickControl.SetFlydigiRgbAsync(enabled);
+            });
+        }
+
+        #endregion
+
+        private async Task ApplyAsync(Func<Task> action)
         {
             _applying = true;
-            StatusText.Text = "Applying…";
             try
             {
                 await action();
-                StatusText.Text = successStatus;
-                return true;
             }
-            catch (Exception ex)
+            catch
             {
-                StatusText.Text = ex.Message;
-                return false;
+                // Silently fail
             }
             finally
             {
                 _applying = false;
             }
-        }
-
-        private void UpdateHeaderContext()
-        {
-            HeaderContextText.Text = _selectedPreset;
         }
 
         private void PositionNearTray()

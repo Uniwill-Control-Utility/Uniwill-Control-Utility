@@ -3,10 +3,10 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-    mc:Ignorable="d"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml" xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+                 mc:Ignorable="d"
     Title="UCU Quick Control"
-    Width="414"
+    Width="360"
     MinWidth="0"
     MaxWidth="414"
     MinHeight="0"
@@ -28,13 +28,18 @@
     UseLayoutRounding="True">
 
     <ui:FluentWindow.Resources>
-        <Style x:Key="PresetButtonStyle"
-               TargetType="{x:Type ToggleButton}"
+        <Style x:Key="QuickToggleStyle"
+               TargetType="ToggleButton"
                BasedOn="{StaticResource {x:Type ToggleButton}}">
+            <Setter Property="Background"
+                    Value="{DynamicResource ControlFillColorDefaultBrush}" />
+            <Setter Property="Padding" Value="12,8" />
             <Style.Triggers>
                 <Trigger Property="IsChecked" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-                    <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+                    <Setter Property="Background"
+                            Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -44,15 +49,11 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="44" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- ===== HEADER ===== -->
-        <Border Grid.Row="0"
-                Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
-                BorderThickness="0,0,0,1"
-                CornerRadius="8,8,0,0"
-                MouseLeftButtonDown="Header_MouseLeftButtonDown">
+        <!-- ===== HEADER (drag target, no border) ===== -->
+        <Grid Grid.Row="0" MouseLeftButtonDown="Header_MouseLeftButtonDown">
             <Grid Margin="8,0,8,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -72,163 +73,284 @@
                                    Text="Live controls · cached telemetry" />
                 </StackPanel>
             </Grid>
-        </Border>
+        </Grid>
 
-        <!-- ===== CONTENT ===== -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Disabled">
-            <StackPanel Margin="12">
-
-                <!-- ===== PRESETS ===== -->
-                <ui:TextBlock FontTypography="Caption"
-                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               Text="PRESETS"
-                               Margin="0,0,0,8" />
-
-                <!-- Row 1: Stock presets (Office, Gaming, Turbo) -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,0">
-                    <ToggleButton x:Name="PresetOfficeButton"
-                                   Style="{StaticResource PresetButtonStyle}"
-                                   Height="36"
-                                   Width="100"
-                                   Margin="12"
-                                   HorizontalContentAlignment="Center"
-                                   Click="PresetButton_Click">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons"
-                                          Glyph="&#xE8BE;"
-                                          FontSize="14"
-                                          Margin="0,0,6,0">
-                                <ui:FontIcon.Foreground>
-                                    <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
-                                             Path="Foreground" />
-                                </ui:FontIcon.Foreground>
-                            </ui:FontIcon>
-                            <ui:TextBlock VerticalAlignment="Center"
-                                           FontSize="13"
-                                           Text="Office" />
-                        </StackPanel>
-                    </ToggleButton>
-
-                    <ToggleButton x:Name="PresetGamingButton"
-                                   Style="{StaticResource PresetButtonStyle}"
-                                   Height="36"
-                                   Width="100"
-                                   Margin="12"
-                                   HorizontalContentAlignment="Center"
-                                   Click="PresetButton_Click">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons"
-                                          Glyph="&#xE967;"
-                                          FontSize="14"
-                                          Margin="0,0,6,0">
-                                <ui:FontIcon.Foreground>
-                                    <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
-                                             Path="Foreground" />
-                                </ui:FontIcon.Foreground>
-                            </ui:FontIcon>
-                            <ui:TextBlock VerticalAlignment="Center"
-                                           FontSize="13"
-                                           Text="Gaming" />
-                        </StackPanel>
-                    </ToggleButton>
-
-                    <ToggleButton x:Name="PresetTurboButton"
-                                   Style="{StaticResource PresetButtonStyle}"
-                                   Height="36"
-                                   Width="100"
-                                   Margin="12"
-                                   HorizontalContentAlignment="Center"
-                                   Click="PresetButton_Click">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons"
-                                          Glyph="&#xE945;"
-                                          FontSize="14"
-                                          Margin="0,0,6,0">
-                                <ui:FontIcon.Foreground>
-                                    <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
-                                             Path="Foreground" />
-                                </ui:FontIcon.Foreground>
-                            </ui:FontIcon>
-                            <ui:TextBlock VerticalAlignment="Center"
-                                           FontSize="13"
-                                           Text="Turbo" />
-                        </StackPanel>
-                    </ToggleButton>
-                </StackPanel>
-
-                <!-- Row 2: Custom presets (dynamically populated, multi-row) -->
-                <StackPanel x:Name="CustomPresetsPanel" Visibility="Collapsed"/>
-
-                <Separator Margin="0,12"
-                           Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
-
-                <!-- ===== FAN CONTROL ===== -->
-                <ui:TextBlock x:Name="FanControlHeader"
-                               FontTypography="Caption"
-                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               Text="FAN CONTROL"
-                               Margin="0,0,0,8" />
-
-                <TextBlock x:Name="FanControlPlaceholder"
-                           FontSize="12"
-                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                           Text="(fan control toggles)" />
-
-                <Separator Margin="0,12"
-                           Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
-
-                <!-- ===== HYDRO UI ===== -->
-                <ui:TextBlock x:Name="HydroHeader"
-                               FontTypography="Caption"
-                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               Text="HYDRO UI"
-                               Margin="0,0,0,8" />
-
-                <TextBlock x:Name="HydroPlaceholder"
-                           FontSize="12"
-                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                           Text="(hydro ui toggles)" />
-
-                <Separator Margin="0,12"
-                           Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
-
-                <!-- ===== FLYDIGI ===== -->
-                <ui:TextBlock x:Name="FlydigiHeader"
-                               FontTypography="Caption"
-                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               Text="FLYDIGI"
-                               Margin="0,0,0,8" />
-
-                <TextBlock x:Name="FlydigiPlaceholder"
-                           FontSize="12"
-                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                           Text="(flydigi toggles)" />
-
-                <!-- ===== FOOTER ===== -->
-                <Grid Margin="0,12,0,0">
+        <!-- ===== QUICK SETTINGS GRID ===== -->
+        <!-- Top border edge-to-edge separates header from button section -->
+        <Border Grid.Row="1"
+                Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="12">
+            <Grid x:Name="ButtonsGrid" Margin="0,12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="24" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="24" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <ui:TextBlock x:Name="StatusText"
-                                   VerticalAlignment="Center"
-                                   FontTypography="Caption"
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                   Text="All controls ready" />
-                    <ui:Button Grid.Column="1"
-                                Height="31"
-                                Padding="13,0"
-                                Appearance="Primary"
-                                Click="OpenUcuButton_Click">
-                        <StackPanel Orientation="Horizontal">
-                            <ui:TextBlock Margin="0,0,8,0"
-                                           FontSize="11"
-                                           Text="Open UCU" />
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" FontSize="13" Glyph="&#xE740;" />
-                        </StackPanel>
-                    </ui:Button>
+
+                    <!-- Row 1 -->
+                    <StackPanel Grid.Row="0" Grid.Column="0"
+                                Orientation="Vertical"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                x:Name="SlotAdaptiveMode">
+                        <ToggleButton x:Name="BtnAdaptiveMode"
+                                       Width="96"
+                                       Height="46"
+                                       Style="{StaticResource QuickToggleStyle}"
+                                       Click="BtnAdaptiveMode_Click">
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xEB44;"
+                                          FontSize="16">
+                                <ui:FontIcon.Foreground>
+                                    <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                             Path="Foreground" />
+                                </ui:FontIcon.Foreground>
+                            </ui:FontIcon>
+                        </ToggleButton>
+                        <ui:TextBlock FontSize="11"
+                                       Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Adaptive Mode" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="0" Grid.Column="1"
+                                Orientation="Vertical"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                x:Name="SlotHydroSmartMode">
+                        <ToggleButton x:Name="BtnHydroSmartMode"
+                                       Width="96"
+                                       Height="46"
+                                       Style="{StaticResource QuickToggleStyle}"
+                                       Click="BtnHydroSmartMode_Click">
+                        <iconPacks:PackIconLucide
+                               Kind="BrainCircuit"
+                               Width="16"
+                               Height="16"
+                               VerticalAlignment="Center" >
+                            <iconPacks:PackIconLucide.Foreground>
+                                <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                        Path="Foreground" />
+                            </iconPacks:PackIconLucide.Foreground>
+                        </iconPacks:PackIconLucide>
+                    </ToggleButton>
+                        <ui:TextBlock FontSize="11"
+                                       Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Hydro Smart" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="0" Grid.Column="2"
+                                Orientation="Vertical"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                x:Name="SlotHydroRgb">
+                        <ToggleButton x:Name="BtnHydroRgb"
+                                       Width="96"
+                                       Height="46"
+                                       Style="{StaticResource QuickToggleStyle}"
+                                       Click="BtnHydroRgb_Click">
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xE790;"
+                                          FontSize="16">
+                                <ui:FontIcon.Foreground>
+                                    <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                             Path="Foreground" />
+                                </ui:FontIcon.Foreground>
+                            </ui:FontIcon>
+                        </ToggleButton>
+                        <ui:TextBlock FontSize="11"
+                                       Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Hydro RGB" />
+                    </StackPanel>
+
+                    <!-- Row 2 -->
+                    <StackPanel Grid.Row="2" Grid.Column="0"
+                                Orientation="Vertical"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                x:Name="SlotKeyboardBacklight">
+                        <ToggleButton x:Name="BtnKeyboardBacklight"
+                                       Width="96"
+                                       Height="46"
+                                       Style="{StaticResource QuickToggleStyle}"
+                                       Click="BtnKeyboardBacklight_Click">
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xE92E;"
+                                          FontSize="16">
+                                <ui:FontIcon.Foreground>
+                                    <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                             Path="Foreground" />
+                                </ui:FontIcon.Foreground>
+                            </ui:FontIcon>
+                        </ToggleButton>
+                        <ui:TextBlock FontSize="11"
+                                       Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Keyboard RGB" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2" Grid.Column="1"
+                                Orientation="Vertical"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                x:Name="SlotLightBar">
+                        <ToggleButton x:Name="BtnLightBar"
+                                       Width="96"
+                                       Height="46"
+                                       Style="{StaticResource QuickToggleStyle}"
+                                       Click="BtnLightBar_Click">
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xED39;"
+                                          FontSize="18">
+                                <ui:FontIcon.Foreground>
+                                    <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                             Path="Foreground" />
+                                </ui:FontIcon.Foreground>
+                            </ui:FontIcon>
+                        </ToggleButton>
+                        <ui:TextBlock FontSize="11"
+                                       Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Light Bar" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2" Grid.Column="2"
+                                Orientation="Vertical"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                x:Name="SlotFanSmartMode">
+                        <ToggleButton x:Name="BtnFanSmartMode"
+                                       Width="96"
+                                       Height="46"
+                                       Style="{StaticResource QuickToggleStyle}"
+                                       Click="BtnFanSmartMode_Click">
+                        <iconPacks:PackIconLucide
+                            Kind="Fan"
+                            Width="16"
+                            Height="16"
+                            VerticalAlignment="Center" >
+                            <iconPacks:PackIconLucide.Foreground>
+                                <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                    Path="Foreground" />
+                            </iconPacks:PackIconLucide.Foreground>
+                        </iconPacks:PackIconLucide>
+                    </ToggleButton>
+                        <ui:TextBlock FontSize="11"
+                                       Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Smart Fan Mode" />
+                    </StackPanel>
+
+                    <!-- Row 3 -->
+                    <StackPanel Grid.Row="4" Grid.Column="0"
+                                Orientation="Vertical"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                x:Name="SlotLocalDimming">
+                        <ToggleButton x:Name="BtnLocalDimming"
+                                       Width="96"
+                                       Height="46"
+                                       Style="{StaticResource QuickToggleStyle}"
+                                       Click="BtnLocalDimming_Click">
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xE7F4;"
+                                          FontSize="16">
+                                <ui:FontIcon.Foreground>
+                                    <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                             Path="Foreground" />
+                                </ui:FontIcon.Foreground>
+                            </ui:FontIcon>
+                        </ToggleButton>
+                        <ui:TextBlock FontSize="11"
+                                       Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Local Dimming" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="4" Grid.Column="1"
+                                Orientation="Vertical"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                x:Name="SlotOverlay">
+                        <ToggleButton x:Name="BtnOverlay"
+                                       Width="96"
+                                       Height="46"
+                                       Style="{StaticResource QuickToggleStyle}"
+                                       Click="BtnOverlay_Click">
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xE81E;"
+                                          FontSize="16">
+                                <ui:FontIcon.Foreground>
+                                    <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                             Path="Foreground" />
+                                </ui:FontIcon.Foreground>
+                            </ui:FontIcon>
+                        </ToggleButton>
+                        <ui:TextBlock FontSize="11"
+                                       Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Overlay" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="4" Grid.Column="2"
+                                Orientation="Vertical"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                x:Name="SlotFlydigiRgb">
+                        <ToggleButton x:Name="BtnFlydigiRgb"
+                                       Width="96"
+                                       Height="46"
+                                       Style="{StaticResource QuickToggleStyle}"
+                                       Click="BtnFlydigiRgb_Click">
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xE790;"
+                                          FontSize="16">
+                                <ui:FontIcon.Foreground>
+                                    <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                             Path="Foreground" />
+                                </ui:FontIcon.Foreground>
+                            </ui:FontIcon>
+                        </ToggleButton>
+                        <ui:TextBlock FontSize="11"
+                                       Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Flydigi RGB" />
+                    </StackPanel>
                 </Grid>
-            </StackPanel>
-        </ScrollViewer>
+        </Border>
+
+        <!-- ===== FOOTER ===== -->
+        <Grid Grid.Row="2" Margin="12,8,12,12">
+            <Button HorizontalAlignment="Right"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Padding="8"
+                    Click="OpenUcuButton_Click"
+                    ToolTip="Open UCU">
+                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                              FontSize="14"
+                              Glyph="&#xE740;"
+                              Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </Button>
+        </Grid>
     </Grid>
 </ui:FluentWindow>

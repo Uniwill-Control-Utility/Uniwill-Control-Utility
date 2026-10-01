@@ -9,7 +9,7 @@ namespace Uniwill_Control_Utility.ViewModels
         Auto
     }
 
-    internal sealed record FeatureNavigationPreferences(
+    public sealed record FeatureNavigationPreferences(
         bool Adaptive,
         bool HydroUi,
         bool LightBar,
