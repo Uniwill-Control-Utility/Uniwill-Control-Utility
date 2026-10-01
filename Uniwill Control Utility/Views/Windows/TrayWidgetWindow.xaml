@@ -43,6 +43,11 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <ContextMenu x:Key="NavigateContextMenu"
+                     Opened="NavigateContextMenu_Opened">
+            <MenuItem Header="Go to UCU" Click="GoToUcuMenuItem_Click" />
+        </ContextMenu>
     </ui:FluentWindow.Resources>
 
     <Grid>
@@ -105,6 +110,8 @@
                                        Width="96"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
+                                       Tag="Adaptive"
+                                       ContextMenu="{StaticResource NavigateContextMenu}"
                                        Click="BtnAdaptiveMode_Click">
                             <ui:FontIcon FontFamily="Segoe Fluent Icons"
                                           Glyph="&#xEB44;"
@@ -131,6 +138,8 @@
                                        Width="96"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
+                                       Tag="Watercooler"
+                                       ContextMenu="{StaticResource NavigateContextMenu}"
                                        Click="BtnHydroSmartMode_Click">
                         <iconPacks:PackIconLucide
                                Kind="BrainCircuit"
@@ -159,6 +168,8 @@
                                        Width="96"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
+                                       Tag="Watercooler"
+                                       ContextMenu="{StaticResource NavigateContextMenu}"
                                        Click="BtnHydroRgb_Click">
                             <ui:FontIcon FontFamily="Segoe Fluent Icons"
                                           Glyph="&#xE790;"
@@ -186,6 +197,8 @@
                                        Width="96"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
+                                       Tag="Keyboard"
+                                       ContextMenu="{StaticResource NavigateContextMenu}"
                                        Click="BtnKeyboardBacklight_Click">
                             <ui:FontIcon FontFamily="Segoe Fluent Icons"
                                           Glyph="&#xE92E;"
@@ -212,6 +225,8 @@
                                        Width="96"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
+                                       Tag="LightBar"
+                                       ContextMenu="{StaticResource NavigateContextMenu}"
                                        Click="BtnLightBar_Click">
                             <ui:FontIcon FontFamily="Segoe Fluent Icons"
                                           Glyph="&#xED39;"
@@ -238,6 +253,8 @@
                                        Width="96"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
+                                       Tag="FanControl"
+                                       ContextMenu="{StaticResource NavigateContextMenu}"
                                        Click="BtnFanSmartMode_Click">
                         <iconPacks:PackIconLucide
                             Kind="Fan"
@@ -267,6 +284,8 @@
                                        Width="96"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
+                                       Tag="SettingsPage"
+                                       ContextMenu="{StaticResource NavigateContextMenu}"
                                        Click="BtnLocalDimming_Click">
                             <ui:FontIcon FontFamily="Segoe Fluent Icons"
                                           Glyph="&#xE7F4;"
@@ -293,6 +312,8 @@
                                        Width="96"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
+                                       Tag="OverlaySettingsPage"
+                                       ContextMenu="{StaticResource NavigateContextMenu}"
                                        Click="BtnOverlay_Click">
                             <ui:FontIcon FontFamily="Segoe Fluent Icons"
                                           Glyph="&#xE81E;"
@@ -319,6 +340,8 @@
                                        Width="96"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
+                                       Tag="FlydigiCooler"
+                                       ContextMenu="{StaticResource NavigateContextMenu}"
                                        Click="BtnFlydigiRgb_Click">
                             <ui:FontIcon FontFamily="Segoe Fluent Icons"
                                           Glyph="&#xE790;"
@@ -339,13 +362,13 @@
         </Border>
 
         <!-- ===== FOOTER ===== -->
-        <Grid Grid.Row="2" Margin="12,8,12,12">
+        <Grid Grid.Row="2" Margin="12,12,12,12">
             <Button HorizontalAlignment="Right"
                     Background="Transparent"
                     BorderThickness="0"
                     Padding="8"
                     Click="OpenUcuButton_Click"
-                    ToolTip="Open UCU">
+                    ToolTip="Open UCU" >
                 <ui:FontIcon FontFamily="Segoe Fluent Icons"
                               FontSize="14"
                               Glyph="&#xE740;"

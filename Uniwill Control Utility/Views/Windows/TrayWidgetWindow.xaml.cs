@@ -374,6 +374,49 @@ namespace Uniwill_Control_Utility.Views.Windows
             mainWindow.Activate();
         }
 
+        private void NavigateContextMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            // Store the source button's Tag in the context menu so the click handler
+            // knows which page to navigate to.
+            if (sender is System.Windows.Controls.ContextMenu menu && menu.PlacementTarget is System.Windows.Controls.Primitives.ToggleButton btn)
+                menu.Tag = btn.Tag;
+        }
+
+        private void GoToUcuMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            HideWidget();
+
+            if (sender is not System.Windows.Controls.MenuItem item || item.Parent is not System.Windows.Controls.ContextMenu menu)
+                return;
+            if (menu.Tag is not string tagName)
+                return;
+
+            MainWindow? mainWindow = MainWindow.Instance;
+            if (mainWindow is null)
+                return;
+
+            mainWindow.Show();
+            mainWindow.WindowState = WindowState.Normal;
+            mainWindow.Activate();
+
+            // Navigate to the page matching the button's Tag.
+            Type? pageType = tagName switch
+            {
+                "Adaptive" => typeof(Views.Pages.Adaptive),
+                "Watercooler" => typeof(Views.Pages.Watercooler),
+                "Keyboard" => typeof(Views.Pages.Keyboard),
+                "LightBar" => typeof(Views.Pages.LightBar),
+                "FanControl" => typeof(Views.Pages.FanControl),
+                "SettingsPage" => typeof(Views.Pages.SettingsPage),
+                "OverlaySettingsPage" => typeof(Views.Pages.OverlaySettingsPage),
+                "FlydigiCooler" => typeof(Views.Pages.FlydigiCooler),
+                _ => null
+            };
+
+            if (pageType is not null)
+                mainWindow.Navigate(pageType);
+        }
+
         [StructLayout(LayoutKind.Sequential)]
         private struct NativeRect
         {
