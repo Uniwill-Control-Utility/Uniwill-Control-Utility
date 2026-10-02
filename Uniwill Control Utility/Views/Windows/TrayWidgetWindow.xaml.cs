@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -91,6 +92,10 @@ namespace Uniwill_Control_Utility.Views.Windows
             ApplyToggle(SlotLocalDimming, BtnLocalDimming, policy.ShowLocalDimming, snapshot.LocalDimmingOn);
             ApplyToggle(SlotOverlay, BtnOverlay, policy.ShowOverlay, snapshot.OverlayOn);
             ApplyToggle(SlotFlydigiRgb, BtnFlydigiRgb, policy.ShowFlydigiRgb, snapshot.FlydigiRgbOn);
+
+            // Recalculate UniformGrid rows based on visible children so collapsed
+            // items don't leave gaps and buttons flow left-to-right, top-to-bottom.
+            UpdateButtonGridRows();
         }
 
         private static void ApplyToggle(
@@ -101,6 +106,53 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             panel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
             button.IsChecked = isChecked;
+        }
+
+        private void UpdateButtonGridRows()
+        {
+            const int Columns = 3;
+            const int RowGap = 24;
+
+            // Collect visible children in order.
+            var visible = new List<FrameworkElement>();
+            foreach (FrameworkElement child in ButtonsGrid.Children)
+            {
+                if (child.Visibility == Visibility.Visible)
+                    visible.Add(child);
+            }
+
+            int visibleCount = visible.Count;
+            int rowCount = visibleCount > 0 ? (visibleCount + Columns - 1) / Columns : 0;
+
+            // Build row definitions: one Auto row per content row, plus a spacer row between each.
+            ButtonsGrid.RowDefinitions.Clear();
+            for (int r = 0; r < rowCount; r++)
+            {
+                ButtonsGrid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = new GridLength(0, GridUnitType.Auto) });
+                if (r < rowCount - 1)
+                {
+                    ButtonsGrid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = new GridLength(RowGap) });
+                }
+            }
+
+            // Assign each visible slot to the correct Grid.Row and column, clear margins.
+            for (int i = 0; i < visibleCount; i++)
+            {
+                int col = i % Columns;
+                int contentRow = (i / Columns) * 2; // 0, 2, 4, ... (spacer rows are 1, 3, ...)
+                System.Windows.Controls.Grid.SetRow(visible[i], contentRow);
+                System.Windows.Controls.Grid.SetColumn(visible[i], col);
+                visible[i].Margin = new System.Windows.Thickness(0);
+            }
+
+            // Hide any collapsed children by clearing their row (they stay in Children but invisible).
+            foreach (FrameworkElement child in ButtonsGrid.Children)
+            {
+                if (child.Visibility != Visibility.Visible)
+                {
+                    System.Windows.Controls.Grid.SetRow(child, -1);
+                }
+            }
         }
 
         #region Toggle Handlers

@@ -604,9 +604,12 @@ namespace Uniwill_Control_Utility
             // Auto-connect watercooler on startup if enabled
             try
             {
-                var waterCoolerService = _host?.Services.GetService<WaterCoolerService>();
-                if (waterCoolerService != null && WaterCoolerHardwareDetector.IsSupportedHardware())
-                    await waterCoolerService.TryAutoConnectAsync();
+                if (Settings.Default.EnableHydroUiNavigation)
+                {
+                    var waterCoolerService = _host?.Services.GetService<WaterCoolerService>();
+                    if (waterCoolerService != null && WaterCoolerHardwareDetector.IsSupportedHardware())
+                        await waterCoolerService.TryAutoConnectAsync();
+                }
             }
             catch (Exception ex)
             {

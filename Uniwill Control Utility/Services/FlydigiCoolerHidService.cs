@@ -318,6 +318,10 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public void ResumeBackgroundServices()
         {
+            // If Flydigi functionality is disabled, don't restart background services.
+            if (!Properties.Settings.Default.EnableFlydigi)
+                return;
+
             LoadSettings();
             _userDisconnected = false;
             _connectGeneration++; // Invalidate any stale reconnect from before suspend

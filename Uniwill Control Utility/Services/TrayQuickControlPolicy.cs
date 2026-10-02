@@ -40,6 +40,7 @@ namespace Uniwill_Control_Utility.Services
             bool adaptiveWaterCoolerEnabled,
             bool hasMiniLedPanel,
             bool flydigiDeviceAvailable,
+            bool flydigiEnabled,
             FeatureNavigationPreferences features)
         {
             return new TrayQuickControlPolicy(
@@ -60,7 +61,7 @@ namespace Uniwill_Control_Utility.Services
                 ShowFanSmartMode: !adaptiveFanEnabled,
                 ShowLocalDimming: hasMiniLedPanel,
                 ShowOverlay: features.Overlay,
-                ShowFlydigiRgb: flydigiDeviceAvailable);
+                ShowFlydigiRgb: flydigiEnabled && flydigiDeviceAvailable);
         }
     }
 }

@@ -63,6 +63,7 @@ namespace Uniwill_Control_Utility.Services
             bool hydroSupported = WaterCoolerHardwareDetector.IsSupportedHardware();
             bool hasMiniLed = App.HasMiniLEDPanel;
             bool flydigiAvailable = FlydigiCoolerHidService.IsDeviceAvailable();
+            bool flydigiEnabled = Properties.Settings.Default.EnableFlydigi;
 
             var features = new FeatureNavigationPreferences(
                 Adaptive: Settings.Default.EnableAdaptiveNavigation,
@@ -81,6 +82,7 @@ namespace Uniwill_Control_Utility.Services
                 adaptiveWaterCoolerEnabled: adaptiveRunning && _deviceApplier.IsWatercoolerOverridden,
                 hasMiniLedPanel: hasMiniLed,
                 flydigiDeviceAvailable: flydigiAvailable,
+                flydigiEnabled: flydigiEnabled,
                 features: features);
 
             var waterSettings = _waterCooler.GetSettings();
