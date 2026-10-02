@@ -1,4 +1,5 @@
 using Uniwill_Control_Utility.Services;
+using Uniwill_Control_Utility.ViewModels;
 
 namespace Uniwill_Control_Utility.Tests.Services;
 
@@ -14,7 +15,14 @@ public sealed class TrayQuickControlPolicyTests
             adaptiveCpuEnabled: false,
             adaptiveGpuEnabled: false,
             adaptiveFanEnabled: false,
-            adaptiveWaterCoolerEnabled: false);
+            adaptiveWaterCoolerEnabled: false,
+            adaptiveKeyboardEnabled: false,
+            adaptiveLightBarEnabled: false,
+            adaptiveFlydigiEnabled: false,
+            hasMiniLedPanel: false,
+            flydigiDeviceAvailable: false,
+            flydigiEnabled: false,
+            features: new FeatureNavigationPreferences(false, false, false, false, false));
 
         Assert.False(policy.ShowTgp);
         Assert.False(policy.ShowHydro);
@@ -33,7 +41,14 @@ public sealed class TrayQuickControlPolicyTests
             adaptiveCpuEnabled: true,
             adaptiveGpuEnabled: false,
             adaptiveFanEnabled: true,
-            adaptiveWaterCoolerEnabled: true);
+            adaptiveWaterCoolerEnabled: true,
+            adaptiveKeyboardEnabled: false,
+            adaptiveLightBarEnabled: false,
+            adaptiveFlydigiEnabled: false,
+            hasMiniLedPanel: false,
+            flydigiDeviceAvailable: false,
+            flydigiEnabled: false,
+            features: new FeatureNavigationPreferences(false, false, false, false, false));
 
         Assert.True(policy.ShowTgp);
         Assert.True(policy.ShowHydro);

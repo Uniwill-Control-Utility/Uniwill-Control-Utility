@@ -38,7 +38,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Grid>
+                        <Grid IsHitTestVisible="{TemplateBinding IsEnabled}">
                             <!-- Base background -->
                             <Border x:Name="BaseBackground"
                                     Background="{TemplateBinding Background}"
@@ -66,7 +66,8 @@
                                     CornerRadius="6"
                                     Visibility="Collapsed" />
                             <!-- Content -->
-                            <ContentPresenter HorizontalAlignment="Center"
+                            <ContentPresenter x:Name="ContentPresenter"
+                                              HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
                                               RecognizesAccessKey="True" />
                         </Grid>
@@ -91,6 +92,13 @@
                                 </MultiTrigger.Conditions>
                                 <Setter TargetName="HoverOnOverlay" Property="Visibility" Value="Visible" />
                             </MultiTrigger>
+                            <!-- Disabled state: dim background, off-state foreground -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Background"
+                                        Value="{DynamicResource ControlAltFillColorSecondaryBrush}" />
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>

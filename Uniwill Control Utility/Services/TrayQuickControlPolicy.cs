@@ -28,7 +28,19 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>Whether the Overlay toggle should be visible (feature enabled).</summary>
         bool ShowOverlay,
         /// <summary>Whether the Flydigi RGB toggle should be visible (device + feature enabled).</summary>
-        bool ShowFlydigiRgb)
+        bool ShowFlydigiRgb,
+        /// <summary>Whether the Fan Smart Mode toggle should be disabled (adaptive mode controls it).</summary>
+        bool DisableFanSmartMode,
+        /// <summary>Whether the Hydro UI Smart Mode toggle should be disabled (adaptive mode controls it).</summary>
+        bool DisableHydroSmartMode,
+        /// <summary>Whether the Hydro UI RGB toggle should be disabled (adaptive mode controls it).</summary>
+        bool DisableHydroRgb,
+        /// <summary>Whether the Keyboard RGB toggle should be disabled (adaptive mode controls it).</summary>
+        bool DisableKeyboardBacklight,
+        /// <summary>Whether the Light Bar toggle should be disabled (adaptive mode controls it).</summary>
+        bool DisableLightBar,
+        /// <summary>Whether the Flydigi RGB toggle should be disabled (adaptive mode controls it).</summary>
+        bool DisableFlydigiRgb)
     {
         public static TrayQuickControlPolicy Create(
             bool hasNvidiaGpu,
@@ -38,6 +50,9 @@ namespace Uniwill_Control_Utility.Services
             bool adaptiveGpuEnabled,
             bool adaptiveFanEnabled,
             bool adaptiveWaterCoolerEnabled,
+            bool adaptiveKeyboardEnabled,
+            bool adaptiveLightBarEnabled,
+            bool adaptiveFlydigiEnabled,
             bool hasMiniLedPanel,
             bool flydigiDeviceAvailable,
             bool flydigiEnabled,
@@ -58,10 +73,16 @@ namespace Uniwill_Control_Utility.Services
                 ShowHydroRgb: features.HydroUi && hasSupportedWaterCooler && waterCoolerConnected,
                 ShowKeyboardBacklight: true,
                 ShowLightBar: features.LightBar,
-                ShowFanSmartMode: !adaptiveFanEnabled,
+                ShowFanSmartMode: true,
                 ShowLocalDimming: hasMiniLedPanel,
                 ShowOverlay: features.Overlay,
-                ShowFlydigiRgb: flydigiEnabled && flydigiDeviceAvailable);
+                ShowFlydigiRgb: flydigiEnabled && flydigiDeviceAvailable,
+                DisableFanSmartMode: adaptiveFanEnabled,
+                DisableHydroSmartMode: adaptiveWaterCoolerEnabled,
+                DisableHydroRgb: adaptiveWaterCoolerEnabled,
+                DisableKeyboardBacklight: adaptiveKeyboardEnabled,
+                DisableLightBar: adaptiveLightBarEnabled,
+                DisableFlydigiRgb: adaptiveFlydigiEnabled);
         }
     }
 }

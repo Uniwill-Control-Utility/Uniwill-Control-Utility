@@ -83,15 +83,15 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             var policy = snapshot.Policy;
 
-            ApplyToggle(SlotAdaptiveMode, BtnAdaptiveMode, policy.ShowAdaptiveMode, snapshot.AdaptiveModeRunning);
-            ApplyToggle(SlotHydroSmartMode, BtnHydroSmartMode, policy.ShowHydroSmartMode, snapshot.HydroSmartMode);
-            ApplyToggle(SlotHydroRgb, BtnHydroRgb, policy.ShowHydroRgb, snapshot.HydroRgbOn);
-            ApplyToggle(SlotKeyboardBacklight, BtnKeyboardBacklight, policy.ShowKeyboardBacklight, snapshot.KeyboardRgbOn);
-            ApplyToggle(SlotLightBar, BtnLightBar, policy.ShowLightBar, snapshot.LightBarOn);
-            ApplyToggle(SlotFanSmartMode, BtnFanSmartMode, policy.ShowFanSmartMode, snapshot.FanSmartMode);
-            ApplyToggle(SlotLocalDimming, BtnLocalDimming, policy.ShowLocalDimming, snapshot.LocalDimmingOn);
-            ApplyToggle(SlotOverlay, BtnOverlay, policy.ShowOverlay, snapshot.OverlayOn);
-            ApplyToggle(SlotFlydigiRgb, BtnFlydigiRgb, policy.ShowFlydigiRgb, snapshot.FlydigiRgbOn);
+            ApplyToggle(SlotAdaptiveMode, BtnAdaptiveMode, policy.ShowAdaptiveMode, snapshot.AdaptiveModeRunning, false);
+            ApplyToggle(SlotHydroSmartMode, BtnHydroSmartMode, policy.ShowHydroSmartMode, snapshot.HydroSmartMode, policy.DisableHydroSmartMode);
+            ApplyToggle(SlotHydroRgb, BtnHydroRgb, policy.ShowHydroRgb, snapshot.HydroRgbOn, policy.DisableHydroRgb);
+            ApplyToggle(SlotKeyboardBacklight, BtnKeyboardBacklight, policy.ShowKeyboardBacklight, snapshot.KeyboardRgbOn, policy.DisableKeyboardBacklight);
+            ApplyToggle(SlotLightBar, BtnLightBar, policy.ShowLightBar, snapshot.LightBarOn, policy.DisableLightBar);
+            ApplyToggle(SlotFanSmartMode, BtnFanSmartMode, policy.ShowFanSmartMode, snapshot.FanSmartMode, policy.DisableFanSmartMode);
+            ApplyToggle(SlotLocalDimming, BtnLocalDimming, policy.ShowLocalDimming, snapshot.LocalDimmingOn, false);
+            ApplyToggle(SlotOverlay, BtnOverlay, policy.ShowOverlay, snapshot.OverlayOn, false);
+            ApplyToggle(SlotFlydigiRgb, BtnFlydigiRgb, policy.ShowFlydigiRgb, snapshot.FlydigiRgbOn, policy.DisableFlydigiRgb);
 
             // Recalculate UniformGrid rows based on visible children so collapsed
             // items don't leave gaps and buttons flow left-to-right, top-to-bottom.
@@ -102,10 +102,12 @@ namespace Uniwill_Control_Utility.Views.Windows
             System.Windows.Controls.Panel panel,
             System.Windows.Controls.Primitives.ToggleButton button,
             bool visible,
-            bool isChecked)
+            bool isChecked,
+            bool isDisabled)
         {
             panel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
             button.IsChecked = isChecked;
+            button.IsEnabled = !isDisabled;
         }
 
         private void UpdateButtonGridRows()
@@ -165,8 +167,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             bool enabled = btn.IsChecked == true;
             await ApplyAsync(async () =>
             {
-                _quickControl.SetAdaptiveMode(enabled);
-                await Task.CompletedTask;
+                await _quickControl.SetAdaptiveModeAsync(enabled);
             });
         }
 
@@ -283,6 +284,17 @@ namespace Uniwill_Control_Utility.Views.Windows
             try
             {
                 await action();
+
+                // Re-fetch snapshot to update button enabled states after any change.
+                try
+                {
+                    var snapshot = await Task.Run(_quickControl.GetSnapshot);
+                    ApplySnapshot(snapshot);
+                }
+                catch
+                {
+                    // Ignore — snapshot refresh is best-effort
+                }
             }
             catch
             {
