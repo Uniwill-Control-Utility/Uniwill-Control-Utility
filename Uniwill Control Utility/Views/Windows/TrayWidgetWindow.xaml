@@ -42,7 +42,17 @@
                             <!-- Base background -->
                             <Border x:Name="BaseBackground"
                                     Background="{TemplateBinding Background}"
-                                    CornerRadius="6" />
+                                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="Black"
+                                                      Opacity="0.12"
+                                                      BlurRadius="8"
+                                                      ShadowDepth="2"
+                                                      Direction="270" />
+                                </Border.Effect>
+                            </Border>
                             <!-- Hover overlay for off-state (15% white) -->
                             <Border x:Name="HoverOffOverlay"
                                     Background="White"
@@ -116,14 +126,16 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="1" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="1" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- ===== METRICS SECTION (no card background) ===== -->
         <Border Grid.Row="0"
-                Padding="12,16"
-                Background="Transparent">
+                Padding="12,20"
+                Background="Transparent" VerticalAlignment="Center">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -311,8 +323,11 @@
             </Grid>
         </Border>
 
+        <!-- Divider -->
+        <Border Grid.Row="1" Background="{DynamicResource SurfaceStrokeColorFlyoutBrush}" />
+
         <!-- ===== QUICK SETTINGS GRID (with card background) ===== -->
-        <Border Grid.Row="1" Margin="0,8,0,0"
+        <Border Grid.Row="2" Margin="0,0,0,0"
                 Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
                 BorderThickness="0"
                 Padding="20,23,20,23">
@@ -591,8 +606,11 @@
                 </Grid>
         </Border>
 
+        <!-- Divider -->
+        <Border Grid.Row="3" Background="{DynamicResource SurfaceStrokeColorFlyoutBrush}" />
+
         <!-- ===== FOOTER ===== -->
-        <Grid Grid.Row="2" Margin="12,12,12,12">
+        <Grid Grid.Row="4" Margin="12,12,12,12">
             <Button HorizontalAlignment="Right"
                     Background="Transparent"
                     BorderThickness="0"
