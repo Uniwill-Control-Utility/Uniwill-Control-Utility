@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
@@ -294,7 +295,6 @@ namespace Uniwill_Control_Utility.Services
         /// <remarks>
         /// The WMI-based Local Dimming logic is duplicated from SettingsPage
         /// because it requires System.Management which is page-specific.
-        /// We use reflection to call the SettingsPage method, or replicate the WMI calls here.
         /// </remarks>
         private bool SettingsPage_SetLocalDimming(bool enable)
         {
@@ -338,6 +338,9 @@ namespace Uniwill_Control_Utility.Services
                         return false;
                 }
 
+                // Give the EC time to process the WMI command.
+                Thread.Sleep(100);
+
                 Settings.Default.DisplayLocalDimming = enable;
                 Settings.Default.Save();
                 return true;
@@ -348,16 +351,18 @@ namespace Uniwill_Control_Utility.Services
             }
         }
 
+        /// <summary>
+        /// Calls GetSetULong via WMI using the correct GetMethodParameters pattern.
+        /// Matches the pattern used by MechControl (Heavyfail fork) on Uniwill IDY/Tongfang X6 laptops.
+        /// </summary>
         private static byte WmiCall(
-            System.Management.ManagementObject mo, ulong command)
+            System.Management.ManagementObject mo, ulong data)
         {
-            byte[] input = new byte[8];
-            for (int i = 0; i < 8; i++)
-                input[i] = (byte)(command >> (i * 8));
+            using var input = mo.GetMethodParameters("GetSetULong");
+            input["Data"] = data;
 
-            mo.InvokeMethod("SendCommand", new object[] { input, (uint)0 });
-            byte[] output = (byte[])mo["Output"]!;
-            return output[0];
+            using var output = (System.Management.ManagementBaseObject)mo.InvokeMethod("GetSetULong", input, null);
+            return (byte)(uint)output["Return"];
         }
 
         /// <summary>Toggles Performance Overlay on/off.</summary>
