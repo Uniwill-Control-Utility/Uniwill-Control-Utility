@@ -17,7 +17,7 @@ namespace Uniwill_Control_Utility.Views.Windows
     public partial class TrayWidgetWindow : ITrayWidget
     {
         private readonly TrayQuickControlService _quickControl;
-        private readonly TrayMetricsWindow _metricsWindow;
+        private readonly DispatcherTimer _refreshTimer;
         private bool _loading;
         private bool _applying;
         private bool _showing;
@@ -27,9 +27,14 @@ namespace Uniwill_Control_Utility.Views.Windows
         public TrayWidgetWindow(TrayQuickControlService quickControl)
         {
             _quickControl = quickControl;
-            _metricsWindow = new TrayMetricsWindow(quickControl);
             InitializeComponent();
             SystemThemeWatcher.Watch(this, Wpf.Ui.Controls.WindowBackdropType.Mica, true);
+
+            _refreshTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(2)
+            };
+            _refreshTimer.Tick += (s, e) => UpdateMetrics();
         }
 
         public async Task ToggleAsync()
@@ -46,18 +51,17 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             Show();
             UpdateLayout();
-            _metricsWindow.Show();
-            _metricsWindow.StartRefresh();
-            _metricsWindow.UpdateLayout();
-            PositionStack();
+            PositionNearTray();
             Activate();
+            _refreshTimer.Start();
 
             try
             {
                 TrayQuickControlSnapshot snapshot = await Task.Run(_quickControl.GetSnapshot);
                 ApplySnapshot(snapshot);
+                UpdateMetrics();
                 UpdateLayout();
-                PositionStack();
+                PositionNearTray();
             }
             catch
             {
@@ -68,7 +72,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 _loading = false;
             }
 
-             // Small delay before enabling deactivate-to-hide, so the window
+            // Small delay before enabling deactivate-to-hide, so the window
             // doesn't immediately close on the initial activation/deactivation flicker.
             await Task.Delay(200);
             _showing = false;
@@ -238,25 +242,55 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
         }
 
-        /// <summary>Positions the metrics window above and this window below, stacked near the tray.</summary>
-        private void PositionStack()
+        private void UpdateMetrics()
+        {
+            try
+            {
+                var snapshot = _quickControl.GetTelemetrySnapshot();
+                ApplyMetrics(snapshot);
+            }
+            catch
+            {
+                // Silently fail — metrics are best-effort
+            }
+        }
+
+        private void ApplyMetrics(TrayQuickTelemetrySnapshot s)
+        {
+            // CPU hero values
+            CpuTempText.Text = $"{s.CpuTemperature}°";
+            CpuUsageText.Text = $"{s.CpuUsage}%";
+
+            // CPU segmented bars
+            CpuPowerBar.Value = s.CpuPowerWatts;
+            CpuPowerText.Text = $"{s.CpuPowerWatts} W";
+            CpuClockBar.Value = s.CpuClockMhz;
+            CpuClockText.Text = $"{s.CpuClockMhz / 1000.0:F1} GHz";
+            CpuFanBar.Value = s.CpuFanPercent;
+            CpuFanText.Text = $"{s.CpuFanPercent}%";
+
+            // GPU hero values
+            GpuTempText.Text = $"{s.GpuTemperature}°";
+            GpuUsageText.Text = $"{(int)s.GpuUsage}%";
+
+            // GPU segmented bars
+            GpuPowerBar.Value = s.GpuPowerWatts;
+            GpuPowerText.Text = $"{s.GpuPowerWatts} W";
+            GpuClockBar.Value = s.GpuClockMhz;
+            GpuClockText.Text = $"{s.GpuClockMhz / 1000.0:F1} GHz";
+            GpuFanBar.Value = s.GpuFanPercent;
+            GpuFanText.Text = $"{s.GpuFanPercent}%";
+        }
+
+        private void PositionNearTray()
         {
             IntPtr handle = new WindowInteropHelper(this).Handle;
-            IntPtr metricsHandle = new WindowInteropHelper(_metricsWindow).Handle;
-            if (handle == IntPtr.Zero || !GetWindowRect(handle, out NativeRect controlRect))
+            if (handle == IntPtr.Zero || !GetWindowRect(handle, out NativeRect windowRect))
                 return;
 
-            // Get metrics window dimensions
-            System.Drawing.Size metricsSize = GetMetricsSize();
-            var controlSize = new System.Drawing.Size(
-                controlRect.Right - controlRect.Left,
-                controlRect.Bottom - controlRect.Top);
-
-            // Total stack height = metrics + gap + controls
-            int stackHeight = metricsSize.Height + 8 + controlSize.Height;
-            var stackSize = new System.Drawing.Size(
-                Math.Max(controlSize.Width, metricsSize.Width),
-                stackHeight);
+            var windowSize = new System.Drawing.Size(
+                windowRect.Right - windowRect.Left,
+                windowRect.Bottom - windowRect.Top);
 
             Screen screen = Screen.AllScreens.FirstOrDefault(candidate =>
                 string.Equals(
@@ -268,48 +302,20 @@ namespace Uniwill_Control_Utility.Views.Windows
                 screen.Bounds,
                 screen.WorkingArea,
                 _placementAnchor,
-                stackSize,
+                windowSize,
                 gap: 10,
                 taskbarBounds: FindTaskbarBounds(screen.Bounds));
-
-            // Metrics window sits above the controls window
-            int metricsX = placement.Location.X;
-            int metricsY = placement.Location.Y;
-            int controlX = placement.Location.X;
-            int controlY = placement.Location.Y + metricsSize.Height + 8;
-
-            SetWindowPos(
-                metricsHandle,
-                IntPtr.Zero,
-                metricsX,
-                metricsY,
-                0,
-                0,
-                SetWindowPosFlags.NoSize |
-                SetWindowPosFlags.NoZOrder |
-                SetWindowPosFlags.NoActivate);
 
             SetWindowPos(
                 handle,
                 IntPtr.Zero,
-                controlX,
-                controlY,
+                placement.Location.X,
+                placement.Location.Y,
                 0,
                 0,
                 SetWindowPosFlags.NoSize |
                 SetWindowPosFlags.NoZOrder |
                 SetWindowPosFlags.NoActivate);
-        }
-
-        private System.Drawing.Size GetMetricsSize()
-        {
-            if (_metricsWindow.IsVisible)
-            {
-                if (GetWindowRect(new WindowInteropHelper(_metricsWindow).Handle, out NativeRect r))
-                    return new System.Drawing.Size(r.Right - r.Left, r.Bottom - r.Top);
-            }
-            // Fallback estimated size
-            return new System.Drawing.Size(360, 100);
         }
 
         private void CapturePlacementAnchor()
@@ -398,11 +404,11 @@ namespace Uniwill_Control_Utility.Views.Windows
         }
 
         private void Window_DpiChanged(object sender, DpiChangedEventArgs e) =>
-            Dispatcher.BeginInvoke(PositionStack, DispatcherPriority.Loaded);
+            Dispatcher.BeginInvoke(PositionNearTray, DispatcherPriority.Loaded);
 
         private void HideWidget()
         {
-            _metricsWindow.HideAndStop();
+            _refreshTimer.Stop();
             Hide();
         }
 
@@ -411,22 +417,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (_showing || _applying)
                 return;
 
-            // Defer the check so both windows' Deactivated events have fired and the
-            // activated window has been set. Only close if neither window in the stack
-            // is the active one (i.e. focus went elsewhere).
-            Dispatcher.BeginInvoke(
-                (Action)(() =>
-                {
-                    if (!IsActive && !_metricsWindow.IsActive)
-                        HideWidget();
-                }),
-                DispatcherPriority.Background);
-        }
-
-        private void MetricsWindow_Deactivated(object sender, EventArgs e)
-        {
-            // The metrics window is part of the stacked widget — let the control window
-            // own the hide decision. Do nothing here.
+            HideWidget();
         }
 
         private void Window_Closed(object? sender, EventArgs e) { }
