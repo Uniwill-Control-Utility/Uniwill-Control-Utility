@@ -330,7 +330,7 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Row 1 -->
+                    <!-- Row 1: Adaptive Mode | Keyboard RGB | Light Bar -->
                     <StackPanel Grid.Row="0" Grid.Column="0"
                                 Orientation="Vertical"
                                 HorizontalAlignment="Center"
@@ -363,65 +363,6 @@
                                 Orientation="Vertical"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
-                                x:Name="SlotHydroSmartMode">
-                        <ToggleButton x:Name="BtnHydroSmartMode"
-                                       Width="92"
-                                       Height="46"
-                                       Style="{StaticResource QuickToggleStyle}"
-                                       Tag="Watercooler"
-                                       ContextMenu="{StaticResource NavigateContextMenu}"
-                                       Click="BtnHydroSmartMode_Click">
-                        <iconPacks:PackIconLucide
-                               Kind="BrainCircuit"
-                               Width="16"
-                               Height="16"
-                               VerticalAlignment="Center" >
-                            <iconPacks:PackIconLucide.Foreground>
-                                <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
-                                        Path="Foreground" />
-                            </iconPacks:PackIconLucide.Foreground>
-                        </iconPacks:PackIconLucide>
-                    </ToggleButton>
-                        <ui:TextBlock FontSize="11"
-                                       Margin="0,8,0,0"
-                                       HorizontalAlignment="Center"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Text="Hydro Smart" />
-                    </StackPanel>
-
-                    <StackPanel Grid.Row="0" Grid.Column="2"
-                                Orientation="Vertical"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                x:Name="SlotHydroRgb">
-                        <ToggleButton x:Name="BtnHydroRgb"
-                                       Width="92"
-                                       Height="46"
-                                       Style="{StaticResource QuickToggleStyle}"
-                                       Tag="Watercooler"
-                                       ContextMenu="{StaticResource NavigateContextMenu}"
-                                       Click="BtnHydroRgb_Click">
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons"
-                                          Glyph="&#xE790;"
-                                          FontSize="16">
-                                <ui:FontIcon.Foreground>
-                                    <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
-                                             Path="Foreground" />
-                                </ui:FontIcon.Foreground>
-                            </ui:FontIcon>
-                        </ToggleButton>
-                        <ui:TextBlock FontSize="11"
-                                       Margin="0,8,0,0"
-                                       HorizontalAlignment="Center"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Text="Hydro RGB" />
-                    </StackPanel>
-
-                    <!-- Row 2 -->
-                    <StackPanel Grid.Row="2" Grid.Column="0"
-                                Orientation="Vertical"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
                                 x:Name="SlotKeyboardBacklight">
                         <ToggleButton x:Name="BtnKeyboardBacklight"
                                        Width="92"
@@ -446,7 +387,7 @@
                                        Text="Keyboard RGB" />
                     </StackPanel>
 
-                    <StackPanel Grid.Row="2" Grid.Column="1"
+                    <StackPanel Grid.Row="0" Grid.Column="2"
                                 Orientation="Vertical"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
@@ -474,7 +415,8 @@
                                        Text="Light Bar" />
                     </StackPanel>
 
-                    <StackPanel Grid.Row="2" Grid.Column="2"
+                    <!-- Row 2: Smart Fan Mode | Overlay | Local Dimming -->
+                    <StackPanel Grid.Row="2" Grid.Column="0"
                                 Orientation="Vertical"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
@@ -504,8 +446,35 @@
                                        Text="Smart Fan Mode" />
                     </StackPanel>
 
-                    <!-- Row 3 -->
-                    <StackPanel Grid.Row="4" Grid.Column="0"
+                    <StackPanel Grid.Row="2" Grid.Column="1"
+                                Orientation="Vertical"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                x:Name="SlotOverlay">
+                        <ToggleButton x:Name="BtnOverlay"
+                                       Width="92"
+                                       Height="46"
+                                       Style="{StaticResource QuickToggleStyle}"
+                                       Tag="OverlaySettingsPage"
+                                       ContextMenu="{StaticResource NavigateContextMenu}"
+                                       Click="BtnOverlay_Click">
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xE81E;"
+                                          FontSize="16">
+                                <ui:FontIcon.Foreground>
+                                    <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                             Path="Foreground" />
+                                </ui:FontIcon.Foreground>
+                            </ui:FontIcon>
+                        </ToggleButton>
+                        <ui:TextBlock FontSize="11"
+                                       Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Overlay" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2" Grid.Column="2"
                                 Orientation="Vertical"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
@@ -533,20 +502,51 @@
                                        Text="Local Dimming" />
                     </StackPanel>
 
+                    <!-- Row 3: Smart Hydro | Hydro RGB | Flydigi RGB -->
+                    <StackPanel Grid.Row="4" Grid.Column="0"
+                                Orientation="Vertical"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                x:Name="SlotHydroSmartMode">
+                        <ToggleButton x:Name="BtnHydroSmartMode"
+                                       Width="92"
+                                       Height="46"
+                                       Style="{StaticResource QuickToggleStyle}"
+                                       Tag="Watercooler"
+                                       ContextMenu="{StaticResource NavigateContextMenu}"
+                                       Click="BtnHydroSmartMode_Click">
+                        <iconPacks:PackIconLucide
+                               Kind="BrainCircuit"
+                               Width="16"
+                               Height="16"
+                               VerticalAlignment="Center" >
+                            <iconPacks:PackIconLucide.Foreground>
+                                <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                        Path="Foreground" />
+                            </iconPacks:PackIconLucide.Foreground>
+                        </iconPacks:PackIconLucide>
+                    </ToggleButton>
+                        <ui:TextBlock FontSize="11"
+                                       Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Smart Hydro" />
+                    </StackPanel>
+
                     <StackPanel Grid.Row="4" Grid.Column="1"
                                 Orientation="Vertical"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
-                                x:Name="SlotOverlay">
-                        <ToggleButton x:Name="BtnOverlay"
+                                x:Name="SlotHydroRgb">
+                        <ToggleButton x:Name="BtnHydroRgb"
                                        Width="92"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
-                                       Tag="OverlaySettingsPage"
+                                       Tag="Watercooler"
                                        ContextMenu="{StaticResource NavigateContextMenu}"
-                                       Click="BtnOverlay_Click">
+                                       Click="BtnHydroRgb_Click">
                             <ui:FontIcon FontFamily="Segoe Fluent Icons"
-                                          Glyph="&#xE81E;"
+                                          Glyph="&#xE790;"
                                           FontSize="16">
                                 <ui:FontIcon.Foreground>
                                     <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
@@ -558,7 +558,7 @@
                                        Margin="0,8,0,0"
                                        HorizontalAlignment="Center"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Text="Overlay" />
+                                       Text="Hydro RGB" />
                     </StackPanel>
 
                     <StackPanel Grid.Row="4" Grid.Column="2"
