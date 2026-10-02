@@ -68,6 +68,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbxBs2ProEnabled.IsChecked = Settings.Default.AdaptiveBs2ProEnabled;
             cbxWcEnabled.IsChecked = Settings.Default.AdaptiveWcEnabled;
             cbxKbEnabled.IsChecked = Settings.Default.AdaptiveKeyboardEnabled;
+            cbxEcFanEnabled.IsChecked = Settings.Default.AdaptiveEcFanEnabled;
             cbxCpuEnabled.IsChecked = Settings.Default.AdaptiveCpuEnabled;
             cbxGpuEnabled.IsChecked = Settings.Default.AdaptiveGpuEnabled;
             cbxLbEnabled.IsChecked = Settings.Default.AdaptiveLbEnabled;
@@ -1161,6 +1162,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Sync active settings so other pages can detect the change immediately
             Settings.Default.AdaptiveBs2ProEnabled = cbxBs2ProEnabled.IsChecked ?? false;
             Settings.Default.AdaptiveWcEnabled = cbxWcEnabled.IsChecked ?? false;
+            Settings.Default.AdaptiveEcFanEnabled = cbxEcFanEnabled.IsChecked ?? false;
             Settings.Default.AdaptiveCpuEnabled = cbxCpuEnabled.IsChecked ?? false;
             Settings.Default.AdaptiveGpuEnabled = cbxGpuEnabled.IsChecked ?? false;
             Settings.Default.AdaptiveLbEnabled = cbxLbEnabled.IsChecked ?? false;
@@ -1235,6 +1237,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void cbxEcFanEnabled_Toggled(object sender, RoutedEventArgs e)
         {
             bool enabled = cbxEcFanEnabled.IsChecked ?? false;
+            Settings.Default.AdaptiveEcFanEnabled = enabled;
+            Settings.Default.Save();
 
             // Only apply override when Adaptive Mode is running
             if (!start) return;

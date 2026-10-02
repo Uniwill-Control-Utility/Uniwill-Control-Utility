@@ -72,14 +72,24 @@ namespace Uniwill_Control_Utility.Services
                 Overlay: Settings.Default.EnableOverlayNavigation,
                 Auto: Settings.Default.EnableAutoNavigation);
 
+            /*
+             * Use persisted adaptive settings as the source of truth for button
+             * disable state, NOT runtime override flags (IsWatercoolerOverridden,
+             * IsFlydigiOverridden, etc.).  The runtime flags are set asynchronously
+             * during RestoreAdaptiveModeAsync and the tray may snapshot before they
+             * are restored, causing buttons to appear enabled when they shouldn't.
+             */
             var policy = TrayQuickControlPolicy.Create(
                 hasNvidiaGpu: hasGpu,
                 hasSupportedWaterCooler: hydroSupported,
                 waterCoolerConnected: _waterCooler.IsConnected,
                 adaptiveCpuEnabled: adaptiveRunning && Settings.Default.AdaptiveCpuEnabled,
                 adaptiveGpuEnabled: adaptiveRunning && Settings.Default.AdaptiveGpuEnabled,
-                adaptiveFanEnabled: adaptiveRunning && _deviceApplier.IsEcFanOverridden,
-                adaptiveWaterCoolerEnabled: adaptiveRunning && _deviceApplier.IsWatercoolerOverridden,
+                adaptiveFanEnabled: adaptiveRunning && Settings.Default.AdaptiveEcFanEnabled,
+                adaptiveWaterCoolerEnabled: adaptiveRunning && Settings.Default.AdaptiveWcEnabled,
+                adaptiveKeyboardEnabled: adaptiveRunning && Settings.Default.AdaptiveKeyboardEnabled,
+                adaptiveLightBarEnabled: adaptiveRunning && Settings.Default.AdaptiveLbEnabled,
+                adaptiveFlydigiEnabled: adaptiveRunning && Settings.Default.AdaptiveBs2ProEnabled,
                 hasMiniLedPanel: hasMiniLed,
                 flydigiDeviceAvailable: flydigiAvailable,
                 flydigiEnabled: flydigiEnabled,
@@ -106,14 +116,31 @@ namespace Uniwill_Control_Utility.Services
 
         #region Toggle Handlers
 
-        /// <summary>Toggles Adaptive Mode on/off. Persists to Settings.Default.</summary>
-        public void SetAdaptiveMode(bool enabled)
+        /// <summary>Toggles Adaptive Mode on/off. Lifts/applies overrides and updates the page.</summary>
+        public async Task SetAdaptiveModeAsync(bool enabled)
         {
-            Settings.Default.isAdaptiveModeRunning = enabled;
+            if (enabled)
+            {
+                Settings.Default.isAdaptiveModeRunning = true;
+                Settings.Default.isStartAdpative = true;
+            }
+            else
+            {
+                Settings.Default.isAdaptiveModeRunning = false;
+                Settings.Default.isStartAdpative = false;
+
+                // Lift all DeviceApplier overrides so pages regain control.
+                if (_deviceApplier != null)
+                {
+                    await _deviceApplier.DisableFlydigiOverrideAsync();
+                    await _deviceApplier.DisableWatercoolerOverrideAsync();
+                    _deviceApplier.DisableEcFanOverride();
+                    _deviceApplier.DisableKeyboardOverride();
+                    _deviceApplier.DisableLightBarOverride();
+                    await _deviceApplier.DisableCpuGpuOverrideAsync();
+                }
+            }
             Settings.Default.Save();
-            // The Adaptive page and DashboardViewModel listen for this change.
-            // The actual start/stop is triggered by the Adaptive page toggle.
-            // Here we just persist the setting so the main window picks it up.
         }
 
         /// <summary>Toggles Hydro UI Smart Mode on/off.</summary>

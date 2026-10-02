@@ -664,6 +664,15 @@ namespace Uniwill_Control_Utility
 
                     if (Settings.Default.AdaptiveKeyboardEnabled)
                         deviceApplier.EnableKeyboardOverride();
+
+                    if (Settings.Default.AdaptiveEcFanEnabled)
+                        deviceApplier.EnableEcFanOverride();
+
+                    if (Settings.Default.AdaptiveLbEnabled)
+                        deviceApplier.EnableLightBarOverride();
+
+                    if (Settings.Default.AdaptiveCpuEnabled || Settings.Default.AdaptiveGpuEnabled)
+                        deviceApplier.EnableCpuGpuOverride();
                 }
             }
             catch (Exception ex)
