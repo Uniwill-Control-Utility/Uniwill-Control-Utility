@@ -347,11 +347,6 @@ namespace Uniwill_Control_Utility.Views.Windows
         private void Window_DpiChanged(object sender, DpiChangedEventArgs e) =>
             Dispatcher.BeginInvoke(PositionNearTray, DispatcherPriority.Loaded);
 
-        private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            // Intentionally empty — window is position-only near the tray.
-        }
-
         private void HideWidget() => Hide();
 
         private void Window_Deactivated(object sender, EventArgs e)

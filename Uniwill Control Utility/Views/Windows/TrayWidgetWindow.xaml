@@ -52,41 +52,16 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="44" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- ===== HEADER (no drag) ===== -->
-        <Grid Grid.Row="0">
-            <Grid Margin="8,0,8,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <Border Width="24" Height="24" CornerRadius="12" Background="#183F46">
-                    <Image Width="19" Height="19" Source="pack://application:,,,/Assets/applicationIcon-32.png" />
-                </Border>
-
-                <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
-                    <ui:TextBlock FontTypography="Caption" Text="UCU Quick Control" />
-                    <ui:TextBlock x:Name="HeaderContextText"
-                                   Margin="0,-1,0,0"
-                                   FontTypography="Caption"
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                   Text="Live controls · cached telemetry" />
-                </StackPanel>
-            </Grid>
-        </Grid>
-
         <!-- ===== QUICK SETTINGS GRID ===== -->
-        <!-- Top border edge-to-edge separates header from button section -->
-        <Border Grid.Row="1"
+        <Border Grid.Row="0"
                 Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
-                BorderThickness="0,1,0,0"
-                Padding="12">
-            <Grid x:Name="ButtonsGrid" Margin="0,12">
+                BorderThickness="0"
+                Padding="20,23,20,23">
+            <Grid x:Name="ButtonsGrid">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="24" />
@@ -107,7 +82,7 @@
                                 VerticalAlignment="Center"
                                 x:Name="SlotAdaptiveMode">
                         <ToggleButton x:Name="BtnAdaptiveMode"
-                                       Width="96"
+                                       Width="92"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
                                        Tag="Adaptive"
@@ -135,7 +110,7 @@
                                 VerticalAlignment="Center"
                                 x:Name="SlotHydroSmartMode">
                         <ToggleButton x:Name="BtnHydroSmartMode"
-                                       Width="96"
+                                       Width="92"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
                                        Tag="Watercooler"
@@ -165,7 +140,7 @@
                                 VerticalAlignment="Center"
                                 x:Name="SlotHydroRgb">
                         <ToggleButton x:Name="BtnHydroRgb"
-                                       Width="96"
+                                       Width="92"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
                                        Tag="Watercooler"
@@ -194,7 +169,7 @@
                                 VerticalAlignment="Center"
                                 x:Name="SlotKeyboardBacklight">
                         <ToggleButton x:Name="BtnKeyboardBacklight"
-                                       Width="96"
+                                       Width="92"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
                                        Tag="Keyboard"
@@ -222,7 +197,7 @@
                                 VerticalAlignment="Center"
                                 x:Name="SlotLightBar">
                         <ToggleButton x:Name="BtnLightBar"
-                                       Width="96"
+                                       Width="92"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
                                        Tag="LightBar"
@@ -250,7 +225,7 @@
                                 VerticalAlignment="Center"
                                 x:Name="SlotFanSmartMode">
                         <ToggleButton x:Name="BtnFanSmartMode"
-                                       Width="96"
+                                       Width="92"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
                                        Tag="FanControl"
@@ -281,7 +256,7 @@
                                 VerticalAlignment="Center"
                                 x:Name="SlotLocalDimming">
                         <ToggleButton x:Name="BtnLocalDimming"
-                                       Width="96"
+                                       Width="92"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
                                        Tag="SettingsPage"
@@ -309,7 +284,7 @@
                                 VerticalAlignment="Center"
                                 x:Name="SlotOverlay">
                         <ToggleButton x:Name="BtnOverlay"
-                                       Width="96"
+                                       Width="92"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
                                        Tag="OverlaySettingsPage"
@@ -337,7 +312,7 @@
                                 VerticalAlignment="Center"
                                 x:Name="SlotFlydigiRgb">
                         <ToggleButton x:Name="BtnFlydigiRgb"
-                                       Width="96"
+                                       Width="92"
                                        Height="46"
                                        Style="{StaticResource QuickToggleStyle}"
                                        Tag="FlydigiCooler"
@@ -362,7 +337,7 @@
         </Border>
 
         <!-- ===== FOOTER ===== -->
-        <Grid Grid.Row="2" Margin="12,12,12,12">
+        <Grid Grid.Row="1" Margin="12,12,12,12">
             <Button HorizontalAlignment="Right"
                     Background="Transparent"
                     BorderThickness="0"
