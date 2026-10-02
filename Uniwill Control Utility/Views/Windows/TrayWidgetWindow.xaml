@@ -35,14 +35,56 @@
             <Setter Property="Background"
                     Value="{DynamicResource ControlFillColorDefaultBrush}" />
             <Setter Property="Padding" Value="12,8" />
-            <Style.Triggers>
-                <Trigger Property="IsChecked" Value="True">
-                    <Setter Property="Background"
-                            Value="{DynamicResource AccentFillColorDefaultBrush}" />
-                    <Setter Property="Foreground"
-                            Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
-                </Trigger>
-            </Style.Triggers>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Grid>
+                            <!-- Base background -->
+                            <Border x:Name="BaseBackground"
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="6" />
+                            <!-- Hover overlay for off-state (15% white) -->
+                            <Border x:Name="HoverOffOverlay"
+                                    Background="White"
+                                    Opacity="0.025"
+                                    CornerRadius="6"
+                                    Visibility="Collapsed" />
+                            <!-- Hover overlay for on-state (30% white) -->
+                            <Border x:Name="HoverOnOverlay"
+                                    Background="White"
+                                    Opacity="0.3"
+                                    CornerRadius="6"
+                                    Visibility="Collapsed" />
+                            <!-- Content -->
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Background"
+                                        Value="{DynamicResource AccentTextFillColorTertiaryBrush}" />
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True" />
+                                    <Condition Property="IsChecked" Value="False" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="HoverOffOverlay" Property="Visibility" Value="Visible" />
+                            </MultiTrigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True" />
+                                    <Condition Property="IsChecked" Value="True" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="HoverOnOverlay" Property="Visibility" Value="Visible" />
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- Metrics styles -->
@@ -65,7 +107,8 @@
         </Style>
 
         <ContextMenu x:Key="NavigateContextMenu"
-                     Opened="NavigateContextMenu_Opened">
+                     Opened="NavigateContextMenu_Opened"
+                     >
             <MenuItem Header="Go to UCU" Click="GoToUcuMenuItem_Click" />
         </ContextMenu>
     </ui:FluentWindow.Resources>
@@ -79,7 +122,8 @@
 
         <!-- ===== METRICS SECTION (no card background) ===== -->
         <Border Grid.Row="0"
-                Padding="12,16">
+                Padding="12,16"
+                Background="Transparent">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -88,7 +132,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- CPU -->
-                <Grid Grid.Column="0" Margin="0,0,6,0">
+                <Grid Grid.Column="0" Margin="2,0,16,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -99,7 +143,9 @@
                                Style="{StaticResource LabelStyle}"
                                HorizontalAlignment="Center"
                                FontWeight="SemiBold"
-                               Text="CPU" />
+                               Text="CPU" 
+                               FontSize="12"
+                               Margin="0,0,0,8"/>
 
                     <!-- Hero row: Temp + Util -->
                     <Grid Grid.Row="1" Margin="0,8,0,0">
@@ -111,7 +157,7 @@
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center">
                             <TextBlock x:Name="CpuTempText" Style="{StaticResource HeroStyle}"
-                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                       Foreground="{DynamicResource AccentTextFillColorTertiaryBrush}"
                                        Text="--°"
                                        HorizontalAlignment="Center" />
                         </StackPanel>
@@ -144,7 +190,7 @@
                         <controls:DashboardSegmentedBar x:Name="CpuPowerBar"
                             Grid.Row="0" Grid.Column="1" Height="7" Margin="8,0"
                             Maximum="300" Segments="16"
-                            Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                            Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
                         <TextBlock x:Name="CpuPowerText" Grid.Row="0" Grid.Column="2"
                                    Style="{StaticResource ValueStyle}" VerticalAlignment="Center"
                                    Text="-- W" HorizontalAlignment="Center" />
@@ -154,7 +200,7 @@
                         <controls:DashboardSegmentedBar x:Name="CpuClockBar"
                             Grid.Row="2" Grid.Column="1" Height="7" Margin="8,0"
                             Maximum="6000" Segments="16"
-                            Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                            Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
                         <TextBlock x:Name="CpuClockText" Grid.Row="2" Grid.Column="2"
                                    Style="{StaticResource ValueStyle}" VerticalAlignment="Center"
                                    Text="-- GHz" HorizontalAlignment="Center" />
@@ -164,7 +210,7 @@
                         <controls:DashboardSegmentedBar x:Name="CpuFanBar"
                             Grid.Row="4" Grid.Column="1" Height="7" Margin="8,0"
                             Maximum="100" Segments="16"
-                            Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                            Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
                         <TextBlock x:Name="CpuFanText" Grid.Row="4" Grid.Column="2"
                                    Style="{StaticResource ValueStyle}" VerticalAlignment="Center"
                                    Text="--%" HorizontalAlignment="Center" />
@@ -174,10 +220,12 @@
                 <!-- Vertical Divider -->
                 <Border Grid.Column="1"
                         Background="{DynamicResource DividerStrokeColorDefaultBrush}"
-                        Margin="0,4" />
+                        Margin="0,4,0,0" 
+                        Opacity="0.95"
+                        />
 
                 <!-- GPU -->
-                <Grid Grid.Column="2" Margin="6,0,0,0">
+                <Grid Grid.Column="2" Margin="6,0,6,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -188,7 +236,9 @@
                                Style="{StaticResource LabelStyle}"
                                HorizontalAlignment="Center"
                                FontWeight="SemiBold"
-                               Text="GPU" />
+                               Text="GPU" 
+                               FontSize="12"
+                               Margin="0,0,0,8"/>
 
                     <!-- Hero row: Temp + Util -->
                     <Grid Grid.Row="1" Margin="0,8,0,0">
@@ -200,7 +250,7 @@
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center">
                             <TextBlock x:Name="GpuTempText" Style="{StaticResource HeroStyle}"
-                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                       Foreground="{DynamicResource AccentTextFillColorTertiaryBrush}"
                                        Text="--°" HorizontalAlignment="Center" />
                         </StackPanel>
 
@@ -232,7 +282,7 @@
                         <controls:DashboardSegmentedBar x:Name="GpuPowerBar"
                             Grid.Row="0" Grid.Column="1" Height="7" Margin="8,0"
                             Maximum="300" Segments="16"
-                            Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                            Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
                         <TextBlock x:Name="GpuPowerText" Grid.Row="0" Grid.Column="2"
                                    Style="{StaticResource ValueStyle}" VerticalAlignment="Center"
                                    Text="-- W" HorizontalAlignment="Center" />
@@ -242,7 +292,7 @@
                         <controls:DashboardSegmentedBar x:Name="GpuClockBar"
                             Grid.Row="2" Grid.Column="1" Height="7" Margin="8,0"
                             Maximum="3000" Segments="16"
-                            Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                            Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
                         <TextBlock x:Name="GpuClockText" Grid.Row="2" Grid.Column="2"
                                    Style="{StaticResource ValueStyle}" VerticalAlignment="Center"
                                    Text="-- GHz" HorizontalAlignment="Center" />
@@ -252,7 +302,7 @@
                         <controls:DashboardSegmentedBar x:Name="GpuFanBar"
                             Grid.Row="4" Grid.Column="1" Height="7" Margin="8,0"
                             Maximum="100" Segments="16"
-                            Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                            Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
                         <TextBlock x:Name="GpuFanText" Grid.Row="4" Grid.Column="2"
                                    Style="{StaticResource ValueStyle}" VerticalAlignment="Center"
                                    Text="--%" HorizontalAlignment="Center" />
