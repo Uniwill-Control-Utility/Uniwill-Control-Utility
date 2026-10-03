@@ -301,6 +301,28 @@ namespace Uniwill_Control_Utility.ViewModels
                     _refreshTimer.IsEnabled = true;
                     _batteryEcTimer.IsEnabled = true;
                 });
+
+                // Start Hydro UI Smart Mode now that temperature data is available.
+                // This is done here (not in TryAutoConnectAsync) because during
+                // pre-loading, LibreHardwareMonitor may not have valid temperature
+                // readings yet — causing Smart Mode to initialize with a filtered
+                // temperature of 0 and take 8+ seconds to ramp up on a hot CPU.
+                // By the time the dashboard navigates, LHM has valid sensor data.
+                try
+                {
+                    var snapshot = _hardwareMonitoring.ReadSnapshot();
+                    bool hasTemp = snapshot.CpuTemperature > 0 || snapshot.GpuTemperature > 0;
+
+                    if (hasTemp && _waterCoolerService.IsConnected)
+                    {
+                        var settings = _waterCoolerService.GetSettings();
+                        if (settings.SmartModeEnabled && !_waterCoolerService.IsSmartModeActive)
+                        {
+                            _waterCoolerService.StartSmartMode();
+                        }
+                    }
+                }
+                catch { /* non-critical — Smart Mode will retry on next navigation */ }
             });
 
             // Phase 2 (slow): EC handshake and battery telemetry read run in parallel
