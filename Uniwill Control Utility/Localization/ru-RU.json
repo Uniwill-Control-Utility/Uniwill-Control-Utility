@@ -1,4 +1,4 @@
-﻿{
+{
   "0.1% Low": "0.1% Low",
   "0.1% ms": "0,1% мс",
   "1 - Quiet": "1 - Тихий",
@@ -616,6 +616,8 @@
   "Configuring services": "Настройка служб",
   "Initializing sensors": "Инициализация датчиков",
   "Applying startup settings": "Применение настроек запуска",
+  "Connecting devices": "Connecting devices",
+  "Restoring adaptive mode": "Restoring adaptive mode",
   "Opening dashboard": "Открытие главной страницы",
   "Ready": "Готово",
   "Show startup progress": "Показывать ход запуска",

@@ -1,4 +1,4 @@
-﻿{
+{
   "0.1% Low": "0.1% Low",
   "0.1% ms": "0.1% ms",
   "1 - Quiet": "1 - 静音",
@@ -616,6 +616,8 @@
   "Configuring services": "サービスを構成しています",
   "Initializing sensors": "センサーを初期化しています",
   "Applying startup settings": "起動設定を適用しています",
+  "Connecting devices": "Connecting devices",
+  "Restoring adaptive mode": "Restoring adaptive mode",
   "Opening dashboard": "ダッシュボードを開いています",
   "Ready": "準備完了",
   "Show startup progress": "起動進行状況を表示",

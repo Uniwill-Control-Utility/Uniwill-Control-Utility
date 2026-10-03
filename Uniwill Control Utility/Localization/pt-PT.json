@@ -1,4 +1,4 @@
-﻿{
+{
   "0.1% Low": "0,1% Low",
   "0.1% ms": "0,1% ms",
   "1 - Quiet": "1 - Silencioso",
@@ -616,6 +616,8 @@
   "Configuring services": "A configurar os serviços",
   "Initializing sensors": "A inicializar os sensores",
   "Applying startup settings": "A aplicar as definições de arranque",
+  "Connecting devices": "Connecting devices",
+  "Restoring adaptive mode": "Restoring adaptive mode",
   "Opening dashboard": "A abrir o painel principal",
   "Ready": "Pronto",
   "Show startup progress": "Mostrar progresso do arranque",

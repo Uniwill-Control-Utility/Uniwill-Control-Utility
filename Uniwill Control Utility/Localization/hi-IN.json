@@ -1,4 +1,4 @@
-﻿{
+{
   "0.1% Low": "0.1% लो (Low)",
   "0.1% ms": "0.1% ms",
   "1 - Quiet": "1 - शांत",
@@ -616,6 +616,8 @@
   "Configuring services": "सेवाएँ कॉन्फ़िगर की जा रही हैं",
   "Initializing sensors": "सेंसर प्रारंभ किए जा रहे हैं",
   "Applying startup settings": "स्टार्टअप सेटिंग्स लागू की जा रही हैं",
+  "Connecting devices": "Connecting devices",
+  "Restoring adaptive mode": "Restoring adaptive mode",
   "Opening dashboard": "डैशबोर्ड खोला जा रहा है",
   "Ready": "तैयार",
   "Show startup progress": "स्टार्टअप प्रगति दिखाएँ",

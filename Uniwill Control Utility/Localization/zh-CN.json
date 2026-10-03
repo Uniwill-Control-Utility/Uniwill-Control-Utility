@@ -1,4 +1,4 @@
-﻿{
+{
   "0.1% Low": "0.1% Low",
   "0.1% ms": "0.1% ms",
   "1 - Quiet": "1 - 安静",
@@ -616,6 +616,8 @@
   "Configuring services": "正在配置服务",
   "Initializing sensors": "正在初始化传感器",
   "Applying startup settings": "正在应用启动设置",
+  "Connecting devices": "Connecting devices",
+  "Restoring adaptive mode": "Restoring adaptive mode",
   "Opening dashboard": "正在打开主面板",
   "Ready": "已就绪",
   "Show startup progress": "显示启动进度",

@@ -1,4 +1,4 @@
-﻿{
+{
   "0.1% Low": "0.1% Low",
   "0.1% ms": "0,1% ms",
   "1 - Quiet": "1 - Cichy",
@@ -616,6 +616,8 @@
   "Configuring services": "Konfigurowanie usług",
   "Initializing sensors": "Inicjowanie czujników",
   "Applying startup settings": "Stosowanie ustawień uruchamiania",
+  "Connecting devices": "Connecting devices",
+  "Restoring adaptive mode": "Restoring adaptive mode",
   "Opening dashboard": "Otwieranie pulpitu",
   "Ready": "Gotowe",
   "Show startup progress": "Pokaż postęp uruchamiania",

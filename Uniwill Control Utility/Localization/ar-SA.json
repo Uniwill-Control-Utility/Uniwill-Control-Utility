@@ -1,4 +1,4 @@
-﻿{
+{
   "0.1% Low": "0.1% منخفض",
   "0.1% ms": "0.1% مللي ثانية",
   "1 - Quiet": "1 - هادئ",
@@ -616,6 +616,8 @@
   "Configuring services": "جارٍ تكوين الخدمات",
   "Initializing sensors": "جارٍ تهيئة المستشعرات",
   "Applying startup settings": "جارٍ تطبيق إعدادات بدء التشغيل",
+  "Connecting devices": "Connecting devices",
+  "Restoring adaptive mode": "Restoring adaptive mode",
   "Opening dashboard": "جارٍ فتح لوحة المعلومات",
   "Ready": "جاهز",
   "Show startup progress": "إظهار تقدم بدء التشغيل",

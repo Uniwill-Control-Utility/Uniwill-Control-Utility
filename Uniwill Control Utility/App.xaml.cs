@@ -56,7 +56,7 @@ namespace Uniwill_Control_Utility
             return _host?.Services.GetService(typeof(T)) as T;
         }
 
-        internal static readonly string version = "0.9.4.2";
+        internal static readonly string version = "0.9.4.3";
         private Mutex? mutex;
         private const string MutexName = "UniwillControlUtility";
 
@@ -366,6 +366,15 @@ namespace Uniwill_Control_Utility
                     }
                 }
 
+                // Auto-connect devices (Hydro UI, Flydigi cooler) during the
+                // pre-loading phase so the dashboard shows connected state on open.
+                await startupProgressReporter.ReportAsync(StartupStage.ConnectingDevices);
+                await AutoConnectDevicesAsync();
+
+                // Restore Adaptive Mode override state from previous session.
+                await startupProgressReporter.ReportAsync(StartupStage.RestoringAdaptiveMode);
+                await RestoreAdaptiveModeAsync();
+
                 await _host.StartAsync(CancellationToken.None);
 
                 await startupProgressReporter.ReportAsync(StartupStage.Complete);
@@ -376,14 +385,6 @@ namespace Uniwill_Control_Utility
                     startupWindow = null;
                 }
                 startupProgressReporter.Detach();
-
-                // Kick off device auto-connects in parallel so they don't block
-                // the dashboard from appearing.  The dashboard's device cards
-                // already handle late-arriving connections (they toggle visibility).
-                SafeFireAndForget(AutoConnectDevicesAsync());
-
-                // Restore Adaptive Mode override state from previous session.
-                SafeFireAndForget(RestoreAdaptiveModeAsync());
 
                 SafeFireAndForget(RunPostStartupTasksAsync());
             }
@@ -594,14 +595,10 @@ namespace Uniwill_Control_Utility
 
         private static async Task AutoConnectDevicesAsync()
         {
-            // Wait for the Bluetooth stack to stabilize after cold boot.
-            // On restart, BLE devices may not be reachable immediately — the radio
-            // needs time to power on and start advertising. The watercooler's
-            // TryAutoConnectAsync also runs a BLE scan and retries, so this
-            // initial delay gives the system time before discovery begins.
-            await Task.Delay(3000);
-
-            // Auto-connect watercooler on startup if enabled
+            // Auto-connect watercooler on startup if enabled.
+            // Runs during the pre-loading phase so the dashboard shows connected
+            // state on open. Each TryAutoConnectAsync has internal guards:
+            // checks AutoConnect flag, LastDeviceAddress, and _userDisconnected.
             try
             {
                 if (Settings.Default.EnableHydroUiNavigation)
@@ -616,7 +613,7 @@ namespace Uniwill_Control_Utility
                 _logger?.LogError(ex, "Failed to auto-connect watercooler");
             }
 
-            // Auto-connect Flydigi BS2 Pro cooling pad on startup if enabled
+            // Auto-connect Flydigi BS2 Pro cooling pad on startup if enabled.
             try
             {
                 if (Settings.Default.EnableFlydigi)
@@ -631,7 +628,7 @@ namespace Uniwill_Control_Utility
                 _logger?.LogError(ex, "Failed to auto-connect Flydigi cooler");
             }
 
-            // Auto-connect Flydigi BS1 (BLE) cooling pad on startup if enabled
+            // Auto-connect Flydigi BS1 (BLE) cooling pad on startup if enabled.
             try
             {
                 if (Settings.Default.EnableFlydigi)
@@ -679,10 +676,6 @@ namespace Uniwill_Control_Utility
             {
                 _logger?.LogError(ex, "Failed to restore Adaptive Mode override state");
             }
-
-            // Small delay so the overrides apply after devices have had a
-            // chance to finish connecting (avoids racing with TryAutoConnectAsync).
-            await Task.Delay(500);
         }
 
         private static async Task RunPostStartupTasksAsync()

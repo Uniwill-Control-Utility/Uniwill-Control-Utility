@@ -1,4 +1,4 @@
-﻿{
+{
   "0.1% Low": "0.1% Mababa",
   "0.1% ms": "0.1% ms",
   "1 - Quiet": "1 - Tahimik",
@@ -616,6 +616,8 @@
   "Configuring services": "Kino-configure ang mga serbisyo",
   "Initializing sensors": "Sinisimulan ang mga sensor",
   "Applying startup settings": "Inilalapat ang mga startup setting",
+  "Connecting devices": "Connecting devices",
+  "Restoring adaptive mode": "Restoring adaptive mode",
   "Opening dashboard": "Binubuksan ang dashboard",
   "Ready": "Handa na",
   "Show startup progress": "Ipakita ang progreso ng pagsisimula",

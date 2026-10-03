@@ -1,4 +1,4 @@
-﻿{
+{
   "0.1% Low": "0,1% Low",
   "0.1% ms": "0,1% ms",
   "1 - Quiet": "1 - Senyap",
@@ -616,6 +616,8 @@
   "Configuring services": "Mengonfigurasi layanan",
   "Initializing sensors": "Menginisialisasi sensor",
   "Applying startup settings": "Menerapkan pengaturan awal",
+  "Connecting devices": "Connecting devices",
+  "Restoring adaptive mode": "Restoring adaptive mode",
   "Opening dashboard": "Membuka dasbor",
   "Ready": "Siap",
   "Show startup progress": "Tampilkan progres startup",
