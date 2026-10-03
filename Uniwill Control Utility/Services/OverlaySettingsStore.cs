@@ -78,9 +78,7 @@ namespace Uniwill_Control_Utility.Services
                     : 0.95,
                 ContentOpacity = IsFinite(options.ContentOpacity)
                     ? Math.Clamp(options.ContentOpacity, 0.0, 1.0)
-                    : 1.0,
-                // New properties default to true when not present in saved file.
-                HideWhenNoGame = true
+                    : 1.0
             };
         }
 

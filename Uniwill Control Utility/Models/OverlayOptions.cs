@@ -19,7 +19,6 @@ namespace Uniwill_Control_Utility.Models
         public bool ShowMemory { get; init; } = true;
         public bool ShowBattery { get; init; } = true;
         public bool ShowGraphs { get; init; } = true;
-        public bool HideWhenNoGame { get; init; } = true;
         public bool VisibleOnLastShutdown { get; init; }
         public double Left { get; init; } = double.NaN;
         public double Top { get; init; } = double.NaN;

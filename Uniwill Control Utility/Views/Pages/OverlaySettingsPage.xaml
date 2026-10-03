@@ -336,7 +336,7 @@
                         </ui:CardExpander.Header>
                         <StackPanel>
                             <!-- Overlay scale -->
-                            <Grid>
+                            <Grid Margin="0,-2,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -395,7 +395,7 @@
 
                             <!-- Divider -->
                             <Border Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultBrush}" />
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                             <!-- Content opacity -->
                             <Grid>
@@ -429,7 +429,7 @@
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                             <!-- Refresh interval -->
-                            <Grid>
+                            <Grid Margin="0,4,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -454,40 +454,6 @@
                         </StackPanel>
                     </ui:CardExpander>
 
-                    <!-- Hide when no game -->
-                    <ui:CardExpander Margin="0,0,0,8"
-                                     IsExpanded="True">
-                        <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C5;" FontSize="20" Margin="4,0,6,0" />
-                        </ui:CardExpander.Icon>
-                        <ui:CardExpander.Header>
-                            <StackPanel>
-                                <ui:TextBlock FontTypography="Body" Text="Visibility" />
-                            </StackPanel>
-                        </ui:CardExpander.Header>
-                        <StackPanel>
-                            <Grid Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Hide when no game" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Automatically hide the overlay when no game is detected"
-                                                   TextWrapping="Wrap" />
-                                </StackPanel>
-                                <ui:ToggleSwitch x:Name="HideWhenNoGameCheckBox"
-                                                 Grid.Column="1"
-                                                 LabelPosition="Left"
-                                                 OnContent="On"
-                                                 OffContent="Off"
-  />
-                            </Grid>
-                        </StackPanel>
-                    </ui:CardExpander>
                 </StackPanel>
             </Grid>
         </ScrollViewer>
