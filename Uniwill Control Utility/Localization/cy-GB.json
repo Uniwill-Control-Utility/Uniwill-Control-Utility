@@ -1,4 +1,4 @@
-﻿{
+{
   "0.1% Low": "0.1% Isel",
   "0.1% ms": "0.1% ms",
   "1 - Quiet": "1 - Tawel",
@@ -616,6 +616,8 @@
   "Configuring services": "Yn ffurfweddu gwasanaethau",
   "Initializing sensors": "Yn ymgychwyn synwyryddion",
   "Applying startup settings": "Yn cymhwyso gosodiadau cychwyn",
+  "Connecting devices": "Connecting devices",
+  "Restoring adaptive mode": "Restoring adaptive mode",
   "Opening dashboard": "Yn agor y dangosfwrdd",
   "Ready": "Yn barod",
   "Show startup progress": "Dangos cynnydd cychwyn",

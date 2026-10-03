@@ -19,13 +19,13 @@ public sealed class DashboardSegmentedBarTests
         int segments,
         int expected)
     {
-        Assert.Equal(expected, DashboardSegmentedBar.CalculateActiveSegments(value, maximum, segments));
+        Assert.Equal(expected, SegmentedBar.CalculateActiveSegments(value, maximum, segments));
     }
 
     [Fact]
     public void CalculateActiveSegments_InvalidScale_ReturnsZero()
     {
-        Assert.Equal(0, DashboardSegmentedBar.CalculateActiveSegments(50, 0, 20));
-        Assert.Equal(0, DashboardSegmentedBar.CalculateActiveSegments(50, 100, 0));
+        Assert.Equal(0, SegmentedBar.CalculateActiveSegments(50, 0, 20));
+        Assert.Equal(0, SegmentedBar.CalculateActiveSegments(50, 100, 0));
     }
 }

@@ -1,4 +1,4 @@
-﻿{
+{
   "0.1% Low": "0.1% Low",
   "0.1% ms": "0.1% ms",
   "1 - Quiet": "1 - เงียบ",
@@ -616,6 +616,8 @@
   "Configuring services": "กำลังกำหนดค่าบริการ",
   "Initializing sensors": "กำลังเริ่มต้นเซ็นเซอร์",
   "Applying startup settings": "กำลังใช้การตั้งค่าเริ่มต้น",
+  "Connecting devices": "Connecting devices",
+  "Restoring adaptive mode": "Restoring adaptive mode",
   "Opening dashboard": "กำลังเปิดแดชบอร์ด",
   "Ready": "พร้อม",
   "Show startup progress": "แสดงความคืบหน้าเมื่อเริ่มต้น",

@@ -57,6 +57,13 @@
               Width="110"
               Height="110"
               Margin="0,8,0,5">
+            <!-- Background ring (visual base under the accent loading ring) -->
+            <Ellipse Width="100"
+                     Height="100"
+                     Stroke="{DynamicResource ControlFillColorDefaultBrush}"
+                     StrokeThickness="6" />
+
+            <!-- Accent loading ring -->
             <Ellipse Width="100"
                      Height="100"
                      Stroke="{DynamicResource AccentTextFillColorPrimaryBrush}"

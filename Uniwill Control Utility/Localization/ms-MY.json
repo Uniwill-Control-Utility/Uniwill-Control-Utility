@@ -1,4 +1,4 @@
-﻿{
+{
   "0.1% Low": "0.1% Rendah",
   "0.1% ms": "0.1% ms",
   "1 - Quiet": "1 - Senyap",
@@ -616,6 +616,8 @@
   "Configuring services": "Mengkonfigurasi perkhidmatan",
   "Initializing sensors": "Memulakan penderia",
   "Applying startup settings": "Menggunakan tetapan permulaan",
+  "Connecting devices": "Connecting devices",
+  "Restoring adaptive mode": "Restoring adaptive mode",
   "Opening dashboard": "Membuka papan pemuka",
   "Ready": "Sedia",
   "Show startup progress": "Tunjukkan kemajuan permulaan",

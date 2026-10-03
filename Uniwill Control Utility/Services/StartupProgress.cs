@@ -18,6 +18,8 @@ internal enum StartupStage
     InitializingSensors,
     ApplyingStartupSettings,
     StartingServices,
+    ConnectingDevices,
+    RestoringAdaptiveMode,
     PreparingInterface,
     OpeningDashboard,
     Complete
@@ -34,10 +36,12 @@ internal static class StartupProgress
         new StartupProgressState(34, "Configuring services"),
         new StartupProgressState(42, "Loading settings"),
         new StartupProgressState(50, "Detecting hardware"),
-        new StartupProgressState(66, "Initializing sensors"),
-        new StartupProgressState(76, "Applying startup settings"),
-        new StartupProgressState(84, "Starting services"),
-        new StartupProgressState(92, "Preparing interface"),
+        new StartupProgressState(58, "Initializing sensors"),
+        new StartupProgressState(66, "Applying startup settings"),
+        new StartupProgressState(74, "Starting services"),
+        new StartupProgressState(82, "Connecting devices"),
+        new StartupProgressState(88, "Restoring adaptive mode"),
+        new StartupProgressState(94, "Preparing interface"),
         new StartupProgressState(98, "Opening dashboard"),
         new StartupProgressState(100, "Ready")
     };

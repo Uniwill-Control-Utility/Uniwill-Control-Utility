@@ -1,4 +1,4 @@
-﻿{
+{
   "0.1% Low": "%0.1 En Düşük",
   "0.1% ms": "%0.1 ms",
   "1 - Quiet": "1 - Sessiz",
@@ -616,6 +616,8 @@
   "Configuring services": "Hizmetler yapılandırılıyor",
   "Initializing sensors": "Sensörler başlatılıyor",
   "Applying startup settings": "Başlangıç ayarları uygulanıyor",
+  "Connecting devices": "Connecting devices",
+  "Restoring adaptive mode": "Restoring adaptive mode",
   "Opening dashboard": "Ana panel açılıyor",
   "Ready": "Hazır",
   "Show startup progress": "Başlangıç ilerlemesini göster",

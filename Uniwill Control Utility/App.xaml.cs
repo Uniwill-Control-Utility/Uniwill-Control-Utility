@@ -56,7 +56,7 @@ namespace Uniwill_Control_Utility
             return _host?.Services.GetService(typeof(T)) as T;
         }
 
-        internal static readonly string version = "0.9.4.2";
+        internal static readonly string version = "0.9.4.3";
         private Mutex? mutex;
         private const string MutexName = "UniwillControlUtility";
 
@@ -366,6 +366,28 @@ namespace Uniwill_Control_Utility
                     }
                 }
 
+                // Auto-connect devices (Hydro UI, Flydigi cooler) during the
+                // pre-loading phase so the dashboard shows connected state on open.
+                // Only show the progress step if at least one device feature is enabled.
+                if (Settings.Default.EnableHydroUiNavigation || Settings.Default.EnableFlydigi)
+                {
+                    await startupProgressReporter.ReportAsync(StartupStage.ConnectingDevices);
+                }
+                await AutoConnectDevicesAsync();
+
+                // Restore Adaptive Mode override state from previous session.
+                // Only show the progress step if adaptive mode was actually running.
+                if (Settings.Default.isAdaptiveModeRunning)
+                {
+                    await startupProgressReporter.ReportAsync(StartupStage.RestoringAdaptiveMode);
+                }
+                await RestoreAdaptiveModeAsync();
+
+                // Apply startup settings (presets, keyboard RGB, EC fan curve,
+                // battery charge limit) during the pre-loading phase so the main
+                // window appears instantly without waiting for hardware writes.
+                await ApplyStartupSettingsAsync();
+
                 await _host.StartAsync(CancellationToken.None);
 
                 await startupProgressReporter.ReportAsync(StartupStage.Complete);
@@ -376,14 +398,6 @@ namespace Uniwill_Control_Utility
                     startupWindow = null;
                 }
                 startupProgressReporter.Detach();
-
-                // Kick off device auto-connects in parallel so they don't block
-                // the dashboard from appearing.  The dashboard's device cards
-                // already handle late-arriving connections (they toggle visibility).
-                SafeFireAndForget(AutoConnectDevicesAsync());
-
-                // Restore Adaptive Mode override state from previous session.
-                SafeFireAndForget(RestoreAdaptiveModeAsync());
 
                 SafeFireAndForget(RunPostStartupTasksAsync());
             }
@@ -594,14 +608,10 @@ namespace Uniwill_Control_Utility
 
         private static async Task AutoConnectDevicesAsync()
         {
-            // Wait for the Bluetooth stack to stabilize after cold boot.
-            // On restart, BLE devices may not be reachable immediately — the radio
-            // needs time to power on and start advertising. The watercooler's
-            // TryAutoConnectAsync also runs a BLE scan and retries, so this
-            // initial delay gives the system time before discovery begins.
-            await Task.Delay(3000);
-
-            // Auto-connect watercooler on startup if enabled
+            // Auto-connect watercooler on startup if enabled.
+            // Runs during the pre-loading phase so the dashboard shows connected
+            // state on open. Each TryAutoConnectAsync has internal guards:
+            // checks AutoConnect flag, LastDeviceAddress, and _userDisconnected.
             try
             {
                 if (Settings.Default.EnableHydroUiNavigation)
@@ -616,7 +626,7 @@ namespace Uniwill_Control_Utility
                 _logger?.LogError(ex, "Failed to auto-connect watercooler");
             }
 
-            // Auto-connect Flydigi BS2 Pro cooling pad on startup if enabled
+            // Auto-connect Flydigi BS2 Pro cooling pad on startup if enabled.
             try
             {
                 if (Settings.Default.EnableFlydigi)
@@ -631,7 +641,7 @@ namespace Uniwill_Control_Utility
                 _logger?.LogError(ex, "Failed to auto-connect Flydigi cooler");
             }
 
-            // Auto-connect Flydigi BS1 (BLE) cooling pad on startup if enabled
+            // Auto-connect Flydigi BS1 (BLE) cooling pad on startup if enabled.
             try
             {
                 if (Settings.Default.EnableFlydigi)
@@ -679,10 +689,22 @@ namespace Uniwill_Control_Utility
             {
                 _logger?.LogError(ex, "Failed to restore Adaptive Mode override state");
             }
+        }
 
-            // Small delay so the overrides apply after devices have had a
-            // chance to finish connecting (avoids racing with TryAutoConnectAsync).
-            await Task.Delay(500);
+        /// <summary>
+        /// Applies startup settings (presets, keyboard RGB, EC fan curve, battery charge limit)
+        /// during the pre-loading phase. All three run in parallel so the total wait is the
+        /// slowest individual operation — not the sum of all three.
+        /// </summary>
+        private static async Task ApplyStartupSettingsAsync()
+        {
+            // Run keyboard RGB, EC fan control, and preset apply in parallel.
+            // Keyboard RGB has retries (up to ~6s), EC writes are fast, preset
+            // translation varies. Running them concurrently hides all latency.
+            await Task.WhenAll(
+                Views.Windows.MainWindow.ApplyOnStart(),
+                Task.Run(Views.Windows.MainWindow.ApplyEcSettingsOnStart),
+                Views.Windows.MainWindow.AsyncApplyKeyboardOnStart());
         }
 
         private static async Task RunPostStartupTasksAsync()

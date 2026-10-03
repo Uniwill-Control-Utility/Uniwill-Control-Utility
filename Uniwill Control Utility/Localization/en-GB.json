@@ -1,4 +1,4 @@
-﻿{
+{
   "0.1% Low": "0.1% Low",
   "0.1% ms": "0.1% ms",
   "1 - Quiet": "1 - Quiet",
@@ -616,6 +616,8 @@
   "Configuring services": "Configuring services",
   "Initializing sensors": "Initializing sensors",
   "Applying startup settings": "Applying startup settings",
+  "Connecting devices": "Connecting devices",
+  "Restoring adaptive mode": "Restoring adaptive mode",
   "Opening dashboard": "Opening dashboard",
   "Ready": "Ready",
   "Show startup progress": "Show startup progress",

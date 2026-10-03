@@ -74,7 +74,6 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             SetupNavigationService(pageProvider);
             SetupUI();
-            ApplyOnStart();
 
             SystemEvents.PowerModeChanged += HandlePowerModeChange;
 
@@ -229,7 +228,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             return version != null ? $"v{version}" : string.Empty;
         }
 
-        private async void ApplyOnStart()
+        internal static async Task ApplyOnStart()
         {
             try
             {
@@ -466,7 +465,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// The ITE HID controller may not be discoverable immediately on cold boot,
         /// and the app may start minimized to tray (before Dashboard navigation fires).
         /// </summary>
-        private async void AsyncApplyKeyboardOnStart()
+        internal static async Task AsyncApplyKeyboardOnStart()
         {
             // Wait for the system to settle after boot. The HID controller needs
             // time to become discoverable — especially on cold startup.
@@ -509,7 +508,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         }
 
         /// <summary>Applies persisted keyboard RGB settings at app startup using a pre-opened HID service.</summary>
-        private void ApplyKeyboardOnStartWithService(KeyboardHidService hidService)
+        private static void ApplyKeyboardOnStartWithService(KeyboardHidService hidService)
         {
             var settings = KeyboardSettingsService.Load();
 
@@ -644,7 +643,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// Applies EC fan curve and battery charge limit at app startup.
         /// Runs once from mainWindow_Loaded — not on every Dashboard navigation.
         /// </summary>
-        private void ApplyEcSettingsOnStart()
+        internal static void ApplyEcSettingsOnStart()
         {
             var ec = App.GetService<UniwillECService>();
             if (ec is null)
@@ -1390,18 +1389,6 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
 
             _ = Task.Run(PremadePresets.SetPremadePresets);
-
-            // Apply keyboard RGB settings on startup. Runs from mainWindow_Loaded so it
-            // fires regardless of whether the app starts minimized to tray (in which case
-            // DashboardViewModel.OnNavigatedToAsync may not run yet). Uses a delay and
-            // retries because the ITE HID controller may not be discoverable on cold boot.
-            _ = Task.Run(AsyncApplyKeyboardOnStart);
-
-            // Apply EC fan curve and battery charge limit on startup. Runs here instead
-            // of DashboardViewModel.OnNavigatedToAsync so it only fires once at app
-            // launch — not every time the user navigates to the Dashboard page. This
-            // prevents the saved fan curve from overwriting live changes (e.g., Fan Turbo).
-            _ = Task.Run(ApplyEcSettingsOnStart);
 
             // Eagerly instantiate the Adaptive page so its constructor runs (starts the
             // sensor polling timer and auto-starts Adaptive Mode if isStartAdpative is set).
@@ -2214,7 +2201,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// <summary>
         /// Builds a RyzenAdj command string from a CustomPreset, mirroring Presets.buildCommandString().
         /// </summary>
-        private string BuildCustomCommandString(Models.CustomPreset p)
+        private static string BuildCustomCommandString(Models.CustomPreset p)
         {
             var parts = new List<string>();
 
@@ -2248,7 +2235,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// <summary>
         /// Applies a Custom preset on startup: SMU commands, V-F curve, and EC writes.
         /// </summary>
-        private async Task ApplyCustomOnStart(string command, Models.CustomPreset p)
+        private static async Task ApplyCustomOnStart(string command, Models.CustomPreset p)
         {
             await Scripts.RyzenAdj_To_UCU.TranslateAsync(command, appliedName: "Custom Preset", localizeAppliedName: false);
 

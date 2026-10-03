@@ -112,15 +112,15 @@
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" VerticalAlignment="Center" Text="Power" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                <controls:DashboardSegmentedBar x:Name="_cpuPowerBar" Grid.Row="0" Grid.Column="1" Height="9" Margin="10,0" Maximum="300" Segments="20" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                <controls:SegmentedBar x:Name="_cpuPowerBar" Grid.Row="0" Grid.Column="1" Height="9" Margin="10,0" Maximum="300" Segments="20" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
                 <TextBlock x:Name="_cpuPowerLabel" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="Medium" Text="--" />
 
                 <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="Clock" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                <controls:DashboardSegmentedBar x:Name="_cpuClockBar" Grid.Row="1" Grid.Column="1" Height="9" Margin="10,0" Maximum="6000" Segments="20" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                <controls:SegmentedBar x:Name="_cpuClockBar" Grid.Row="1" Grid.Column="1" Height="9" Margin="10,0" Maximum="6000" Segments="20" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
                 <TextBlock x:Name="_cpuClockLabel" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="Medium" Text="--" />
 
                 <TextBlock Grid.Row="2" VerticalAlignment="Center" Text="Fan Speed" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                <controls:DashboardSegmentedBar x:Name="_cpuFanBar" Grid.Row="2" Grid.Column="1" Height="9" Margin="10,0" Maximum="100" Segments="20" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                <controls:SegmentedBar x:Name="_cpuFanBar" Grid.Row="2" Grid.Column="1" Height="9" Margin="10,0" Maximum="100" Segments="20" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
                 <TextBlock x:Name="_cpuFanLabel" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="Medium" Text="--" />
             </Grid>
         </Grid>

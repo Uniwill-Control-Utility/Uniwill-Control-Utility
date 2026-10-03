@@ -31,6 +31,7 @@ namespace Uniwill_Control_Utility.Services
         private readonly IHardwareMonitoringService _hardwareMonitoring;
         private readonly EcTelemetryService _ecTelemetry;
         private readonly OverlaySettingsStore _overlaySettingsStore;
+        private readonly OverlayManagerService _overlayManager;
         private readonly FlydigiCoolerHidService _flydigiCooler;
 
         public TrayQuickControlService(
@@ -40,6 +41,7 @@ namespace Uniwill_Control_Utility.Services
             IHardwareMonitoringService hardwareMonitoring,
             EcTelemetryService ecTelemetry,
             OverlaySettingsStore overlaySettingsStore,
+            OverlayManagerService overlayManager,
             FlydigiCoolerHidService flydigiCooler)
         {
             _ec = ec;
@@ -48,6 +50,7 @@ namespace Uniwill_Control_Utility.Services
             _hardwareMonitoring = hardwareMonitoring;
             _ecTelemetry = ecTelemetry;
             _overlaySettingsStore = overlaySettingsStore;
+            _overlayManager = overlayManager;
             _flydigiCooler = flydigiCooler;
         }
 
@@ -399,6 +402,12 @@ namespace Uniwill_Control_Utility.Services
         {
             var options = _overlaySettingsStore.Current;
             _overlaySettingsStore.Save(options with { Enabled = enabled });
+
+            // Also show/hide the overlay window immediately.
+            if (enabled)
+                _overlayManager.ShowOverlay();
+            else
+                _overlayManager.HideOverlay();
         }
 
         /// <summary>Toggles Flydigi RGB on/off.</summary>
