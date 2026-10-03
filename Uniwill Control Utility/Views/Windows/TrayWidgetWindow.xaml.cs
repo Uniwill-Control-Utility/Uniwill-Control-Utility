@@ -322,7 +322,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         private void ApplyMetrics(TrayQuickTelemetrySnapshot s)
         {
             // CPU hero values
-            CpuTempText.Text = $"{s.CpuTemperature}°";
+            CpuTempText.Text = $"{s.CpuTemperature}°C";
             CpuUsageText.Text = $"{s.CpuUsage}%";
 
             // CPU segmented bars
@@ -334,7 +334,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             CpuFanText.Text = $"{s.CpuFanPercent}%";
 
             // GPU hero values
-            GpuTempText.Text = $"{s.GpuTemperature}°";
+            GpuTempText.Text = $"{s.GpuTemperature}°C";
             GpuUsageText.Text = $"{(int)s.GpuUsage}%";
 
             // GPU segmented bars

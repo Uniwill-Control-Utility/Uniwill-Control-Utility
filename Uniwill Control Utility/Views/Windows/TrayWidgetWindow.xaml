@@ -178,7 +178,7 @@
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center">
                             <TextBlock x:Name="CpuTempText" Style="{StaticResource HeroStyle}"
                                        Foreground="{DynamicResource AccentTextFillColorTertiaryBrush}"
-                                       Text="--°"
+                                       Text="--°C"
                                        HorizontalAlignment="Center" />
                         </StackPanel>
 
@@ -271,7 +271,7 @@
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center">
                             <TextBlock x:Name="GpuTempText" Style="{StaticResource HeroStyle}"
                                        Foreground="{DynamicResource AccentTextFillColorTertiaryBrush}"
-                                       Text="--°" HorizontalAlignment="Center" />
+                                       Text="--°C" HorizontalAlignment="Center" />
                         </StackPanel>
 
                         <Border Grid.Column="1" Margin="0,8"
@@ -351,7 +351,7 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
                     <ToggleButton x:Name="BtnAdaptiveMode"
-                                   Width="92"
+                                   Width="95"
                                    Height="46"
                                    Style="{StaticResource QuickToggleStyle}"
                                    Tag="Adaptive"
@@ -379,7 +379,7 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
                     <ToggleButton x:Name="BtnKeyboardBacklight"
-                                   Width="92"
+                                   Width="95"
                                    Height="46"
                                    Style="{StaticResource QuickToggleStyle}"
                                    Tag="Keyboard"
@@ -407,7 +407,7 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
                     <ToggleButton x:Name="BtnLightBar"
-                                   Width="92"
+                                   Width="95"
                                    Height="46"
                                    Style="{StaticResource QuickToggleStyle}"
                                    Tag="LightBar"
@@ -435,7 +435,7 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
                     <ToggleButton x:Name="BtnFanSmartMode"
-                                   Width="92"
+                                   Width="95"
                                    Height="46"
                                    Style="{StaticResource QuickToggleStyle}"
                                    Tag="FanControl"
@@ -465,7 +465,7 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
                     <ToggleButton x:Name="BtnOverlay"
-                                   Width="92"
+                                   Width="95"
                                    Height="46"
                                    Style="{StaticResource QuickToggleStyle}"
                                    Tag="OverlaySettingsPage"
@@ -493,7 +493,7 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
                     <ToggleButton x:Name="BtnLocalDimming"
-                                   Width="92"
+                                   Width="95"
                                    Height="46"
                                    Style="{StaticResource QuickToggleStyle}"
                                    Tag="SettingsPage"
@@ -521,7 +521,7 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
                     <ToggleButton x:Name="BtnHydroSmartMode"
-                                   Width="92"
+                                   Width="95"
                                    Height="46"
                                    Style="{StaticResource QuickToggleStyle}"
                                    Tag="Watercooler"
@@ -551,7 +551,7 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
                     <ToggleButton x:Name="BtnHydroRgb"
-                                   Width="92"
+                                   Width="95"
                                    Height="46"
                                    Style="{StaticResource QuickToggleStyle}"
                                    Tag="Watercooler"
@@ -579,7 +579,7 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
                     <ToggleButton x:Name="BtnFlydigiRgb"
-                                   Width="92"
+                                   Width="95"
                                    Height="46"
                                    Style="{StaticResource QuickToggleStyle}"
                                    Tag="FlydigiCooler"
