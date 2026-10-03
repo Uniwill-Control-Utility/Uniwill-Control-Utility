@@ -27,11 +27,15 @@ public sealed class TrayWidgetControllerTests
     private sealed class FakeTrayWidget : ITrayWidget
     {
         public int ToggleCount { get; private set; }
+        public bool IsVisible { get; private set; }
 
         public Task ToggleAsync()
         {
             ToggleCount++;
+            IsVisible = !IsVisible;
             return Task.CompletedTask;
         }
+
+        public void Hide() => IsVisible = false;
     }
 }

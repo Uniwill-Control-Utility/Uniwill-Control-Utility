@@ -620,6 +620,18 @@ namespace Uniwill_Control_Utility.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool AdaptiveEcFanEnabled {
+            get {
+                return ((bool)(this["AdaptiveEcFanEnabled"]));
+            }
+            set {
+                this["AdaptiveEcFanEnabled"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool isTrack {
             get {
                 return ((bool)(this["isTrack"]));

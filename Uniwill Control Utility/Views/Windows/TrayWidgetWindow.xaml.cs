@@ -1,17 +1,16 @@
 using System;
-using System.Globalization;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
-using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Services;
+using Wpf.Ui.Appearance;
+using Wpf.Ui.Controls;
 using Screen = System.Windows.Forms.Screen;
 
 namespace Uniwill_Control_Utility.Views.Windows
@@ -19,12 +18,10 @@ namespace Uniwill_Control_Utility.Views.Windows
     public partial class TrayWidgetWindow : ITrayWidget
     {
         private readonly TrayQuickControlService _quickControl;
-        private readonly DispatcherTimer _telemetryTimer;
+        private readonly DispatcherTimer _refreshTimer;
         private bool _loading;
         private bool _applying;
-        private string[] _presetNames = Array.Empty<string>();
-        private string _selectedPreset = "Gaming";
-        private int _refreshRate;
+        private bool _showing;
         private System.Drawing.Point _placementAnchor;
         private string? _placementScreenDeviceName;
 
@@ -32,14 +29,13 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             _quickControl = quickControl;
             InitializeComponent();
-            PopulateHydroOptions();
+            SystemThemeWatcher.Watch(this, Wpf.Ui.Controls.WindowBackdropType.Mica, true);
 
-            _telemetryTimer = new DispatcherTimer
+            _refreshTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromSeconds(1),
-                IsEnabled = false
+                Interval = TimeSpan.FromSeconds(2)
             };
-            _telemetryTimer.Tick += TelemetryTimer_Tick;
+            _refreshTimer.Tick += (s, e) => UpdateMetrics();
         }
 
         public async Task ToggleAsync()
@@ -52,202 +48,257 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             CapturePlacementAnchor();
             _loading = true;
-            StatusText.Text = "Loading…";
+            _showing = true;
+
             Show();
             UpdateLayout();
             PositionNearTray();
             Activate();
+            _refreshTimer.Start();
 
             try
             {
                 TrayQuickControlSnapshot snapshot = await Task.Run(_quickControl.GetSnapshot);
                 ApplySnapshot(snapshot);
-                ApplyTelemetry(_quickControl.GetTelemetrySnapshot());
+                UpdateMetrics();
                 UpdateLayout();
                 PositionNearTray();
-                _telemetryTimer.Start();
-                StatusText.Text = "Ready";
             }
-            catch (Exception ex)
+            catch
             {
-                StatusText.Text = ex.Message;
+                // Silently fail — no status text to show
             }
             finally
             {
                 _loading = false;
             }
 
+            // Small delay before enabling deactivate-to-hide, so the window
+            // doesn't immediately close on the initial activation/deactivation flicker.
+            await Task.Delay(200);
+            _showing = false;
         }
 
         private void ApplySnapshot(TrayQuickControlSnapshot snapshot)
         {
-            _presetNames = snapshot.PresetNames;
-            _selectedPreset = snapshot.SelectedPreset;
-            _refreshRate = snapshot.RefreshRate;
-            PresetButtons.ItemsSource = TrayPresetOptions.Build(_presetNames, _selectedPreset);
-            PresetButtons.IsEnabled = snapshot.Policy.PresetEnabled;
+            var policy = snapshot.Policy;
 
-            FullFanButton.IsChecked = snapshot.FullFanEnabled;
-            FullFanButton.IsEnabled = snapshot.Policy.FullFanEnabled;
+            ApplyToggle(SlotAdaptiveMode, BtnAdaptiveMode, policy.ShowAdaptiveMode, snapshot.AdaptiveModeRunning, false);
+            ApplyToggle(SlotHydroSmartMode, BtnHydroSmartMode, policy.ShowHydroSmartMode, snapshot.HydroSmartMode, policy.DisableHydroSmartMode);
+            ApplyToggle(SlotHydroRgb, BtnHydroRgb, policy.ShowHydroRgb, snapshot.HydroRgbOn, policy.DisableHydroRgb);
+            ApplyToggle(SlotKeyboardBacklight, BtnKeyboardBacklight, policy.ShowKeyboardBacklight, snapshot.KeyboardRgbOn, policy.DisableKeyboardBacklight);
+            ApplyToggle(SlotLightBar, BtnLightBar, policy.ShowLightBar, snapshot.LightBarOn, policy.DisableLightBar);
+            ApplyToggle(SlotFanSmartMode, BtnFanSmartMode, policy.ShowFanSmartMode, snapshot.FanSmartMode, policy.DisableFanSmartMode);
+            ApplyToggle(SlotLocalDimming, BtnLocalDimming, policy.ShowLocalDimming, snapshot.LocalDimmingOn, false);
+            ApplyToggle(SlotOverlay, BtnOverlay, policy.ShowOverlay, snapshot.OverlayOn, false);
+            ApplyToggle(SlotFlydigiRgb, BtnFlydigiRgb, policy.ShowFlydigiRgb, snapshot.FlydigiRgbOn, policy.DisableFlydigiRgb);
 
-            RefreshRateComboBox.ItemsSource = snapshot.RefreshRates.Select(rate => $"{rate} Hz").ToArray();
-            RefreshRateComboBox.SelectedItem = $"{snapshot.RefreshRate} Hz";
-            DisplayRow.Visibility = snapshot.RefreshRates.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
-
-            HydroRow.Visibility = snapshot.Policy.ShowHydro ? Visibility.Visible : Visibility.Collapsed;
-            PumpComboBox.IsEnabled = snapshot.Policy.HydroEnabled;
-            HydroFanComboBox.IsEnabled = snapshot.Policy.HydroEnabled;
-            PumpComboBox.SelectedValue = snapshot.PumpVoltage;
-            HydroFanComboBox.SelectedValue = snapshot.FanSpeed;
-
-            UpdateHeaderContext();
+            // Recalculate UniformGrid rows based on visible children so collapsed
+            // items don't leave gaps and buttons flow left-to-right, top-to-bottom.
+            UpdateButtonGridRows();
         }
 
-        private void TelemetryTimer_Tick(object? sender, EventArgs e)
+        private static void ApplyToggle(
+            System.Windows.Controls.Panel panel,
+            System.Windows.Controls.Primitives.ToggleButton button,
+            bool visible,
+            bool isChecked,
+            bool isDisabled)
         {
-            if (!IsVisible)
-                return;
+            panel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            button.IsChecked = isChecked;
+            button.IsEnabled = !isDisabled;
+        }
 
-            try
+        private void UpdateButtonGridRows()
+        {
+            const int Columns = 3;
+            const int RowGap = 24;
+
+            // Collect visible children in order.
+            var visible = new List<FrameworkElement>();
+            foreach (FrameworkElement child in ButtonsGrid.Children)
             {
-                ApplyTelemetry(_quickControl.GetTelemetrySnapshot());
+                if (child.Visibility == Visibility.Visible)
+                    visible.Add(child);
             }
-            catch
+
+            int visibleCount = visible.Count;
+            int rowCount = visibleCount > 0 ? (visibleCount + Columns - 1) / Columns : 0;
+
+            // Build row definitions: one Auto row per content row, plus a spacer row between each.
+            ButtonsGrid.RowDefinitions.Clear();
+            for (int r = 0; r < rowCount; r++)
             {
-                // Keep the last cached sample when a transient read is unavailable.
+                ButtonsGrid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = new GridLength(0, GridUnitType.Auto) });
+                if (r < rowCount - 1)
+                {
+                    ButtonsGrid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = new GridLength(RowGap) });
+                }
+            }
+
+            // Assign each visible slot to the correct Grid.Row and column, clear margins.
+            for (int i = 0; i < visibleCount; i++)
+            {
+                int col = i % Columns;
+                int contentRow = (i / Columns) * 2; // 0, 2, 4, ... (spacer rows are 1, 3, ...)
+                System.Windows.Controls.Grid.SetRow(visible[i], contentRow);
+                System.Windows.Controls.Grid.SetColumn(visible[i], col);
+                visible[i].Margin = new System.Windows.Thickness(0);
+            }
+
+            // Hide any collapsed children by clearing their row (they stay in Children but invisible).
+            foreach (FrameworkElement child in ButtonsGrid.Children)
+            {
+                if (child.Visibility != Visibility.Visible)
+                {
+                    System.Windows.Controls.Grid.SetRow(child, -1);
+                }
             }
         }
 
-        private void ApplyTelemetry(TrayQuickTelemetrySnapshot telemetry)
+        #region Toggle Handlers
+
+        private async void BtnAdaptiveMode_Click(object sender, RoutedEventArgs e)
         {
-            CpuTemperatureText.Text = telemetry.CpuTemperature > 0 ? $"{telemetry.CpuTemperature}°" : "--°";
-            CpuFanText.Text = $"{telemetry.CpuFanPercent}% fan";
-            CpuPowerText.Text = telemetry.CpuPowerWatts > 0 ? $"{telemetry.CpuPowerWatts} W" : "-- W";
-            CpuClockText.Text = FormatClock(telemetry.CpuClockMhz);
-            CpuUsageText.Text = $"{telemetry.CpuUsage}%";
-            CpuUsageBar.Value = telemetry.CpuUsage;
-            SetTemperatureArc(CpuTemperatureArc, telemetry.CpuTemperature);
-
-            GpuTemperatureText.Text = telemetry.GpuTemperature > 0 ? $"{telemetry.GpuTemperature}°" : "--°";
-            GpuFanText.Text = $"{telemetry.GpuFanPercent}% fan";
-            GpuPowerText.Text = telemetry.GpuPowerWatts > 0 ? $"{telemetry.GpuPowerWatts} W" : "-- W";
-            GpuClockText.Text = FormatClock(telemetry.GpuClockMhz);
-            GpuUsageText.Text = $"{telemetry.GpuUsage:F0}%";
-            GpuUsageBar.Value = telemetry.GpuUsage;
-            SetTemperatureArc(GpuTemperatureArc, telemetry.GpuTemperature);
-
-            TrayPowerConsumptionDisplay power = TrayPowerConsumptionDisplay.Create(
-                telemetry.CpuPowerWatts,
-                telemetry.GpuPowerWatts);
-            CpuTdpValueText.Text = power.CpuTdp;
-            GpuTgpValueText.Text = power.GpuTgp;
-        }
-
-        private static string FormatClock(int clockMhz) =>
-            clockMhz > 0 ? $"{clockMhz / 1000.0:F1} GHz" : "-- GHz";
-
-        private static void SetTemperatureArc(ArcSegment arc, int temperature)
-        {
-            const double center = 30;
-            const double radius = 27;
-            double progress = Math.Clamp(temperature, 0, 100) / 100.0;
-            double angle = progress * 359.9;
-            double radians = (angle - 90) * Math.PI / 180.0;
-
-            arc.Point = new Point(
-                center + radius * Math.Cos(radians),
-                center + radius * Math.Sin(radians));
-            arc.IsLargeArc = angle > 180;
-        }
-
-        private async void PresetButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not RadioButton { DataContext: TrayPresetOption option })
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
                 return;
 
-            bool applied = await ApplyAsync(() => _quickControl.ApplyPresetAsync(option.Name), $"Preset: {option.Name}");
-            if (applied)
-                _selectedPreset = option.Name;
-
-            PresetButtons.ItemsSource = TrayPresetOptions.Build(_presetNames, _selectedPreset);
-            UpdateHeaderContext();
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
+            {
+                await _quickControl.SetAdaptiveModeAsync(enabled);
+            });
         }
 
-        private async void FullFanButton_Click(object sender, RoutedEventArgs e)
+        private async void BtnHydroSmartMode_Click(object sender, RoutedEventArgs e)
         {
-            if (_loading || _applying)
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
                 return;
 
-            bool enabled = FullFanButton.IsChecked == true;
-            await SetFullFanStateAsync(enabled);
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
+            {
+                await _quickControl.SetHydroSmartModeAsync(enabled);
+            });
         }
 
-        private async Task SetFullFanStateAsync(bool enabled)
+        private async void BtnHydroRgb_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
+                return;
+
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
+            {
+                await _quickControl.SetHydroRgbAsync(enabled);
+            });
+        }
+
+        private async void BtnKeyboardBacklight_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
+                return;
+
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
+            {
+                _quickControl.SetKeyboardBacklight(enabled);
+                await Task.CompletedTask;
+            });
+        }
+
+        private async void BtnLightBar_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
+                return;
+
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
+            {
+                _quickControl.SetLightBar(enabled);
+                await Task.CompletedTask;
+            });
+        }
+
+        private async void BtnFanSmartMode_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
+                return;
+
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
+            {
+                _quickControl.SetFanSmartMode(enabled);
+                await Task.CompletedTask;
+            });
+        }
+
+        private async void BtnLocalDimming_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
+                return;
+
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
+            {
+                bool success = await _quickControl.SetLocalDimmingAsync(enabled);
+                if (!success)
+                {
+                    // Revert toggle on failure
+                    Application.Current.Dispatcher.Invoke(() => btn.IsChecked = !enabled);
+                }
+            });
+        }
+
+        private async void BtnOverlay_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
+                return;
+
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
+            {
+                _quickControl.SetOverlay(enabled);
+                await Task.CompletedTask;
+            });
+        }
+
+        private async void BtnFlydigiRgb_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
+                return;
+
+            bool enabled = btn.IsChecked == true;
+            await ApplyAsync(async () =>
+            {
+                await _quickControl.SetFlydigiRgbAsync(enabled);
+            });
+        }
+
+        #endregion
+
+        private async Task ApplyAsync(Func<Task> action)
         {
             _applying = true;
-            FullFanButton.IsEnabled = false;
-            StatusText.Text = enabled ? "Enabling full fan…" : "Restoring fan control…";
-            try
-            {
-                await _quickControl.SetFullFanAsync(enabled);
-                FullFanButton.IsChecked = _quickControl.IsFullFanActive;
-                StatusText.Text = enabled ? "Full fan enabled" : "Fan control restored";
-            }
-            catch (Exception ex)
-            {
-                FullFanButton.IsChecked = _quickControl.IsFullFanActive;
-                StatusText.Text = ex.Message;
-            }
-            finally
-            {
-                FullFanButton.IsEnabled = true;
-                _applying = false;
-            }
-        }
-
-        private async void RefreshRateComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_loading || _applying || RefreshRateComboBox.SelectedItem is not string text || !TryReadLeadingInt(text, out int hz))
-                return;
-
-            bool applied = await ApplyAsync(() => _quickControl.SetRefreshRateAsync(hz), $"Display: {hz} Hz");
-            if (applied)
-            {
-                _refreshRate = hz;
-                UpdateHeaderContext();
-            }
-        }
-
-        private async void PumpComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_loading || _applying || PumpComboBox.SelectedValue is not PumpVoltage voltage)
-                return;
-
-            await ApplyAsync(() => _quickControl.SetHydroPumpAsync(voltage), $"Hydro pump: {PumpComboBox.Text}");
-        }
-
-        private async void HydroFanComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_loading || _applying || HydroFanComboBox.SelectedValue is not FanSpeed speed)
-                return;
-
-            await ApplyAsync(() => _quickControl.SetHydroFanAsync(speed), $"Hydro fan: {HydroFanComboBox.Text}");
-        }
-
-        private async Task<bool> ApplyAsync(Func<Task> action, string successStatus)
-        {
-            _applying = true;
-            StatusText.Text = "Applying…";
             try
             {
                 await action();
-                StatusText.Text = successStatus;
-                return true;
+
+                // Re-fetch snapshot to update button enabled states after any change.
+                try
+                {
+                    var snapshot = await Task.Run(_quickControl.GetSnapshot);
+                    ApplySnapshot(snapshot);
+                }
+                catch
+                {
+                    // Ignore — snapshot refresh is best-effort
+                }
             }
-            catch (Exception ex)
+            catch
             {
-                StatusText.Text = ex.Message;
-                return false;
+                // Silently fail
             }
             finally
             {
@@ -255,32 +306,44 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
         }
 
-        private void UpdateHeaderContext()
+        private void UpdateMetrics()
         {
-            HeaderContextText.Text = _refreshRate > 0
-                ? $"{_selectedPreset} · {_refreshRate} Hz"
-                : _selectedPreset;
+            try
+            {
+                var snapshot = _quickControl.GetTelemetrySnapshot();
+                ApplyMetrics(snapshot);
+            }
+            catch
+            {
+                // Silently fail — metrics are best-effort
+            }
         }
 
-        private void PopulateHydroOptions()
+        private void ApplyMetrics(TrayQuickTelemetrySnapshot s)
         {
-            PumpComboBox.DisplayMemberPath = nameof(Option<PumpVoltage>.Label);
-            PumpComboBox.SelectedValuePath = nameof(Option<PumpVoltage>.Value);
-            PumpComboBox.ItemsSource = new[]
-            {
-                new Option<PumpVoltage>("Pump · Off", PumpVoltage.Off), new Option<PumpVoltage>("Pump · 7 V", PumpVoltage.V7),
-                new Option<PumpVoltage>("Pump · 8 V", PumpVoltage.V8), new Option<PumpVoltage>("Pump · 11 V", PumpVoltage.V11)
-            };
+            // CPU hero values
+            CpuTempText.Text = $"{s.CpuTemperature}°C";
+            CpuUsageText.Text = $"{s.CpuUsage}%";
 
-            HydroFanComboBox.DisplayMemberPath = nameof(Option<FanSpeed>.Label);
-            HydroFanComboBox.SelectedValuePath = nameof(Option<FanSpeed>.Value);
-            HydroFanComboBox.ItemsSource = new[]
-            {
-                new Option<FanSpeed>("Fan · Off", FanSpeed.Off), new Option<FanSpeed>("Fan · 25%", FanSpeed.Percent25),
-                new Option<FanSpeed>("Fan · 50%", FanSpeed.Percent50), new Option<FanSpeed>("Fan · 75%", FanSpeed.Percent75),
-                new Option<FanSpeed>("Fan · 90%", FanSpeed.Percent90), new Option<FanSpeed>("Fan · 95%", FanSpeed.Percent95),
-                new Option<FanSpeed>("Fan · 100%", FanSpeed.Percent100)
-            };
+            // CPU segmented bars
+            CpuPowerBar.Value = s.CpuPowerWatts;
+            CpuPowerText.Text = $"{s.CpuPowerWatts} W";
+            CpuClockBar.Value = s.CpuClockMhz;
+            CpuClockText.Text = $"{s.CpuClockMhz / 1000.0:F1} GHz";
+            CpuFanBar.Value = s.CpuFanPercent;
+            CpuFanText.Text = $"{s.CpuFanPercent}%";
+
+            // GPU hero values
+            GpuTempText.Text = $"{s.GpuTemperature}°C";
+            GpuUsageText.Text = $"{(int)s.GpuUsage}%";
+
+            // GPU segmented bars
+            GpuPowerBar.Value = s.GpuPowerWatts;
+            GpuPowerText.Text = $"{s.GpuPowerWatts} W";
+            GpuClockBar.Value = s.GpuClockMhz;
+            GpuClockText.Text = $"{s.GpuClockMhz / 1000.0:F1} GHz";
+            GpuFanBar.Value = s.GpuFanPercent;
+            GpuFanText.Text = $"{s.GpuFanPercent}%";
         }
 
         private void PositionNearTray()
@@ -289,14 +352,16 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (handle == IntPtr.Zero || !GetWindowRect(handle, out NativeRect windowRect))
                 return;
 
+            var windowSize = new System.Drawing.Size(
+                windowRect.Right - windowRect.Left,
+                windowRect.Bottom - windowRect.Top);
+
             Screen screen = Screen.AllScreens.FirstOrDefault(candidate =>
                 string.Equals(
                     candidate.DeviceName,
                     _placementScreenDeviceName,
                     StringComparison.OrdinalIgnoreCase)) ?? Screen.FromHandle(handle);
-            var windowSize = new System.Drawing.Size(
-                windowRect.Right - windowRect.Left,
-                windowRect.Bottom - windowRect.Top);
+
             TrayWidgetPlacementResult placement = TrayWidgetPlacement.Calculate(
                 screen.Bounds,
                 screen.WorkingArea,
@@ -405,33 +470,21 @@ namespace Uniwill_Control_Utility.Views.Windows
         private void Window_DpiChanged(object sender, DpiChangedEventArgs e) =>
             Dispatcher.BeginInvoke(PositionNearTray, DispatcherPriority.Loaded);
 
-        private static bool TryReadLeadingInt(string text, out int value)
-        {
-            string token = text.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
-            return int.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
-        }
-
-        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.LeftButton == MouseButtonState.Pressed)
-                DragMove();
-        }
-
         private void HideWidget()
         {
-            _telemetryTimer.Stop();
+            _refreshTimer.Stop();
             Hide();
         }
 
-        private void CloseButton_Click(object sender, RoutedEventArgs e) => HideWidget();
-
         private void Window_Deactivated(object sender, EventArgs e)
         {
-            if (!_applying)
-                HideWidget();
+            if (_showing || _applying)
+                return;
+
+            HideWidget();
         }
 
-        private void Window_Closed(object? sender, EventArgs e) => _telemetryTimer.Stop();
+        private void Window_Closed(object? sender, EventArgs e) { }
 
         private void OpenUcuButton_Click(object sender, RoutedEventArgs e)
         {
@@ -443,6 +496,49 @@ namespace Uniwill_Control_Utility.Views.Windows
             mainWindow.Show();
             mainWindow.WindowState = WindowState.Normal;
             mainWindow.Activate();
+        }
+
+        private void NavigateContextMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            // Store the source button's Tag in the context menu so the click handler
+            // knows which page to navigate to.
+            if (sender is System.Windows.Controls.ContextMenu menu && menu.PlacementTarget is System.Windows.Controls.Primitives.ToggleButton btn)
+                menu.Tag = btn.Tag;
+        }
+
+        private void GoToUcuMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            HideWidget();
+
+            if (sender is not System.Windows.Controls.MenuItem item || item.Parent is not System.Windows.Controls.ContextMenu menu)
+                return;
+            if (menu.Tag is not string tagName)
+                return;
+
+            MainWindow? mainWindow = MainWindow.Instance;
+            if (mainWindow is null)
+                return;
+
+            mainWindow.Show();
+            mainWindow.WindowState = WindowState.Normal;
+            mainWindow.Activate();
+
+            // Navigate to the page matching the button's Tag.
+            Type? pageType = tagName switch
+            {
+                "Adaptive" => typeof(Views.Pages.Adaptive),
+                "Watercooler" => typeof(Views.Pages.Watercooler),
+                "Keyboard" => typeof(Views.Pages.Keyboard),
+                "LightBar" => typeof(Views.Pages.LightBar),
+                "FanControl" => typeof(Views.Pages.FanControl),
+                "SettingsPage" => typeof(Views.Pages.SettingsPage),
+                "OverlaySettingsPage" => typeof(Views.Pages.OverlaySettingsPage),
+                "FlydigiCooler" => typeof(Views.Pages.FlydigiCooler),
+                _ => null
+            };
+
+            if (pageType is not null)
+                mainWindow.Navigate(pageType);
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -502,7 +598,5 @@ namespace Uniwill_Control_Utility.Views.Windows
             int width,
             int height,
             SetWindowPosFlags flags);
-
-        private sealed record Option<T>(string Label, T Value);
     }
 }

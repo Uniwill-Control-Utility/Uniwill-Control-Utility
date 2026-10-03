@@ -88,7 +88,21 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// <summary>Toggles the compact quick-control widget when the tray icon is left-clicked.</summary>
         private void NotifyIcon_LeftClick(Wpf.Ui.Tray.Controls.NotifyIcon sender, RoutedEventArgs e)
         {
+            // If the main window is already visible and active, just hide the tray widget
+            // instead of toggling it open (main window takes priority).
+            if (this.IsActive && this.Visibility == Visibility.Visible)
+            {
+                _trayWidget.HideIfVisible();
+                return;
+            }
+
             _ = _trayWidget.ToggleAsync();
+        }
+
+        /// <summary>When the main window is activated, hide the tray widget (mutual exclusivity).</summary>
+        private void MainWindow_Activated(object? sender, EventArgs e)
+        {
+            _trayWidget.HideIfVisible();
         }
 
         private void TrayMenu_Opened(object sender, RoutedEventArgs e)
@@ -999,66 +1013,75 @@ namespace Uniwill_Control_Utility.Views.Windows
                             }
 
                             // Auto-reconnect Hydro UI watercooler.
-                            var waterCoolerService = App.GetService<WaterCoolerService>();
-                            if (waterCoolerService != null)
+                            if (Properties.Settings.Default.EnableHydroUiNavigation)
                             {
-                                // If the service still thinks it's connected, the BLE link is a
-                                // zombie - force a disconnect before attempting reconnect.
-                                if (waterCoolerService.IsConnected)
+                                var waterCoolerService = App.GetService<WaterCoolerService>();
+                                if (waterCoolerService != null)
                                 {
-                                    Debug.WriteLine("[WaterCooler] Resuming from sleep - disconnecting zombie BLE link");
-                                    await waterCoolerService.DisconnectAsync();
-                                    await Task.Delay(500);
-                                }
+                                    // If the service still thinks it's connected, the BLE link is a
+                                    // zombie - force a disconnect before attempting reconnect.
+                                    if (waterCoolerService.IsConnected)
+                                    {
+                                        Debug.WriteLine("[WaterCooler] Resuming from sleep - disconnecting zombie BLE link");
+                                        await waterCoolerService.DisconnectAsync();
+                                        await Task.Delay(500);
+                                    }
 
-                                bool connected = await waterCoolerService.TryAutoConnectAsync();
-                                if (connected)
-                                    Debug.WriteLine("[WaterCooler] Auto-reconnected after system resume");
+                                    bool connected = await waterCoolerService.TryAutoConnectAsync();
+                                    if (connected)
+                                        Debug.WriteLine("[WaterCooler] Auto-reconnected after system resume");
+                                }
                             }
 
                             // Resume Flydigi cooler (HID) background services.
-                            var flydigiService = App.GetService<FlydigiCoolerHidService>();
-                            if (flydigiService != null)
+                            if (Properties.Settings.Default.EnableFlydigi)
                             {
-                                try
+                                var flydigiService = App.GetService<FlydigiCoolerHidService>();
+                                if (flydigiService != null)
                                 {
-                                    // If the service still thinks it's connected, the HID link
-                                    // may be stale after hibernate — reconnect.
-                                    if (flydigiService.IsConnected)
+                                    try
                                     {
-                                        Debug.WriteLine("[Flydigi] Resuming from sleep - disconnecting stale HID link");
-                                        flydigiService.DisconnectAsync();
-                                        Task.Delay(500).Wait();
-                                    }
+                                        // If the service still thinks it's connected, the HID link
+                                        // may be stale after hibernate — reconnect.
+                                        if (flydigiService.IsConnected)
+                                        {
+                                            Debug.WriteLine("[Flydigi] Resuming from sleep - disconnecting stale HID link");
+                                            flydigiService.DisconnectAsync();
+                                            Task.Delay(500).Wait();
+                                        }
 
-                                    flydigiService.ResumeBackgroundServices();
-                                    Debug.WriteLine("[Flydigi] Background services resumed after system resume");
-                                }
-                                catch (Exception ex)
-                                {
-                                    Debug.WriteLine($"[Flydigi] Resume failed: {ex.Message}");
+                                        flydigiService.ResumeBackgroundServices();
+                                        Debug.WriteLine("[Flydigi] Background services resumed after system resume");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Debug.WriteLine($"[Flydigi] Resume failed: {ex.Message}");
+                                    }
                                 }
                             }
 
                             // Resume BS1 cooler (BLE) background services.
-                            var bs1Service = App.GetService<FlydigiCoolerBleService>();
-                            if (bs1Service != null)
+                            if (Properties.Settings.Default.EnableFlydigi)
                             {
-                                try
+                                var bs1Service = App.GetService<FlydigiCoolerBleService>();
+                                if (bs1Service != null)
                                 {
-                                    if (bs1Service.IsConnected)
+                                    try
                                     {
-                                        Debug.WriteLine("[BS1] Resuming from sleep - disconnecting zombie BLE link");
-                                        bs1Service.DisconnectAsync();
-                                        await Task.Delay(500);
-                                    }
+                                        if (bs1Service.IsConnected)
+                                        {
+                                            Debug.WriteLine("[BS1] Resuming from sleep - disconnecting zombie BLE link");
+                                            bs1Service.DisconnectAsync();
+                                            await Task.Delay(500);
+                                        }
 
-                                    bs1Service.ResumeBackgroundServices();
-                                    Debug.WriteLine("[BS1] Background services resumed after system resume");
-                                }
-                                catch (Exception ex)
-                                {
-                                    Debug.WriteLine($"[BS1] Resume failed: {ex.Message}");
+                                        bs1Service.ResumeBackgroundServices();
+                                        Debug.WriteLine("[BS1] Background services resumed after system resume");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Debug.WriteLine($"[BS1] Resume failed: {ex.Message}");
+                                    }
                                 }
                             }
                         }

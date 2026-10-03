@@ -24,7 +24,8 @@
     mc:Ignorable="d"
     Loaded="mainWindow_Loaded"
     StateChanged="UiWindow_StateChanged"
-    Closing="UiWindow_Closing">
+    Closing="UiWindow_Closing"
+    Activated="MainWindow_Activated">
 
     <ui:FluentWindow.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />

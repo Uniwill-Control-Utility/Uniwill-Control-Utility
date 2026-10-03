@@ -6,9 +6,9 @@ namespace Uniwill_Control_Utility.Tests.Services;
 public sealed class TrayPresetOptionsTests
 {
     [Fact]
-    public void ProfileNames_MatchTheFourTopLevelPresetPageButtons()
+    public void ProfileNames_ContainsOnlyFixedPresets()
     {
-        Assert.Equal(["Office", "Gaming", "Turbo", "Custom"], TrayPresetOptions.ProfileNames);
+        Assert.Equal(["Office", "Gaming", "Turbo"], TrayPresetOptions.ProfileNames);
     }
 
     [Fact]
@@ -59,5 +59,24 @@ public sealed class TrayPresetOptionsTests
             slotHasChanges: false);
 
         Assert.Equal("Custom", key);
+    }
+
+    [Fact]
+    public void IsCustomPreset_ReturnsTrueForCustomVariants()
+    {
+        Assert.True(TrayPresetOptions.IsCustomPreset("Custom"));
+        Assert.True(TrayPresetOptions.IsCustomPreset("Custom 1"));
+        Assert.True(TrayPresetOptions.IsCustomPreset("Custom 1 (Boost)"));
+        Assert.True(TrayPresetOptions.IsCustomPreset("custom 5"));
+        Assert.False(TrayPresetOptions.IsCustomPreset("Gaming"));
+        Assert.False(TrayPresetOptions.IsCustomPreset("Office"));
+    }
+
+    [Fact]
+    public void CustomPresetDisplayName_FormatsCorrectly()
+    {
+        Assert.Equal("Custom 1", TrayPresetOptions.CustomPresetDisplayName(0, isPowerBoostMode: false));
+        Assert.Equal("Custom 3 (Boost)", TrayPresetOptions.CustomPresetDisplayName(2, isPowerBoostMode: true));
+        Assert.Equal("Custom 5 (Boost)", TrayPresetOptions.CustomPresetDisplayName(4, isPowerBoostMode: true));
     }
 }

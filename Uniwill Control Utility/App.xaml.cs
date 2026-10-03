@@ -604,9 +604,12 @@ namespace Uniwill_Control_Utility
             // Auto-connect watercooler on startup if enabled
             try
             {
-                var waterCoolerService = _host?.Services.GetService<WaterCoolerService>();
-                if (waterCoolerService != null && WaterCoolerHardwareDetector.IsSupportedHardware())
-                    await waterCoolerService.TryAutoConnectAsync();
+                if (Settings.Default.EnableHydroUiNavigation)
+                {
+                    var waterCoolerService = _host?.Services.GetService<WaterCoolerService>();
+                    if (waterCoolerService != null && WaterCoolerHardwareDetector.IsSupportedHardware())
+                        await waterCoolerService.TryAutoConnectAsync();
+                }
             }
             catch (Exception ex)
             {
@@ -661,6 +664,15 @@ namespace Uniwill_Control_Utility
 
                     if (Settings.Default.AdaptiveKeyboardEnabled)
                         deviceApplier.EnableKeyboardOverride();
+
+                    if (Settings.Default.AdaptiveEcFanEnabled)
+                        deviceApplier.EnableEcFanOverride();
+
+                    if (Settings.Default.AdaptiveLbEnabled)
+                        deviceApplier.EnableLightBarOverride();
+
+                    if (Settings.Default.AdaptiveCpuEnabled || Settings.Default.AdaptiveGpuEnabled)
+                        deviceApplier.EnableCpuGpuOverride();
                 }
             }
             catch (Exception ex)

@@ -739,7 +739,23 @@ namespace Uniwill_Control_Utility.Views.Pages
                 };
             }
 
-            selectProfile(saved, apply: false);
+            // Handle custom preset names saved by the tray widget (e.g. "Custom 2", "Custom 3 (Boost)")
+            if (Services.TrayPresetOptions.IsCustomPreset(saved))
+            {
+                // Parse slot from "Custom N" or "Custom N (Boost)"
+                int slot = 0;
+                var parts = saved.Replace("(Boost)", "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 2 && int.TryParse(parts[1], out int parsed))
+                    slot = Math.Clamp(parsed - 1, 0, Models.CustomPreset.MaxSlots - 1);
+
+                // Ensure ActivePresetSlot is synced so selectProfile picks up the correct slot
+                ActivePresetSlot = slot;
+                selectProfile("Custom", apply: false);
+            }
+            else
+            {
+                selectProfile(saved, apply: false);
+            }
         }
 
         #region Profile Selection

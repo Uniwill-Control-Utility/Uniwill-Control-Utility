@@ -1,17 +1,17 @@
-<ui:FluentWindow x:Class="Uniwill_Control_Utility.Views.Windows.TrayWidgetWindow"
+﻿<ui:FluentWindow x:Class="Uniwill_Control_Utility.Views.Windows.TrayWidgetWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-    mc:Ignorable="d"
+    xmlns:controls="clr-namespace:Uniwill_Control_Utility.Views.Controls"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml" xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+                 mc:Ignorable="d"
     Title="UCU Quick Control"
-    Width="414"
+    Width="360"
     MinWidth="0"
     MaxWidth="414"
-    MinHeight="0"
+    MinHeight="100"
     SizeToContent="Height"
-    WindowStyle="None"
     ResizeMode="NoResize"
     ShowInTaskbar="False"
     Topmost="True"
@@ -19,7 +19,7 @@
     WindowCornerPreference="Round"
     WindowBackdropType="Mica"
     ExtendsContentIntoTitleBar="True"
-    Background="{DynamicResource ApplicationBackgroundBrush}"
+    d:Background="{DynamicResource MicaBackgroundFillColorBaseBrush}"
     Foreground="{DynamicResource TextFillColorPrimaryBrush}"
     FontFamily="Segoe UI Variable Text, Segoe UI"
     Deactivated="Window_Deactivated"
@@ -29,153 +29,75 @@
     UseLayoutRounding="True">
 
     <ui:FluentWindow.Resources>
-        <Style x:Key="SurfaceStyle" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="10" />
-            <Setter Property="Padding" Value="10" />
-        </Style>
-
-        <Style x:Key="MetricCardStyle" TargetType="Border" BasedOn="{StaticResource SurfaceStyle}">
-            <Setter Property="Height" Value="82" />
-            <Setter Property="Padding" Value="9" />
-        </Style>
-
-        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI" />
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
-        </Style>
-
-        <Style x:Key="CaptionStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="9" />
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
-        </Style>
-
-        <Style x:Key="MetricValueStyle" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI" />
-            <Setter Property="FontSize" Value="10" />
-            <Setter Property="FontWeight" Value="Medium" />
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
-        </Style>
-
-        <Style x:Key="CompactComboBoxStyle"
-               TargetType="ComboBox"
-               BasedOn="{StaticResource {x:Type ComboBox}}">
-            <Setter Property="Height" Value="32" />
-            <Setter Property="Padding" Value="9,0" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="FontSize" Value="11" />
-        </Style>
-
-        <Style x:Key="PowerValueStyle" TargetType="TextBlock">
-            <Setter Property="Margin" Value="0,4,0,0" />
-            <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI" />
-            <Setter Property="FontSize" Value="15" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
-        </Style>
-
-        <Style x:Key="PresetButtonStyle" TargetType="RadioButton">
-            <Setter Property="Height" Value="34" />
-            <Setter Property="Margin" Value="2,0" />
-            <Setter Property="FontSize" Value="10" />
-            <Setter Property="FontWeight" Value="Medium" />
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
-            <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Chrome"
-                                CornerRadius="7"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}">
-                            <TextBlock x:Name="Label"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       FontSize="{TemplateBinding FontSize}"
-                                       FontWeight="{TemplateBinding FontWeight}"
-                                       Foreground="{TemplateBinding Foreground}"
-                                       Text="{TemplateBinding Content}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-                                <Setter TargetName="Label" Property="Foreground" Value="White" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.42" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="FullFanButtonStyle" TargetType="ToggleButton">
-            <Setter Property="Height" Value="32" />
-            <Setter Property="Padding" Value="9,0" />
-            <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
-            <Setter Property="Cursor" Value="Hand" />
+        <Style x:Key="QuickToggleStyle"
+               TargetType="ToggleButton"
+               BasedOn="{StaticResource {x:Type ToggleButton}}">
+            <Setter Property="Background"
+                    Value="{DynamicResource ControlFillColorDefaultBrush}" />
+            <Setter Property="Padding" Value="12,8" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="Chrome"
-                                Padding="{TemplateBinding Padding}"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="7">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock FontSize="10" FontWeight="SemiBold"
-                                               Foreground="{TemplateBinding Foreground}" Text="Full fan" />
-                                    <TextBlock FontSize="9" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Max RPM" />
-                                </StackPanel>
-                                <Border x:Name="Track" Grid.Column="1" Width="40" Height="20"
-                                        Margin="8,0,0,0" Padding="3"
-                                        VerticalAlignment="Center"
-                                        Background="{DynamicResource ControlFillColorDefaultBrush}"
-                                        BorderBrush="{DynamicResource ControlStrongStrokeColorDefaultBrush}"
-                                        BorderThickness="1" CornerRadius="10">
-                                    <Ellipse x:Name="Knob" Width="12" Height="12"
-                                             HorizontalAlignment="Left"
-                                             Fill="{DynamicResource TextFillColorSecondaryBrush}" />
-                                </Border>
-                            </Grid>
-                        </Border>
+                        <Grid IsHitTestVisible="{TemplateBinding IsEnabled}">
+                            <!-- Base background -->
+                            <Border x:Name="BaseBackground"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="Black"
+                                                      Opacity="0.12"
+                                                      BlurRadius="8"
+                                                      ShadowDepth="2"
+                                                      Direction="270" />
+                                </Border.Effect>
+                            </Border>
+                            <!-- Hover overlay for off-state (15% white) -->
+                            <Border x:Name="HoverOffOverlay"
+                                    Background="White"
+                                    Opacity="0.025"
+                                    CornerRadius="6"
+                                    Visibility="Collapsed" />
+                            <!-- Hover overlay for on-state (30% white) -->
+                            <Border x:Name="HoverOnOverlay"
+                                    Background="White"
+                                    Opacity="0.3"
+                                    CornerRadius="6"
+                                    Visibility="Collapsed" />
+                            <!-- Content -->
+                            <ContentPresenter x:Name="ContentPresenter"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True" />
+                        </Grid>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource ControlFillColorTertiaryBrush}" />
-                            </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-                                <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-                                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
-                                <Setter TargetName="Knob" Property="Fill" Value="White" />
+                                <Setter Property="Background"
+                                        Value="{DynamicResource AccentTextFillColorTertiaryBrush}" />
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
                             </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Opacity" Value="0.78" />
-                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True" />
+                                    <Condition Property="IsChecked" Value="False" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="HoverOffOverlay" Property="Visibility" Value="Visible" />
+                            </MultiTrigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True" />
+                                    <Condition Property="IsChecked" Value="True" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="HoverOnOverlay" Property="Visibility" Value="Visible" />
+                            </MultiTrigger>
+                            <!-- Disabled state: dim background, off-state foreground -->
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Chrome" Property="Opacity" Value="0.45" />
+                                <Setter Property="Background"
+                                        Value="{DynamicResource ControlAltFillColorSecondaryBrush}" />
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource TextFillColorSecondaryBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -183,302 +105,520 @@
             </Setter>
         </Style>
 
-        <Style x:Key="CloseButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="30" />
-            <Setter Property="Height" Value="30" />
-            <Setter Property="Padding" Value="0" />
+        <!-- Metrics styles -->
+        <Style x:Key="LabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="9" />
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="6">
-                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
-                                       Margin="0,-2,0,0" FontSize="18"
-                                       Foreground="{TemplateBinding Foreground}" Text="×" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#C42B1C" />
-                                <Setter Property="Foreground" Value="White" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
         </Style>
+
+        <Style x:Key="HeroStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI" />
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="ValueStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+        </Style>
+
+        <ContextMenu x:Key="NavigateContextMenu"
+                     Opened="NavigateContextMenu_Opened"
+                     >
+            <MenuItem Header="Go to UCU" Click="GoToUcuMenuItem_Click" />
+        </ContextMenu>
     </ui:FluentWindow.Resources>
 
-    <Border Background="{DynamicResource ApplicationBackgroundBrush}"
-            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-            BorderThickness="1"
-            CornerRadius="11">
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="44" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="1" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="1" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-            <Border Grid.Row="0"
-                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
-                    BorderThickness="0,0,0,1"
-                    CornerRadius="11,11,0,0"
-                    MouseLeftButtonDown="Header_MouseLeftButtonDown">
-                <Grid Margin="11,0,6,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Border Width="24" Height="24" CornerRadius="12" Background="#183F46">
-                        <Image Width="19" Height="19" Source="pack://application:,,,/Assets/applicationIcon-32.png" />
-                    </Border>
-                    <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock FontFamily="Segoe UI Variable Display, Segoe UI"
-                                   FontSize="13" FontWeight="SemiBold" Text="UCU Quick Control" />
-                        <TextBlock x:Name="HeaderContextText" Margin="0,-1,0,0" FontSize="9"
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                   Text="Live controls · cached telemetry" />
-                    </StackPanel>
-                    <Button Grid.Column="2" Style="{StaticResource CloseButtonStyle}"
-                            ToolTip="Close" Click="CloseButton_Click" />
-                </Grid>
-            </Border>
+        <!-- ===== METRICS SECTION (no card background) ===== -->
+        <Border Grid.Row="0"
+                Padding="12,20"
+                Background="Transparent" VerticalAlignment="Center">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="1" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Row="1" Margin="10">
-                <Grid Margin="0,0,0,8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="8" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+                <!-- CPU -->
+                <Grid Grid.Column="0" Margin="2,0,16,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                    <Border Style="{StaticResource MetricCardStyle}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="64" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid Width="60" Height="60" HorizontalAlignment="Left" VerticalAlignment="Center">
-                                <Ellipse Width="56" Height="56" Stroke="{DynamicResource ControlStrongStrokeColorDefaultBrush}" StrokeThickness="5" Opacity="0.35" />
-                                <Path Stroke="{DynamicResource AccentFillColorDefaultBrush}" StrokeThickness="5" StrokeStartLineCap="Round" StrokeEndLineCap="Round">
-                                    <Path.Data>
-                                        <PathGeometry>
-                                            <PathFigure StartPoint="30,3">
-                                                <ArcSegment x:Name="CpuTemperatureArc" Point="30,3" Size="27,27" SweepDirection="Clockwise" />
-                                            </PathFigure>
-                                        </PathGeometry>
-                                    </Path.Data>
-                                </Path>
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock x:Name="CpuTemperatureText" HorizontalAlignment="Center"
-                                               FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="15" FontWeight="SemiBold" Text="--°" />
-                                    <TextBlock HorizontalAlignment="Center" Style="{StaticResource CaptionStyle}" Text="CPU" />
-                                </StackPanel>
-                            </Grid>
-                            <Grid Grid.Column="1" Margin="5,1,0,1">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <Grid>
-                                    <TextBlock Style="{StaticResource SectionTitleStyle}" Text="CPU" />
-                                    <TextBlock x:Name="CpuFanText" HorizontalAlignment="Right" Style="{StaticResource CaptionStyle}" Text="-- fan" />
-                                </Grid>
-                                <Grid Grid.Row="1" VerticalAlignment="Center">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="CpuPowerText" Style="{StaticResource MetricValueStyle}" Text="-- W" />
-                                    <TextBlock x:Name="CpuClockText" Grid.Column="1" Style="{StaticResource MetricValueStyle}" Text="-- GHz" />
-                                </Grid>
-                                <Grid Grid.Row="2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <ProgressBar x:Name="CpuUsageBar" Height="4" Margin="0,0,7,0"
-                                                 VerticalAlignment="Center" Maximum="100" Value="0" />
-                                    <TextBlock x:Name="CpuUsageText" Grid.Column="1" MinWidth="23"
-                                               HorizontalAlignment="Right" VerticalAlignment="Center"
-                                               TextAlignment="Right" Style="{StaticResource CaptionStyle}" Text="--%" />
-                                </Grid>
-                            </Grid>
-                        </Grid>
-                    </Border>
+                    <TextBlock Grid.Row="0"
+                               Style="{StaticResource LabelStyle}"
+                               HorizontalAlignment="Center"
+                               FontWeight="SemiBold"
+                               Text="CPU" 
+                               FontSize="12"
+                               Margin="0,0,0,8"/>
 
-                    <Border Grid.Column="2" Style="{StaticResource MetricCardStyle}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="64" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid Width="60" Height="60" HorizontalAlignment="Left" VerticalAlignment="Center">
-                                <Ellipse Width="56" Height="56" Stroke="{DynamicResource ControlStrongStrokeColorDefaultBrush}" StrokeThickness="5" Opacity="0.35" />
-                                <Path Stroke="{DynamicResource AccentFillColorDefaultBrush}" StrokeThickness="5" StrokeStartLineCap="Round" StrokeEndLineCap="Round">
-                                    <Path.Data>
-                                        <PathGeometry>
-                                            <PathFigure StartPoint="30,3">
-                                                <ArcSegment x:Name="GpuTemperatureArc" Point="30,3" Size="27,27" SweepDirection="Clockwise" />
-                                            </PathFigure>
-                                        </PathGeometry>
-                                    </Path.Data>
-                                </Path>
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock x:Name="GpuTemperatureText" HorizontalAlignment="Center"
-                                               FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="15" FontWeight="SemiBold" Text="--°" />
-                                    <TextBlock HorizontalAlignment="Center" Style="{StaticResource CaptionStyle}" Text="GPU" />
-                                </StackPanel>
-                            </Grid>
-                            <Grid Grid.Column="1" Margin="5,1,0,1">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <Grid>
-                                    <TextBlock Style="{StaticResource SectionTitleStyle}" Text="GPU" />
-                                    <TextBlock x:Name="GpuFanText" HorizontalAlignment="Right" Style="{StaticResource CaptionStyle}" Text="-- fan" />
-                                </Grid>
-                                <Grid Grid.Row="1" VerticalAlignment="Center">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="GpuPowerText" Style="{StaticResource MetricValueStyle}" Text="-- W" />
-                                    <TextBlock x:Name="GpuClockText" Grid.Column="1" Style="{StaticResource MetricValueStyle}" Text="-- GHz" />
-                                </Grid>
-                                <Grid Grid.Row="2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <ProgressBar x:Name="GpuUsageBar" Height="4" Margin="0,0,7,0"
-                                                 VerticalAlignment="Center" Maximum="100" Value="0" />
-                                    <TextBlock x:Name="GpuUsageText" Grid.Column="1" MinWidth="23"
-                                               HorizontalAlignment="Right" VerticalAlignment="Center"
-                                               TextAlignment="Right" Style="{StaticResource CaptionStyle}" Text="--%" />
-                                </Grid>
-                            </Grid>
-                        </Grid>
-                    </Border>
-                </Grid>
+                    <!-- Hero row: Temp + Util -->
+                    <Grid Grid.Row="1" Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="1" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
 
-                <Border Style="{StaticResource SurfaceStyle}" Margin="0,0,0,8">
-                    <StackPanel>
-                        <Grid Margin="0,0,0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" Text="PRESETS" />
-                            <StackPanel x:Name="DisplayRow" Grid.Column="1" Orientation="Horizontal">
-                                <TextBlock Margin="0,0,6,0" VerticalAlignment="Center" Style="{StaticResource CaptionStyle}" Text="DISPLAY" />
-                                <ComboBox x:Name="RefreshRateComboBox" Width="82" Height="25" Padding="6,0"
-                                          VerticalContentAlignment="Center" FontSize="10"
-                                          SelectionChanged="RefreshRateComboBox_SelectionChanged" />
-                            </StackPanel>
-                        </Grid>
-
-                        <ItemsControl x:Name="PresetButtons" Margin="-2,0,-2,8">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <UniformGrid Columns="4" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <RadioButton GroupName="QuickControlPresets"
-                                                 Style="{StaticResource PresetButtonStyle}"
-                                                 Content="{Binding Name}"
-                                                 IsChecked="{Binding IsActive, Mode=OneWay}"
-                                                 Click="PresetButton_Click" />
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                        <Grid>
-                            <TextBlock VerticalAlignment="Center" Style="{StaticResource CaptionStyle}" Text="COOLING OVERRIDE" />
-                            <ToggleButton x:Name="FullFanButton" Width="124" HorizontalAlignment="Right"
-                                          Style="{StaticResource FullFanButtonStyle}"
-                                          Click="FullFanButton_Click" />
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
-                <Border Style="{StaticResource SurfaceStyle}" Margin="0,0,0,8">
-                    <StackPanel>
-                        <Grid Margin="0,0,0,5">
-                            <TextBlock Style="{StaticResource SectionTitleStyle}" Text="POWER" />
-                            <TextBlock HorizontalAlignment="Right" Style="{StaticResource CaptionStyle}" Text="LIVE" />
-                        </Grid>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="8" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <Border Background="{DynamicResource ControlFillColorSecondaryBrush}" CornerRadius="7" Padding="8,5">
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource CaptionStyle}" Text="CPU TDP" />
-                                    <TextBlock x:Name="CpuTdpValueText" Style="{StaticResource PowerValueStyle}" Text="-- W" />
-                                </StackPanel>
-                            </Border>
-
-                            <Border Grid.Column="2" Background="{DynamicResource ControlFillColorSecondaryBrush}" CornerRadius="7" Padding="8,5">
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource CaptionStyle}" Text="GPU TGP" />
-                                    <TextBlock x:Name="GpuTgpValueText" Style="{StaticResource PowerValueStyle}" Text="-- W" />
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
-                <Border x:Name="HydroRow" Style="{StaticResource SurfaceStyle}" Margin="0,0,0,8">
-                    <StackPanel>
-                        <Grid Margin="0,0,0,6">
-                            <TextBlock Style="{StaticResource SectionTitleStyle}" Text="HYDRO UI" />
-                            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-                                <Ellipse Width="6" Height="6" Margin="0,0,5,0" VerticalAlignment="Center" Fill="#57C785" />
-                                <TextBlock Style="{StaticResource CaptionStyle}" Text="CONNECTED" />
-                            </StackPanel>
-                        </Grid>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="8" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <ComboBox x:Name="PumpComboBox" Style="{StaticResource CompactComboBoxStyle}"
-                                      SelectionChanged="PumpComboBox_SelectionChanged" />
-                            <ComboBox x:Name="HydroFanComboBox" Grid.Column="2" Style="{StaticResource CompactComboBoxStyle}"
-                                      SelectionChanged="HydroFanComboBox_SelectionChanged" />
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
-                <Grid Margin="2,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock x:Name="StatusText" VerticalAlignment="Center" FontSize="10"
-                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="All controls ready" />
-                    <ui:Button Grid.Column="1" Height="31" Padding="13,0" Appearance="Primary"
-                               Click="OpenUcuButton_Click">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Margin="0,0,8,0" FontSize="11" Text="Open UCU" />
-                            <TextBlock FontSize="13" Text="→" />
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <TextBlock x:Name="CpuTempText" Style="{StaticResource HeroStyle}"
+                                       Foreground="{DynamicResource AccentTextFillColorTertiaryBrush}"
+                                       Text="--°C"
+                                       HorizontalAlignment="Center" />
                         </StackPanel>
-                    </ui:Button>
+
+                        <Border Grid.Column="1" Margin="0,8"
+                                Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <TextBlock x:Name="CpuUsageText" Style="{StaticResource HeroStyle}" Text="--%" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Segmented bars -->
+                    <Grid Grid.Row="2" Margin="0,12,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="6" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="6" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="44" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Row="0" Style="{StaticResource LabelStyle}"
+                                   VerticalAlignment="Center" Text="Power" HorizontalAlignment="Center" />
+                        <controls:DashboardSegmentedBar x:Name="CpuPowerBar"
+                            Grid.Row="0" Grid.Column="1" Height="7" Margin="8,0"
+                            Maximum="300" Segments="16"
+                            Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
+                        <TextBlock x:Name="CpuPowerText" Grid.Row="0" Grid.Column="2"
+                                   Style="{StaticResource ValueStyle}" VerticalAlignment="Center"
+                                   Text="-- W" HorizontalAlignment="Center" />
+
+                        <TextBlock Grid.Row="2" Style="{StaticResource LabelStyle}"
+                                   VerticalAlignment="Center" Text="Clock" HorizontalAlignment="Center" />
+                        <controls:DashboardSegmentedBar x:Name="CpuClockBar"
+                            Grid.Row="2" Grid.Column="1" Height="7" Margin="8,0"
+                            Maximum="6000" Segments="16"
+                            Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
+                        <TextBlock x:Name="CpuClockText" Grid.Row="2" Grid.Column="2"
+                                   Style="{StaticResource ValueStyle}" VerticalAlignment="Center"
+                                   Text="-- GHz" HorizontalAlignment="Center" />
+
+                        <TextBlock Grid.Row="4" Style="{StaticResource LabelStyle}"
+                                   VerticalAlignment="Center" Text="Fan" HorizontalAlignment="Center" />
+                        <controls:DashboardSegmentedBar x:Name="CpuFanBar"
+                            Grid.Row="4" Grid.Column="1" Height="7" Margin="8,0"
+                            Maximum="100" Segments="16"
+                            Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
+                        <TextBlock x:Name="CpuFanText" Grid.Row="4" Grid.Column="2"
+                                   Style="{StaticResource ValueStyle}" VerticalAlignment="Center"
+                                   Text="--%" HorizontalAlignment="Center" />
+                    </Grid>
                 </Grid>
-            </StackPanel>
+
+                <!-- Vertical Divider -->
+                <Border Grid.Column="1"
+                        Background="{DynamicResource DividerStrokeColorDefaultBrush}"
+                        Margin="0,4,0,0" 
+                        Opacity="0.95"
+                        />
+
+                <!-- GPU -->
+                <Grid Grid.Column="2" Margin="6,0,6,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Style="{StaticResource LabelStyle}"
+                               HorizontalAlignment="Center"
+                               FontWeight="SemiBold"
+                               Text="GPU" 
+                               FontSize="12"
+                               Margin="0,0,0,8"/>
+
+                    <!-- Hero row: Temp + Util -->
+                    <Grid Grid.Row="1" Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="1" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <TextBlock x:Name="GpuTempText" Style="{StaticResource HeroStyle}"
+                                       Foreground="{DynamicResource AccentTextFillColorTertiaryBrush}"
+                                       Text="--°C" HorizontalAlignment="Center" />
+                        </StackPanel>
+
+                        <Border Grid.Column="1" Margin="0,8"
+                                Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <TextBlock x:Name="GpuUsageText" Style="{StaticResource HeroStyle}" Text="--%" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Segmented bars -->
+                    <Grid Grid.Row="2" Margin="2,12,2,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="6" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="6" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="44" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Row="0" Style="{StaticResource LabelStyle}"
+                                   VerticalAlignment="Center" Text="Power" HorizontalAlignment="Center" />
+                        <controls:DashboardSegmentedBar x:Name="GpuPowerBar"
+                            Grid.Row="0" Grid.Column="1" Height="7" Margin="8,0"
+                            Maximum="300" Segments="16"
+                            Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
+                        <TextBlock x:Name="GpuPowerText" Grid.Row="0" Grid.Column="2"
+                                   Style="{StaticResource ValueStyle}" VerticalAlignment="Center"
+                                   Text="-- W" HorizontalAlignment="Center" />
+
+                        <TextBlock Grid.Row="2" Style="{StaticResource LabelStyle}"
+                                   VerticalAlignment="Center" Text="Clock" HorizontalAlignment="Center" />
+                        <controls:DashboardSegmentedBar x:Name="GpuClockBar"
+                            Grid.Row="2" Grid.Column="1" Height="7" Margin="8,0"
+                            Maximum="3000" Segments="16"
+                            Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
+                        <TextBlock x:Name="GpuClockText" Grid.Row="2" Grid.Column="2"
+                                   Style="{StaticResource ValueStyle}" VerticalAlignment="Center"
+                                   Text="-- GHz" HorizontalAlignment="Center" />
+
+                        <TextBlock Grid.Row="4" Style="{StaticResource LabelStyle}"
+                                   VerticalAlignment="Center" Text="Fan" HorizontalAlignment="Center" />
+                        <controls:DashboardSegmentedBar x:Name="GpuFanBar"
+                            Grid.Row="4" Grid.Column="1" Height="7" Margin="8,0"
+                            Maximum="100" Segments="16"
+                            Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
+                        <TextBlock x:Name="GpuFanText" Grid.Row="4" Grid.Column="2"
+                                   Style="{StaticResource ValueStyle}" VerticalAlignment="Center"
+                                   Text="--%" HorizontalAlignment="Center" />
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Divider -->
+        <Border Grid.Row="1" Background="{DynamicResource SurfaceStrokeColorFlyoutBrush}" />
+
+        <!-- ===== QUICK SETTINGS GRID (with card background) ===== -->
+        <Border Grid.Row="2" Margin="0,0,0,0"
+                Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
+                BorderThickness="0"
+                Padding="20,22,20,22">
+            <Grid x:Name="ButtonsGrid">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <!-- Adaptive Mode -->
+                <StackPanel x:Name="SlotAdaptiveMode"
+                            Orientation="Vertical"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <ToggleButton x:Name="BtnAdaptiveMode"
+                                   Width="95"
+                                   Height="46"
+                                   Style="{StaticResource QuickToggleStyle}"
+                                   Tag="Adaptive"
+                                   ContextMenu="{StaticResource NavigateContextMenu}"
+                                   Click="BtnAdaptiveMode_Click">
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                      Glyph="&#xEB44;"
+                                      FontSize="16">
+                            <ui:FontIcon.Foreground>
+                                <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                         Path="Foreground" />
+                            </ui:FontIcon.Foreground>
+                        </ui:FontIcon>
+                    </ToggleButton>
+                    <ui:TextBlock FontSize="11"
+                                   Margin="0,8,0,0"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Adaptive Mode" />
+                </StackPanel>
+
+                <!-- Keyboard RGB -->
+                <StackPanel x:Name="SlotKeyboardBacklight"
+                            Orientation="Vertical"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <ToggleButton x:Name="BtnKeyboardBacklight"
+                                   Width="95"
+                                   Height="46"
+                                   Style="{StaticResource QuickToggleStyle}"
+                                   Tag="Keyboard"
+                                   ContextMenu="{StaticResource NavigateContextMenu}"
+                                   Click="BtnKeyboardBacklight_Click">
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                      Glyph="&#xE92E;"
+                                      FontSize="16">
+                            <ui:FontIcon.Foreground>
+                                <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                         Path="Foreground" />
+                            </ui:FontIcon.Foreground>
+                        </ui:FontIcon>
+                    </ToggleButton>
+                    <ui:TextBlock FontSize="11"
+                                   Margin="0,8,0,0"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Keyboard RGB" />
+                </StackPanel>
+
+                <!-- Light Bar -->
+                <StackPanel x:Name="SlotLightBar"
+                            Orientation="Vertical"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <ToggleButton x:Name="BtnLightBar"
+                                   Width="95"
+                                   Height="46"
+                                   Style="{StaticResource QuickToggleStyle}"
+                                   Tag="LightBar"
+                                   ContextMenu="{StaticResource NavigateContextMenu}"
+                                   Click="BtnLightBar_Click">
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                      Glyph="&#xED39;"
+                                      FontSize="18">
+                            <ui:FontIcon.Foreground>
+                                <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                         Path="Foreground" />
+                            </ui:FontIcon.Foreground>
+                        </ui:FontIcon>
+                    </ToggleButton>
+                    <ui:TextBlock FontSize="11"
+                                   Margin="0,8,0,0"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Light Bar" />
+                </StackPanel>
+
+                <!-- Smart Fan Mode -->
+                <StackPanel x:Name="SlotFanSmartMode"
+                            Orientation="Vertical"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <ToggleButton x:Name="BtnFanSmartMode"
+                                   Width="95"
+                                   Height="46"
+                                   Style="{StaticResource QuickToggleStyle}"
+                                   Tag="FanControl"
+                                   ContextMenu="{StaticResource NavigateContextMenu}"
+                                   Click="BtnFanSmartMode_Click">
+                        <iconPacks:PackIconLucide
+                            Kind="Fan"
+                            Width="16"
+                            Height="16"
+                            VerticalAlignment="Center" >
+                            <iconPacks:PackIconLucide.Foreground>
+                                <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                        Path="Foreground" />
+                            </iconPacks:PackIconLucide.Foreground>
+                        </iconPacks:PackIconLucide>
+                    </ToggleButton>
+                    <ui:TextBlock FontSize="11"
+                                   Margin="0,8,0,0"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Smart Fan Mode" />
+                </StackPanel>
+
+                <!-- Overlay -->
+                <StackPanel x:Name="SlotOverlay"
+                            Orientation="Vertical"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <ToggleButton x:Name="BtnOverlay"
+                                   Width="95"
+                                   Height="46"
+                                   Style="{StaticResource QuickToggleStyle}"
+                                   Tag="OverlaySettingsPage"
+                                   ContextMenu="{StaticResource NavigateContextMenu}"
+                                   Click="BtnOverlay_Click">
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                      Glyph="&#xE81E;"
+                                      FontSize="16">
+                            <ui:FontIcon.Foreground>
+                                <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                         Path="Foreground" />
+                            </ui:FontIcon.Foreground>
+                        </ui:FontIcon>
+                    </ToggleButton>
+                    <ui:TextBlock FontSize="11"
+                                   Margin="0,8,0,0"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Overlay" />
+                </StackPanel>
+
+                <!-- Local Dimming (dynamic circumstance) -->
+                <StackPanel x:Name="SlotLocalDimming"
+                            Orientation="Vertical"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <ToggleButton x:Name="BtnLocalDimming"
+                                   Width="95"
+                                   Height="46"
+                                   Style="{StaticResource QuickToggleStyle}"
+                                   Tag="SettingsPage"
+                                   ContextMenu="{StaticResource NavigateContextMenu}"
+                                   Click="BtnLocalDimming_Click">
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                      Glyph="&#xE7F4;"
+                                      FontSize="16">
+                            <ui:FontIcon.Foreground>
+                                <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                         Path="Foreground" />
+                            </ui:FontIcon.Foreground>
+                        </ui:FontIcon>
+                    </ToggleButton>
+                    <ui:TextBlock FontSize="11"
+                                   Margin="0,8,0,0"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Local Dimming" />
+                </StackPanel>
+
+                <!-- Smart Hydro (dynamic circumstance) -->
+                <StackPanel x:Name="SlotHydroSmartMode"
+                            Orientation="Vertical"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <ToggleButton x:Name="BtnHydroSmartMode"
+                                   Width="95"
+                                   Height="46"
+                                   Style="{StaticResource QuickToggleStyle}"
+                                   Tag="Watercooler"
+                                   ContextMenu="{StaticResource NavigateContextMenu}"
+                                   Click="BtnHydroSmartMode_Click">
+                        <iconPacks:PackIconLucide
+                               Kind="BrainCircuit"
+                               Width="16"
+                               Height="16"
+                               VerticalAlignment="Center" >
+                            <iconPacks:PackIconLucide.Foreground>
+                                <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                        Path="Foreground" />
+                            </iconPacks:PackIconLucide.Foreground>
+                        </iconPacks:PackIconLucide>
+                    </ToggleButton>
+                    <ui:TextBlock FontSize="11"
+                                   Margin="0,8,0,0"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Smart Hydro" />
+                </StackPanel>
+
+                <!-- Hydro RGB (dynamic circumstance) -->
+                <StackPanel x:Name="SlotHydroRgb"
+                            Orientation="Vertical"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <ToggleButton x:Name="BtnHydroRgb"
+                                   Width="95"
+                                   Height="46"
+                                   Style="{StaticResource QuickToggleStyle}"
+                                   Tag="Watercooler"
+                                   ContextMenu="{StaticResource NavigateContextMenu}"
+                                   Click="BtnHydroRgb_Click">
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                      Glyph="&#xE790;"
+                                      FontSize="16">
+                            <ui:FontIcon.Foreground>
+                                <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                         Path="Foreground" />
+                            </ui:FontIcon.Foreground>
+                        </ui:FontIcon>
+                    </ToggleButton>
+                    <ui:TextBlock FontSize="11"
+                                   Margin="0,8,0,0"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Hydro RGB" />
+                </StackPanel>
+
+                <!-- Flydigi RGB (dynamic circumstance) -->
+                <StackPanel x:Name="SlotFlydigiRgb"
+                            Orientation="Vertical"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    <ToggleButton x:Name="BtnFlydigiRgb"
+                                   Width="95"
+                                   Height="46"
+                                   Style="{StaticResource QuickToggleStyle}"
+                                   Tag="FlydigiCooler"
+                                   ContextMenu="{StaticResource NavigateContextMenu}"
+                                   Click="BtnFlydigiRgb_Click">
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                      Glyph="&#xE790;"
+                                      FontSize="16">
+                            <ui:FontIcon.Foreground>
+                                <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                         Path="Foreground" />
+                            </ui:FontIcon.Foreground>
+                        </ui:FontIcon>
+                    </ToggleButton>
+                    <ui:TextBlock FontSize="11"
+                                   Margin="0,8,0,0"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Flydigi RGB" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Divider -->
+        <Border Grid.Row="3" Background="{DynamicResource SurfaceStrokeColorFlyoutBrush}" />
+
+        <!-- ===== FOOTER ===== -->
+        <Grid Grid.Row="4" Margin="12,12,12,12">
+            <Button HorizontalAlignment="Right"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Padding="8"
+                    Click="OpenUcuButton_Click"
+                    ToolTip="Open UCU" >
+                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                              FontSize="14"
+                              Glyph="&#xE740;"
+                              Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </Button>
         </Grid>
-    </Border>
+    </Grid>
 </ui:FluentWindow>
