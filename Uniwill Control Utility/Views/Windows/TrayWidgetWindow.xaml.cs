@@ -362,13 +362,14 @@ namespace Uniwill_Control_Utility.Views.Windows
                     _placementScreenDeviceName,
                     StringComparison.OrdinalIgnoreCase)) ?? Screen.FromHandle(handle);
 
+            var tbBounds = FindTaskbarBounds(screen.Bounds);
             TrayWidgetPlacementResult placement = TrayWidgetPlacement.Calculate(
                 screen.Bounds,
                 screen.WorkingArea,
                 _placementAnchor,
                 windowSize,
                 gap: 10,
-                taskbarBounds: FindTaskbarBounds(screen.Bounds));
+                taskbarBounds: tbBounds);
 
             SetWindowPos(
                 handle,
@@ -391,32 +392,10 @@ namespace Uniwill_Control_Utility.Views.Windows
         private static System.Drawing.Rectangle? FindTaskbarBounds(
             System.Drawing.Rectangle monitorBounds)
         {
-            foreach (TrayEdge edge in Enum.GetValues<TrayEdge>())
-            {
-                var appBarData = new AppBarData
-                {
-                    Size = (uint)Marshal.SizeOf<AppBarData>(),
-                    Edge = (uint)edge,
-                    Bounds = new NativeRect
-                    {
-                        Left = monitorBounds.Left,
-                        Top = monitorBounds.Top,
-                        Right = monitorBounds.Right,
-                        Bottom = monitorBounds.Bottom
-                    }
-                };
-                IntPtr autoHideTaskbar = SHAppBarMessage(GetAutoHideBarEx, ref appBarData);
-                if (TryGetTaskbarBounds(
-                        autoHideTaskbar,
-                        monitorBounds,
-                        edge,
-                        requireIntersection: false,
-                        out System.Drawing.Rectangle autoHideBounds))
-                {
-                    return autoHideBounds;
-                }
-            }
-
+            // Prefer FindWindow to get the actual taskbar HWND and read its real
+            // bounds via GetWindowRect. SHAppBarMessage(GetAutoHideBarEx) returns
+            // monitor-sized bounds for non-auto-hide taskbars, which corrupts
+            // the placement calculation.
             IntPtr primaryTaskbar = FindWindow("Shell_TrayWnd", null);
             if (TryGetTaskbarBounds(
                     primaryTaskbar,

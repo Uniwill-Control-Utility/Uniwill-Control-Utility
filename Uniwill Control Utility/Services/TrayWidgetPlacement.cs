@@ -29,7 +29,10 @@ internal static class TrayWidgetPlacement
         if (taskbarBounds is Rectangle taskbar && taskbar.IntersectsWith(monitorBounds))
         {
             edge = DetectTaskbarEdge(monitorBounds, taskbar);
-            workingArea = ExcludeTaskbar(workingArea, taskbar, edge);
+            // Derive the working area from the taskbar bounds directly rather
+            // than relying on Screen.WorkingArea, which may be stale after a
+            // taskbar position change (Windows only updates it on WM_SETTINGCHANGE).
+            workingArea = ExcludeTaskbar(monitorBounds, taskbar, edge);
         }
         else
         {
