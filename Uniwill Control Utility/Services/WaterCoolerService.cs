@@ -1478,7 +1478,15 @@ namespace Uniwill_Control_Utility.Services
                 // Restore saved settings to device.
                 // WriteWithResponse ensures each command is acknowledged before the next fires,
                 // so no artificial inter-command delays are needed (matches Python reference).
-                // If Smart Mode is enabled, skip pump/fan restore — Smart Mode will apply them.
+                //
+                // During pre-loading auto-connect, we intentionally skip Smart Mode
+                // activation here — LibreHardwareMonitor may not have valid temperature
+                // readings yet, causing Smart Mode to apply idle speeds to a hot CPU.
+                // Smart Mode is started later in DashboardViewModel.OnNavigatedToAsync()
+                // after temperature data is confirmed available.
+                //
+                // If Smart Mode is enabled, skip pump/fan entirely (not just restore) —
+                // Smart Mode will apply the correct speeds once it starts.
                 try
                 {
                     if (!_settings.SmartModeEnabled)
@@ -1501,10 +1509,6 @@ namespace Uniwill_Control_Utility.Services
                 {
                     // Non-critical: failed to restore settings during auto-connect
                 }
-
-                // Re-start Smart Mode if it was enabled
-                if (_settings.SmartModeEnabled)
-                    StartSmartMode();
 
                 StatusChanged?.Invoke(this, "Auto-connected successfully");
             }
