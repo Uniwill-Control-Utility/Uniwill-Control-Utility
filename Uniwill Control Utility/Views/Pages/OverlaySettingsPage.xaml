@@ -193,7 +193,7 @@
                         </ui:CardExpander.Header>
                         <StackPanel>
                             <!-- FPS -->
-                            <Grid>
+                            <Grid Margin="0,2,0,12" >
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -203,16 +203,15 @@
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
-                                                 OffContent="Off"
-  />
+                                                 OffContent="Off" />
                             </Grid>
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
+                            <Border Height="1" Margin="-58,6,-46,6"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                             <!-- Frame times -->
-                            <Grid>
+                            <Grid Margin="0,12,0,12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -222,16 +221,15 @@
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
-                                                 OffContent="Off"
-  />
+                                                 OffContent="Off" />
                             </Grid>
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
+                            <Border Height="1" Margin="-58,6,-46,6"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                             <!-- GPU sensors -->
-                            <Grid>
+                            <Grid Margin="0,12,0,12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -244,16 +242,15 @@
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
-                                                 OffContent="Off"
-  />
+                                                 OffContent="Off" />
                             </Grid>
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
+                            <Border Height="1" Margin="-58,6,-46,6"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                             <!-- CPU sensors -->
-                            <Grid>
+                            <Grid Margin="0,12,0,12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -263,16 +260,15 @@
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
-                                                 OffContent="Off"
-  />
+                                                 OffContent="Off" />
                             </Grid>
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
+                            <Border Height="1" Margin="-58,6,-46,6"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                             <!-- Memory usage -->
-                            <Grid>
+                            <Grid Margin="0,12,0,12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -282,16 +278,15 @@
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
-                                                 OffContent="Off"
-  />
+                                                 OffContent="Off" />
                             </Grid>
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
+                            <Border Height="1" Margin="-58,6,-46,6"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                             <!-- Battery tile -->
-                            <Grid>
+                            <Grid Margin="0,12,0,12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -301,16 +296,15 @@
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
-                                                 OffContent="Off"
-  />
+                                                 OffContent="Off" />
                             </Grid>
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
+                            <Border Height="1" Margin="-58,6,-46,6"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
                             <!-- Rolling graphs -->
-                            <Grid>
+                            <Grid Margin="0,12,0,2">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -320,8 +314,7 @@
                                                  Grid.Column="1"
                                                  LabelPosition="Left"
                                                  OnContent="On"
-                                                 OffContent="Off"
-  />
+                                                 OffContent="Off" />
                             </Grid>
                         </StackPanel>
                     </ui:CardExpander>
