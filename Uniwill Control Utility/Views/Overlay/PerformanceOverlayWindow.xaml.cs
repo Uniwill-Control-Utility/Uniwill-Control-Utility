@@ -90,12 +90,6 @@ namespace Uniwill_Control_Utility.Views.Overlay
 
         private void HandleGameActiveChanged()
         {
-            if (!_viewModel.HideWhenNoGame)
-            {
-                _userWantsVisible = false;
-                return;
-            }
-
             if (_viewModel.GameActive)
             {
                 if (!IsVisible)
@@ -118,7 +112,7 @@ namespace Uniwill_Control_Utility.Views.Overlay
 
         private void OnMetricsUpdated(object? sender, EventArgs e)
         {
-            if (!_viewModel.HideWhenNoGame || !_viewModel.GameActive)
+            if (!_viewModel.GameActive)
                 return;
 
             bool moving = IsTargetWindowMoving();
@@ -346,9 +340,8 @@ namespace Uniwill_Control_Utility.Views.Overlay
 
         #region Window-relative positioning
 
-        // Positions the overlay relative to the foreground game window when the game
-        // is running in a window (not fullscreen). Falls back to monitor-relative
-        // positioning when the game is fullscreen or no foreground window is found.
+        // Positions the overlay relative to the foreground game window (windowed)
+        // or falls back to monitor positioning (fullscreen).
         public void PositionRelativeToForegroundWindow()
         {
             IntPtr target = GetForegroundWindow();

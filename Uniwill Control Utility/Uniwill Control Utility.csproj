@@ -16,11 +16,11 @@
     <UseWindowsForms>True</UseWindowsForms>
     <SignAssembly>False</SignAssembly>
 	<Copyright>© 2020-2026 UXTU Team, 2026 UCU Team</Copyright>    
-	<AssemblyVersion>0.9.4.3</AssemblyVersion>
-    <FileVersion>0.9.4.3</FileVersion>
+	<AssemblyVersion>0.9.4.5</AssemblyVersion>
+    <FileVersion>0.9.4.5</FileVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <SupportedOSPlatformVersion>10.0.22621.0</SupportedOSPlatformVersion>
-    <Version>0.9.4.3</Version>
+    <Version>0.9.4.5</Version>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

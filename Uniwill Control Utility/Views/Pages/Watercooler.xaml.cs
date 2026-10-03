@@ -145,6 +145,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 OnConnectionStateChanged(null, WaterCoolerService.WatercoolerConnectionState.Connected);
                 // Also re-sync the current flow status in case it changed while away.
                 UpdateFlowStatusUi(_waterCoolerService.FlowStatus);
+
+                // Re-sync firmware version — the query may have completed before this
+                // page was first navigated to, so the event was missed.
+                if (_waterCoolerService.FirmwareVersion is string version)
+                    OnFirmwareVersionReceived(null, version);
             }
             else
             {
@@ -778,8 +783,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                         // Reset standby button state
                         UpdateStandbyButton(false);
 
-                        // Reset flow status UI to Off (matches the service's FlowStatus = FlowStatus.Off on connect)
-                        UpdateFlowStatusUi(FlowStatus.Off);
+                        // Re-sync flow status from service — it may already be in a
+                        // non-Off state if Smart Mode restarted and turned the pump on.
+                        UpdateFlowStatusUi(_waterCoolerService.FlowStatus);
                         break;
 
                     case WaterCoolerService.WatercoolerConnectionState.Disconnected:

@@ -144,20 +144,6 @@ namespace Uniwill_Control_Utility.Services
                     return;
                 }
 
-                // If HideWhenNoGame was turned off, flush any pending show.
-                if (!normalisedOptions.HideWhenNoGame &&
-                    _window is not null &&
-                    !_window.IsVisible &&
-                    _window.HasPendingShow())
-                {
-                    _window.SetPendingShow(false);
-                    _window.SetUserWantsVisible(true);
-                    _window.PositionRelativeToForegroundWindow();
-                    _window.Show();
-                    _viewModel?.StartMonitoring();
-                    return;
-                }
-
                 if (_window?.IsVisible == true &&
                     _contentsVisible)
                 {
@@ -196,12 +182,10 @@ namespace Uniwill_Control_Utility.Services
                     return;
                 }
 
-                // When HideWhenNoGame is enabled, defer the initial Show() until the
-                // first FPS sample confirms a game is active — this prevents the
-                // overlay from flashing briefly then disappearing when no game is
-                // currently in the foreground.
-                if (options.HideWhenNoGame &&
-                    !_viewModel.GameActive)
+                // Defer the initial Show() until the first FPS sample confirms a game
+                // is active — this prevents the overlay from flashing briefly then
+                // disappearing when no game is currently in the foreground.
+                if (!_viewModel.GameActive)
                 {
                     _window.SetPendingShow(true);
                     return;
@@ -256,8 +240,7 @@ namespace Uniwill_Control_Utility.Services
 
                 if (_window?.IsVisible != true)
                 {
-                    if (options.HideWhenNoGame &&
-                        !_viewModel!.GameActive)
+                    if (!_viewModel!.GameActive)
                     {
                         _window!.SetPendingShow(true);
                         _window!.SetUserWantsVisible(true);

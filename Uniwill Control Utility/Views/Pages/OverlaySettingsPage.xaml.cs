@@ -74,9 +74,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             ShowBatteryCheckBox.Unchecked += (_, __) => SaveOptions();
             ShowGraphsCheckBox.Checked += (_, __) => SaveOptions();
             ShowGraphsCheckBox.Unchecked += (_, __) => SaveOptions();
-            HideWhenNoGameCheckBox.Checked += (_, __) => SaveOptions();
-            HideWhenNoGameCheckBox.Unchecked += (_, __) => SaveOptions();
-
+    
             RefreshIntervalNumberBox.ValueChanged += (_, __) => SaveOptions();
 
             // Poll RTSS status every 2 seconds.
@@ -132,7 +130,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             ShowMemoryCheckBox.IsChecked = options.ShowMemory;
            ShowBatteryCheckBox.IsChecked = options.ShowBattery;
             ShowGraphsCheckBox.IsChecked = options.ShowGraphs;
-            HideWhenNoGameCheckBox.IsChecked = options.HideWhenNoGame;
         }
 
         private void HotkeyTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -221,8 +218,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 ShowCpu = ShowCpuCheckBox.IsChecked == true,
                 ShowMemory = ShowMemoryCheckBox.IsChecked == true,
                 ShowBattery = ShowBatteryCheckBox.IsChecked == true,
-                ShowGraphs = ShowGraphsCheckBox.IsChecked == true,
-                HideWhenNoGame = HideWhenNoGameCheckBox.IsChecked == true
+                ShowGraphs = ShowGraphsCheckBox.IsChecked == true
             };
         }
 

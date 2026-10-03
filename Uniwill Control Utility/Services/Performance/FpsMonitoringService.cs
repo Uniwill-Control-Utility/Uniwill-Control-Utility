@@ -87,10 +87,12 @@ namespace Uniwill_Control_Utility.Services.Performance
                 // Try RTSS first — it works with DX12, anti-cheat, and all graphics APIs.
                 if (RtssReader.TryRead(processId, out RtssFpsData rtssData) && rtssData.Fps > 0)
                 {
-                    // If RTSS returned a different PID than the foreground, it used the fallback
-                    // (best game-like process in RTSS). Only accept the fallback if the foreground
-                    // process is a recognized installed game — otherwise the user alt-tabbed away.
-                    if (rtssData.ProcessId != processId && !IsRecognizedGame(processId))
+                    // Only show the overlay for recognized installed games. If RTSS returned
+                    // a different PID than the foreground (fallback), also verify the
+                    // foreground process itself is a recognized game — otherwise the user
+                    // alt-tabbed away from the game.
+                    if (!IsRecognizedGame(rtssData.ProcessId) ||
+                        (rtssData.ProcessId != processId && !IsRecognizedGame(processId)))
                     {
                         Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
                         continue;
@@ -139,7 +141,8 @@ namespace Uniwill_Control_Utility.Services.Performance
                 {
                     processor.TargetProcessId = processId;
                     FrameStatistics statistics = processor.GetStatistics(processId);
-                    if (statistics.Fps == 0 || !TryGetProcessDetailsCached(processId, out string name, out string path))
+                    if (statistics.Fps == 0 || !IsRecognizedGame(processId) ||
+                        !TryGetProcessDetailsCached(processId, out string name, out string path))
                     {
                         Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
                         continue;

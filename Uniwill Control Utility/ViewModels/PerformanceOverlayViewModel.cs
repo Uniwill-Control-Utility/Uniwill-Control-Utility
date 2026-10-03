@@ -54,7 +54,6 @@ namespace Uniwill_Control_Utility.ViewModels
         [ObservableProperty] private bool _showMemory = true;
         [ObservableProperty] private bool _showBattery = true;
         [ObservableProperty] private bool _showGraphs = true;
-        [ObservableProperty] private bool _hideWhenNoGame;
         [ObservableProperty] private int _currentFps;
         [ObservableProperty] private int _onePercentLowFps;
         [ObservableProperty] private int _pointOnePercentLowFps;
@@ -243,7 +242,6 @@ namespace Uniwill_Control_Utility.ViewModels
             ShowMemory = options.ShowMemory;
             ShowBattery = options.ShowBattery;
             ShowGraphs = options.ShowGraphs;
-            HideWhenNoGame = options.HideWhenNoGame;
             _timer.Interval = TimeSpan.FromMilliseconds(refreshInterval);
             NotifyVisibilityProperties();
 

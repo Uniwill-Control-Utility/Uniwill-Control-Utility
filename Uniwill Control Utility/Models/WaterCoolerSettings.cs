@@ -65,7 +65,7 @@ namespace Uniwill_Control_Utility.Models
 
         /// <summary>Pump voltage when temperature is below the low threshold.</summary>
         [JsonProperty("smartModeIdlePump", NullValueHandling = NullValueHandling.Ignore)]
-        public string SmartModeIdlePump { get; set; } = "V7";
+        public string SmartModeIdlePump { get; set; } = "Off";
 
         /// <summary>Pump voltage when temperature is above the high threshold.</summary>
         [JsonProperty("smartModeBoostPump", NullValueHandling = NullValueHandling.Ignore)]
@@ -73,7 +73,7 @@ namespace Uniwill_Control_Utility.Models
 
         /// <summary>Fan speed when temperature is below the low threshold.</summary>
         [JsonProperty("smartModeIdleFan", NullValueHandling = NullValueHandling.Ignore)]
-        public string SmartModeIdleFan { get; set; } = "Percent50";
+        public string SmartModeIdleFan { get; set; } = "Percent25";
 
         /// <summary>Fan speed when temperature is above the high threshold.</summary>
         [JsonProperty("smartModeBoostFan", NullValueHandling = NullValueHandling.Ignore)]
@@ -138,7 +138,7 @@ namespace Uniwill_Control_Utility.Models
             if (_legacySmartPumpHighThreshold.HasValue && SmartModeHighThreshold == 70)
                 SmartModeHighThreshold = _legacySmartPumpHighThreshold.Value;
 
-            if (_legacySmartPumpIdleSpeed != null && SmartModeIdlePump == "V7")
+            if (_legacySmartPumpIdleSpeed != null && SmartModeIdlePump == "Off")
                 SmartModeIdlePump = _legacySmartPumpIdleSpeed;
 
             if (_legacySmartPumpBoostSpeed != null && SmartModeBoostPump == "V11")
@@ -149,7 +149,7 @@ namespace Uniwill_Control_Utility.Models
         public PumpVoltage GetSmartModeIdlePump()
         {
             return Enum.TryParse<PumpVoltage>(SmartModeIdlePump, true, out var v)
-                ? v : Models.PumpVoltage.V7;
+                ? v : Models.PumpVoltage.Off;
         }
 
         /// <summary>Returns the enum value for the stored boost pump speed in Smart Mode.</summary>
@@ -163,7 +163,7 @@ namespace Uniwill_Control_Utility.Models
         public FanSpeed GetSmartModeIdleFan()
         {
             return Enum.TryParse<FanSpeed>(SmartModeIdleFan, true, out var f)
-                ? f : Models.FanSpeed.Percent50;
+                ? f : Models.FanSpeed.Percent25;
         }
 
         /// <summary>Returns the enum value for the stored boost fan speed in Smart Mode.</summary>
