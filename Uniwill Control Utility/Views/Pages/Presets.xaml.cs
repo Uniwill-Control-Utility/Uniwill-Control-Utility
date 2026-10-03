@@ -795,6 +795,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             customScroll.Visibility = profile == "Custom" ? Visibility.Visible : Visibility.Collapsed;
             bottomBar.Visibility = profile == "Custom" ? Visibility.Visible : Visibility.Collapsed;
 
+            // Stock presets always apply on startup - hide the checkbox for them.
+            bool isBuiltIn = Services.PresetProfileApplier.IsBuiltInProfile(profile);
+            cbApplyOnStartup.Visibility = isBuiltIn ? Visibility.Collapsed : Visibility.Visible;
+
             // Set profile values from SKU database (falls back to hardcoded defaults)
             var limits = GetPowerLimits();
             int cpuMax = limits?.CpuPl1Sustained ?? 135;

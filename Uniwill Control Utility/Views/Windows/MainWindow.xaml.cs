@@ -232,6 +232,18 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             try
             {
+                // Stock presets (Office/Gaming/Turbo) always apply on startup regardless of the checkbox.
+                if (PresetProfileApplier.IsBuiltInProfile(Settings.Default.presetProfile))
+                {
+                    await Task.Run(() => GetBatteryStatus());
+
+                    string profileName = Settings.Default.presetProfile;
+                    await PresetProfileApplier.ApplyProfileAsync(profileName, PresetProfileApplier.DisplayName(profileName));
+                    ToastNotification.ShowToastNotification($"{profileName} Preset Applied",
+                        $"Your {profileName} preset has been applied on startup!");
+                    return;
+                }
+
                 if (Settings.Default.ApplyOnStart)
                 {
                     // If the last selected profile was Custom, apply from CustomPresetStore.
