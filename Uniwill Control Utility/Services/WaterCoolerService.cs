@@ -1024,6 +1024,10 @@ namespace Uniwill_Control_Utility.Services
         {
             if (!IsConnected) return;
 
+            // Track pump state for flow meter grace period — the ramped path
+            // is only called when transitioning to an active voltage (never Off).
+            OnPumpStateChanged(true);
+
             byte voltageCode = (byte)voltage;
 
             // Phase 1: Send at reduced duty cycle (30%) to let the pump start gently
