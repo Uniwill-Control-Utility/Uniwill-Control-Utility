@@ -448,6 +448,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 // Non-critical: resume failures shouldn't block the UI.
             }
+
+            _mainWindowViewModel.RefreshNavigationItems();
+            AdjustMainWindowHeight();
         }
 
         private void cbHideFlydigi_Unchecked(object sender, RoutedEventArgs e)
@@ -471,6 +474,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                         // Ignore — best-effort cleanup when disabling Flydigi.
                     }
             });
+
+            _mainWindowViewModel.RefreshNavigationItems();
+            AdjustMainWindowHeight();
         }
 
         private void cbDisableCpuVoltageControl_Checked(object sender, RoutedEventArgs e)
@@ -582,6 +588,22 @@ namespace Uniwill_Control_Utility.Views.Pages
             updateSetting(isVisible);
             Settings.Default.Save();
             _mainWindowViewModel.RefreshNavigationItems();
+            AdjustMainWindowHeight();
+        }
+
+        /// <summary>
+        /// Adjusts the main window height based on whether Hydro UI and Flydigi are both disabled.
+        /// When both are off, reduces height from 1080 to 907.
+        /// </summary>
+        private void AdjustMainWindowHeight()
+        {
+            var mainWindow = Application.Current.MainWindow;
+            if (mainWindow is null)
+                return;
+
+            bool hydroDisabled = !Settings.Default.EnableHydroUiNavigation;
+            bool flydigiDisabled = !Settings.Default.EnableFlydigi;
+            mainWindow.Height = (hydroDisabled && flydigiDisabled) ? 907 : 1080;
         }
 
        #endregion

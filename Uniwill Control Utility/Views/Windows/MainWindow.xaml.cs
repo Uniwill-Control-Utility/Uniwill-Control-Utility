@@ -232,6 +232,18 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             try
             {
+                // Stock presets (Office/Gaming/Turbo) always apply on startup regardless of the checkbox.
+                if (PresetProfileApplier.IsBuiltInProfile(Settings.Default.presetProfile))
+                {
+                    await Task.Run(() => GetBatteryStatus());
+
+                    string profileName = Settings.Default.presetProfile;
+                    await PresetProfileApplier.ApplyProfileAsync(profileName, PresetProfileApplier.DisplayName(profileName));
+                    ToastNotification.ShowToastNotification($"{profileName} Preset Applied",
+                        $"Your {profileName} preset has been applied on startup!");
+                    return;
+                }
+
                 if (Settings.Default.ApplyOnStart)
                 {
                     // If the last selected profile was Custom, apply from CustomPresetStore.
@@ -1375,17 +1387,16 @@ namespace Uniwill_Control_Utility.Views.Windows
             {
                 this.WindowState = WindowState.Minimized;
             }
-            else
+
+            // Adjust window height based on feature toggles.
+            // When both Hydro UI and Flydigi are disabled, use a smaller height.
+            // Runs here (Loaded) instead of the constructor so the window is already
+            // shown and the layout is finalized, avoiding a visible flash at 1080.
+            bool hydroDisabled = !Settings.Default.EnableHydroUiNavigation;
+            bool flydigiDisabled = !Settings.Default.EnableFlydigi;
+            if (hydroDisabled && flydigiDisabled)
             {
-                if (GetSystemInfo.Manufacturer.ToUpper().Contains("AYANEO") || GetSystemInfo.Manufacturer.ToUpper().Contains("GPD") || GetSystemInfo.Product.ToUpper().Contains("ONEXPLAYER"))
-                {
-                    int displayCount = Screen.AllScreens.Length;
-                    if (displayCount < 2)
-                    {
-                        this.MaxHeight = SystemParameters.MaximizedPrimaryScreenHeight;
-                        this.WindowState = WindowState.Maximized;
-                    }
-                }
+                this.Height = 907;
             }
 
             _ = Task.Run(PremadePresets.SetPremadePresets);
