@@ -80,9 +80,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void InitializeDeviceControls()
         {
-            // Gate Hydro UI control by hardware support — unsupported hardware
+            // Gate Hydro UI control by hardware support and feature toggle — unsupported hardware
             // never shows, even if connected (won't be on a watercooler laptop).
-            if (!WaterCoolerHardwareDetector.IsSupportedHardware())
+            if (!WaterCoolerHardwareDetector.IsSupportedHardware() || !Settings.Default.EnableHydroUiNavigation)
                 _hydroUi.Visibility = Visibility.Collapsed;
 
             // Gate Flydigi control by user setting — collapsed immediately so it
@@ -284,10 +284,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void OnDeviceMetricsUpdated(object? sender, DeviceMetricsSnapshot snapshot)
         {
-            // Update metrics first — each control sets its own visibility based on connection state.
-            _hydroUi.UpdateMetrics(snapshot);
+            // Only update Hydro UI metrics if the feature toggle is enabled.
+            if (Settings.Default.EnableHydroUiNavigation)
+                _hydroUi.UpdateMetrics(snapshot);
 
-            // Only update Flydigi metrics if enabled in Settings
+            // Only update Flydigi metrics if the feature toggle is enabled.
             if (Settings.Default.EnableFlydigi)
                 _flydigi.UpdateMetrics(snapshot);
 
