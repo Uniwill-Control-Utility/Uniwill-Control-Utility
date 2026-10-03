@@ -56,7 +56,7 @@ namespace Uniwill_Control_Utility
             return _host?.Services.GetService(typeof(T)) as T;
         }
 
-        internal static readonly string version = "0.9.4.4";
+        internal static readonly string version = "0.9.4.5";
         private Mutex? mutex;
         private const string MutexName = "UniwillControlUtility";
 
