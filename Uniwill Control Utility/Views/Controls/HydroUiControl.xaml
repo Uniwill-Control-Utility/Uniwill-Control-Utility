@@ -81,7 +81,7 @@
                         <TextBlock FontSize="12" Text="Fan Speed" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         <TextBlock x:Name="_fanLabel" Margin="0,2,0,0" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="24" FontWeight="SemiBold" Text="--" />
                     </StackPanel>
-                    <controls:DashboardSegmentedBar x:Name="_fanBar" Grid.Column="1" Height="10" Margin="26,0,0,0" VerticalAlignment="Center" Maximum="100" Segments="20" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                    <controls:SegmentedBar x:Name="_fanBar" Grid.Column="1" Height="10" Margin="26,0,0,0" VerticalAlignment="Center" Maximum="100" Segments="20" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
                 </Grid>
 
                 <Border Grid.Column="1" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
@@ -95,7 +95,7 @@
                         <TextBlock FontSize="12" Text="Pump" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         <TextBlock x:Name="_pumpLabel" Margin="0,2,0,0" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="24" FontWeight="SemiBold" Text="--" />
                     </StackPanel>
-                    <controls:DashboardSegmentedBar x:Name="_pumpBar" Grid.Column="1" Height="10" Margin="26,0,0,0" VerticalAlignment="Center" Maximum="12" Segments="20" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                    <controls:SegmentedBar x:Name="_pumpBar" Grid.Column="1" Height="10" Margin="26,0,0,0" VerticalAlignment="Center" Maximum="12" Segments="20" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
                 </Grid>
             </Grid>
 

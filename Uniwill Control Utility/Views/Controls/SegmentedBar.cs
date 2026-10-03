@@ -4,42 +4,42 @@ using System.Windows.Media;
 
 namespace Uniwill_Control_Utility.Views.Controls;
 
-public sealed class DashboardSegmentedBar : FrameworkElement
+public sealed class SegmentedBar : FrameworkElement
 {
     public static readonly DependencyProperty ValueProperty = DependencyProperty.Register(
         nameof(Value),
         typeof(double),
-        typeof(DashboardSegmentedBar),
+        typeof(SegmentedBar),
         new FrameworkPropertyMetadata(0d, FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty MaximumProperty = DependencyProperty.Register(
         nameof(Maximum),
         typeof(double),
-        typeof(DashboardSegmentedBar),
+        typeof(SegmentedBar),
         new FrameworkPropertyMetadata(100d, FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty SegmentsProperty = DependencyProperty.Register(
         nameof(Segments),
         typeof(int),
-        typeof(DashboardSegmentedBar),
+        typeof(SegmentedBar),
         new FrameworkPropertyMetadata(20, FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty SegmentGapProperty = DependencyProperty.Register(
         nameof(SegmentGap),
         typeof(double),
-        typeof(DashboardSegmentedBar),
+        typeof(SegmentedBar),
         new FrameworkPropertyMetadata(3d, FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty FillProperty = DependencyProperty.Register(
         nameof(Fill),
         typeof(Brush),
-        typeof(DashboardSegmentedBar),
+        typeof(SegmentedBar),
         new FrameworkPropertyMetadata(Brushes.DodgerBlue, FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty TrackProperty = DependencyProperty.Register(
         nameof(Track),
         typeof(Brush),
-        typeof(DashboardSegmentedBar),
+        typeof(SegmentedBar),
         new FrameworkPropertyMetadata(
             new SolidColorBrush(Color.FromArgb(54, 160, 160, 160)),
             FrameworkPropertyMetadataOptions.AffectsRender));

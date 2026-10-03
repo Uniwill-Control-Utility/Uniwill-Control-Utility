@@ -79,7 +79,7 @@
                     <ColumnDefinition Width="52" />
                 </Grid.ColumnDefinitions>
                 <TextBlock VerticalAlignment="Center" Text="Temperature" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                <controls:DashboardSegmentedBar x:Name="_batteryTempBar" Grid.Column="1" Height="10" Margin="12,0" Maximum="100" Segments="20" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                <controls:SegmentedBar x:Name="_batteryTempBar" Grid.Column="1" Height="10" Margin="12,0" Maximum="100" Segments="20" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
                 <TextBlock x:Name="_batteryTempLabel" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="Medium" Text="--" />
             </Grid>
         </Grid>

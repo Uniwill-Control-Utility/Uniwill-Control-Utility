@@ -60,7 +60,7 @@
                 <TextBlock x:Name="_memoryPercent" Grid.Column="1" VerticalAlignment="Center" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="22" FontWeight="SemiBold" Text="--" />
             </Grid>
 
-            <controls:DashboardSegmentedBar x:Name="_memoryBar" Margin="4,0,4,0" Grid.Row="4" Height="10" Maximum="100" Segments="24" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+            <controls:SegmentedBar x:Name="_memoryBar" Margin="4,0,4,0" Grid.Row="4" Height="10" Maximum="100" Segments="24" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
 
             <Grid Grid.Row="7" Margin="4,0,4,0">
                 <Grid.ColumnDefinitions>
@@ -82,11 +82,11 @@
                 <TextBlock x:Name="_moduleSpeed" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" FontSize="12" FontWeight="Medium" Text="Not available" />
 
                 <TextBlock Grid.Row="0" Grid.Column="3" VerticalAlignment="Center" FontSize="12" Text="DIMM #1" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                <controls:DashboardSegmentedBar x:Name="_memoryTemp1Bar" Grid.Row="0" Grid.Column="4" Height="8" Margin="6,0" Maximum="100" Segments="10" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                <controls:SegmentedBar x:Name="_memoryTemp1Bar" Grid.Row="0" Grid.Column="4" Height="8" Margin="6,0" Maximum="100" Segments="10" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
                 <TextBlock x:Name="_memoryTemp1Label" Grid.Row="0" Grid.Column="5" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="Medium" Text="--" />
 
                 <TextBlock Grid.Row="1" Grid.Column="3" VerticalAlignment="Center" FontSize="12" Text="DIMM #2" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                <controls:DashboardSegmentedBar x:Name="_memoryTemp2Bar" Grid.Row="1" Grid.Column="4" Height="8" Margin="6,0" Maximum="100" Segments="10" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
+                <controls:SegmentedBar x:Name="_memoryTemp2Bar" Grid.Row="1" Grid.Column="4" Height="8" Margin="6,0" Maximum="100" Segments="10" Fill="{DynamicResource AccentFillColorDefaultBrush}" />
                 <TextBlock x:Name="_memoryTemp2Label" Grid.Row="1" Grid.Column="5" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="Medium" Text="--" />
             </Grid>
         </Grid>

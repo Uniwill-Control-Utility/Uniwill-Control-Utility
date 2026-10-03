@@ -207,7 +207,7 @@
 
                         <TextBlock Grid.Row="0" Style="{StaticResource LabelStyle}"
                                    VerticalAlignment="Center" Text="Power" HorizontalAlignment="Center" />
-                        <controls:DashboardSegmentedBar x:Name="CpuPowerBar"
+                        <controls:SegmentedBar x:Name="CpuPowerBar"
                             Grid.Row="0" Grid.Column="1" Height="7" Margin="8,0"
                             Maximum="300" Segments="16"
                             Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
@@ -217,7 +217,7 @@
 
                         <TextBlock Grid.Row="2" Style="{StaticResource LabelStyle}"
                                    VerticalAlignment="Center" Text="Clock" HorizontalAlignment="Center" />
-                        <controls:DashboardSegmentedBar x:Name="CpuClockBar"
+                        <controls:SegmentedBar x:Name="CpuClockBar"
                             Grid.Row="2" Grid.Column="1" Height="7" Margin="8,0"
                             Maximum="6000" Segments="16"
                             Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
@@ -227,7 +227,7 @@
 
                         <TextBlock Grid.Row="4" Style="{StaticResource LabelStyle}"
                                    VerticalAlignment="Center" Text="Fan" HorizontalAlignment="Center" />
-                        <controls:DashboardSegmentedBar x:Name="CpuFanBar"
+                        <controls:SegmentedBar x:Name="CpuFanBar"
                             Grid.Row="4" Grid.Column="1" Height="7" Margin="8,0"
                             Maximum="100" Segments="16"
                             Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
@@ -299,7 +299,7 @@
 
                         <TextBlock Grid.Row="0" Style="{StaticResource LabelStyle}"
                                    VerticalAlignment="Center" Text="Power" HorizontalAlignment="Center" />
-                        <controls:DashboardSegmentedBar x:Name="GpuPowerBar"
+                        <controls:SegmentedBar x:Name="GpuPowerBar"
                             Grid.Row="0" Grid.Column="1" Height="7" Margin="8,0"
                             Maximum="300" Segments="16"
                             Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
@@ -309,7 +309,7 @@
 
                         <TextBlock Grid.Row="2" Style="{StaticResource LabelStyle}"
                                    VerticalAlignment="Center" Text="Clock" HorizontalAlignment="Center" />
-                        <controls:DashboardSegmentedBar x:Name="GpuClockBar"
+                        <controls:SegmentedBar x:Name="GpuClockBar"
                             Grid.Row="2" Grid.Column="1" Height="7" Margin="8,0"
                             Maximum="3000" Segments="16"
                             Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
@@ -319,7 +319,7 @@
 
                         <TextBlock Grid.Row="4" Style="{StaticResource LabelStyle}"
                                    VerticalAlignment="Center" Text="Fan" HorizontalAlignment="Center" />
-                        <controls:DashboardSegmentedBar x:Name="GpuFanBar"
+                        <controls:SegmentedBar x:Name="GpuFanBar"
                             Grid.Row="4" Grid.Column="1" Height="7" Margin="8,0"
                             Maximum="100" Segments="16"
                             Fill="{DynamicResource AccentTextFillColorTertiaryBrush}" />
