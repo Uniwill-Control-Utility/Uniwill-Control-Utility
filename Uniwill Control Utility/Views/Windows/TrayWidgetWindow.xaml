@@ -42,28 +42,26 @@
                             <!-- Base background -->
                             <Border x:Name="BaseBackground"
                                     Background="{TemplateBinding Background}"
-                                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                    BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}"
                                     BorderThickness="1"
-                                    CornerRadius="6">
+                                    CornerRadius="4">
                                 <Border.Effect>
                                     <DropShadowEffect Color="Black"
-                                                      Opacity="0.12"
-                                                      BlurRadius="8"
-                                                      ShadowDepth="2"
+                                                      Opacity="0.08"
+                                                      BlurRadius="3"
+                                                      ShadowDepth="1"
                                                       Direction="270" />
                                 </Border.Effect>
                             </Border>
-                            <!-- Hover overlay for off-state (15% white) -->
+                            <!-- Hover overlay for off-state -->
                             <Border x:Name="HoverOffOverlay"
-                                    Background="White"
-                                    Opacity="0.025"
-                                    CornerRadius="6"
+                                    Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                    CornerRadius="4"
                                     Visibility="Collapsed" />
-                            <!-- Hover overlay for on-state (30% white) -->
+                            <!-- Hover overlay for on-state -->
                             <Border x:Name="HoverOnOverlay"
-                                    Background="White"
-                                    Opacity="0.3"
-                                    CornerRadius="6"
+                                    Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                    CornerRadius="4"
                                     Visibility="Collapsed" />
                             <!-- Content -->
                             <ContentPresenter x:Name="ContentPresenter"
@@ -95,9 +93,9 @@
                             <!-- Disabled state: dim background, off-state foreground -->
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Background"
-                                        Value="{DynamicResource ControlAltFillColorSecondaryBrush}" />
+                                        Value="{DynamicResource ControlFillColorDisabledBrush}" />
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        Value="{DynamicResource TextFillColorDisabledBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
