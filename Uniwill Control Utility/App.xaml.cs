@@ -368,12 +368,25 @@ namespace Uniwill_Control_Utility
 
                 // Auto-connect devices (Hydro UI, Flydigi cooler) during the
                 // pre-loading phase so the dashboard shows connected state on open.
-                await startupProgressReporter.ReportAsync(StartupStage.ConnectingDevices);
+                // Only show the progress step if at least one device feature is enabled.
+                if (Settings.Default.EnableHydroUiNavigation || Settings.Default.EnableFlydigi)
+                {
+                    await startupProgressReporter.ReportAsync(StartupStage.ConnectingDevices);
+                }
                 await AutoConnectDevicesAsync();
 
                 // Restore Adaptive Mode override state from previous session.
-                await startupProgressReporter.ReportAsync(StartupStage.RestoringAdaptiveMode);
+                // Only show the progress step if adaptive mode was actually running.
+                if (Settings.Default.isAdaptiveModeRunning)
+                {
+                    await startupProgressReporter.ReportAsync(StartupStage.RestoringAdaptiveMode);
+                }
                 await RestoreAdaptiveModeAsync();
+
+                // Apply startup settings (presets, keyboard RGB, EC fan curve,
+                // battery charge limit) during the pre-loading phase so the main
+                // window appears instantly without waiting for hardware writes.
+                await ApplyStartupSettingsAsync();
 
                 await _host.StartAsync(CancellationToken.None);
 
@@ -676,6 +689,22 @@ namespace Uniwill_Control_Utility
             {
                 _logger?.LogError(ex, "Failed to restore Adaptive Mode override state");
             }
+        }
+
+        /// <summary>
+        /// Applies startup settings (presets, keyboard RGB, EC fan curve, battery charge limit)
+        /// during the pre-loading phase. All three run in parallel so the total wait is the
+        /// slowest individual operation — not the sum of all three.
+        /// </summary>
+        private static async Task ApplyStartupSettingsAsync()
+        {
+            // Run keyboard RGB, EC fan control, and preset apply in parallel.
+            // Keyboard RGB has retries (up to ~6s), EC writes are fast, preset
+            // translation varies. Running them concurrently hides all latency.
+            await Task.WhenAll(
+                Views.Windows.MainWindow.ApplyOnStart(),
+                Task.Run(Views.Windows.MainWindow.ApplyEcSettingsOnStart),
+                Views.Windows.MainWindow.AsyncApplyKeyboardOnStart());
         }
 
         private static async Task RunPostStartupTasksAsync()
