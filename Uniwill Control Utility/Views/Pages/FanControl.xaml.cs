@@ -919,8 +919,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 SaveCurrentSettings();
                 ApplyCurveNow();
+                UpdateBanner();
             }
-            UpdateBanner();
         }
 
         private void cbCpuPreset_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -932,8 +932,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 SaveCurrentSettings();
                 ApplyCurveNow();
+                UpdateBanner();
             }
-            UpdateBanner();
         }
 
         private void cbGpuPreset_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -945,8 +945,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 SaveCurrentSettings();
                 ApplyCurveNow();
+                UpdateBanner();
             }
-            UpdateBanner();
         }
 
         private void HandlePresetSelection(
