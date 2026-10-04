@@ -10,6 +10,7 @@ namespace Uniwill_Control_Utility.Models
     public static class PanelDatabase
     {
         public const string PanelTypeMiniLED = "MiniLED";
+        public const string PanelTypeOLED = "OLED";
         public const string PanelTypeIPS = "IPS";
 
         /// <summary>
@@ -111,6 +112,7 @@ namespace Uniwill_Control_Utility.Models
             { "BOE0D5A", new PanelInfo("NE160QDM-NM9", "BOE0D5A", PanelTypeMiniLED, 300) },
             { "AUO30A5", new PanelInfo("B160QAN03.K", "AUO30A5", PanelTypeMiniLED, 165) },
             { "BOE0AF0", new PanelInfo("NE160QDM-NZ1", "BOE0AF0", PanelTypeIPS, 240) },
+            { "SDC420B", new PanelInfo("SDC420B", "SDC420B", PanelTypeOLED, 240) },
         };
 
         private static readonly System.Collections.Generic.Dictionary<string, PanelInfo> PanelsByModel = new()
@@ -128,6 +130,7 @@ namespace Uniwill_Control_Utility.Models
             { "MNG007DA1-8",   new PanelInfo("MNG007DA1-8", null, PanelTypeIPS, 165) },
             { "MNG007DA1-Q",   new PanelInfo("MNG007DA1-Q", null, PanelTypeIPS, 165) },
             { "N160GLE-GT1",   new PanelInfo("N160GLE-GT1", null, PanelTypeIPS, 165) },
+            { "SDC420B",       new PanelInfo("SDC420B", "SDC420B", PanelTypeOLED, 240) },
         };
     }
 
