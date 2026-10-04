@@ -52,6 +52,7 @@
                             <StackPanel>
                                 <TextBlock Text="Shift + Click point — range select" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,6"/>
                                 <TextBlock Text="Shift + Double-press Enter — flatten selection" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,6"/>
+                                <TextBlock Text="Right-click point — flatten curve to the right" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,6"/>
                                 <TextBlock Text="Ctrl + Click point — select all, move all" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,6"/>
                                 <TextBlock Text="Ctrl + A — select all" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,6"/>
                                 <TextBlock Text="Ctrl + D — clear selection" FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Margin="0,0,0,6"/>

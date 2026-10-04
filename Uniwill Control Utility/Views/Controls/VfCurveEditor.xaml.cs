@@ -95,6 +95,9 @@ namespace Uniwill_Control_Utility.Views.Controls
         private Point? _clickStartPos;         // Click position at MouseDown
         private Ellipse? _placementDot;       // Zero-size anchor for tooltip placement near points
 
+        // Context menu state
+        private int? _contextMenuPointIndex;  // Point index under right-click context menu
+
         // Undo/redo stacks
         private Stack<Dictionary<int, int>> _undoStack = new();
         private Stack<Dictionary<int, int>> _redoStack = new();
@@ -1155,6 +1158,43 @@ namespace Uniwill_Control_Utility.Views.Controls
                 _pendingRangeSelection = null;
                 _canvas.ReleaseMouseCapture();
             }
+        }
+
+        private void Canvas_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var pos = e.GetPosition(_canvas);
+            int? nearest = FindNearestPoint(pos);
+
+            if (nearest.HasValue && nearest.Value < _editorPoints.Count - 1)
+            {
+                _contextMenuPointIndex = nearest.Value;
+                _flattenRightMenuItem.IsEnabled = true;
+                _contextMenu.IsOpen = true;
+            }
+            else
+            {
+                _contextMenuPointIndex = null;
+                _flattenRightMenuItem.IsEnabled = false;
+            }
+
+            e.Handled = true;
+        }
+
+        private void FlattenRightMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_contextMenuPointIndex.HasValue) return;
+
+            int idx = _contextMenuPointIndex.Value;
+            int targetFreq = _editorPoints[idx].EffectiveFrequencyMHz();
+
+            SaveUndoState();
+            for (int i = idx + 1; i < _editorPoints.Count; i++)
+                _editorPoints[i].OffsetMHz = targetFreq - _editorPoints[i].BaseFrequencyMHz;
+
+            _contextMenuPointIndex = null;
+            DrawGraph();
+            UpdateSelectionVisuals();
+            CurveChanged?.Invoke(this, EventArgs.Empty);
         }
 
  

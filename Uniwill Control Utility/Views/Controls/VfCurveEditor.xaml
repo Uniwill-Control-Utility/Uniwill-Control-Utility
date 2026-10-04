@@ -46,7 +46,16 @@
                 MouseMove="Canvas_MouseMove"
                 MouseLeave="Canvas_MouseLeave"
                 MouseLeftButtonDown="Canvas_MouseLeftButtonDown"
-                MouseLeftButtonUp="Canvas_MouseLeftButtonUp"/>
+                MouseLeftButtonUp="Canvas_MouseLeftButtonUp"
+                MouseRightButtonDown="Canvas_MouseRightButtonDown">
+            <Canvas.ContextMenu>
+                <ContextMenu x:Name="_contextMenu">
+                    <MenuItem x:Name="_flattenRightMenuItem"
+                              Header="Flatten the curve to the right"
+                              Click="FlattenRightMenuItem_Click"/>
+                </ContextMenu>
+            </Canvas.ContextMenu>
+        </Canvas>
 
         <!-- X-axis labels (Voltage mV) — fills grid column like the canvas -->
         <Canvas x:Name="_xAxisLabels"
