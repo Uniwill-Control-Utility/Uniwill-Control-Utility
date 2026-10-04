@@ -19,11 +19,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             InitializeComponent();
             _ = Tablet.TabletDevices;
 
-            PopulateComboBox(cbxCharge);
-            PopulateComboBox(cbxDischarge);
-            PopulateComboBox(cbxResume);
+            PopulateComboBox(cbxCharge, ActivePresetMode);
+            PopulateComboBox(cbxDischarge, ActivePresetMode);
+            PopulateComboBox(cbxResume, ActivePresetMode);
 
-            // Restore saved selections
+            // Restore saved selections — resets to None if the saved preset is from the wrong mode pool.
             getAcPreset(Settings.Default.acPreset);
             getDcPreset(Settings.Default.dcPreset);
             getResumePreset(Settings.Default.resumePreset);
@@ -31,14 +31,39 @@ namespace Uniwill_Control_Utility.Views.Pages
             setup = true;
         }
 
+        /// <summary>
+        /// Returns the active preset mode based on the Power boost mode setting.
+        /// </summary>
+        private static PresetMode ActivePresetMode =>
+            Settings.Default.EnablePowerBoostMode
+                ? PresetMode.Boost
+                : PresetMode.Normal;
+
         #region ComboBox Population
 
-        private static void PopulateComboBox(ComboBox comboBox)
+        /// <summary>
+        /// Populates a ComboBox with "None" plus all available preset display names
+        /// filtered to only include custom presets from the currently active preset mode.
+        /// Built-in profiles (Office, Gaming, Turbo) are always included.
+        /// </summary>
+        private static void PopulateComboBox(ComboBox comboBox, PresetMode mode)
         {
             comboBox.Items.Add("None");
-            foreach (string name in PresetProfileApplier.GetProfileNames())
+
+            // Always show built-in profiles
+            foreach (string name in PresetProfileApplier.BuiltInProfileNames)
             {
                 comboBox.Items.Add(PresetProfileApplier.DisplayName(name));
+            }
+
+            // Only show custom presets from the active mode pool
+            var presets = CustomPresetStore.Load(mode);
+            for (int i = 0; i < presets.Length; i++)
+            {
+                if (presets[i].HasChanges)
+                {
+                    comboBox.Items.Add(PresetProfileApplier.CustomProfileKey(i, mode));
+                }
             }
         }
 
@@ -51,7 +76,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             setup = false;
             string oldPreset = Settings.Default.acPreset;
             cbxCharge.Items.Clear();
-            PopulateComboBox(cbxCharge);
+            PopulateComboBox(cbxCharge, ActivePresetMode);
             getAcPreset(oldPreset);
             setup = true;
         }
@@ -61,7 +86,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             setup = false;
             string oldPreset = Settings.Default.dcPreset;
             cbxDischarge.Items.Clear();
-            PopulateComboBox(cbxDischarge);
+            PopulateComboBox(cbxDischarge, ActivePresetMode);
             getDcPreset(oldPreset);
             setup = true;
         }
@@ -71,7 +96,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             setup = false;
             string oldPreset = Settings.Default.resumePreset;
             cbxResume.Items.Clear();
-            PopulateComboBox(cbxResume);
+            PopulateComboBox(cbxResume, ActivePresetMode);
             getResumePreset(oldPreset);
             setup = true;
         }
@@ -170,6 +195,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// <summary>
         /// Selects a combobox item matching the saved display name.
         /// Falls back to resolving old display name format (e.g. "Office Preset" → "Office") and saves the corrected value.
+        /// If the saved preset is not found (e.g. it belongs to a different power mode pool), resets to "None".
         /// </summary>
         private static void setPresetFromSaved(ComboBox comboBox, string searchName, Action<string?> saveCallback)
         {
@@ -206,7 +232,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
             }
 
+            // Preset not found — likely from a different power mode pool. Reset to None.
             comboBox.SelectedIndex = 0;
+            saveCallback(null);
+            Settings.Default.Save();
         }
 
         #endregion
