@@ -254,6 +254,30 @@ Application preferences, diagnostics, updates, and embedded system information.
 
 ![Settings](screenshots/settings.jpg)
 
+## Prerequisites
+
+UCU requires the following to be installed and configured before first use:
+
+### UWACPIDriver.sys (Uniwill EC Driver)
+
+UCU communicates with the Uniwill Embedded Controller through the `UWACPIDriver.sys` kernel driver. Check if it's already present at:
+
+```
+C:\Windows\System32\drivers\UWACPIDriver.sys
+```
+
+If the file exists, you're good to go. If it doesn't, install the official Control Center for your laptop (e.g., XMG Control Center, MechRevo Control Center, or another OEM utility that ships the Uniwill driver), then uninstall it — the driver file persists on disk after uninstall and is all that's needed.
+
+> **Note:** UCU does not bundle or redistribute this driver. Running as Administrator is required for EC access.
+
+### Pawn.IO
+
+[Pawn.IO](https://github.com/JamesCJ60/Pawn.IO) is required for AMD Ryzen CPU tuning features (power limits, Curve Optimizer, TjMax). Download and install it from the [releases page](https://github.com/JamesCJ60/Pawn.IO/releases).
+
+### RivaTuner Statistics Server (RTSS)
+
+RTSS is required for the **Game Overlay** FPS sensor. The overlay integrates with RTSS to display real-time frame rates. Download it from the [RivaTuner website](https://www.guru3d.com/download/rivatuner-statistics-server-download/).
+
 ## Installation
 
 1. Head over to the [Releases](https://github.com/jgudec/Uniwill-Control-Utility/releases) page
