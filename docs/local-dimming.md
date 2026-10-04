@@ -71,7 +71,7 @@ The `0x5000000000X` pattern:
 
 ### Read (Verification)
 
-After sending WMI commands, verify the state by reading EC register `0x72B`:
+After sending WMI commands, verify the state by reading EC register `0x72B`. The `ReadECRegister` method uses `DeviceIoControl` with IOCTL `0x9C40A488` directly against `UWACPIDriver.sys` (not through a proprietary DLL):
 
 ```csharp
 byte ecValue = ecService.ReadECRegister(0x072B);
@@ -106,5 +106,5 @@ Reverse-engineered from MechControl (Heavyfail fork) which implements a working 
 ## References
 
 - MechControl `LocalDimmingControl.cs` — WMI call pattern, command constants
-- MechControl `EcDevice.cs` — EC register read via `\\.\ACPIDriver`
+- MechControl `EcDevice.cs` — EC register read via `\\.\ACPIDriver` (IOCTL `0x9C40A488`)
 - EC register `0x72B` bit 1 — Local Dimming status flag

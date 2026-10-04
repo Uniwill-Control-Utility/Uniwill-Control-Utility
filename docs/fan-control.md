@@ -2,7 +2,7 @@
 
 This document describes how to control the CPU and GPU fan curves on SCH XMG Neo (and related TUXEDO InfinityBook) laptops through the Uniwill Embedded Controller (EC). It is intended as a reference for developers who want to implement their own fan control software for this hardware.
 
-The approach used by UXTU reads from and writes to EC registers through `ACPIDriverDll.dll`, a native OEM library shipped with the XMG Control Center. All register addresses are cross-referenced with the open-source [uniwill-laptop-driver](https://github.com/t-8ch/uniwill-laptop-driver) Linux kernel module, which documents the same EC under Linux.
+UCU reads from and writes to EC registers by communicating directly with `UWACPIDriver.sys` via `kernel32.dll` P/Invoke (`DeviceIoControl`). All register addresses are cross-referenced with the open-source [uniwill-laptop-driver](https://github.com/t-8ch/uniwill-laptop-driver) Linux kernel module, which documents the same EC under Linux.
 
 ---
 
@@ -41,10 +41,7 @@ Key facts:
 
 ```
 Application (C#)
-    │  P/Invoke (cdecl)
-    ▼
-ACPIDriverDll.dll  (native MFC/C++ OEM library)
-    │  IOCTL
+    │  P/Invoke → kernel32.dll DeviceIoControl
     ▼
 UWACPIDriver.sys   (Windows kernel-mode driver)
     │  ACPI I/O ports
@@ -52,31 +49,24 @@ UWACPIDriver.sys   (Windows kernel-mode driver)
 Uniwill EC         (Embedded Controller hardware)
 ```
 
-### ACPIDriverDll.dll Functions
+### Prerequisite: UWACPIDriver.sys
 
-The OEM DLL exports these functions (all `cdecl`, returning `int`):
+The driver must be present at `C:\Windows\System32\drivers\UWACPIDriver.sys`. It is installed by the OEM Control Center (e.g., XMG Control Center, MechRevo Control Center) and persists after uninstall. If the driver is missing, EC access is unavailable.
 
-| Function | Signature | Description |
-|----------|-----------|-------------|
-| `ReadEC` | `int ReadEC(ushort address)` | Read a byte from EC address |
-| `WriteEC` | `int WriteEC(ushort address, byte value)` | Write a byte to EC address |
-| `ReadIO` | `int ReadIO(ushort port)` | Read I/O port |
-| `WriteIO` | `int WriteIO(ushort port, byte value)` | Write I/O port |
-| `ReadIndexIO` | `int ReadIndexIO(ushort address)` | Read indexed I/O |
-| `WriteIndexIO` | `int WriteIndexIO(ushort address, byte value)` | Write indexed I/O |
+### DeviceIoControl Access
 
-For fan control, only `ReadEC` and `WriteEC` are needed.
+UCU opens `\\.\ACPIDriver` via `CreateFileW` and issues EC reads/writes through `DeviceIoControl` with the following IOCTL codes (sourced from MechControl's `EcDevice.cs`):
+
+| Operation | IOCTL Code | Description |
+|-----------|-----------|-------------|
+| EC Read | `0x9C40A488` | Read a byte from an EC address |
+| EC Write | `0x9C40A48C` | Write a byte to an EC address |
+
+**Buffer format:**
+- **Read:** Input is a 4-byte `int` (little-endian EC address); output is a 4-byte `int` (EC value, masked to byte).
+- **Write:** Input is an 8-byte `int[]` array `{address, value}`; output is a 4-byte `int` (status).
 
 **Timing constraint:** Each EC operation requires a **6ms delay** between calls. The Linux driver defines this as `UNIWILL_EC_DELAY_US = 6000`. Skipping this delay causes unreliable reads/writes.
-
-### Locating the DLL
-
-Search order used by UXTU:
-1. Application directory (`ACPIDriverDll.dll` bundled with the app)
-2. `C:\Program Files\OEM\Control Center\AiStoneService\MyControlCenter\ACPIDriverDll.dll`
-3. `C:\Program Files (x86)\OEM\Control Center\AiStoneService\MyControlCenter\ACPIDriverDll.dll`
-
-If none exist, EC access is unavailable.
 
 ---
 
@@ -353,7 +343,7 @@ UXTU's `UniwillECService` provides a complete C# implementation of all EC operat
 
 | Method | Description |
 |--------|-------------|
-| `Initialize()` | Load DLL, verify EC access |
+| `Initialize()` | Open driver handle, verify EC access |
 | `InitializeEc()` | Run the 8-step activation handshake |
 | `ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps)` | Upload and activate custom curves |
 | `SetFanSpeedPercent(percent)` | Set both fans to a fixed speed |
