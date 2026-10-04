@@ -13,6 +13,7 @@ namespace Uniwill_Control_Utility.Views.Windows
     {
         private const string PawnIoUrl = "https://pawnio.eu/";
         private const string RtssUrl = "https://www.guru3d.com/download/rtss-rivatuner-statistics-server-download/";
+        private const string TuxedoControlCenterUrl = "https://mytuxedo.de/public.php/dav/files/ZeB8FTf8CrpEtJr/Stellaris_Series/Stellaris_Gen7_AMD/ControlCenter_5.x_2025.zip";
 
         public PrerequisiteDialog()
         {
@@ -22,8 +23,43 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void UpdateStatuses()
         {
+            UpdateEcDriverStatus();
             UpdatePawnIoStatus();
             UpdateRtssStatus();
+        }
+
+        private void UpdateEcDriverStatus()
+        {
+            bool installed = EcDriverDetectionService.IsInstalled();
+
+            EcDriverStatusIcon.Symbol = installed ? SymbolRegular.CheckmarkCircle20 : SymbolRegular.Warning20;
+            EcDriverStatusIcon.Foreground = FindResource("SystemFillColor" + (installed ? "Success" : "Caution") + "Brush") as Brush;
+
+            if (installed)
+            {
+                UpdateButtonContent(EcDriverButton, true, "Installed", "Download");
+                EcDriverDescription.Text = "Kernel driver required for EC communication (fan control, battery, power limits). This driver is installed and ready to use.";
+            }
+            else
+            {
+                // Determine what to show based on detected laptop brand
+                var model = LaptopDetector.Detected;
+                string? manufacturer = model?.SystemManufacturer;
+
+                if (manufacturer != null && (manufacturer.Equals("SchenkerTechnologiesGmbH", StringComparison.OrdinalIgnoreCase) ||
+                                            manufacturer.Equals("PCSpecialist", StringComparison.OrdinalIgnoreCase)))
+                {
+                    // XMG or PCSpecialist — link to official driver page
+                    EcDriverDescription.Text = "Kernel driver required for EC communication (fan control, battery, power limits). Install your manufacturer's Control Center, then uninstall it — the driver persists on disk.";
+                    UpdateButtonContent(EcDriverButton, false, "Installed", "Driver Page");
+                }
+                else
+                {
+                    // Other brands — generic instructions with Tuxedo fallback
+                    EcDriverDescription.Text = "Kernel driver required for EC communication (fan control, battery, power limits). Download your manufacturer's Control Center software. If unavailable, try the Tuxedo Control Center (at your own risk).";
+                    UpdateButtonContent(EcDriverButton, false, "Installed", "Download");
+                }
+            }
         }
 
         private void UpdatePawnIoStatus()
@@ -64,6 +100,21 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             button.IsEnabled = !isReady;
             button.Appearance = isReady ? Wpf.Ui.Controls.ControlAppearance.Transparent : Wpf.Ui.Controls.ControlAppearance.Primary;
+        }
+
+        private void EcDriverButton_Click(object sender, RoutedEventArgs e)
+        {
+            var model = LaptopDetector.Detected;
+            string? manufacturer = model?.SystemManufacturer;
+
+            string url = manufacturer switch
+            {
+                _ when manufacturer.Equals("SchenkerTechnologiesGmbH", StringComparison.OrdinalIgnoreCase) => LaptopDetector.GetDriverUrl()!,
+                _ when manufacturer.Equals("PCSpecialist", StringComparison.OrdinalIgnoreCase) => LaptopDetector.GetDriverUrl()!,
+                _ => TuxedoControlCenterUrl
+            };
+
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         }
 
         private void PawnIoButton_Click(object sender, RoutedEventArgs e)

@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Management;
 using Uniwill_Control_Utility.Models;
+using Uniwill_Control_Utility.Scripts;
 
 namespace Uniwill_Control_Utility.Services
 {
     /// <summary>
     /// Detects the current laptop model by matching Win32_ComputerSystem.Manufacturer
     /// and the first 4 characters of Win32_BaseBoard.Product against a known catalog.
-    /// 
+    ///
     /// This approach is resilient to custom BIOS modifications that may alter the
     /// System Model value — the baseboard product identifier is harder to change
     /// and uniquely identifies the chassis.
@@ -18,12 +19,13 @@ namespace Uniwill_Control_Utility.Services
     {
         /// <summary>
         /// Brands that support driver page URLs.
-        /// XMG uses a fixed download URL by model, PCSpecialist requires the System SKU number.
+        /// XMG and TUXEDO use fixed URLs by model, PCSpecialist requires the System SKU number.
         /// </summary>
         private static readonly HashSet<string> DriverSupportedManufacturers = new(StringComparer.OrdinalIgnoreCase)
         {
             "SchenkerTechnologiesGmbH",
-            "PCSpecialist"
+            "PCSpecialist",
+            "TUXEDO"
         };
 
         private static string? _systemSkuNumber;
@@ -48,6 +50,8 @@ namespace Uniwill_Control_Utility.Services
         /// XMG Neo 16 A25: https://download.schenker-tech.de/package/xmg-neo-16-a25-xne16a25/
         /// XMG Neo 16 E25: https://download.schenker-tech.de/package/xmg-neo-16-e25-xne16e25/
         /// PCSpecialist Recoil III: https://www.pcspecialist.ie/drivers/{SkuNumber}/w11/
+        /// TUXEDO Stellaris 16 Gen7 (AMD): https://mytuxedo.de/index.php/s/ZeB8FTf8CrpEtJr?dir=/Stellaris_Series/Stellaris_Gen7_AMD
+        /// TUXEDO Stellaris 16 Gen7 (Intel): https://mytuxedo.de/index.php/s/ZeB8FTf8CrpEtJr?dir=/Stellaris_Series/Stellaris_Gen7_Intel
         /// </summary>
         public static string? GetDriverUrl()
         {
@@ -73,6 +77,15 @@ namespace Uniwill_Control_Utility.Services
                     return null; // Unicorn BIOS with cleared SKU — can't build URL
 
                 return $"https://www.pcspecialist.ie/drivers/{sku}/w11/";
+            }
+
+            // TUXEDO — CPU-vendor-aware URL
+            if (model.SystemManufacturer.Equals("TUXEDO", StringComparison.OrdinalIgnoreCase))
+            {
+                bool isIntel = Family.TYPE == Family.ProcessorType.Intel;
+                return isIntel
+                    ? "https://mytuxedo.de/index.php/s/ZeB8FTf8CrpEtJr?dir=/Stellaris_Series/Stellaris_Gen7_Intel"
+                    : "https://mytuxedo.de/index.php/s/ZeB8FTf8CrpEtJr?dir=/Stellaris_Series/Stellaris_Gen7_AMD";
             }
 
             return null;
