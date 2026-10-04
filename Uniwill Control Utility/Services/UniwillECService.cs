@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -9,12 +10,13 @@ using System.Management;
 namespace Uniwill_Control_Utility.Services
 {
     /// <summary>
-    /// Wrapper around ACPIDriverDll.dll (the native Uniwill OEM DLL) that provides
-    /// ReadEC / WriteEC / ReadIO / WriteIO / ReadIndexIO / WriteIndexIO access to
-    /// the Uniwill Embedded Controller.
-    ///
-    /// The OEM DLL (ACPIDriverDll.dll, an MFC/C++ native library) communicates with
-    /// the UWACPIDriver.sys kernel driver which is bound to ACPI device INOU0000.
+    /// Direct EC access to the Uniwill Embedded Controller via DeviceIoControl.
+    /// Communicates with the UWACPIDriver.sys kernel driver (bound to ACPI device INOU0000)
+    /// using IOCTL codes discovered from MechControl's decompiled EcDevice.cs.
+    /// 
+    /// Replaces the previous ACPIDriverDll.dll dependency with direct kernel32.dll P/Invoke.
+    /// Requires UWACPIDriver.sys to be installed (e.g., from XMG Control Center).
+    /// 
     /// All EC register addresses come from the uniwill-laptop-driver Linux kernel
     /// module source (which documents the same EC on the same hardware under Linux).
     /// </summary>
@@ -53,7 +55,7 @@ namespace Uniwill_Control_Utility.Services
         public const ushort REG_GPU_TEMP_START_TABLE = 0x0F40;  // 16 bytes
         public const ushort REG_GPU_FAN_SPEED_TABLE = 0x0F50;   // 16 bytes (duty 0-200)
 
-        // --- Direct fan PWM (WMI-only on Linux; on Windows we use WriteEC through ACPIDriverDll) ---
+        // --- Direct fan PWM ---
         public const ushort REG_PWM_1_WRITEABLE = 0x1804;
         public const ushort REG_PWM_2_WRITEABLE = 0x1809;
 
@@ -137,38 +139,66 @@ namespace Uniwill_Control_Utility.Services
 
         #endregion
 
-        #region P/Invoke to ACPIDriverDll.dll
+        #region Driver Communication (kernel32.dll P/Invoke)
 
-        // The OEM DLL exports these functions. They are cdecl with int return.
-        // ReadEC(ushort address) -> byte value (as int)
-        // WriteEC(ushort address, byte value) -> int status
-        // ReadIO, WriteIO, ReadIndexIO, WriteIndexIO, ReadCMOS, WriteCMOS, ReadMEMB, WriteMEMB, ReadPCI, WritePCI
+        // Device path for the UWACPIDriver.sys kernel driver
+        private const string AcpiDriverDevice = @"\\.\ACPIDriver";
 
-        private const string AcpiDriverDllName = "ACPIDriverDll.dll";
+        // IOCTL codes from MechControl's EcDevice.cs - proven to work on NB05.
+        // MechControl decimal values: 2621482120u (read) / 2621482124u (write)
+        // IOCTL_ECREAD  = 0x9C40A488
+        // IOCTL_ECWRITE = 0x9C40A48C
+        private const uint IOCTL_ECREAD = 0x9C40A488;
+        private const uint IOCTL_ECWRITE = 0x9C40A48C;
 
-        [DllImport(AcpiDriverDllName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int ReadEC(ushort address);
+        // File access/share flags
+        private const uint GENERIC_READ_WRITE = 0xC0000000; // GENERIC_READ | GENERIC_WRITE
+        private const uint FILE_SHARE_RW = 3;               // FILE_SHARE_READ | FILE_SHARE_WRITE
+        private const uint OPEN_EXISTING = 3;
 
-        [DllImport(AcpiDriverDllName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int WriteEC(ushort address, byte value);
+        private static readonly nint InvalidHandle = new(-1);
 
-        [DllImport(AcpiDriverDllName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int ReadIO(ushort port);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern nint CreateFileW(
+            string lpFileName,
+            uint dwDesiredAccess,
+            uint dwShareMode,
+            nint lpSecurityAttributes,
+            uint dwCreationDisposition,
+            uint dwFlagsAndAttributes,
+            nint hTemplateFile);
 
-        [DllImport(AcpiDriverDllName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int WriteIO(ushort port, byte value);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool DeviceIoControl(
+            nint hDevice,
+            uint dwIoControlCode,
+            ref int lpInBuffer,
+            int nInBufferSize,
+            ref int lpOutBuffer,
+            int nOutBufferSize,
+            out int lpBytesReturned,
+            nint lpOverlapped);
 
-        [DllImport(AcpiDriverDllName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int ReadIndexIO(ushort address);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool DeviceIoControl(
+            nint hDevice,
+            uint dwIoControlCode,
+            int[] lpInBuffer,
+            int nInBufferSize,
+            ref int lpOutBuffer,
+            int nOutBufferSize,
+            out int lpBytesReturned,
+            nint lpOverlapped);
 
-        [DllImport(AcpiDriverDllName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int WriteIndexIO(ushort address, byte value);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(nint hObject);
 
         #endregion
 
         #region Private State
 
-        private readonly string _dllPath;
+        private nint _driverHandle = InvalidHandle;
+        private readonly int[] _writeBuffer = new int[2];
         private bool _initialized;
         private bool _disposed;
         private bool _boostActive;
@@ -191,17 +221,15 @@ namespace Uniwill_Control_Utility.Services
         #region Constructor & Initialization
 
         /// <summary>
-        /// Creates a new UniwillECService that loads ACPIDriverDll.dll from the specified path.
-        /// Pass null to use the DLL from the application directory or system PATH.
+        /// Creates a new UniwillECService that communicates directly with UWACPIDriver.sys.
         /// </summary>
-        public UniwillECService(string? dllPath = null)
+        public UniwillECService()
         {
-            _dllPath = dllPath ?? string.Empty;
         }
 
         /// <summary>
-        /// Initializes the EC service by loading ACPIDriverDll.dll.
-        /// Returns true if the DLL loaded successfully and the EC is accessible.
+        /// Initializes the EC service by opening a handle to \\.\ACPIDriver.
+        /// Returns true if the driver is accessible and the EC responds.
         /// </summary>
         public bool Initialize()
         {
@@ -215,21 +243,18 @@ namespace Uniwill_Control_Utility.Services
 
                 try
                 {
-                    if (!string.IsNullOrEmpty(_dllPath))
-                    {
-                        // Load the DLL from a specific path
-                        NativeLibrary.Load(_dllPath);
-                    }
+                    _driverHandle = OpenDriverHandle();
 
                     // Test EC access by reading the PROJECT_ID register
-                    int projectId = ReadEC(REG_PROJECT_ID);
-                    DebugLog($"UniwillEC: Initialized successfully. PROJECT_ID = 0x{projectId & 0xFF:X2}");
+                    byte projectId = ReadECInternal(REG_PROJECT_ID);
+                    DebugLog($"UniwillEC: Initialized successfully. PROJECT_ID = 0x{projectId:X2}");
                     _initialized = true;
                     return true;
                 }
-                catch (DllNotFoundException)
+                catch (Win32Exception ex)
                 {
-                    DebugLog($"[ERROR] UniwillEC: ACPIDriverDll.dll not found. Ensure the DLL is in the application directory or specify the path.");
+                    DebugLog($"[ERROR] UniwillEC: Cannot open {AcpiDriverDevice} (error {ex.NativeErrorCode}). " +
+                        "Is UWACPIDriver.sys installed? Are you running as Administrator?");
                     return false;
                 }
                 catch (Exception ex)
@@ -238,6 +263,36 @@ namespace Uniwill_Control_Utility.Services
                     return false;
                 }
             }
+        }
+
+        /// <summary>Opens a handle to \\.\ACPIDriver for EC communication.</summary>
+        private nint OpenDriverHandle()
+        {
+            nint handle = CreateFileW(
+                AcpiDriverDevice,
+                GENERIC_READ_WRITE,
+                FILE_SHARE_RW,
+                nint.Zero,
+                OPEN_EXISTING,
+                0,
+                nint.Zero);
+
+            if (handle == InvalidHandle)
+            {
+                int error = Marshal.GetHRForLastWin32Error();
+                throw new Win32Exception(Marshal.GetLastWin32Error(),
+                    $"Failed to open {AcpiDriverDevice} (error {Marshal.GetLastWin32Error()}). " +
+                    "Is the UWACPIDriver.sys kernel driver installed and started?");
+            }
+
+            return handle;
+        }
+
+        /// <summary>Tries to reconnect the driver handle after a failure.</summary>
+        private void TryReconnect()
+        {
+            try { CloseHandle(_driverHandle); } catch { /* ignore */ }
+            _driverHandle = OpenDriverHandle();
         }
 
         /// <summary>
@@ -353,23 +408,63 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
+        /// Reads a single byte from EC via IOCTL_ECREAD.
+        /// </summary>
+        private byte ReadECInternal(ushort address)
+        {
+            int lpIn = address;
+            int lpOut = 0;
+            if (!DeviceIoControl(_driverHandle, IOCTL_ECREAD, ref lpIn, 4, ref lpOut, 4, out _, nint.Zero))
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error(),
+                    $"EC read failed at 0x{address:X3}");
+            }
+            return (byte)(lpOut & 0xFF);
+        }
+
+        /// <summary>
+        /// Writes a byte to EC via IOCTL_ECWRITE.
+        /// </summary>
+        private void WriteECInternal(ushort address, byte value)
+        {
+            _writeBuffer[0] = address;
+            _writeBuffer[1] = value;
+            int lpOut = 0;
+            if (!DeviceIoControl(_driverHandle, IOCTL_ECWRITE, _writeBuffer, 8, ref lpOut, 4, out _, nint.Zero))
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error(),
+                    $"EC write failed at 0x{address:X3} value 0x{value:X2}");
+            }
+        }
+
+        /// <summary>
         /// Writes a byte directly to EC without the outer lock (used internally by InitializeEc).
         /// </summary>
         private void WriteECRaw(ushort address, byte value)
         {
-            int result = WriteEC(address, value);
-            Thread.Sleep(EcDelayMs);
-            if (result != 0)
+            try
             {
-                DebugLog($"[WARN] UniwillEC: WriteECRaw(0x{address:X2}, 0x{value:X2}) returned {result}");
+                WriteECInternal(address, value);
             }
+            catch
+            {
+                TryReconnect();
+                WriteECInternal(address, value);
+            }
+            Thread.Sleep(EcDelayMs);
         }
 
         private byte ReadECRaw(ushort address)
         {
-            int result = ReadEC(address);
-            Thread.Sleep(EcDelayMs);
-            return (byte)(result & 0xFF);
+            try
+            {
+                return ReadECInternal(address);
+            }
+            catch
+            {
+                TryReconnect();
+                return ReadECInternal(address);
+            }
         }
 
         /// <summary>
@@ -395,9 +490,7 @@ namespace Uniwill_Control_Utility.Services
             EnsureInitialized();
             lock (_lock)
             {
-                int result = ReadEC(address);
-                Thread.Sleep(EcDelayMs);
-                return (byte)(result & 0xFF);
+                return ReadECInternal(address);
             }
         }
 
@@ -409,12 +502,7 @@ namespace Uniwill_Control_Utility.Services
             EnsureInitialized();
             lock (_lock)
             {
-                int result = WriteEC(address, value);
-                Thread.Sleep(EcDelayMs);
-                if (result != 0)
-                {
-                    DebugLog($"[WARN] UniwillEC: WriteEC(0x{address:X2}, 0x{value:X2}) returned {result}");
-                }
+                WriteECInternal(address, value);
             }
         }
 
@@ -429,7 +517,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 for (int i = 0; i < count; i++)
                 {
-                    data[i] = (byte)(ReadEC((ushort)(startAddress + i)) & 0xFF);
+                    data[i] = ReadECInternal((ushort)(startAddress + i));
                     Thread.Sleep(EcDelayMs);
                 }
             }
@@ -446,7 +534,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 for (int i = 0; i < data.Length; i++)
                 {
-                    WriteEC((ushort)(startAddress + i), data[i]);
+                    WriteECInternal((ushort)(startAddress + i), data[i]);
                     Thread.Sleep(EcDelayMs);
                 }
             }
@@ -457,10 +545,8 @@ namespace Uniwill_Control_Utility.Services
             EnsureInitialized();
             lock (_lock)
             {
-                int result = WriteEC(address, value);
+                WriteECInternal(address, value);
                 Thread.Sleep(EcDelayMs);
-                if (result != 0)
-                    throw new InvalidOperationException($"EC write to 0x{address:X4} failed with code {result}.");
             }
         }
 
@@ -471,11 +557,8 @@ namespace Uniwill_Control_Utility.Services
             {
                 for (int i = 0; i < data.Length; i++)
                 {
-                    ushort address = (ushort)(startAddress + i);
-                    int result = WriteEC(address, data[i]);
+                    WriteECInternal((ushort)(startAddress + i), data[i]);
                     Thread.Sleep(EcDelayMs);
-                    if (result != 0)
-                        throw new InvalidOperationException($"EC write to 0x{address:X4} failed with code {result}.");
                 }
             }
         }
@@ -513,13 +596,13 @@ namespace Uniwill_Control_Utility.Services
                 DebugLog($"ActivateGpuPowerControl(ctgpOffset={ctgpOffset}, dbOffset={dbOffset}, dbClamped={dbClamped})");
 
                 // Prerequisite: enable CUSTOM_PROFILE mode so the EC accepts GPU power writes.
-                byte beforeCp = (byte)ReadEC(REG_CUSTOM_PROFILE);
+                byte beforeCp = ReadECInternal(REG_CUSTOM_PROFILE);
                 byte customProfile = (byte)(beforeCp | CUSTOM_PROFILE_ENABLE);
-                WriteEC(REG_CUSTOM_PROFILE, customProfile);
+                WriteECInternal(REG_CUSTOM_PROFILE, customProfile);
                 Thread.Sleep(EcDelayMs);
 
                 // Step 0: Set GPU power management enable flag (0x0741).
-                WriteEC(0x0741, 0x01);
+                WriteECInternal(0x0741, 0x01);
                 Thread.Sleep(EcDelayMs);
 
                 // Step 0.5: Enable CTGP/DB feature in EC (0x0743).
@@ -530,27 +613,27 @@ namespace Uniwill_Control_Utility.Services
                 byte ctgpDbEnable = (byte)(CTGP_DB_ENABLE_GENERAL | CTGP_DB_ENABLE_CTGP);
                 if (dbClamped > 0)
                     ctgpDbEnable |= CTGP_DB_ENABLE_DB;
-                WriteEC(REG_CTGP_DB_ENABLE, ctgpDbEnable);
+                WriteECInternal(REG_CTGP_DB_ENABLE, ctgpDbEnable);
                 Thread.Sleep(EcDelayMs);
 
                 // Step 1: cTGP offset (targetWatts - defaultWatts, per UCC/tuxedo-drivers).
-                WriteEC(REG_CTGP_DB_CTGP_OFFSET, (byte)ctgpOffset);
+                WriteECInternal(REG_CTGP_DB_CTGP_OFFSET, (byte)ctgpOffset);
                 Thread.Sleep(EcDelayMs);
 
                 // Step 2: TPP offset = 255 (max total power pool)
-                WriteEC(REG_CTGP_DB_TPP_OFFSET, 255);
+                WriteECInternal(REG_CTGP_DB_TPP_OFFSET, 255);
                 Thread.Sleep(EcDelayMs);
 
                 // Step 3: Dynamic Boost offset (watts the GPU can borrow from CPU)
-                WriteEC(REG_CTGP_DB_DB_OFFSET, dbClamped);
+                WriteECInternal(REG_CTGP_DB_DB_OFFSET, dbClamped);
                 Thread.Sleep(EcDelayMs);
 
                 // Verify writes by reading back all registers
-                byte r0 = (byte)ReadEC(REG_CUSTOM_PROFILE);
-                byte r1 = (byte)ReadEC(REG_CTGP_DB_ENABLE);
-                byte r2 = (byte)ReadEC(REG_CTGP_DB_CTGP_OFFSET);
-                byte r3 = (byte)ReadEC(REG_CTGP_DB_TPP_OFFSET);
-                byte r4 = (byte)ReadEC(REG_CTGP_DB_DB_OFFSET);
+                byte r0 = ReadECInternal(REG_CUSTOM_PROFILE);
+                byte r1 = ReadECInternal(REG_CTGP_DB_ENABLE);
+                byte r2 = ReadECInternal(REG_CTGP_DB_CTGP_OFFSET);
+                byte r3 = ReadECInternal(REG_CTGP_DB_TPP_OFFSET);
+                byte r4 = ReadECInternal(REG_CTGP_DB_DB_OFFSET);
                 DebugLog($"ActivateGpuPowerControl readback: 0x0727=0x{r0:X2} 0x0743=0x{r1:X2} 0x0744=0x{r2:X2} (wanted 0x{ctgpOffset:X2}) 0x0745=0x{r3:X2} 0x0746=0x{r4:X2} (wanted db=0x{dbClamped:X2})");
             }
         }
@@ -564,15 +647,15 @@ namespace Uniwill_Control_Utility.Services
             lock (_lock)
             {
                 // Disable CTGP/DB feature in EC (0x0743 = 0x00)
-                WriteEC(REG_CTGP_DB_ENABLE, 0x00);
+                WriteECInternal(REG_CTGP_DB_ENABLE, 0x00);
                 Thread.Sleep(EcDelayMs);
 
                 // Reset offsets to defaults
-                WriteEC(REG_CTGP_DB_CTGP_OFFSET, 55);
+                WriteECInternal(REG_CTGP_DB_CTGP_OFFSET, 55);
                 Thread.Sleep(EcDelayMs);
-                WriteEC(REG_CTGP_DB_TPP_OFFSET, 0);
+                WriteECInternal(REG_CTGP_DB_TPP_OFFSET, 0);
                 Thread.Sleep(EcDelayMs);
-                WriteEC(REG_CTGP_DB_DB_OFFSET, 0);
+                WriteECInternal(REG_CTGP_DB_DB_OFFSET, 0);
             }
         }
 
@@ -1142,10 +1225,10 @@ namespace Uniwill_Control_Utility.Services
             EnsureInitialized();
             lock (_lock)
             {
-                int result = WriteEC(reg, (byte)duty);
+                WriteECInternal(reg, (byte)duty);
                 Thread.Sleep(EcDelayMs);
-                DebugLog($"[DIAG] UniwillEC: Direct PWM write to 0x{reg:X2} = {duty}, result={result}");
-                return result == 0;
+                DebugLog($"[DIAG] UniwillEC: Direct PWM write to 0x{reg:X2} = {duty}");
+                return true;
             }
         }
 
@@ -1946,6 +2029,12 @@ namespace Uniwill_Control_Utility.Services
             if (_disposed)
                 return;
             _disposed = true;
+
+            if (_driverHandle != InvalidHandle)
+            {
+                try { CloseHandle(_driverHandle); } catch { /* ignore */ }
+                _driverHandle = InvalidHandle;
+            }
         }
 
         #endregion

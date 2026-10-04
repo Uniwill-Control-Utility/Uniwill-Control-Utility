@@ -253,32 +253,7 @@ namespace Uniwill_Control_Utility
                         // Uniwill EC access (for XMG / TUXEDO laptops)
                         services.AddSingleton<UniwillECService>(provider =>
                         {
-                            string? dllPath = null;
-                            try
-                            {
-                                // Search order: bundled DLL first (shipped with UCU),
-                                // then fallback to OEM Control Center installation paths.
-                                string appDir = AppDomain.CurrentDomain.BaseDirectory;
-                                string[] searchPaths = new[]
-                                {
-                                    Path.Combine(appDir, "ACPIDriverDll.dll"),
-                                    @"C:\Program Files\OEM\Control Center\AiStoneService\MyControlCenter\ACPIDriverDll.dll",
-                                    @"C:\Program Files (x86)\OEM\Control Center\AiStoneService\MyControlCenter\ACPIDriverDll.dll",
-                                };
-                                foreach (string path in searchPaths)
-                                {
-                                    if (File.Exists(path))
-                                    {
-                                        dllPath = path;
-                                        break;
-                                    }
-                                }
-                            }
-                            catch
-                            {
-                                // Ignore path discovery errors
-                            }
-                            return new UniwillECService(dllPath);
+                            return new UniwillECService();
                         });
                         services.AddSingleton<EcTelemetryService>();
 
