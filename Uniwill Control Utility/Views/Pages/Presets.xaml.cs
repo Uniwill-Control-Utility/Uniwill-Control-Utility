@@ -137,6 +137,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                     updateAllLabels();
                 }
 
+                // After ALL slider value assignments (profile load + Custom fallback),
+                // clamp to current limits so Power Boost mode changes are respected.
+                // Must run after the Custom block above because LoadCustomValues()
+                // can overwrite slider values that were already clamped.
+                clampSlidersToLimits();
+
                 // Refresh preset mode label and bottom bar stroke on every navigation
                 // (handles settings changes from the Settings page).
                 UpdatePresetModeLabel(Settings.Default.EnablePowerBoostMode);
@@ -278,6 +284,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Update labels — always refresh so the TGP label matches the slider value
             // even when the custom panel is collapsed (pre-made profiles).
+            updateAllLabels();
+
+            // Clamp slider values to current limits after Page_Loaded overwrites them.
+            // (OnNavigatedToAsync clamps too, but Page_Loaded fires after and resets values.)
+            clampSlidersToLimits();
             updateAllLabels();
 
             // Update overlay based on Adaptive Mode override state
@@ -523,6 +534,28 @@ namespace Uniwill_Control_Utility.Views.Pages
             return null;
         }
 
+        /// <summary>
+        /// Updates a slider Maximum and adjusts the value if the range changed.
+        /// If the max shrinks and the value exceeds it, clamps down.
+        /// If the max grows and the value was at the old max, bumps to the new max.
+        /// </summary>
+        private static void applySliderMaxChange(Slider slider, double newMax)
+        {
+            double oldMax = slider.Maximum;
+            double value = slider.Value;
+
+            slider.Maximum = newMax;
+
+            if (value > newMax)
+            {
+                slider.Value = newMax;
+            }
+            else if (newMax > oldMax && value >= oldMax)
+            {
+                slider.Value = newMax;
+            }
+        }
+
         private void applyPowerLimits()
         {
             var limits = GetPowerLimits();
@@ -540,20 +573,65 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             if (Family.TYPE == Family.ProcessorType.Amd_Apu)
             {
-                sdSustained.Maximum = powerBoostMode ? boostPl1 : pl.CpuPl1Sustained;
-                sdBoost.Maximum = powerBoostMode ? boostPl2 : pl.CpuPl2Boost;
+                applySliderMaxChange(sdSustained, powerBoostMode ? boostPl1 : pl.CpuPl1Sustained);
+                applySliderMaxChange(sdBoost, powerBoostMode ? boostPl2 : pl.CpuPl2Boost);
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
-                sdIntelPl1.Maximum = powerBoostMode ? boostPl1 : pl.CpuPl1Sustained;
-                sdIntelPl2.Maximum = powerBoostMode ? boostPl2 : pl.CpuPl2Boost;
+                applySliderMaxChange(sdIntelPl1, powerBoostMode ? boostPl1 : pl.CpuPl1Sustained);
+                applySliderMaxChange(sdIntelPl2, powerBoostMode ? boostPl2 : pl.CpuPl2Boost);
             }
 
-            // GPU TGP slider — set per-GPU min/max range
             SetGpuSliderLimits(pl.GpuTgpBaseline);
 
             // Dynamic Boost offset — max is the DB max from SKU config
             sdNvDbOffset.Maximum = pl.DynamicBoostMax;
+        }
+
+        /// <summary>
+        /// Clamps slider values to current limits after profile loading.
+        /// If the slider max grew (Power Boost enabled) and the value was at the old max,
+        /// bumps it to the new max so the label and thumb stay in sync.
+        /// </summary>
+        private void clampSlidersToLimits()
+        {
+            var limits = GetPowerLimits();
+            if (limits == null)
+                return;
+
+            var pl = limits;
+            bool powerBoostMode = Settings.Default.EnablePowerBoostMode;
+
+            // CPU sliders
+            int boostPl1 = Family.TYPE == Family.ProcessorType.Amd_Apu ? 160 : 255;
+            int boostPl2 = Family.TYPE == Family.ProcessorType.Amd_Apu ? 160 : 255;
+
+            if (Family.TYPE == Family.ProcessorType.Amd_Apu)
+            {
+                int effectiveMax = powerBoostMode ? boostPl1 : pl.CpuPl1Sustained;
+                if (sdSustained.Value > effectiveMax) sdSustained.Value = effectiveMax;
+                if (powerBoostMode && sdSustained.Value == pl.CpuPl1Sustained) sdSustained.Value = boostPl1;
+
+                effectiveMax = powerBoostMode ? boostPl2 : pl.CpuPl2Boost;
+                if (sdBoost.Value > effectiveMax) sdBoost.Value = effectiveMax;
+                if (powerBoostMode && sdBoost.Value == pl.CpuPl2Boost) sdBoost.Value = boostPl2;
+            }
+            else if (Family.TYPE == Family.ProcessorType.Intel)
+            {
+                int effectiveMax = powerBoostMode ? boostPl1 : pl.CpuPl1Sustained;
+                if (sdIntelPl1.Value > effectiveMax) sdIntelPl1.Value = effectiveMax;
+                if (powerBoostMode && sdIntelPl1.Value == pl.CpuPl1Sustained) sdIntelPl1.Value = boostPl1;
+
+                effectiveMax = powerBoostMode ? boostPl2 : pl.CpuPl2Boost;
+                if (sdIntelPl2.Value > effectiveMax) sdIntelPl2.Value = effectiveMax;
+                if (powerBoostMode && sdIntelPl2.Value == pl.CpuPl2Boost) sdIntelPl2.Value = boostPl2;
+            }
+
+            // GPU TGP slider — clamp to current max.
+            if (sdNvPower.Value > sdNvPower.Maximum)
+            {
+                sdNvPower.Value = sdNvPower.Maximum;
+            }
         }
 
         private void SetGpuSliderLimits(int fallbackMax)
@@ -567,12 +645,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                 var n when n.Contains("rtx 5070") => (60, boostEnabled ? 250 : 115),
                 _ => (50, fallbackMax)
             };
+
             sdNvPower.Minimum = min;
             sdNvPower.Maximum = max;
 
-            // Clamp current value to new range only if out of bounds.
-            // This handles the case where Power boost mode setting changes
-            // (e.g., user disables boost, reducing the max from 250 to 150).
+            // Clamp current value to new range if above max.
+            // The upward bump (max grows, value was at old max) is handled
+            // separately in clampSlidersToLimits() which runs after profile loading.
             if (sdNvPower.Value > max) sdNvPower.Value = max;
             if (sdNvPower.Value < min) sdNvPower.Value = min;
 
@@ -899,6 +978,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Update status display
             updateStatus();
+
+            // Clamp slider values to current limits after profile values are set.
+            // Handles Power Boost mode changes: if boost is ON and a profile value
+            // equals the non-boost max, bump to the boost max.
+            clampSlidersToLimits();
 
             // Save selection
             Settings.Default.presetProfile = profile;

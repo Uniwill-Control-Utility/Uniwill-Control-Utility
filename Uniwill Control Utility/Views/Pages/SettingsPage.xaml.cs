@@ -418,16 +418,24 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.Save();
         }
 
-       private void cbPowerBoostMode_Checked(object sender, RoutedEventArgs e)
+      private void cbPowerBoostMode_Checked(object sender, RoutedEventArgs e)
         {
             Settings.Default.EnablePowerBoostMode = true;
             Settings.Default.Save();
+
+            // Invalidate cached Presets/Adaptive page instances so the next
+            // navigation creates fresh instances with the new slider ranges.
+            var pageService = App.GetService<Wpf.Ui.Abstractions.INavigationViewPageProvider>() as PageService;
+            pageService?.InvalidateBoostDependentPages();
         }
 
         private void cbPowerBoostMode_Unchecked(object sender, RoutedEventArgs e)
         {
             Settings.Default.EnablePowerBoostMode = false;
             Settings.Default.Save();
+
+            var pageService = App.GetService<Wpf.Ui.Abstractions.INavigationViewPageProvider>() as PageService;
+            pageService?.InvalidateBoostDependentPages();
         }
 
         private void cbHideFlydigi_Checked(object sender, RoutedEventArgs e)
