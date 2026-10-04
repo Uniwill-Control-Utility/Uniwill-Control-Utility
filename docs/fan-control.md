@@ -2,7 +2,7 @@
 
 This document describes how to control the CPU and GPU fan curves on SCH XMG Neo (and related TUXEDO InfinityBook) laptops through the Uniwill Embedded Controller (EC). It is intended as a reference for developers who want to implement their own fan control software for this hardware.
 
-UCU reads from and writes to EC registers by communicating directly with `UWACPIDriver.sys` via `kernel32.dll` P/Invoke (`DeviceIoControl`). All register addresses are cross-referenced with the open-source [uniwill-laptop-driver](https://github.com/t-8ch/uniwill-laptop-driver) Linux kernel module, which documents the same EC under Linux.
+UCU reads from and writes to EC registers by communicating directly with `UWACPIDriver.sys` via `kernel32.dll` P/Invoke (`DeviceIoControl`). All register addresses are cross-referenced with the open-source [uniwill-laptop-driver](https://github.com/nanomatters/uniwill-laptop-driver) Linux kernel module, which documents the same EC under Linux.
 
 ---
 
