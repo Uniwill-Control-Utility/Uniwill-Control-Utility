@@ -99,10 +99,8 @@ We do not mind features/code created with the assistance of AI, as long as it's 
  - Extra RGB effects/directions for the keyboard
  - Live metric overlay (WIP)
  - System tray controls for Power profile, Hydro UI, Fan and FLydigi control
-
-## Features that haven't bee implemented yet
- - multi-color RGB control of the Light Bar (single-color control works - **PRs are more than welcome**)
-
+ - Smart Hydro UI - turn the pump on/off and the fan up/down (noise optimization)
+ - Smart Fan Mode - all fans now use one temperature sensor as the reference
 
 # App Features
 
