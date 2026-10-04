@@ -150,9 +150,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="ACPIDriverDll.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Update="Assets\applicationIcon-1024.png">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>

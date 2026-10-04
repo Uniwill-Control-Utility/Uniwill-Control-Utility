@@ -70,6 +70,10 @@ namespace Uniwill_Control_Utility.Scripts
             // --- Intel ---
             if (TYPE == ProcessorType.Intel)
             {
+                // Core Ultra 9 290HX Plus (2026 XMG Neo M26) - 140W air / 170W liquid
+                if (name.Contains("290HX"))
+                    return watercoolerConnected ? 170 : 140;
+
                 // Core Ultra 9 275HX (2025 XMG Neo) - 140W air / 160W liquid
                 if (name.Contains("275HX"))
                     return watercoolerConnected ? 160 : 140;

@@ -252,8 +252,9 @@ namespace Uniwill_Control_Utility.Views.Windows
                         await Task.Run(() => GetBatteryStatus());
 
                         // Determine active preset mode based on current Power boost mode setting
-                        bool boostEnabled = Scripts.GPUs.NVIDIA.NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
-                        Models.PresetMode mode = boostEnabled ? Models.PresetMode.Boost : Models.PresetMode.Normal;
+                        Models.PresetMode mode = Settings.Default.EnablePowerBoostMode
+                            ? Models.PresetMode.Boost
+                            : Models.PresetMode.Normal;
                         var presets = Models.CustomPresetStore.Load(mode);
                         // Use the saved slot for the active mode, fall back to first slot with data.
                         int slot = mode == Models.PresetMode.Boost
@@ -1206,8 +1207,9 @@ namespace Uniwill_Control_Utility.Views.Windows
             try
             {
                 // Determine active preset mode for the "checked" indicator
-                bool boostEnabled = Scripts.GPUs.NVIDIA.NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
-                Models.PresetMode activeMode = boostEnabled ? Models.PresetMode.Boost : Models.PresetMode.Normal;
+                Models.PresetMode activeMode = Settings.Default.EnablePowerBoostMode
+                    ? Models.PresetMode.Boost
+                    : Models.PresetMode.Normal;
                 int activeSlot = activeMode == Models.PresetMode.Boost
                     ? Settings.Default.customPresetSlotBoost
                     : Settings.Default.customPresetSlot;

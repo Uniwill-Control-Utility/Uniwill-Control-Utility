@@ -315,11 +315,11 @@ Fallback curves in `UserFanTables/` (not model-specific). Used by all DefaultFan
 | 0x0786 | TCC_OFFSET |
 | 0x07AB | MODE_INDEX |
 
-Accessed via `ACPIDriverDll.dll` (ReadEC/WriteEC with 6ms delay after write).
+Accessed via `DeviceIoControl` against `UWACPIDriver.sys` (IOCTL `0x9C40A488` for read, `0x9C40A48C` for write, with 6ms delay between operations).
 
 ### UXTU Translate Pipeline Gap
 
-The current `RyzenAdj_To_UXTU.TranslateCore()` has **NO handler for EC register writes**. The AMD SMU path (`SMUCommands.applySettings`) handles SoC-level commands. EC writes (chassis layer) require a separate path through `ACPIDriverDll.dll`.
+The current `RyzenAdj_To_UXTU.TranslateCore()` has **NO handler for EC register writes**. The AMD SMU path (`SMUCommands.applySettings`) handles SoC-level commands. EC writes (chassis layer) require a separate path through `DeviceIoControl` against `UWACPIDriver.sys`.
 
 **Required new command keys**:
 - `--ec-pl1=value` → `ACPI write 0x0783`

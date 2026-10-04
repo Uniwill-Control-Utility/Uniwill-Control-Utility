@@ -38,16 +38,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         /// <summary>
         /// Returns the active PresetMode based on Power boost mode setting.
-        /// Only Blackwell high-end GPUs (RTX 5080/5090) support the Boost pool.
         /// </summary>
-        private Models.PresetMode ActivePresetMode
-        {
-            get
-            {
-                bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
-                return boostEnabled ? Models.PresetMode.Boost : Models.PresetMode.Normal;
-            }
-        }
+        private Models.PresetMode ActivePresetMode =>
+            Settings.Default.EnablePowerBoostMode
+                ? Models.PresetMode.Boost
+                : Models.PresetMode.Normal;
 
         /// <summary>
         /// Gets or sets the slot index for the active preset mode, persisted separately per mode.
@@ -144,8 +139,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 // Refresh preset mode label and bottom bar stroke on every navigation
                 // (handles settings changes from the Settings page).
-                bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
-                UpdatePresetModeLabel(boostEnabled);
+                UpdatePresetModeLabel(Settings.Default.EnablePowerBoostMode);
 
                 // Update overlay based on Adaptive Mode override state
                 UpdateAdaptiveOverlay();
@@ -565,12 +559,12 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void SetGpuSliderLimits(int fallbackMax)
         {
             string gpuName = NvTuning.GetGpuName() ?? string.Empty;
-            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
+            bool boostEnabled = Settings.Default.EnablePowerBoostMode;
             (int min, int max) = gpuName.ToLowerInvariant() switch
             {
                 var n when n.Contains("rtx 5090") => (95, boostEnabled ? 250 : 150),
                 var n when n.Contains("rtx 5080") => (80, boostEnabled ? 250 : 150),
-                var n when n.Contains("rtx 5070") => (60, 115),
+                var n when n.Contains("rtx 5070") => (60, boostEnabled ? 250 : 115),
                 _ => (50, fallbackMax)
             };
             sdNvPower.Minimum = min;
@@ -625,7 +619,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool hydro = IsHydroConnected;
             string coolingLabel = hydro ? " (water)" : " (air)";
             var limits = GetPowerLimits();
-            bool gpuBoostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
+            bool gpuBoostEnabled = Settings.Default.EnablePowerBoostMode;
 
             // Try to get SKU-specific profile data for tooltips
             Models.SkuProfileEntry? officeProfile = Services.SkuResolver.GetProfile("office");
@@ -807,7 +801,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // When Power boost mode is ON, merge TGP + DB offset into a single TGP value
             // and disable Dynamic Boost (the DB UI controls are hidden in boost mode).
-            bool gpuBoostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
+            bool gpuBoostEnabled = Settings.Default.EnablePowerBoostMode;
 
             if (profile == "Office")
             {
@@ -1557,7 +1551,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     int core = Settings.Default.EnableGpuClockControl ? (int)sdNvCore.Value : 0;
                     int mem = Settings.Default.EnableGpuClockControl ? (int)sdNvMem.Value : 0;
                     int tgp = (int)sdNvPower.Value;
-                    bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
+                    bool boostEnabled = Settings.Default.EnablePowerBoostMode;
                     bool dbEnabled = !boostEnabled && togDynamicBoost.IsChecked == true;
                     int dbOffset = dbEnabled ? (int)sdNvDbOffset.Value : 0;
                     int totalWatts = tgp + dbOffset;

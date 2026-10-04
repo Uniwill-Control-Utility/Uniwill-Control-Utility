@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Management;
 using Uniwill_Control_Utility.Models;
+using Uniwill_Control_Utility.Scripts;
 
 namespace Uniwill_Control_Utility.Services
 {
     /// <summary>
     /// Detects the current laptop model by matching Win32_ComputerSystem.Manufacturer
     /// and the first 4 characters of Win32_BaseBoard.Product against a known catalog.
-    /// 
+    ///
     /// This approach is resilient to custom BIOS modifications that may alter the
     /// System Model value — the baseboard product identifier is harder to change
     /// and uniquely identifies the chassis.
@@ -18,12 +19,13 @@ namespace Uniwill_Control_Utility.Services
     {
         /// <summary>
         /// Brands that support driver page URLs.
-        /// XMG uses a fixed download URL by model, PCSpecialist requires the System SKU number.
+        /// XMG and TUXEDO use fixed URLs by model, PCSpecialist requires the System SKU number.
         /// </summary>
         private static readonly HashSet<string> DriverSupportedManufacturers = new(StringComparer.OrdinalIgnoreCase)
         {
             "SchenkerTechnologiesGmbH",
-            "PCSpecialist"
+            "PCSpecialist",
+            "TUXEDO"
         };
 
         private static string? _systemSkuNumber;
@@ -48,6 +50,8 @@ namespace Uniwill_Control_Utility.Services
         /// XMG Neo 16 A25: https://download.schenker-tech.de/package/xmg-neo-16-a25-xne16a25/
         /// XMG Neo 16 E25: https://download.schenker-tech.de/package/xmg-neo-16-e25-xne16e25/
         /// PCSpecialist Recoil III: https://www.pcspecialist.ie/drivers/{SkuNumber}/w11/
+        /// TUXEDO Stellaris 16 Gen7 (AMD): https://mytuxedo.de/index.php/s/ZeB8FTf8CrpEtJr?dir=/Stellaris_Series/Stellaris_Gen7_AMD
+        /// TUXEDO Stellaris 16 Gen7 (Intel): https://mytuxedo.de/index.php/s/ZeB8FTf8CrpEtJr?dir=/Stellaris_Series/Stellaris_Gen7_Intel
         /// </summary>
         public static string? GetDriverUrl()
         {
@@ -62,6 +66,8 @@ namespace Uniwill_Control_Utility.Services
                     return "https://download.schenker-tech.de/package/xmg-neo-16-a25-xne16a25/";
                 if (model.DisplayName.Contains("E25", StringComparison.OrdinalIgnoreCase))
                     return "https://download.schenker-tech.de/package/xmg-neo-16-e25-xne16e25/";
+                if (model.DisplayName.Contains("M26", StringComparison.OrdinalIgnoreCase))
+                    return "https://download.schenker-tech.de/package/xmg-neo-16-m26-xne16m26/";
                 return null;
             }
 
@@ -73,6 +79,15 @@ namespace Uniwill_Control_Utility.Services
                     return null; // Unicorn BIOS with cleared SKU — can't build URL
 
                 return $"https://www.pcspecialist.ie/drivers/{sku}/w11/";
+            }
+
+            // TUXEDO — CPU-vendor-aware URL
+            if (model.SystemManufacturer.Equals("TUXEDO", StringComparison.OrdinalIgnoreCase))
+            {
+                bool isIntel = Family.TYPE == Family.ProcessorType.Intel;
+                return isIntel
+                    ? "https://mytuxedo.de/index.php/s/ZeB8FTf8CrpEtJr?dir=/Stellaris_Series/Stellaris_Gen7_Intel"
+                    : "https://mytuxedo.de/index.php/s/ZeB8FTf8CrpEtJr?dir=/Stellaris_Series/Stellaris_Gen7_AMD";
             }
 
             return null;
@@ -87,6 +102,8 @@ namespace Uniwill_Control_Utility.Services
         private static readonly List<LaptopModelInfo> Catalog = new()
         {
             // --- XMG / Schenker ---
+            // NB02 chassis — Win32_BaseBoard.Manufacturer = "NB02"
+            // X6FR = AMD, X6AR = Intel, XxAF = Intel 290HX Plus (M26)
             new LaptopModelInfo(
                 DisplayName: "XMG NEO 16 (A25)",
                 SystemManufacturer: "SchenkerTechnologiesGmbH",
@@ -97,6 +114,14 @@ namespace Uniwill_Control_Utility.Services
                 DisplayName: "XMG NEO 16 (E25)",
                 SystemManufacturer: "SchenkerTechnologiesGmbH",
                 BaseBoardProductPrefix: "X6AR",
+                ImagePath: "pack://application:,,,/Assets/Laptops/XMG/Neo-25.png"),
+
+            // M26 generation uses XxAF baseboard product: "XxAF5xxx (NB02)"
+            // EC register map is identical to X6FR/X6AR.
+            new LaptopModelInfo(
+                DisplayName: "XMG NEO 16 (M26)",
+                SystemManufacturer: "SchenkerTechnologiesGmbH",
+                BaseBoardProductPrefix: "XxAF",
                 ImagePath: "pack://application:,,,/Assets/Laptops/XMG/Neo-25.png"),
 
             // --- PCSpecialist ---
@@ -159,7 +184,7 @@ namespace Uniwill_Control_Utility.Services
             // e.g. new LaptopModelInfo("TUXEDO Pulse 15", "TUXEDO", "X6FR", "..."),
 
             // --- Future brands ---
-            // Add entries for any other rebrand that ships TongFeng NB05/NB02 chassis laptops.
+            // Add entries for any other rebrand that ships TongFeng NB02 chassis laptops.
         };
 
         /// <summary>
@@ -178,7 +203,7 @@ namespace Uniwill_Control_Utility.Services
         public static LaptopModelInfo? Detected => _detectedModel;
 
         /// <summary>
-        /// True when the baseboard product starts with a known TongFeng prefix (X6FR / X6AR),
+        /// True when the baseboard product contains a known TongFeng prefix (X6FR, X6AR, XxAF),
         /// regardless of whether the brand is in the catalog.
         /// </summary>
         public static bool IsTongFengChassis => _isTongFengChassis ?? false;
@@ -202,10 +227,13 @@ namespace Uniwill_Control_Utility.Services
                 if (string.IsNullOrEmpty(baseBoardProduct))
                     return;
 
-                // Check for any TongFeng chassis prefix (X6FR = AMD, X6AR = Intel).
-                // The chassis code may appear at position 0 (e.g. "X6AR558Y") or
-                // embedded in the string (e.g. Mechrevo "YAOSHI Series-X6AR55xY").
-                _isTongFengChassis = baseBoardProduct.IndexOf("X6", StringComparison.OrdinalIgnoreCase) >= 0;
+                // Check for any TongFeng chassis prefix.
+                // All models report Win32_BaseBoard.Manufacturer = "NB02".
+                // X6FR (AMD), X6AR (Intel) — e.g. "X6AR558Y"
+                // XxAF (Intel M26) — e.g. "XxAF5xxx (NB02)"
+                // The chassis code may appear at position 0 or embedded (e.g. Mechrevo "YAOSHI Series-X6AR55xY").
+                _isTongFengChassis = baseBoardProduct.IndexOf("X6", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                     baseBoardProduct.IndexOf("XA", StringComparison.OrdinalIgnoreCase) >= 0;
 
                 if (string.IsNullOrEmpty(manufacturer))
                     return;

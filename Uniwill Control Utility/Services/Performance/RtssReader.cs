@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using Uniwill_Control_Utility.Scripts.Misc;
@@ -106,8 +107,25 @@ namespace Uniwill_Control_Utility.Services.Performance
         [LibraryImport("kernel32.dll")]
         private static partial int CloseHandle(IntPtr hObject);
 
-        /// <summary>Quick check whether RTSS shared memory is accessible (RTSS is running).</summary>
+        /// <summary>Quick check whether RTSS is installed and running.</summary>
+        /// <remarks>
+        /// Checks both the shared memory signature AND the process list. Shared memory
+        /// alone is unreliable — it can linger after a crash or be inaccessible due to
+        /// permissions. The process check catches cases where RTSS is running but hasn't
+        /// created shared memory yet, or when the user's process lacks access.
+        /// </remarks>
         public static bool IsRunning()
+        {
+            // Check shared memory first (fast, no process enumeration).
+            bool sharedMemoryValid = CheckSharedMemory();
+
+            // Also check for the Rtss.exe process to avoid false negatives.
+            bool processRunning = CheckProcess();
+
+            return sharedMemoryValid || processRunning;
+        }
+
+        private static bool CheckSharedMemory()
         {
             IntPtr mappingHandle = OpenFileMapping(FileMapRead, false, SharedMemoryName);
             if (mappingHandle == IntPtr.Zero)
@@ -131,6 +149,18 @@ namespace Uniwill_Control_Utility.Services.Performance
             {
                 UnmapViewOfFile(viewPtr);
                 CloseHandle(mappingHandle);
+            }
+        }
+
+        private static bool CheckProcess()
+        {
+            try
+            {
+                return Process.GetProcessesByName("Rtss").Length > 0;
+            }
+            catch
+            {
+                return false;
             }
         }
 

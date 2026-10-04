@@ -53,7 +53,56 @@
                            FontSize="13"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                            TextWrapping="Wrap"
-                           Text="UCU requires two third-party tools to access hardware sensors and display FPS overlays. Please install any that are missing before continuing." />
+                           Text="UCU requires the following software and drivers to function correctly. Please ensure all prerequisites are met before continuing." />
+
+                <!-- UWACPIDriver card -->
+                <ui:Card x:Name="CardEcDriver"
+                         Padding="16"
+                         Margin="0,0,0,12"
+                         RenderOptions.EdgeMode="Aliased"
+                         SnapsToDevicePixels="True">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon x:Name="EcDriverStatusIcon"
+                                               Symbol="CheckmarkCircle20"
+                                               FontSize="18"
+                                               Margin="0,0,8,0"
+                                               VerticalAlignment="Center" />
+                                <TextBlock FontSize="15"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
+                                           Text="UWACPIDriver.sys (Uniwill EC Driver)" />
+                            </StackPanel>
+
+                            <TextBlock x:Name="EcDriverDescription"
+                                       Margin="0,6,0,0"
+                                       FontSize="13"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="Kernel driver required for EC communication (fan control, battery, power limits). Installed by your laptop manufacturer's Control Center and persists after uninstall." />
+                        </StackPanel>
+
+                        <ui:Button x:Name="EcDriverButton"
+                                   Grid.Column="1"
+                                   Width="140"
+                                   Height="34"
+                                   Margin="12,0,0,0"
+                                   VerticalAlignment="Top"
+                                   Appearance="Primary"
+                                   Click="EcDriverButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="ArrowDownload20" Margin="0,0,6,0" />
+                                <TextBlock Text="Download" />
+                            </StackPanel>
+                        </ui:Button>
+                    </Grid>
+                </ui:Card>
 
                 <!-- PawnIO card -->
                 <ui:Card x:Name="CardPawnIo"

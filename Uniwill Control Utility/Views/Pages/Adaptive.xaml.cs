@@ -646,12 +646,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (sdGpuSettings.Visibility == Visibility.Visible)
             {
                 string gpuName = NvTuning.GetGpuName()?.ToLowerInvariant() ?? string.Empty;
-                bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
+                bool boostEnabled = Settings.Default.EnablePowerBoostMode;
                 int gpuMax = gpuName switch
                 {
                     var n when n.Contains("rtx 5090") => boostEnabled ? 250 : 150,
                     var n when n.Contains("rtx 5080") => boostEnabled ? 250 : 150,
-                    var n when n.Contains("rtx 5070") => 115,
+                    var n when n.Contains("rtx 5070") => boostEnabled ? 250 : 115,
                     _ => limits.GpuTgpBaseline
                 };
                 AdpSdNvPower.Maximum = gpuMax;
@@ -873,7 +873,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private static AdaptiveGpuSettings GetActiveGpuSettings(AdaptivePreset preset)
         {
-            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
+            bool boostEnabled = Settings.Default.EnablePowerBoostMode;
             return boostEnabled ? preset.GpuBoost : preset.GpuNormal;
         }
 
@@ -882,7 +882,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void CaptureGpuToPreset(AdaptivePreset preset)
         {
-            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
+            bool boostEnabled = Settings.Default.EnablePowerBoostMode;
             var gpu = boostEnabled ? preset.GpuBoost : preset.GpuNormal;
             gpu.Tgp = (int)AdpSdNvPower.Value;
             gpu.DynamicBoost = AdpTogDynamicBoost.IsChecked == true;
@@ -1810,7 +1810,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
 
             int tgp = (int)AdpSdNvPower.Value;
-            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
+            bool boostEnabled = Settings.Default.EnablePowerBoostMode;
             bool dbEnabled = !boostEnabled && AdpTogDynamicBoost.IsChecked == true;
             int dbOffset = dbEnabled ? (int)AdpSdNvDbOffset.Value : 0;
             bool gpuClockDisabled = !Settings.Default.EnableGpuClockControl;
@@ -1965,8 +1965,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             ApplyAdpPowerLimitMax();
 
             // Update bottom bar boost mode label
-            bool boostEnabled = NvTuning.IsBlackwellHighEnd() && Settings.Default.EnablePowerBoostMode;
-            UpdateAdpPresetModeLabel(boostEnabled);
+            UpdateAdpPresetModeLabel(Settings.Default.EnablePowerBoostMode);
 
             // Defer preset loading to after the first frame renders so the page
             // appears immediately and control updates happen in a second pass.

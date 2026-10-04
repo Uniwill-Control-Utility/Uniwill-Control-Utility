@@ -105,7 +105,9 @@ The missing piece was **register `0x0743`** — discovered in the tuxedo-drivers
 
 ### XMG Control Center Architecture
 
-XMG CC (`GCUService.exe`) uses a kernel driver (`ACPIDriverDll.dll`) with custom IOCTLs (`IOCTL_GPD_ACPI_ECWRITE`, `IOCTL_GPD_ACPI_SMAPCTABLE`) for GPU power control. The EC register sequence is the same as tuxedo-drivers. XMG CC additionally writes ACPI/SMM tables via the Smart APC Table IOCTL — however, the EC-only path (matching tuxedo-drivers) is sufficient on Windows.
+XMG CC (`GCUService.exe`) uses `ACPIDriverDll.dll` which wraps `UWACPIDriver.sys` with custom IOCTLs (`IOCTL_GPD_ACPI_ECWRITE`, `IOCTL_GPD_ACPI_SMAPCTABLE`) for GPU power control.
+
+UCU bypasses the proprietary DLL and communicates directly with `UWACPIDriver.sys` via `kernel32.dll` P/Invoke (`DeviceIoControl`). The IOCTL codes `0x9C40A488` (read) and `0x9C40A48C` (write) are sourced from MechControl's `EcDevice.cs`. The EC register sequence is identical to both the OEM path and tuxedo-drivers. XMG CC additionally writes ACPI/SMM tables via the Smart APC Table IOCTL — however, the EC-only path (matching tuxedo-drivers) is sufficient on Windows.
 
 ## References
 

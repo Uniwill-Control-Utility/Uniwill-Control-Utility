@@ -1,23 +1,24 @@
 # Uniwill Control Utility
 
-[![Download Latest](https://img.shields.io/github/downloads/jgudec/Uniwill-Control-Utility/latest/total?style=flat-square&color=orange&label=Download%20Latest)](https://github.com/jgudec/Uniwill-Control-Utility/releases/latest)
-[![Total Downloads](https://img.shields.io/github/downloads/jgudec/Uniwill-Control-Utility/total?style=flat-square&color=orange&label=Download%20Total)](https://github.com/jgudec/Uniwill-Control-Utility/releases/latest)
+A hardware tuning/monitoring application for laptops with **Uniwill-based embedded controllers**, with additional support for AMD Ryzen and Intel CPU tuning, NVIDIA GPU controls, and peripheral device management.
 
-![Dashboard](screenshots/dashboard.jpg)
+Its purpose is to serve as an open-source alternative to the XMG/PCSpecialist's official Control Center.
 
-This project is still very much a **WORK IN PROGRESS**!
+UCU was built on top of the foundation laid by [UXTU](https://github.com/JamesCJ60/Universal-x86-Tuning-Utility) (Universal x86 Tuning Utility), reworking/extending its capabilities with Uniwill EC integration, Flydigi cooler support, watercooler control, and a modern Fluent Design interface in order to provide a tailored software for the hardware used by the likes of XMG Neo A25/E25, PCSpecialist Recoil 3 16 (Intel/AMD) and so on.
 
-> **DISCLAIMER:** THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. MISUSE OF THIS SOFTWARE COULD CAUSE SYSTEM INSTABILITY OR MALFUNCTION. USE AT YOUR OWN RISK.
+![Dashboard](screenshots/dashboard.png)
 
-If you come across any issues or errors, please [open an issue on GitHub](https://github.com/jgudec/Uniwill-Control-Utility/issues).
 
-If you made an improvement or added some new feature, I warmly encourage you to make a PR so that it can be included.
 
-## What is Uniwill Control Utility?
+## ⚠️ Disclaimer & Trademarks
 
-Uniwill Control Utility (UCU) is a hardware tuning and monitoring application for laptops with **Uniwill-based embedded controllers**, with additional support for AMD Ryzen and Intel CPU tuning, NVIDIA GPU controls, and peripheral device management. Its purpose is to serve as a mostly open-source alternative to the XMG/PCSpecialist's closed-source and visually outdated Control Center.
+* **This project is still very much a WORK IN PROGRESS** - Although a lot of attention and time has been invested into polishing this app, one should still expect some (minor) bugs
+* **Unofficial Software:** This project is an independent, community-driven, free and open-source utility. It is **not** affiliated with, endorsed by, or sponsored by Uniwill, Tongfang, Flydigi or any laptop/cooler brand/reseller mentioned above.
+* **Trademarks:** All product names, logos, images, brands, trademarks, and registered trademarks are property of their respective owners. Their use here is strictly for identification and compatibility purposes.
+* **No Warranty / Hardware Risks:** This software interfaces directly with hardware management features. **Use it at your own risk.** The developer assumes no liability for any hardware damage, system instability, battery degradation, or voided warranties resulting from the use of this utility.
 
-UCU was built on top of the foundation laid by [UXTU](https://github.com/JamesCJ60/Universal-x86-Tuning-Utility) (Universal x86 Tuning Utility), reworking/extending its capabilities with Uniwill EC integration, Flydigi cooler support, watercooler control, and a modern Fluent Design interface in order to provide a tailored software for the hardware used by the XMG Neo A25/E25 and PCSpecialist Recoil 3 16 (Intel/AMD).
+If you come across any issues or errors, please [open an issue on GitHub](https://github.com/Uniwill-Control-Utility/Uniwill-Control-Utility/issues).
+
 
 ## Which hardware has this tool been tested on?
  - **XMG Neo 16 (A25)**
@@ -28,12 +29,25 @@ UCU was built on top of the foundation laid by [UXTU](https://github.com/JamesCJ
     - CPU: **Intel® Core™ Ultra 9 Processor 275HX**
     - GPU: **NVIDIA GeForce RTX 5080 Laptop**
     - Panel: **MiniLED**
+ - **Mechrevo Aurora 16 Ultra**
+    - CPU: **Intel® Core™ Ultra 9 Processor 275HX**
+    - GPU: **NVIDIA GeForce RTX 5080 Laptop**
+    - Panel: **IPS**   
+ - **Tuxedo Stellaris 16 Gen7**
+    - CPU: **Intel® Core™ Ultra 9 Processor 275HX**
+    - GPU: **NVIDIA GeForce RTX 5080 Laptop**
+    - Panel: **IPS**   
+ - **Mifcom 16**
+    - CPU: **AMD Ryzen 9 9955HX3D**
+    - GPU: **NVIDIA GeForce RTX 5090 Laptop**
+    - Panel: **MiniLED**  
 
-### Testing limitations
+## Testing limitations
 
- The PCSpecialist Recoil 3 16 (Intel) has CPU voltage control disabled on the BIOS level, so CPU voltage control in the app couldn't be tested.
+Intel CPU voltage control is currently not available.
 
-However, CPU TDP control has been tested and confirmed to be working.
+However, CPU TDP control has been tested and confirmed to be working on both AMD and Intel variants.
+
 ## How were the features achieved?
 
 A fair amount of research into other projects that have been mentioned in the Credits section.
@@ -50,6 +64,19 @@ AI (**Qwen 3.6 27B**) was used to:
  - research open-source software from the Credits section
  - implement a fair amount of the backend
  - set up initial skeletons of the UI
+
+## Pull Requests
+
+PRs with additional (well-structured and tested) features are welcome.
+
+We do not mind features/code created with the assistance of AI, as long as it's thoroughly tested by the owner of said code and as long as the code is not of bad quality (aka "AI slop").
+
+## Missing features 
+ - MUX switching
+ - Power Preset button interception
+
+ These are the features I was unable to implement due to various blockers.
+ PRs are more than welcome.
 
 ## Features replicated from XMG's Control Center
  - Performance profiles
@@ -79,6 +106,12 @@ AI (**Qwen 3.6 27B**) was used to:
 
 # App Features
 
+### **Tray Widget**
+
+Simple metrics and toggles for quick changes.
+
+![Tray](screenshots/tray.png)
+
 ### **Dashboard**
 
 At-a-glance system overview showing your device's specifications and live hardware metrics.
@@ -87,6 +120,7 @@ At-a-glance system overview showing your device's specifications and live hardwa
 - Live CPU, GPU, memory, and battery telemetry cards
 - Quick-launch device controls for Flydigi coolers and Hydro UI watercoolers (when supported)
 
+![Dashboard](screenshots/dashboard.png)
 
 ### **Presets**
 
@@ -98,9 +132,11 @@ One-click tuning profiles and granular hardware controls for CPU, GPU, and syste
 - **CPU Power Tuning** (AMD) — Sustained Power Limit (SPL), Fast Power Limit (FPL), TjMax, and Curve Optimizer
 - **Intel Tuning** — PL1, PL2 power limits and CPU undervolting via FIVR
 - **GPU Tuning** (NVIDIA) — GPU TGP, Dynamic Boost, Dynamic Boost Offset, Core/Memory Clock Offsets, and V-F Curve Editor (a fully working curve editor for undervolting)
-- **Custom presets** — Up to 5 custom presets can be set up
+- **Custom presets** — Up to 5 custom presets can be set up (mirrored by another set when Power Boost Mode is ON)
 - **Preset backup & import** — Export and restore all custom presets and adaptive mode profiles
 
+![Presets](screenshots/presets.png)
+![GPU Curve](screenshots/gpu-curve.png)
 
 ### **Adaptive Mode**
 
@@ -112,8 +148,11 @@ Intelligent, game-aware performance optimization that automatically adjusts sett
 - **Fan Control** — Custom EC fan curves per game
 - **Flydigi cooler** — Custom fan curves and RGB speed per game
 - **Keyboard RGB** — Per-game multi-color lighting profiles with auto-detection of running games
+- **Hydro UI** - per-game configuration of the liquid cooler RGB and fan/pump speed
+- **Light Bar** - per-game customization of the light bar
 - **Per-game presets** — Automatic profile switching when games launch or close
 
+![Adaptive](screenshots/adaptive.png)
 
 ### **Game Overlay**
 
@@ -123,7 +162,9 @@ Click-through hardware monitoring overlay for real-time performance tracking whi
 - Customizable overlay scale (50–200%) and panel opacity
 - Adjustable refresh interval to balance accuracy and overhead
 - Global keyboard shortcuts to toggle overlay visibility and sensor polling
+- Relies on RTSS for safe metric retrieval (thus avoiding the risk of EAC game bans and such)
 
+![Overlay](screenshots/overlay.png)
 
 ### **Automations**
 
@@ -133,6 +174,7 @@ Set-and-forget rules that apply presets automatically when system state changes.
 - **Preset on Battery Discharge** — Apply a preset when running on battery
 - **Preset on System Resume** — Reapply settings after sleep or hibernation
 
+![Auto](screenshots/auto.png)
 
 ### **Fan Control**
 
@@ -143,8 +185,10 @@ Full control over system fan curves with real-time temperature monitoring.
 - 11 thermal threshold zones per curve
 - Turbo mode (100% fans) and Restore Auto to return control to the EC firmware
 - Live CPU/GPU temperature display
-- Flydigi cooler pad fan control section (when connected)
+- **Smart Fan Mode** — forces all the fans to use the same temperature source - CPU,GPU or the Hottest of the two
 
+
+![Fan Control](screenshots/fan-control.png)
 
 ### Keyboard
 
@@ -158,6 +202,8 @@ Per-key and global RGB keyboard backlight control via the ITE HID controller.
 - On/off toggle and brightness slider
 - White-backlight-only mode for keyboards without RGB
 
+![Keyboard](screenshots/keyboard.png)
+![Per-Key Keyboard](screenshots/keyboard-per-key.png)
 
 ### Light Bar
 
@@ -168,6 +214,7 @@ RGB light bar control with multiple effects and color options.
 - Speed slider for animated effects
 - Fixed rainbow palette for Wave and Marquee effects
 
+![Light Bar](screenshots/light-bar.png)
 
 ### Battery
 
@@ -181,6 +228,7 @@ Battery charging management and live telemetry from the EC.
   - Power source indicator (AC / battery)
 - Manual refresh button
 
+![Battery](screenshots/battery.png)
 
 ### Flydigi Cooler
 
@@ -196,63 +244,57 @@ Control Flydigi laptop cooling pads via BLE (BS1) and HID (BS2, BS2 Pro, BS3, BS
 - Live RPM and temperature readback
 - Dual protocol support — HID (BS2/BS2 Pro/BS3) and BLE (BS1)
 
+![Flydigi](screenshots/flydigi.png)
 
-### Hydro UI — Watercooler Control
+### Hydro UI 
 
-Full control of LCT liquid cooling systems via Bluetooth Low Energy.
+Full control of LCT liquid cooling systems (e.g. XMG Oasis) via Bluetooth Low Energy.
 
 - BLE device discovery with scan and device selection
 - **Pump Voltage** — Off, 7V, 8V, 11V
 - **Fan Speed** — Off, 25%, 50%, 75%, 90%, 95%, 100%
 - **RGB Effect** — Off, Static, Breathe, Colorful, Breathe Color with color picker
 - Auto-connect on system startup and auto-reconnect after system resume
+- **Smart Mode** — Set lower and upper temperature thresholds, at which the pump/fan slow down, speed up or turn off/on
+
+![Hydro UI](screenshots/hydro-ui.png)
 
 ### Settings
 
 Application preferences, diagnostics, updates, and embedded system information.
 
-- **Application behaviour** — Language selector (21 languages), start on boot, start minimized, minimize-to-tray, reapply settings on start, auto-reapply interval, auto-start Adaptive Mode, game library sync
+- **Application behaviour** — Start on boot, start minimized, minimize-to-tray, reapply settings on start, auto-reapply interval, auto-start Adaptive Mode
 - **Preset backup** — Export and import custom and adaptive mode presets as JSON
+- **Feature Control** - enable/disable various pages (e.g. the Flydigi cooler page if you do not need it)
 - **Diagnostics** — Diagnostic logging level (Off, Error, Info, Debug)
 - **System Information** — Device, processor, memory, and battery specs with detailed RAM timings and SPD data
 
+![Settings](screenshots/settings.png)
 
-## Disclaimers & Cautions
 
-- If you intend to use Uniwill Control Utility in a video, text post, or stream online (e.g. YouTube, Reddit), please credit the project by linking to the [GitHub releases page](https://github.com/jgudec/Uniwill-Control-Utility/releases)! 
-- I am not liable for any damages that may occur from using this software. Please use it at your own risk!
-- "AMD", "APU", "Ryzen", and "AMD Ryzen" are trademarked by and belong to Advanced Micro Devices, Inc. This project makes no claims to these assets and uses them for informational purposes only.
+## Prerequisites
 
-## Screenshots
-![Dashboard](screenshots/dashboard.jpg)
+UCU requires the following to be installed and configured before first use:
 
-![Presets](screenshots/presets.jpg)
+### UWACPIDriver.sys (Uniwill EC Driver)
 
-![GPU Curve](screenshots/gpu-curve.jpg)
+UCU communicates with the Uniwill Embedded Controller through the `UWACPIDriver.sys` kernel driver. Check if it's already present at:
 
-![Adaptive](screenshots/adaptive.jpg)
+```
+C:\Windows\System32\drivers\UWACPIDriver.sys
+```
 
-![Hydro UI](screenshots/hydro-ui.jpg)
+If the file exists, you're good to go. If it doesn't, install the official Control Center for your laptop (e.g., XMG Control Center, MechRevo Control Center, or another OEM utility that ships the Uniwill driver), then uninstall it — the driver file persists on disk after uninstall and is all that's needed.
 
-![Fan Control](screenshots/fan-control.jpg)
+> **Note:** UCU does not bundle or redistribute this driver. Running as Administrator is required for EC access.
 
-![Keyboard](screenshots/keyboard.jpg)
+### Pawn.IO
 
-![Per-Key Keyboard](screenshots/keyboard-per-key.jpg)
+[Pawn.IO](https://github.com/JamesCJ60/Pawn.IO) is required for AMD Ryzen CPU tuning features (power limits, Curve Optimizer, TjMax). Download and install it from the [releases page](https://github.com/JamesCJ60/Pawn.IO/releases).
 
-![Light Bar](screenshots/light-bar.jpg)
+### RivaTuner Statistics Server (RTSS)
 
-![Battery](screenshots/battery.jpg)
-
-![Overlay](screenshots/overlay.jpg)
-
-![Auto](screenshots/automations.jpg)
-
-![Flydigi 1](screenshots/flydigi-1.jpg)
-
-![Flydigi 2](screenshots/flydigi-2.jpg)
-
-![Settings](screenshots/settings.jpg)
+RTSS is required for the **Game Overlay** FPS sensor. The overlay integrates with RTSS to display real-time frame rates. Download it from the [RivaTuner website](https://www.guru3d.com/download/rivatuner-statistics-server-download/).
 
 ## Installation
 
@@ -268,26 +310,22 @@ UCU builds on the work of many open-source projects and reverse-engineering effo
 ### Foundation
 - [UXTU (GitHub)](https://github.com/JamesCJ60/Universal-x86-Tuning-Utility) — Universal x86 Tuning Utility. UCU is built on top of UXTU's codebase, extending it with Uniwill EC support, Flydigi cooler controls, watercooler management, and a rebranded Fluent Design interface.
 
+### Contribution
+- [noteMASTER11](https://github.com/noteMASTER11) - help with optimizing the fan control EC write flow, dashboard re-design and tray feature suggestion/foundation
+- [Heavyfail](https://github.com/Heavyfail) - help with getting MiniLED Local Dimming control to work
+
 ### Core & Inspiration
 - [G-Helper (GitHub)](https://github.com/seerge/g-helper) — Lightweight laptop tuning utility that inspired UCU's design philosophy
+- [LenovoLegionToolkit (GitHub)](https://github.com/LenovoLegionToolkit/LenovoLegionToolkit) — Reference for the color picker UI pattern, fan curve editor approach, and keyboard visualizer layout.
 - [WPF UI (GitHub)](https://github.com/lepoco/wpfui) — Modern Fluent Design UI library used for the UCU interface
 - [Magpie (GitHub)](https://github.com/Blinue/Magpie) — Translation management library used for localization
 
-### Reverse Engineering References
-- [reverse_engineering (GitHub)](https://github.com/zllovesuki/reverse_engineering) — DSDT and WMI reverse engineering references
-- [Laptops (GitHub)](https://github.com/ahahahahahMtnf/Laptops/tree/main/Asus/WMI) — ASUS WMI method documentation
-- [ADLX SDK Wrapper (GitHub)](https://github.com/jgudec/ADLX-SDK-Wrapper) — AMD ADLX SDK wrapper for GPU controls
-
 ### Device Protocol References
-- [THRM (GitHub)](https://github.com/TIANLI0/THRM) by TIANLI0 — Primary reference for the Flydigi `5A A5` cooler protocol. Provided the most complete documentation of the frame format, RGB upload sequence, and gear RPM table.
+- [THRM (GitHub)](https://github.com/TIANLI0/THRM) (user and repository gone at the time of writing - October 4th 2026) by TIANLI0 — Primary reference for the Flydigi `5A A5` cooler protocol. Provided the most complete documentation of the frame format, RGB upload sequence, and gear RPM table.
 - [watercooler-manager (GitHub)](https://github.com/tomups/watercooler-manager) by tomups — Primary reference for the LCT watercooler BLE protocol. The Python implementation confirmed the Nordic UART UUIDs, frame format, and command byte values.
 - [UCC (GitHub)](https://github.com/nanomatters/ucc) by nanomatters — Reference for the LCT watercooler protocol (BLE connection lifecycle, error recovery, state management) and for the ITE 8291 keyboard HID controller protocol (HID device enumeration, ACPI interface, zone-based control commands).
 - [tuxedo-drivers (GitLab)](https://gitlab.com/tuxedocomputers/development/packages/tuxedo-drivers) by TUXEDO Computers — Authoritative reference for the ITE 8291 per-key RGB protocol. The Linux kernel driver (`src/ite_8291/ite_8291.c`) provided the exact byte layouts for UserMode entry, row announcement, and the 65-byte BGR-planar output report format. Also provided the EC register definitions (`src/uniwill_interfaces.h`) for NVIDIA GPU power control on Schenker/XMG laptops (cTGP/TPP/DB offset registers and the `0x0743` enable register).
-- [LenovoLegionToolkit (GitHub)](https://github.com/LenovoLegionToolkit/LenovoLegionToolkit) — Reference for the color picker UI pattern, fan curve editor approach, and keyboard visualizer layout. **Not** used for keyboard protocol details (Lenovo uses different hardware).
-- **MechControl.dll fork** (decompiled, closed-source) by [Heavyfail (GitHub)](https://github.com/Heavyfail) — Schenker/Mechrevo utility. Source for the global keyboard effects protocol (zone-based 9-byte HID feature reports) and MiniLED Local Dimming control (WMI `AcpiTest_MULong` / `GetSetULong` invocation pattern).
+
+- **MechControl** (decompiled, closed-source) — Original by Okashira (Discord: defty1234), fork by [Heavyfail (GitHub)](https://github.com/Heavyfail). Schenker/Mechrevo utility. Source for the global keyboard effects protocol (zone-based 9-byte HID feature reports), MiniLED Local Dimming control (WMI `AcpiTest_MULong` / `GetSetULong` invocation pattern), and UWACPIDriver.sys IOCTL codes (0x9C40A488/0x9C40A48C) for direct EC access.
 - **XMG Control Center / GCUService.exe** (closed-source) — Official Schenker/XMG utility. Studied for HID device communication patterns, handle acquisition, and GPU power control EC register sequences (via `GPUInfoDLL.dll` and `ACPIDriverDll.dll` binary analysis).
 
-### Earlier Projects by the Team
-- [Ryzen Controller (GitLab)](https://gitlab.com/ryzen-controller-team/ryzen-controller) — Desktop Ryzen tuning utility
-- [Renoir Mobile Tuning (GitHub)](https://github.com/sbski/Renoir-Mobile-Tuning) — Early mobile Ryzen tuning experiment
-- [Power Control Panel (GitHub)](https://github.com/project-sbc/Power-Control-Panel-v2) — Power limit control utility
