@@ -25,6 +25,10 @@ If you come across any issues or errors, please [open an issue on GitHub](https:
     - CPU: **AMD Ryzen 9 9955HX3D**
     - GPU: **NVIDIA GeForce RTX 5090 Laptop**
     - Panel: **MiniLED**
+ - **XMG Neo 16 (M26)**
+    - CPU: **Intel® Core™ Ultra 9 Processor 290HX Plus**
+    - GPU: **NVIDIA GeForce RTX 5080 Laptop**
+    - Panel: **OLED**
  - **PCSpecialist Recoil 3 16 (Intel)**
     - CPU: **Intel® Core™ Ultra 9 Processor 275HX**
     - GPU: **NVIDIA GeForce RTX 5080 Laptop**
