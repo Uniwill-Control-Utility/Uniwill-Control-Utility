@@ -6,6 +6,7 @@ using System.Management;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using Newtonsoft.Json;
 using Uniwill_Control_Utility.Models;
 using System.Diagnostics;
@@ -806,6 +807,8 @@ namespace Uniwill_Control_Utility.Services
         private FanSpeed _smartModeCurrentFan;
         private double _smartModeFilteredTemp;
         private bool _smartModeLastWasBoost; // For hysteresis direction tracking
+        private RgbState _smartModeCurrentRgbMode;
+        private RgbColor _smartModeCurrentRgbColor;
 
         /// <summary>
         /// Starts the Smart Mode control loop.
@@ -842,6 +845,8 @@ namespace Uniwill_Control_Utility.Services
             // what the device's actual pump/fan speed is.
             _smartModeCurrentPump = settings.GetSmartModeIdlePump();
             _smartModeCurrentFan = settings.GetSmartModeIdleFan();
+            _smartModeCurrentRgbMode = default;
+            _smartModeCurrentRgbColor = default;
 
             _ = Task.Run(async () =>
             {
@@ -890,6 +895,8 @@ namespace Uniwill_Control_Utility.Services
             var timer = _smartModeTimer;
             _smartModeTimer = null;
             timer?.Dispose();
+            _smartModeCurrentRgbMode = default;
+            _smartModeCurrentRgbColor = default;
             Debug.WriteLine("[WaterCooler] Smart Mode stopped");
             SmartModeStateChanged?.Invoke(this, false);
         }
@@ -984,6 +991,40 @@ namespace Uniwill_Control_Utility.Services
             {
                 _smartModeCurrentFan = targetFan;
                 await WriteFanModeAsync(targetFan);
+            }
+
+            // Temperature-based RGB (only when SmartModeTemperatureRgb is enabled)
+            if (settings.SmartModeTemperatureRgb)
+            {
+                RgbState rgbMode;
+                RgbColor rgbColor;
+
+                if (filtered < lowThreshold)
+                {
+                    rgbMode = RgbState.Static;
+                    rgbColor = RgbColor.Green; // Idle - cool
+                }
+                else if (filtered > highThreshold)
+                {
+                    rgbMode = RgbState.Static;
+                    rgbColor = RgbColor.Red; // Boost - hot
+                }
+                else
+                {
+                    rgbMode = RgbState.Static;
+                    rgbColor = RgbColor.White; // Transition - between thresholds
+                }
+
+                // Write RGB if it differs from current
+                if (_smartModeCurrentRgbMode != rgbMode || _smartModeCurrentRgbColor != rgbColor)
+                {
+                    _smartModeCurrentRgbMode = rgbMode;
+                    _smartModeCurrentRgbColor = rgbColor;
+                    Application.Current.Dispatcher.InvokeAsync(async () =>
+                    {
+                        await WriteRgbModeAsync(rgbMode, rgbColor);
+                    });
+                }
             }
 
             if (pumpChanged || fanChanged)

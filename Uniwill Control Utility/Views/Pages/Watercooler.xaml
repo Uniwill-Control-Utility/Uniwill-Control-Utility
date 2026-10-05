@@ -388,6 +388,32 @@
                                         </ComboBox>
                                     </StackPanel>
                                 </Grid>
+                                <!-- Divider -->
+                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <!-- Temperature-based RGB -->
+                                <Grid Margin="0,4,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Temperature-Based RGB" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                               FontTypography="Caption"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                               Text="RGB changes with temperature: green (idle), white (transition), red (boost)" />
+                                    </StackPanel>
+                                    <ui:ToggleSwitch x:Name="tsSmartModeTemperatureRgb"
+                              Grid.Column="1"
+                              Margin="4,0,0,0"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Center"
+                              LabelPosition="Left"
+                              OnContent="On"
+                              OffContent="Off"
+                              Checked="tsSmartModeTemperatureRgb_Checked"
+                              Unchecked="tsSmartModeTemperatureRgb_Unchecked" />
+                                </Grid>
                             </StackPanel>
                         </ui:CardExpander>
 

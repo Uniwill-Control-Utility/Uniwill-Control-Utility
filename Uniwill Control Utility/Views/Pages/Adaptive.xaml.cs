@@ -1417,13 +1417,15 @@ namespace Uniwill_Control_Utility.Views.Pages
             // pump voltage that Smart Mode would immediately overwrite.
             bool smartModeConfigured = _waterCoolerService?.GetSettings().SmartModeEnabled == true;
             bool skipPumpFan = smartModeActive || smartModeConfigured;
+            // Also skip RGB when Smart Mode temperature-based RGB is active
+            bool skipRgb = smartModeActive && (_waterCoolerService?.GetSettings().SmartModeTemperatureRgb == true);
 
             // When Smart Mode is active or configured, skip pump voltage and fan speed overrides
-            // — Smart Mode controls them internally. RGB still applies.
+            // — Smart Mode controls them internally. RGB still applies unless temperature-based RGB is active.
             PumpVoltage? curPump = skipPumpFan ? null : (PumpVoltage?)GetPumpVoltageFromIndex(cbxWcPumpVoltage.SelectedIndex);
             FanSpeed? curFan = skipPumpFan ? null : GetFanSpeedFromIndex(cbxWcFanSpeed.SelectedIndex);
-            RgbState curRgbMode = GetRgbModeFromIndex(cbxWcRgbMode.SelectedIndex);
-            RgbColor curRgbColor = GetRgbColorFromIndex(cbxWcRgbColor.SelectedIndex);
+            RgbState curRgbMode = skipRgb ? lastWcRgbMode : GetRgbModeFromIndex(cbxWcRgbMode.SelectedIndex);
+            RgbColor curRgbColor = skipRgb ? lastWcRgbColor : GetRgbColorFromIndex(cbxWcRgbColor.SelectedIndex);
 
             if (curPump != lastWcPump || curFan != lastWcFan ||
                 curRgbMode != lastWcRgbMode || curRgbColor != lastWcRgbColor)
@@ -1944,11 +1946,15 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 spWcPumpFan.Visibility = Visibility.Collapsed;
                 spWcSmartModeBadge.Visibility = Visibility.Visible;
+                bool tempRgb = _waterCoolerService?.GetSettings().SmartModeTemperatureRgb == true;
+                spWcRgb.Visibility = tempRgb ? Visibility.Collapsed : Visibility.Visible;
+                tbWcSmartModeBadgeText.Text = "Smart Mode ON";
             }
             else
             {
                 spWcPumpFan.Visibility = Visibility.Visible;
                 spWcSmartModeBadge.Visibility = Visibility.Collapsed;
+                spWcRgb.Visibility = Visibility.Visible;
             }
 
             // Refresh CPU voltage control visibility so setting changes from Settings page take effect
@@ -2237,11 +2243,17 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     spWcPumpFan.Visibility = Visibility.Collapsed;
                     spWcSmartModeBadge.Visibility = Visibility.Visible;
+                    tbWcSmartModeBadgeText.Text = "Smart Mode ON";
+
+                    // Hide RGB controls when Smart Mode temperature-based RGB is active
+                    bool tempRgb = _waterCoolerService?.GetSettings().SmartModeTemperatureRgb == true;
+                    spWcRgb.Visibility = tempRgb ? Visibility.Collapsed : Visibility.Visible;
                 }
                 else
                 {
                     spWcPumpFan.Visibility = Visibility.Visible;
                     spWcSmartModeBadge.Visibility = Visibility.Collapsed;
+                    spWcRgb.Visibility = Visibility.Visible;
                 }
 
                 // Reset pump/fan tracking so the next update() tick picks up the

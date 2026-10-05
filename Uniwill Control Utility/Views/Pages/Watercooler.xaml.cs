@@ -567,6 +567,20 @@ namespace Uniwill_Control_Utility.Views.Pages
             SaveSmartModeSettings();
         }
 
+        private void tsSmartModeTemperatureRgb_Checked(object sender, RoutedEventArgs e)
+        {
+            SaveSmartModeSettings();
+            if (_waterCoolerService?.IsSmartModeActive == true)
+                _waterCoolerService.StartSmartMode(); // restart to pick up new setting
+        }
+
+        private void tsSmartModeTemperatureRgb_Unchecked(object sender, RoutedEventArgs e)
+        {
+            SaveSmartModeSettings();
+            if (_waterCoolerService?.IsSmartModeActive == true)
+                _waterCoolerService.StartSmartMode(); // restart to pick up new setting
+        }
+
         private void TextBox_NumericOnly(object sender, TextCompositionEventArgs e)
         {
             e.Handled = !Regex.IsMatch(e.Text, @"^\d+$");
@@ -640,6 +654,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _ => "Percent100"
             };
 
+            settings.SmartModeTemperatureRgb = tsSmartModeTemperatureRgb.IsChecked == true;
+
             _waterCoolerService.SaveSettings();
         }
 
@@ -704,6 +720,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                     FanSpeed.Percent95 => 5,
                     _ => 6
                 };
+
+                // Temperature-based RGB toggle
+                tsSmartModeTemperatureRgb.IsChecked = settings.SmartModeTemperatureRgb;
 
                 // Apply smart mode enabled state
                 if (settings.SmartModeEnabled && _waterCoolerService.IsConnected)

@@ -665,7 +665,7 @@
                         <StackPanel>
                             <!-- Smart Mode ON badge (shown when Smart Mode is active) -->
                             <Grid x:Name="spWcSmartModeBadge" Visibility="Collapsed" Margin="0,0,0,4">
-                                <TextBlock Text="Smart Mode ON, pump/fan speed cannot be overriden"
+                                <TextBlock x:Name="tbWcSmartModeBadgeText" Text="Smart Mode ON"
                                            FontWeight="Bold"
                                            FontSize="14"
                                            HorizontalAlignment="Center"
@@ -729,64 +729,67 @@
                                     </ComboBox>
                                 </Grid>
                             </StackPanel>
-                            <!-- Divider before RGB (always shown) -->
-                            <Border x:Name="WcPumpFanRgbDivider" Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-                            <!-- Row: RGB Mode -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="RGB Mode" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Select the RGB lighting mode for this game" />
-                                </StackPanel>
-                                <ComboBox Name="cbxWcRgbMode"
-                                          Grid.Column="1"
-                                          MinWidth="160"
-                                          Margin="4,0,0,0"
-                                          SelectedIndex="1"
-                                          SelectionChanged="cbxWcRgbMode_SelectionChanged">
-                                    <ComboBoxItem>Off</ComboBoxItem>
-                                    <ComboBoxItem>Static</ComboBoxItem>
-                                    <ComboBoxItem>Breathe</ComboBoxItem>
-                                    <ComboBoxItem>Colorful</ComboBoxItem>
-                                    <ComboBoxItem>Breathe Color</ComboBoxItem>
-                                </ComboBox>
-                            </Grid>
-                            <!-- Divider (hidden for modes without color) -->
-                            <Border x:Name="WcRgbColorDivider"
-                                    Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
-                                    Visibility="Collapsed" />
-                            <!-- Row: RGB Color (hidden for Off/Colorful/Breathe Color) -->
-                            <Grid x:Name="spWcRgbColor">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="RGB Color" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Select the RGB color for this game" />
-                                </StackPanel>
-                                <ComboBox Name="cbxWcRgbColor"
-                                          Grid.Column="1"
-                                          MinWidth="160"
-                                          Margin="4,0,0,0"
-                                          SelectedIndex="0">
-                                    <ComboBoxItem>Red</ComboBoxItem>
-                                    <ComboBoxItem>Green</ComboBoxItem>
-                                    <ComboBoxItem>Blue</ComboBoxItem>
-                                    <ComboBoxItem>White</ComboBoxItem>
-                                </ComboBox>
-                            </Grid>
+                            <!-- RGB controls (shown/hidden together when Smart Mode temperature-based RGB is active) -->
+                            <StackPanel x:Name="spWcRgb">
+                                <!-- Divider before RGB -->
+                                <Border x:Name="WcPumpFanRgbDivider" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <!-- Row: RGB Mode -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="RGB Mode" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Select the RGB lighting mode for this game" />
+                                    </StackPanel>
+                                    <ComboBox Name="cbxWcRgbMode"
+                                              Grid.Column="1"
+                                              MinWidth="160"
+                                              Margin="4,0,0,0"
+                                              SelectedIndex="1"
+                                              SelectionChanged="cbxWcRgbMode_SelectionChanged">
+                                        <ComboBoxItem>Off</ComboBoxItem>
+                                        <ComboBoxItem>Static</ComboBoxItem>
+                                        <ComboBoxItem>Breathe</ComboBoxItem>
+                                        <ComboBoxItem>Colorful</ComboBoxItem>
+                                        <ComboBoxItem>Breathe Color</ComboBoxItem>
+                                    </ComboBox>
+                                </Grid>
+                                <!-- Divider (hidden for modes without color) -->
+                                <Border x:Name="WcRgbColorDivider"
+                                        Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                <!-- Row: RGB Color (hidden for Off/Colorful/Breathe Color) -->
+                                <Grid x:Name="spWcRgbColor">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="RGB Color" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Select the RGB color for this game" />
+                                    </StackPanel>
+                                    <ComboBox Name="cbxWcRgbColor"
+                                              Grid.Column="1"
+                                              MinWidth="160"
+                                              Margin="4,0,0,0"
+                                              SelectedIndex="0">
+                                        <ComboBoxItem>Red</ComboBoxItem>
+                                        <ComboBoxItem>Green</ComboBoxItem>
+                                        <ComboBoxItem>Blue</ComboBoxItem>
+                                        <ComboBoxItem>White</ComboBoxItem>
+                                    </ComboBox>
+                                </Grid>
+                            </StackPanel>
                         </StackPanel>
                     </ui:CardExpander>
 
