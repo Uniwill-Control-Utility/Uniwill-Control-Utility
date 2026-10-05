@@ -113,6 +113,7 @@ namespace Uniwill_Control_Utility.Services
         void AcquirePersistent(HardwareMonitoringCategory categories);
         HardwareMetricsSnapshot ReadSnapshot();
         float ReadSensor(HardwareType hardwareType, SensorType sensorType, string sensorName);
+        void ResetComputer();
     }
 
     public sealed partial class HardwareMonitoringService : IHardwareMonitoringService, IDisposable
@@ -199,6 +200,65 @@ namespace Uniwill_Control_Utility.Services
 
         public float ReadSensor(HardwareType hardwareType, SensorType sensorType, string sensorName) =>
             _stateCache.Read().ReadSensor(hardwareType, sensorType, sensorName);
+
+        /// <summary>
+        /// Closes the LibreHardwareMonitor Computer and rebuilds it with fresh driver handles.
+        /// Call this proactively after events that invalidate GPU driver state:
+        /// monitor hotplug (display topology change), hibernation resume, etc.
+        /// This prevents ExecutionEngineException from NVML stale handles.
+        /// </summary>
+        public void ResetComputer()
+        {
+            lock (_sync)
+            {
+                ThrowIfDisposed();
+
+                try { Serilog.Log.Information("[LHM] ResetComputer called — reopening Computer with fresh handles"); }
+                catch { /* Serilog may not be ready */ }
+
+                _computer?.Close();
+                _computer = null;
+                _lastUpdateUtc = DateTime.MinValue;
+                _updateFailureCount = 0;
+
+                if (_activeCategories == HardwareMonitoringCategory.None)
+                    return;
+
+                var computer = new Computer
+                {
+                    IsCpuEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Cpu),
+                    IsMemoryEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Memory),
+                    IsGpuEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Gpu),
+                    IsBatteryEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Battery),
+                    IsMotherboardEnabled = true,
+                    IsStorageEnabled = true,
+                    IsControllerEnabled = true
+                };
+
+                Monitor.Exit(_sync);
+                try
+                {
+                    computer.Open();
+                    _stateCache.Invalidate();
+                }
+                catch (Exception ex)
+                {
+                    try { Serilog.Log.Warning(ex, "[LHM] ResetComputer: failed to reopen Computer"); }
+                    catch { }
+                    computer.Close();
+                    computer = null;
+                }
+                finally
+                {
+                    Monitor.Enter(_sync);
+                }
+
+                if (_activeCategories != HardwareMonitoringCategory.None && _computer is null)
+                {
+                    _computer = computer;
+                }
+            }
+        }
 
         private void Release(long id)
         {

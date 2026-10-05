@@ -77,6 +77,11 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             SystemEvents.PowerModeChanged += HandlePowerModeChange;
 
+            // Subscribe to window messages for display change detection.
+            // We reset LHM Computer proactively when the display topology changes
+            // (monitor hotplug) to prevent ExecutionEngineException from stale NVML handles.
+            this.SourceInitialized += OnSourceInitialized;
+
             Instance = this;
 
             // Ensure tray icon is visible
@@ -901,6 +906,20 @@ namespace Uniwill_Control_Utility.Views.Windows
                             // Give the system a moment to reinitialize after resume
                             await Task.Delay(1500);
 
+                            // Reset LibreHardwareMonitor Computer to get fresh NVML/ADL handles.
+                            // GPU driver state is stale after hibernation/sleep resume, causing
+                            // ExecutionEngineException when LHM tries to use old handles.
+                            try
+                            {
+                                var monitoring = App.GetService<IHardwareMonitoringService>();
+                                monitoring?.ResetComputer();
+                                Debug.WriteLine("[Resume] LHM Computer reset with fresh handles");
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[Resume] LHM reset failed: {ex.Message}");
+                            }
+
                             // Invalidate Adaptive page diff-tracking so next timer tick
                             // force-applies everything (hardware reverted to BIOS defaults).
                             try
@@ -1110,6 +1129,57 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
         }
 
+        #region Display Change Detection
+
+        private HwndSourceHook? _hwndHook;
+
+        private void OnSourceInitialized(object? sender, EventArgs e)
+        {
+            SourceInitialized -= OnSourceInitialized;
+
+            var source = PresentationSource.FromVisual(this) as HwndSource;
+            if (source is null)
+                return;
+
+            _hwndHook = OnWindowMessage;
+            source.AddHook(_hwndHook);
+        }
+
+        /// <summary>
+        /// WM_DISPLAYCHANGE (0x007E) fires when the display topology changes
+        /// (monitor added/removed, resolution change, orientation change).
+        /// We use this to proactively reset LHM Computer before stale NVML handles cause crashes.
+        /// </summary>
+        private const int WM_DISPLAYCHANGE = 0x007E;
+
+        private IntPtr OnWindowMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WM_DISPLAYCHANGE)
+            {
+                // Don't mark as handled — other WPF code may need this message.
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        // Give the GPU driver a moment to reinitialize after topology change
+                        Task.Delay(500).Wait();
+
+                        var monitoring = App.GetService<IHardwareMonitoringService>();
+                        monitoring?.ResetComputer();
+                        Debug.WriteLine("[Display] LHM Computer reset after display topology change");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[Display] LHM reset failed: {ex.Message}");
+                    }
+                });
+            }
+
+            return IntPtr.Zero;
+        }
+
+        #endregion
+
         #region INavigationWindow Methods
 
         public INavigationView GetNavigation() => RootNavigation;
@@ -1140,6 +1210,12 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         protected override void OnClosed(EventArgs e)
         {
+            // Remove the window hook to avoid keeping the HwndSource alive
+            var source = PresentationSource.FromVisual(this) as HwndSource;
+            source?.RemoveHook(_hwndHook);
+
+            SystemEvents.PowerModeChanged -= HandlePowerModeChange;
+
             base.OnClosed(e);
             Application.Current.Shutdown();
         }
