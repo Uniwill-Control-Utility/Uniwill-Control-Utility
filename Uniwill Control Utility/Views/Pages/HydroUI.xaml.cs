@@ -578,12 +578,25 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _hydroUIService.StartSmartMode();
         }
 
-        private void tsSmartModeTemperatureRgb_Unchecked(object sender, RoutedEventArgs e)
+        private async void tsSmartModeTemperatureRgb_Unchecked(object sender, RoutedEventArgs e)
         {
             SaveSmartModeSettings();
             // Restore manual RGB controls
             RgbCardExpander.IsEnabled = true;
             RgbCardExpander.Visibility = Visibility.Visible;
+            // Re-apply the saved manual RGB state
+            if (_hydroUIService?.IsConnected == true)
+            {
+                var settings = _hydroUIService.GetSettings();
+                if (settings.RgbEnabled)
+                {
+                    await _hydroUIService.WriteRgbModeAsync(settings.GetRgbMode(), settings.GetRgbColor());
+                }
+                else
+                {
+                    await _hydroUIService.WriteRgbModeAsync(RgbState.Off, RgbColor.Red);
+                }
+            }
             if (_hydroUIService?.IsSmartModeActive == true)
                 _hydroUIService.StartSmartMode(); // restart to pick up new setting
         }
