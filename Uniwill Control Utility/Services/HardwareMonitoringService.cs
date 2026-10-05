@@ -134,6 +134,12 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>When the last UpdateHardware failure occurred.</summary>
         private DateTime _lastUpdateFailureUtc = DateTime.MinValue;
 
+        /// <summary>When ResetComputer() was last called — used to enforce a cooldown before reopening.</summary>
+        private DateTime _lastResetUtc = DateTime.MinValue;
+
+        /// <summary>How long to wait after ResetComputer() before attempting to reopen (gives GPU driver time to settle).</summary>
+        private static readonly TimeSpan ResetCooldown = TimeSpan.FromSeconds(3);
+
         public HardwareMonitoringService()
         {
             _stateCache = new StaleWhileRevalidateCache<HardwareMonitoringState>(
@@ -202,10 +208,14 @@ namespace Uniwill_Control_Utility.Services
             _stateCache.Read().ReadSensor(hardwareType, sensorType, sensorName);
 
         /// <summary>
-        /// Closes the LibreHardwareMonitor Computer and rebuilds it with fresh driver handles.
+        /// Closes the LibreHardwareMonitor Computer to release stale GPU driver handles.
         /// Call this proactively after events that invalidate GPU driver state:
         /// monitor hotplug (display topology change), hibernation resume, etc.
-        /// This prevents ExecutionEngineException from NVML stale handles.
+        ///
+        /// This method does NOT immediately reopen the Computer — it only closes it and
+        /// invalidates the cache. The next background refresh cycle will handle reopening
+        /// with fresh handles. This avoids calling computer.Open() on the calling thread,
+        /// which can trigger ExecutionEngineException if the GPU driver is in a corrupted state.
         /// </summary>
         public void ResetComputer()
         {
@@ -213,50 +223,20 @@ namespace Uniwill_Control_Utility.Services
             {
                 ThrowIfDisposed();
 
-                try { Serilog.Log.Information("[LHM] ResetComputer called — reopening Computer with fresh handles"); }
+                try { Serilog.Log.Information("[LHM] ResetComputer called — releasing stale handles, reopening deferred to next refresh"); }
                 catch { /* Serilog may not be ready */ }
 
+                // Close releases NVML/ADL handles. Do this while holding the lock so
+                // no other thread is accessing the computer.
                 _computer?.Close();
                 _computer = null;
                 _lastUpdateUtc = DateTime.MinValue;
                 _updateFailureCount = 0;
+                _lastResetUtc = DateTime.UtcNow;
 
-                if (_activeCategories == HardwareMonitoringCategory.None)
-                    return;
-
-                var computer = new Computer
-                {
-                    IsCpuEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Cpu),
-                    IsMemoryEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Memory),
-                    IsGpuEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Gpu),
-                    IsBatteryEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Battery),
-                    IsMotherboardEnabled = true,
-                    IsStorageEnabled = true,
-                    IsControllerEnabled = true
-                };
-
-                Monitor.Exit(_sync);
-                try
-                {
-                    computer.Open();
-                    _stateCache.Invalidate();
-                }
-                catch (Exception ex)
-                {
-                    try { Serilog.Log.Warning(ex, "[LHM] ResetComputer: failed to reopen Computer"); }
-                    catch { }
-                    computer.Close();
-                    computer = null;
-                }
-                finally
-                {
-                    Monitor.Enter(_sync);
-                }
-
-                if (_activeCategories != HardwareMonitoringCategory.None && _computer is null)
-                {
-                    _computer = computer;
-                }
+                // Invalidate cache so the next ReadSnapshot() triggers a background
+                // refresh which will reopen the Computer with fresh handles.
+                _stateCache.Invalidate();
             }
         }
 
@@ -407,6 +387,82 @@ namespace Uniwill_Control_Utility.Services
 
         private void UpdateHardware()
         {
+            // If _computer is null but categories are active, attempt to reopen.
+            // This can happen after ResetComputer() releases stale handles, or after
+            // a previous failure cleared the computer. We only reopen if enough time
+            // has passed since the last failure to avoid tight loops on broken drivers.
+            if (_computer is null && _activeCategories != HardwareMonitoringCategory.None)
+            {
+                // Enforce cooldown after ResetComputer() — give the GPU driver time to
+                // settle after display topology changes before probing with fresh handles.
+                if (DateTime.UtcNow - _lastResetUtc < ResetCooldown)
+                {
+                    return;
+                }
+
+                // Rate-limit reopen attempts to avoid tight loops if the GPU driver is broken.
+                if (_updateFailureCount > 3 &&
+                    DateTime.UtcNow - _lastUpdateFailureUtc < TimeSpan.FromSeconds(10))
+                {
+                    return;
+                }
+
+                try
+                {
+                    var computer = new Computer
+                    {
+                        IsCpuEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Cpu),
+                        IsMemoryEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Memory),
+                        IsGpuEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Gpu),
+                        IsBatteryEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Battery),
+                        IsMotherboardEnabled = true,
+                        IsStorageEnabled = true,
+                        IsControllerEnabled = true
+                    };
+
+                    // Release lock during Open() — it probes drivers and can take 1-2 seconds.
+                    Monitor.Exit(_sync);
+                    try
+                    {
+                        computer.Open();
+                    }
+                    catch (Exception ex)
+                    {
+                        try { Serilog.Log.Warning(ex, "[LHM] UpdateHardware: failed to reopen Computer"); } catch { }
+                        computer.Close();
+                        _updateFailureCount++;
+                        _lastUpdateFailureUtc = DateTime.UtcNow;
+                        return;
+                    }
+                    finally
+                    {
+                        Monitor.Enter(_sync);
+                    }
+
+                    // Check that categories didn't change while we were opening.
+                    if (_activeCategories != HardwareMonitoringCategory.None && _computer is null)
+                    {
+                        _computer = computer;
+                    }
+                    else
+                    {
+                        computer.Close();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    /*
+                     * ExecutionEngineException from NVML can corrupt the process before
+                     * this catch block executes. However, when it doesn't, we log and
+                     * rate-limit retries so the app stays alive.
+                     */
+                    try { Serilog.Log.Warning(ex, "[LHM] UpdateHardware: exception during Computer reopen"); } catch { }
+                    _updateFailureCount++;
+                    _lastUpdateFailureUtc = DateTime.UtcNow;
+                    return;
+                }
+            }
+
             if (_computer is null || DateTime.UtcNow - _lastUpdateUtc < TimeSpan.FromMilliseconds(250))
                 return;
 
@@ -425,47 +481,17 @@ namespace Uniwill_Control_Utility.Services
                  * ADL/AMDL for AMD). When a display topology changes (e.g. monitor hotplug),
                  * the GPU driver can invalidate those handles, causing ExecutionEngineException
                  * or other fatal interop failures. Catch everything here to prevent the timer
-                 * thread from taking down the process, then reopen the Computer to get fresh
-                 * driver handles.
-                 *
-                 * We also rate-limit resets to avoid tight loops if the driver stays broken.
+                 * thread from taking down the process, then clear the computer so the next
+                 * call to UpdateHardware() will attempt a reopen with fresh handles.
                  */
                 _updateFailureCount++;
                 _lastUpdateFailureUtc = DateTime.UtcNow;
 
-                try { Serilog.Log.Warning(ex, "[LHM] UpdateHardware failed (failure #{Count}) — attempting Computer reset", _updateFailureCount); } catch { /* Serilog may not be ready */ }
+                try { Serilog.Log.Warning(ex, "[LHM] UpdateHardware failed (failure #{Count}) — clearing Computer for next refresh", _updateFailureCount); } catch { /* Serilog may not be ready */ }
 
-                // Only attempt a reset if at least 2 seconds have passed since the last failure
-                // to avoid tight loops during sustained driver issues.
-                if (DateTime.UtcNow - _lastUpdateFailureUtc > TimeSpan.FromSeconds(2) || _updateFailureCount <= 3)
-                {
-                    try
-                    {
-                        _computer?.Close();
-                        _computer = null;
-
-                        // Reopen with the currently active categories
-                        if (_activeCategories != HardwareMonitoringCategory.None)
-                        {
-                            _computer = new Computer
-                            {
-                                IsCpuEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Cpu),
-                                IsMemoryEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Memory),
-                                IsGpuEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Gpu),
-                                IsBatteryEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Battery),
-                                IsMotherboardEnabled = true,
-                                IsStorageEnabled = true,
-                                IsControllerEnabled = true
-                            };
-                            _computer.Open();
-                        }
-                    }
-                    catch
-                    {
-                        // If reopening also fails, give up and let the next tick retry later.
-                        _computer = null;
-                    }
-                }
+                // Close and clear — the next UpdateHardware() call will handle reopen.
+                _computer?.Close();
+                _computer = null;
             }
         }
 

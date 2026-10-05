@@ -1157,22 +1157,19 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (msg == WM_DISPLAYCHANGE)
             {
                 // Don't mark as handled — other WPF code may need this message.
-                _ = Task.Run(() =>
+                // ResetComputer() only closes the Computer and invalidates the cache.
+                // The actual reopen happens on the next background refresh cycle, so
+                // we don't need to delay or run on a separate thread.
+                try
                 {
-                    try
-                    {
-                        // Give the GPU driver a moment to reinitialize after topology change
-                        Task.Delay(500).Wait();
-
-                        var monitoring = App.GetService<IHardwareMonitoringService>();
-                        monitoring?.ResetComputer();
-                        Debug.WriteLine("[Display] LHM Computer reset after display topology change");
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"[Display] LHM reset failed: {ex.Message}");
-                    }
-                });
+                    var monitoring = App.GetService<IHardwareMonitoringService>();
+                    monitoring?.ResetComputer();
+                    Debug.WriteLine("[Display] LHM Computer reset after display topology change");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Display] LHM reset failed: {ex.Message}");
+                }
             }
 
             return IntPtr.Zero;
