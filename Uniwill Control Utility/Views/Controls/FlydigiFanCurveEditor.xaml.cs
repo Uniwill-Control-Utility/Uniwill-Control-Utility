@@ -7,7 +7,6 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using System.Windows.Threading;
 using Uniwill_Control_Utility.Models;
 
 namespace Uniwill_Control_Utility.Views.Controls
@@ -21,7 +20,6 @@ namespace Uniwill_Control_Utility.Views.Controls
     {
         private readonly List<Slider> _sliders = new();
         private readonly InfoTooltip _customToolTip = new();
-        private DispatcherOperation? _pendingGraphRedraw;
 
         // Fixed temperature points: 0, 10, 20, ..., 100 °C (11 points)
         private static readonly int[] Temperatures = { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
@@ -70,10 +68,7 @@ namespace Uniwill_Control_Utility.Views.Controls
                 _slidersGrid.Children.Add(slider);
             }
 
-            // Force ArrangeOverride to fire so DrawGraph runs after the new sliders
-            // have been measured. Using InvalidateArrange is more reliable than
-            // RequestGraphRedraw here because the dispatcher-queued redraw can run
-            // before layout settles, producing zero-sized thumb positions.
+            // Force ArrangeOverride to fire so DrawGraph runs after layout settles.
             InvalidateArrange();
         }
 
@@ -180,20 +175,8 @@ namespace Uniwill_Control_Utility.Views.Controls
                 return;
 
             VerifyMonotonicity(currentSlider);
-            RequestGraphRedraw();
+            InvalidateArrange();
             CurveChanged?.Invoke(this, EventArgs.Empty);
-        }
-
-        private void RequestGraphRedraw()
-        {
-            if (_pendingGraphRedraw is { Status: DispatcherOperationStatus.Pending })
-                return;
-
-            _pendingGraphRedraw = Dispatcher.InvokeAsync(() =>
-            {
-                _pendingGraphRedraw = null;
-                DrawGraph();
-            }, DispatcherPriority.Background);
         }
 
         /// <summary>

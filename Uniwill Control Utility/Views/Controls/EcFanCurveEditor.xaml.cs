@@ -7,7 +7,6 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using System.Windows.Threading;
 using Uniwill_Control_Utility.Models;
 
 namespace Uniwill_Control_Utility.Views.Controls
@@ -24,7 +23,6 @@ namespace Uniwill_Control_Utility.Views.Controls
         private readonly List<Slider> _sliders = new();
         private int[] _temperatures = EcFanCurve.CpuTemperatures;
         private bool _isReadOnly;
-        private DispatcherOperation? _pendingGraphRedraw;
 
         /// <summary>
         /// Sets the temperature labels displayed on the X-axis and in tooltips.
@@ -113,7 +111,7 @@ namespace Uniwill_Control_Utility.Views.Controls
                 _slidersGrid.Children.Add(slider);
             }
 
-            RequestGraphRedraw();
+            InvalidateArrange();
         }
 
         private void UpdateTemperatureLabels()
@@ -229,20 +227,8 @@ namespace Uniwill_Control_Utility.Views.Controls
                 return;
 
             VerifyMonotonicity(currentSlider);
-            RequestGraphRedraw();
+            InvalidateArrange();
             CurveChanged?.Invoke(this, EventArgs.Empty);
-        }
-
-        private void RequestGraphRedraw()
-        {
-            if (_pendingGraphRedraw is { Status: DispatcherOperationStatus.Pending })
-                return;
-
-            _pendingGraphRedraw = Dispatcher.InvokeAsync(() =>
-            {
-                _pendingGraphRedraw = null;
-                DrawGraph();
-            }, DispatcherPriority.Background);
         }
 
         private void VerifyMonotonicity(Slider currentSlider)
