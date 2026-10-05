@@ -194,6 +194,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Expand/collapse RGB card based on enabled state
             RgbCardExpander.IsExpanded = tsRgbEnabled.IsChecked == true;
+            RgbContentPanel.Visibility = tsRgbEnabled.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
 
             // Restore auto-connect toggle
             tsAutoConnect.IsChecked = settings.AutoConnect;
@@ -430,6 +431,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             if (_isSyncingFromPreset || _isSyncingFromExternal) return;
             if (_hydroUIService == null || !_hydroUIService.IsConnected) return;
+            if (tsRgbEnabled.IsChecked != true) return; // RGB disabled — don't apply
 
             var mode = GetSelectedRgbMode();
             var color = GetSelectedRgbColor();
@@ -450,6 +452,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (_isSyncingFromPreset || _isSyncingFromExternal) return;
             if (_hydroUIService == null || !_hydroUIService.IsConnected) return;
+            if (tsRgbEnabled.IsChecked != true) return; // RGB disabled — don't apply
 
             var mode = GetSelectedRgbMode();
             var color = GetSelectedRgbColor();
@@ -466,6 +469,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             _hydroUIService.SaveSettings();
 
             RgbCardExpander.IsExpanded = true;
+            RgbContentPanel.Visibility = Visibility.Visible;
 
             // Apply current effect/color to device
             if (_hydroUIService.IsConnected)
@@ -485,6 +489,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             _hydroUIService.SaveSettings();
 
             RgbCardExpander.IsExpanded = false;
+            RgbContentPanel.Visibility = Visibility.Collapsed;
 
             // Turn off RGB on device
             if (_hydroUIService.IsConnected)
@@ -931,6 +936,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                     // Update color picker visibility based on loaded mode
                     UpdateRgbColorVisibility();
+                    RgbContentPanel.Visibility = tsRgbEnabled.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
                 }
                 finally
                 {
@@ -1073,6 +1079,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 cbxRgbColor.SelectedIndex = GetRgbColorIndex(settings.GetRgbColor());
                 UpdateRgbColorVisibility();
                 RgbCardExpander.IsExpanded = tsRgbEnabled.IsChecked == true;
+                RgbContentPanel.Visibility = tsRgbEnabled.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
             }
             finally
             {
@@ -1140,6 +1147,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbxRgbColor.SelectedIndex = GetRgbColorIndex(e.RgbColor);
             UpdateRgbColorVisibility();
             RgbCardExpander.IsExpanded = tsRgbEnabled.IsChecked == true;
+            RgbContentPanel.Visibility = tsRgbEnabled.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         }
 
         /* ------------------------------------------------------------------ */

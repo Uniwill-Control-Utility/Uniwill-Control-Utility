@@ -506,7 +506,7 @@
                                   Unchecked="tsRgbEnabled_Unchecked" />
                             </Grid>
                         </ui:CardExpander.Header>
-                        <StackPanel>
+                        <StackPanel x:Name="RgbContentPanel">
                             <!-- Effect mode -->
                             <Grid Margin="0,0,0,2">
                                 <Grid.ColumnDefinitions>
