@@ -862,6 +862,19 @@ namespace Uniwill_Control_Utility.Services
                         if (_smartModeCurrentFan != FanSpeed.Off)
                             await WriteFanModeAsync(_smartModeCurrentFan);
 
+                        // Apply initial temperature-based RGB if enabled
+                        if (settings.SmartModeTemperatureRgb)
+                        {
+                            var rgbColor = _smartModeFilteredTemp < settings.SmartModeLowThreshold
+                                ? RgbColor.Green
+                                : _smartModeFilteredTemp > settings.SmartModeHighThreshold
+                                    ? RgbColor.Red
+                                    : RgbColor.White;
+                            _smartModeCurrentRgbMode = RgbState.Static;
+                            _smartModeCurrentRgbColor = rgbColor;
+                            await WriteRgbModeAsync(RgbState.Static, rgbColor);
+                        }
+
                         Debug.WriteLine($"[WaterCooler] Smart mode initial: pump {_smartModeCurrentPump}, fan {_smartModeCurrentFan}");
                     }
                 }
