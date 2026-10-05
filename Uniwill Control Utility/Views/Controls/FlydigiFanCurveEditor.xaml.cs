@@ -70,7 +70,11 @@ namespace Uniwill_Control_Utility.Views.Controls
                 _slidersGrid.Children.Add(slider);
             }
 
-            RequestGraphRedraw();
+            // Force ArrangeOverride to fire so DrawGraph runs after the new sliders
+            // have been measured. Using InvalidateArrange is more reliable than
+            // RequestGraphRedraw here because the dispatcher-queued redraw can run
+            // before layout settles, producing zero-sized thumb positions.
+            InvalidateArrange();
         }
 
         /// <summary>
@@ -189,7 +193,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             {
                 _pendingGraphRedraw = null;
                 DrawGraph();
-            }, DispatcherPriority.Loaded);
+            }, DispatcherPriority.Background);
         }
 
         /// <summary>

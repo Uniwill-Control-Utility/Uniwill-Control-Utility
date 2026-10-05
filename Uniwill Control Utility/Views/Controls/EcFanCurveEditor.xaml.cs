@@ -37,7 +37,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             {
                 _temperatures = value;
                 UpdateTemperatureLabels();
-                RequestGraphRedraw();
+                InvalidateArrange();
             }
         }
 
@@ -152,7 +152,9 @@ namespace Uniwill_Control_Utility.Views.Controls
             {
                 _sliders[i].Value = curve.Duties[i];
             }
-            RequestGraphRedraw();
+
+            // Force ArrangeOverride to fire so DrawGraph runs after layout is settled.
+            InvalidateArrange();
         }
 
         /// <summary>Read the current slider values into an EcFanCurve.</summary>
@@ -240,7 +242,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             {
                 _pendingGraphRedraw = null;
                 DrawGraph();
-            }, DispatcherPriority.Loaded);
+            }, DispatcherPriority.Background);
         }
 
         private void VerifyMonotonicity(Slider currentSlider)
