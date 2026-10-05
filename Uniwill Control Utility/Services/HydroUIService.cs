@@ -1395,8 +1395,10 @@ namespace Uniwill_Control_Utility.Services
                 // Re-apply RGB
                 var rgbMode = settings.GetRgbMode();
                 var rgbColor = settings.GetRgbColor();
-                if (settings.RgbEnabled && rgbMode != RgbState.Off)
+                if (settings.RgbEnabled)
                     await WriteRgbModeAsync(rgbMode, rgbColor);
+                else
+                    await WriteRgbModeAsync(RgbState.Off, RgbColor.Red);
 
                 Debug.WriteLine("[WaterCooler] Standby mode exited — settings restored");
             }
@@ -1560,8 +1562,10 @@ namespace Uniwill_Control_Utility.Services
 
                     var rgbMode = _settings.GetRgbMode();
                     var rgbColor = _settings.GetRgbColor();
-                    if (_settings.RgbEnabled && rgbMode != RgbState.Off)
+                    if (_settings.RgbEnabled)
                         await WriteRgbModeAsync(rgbMode, rgbColor);
+                    else
+                        await WriteRgbModeAsync(RgbState.Off, RgbColor.Red);
                 }
                 catch
                 {
