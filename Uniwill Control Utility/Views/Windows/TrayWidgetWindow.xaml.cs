@@ -506,7 +506,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             Type? pageType = tagName switch
             {
                 "Adaptive" => typeof(Views.Pages.Adaptive),
-                "Watercooler" => typeof(Views.Pages.Watercooler),
+                "HydroUI" => typeof(Views.Pages.HydroUI),
                 "Keyboard" => typeof(Views.Pages.Keyboard),
                 "LightBar" => typeof(Views.Pages.LightBar),
                 "FanControl" => typeof(Views.Pages.FanControl),

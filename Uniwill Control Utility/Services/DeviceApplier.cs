@@ -17,13 +17,13 @@ namespace Uniwill_Control_Utility.Services
     {
         private readonly FlydigiCoolerHidService _flydigiService;
         private readonly FlydigiCoolerBleService? _bs1Service;
-        private readonly WaterCoolerService _waterCoolerService;
+        private readonly HydroUIService _hydroUIService;
         private readonly UniwillECService? _uniwillEc;
 
         /// <summary>Whether Adaptive Mode is currently overriding Flydigi device control.</summary>
         public bool IsFlydigiOverridden { get; private set; }
 
-        /// <summary>Whether Adaptive Mode is currently overriding Watercooler device control.</summary>
+        /// <summary>Whether Adaptive Mode is currently overriding HydroUI device control.</summary>
         public bool IsWatercoolerOverridden { get; private set; }
 
         /// <summary>Whether Adaptive Mode is currently overriding EC Fan Control.</summary>
@@ -38,7 +38,7 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>The last Flydigi preset applied from Adaptive Mode (null when nothing has been applied yet).</summary>
         public FlydigiPresetAppliedEventArgs? LastAppliedFlydigiPreset { get; private set; }
 
-        /// <summary>The last Watercooler preset applied from Adaptive Mode (null when nothing has been applied yet).</summary>
+        /// <summary>The last HydroUI preset applied from Adaptive Mode (null when nothing has been applied yet).</summary>
         public WatercoolerPresetAppliedEventArgs? LastAppliedWatercoolerPreset { get; private set; }
 
         /// <summary>The last EC Fan curve applied from Adaptive Mode (null when nothing has been applied yet).</summary>
@@ -54,7 +54,7 @@ namespace Uniwill_Control_Utility.Services
         public event EventHandler<bool>? FlydigiOverrideChanged;
 
         /// <summary>
-        /// Raised when the Watercooler override state changes.
+        /// Raised when the HydroUI override state changes.
         /// Args: (isOverridden)
         /// </summary>
         public event EventHandler<bool>? WatercoolerOverrideChanged;
@@ -66,7 +66,7 @@ namespace Uniwill_Control_Utility.Services
         public event EventHandler<FlydigiPresetAppliedEventArgs>? FlydigiPresetApplied;
 
         /// <summary>
-        /// Raised when profile-specific Watercooler settings have been applied and the page
+        /// Raised when profile-specific HydroUI settings have been applied and the page
         /// should update its UI controls to reflect the profile's values.
         /// </summary>
         public event EventHandler<WatercoolerPresetAppliedEventArgs>? WatercoolerPresetApplied;
@@ -108,7 +108,7 @@ namespace Uniwill_Control_Utility.Services
         private Bs2ProSettings? _savedFlydigiSettings;
 
         /// <summary>
-        /// Saved user Watercooler settings, captured when override is enabled.
+        /// Saved user HydroUI settings, captured when override is enabled.
         /// Restored when override is lifted.
         /// </summary>
         private WaterCoolerSettings? _savedWatercoolerSettings;
@@ -131,11 +131,11 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private (byte R, byte G, byte B, int Brightness, int EffectIndex, int Speed, bool Enabled)? _savedLightBarSettings;
 
-        public DeviceApplier(FlydigiCoolerHidService flydigiService, FlydigiCoolerBleService? bs1Service, WaterCoolerService waterCoolerService, UniwillECService? uniwillEc = null)
+        public DeviceApplier(FlydigiCoolerHidService flydigiService, FlydigiCoolerBleService? bs1Service, HydroUIService hydroUIService, UniwillECService? uniwillEc = null)
         {
             _flydigiService = flydigiService;
             _bs1Service = bs1Service;
-            _waterCoolerService = waterCoolerService;
+            _hydroUIService = hydroUIService;
             _uniwillEc = uniwillEc;
         }
 
@@ -207,7 +207,7 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
-        /// Enables Adaptive Mode override for the Watercooler device.
+        /// Enables Adaptive Mode override for the HydroUI device.
         /// Captures the current user settings so they can be restored later.
         /// </summary>
         public void EnableWatercoolerOverride()
@@ -222,7 +222,7 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
-        /// Disables Adaptive Mode override for the Watercooler device.
+        /// Disables Adaptive Mode override for the HydroUI device.
         /// Restores the previously saved user settings to the service's settings object
         /// and re-applies them to the device immediately (regardless of page visibility).
         /// </summary>
@@ -237,15 +237,15 @@ namespace Uniwill_Control_Utility.Services
             WaterCoolerSettings? saved = _savedWatercoolerSettings;
             if (saved != null)
             {
-                var currentSettings = _waterCoolerService.GetSettings();
+                var currentSettings = _hydroUIService.GetSettings();
                 CopyWatercoolerSettings(saved, currentSettings);
-                _waterCoolerService.SaveSettings();
+                _hydroUIService.SaveSettings();
                 _savedWatercoolerSettings = null;
 
                 // Re-apply restored settings to the device immediately.
                 // When Smart Mode is configured, skip pump and fan writes — Smart Mode
                 // controls them and would fight with a one-shot restore.
-                if (_waterCoolerService.IsConnected)
+                if (_hydroUIService.IsConnected)
                 {
                     try
                     {
@@ -256,7 +256,7 @@ namespace Uniwill_Control_Utility.Services
                     }
                     catch (Exception ex)
                     {
-                        DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to re-apply user Watercooler settings on override-lift");
+                        DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to re-apply user HydroUI settings on override-lift");
                     }
                 }
             }
@@ -1005,7 +1005,7 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /* ------------------------------------------------------------------ */
-        /*  Watercooler Device Commands                                        */
+        /*  HydroUI Device Commands                                        */
         /* ------------------------------------------------------------------ */
 
         /// <summary>
@@ -1017,29 +1017,29 @@ namespace Uniwill_Control_Utility.Services
             RgbState? rgbMode = null,
             RgbColor? rgbColor = null)
         {
-            if (!_waterCoolerService.IsConnected)
+            if (!_hydroUIService.IsConnected)
                 return;
 
             try
             {
                 if (pumpVoltage.HasValue)
-                    await _waterCoolerService.WritePumpModeAsync(pumpVoltage.Value);
+                    await _hydroUIService.WritePumpModeAsync(pumpVoltage.Value);
 
                 if (fanSpeed.HasValue)
-                    await _waterCoolerService.WriteFanModeAsync(fanSpeed.Value);
+                    await _hydroUIService.WriteFanModeAsync(fanSpeed.Value);
 
                 if (rgbMode.HasValue && rgbColor.HasValue)
-                    await _waterCoolerService.WriteRgbModeAsync(rgbMode.Value, rgbColor.Value);
+                    await _hydroUIService.WriteRgbModeAsync(rgbMode.Value, rgbColor.Value);
             }
             catch (Exception ex)
             {
-                DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to apply Watercooler settings");
+                DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to apply HydroUI settings");
             }
         }
 
         /// <summary>
-        /// Applies a complete Watercooler preset from Adaptive Mode.
-        /// Fires <see cref="WatercoolerPresetApplied"/> so the Watercooler page can sync its UI.
+        /// Applies a complete HydroUI preset from Adaptive Mode.
+        /// Fires <see cref="WatercoolerPresetApplied"/> so the HydroUI page can sync its UI.
         /// </summary>
         public async Task ApplyWatercoolerFromPresetAsync(
             PumpVoltage pumpVoltage,
@@ -1049,7 +1049,7 @@ namespace Uniwill_Control_Utility.Services
         {
             await ApplyWatercoolerAsync(pumpVoltage, fanSpeed, rgbMode, rgbColor);
 
-            // Notify subscribers so the Watercooler page can update its UI controls
+            // Notify subscribers so the HydroUI page can update its UI controls
             var args = new WatercoolerPresetAppliedEventArgs(pumpVoltage, fanSpeed, rgbMode, rgbColor);
             LastAppliedWatercoolerPreset = args;
             WatercoolerPresetApplied?.Invoke(this, args);
@@ -1116,7 +1116,7 @@ namespace Uniwill_Control_Utility.Services
 
         private WaterCoolerSettings CaptureWatercoolerSettings()
         {
-            var source = _waterCoolerService.GetSettings();
+            var source = _hydroUIService.GetSettings();
             return new WaterCoolerSettings
             {
                 PumpVoltage = source.PumpVoltage,
@@ -1176,8 +1176,8 @@ namespace Uniwill_Control_Utility.Services
     }
 
     /// <summary>
-    /// Raised when profile-specific Watercooler settings have been applied to the device.
-    /// The Watercooler page should sync its UI controls to reflect these values.
+    /// Raised when profile-specific HydroUI settings have been applied to the device.
+    /// The HydroUI page should sync its UI controls to reflect these values.
     /// </summary>
     public class WatercoolerPresetAppliedEventArgs : EventArgs
     {

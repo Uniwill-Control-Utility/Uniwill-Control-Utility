@@ -17,7 +17,7 @@ namespace Uniwill_Control_Utility.Views.Controls
         }
 
         /// <summary>
-        /// Sets the navigation service so the "Connect" button can navigate to the Watercooler page.
+        /// Sets the navigation service so the "Connect" button can navigate to the HydroUI page.
         /// </summary>
         public void SetNavigationService(INavigationService navigationService)
         {

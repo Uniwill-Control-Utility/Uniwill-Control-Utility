@@ -12,7 +12,7 @@ namespace Uniwill_Control_Utility.Services
 {
     public class AdaptivePreset
     {
-        // Watercooler (Hydro UI) per-game settings
+        // HydroUI (Hydro UI) per-game settings
         public bool WcEnabled { get; set; } = false;
         public string WcPumpVoltage { get; set; } = "V7";
         public string WcFanSpeed { get; set; } = "Percent50";

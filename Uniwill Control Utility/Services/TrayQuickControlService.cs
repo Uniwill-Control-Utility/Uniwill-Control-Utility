@@ -26,7 +26,7 @@ namespace Uniwill_Control_Utility.Services
     public sealed class TrayQuickControlService
     {
         private readonly UniwillECService _ec;
-        private readonly WaterCoolerService _waterCooler;
+        private readonly HydroUIService _waterCooler;
         private readonly DeviceApplier _deviceApplier;
         private readonly IHardwareMonitoringService _hardwareMonitoring;
         private readonly EcTelemetryService _ecTelemetry;
@@ -36,7 +36,7 @@ namespace Uniwill_Control_Utility.Services
 
         public TrayQuickControlService(
             UniwillECService ec,
-            WaterCoolerService waterCooler,
+            HydroUIService waterCooler,
             DeviceApplier deviceApplier,
             IHardwareMonitoringService hardwareMonitoring,
             EcTelemetryService ecTelemetry,

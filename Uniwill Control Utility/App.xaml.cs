@@ -238,9 +238,9 @@ namespace Uniwill_Control_Utility
                         services.AddScoped<Views.Pages.OverlaySettingsPage>();
                         services.AddScoped<Views.Pages.AboutPage>();
 
-                        // Watercooler service (singleton for auto-connect)
-                        services.AddScoped<Views.Pages.Watercooler>();
-                        services.AddSingleton<WaterCoolerService>();
+                        // HydroUI service (singleton for auto-connect)
+                        services.AddScoped<Views.Pages.HydroUI>();
+                        services.AddSingleton<HydroUIService>();
 
                         // Flydigi BS2 Pro cooling pad page and service
                         // Singleton so the host disposes it on shutdown (stops background timers).
@@ -591,9 +591,9 @@ namespace Uniwill_Control_Utility
             {
                 if (Settings.Default.EnableHydroUiNavigation)
                 {
-                    var waterCoolerService = _host?.Services.GetService<WaterCoolerService>();
-                    if (waterCoolerService != null && WaterCoolerHardwareDetector.IsSupportedHardware())
-                        await waterCoolerService.TryAutoConnectAsync();
+                    var hydroUIService = _host?.Services.GetService<HydroUIService>();
+                    if (hydroUIService != null && WaterCoolerHardwareDetector.IsSupportedHardware())
+                        await hydroUIService.TryAutoConnectAsync();
                 }
             }
             catch (Exception ex)

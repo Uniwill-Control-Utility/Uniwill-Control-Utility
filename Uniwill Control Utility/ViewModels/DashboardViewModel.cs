@@ -23,7 +23,7 @@ namespace Uniwill_Control_Utility.ViewModels
         private readonly IHardwareMonitoringService _hardwareMonitoring;
         private readonly EcTelemetryService _ecTelemetry;
         private readonly UniwillECService? _uniwillEc;
-        private readonly WaterCoolerService _waterCoolerService;
+        private readonly HydroUIService _hydroUIService;
         private readonly FlydigiCoolerHidService _flydigiService;
         private readonly FlydigiCoolerBleService _bs1Service;
         private readonly DispatcherTimer _refreshTimer;
@@ -39,7 +39,7 @@ namespace Uniwill_Control_Utility.ViewModels
             IHardwareMonitoringService hardwareMonitoring,
             EcTelemetryService ecTelemetry,
             UniwillECService? uniwillEc,
-            WaterCoolerService waterCoolerService,
+            HydroUIService hydroUIService,
             FlydigiCoolerHidService flydigiService,
             FlydigiCoolerBleService bs1Service)
         {
@@ -50,7 +50,7 @@ namespace Uniwill_Control_Utility.ViewModels
             _ecTelemetry = ecTelemetry
                 ?? throw new ArgumentNullException(nameof(ecTelemetry));
             _uniwillEc = uniwillEc;
-            _waterCoolerService = waterCoolerService;
+            _hydroUIService = hydroUIService;
             _flydigiService = flydigiService;
             _bs1Service = bs1Service;
 
@@ -154,8 +154,8 @@ namespace Uniwill_Control_Utility.ViewModels
         private DeviceMetricsSnapshot BuildDeviceSnapshot()
         {
             // Hydro UI (LCT watercooler)
-            bool hydroConnected = _waterCoolerService.IsConnected;
-            bool hydroSmartModeActive = _waterCoolerService.IsSmartModeActive;
+            bool hydroConnected = _hydroUIService.IsConnected;
+            bool hydroSmartModeActive = _hydroUIService.IsSmartModeActive;
             int hydroPumpVoltage = 0;
             int hydroFanSpeed = 0;
             int hydroFanRpm = 0;
@@ -166,18 +166,18 @@ namespace Uniwill_Control_Utility.ViewModels
                 {
                     if (hydroSmartModeActive)
                     {
-                        hydroPumpVoltage = _waterCoolerService.SmartModeCurrentPump switch
+                        hydroPumpVoltage = _hydroUIService.SmartModeCurrentPump switch
                         {
                             PumpVoltage.V7 => 7,
                             PumpVoltage.V8 => 8,
                             PumpVoltage.V11 => 11,
                             _ => 0
                         };
-                        hydroFanSpeed = (int)_waterCoolerService.SmartModeCurrentFan;
+                        hydroFanSpeed = (int)_hydroUIService.SmartModeCurrentFan;
                     }
                     else
                     {
-                        var wcSettings = _waterCoolerService.GetSettings();
+                        var wcSettings = _hydroUIService.GetSettings();
                         hydroPumpVoltage = wcSettings.GetPumpVoltage() switch
                         {
                             PumpVoltage.V7 => 7,
@@ -313,12 +313,12 @@ namespace Uniwill_Control_Utility.ViewModels
                     var snapshot = _hardwareMonitoring.ReadSnapshot();
                     bool hasTemp = snapshot.CpuTemperature > 0 || snapshot.GpuTemperature > 0;
 
-                    if (hasTemp && _waterCoolerService.IsConnected)
+                    if (hasTemp && _hydroUIService.IsConnected)
                     {
-                        var settings = _waterCoolerService.GetSettings();
-                        if (settings.SmartModeEnabled && !_waterCoolerService.IsSmartModeActive)
+                        var settings = _hydroUIService.GetSettings();
+                        if (settings.SmartModeEnabled && !_hydroUIService.IsSmartModeActive)
                         {
-                            _waterCoolerService.StartSmartMode();
+                            _hydroUIService.StartSmartMode();
                         }
                     }
                 }

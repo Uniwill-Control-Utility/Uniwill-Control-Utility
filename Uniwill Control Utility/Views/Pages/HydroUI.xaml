@@ -1,4 +1,4 @@
-<Page x:Class="Uniwill_Control_Utility.Views.Pages.Watercooler"
+<Page x:Class="Uniwill_Control_Utility.Views.Pages.HydroUI"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -7,7 +7,7 @@
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
       mc:Ignorable="d"
-      d:DataContext="{d:DesignInstance local:Watercooler, IsDesignTimeCreatable=False}"
+      d:DataContext="{d:DesignInstance local:HydroUI, IsDesignTimeCreatable=False}"
       d:Background="{DynamicResource ApplicationBackgroundBrush}"
       d:DesignHeight="650" d:DesignWidth="900"
       Title="Watercooler Control"
@@ -391,7 +391,7 @@
                                 <!-- Divider -->
                                 <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                                 <!-- Temperature-based RGB -->
-                                <Grid Margin="0,4,0,4">
+                                <Grid Margin="0,4,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />

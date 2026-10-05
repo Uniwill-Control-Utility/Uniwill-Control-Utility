@@ -120,11 +120,11 @@ namespace Uniwill_Control_Utility.ViewModels
 
                 case OptionalNavigationFeature.HydroUi:
                     // Disconnect the watercooler if connected.
-                    var waterCoolerService = App.GetService<WaterCoolerService>();
-                    if (waterCoolerService?.IsConnected == true)
+                    var hydroUIService = App.GetService<HydroUIService>();
+                    if (hydroUIService?.IsConnected == true)
                     {
-                        waterCoolerService.SetUserDisconnected();
-                        await waterCoolerService.DisconnectAsync();
+                        hydroUIService.SetUserDisconnected();
+                        await hydroUIService.DisconnectAsync();
                     }
                     break;
 
@@ -170,7 +170,7 @@ namespace Uniwill_Control_Utility.ViewModels
 
             if (FeatureNavigationPolicy.IsVisible(OptionalNavigationFeature.HydroUi, preferences, hydroUiAvailable, lightBarAvailable))
             {
-                createNavItem("Hydro UI", "watercooler", "\uEB42", typeof(Views.Pages.Watercooler), false);
+                createNavItem("Hydro UI", "watercooler", "\uEB42", typeof(Views.Pages.HydroUI), false);
             }
 
             // Flydigi cooler in footer (hidden if user has disabled it in Settings)

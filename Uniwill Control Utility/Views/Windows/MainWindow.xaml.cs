@@ -1058,19 +1058,19 @@ namespace Uniwill_Control_Utility.Views.Windows
                             // Auto-reconnect Hydro UI watercooler.
                             if (Properties.Settings.Default.EnableHydroUiNavigation)
                             {
-                                var waterCoolerService = App.GetService<WaterCoolerService>();
-                                if (waterCoolerService != null)
+                                var hydroUIService = App.GetService<HydroUIService>();
+                                if (hydroUIService != null)
                                 {
                                     // If the service still thinks it's connected, the BLE link is a
                                     // zombie - force a disconnect before attempting reconnect.
-                                    if (waterCoolerService.IsConnected)
+                                    if (hydroUIService.IsConnected)
                                     {
                                         Debug.WriteLine("[WaterCooler] Resuming from sleep - disconnecting zombie BLE link");
-                                        await waterCoolerService.DisconnectAsync();
+                                        await hydroUIService.DisconnectAsync();
                                         await Task.Delay(500);
                                     }
 
-                                    bool connected = await waterCoolerService.TryAutoConnectAsync();
+                                    bool connected = await hydroUIService.TryAutoConnectAsync();
                                     if (connected)
                                         Debug.WriteLine("[WaterCooler] Auto-reconnected after system resume");
                                 }
@@ -1516,7 +1516,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             // delay on first navigation. These pages do heavy work in Loaded (service
             // resolution, event subscriptions, settings loading) which is noticeable
             // when the page is created lazily on first visit.
-            _ = App.GetService<Views.Pages.Watercooler>();
+            _ = App.GetService<Views.Pages.HydroUI>();
             _ = App.GetService<Views.Pages.FlydigiCooler>();
 
             Task.Run(Garbage.Garbage_Collect);
@@ -1531,10 +1531,10 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
 
-            var wc = App.GetService<WaterCoolerService>();
+            var wc = App.GetService<HydroUIService>();
             if (wc == null || !wc.IsConnected)
             {
-                ToastNotification.ShowToastNotification("Hydro UI", "Watercooler not connected");
+                ToastNotification.ShowToastNotification("Hydro UI", "HydroUI not connected");
                 return;
             }
 
@@ -1560,10 +1560,10 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
 
-            var wc = App.GetService<WaterCoolerService>();
+            var wc = App.GetService<HydroUIService>();
             if (wc == null || !wc.IsConnected)
             {
-                ToastNotification.ShowToastNotification("Hydro UI", "Watercooler not connected");
+                ToastNotification.ShowToastNotification("Hydro UI", "HydroUI not connected");
                 return;
             }
 
@@ -1591,10 +1591,10 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
 
-            var wc = App.GetService<WaterCoolerService>();
+            var wc = App.GetService<HydroUIService>();
             if (wc == null || !wc.IsConnected)
             {
-                ToastNotification.ShowToastNotification("Hydro UI", "Watercooler not connected");
+                ToastNotification.ShowToastNotification("Hydro UI", "HydroUI not connected");
                 return;
             }
 
@@ -1624,7 +1624,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 return;
 
             bool enabled = item.IsChecked == true;
-            var wc = App.GetService<WaterCoolerService>();
+            var wc = App.GetService<HydroUIService>();
             if (wc == null)
                 return;
 
@@ -2054,7 +2054,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             try
             {
-                var wc = App.GetService<WaterCoolerService>();
+                var wc = App.GetService<HydroUIService>();
                 if (wc == null) return;
 
                 var settings = wc.GetSettings();
@@ -2265,7 +2265,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 return;
             }
 
-            var wc = App.GetService<WaterCoolerService>();
+            var wc = App.GetService<HydroUIService>();
             miSectionHydro.Visibility = wc?.IsConnected == true
                 ? Visibility.Visible
                 : Visibility.Collapsed;

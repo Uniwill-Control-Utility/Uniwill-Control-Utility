@@ -40,7 +40,7 @@ namespace Uniwill_Control_Utility.Services
                     var logger = _serviceProvider.GetService(typeof(Microsoft.Extensions.Logging.ILogger<Views.Pages.Presets>)) as Microsoft.Extensions.Logging.ILogger<Views.Pages.Presets>;
                     var navRequest = _serviceProvider.GetService(typeof(Services.PresetsNavigationRequest)) as Services.PresetsNavigationRequest;
                     var gpuInventory = _serviceProvider.GetService(typeof(Services.GpuInventoryService)) as Services.GpuInventoryService;
-                    var waterCooler = _serviceProvider.GetService(typeof(Services.WaterCoolerService)) as Services.WaterCoolerService;
+                    var waterCooler = _serviceProvider.GetService(typeof(Services.HydroUIService)) as Services.HydroUIService;
                     var deviceApplier = _serviceProvider.GetService(typeof(Services.DeviceApplier)) as Services.DeviceApplier;
                     _presetsInstance = new Views.Pages.Presets(logger!, navRequest!, gpuInventory, waterCooler, deviceApplier);
                 }

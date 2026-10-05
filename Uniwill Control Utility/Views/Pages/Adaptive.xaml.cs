@@ -36,8 +36,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         private readonly System.Windows.Threading.DispatcherTimer sensors = new System.Windows.Threading.DispatcherTimer();
         private readonly GpuInventoryService gpuInventory;
 
-        // Watercooler connection tracking
-        private WaterCoolerService? _waterCoolerService;
+        // HydroUI connection tracking
+        private HydroUIService? _hydroUIService;
         private bool _hydroConnected;
 
         public Adaptive(GpuInventoryService gpuInventory)
@@ -84,17 +84,17 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (!WaterCoolerHardwareDetector.IsSupportedHardware())
                     return;
 
-                var waterCooler = App.GetService<WaterCoolerService>();
+                var waterCooler = App.GetService<HydroUIService>();
                 bool connected = waterCooler?.IsConnected == true;
 
                 Dispatcher.Invoke(() =>
                 {
-                    _waterCoolerService = waterCooler;
+                    _hydroUIService = waterCooler;
                     _hydroConnected = connected;
 
                     sdHydroUI.Visibility = Visibility.Visible;
-                    _waterCoolerService!.ConnectionStateChanged += OnWaterCoolerConnectionStateChanged;
-                    _waterCoolerService.SmartModeStateChanged += OnSmartModeStateChanged;
+                    _hydroUIService!.ConnectionStateChanged += OnWaterCoolerConnectionStateChanged;
+                    _hydroUIService.SmartModeStateChanged += OnSmartModeStateChanged;
 
                     ApplyFeatureVisibilityGates();
                 });
@@ -503,7 +503,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     StopFlydigiBs1SmartControl();
 
                     // Lift DeviceApplier overrides when Adaptive Mode stops so that
-                    // the Flydigi/Watercooler pages regain control and hide their overlays.
+                    // the Flydigi/HydroUI pages regain control and hide their overlays.
                     if (_deviceApplier != null)
                     {
                         _ = _deviceApplier.DisableFlydigiOverrideAsync();
@@ -603,7 +603,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void ApplyAdpPowerLimitMax()
         {
-            var waterCooler = App.GetService<WaterCoolerService>();
+            var waterCooler = App.GetService<HydroUIService>();
             bool hydro = waterCooler?.IsConnected == true;
             bool powerBoostMode = Settings.Default.EnablePowerBoostMode;
             var limits = SkuResolver.GetPowerLimits(hydro);
@@ -1408,17 +1408,17 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (!Settings.Default.EnableHydroUiNavigation || !_hydroConnected || !(cbxWcEnabled.IsChecked ?? false))
                 return;
 
-            bool smartModeActive = _waterCoolerService?.IsSmartModeActive == true;
+            bool smartModeActive = _hydroUIService?.IsSmartModeActive == true;
             // Also check if Smart Mode is configured in the service settings.
             // At startup there is a gap between BLE connection and Smart Mode timer
             // starting — during that window IsSmartModeActive is false even though
             // Smart Mode will take over pump/fan control shortly. Checking the
             // configured flag prevents Adaptive from applying a one-shot preset
             // pump voltage that Smart Mode would immediately overwrite.
-            bool smartModeConfigured = _waterCoolerService?.GetSettings().SmartModeEnabled == true;
+            bool smartModeConfigured = _hydroUIService?.GetSettings().SmartModeEnabled == true;
             bool skipPumpFan = smartModeActive || smartModeConfigured;
             // Also skip RGB when Smart Mode temperature-based RGB is active
-            bool skipRgb = smartModeActive && (_waterCoolerService?.GetSettings().SmartModeTemperatureRgb == true);
+            bool skipRgb = smartModeActive && (_hydroUIService?.GetSettings().SmartModeTemperatureRgb == true);
 
             // When Smart Mode is active or configured, skip pump voltage and fan speed overrides
             // — Smart Mode controls them internally. RGB still applies unless temperature-based RGB is active.
@@ -1941,12 +1941,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             UpdateFlydigiCardVisibility();
 
             // Apply Smart Mode state on navigation
-            bool smartModeActive = _waterCoolerService?.IsSmartModeActive == true;
+            bool smartModeActive = _hydroUIService?.IsSmartModeActive == true;
             if (smartModeActive)
             {
                 spWcPumpFan.Visibility = Visibility.Collapsed;
                 spWcSmartModeBadge.Visibility = Visibility.Visible;
-                bool tempRgb = _waterCoolerService?.GetSettings().SmartModeTemperatureRgb == true;
+                bool tempRgb = _hydroUIService?.GetSettings().SmartModeTemperatureRgb == true;
                 spWcRgb.Visibility = tempRgb ? Visibility.Collapsed : Visibility.Visible;
                 tbWcSmartModeBadgeText.Text = "Smart Mode ON";
             }
@@ -2028,11 +2028,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
             }
 
-            // Unsubscribe from WaterCoolerService events to allow this scoped instance to be GC'd.
-            if (_waterCoolerService != null)
+            // Unsubscribe from HydroUIService events to allow this scoped instance to be GC'd.
+            if (_hydroUIService != null)
             {
-                _waterCoolerService.ConnectionStateChanged -= OnWaterCoolerConnectionStateChanged;
-                _waterCoolerService.SmartModeStateChanged -= OnSmartModeStateChanged;
+                _hydroUIService.ConnectionStateChanged -= OnWaterCoolerConnectionStateChanged;
+                _hydroUIService.SmartModeStateChanged -= OnSmartModeStateChanged;
             }
         }
 
@@ -2208,12 +2208,12 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// Handles watercooler connection/disconnection events at runtime.
         /// Shows or hides the Hydro UI card and disables the checkbox when disconnected.
         /// </summary>
-        private void OnWaterCoolerConnectionStateChanged(object? sender, WaterCoolerService.WatercoolerConnectionState state)
+        private void OnWaterCoolerConnectionStateChanged(object? sender, HydroUIService.WatercoolerConnectionState state)
         {
             Dispatcher.Invoke(() =>
             {
                 bool wasConnected = _hydroConnected;
-                _hydroConnected = state == WaterCoolerService.WatercoolerConnectionState.Connected;
+                _hydroConnected = state == HydroUIService.WatercoolerConnectionState.Connected;
 
                 if (_hydroConnected && !wasConnected)
                 {
@@ -2246,7 +2246,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     tbWcSmartModeBadgeText.Text = "Smart Mode ON";
 
                     // Hide RGB controls when Smart Mode temperature-based RGB is active
-                    bool tempRgb = _waterCoolerService?.GetSettings().SmartModeTemperatureRgb == true;
+                    bool tempRgb = _hydroUIService?.GetSettings().SmartModeTemperatureRgb == true;
                     spWcRgb.Visibility = tempRgb ? Visibility.Collapsed : Visibility.Visible;
                 }
                 else

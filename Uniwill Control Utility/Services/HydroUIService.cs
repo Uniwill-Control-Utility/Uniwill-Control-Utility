@@ -20,7 +20,7 @@ namespace Uniwill_Control_Utility.Services
     /// BLE communication layer for LCT laptop water coolers (LCT21001/LCT22002).
     /// Uses Nordic nRF52 UART GATT profile.
     /// </summary>
-    public sealed class WaterCoolerService : IDisposable
+    public sealed class HydroUIService : IDisposable
     {
         private BluetoothLEDevice? _device;
         private GattSession? _gattSession;
@@ -74,7 +74,7 @@ namespace Uniwill_Control_Utility.Services
         public event EventHandler<FlowStatus>? FlowStatusChanged;
 
         /// <summary>
-        /// Raised whenever settings are saved. Used by the Watercooler page to
+        /// Raised whenever settings are saved. Used by the HydroUI page to
         /// sync its UI when changes come from external callers (e.g., tray menu).
         /// </summary>
         public event EventHandler? SettingsChanged;
@@ -111,7 +111,7 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public string ConnectedDeviceName { get; private set; } = string.Empty;
 
-        public WaterCoolerService()
+        public HydroUIService()
         {
             LoadSettings();
         }
@@ -272,7 +272,7 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// Resolves a human-readable cooler brand name from the laptop chassis WMI data.
-        /// Returns "XMG Oasis", "TUXEDO Aquaris", "PC Specialist", "Eluktronics", or "LCT Watercooler".
+        /// Returns "XMG Oasis", "TUXEDO Aquaris", "PC Specialist", "Eluktronics", or "LCT HydroUI".
         /// </summary>
         private static string DetectChassisBrand()
         {
@@ -306,12 +306,12 @@ namespace Uniwill_Control_Utility.Services
                 // WMI not available
             }
 
-            return "LCT Watercooler";
+            return "LCT HydroUI";
         }
 
         /// <summary>
         /// Builds a human-readable device name from the BLE name and chassis brand.
-        /// Examples: "XMG Oasis Mk2", "TUXEDO Aquaris Mk1", "LCT Watercooler"
+        /// Examples: "XMG Oasis Mk2", "TUXEDO Aquaris Mk1", "LCT HydroUI"
         /// </summary>
         private static string ResolveDeviceName(string bleName)
         {
@@ -818,7 +818,7 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public void StartSmartMode()
         {
-            // Already running — don't restart. The Watercooler page calls this on every
+            // Already running — don't restart. The HydroUI page calls this on every
             // navigation (IsVisibleChanged → OnConnectionStateChanged), which would reset
             // hysteresis state and the EWMA filter, causing unwanted pump/fan speed changes.
             if (_smartModeTimer != null)

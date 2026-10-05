@@ -23,7 +23,7 @@ namespace Uniwill_Control_Utility.Views.Pages
     {
         private readonly ILogger<Presets> _logger;
         private readonly GpuInventoryService? _gpuInventory;
-        private readonly WaterCoolerService? _waterCooler;
+        private readonly HydroUIService? _waterCooler;
         private readonly DeviceApplier? _deviceApplier;
         private readonly PresetsNavigationRequest _navigationRequest;
         private string _currentProfile = "Gaming";
@@ -94,7 +94,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             ILogger<Presets> logger,
             PresetsNavigationRequest navigationRequest,
             GpuInventoryService? gpuInventory = null,
-            WaterCoolerService? waterCooler = null,
+            HydroUIService? waterCooler = null,
             DeviceApplier? deviceApplier = null)
         {
             _logger = logger;

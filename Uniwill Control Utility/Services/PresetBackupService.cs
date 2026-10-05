@@ -84,7 +84,7 @@ namespace Uniwill_Control_Utility.Services
             // --- BS1 settings (AppData) ---
             var bs1Settings = await ReadFileAsJTokenAsync(Path.Combine(UcuAppDataFolder, "bs1_settings.json"));
 
-            // --- Watercooler settings (AppData) ---
+            // --- HydroUI settings (AppData) ---
             var watercoolerSettings = await ReadFileAsJTokenAsync(Path.Combine(UcuAppDataFolder, "watercooler_settings.json"));
 
             // --- .NET Application Settings ---
@@ -246,7 +246,7 @@ namespace Uniwill_Control_Utility.Services
                     bs1Token.ToString(Formatting.Indented);
             }
 
-            // --- Watercooler settings (AppData) ---
+            // --- HydroUI settings (AppData) ---
             if (backup["watercooler"] is JToken wcToken && wcToken.Type != JTokenType.Null)
             {
                 preparedAppDataFiles[Path.Combine(UcuAppDataFolder, "watercooler_settings.json")] =
