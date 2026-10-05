@@ -7,6 +7,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using Uniwill_Control_Utility.Models;
 
 namespace Uniwill_Control_Utility.Views.Controls
@@ -23,6 +24,7 @@ namespace Uniwill_Control_Utility.Views.Controls
         private readonly List<Slider> _sliders = new();
         private int[] _temperatures = EcFanCurve.CpuTemperatures;
         private bool _isReadOnly;
+        private DispatcherOperation? _pendingFallbackRedraw;
 
         /// <summary>
         /// Sets the temperature labels displayed on the X-axis and in tooltips.
@@ -244,10 +246,30 @@ namespace Uniwill_Control_Utility.Views.Controls
                 if (s.Value < currentValue) s.Value = currentValue;
         }
 
+        /// <summary>Schedules a Background-priority redraw as a safety net when layout hasn't settled.</summary>
+        private void ScheduleFallbackRedraw()
+        {
+            if (_pendingFallbackRedraw is { Status: DispatcherOperationStatus.Pending })
+                return;
+            _pendingFallbackRedraw = Dispatcher.InvokeAsync(() =>
+            {
+                _pendingFallbackRedraw = null;
+                InvalidateArrange();
+            }, DispatcherPriority.Background);
+        }
+
         private void DrawGraph()
         {
             var color = Application.Current.Resources["ControlFillColorDefaultBrush"] as SolidColorBrush;
             if (color == null) return;
+
+            // Skip if sliders aren't measured yet — avoid clearing the canvas
+            // with (0,0) points during early layout passes.
+            if (!(_sliders.Count > 0 && _sliders.All(s => s.ActualWidth > 0 && s.ActualHeight > 0)))
+            {
+                ScheduleFallbackRedraw();
+                return;
+            }
 
             _canvas.Children.Clear();
 

@@ -7,6 +7,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using Uniwill_Control_Utility.Models;
 
 namespace Uniwill_Control_Utility.Views.Controls
@@ -20,6 +21,7 @@ namespace Uniwill_Control_Utility.Views.Controls
     {
         private readonly List<Slider> _sliders = new();
         private readonly InfoTooltip _customToolTip = new();
+        private DispatcherOperation? _pendingFallbackRedraw;
 
         // Fixed temperature points: 0, 10, 20, ..., 100 °C (11 points)
         private static readonly int[] Temperatures = { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
@@ -179,6 +181,18 @@ namespace Uniwill_Control_Utility.Views.Controls
             CurveChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        /// <summary>Schedules a Background-priority redraw as a safety net when layout hasn't settled.</summary>
+        private void ScheduleFallbackRedraw()
+        {
+            if (_pendingFallbackRedraw is { Status: DispatcherOperationStatus.Pending })
+                return;
+            _pendingFallbackRedraw = Dispatcher.InvokeAsync(() =>
+            {
+                _pendingFallbackRedraw = null;
+                InvalidateArrange();
+            }, DispatcherPriority.Background);
+        }
+
         /// <summary>
         /// Enforces monotonicity: raising a slider raises all lower sliders;
         /// lowering a slider lowers all higher sliders.
@@ -215,6 +229,15 @@ namespace Uniwill_Control_Utility.Views.Controls
                 ?? new SolidColorBrush(Colors.Gray);
             if (color == null)
                 return;
+
+            // Check if sliders are actually measured yet. If not, skip drawing to
+            // avoid clearing the canvas with (0,0) points during early layout passes.
+            bool allMeasured = _sliders.Count > 0 && _sliders.All(s => s.ActualWidth > 0 && s.ActualHeight > 0);
+            if (!allMeasured)
+            {
+                ScheduleFallbackRedraw();
+                return;
+            }
 
             _canvas.Children.Clear();
 
