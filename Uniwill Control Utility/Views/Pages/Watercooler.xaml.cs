@@ -567,9 +567,17 @@ namespace Uniwill_Control_Utility.Views.Pages
             SaveSmartModeSettings();
         }
 
-        private void tsSmartModeTemperatureRgb_Checked(object sender, RoutedEventArgs e)
+        private async void tsSmartModeTemperatureRgb_Checked(object sender, RoutedEventArgs e)
         {
             SaveSmartModeSettings();
+            // Hide and disable manual RGB controls — Smart Mode takes over
+            RgbCardExpander.IsEnabled = false;
+            RgbCardExpander.Visibility = Visibility.Collapsed;
+            // Turn off manual RGB so Smart Mode's writes aren't overwritten
+            if (_waterCoolerService?.IsConnected == true)
+            {
+                await _waterCoolerService.WriteRgbModeAsync(RgbState.Off, RgbColor.Red);
+            }
             if (_waterCoolerService?.IsSmartModeActive == true)
                 _waterCoolerService.StartSmartMode(); // restart to pick up new setting
         }
@@ -577,6 +585,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void tsSmartModeTemperatureRgb_Unchecked(object sender, RoutedEventArgs e)
         {
             SaveSmartModeSettings();
+            // Restore manual RGB controls
+            RgbCardExpander.IsEnabled = true;
+            RgbCardExpander.Visibility = Visibility.Visible;
             if (_waterCoolerService?.IsSmartModeActive == true)
                 _waterCoolerService.StartSmartMode(); // restart to pick up new setting
         }
@@ -723,6 +734,13 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 // Temperature-based RGB toggle
                 tsSmartModeTemperatureRgb.IsChecked = settings.SmartModeTemperatureRgb;
+
+                // Hide manual RGB controls if temperature-based RGB is active
+                if (settings.SmartModeTemperatureRgb)
+                {
+                    RgbCardExpander.IsEnabled = false;
+                    RgbCardExpander.Visibility = Visibility.Collapsed;
+                }
 
                 // Apply smart mode enabled state
                 if (settings.SmartModeEnabled && _waterCoolerService.IsConnected)
