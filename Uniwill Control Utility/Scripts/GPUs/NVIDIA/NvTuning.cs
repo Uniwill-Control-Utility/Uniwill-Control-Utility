@@ -1049,7 +1049,18 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
             if (!Nvml.EnsureInitialised()) return false;
 
-            return Nvml.nvmlDeviceGetHandleByIndex_v2(0, out gpu) == Nvml.NVML_SUCCESS;
+            try
+            {
+                return Nvml.nvmlDeviceGetHandleByIndex_v2(0, out gpu) == Nvml.NVML_SUCCESS;
+            }
+            catch
+            {
+                // NVML P/Invoke may throw SEHException/AccessViolationException when the
+                // GPU driver is in a bad state (e.g., after display hotplug). Reset NVML
+                // so the next call reinitializes with fresh handles.
+                Nvml.Reset();
+                return false;
+            }
         }
     }
 
@@ -1070,8 +1081,20 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         private static bool _initAttempted;
         private static bool _initialised;
 
+        /// <summary>Time when NVML was last reset — used to enforce a cooldown before allowing calls.</summary>
+        private static DateTime _lastResetUtc = DateTime.MinValue;
+
+        /// <summary>Minimum time to wait after Reset() before allowing NVML calls (gives GPU driver time to settle).</summary>
+        private static readonly TimeSpan Cooldown = TimeSpan.FromSeconds(5);
+
         public static bool EnsureInitialised()
         {
+            // Block all NVML calls during cooldown after a reset.
+            // This prevents the Adaptive page timer (5s) or other callers from
+            // hitting NVML before the GPU driver has settled after display changes.
+            if (DateTime.UtcNow - _lastResetUtc < Cooldown)
+                return false;
+
             if (_initAttempted) return _initialised;
 
             _initAttempted = true;
@@ -1090,6 +1113,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
             try { nvmlShutdown(); } catch { /* NVML may be in a bad state */ }
             _initAttempted = false;
             _initialised = false;
+            _lastResetUtc = DateTime.UtcNow;
         }
 
         [DllImport(Dll)] public static extern int nvmlInit_v2();
