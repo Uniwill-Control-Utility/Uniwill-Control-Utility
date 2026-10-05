@@ -920,6 +920,18 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 Debug.WriteLine($"[Resume] LHM reset failed: {ex.Message}");
                             }
 
+                            // Also reset the NvTuning NVML state — it uses a separate NVML
+                            // context from LHM and has its own stale handles after resume.
+                            try
+                            {
+                                Scripts.GPUs.NVIDIA.Nvml.Reset();
+                                Debug.WriteLine("[Resume] NVML reset for NvTuning");
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[Resume] NVML reset failed: {ex.Message}");
+                            }
+
                             // Invalidate Adaptive page diff-tracking so next timer tick
                             // force-applies everything (hardware reverted to BIOS defaults).
                             try
@@ -1169,6 +1181,17 @@ namespace Uniwill_Control_Utility.Views.Windows
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"[Display] LHM reset failed: {ex.Message}");
+                }
+
+                // Also reset NvTuning's NVML context — separate from LHM.
+                try
+                {
+                    Scripts.GPUs.NVIDIA.Nvml.Reset();
+                    Debug.WriteLine("[Display] NVML reset for NvTuning");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Display] NVML reset failed: {ex.Message}");
                 }
             }
 

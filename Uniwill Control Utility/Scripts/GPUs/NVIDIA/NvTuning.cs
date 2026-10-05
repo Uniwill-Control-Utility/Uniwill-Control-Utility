@@ -1080,6 +1080,18 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
             return _initialised;
         }
 
+        /// <summary>
+        /// Shuts down NVML and resets the initialization flags so the next EnsureInitialised()
+        /// will reinitialize. Call this proactively after events that invalidate GPU driver state
+        /// (display hotplug, hibernation resume) to prevent ExecutionEngineException from stale handles.
+        /// </summary>
+        public static void Reset()
+        {
+            try { nvmlShutdown(); } catch { /* NVML may be in a bad state */ }
+            _initAttempted = false;
+            _initialised = false;
+        }
+
         [DllImport(Dll)] public static extern int nvmlInit_v2();
         [DllImport(Dll)] public static extern int nvmlShutdown();
         [DllImport(Dll)] public static extern int nvmlDeviceGetHandleByIndex_v2(uint index, out IntPtr device);
