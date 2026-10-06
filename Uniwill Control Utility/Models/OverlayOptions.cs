@@ -6,7 +6,7 @@ namespace Uniwill_Control_Utility.Models
         public bool ShowOnStartup { get; init; }
         public string ToggleOverlayHotkey { get; init; } = "Ctrl+Shift+O";
         public string ToggleContentsHotkey { get; init; } = "Ctrl+Shift+I";
-        public int RefreshIntervalMs { get; init; } = 500;
+        public int RefreshIntervalMs { get; init; } = 250;
         public double Scale { get; init; } = 1;
         /// <summary>Legacy — kept for backwards compatibility with saved settings. Ignored if BackgroundOpacity or ContentOpacity are set.</summary>
         public double Opacity { get; init; } = 0.95;

@@ -36,9 +36,11 @@ namespace Uniwill_Control_Utility.Views.Overlay
         private bool _userWantsVisible; // true while the user has asked for the overlay to show
         private bool _wasMovingLastTick;  // true if the window moved on the previous tick
 
-        // Fast foreground check: polls at 50ms to hide immediately when the game
-        // loses focus, eliminating the 250-750ms latency of relying on FPS service ticks.
-        private DispatcherTimer? _foregroundTimer;
+        // Event-driven foreground detection: uses SetWinEventHook (EVENT_SYSTEM_FOREGROUND)
+        // for instant notification when the foreground window changes. Zero polling overhead,
+        // instant response. Replaces the old 50ms DispatcherTimer approach.
+        private WinEventDelegate? _foregroundHookCallback;
+        private IntPtr _foregroundHook;
         private int _targetPid;
 
         public PerformanceOverlayWindow(PerformanceOverlayViewModel viewModel)
@@ -77,17 +79,12 @@ namespace Uniwill_Control_Utility.Views.Overlay
                 _displaySettingsSubscribed = true;
             }
 
-            // Fast foreground check: polls at 50ms to detect when the game loses
-            // focus so the overlay can hide immediately instead of waiting for the
-            // next FPS service tick (up to 500ms + RefreshIntervalMs latency).
-            _foregroundTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(50), DispatcherPriority.Background, (s, e) =>
-            {
-                if (IsVisible && _userWantsVisible && _targetPid > 0 && !IsForegroundProcess(_targetPid))
-                {
-                    _userWantsVisible = false;
-                    Hide();
-                }
-            }, Dispatcher);
+            // Event-driven foreground detection: SetWinEventHook notifies us instantly
+            // when the foreground window changes. This eliminates the 250-750ms latency
+            // of relying on FPS service ticks and avoids polling overhead.
+            _foregroundHookCallback = OnForegroundChanged;
+            _foregroundHook = SetWinEventHook(WinEvent.SystemForeground, WinEvent.SystemForeground,
+                IntPtr.Zero, _foregroundHookCallback, 0, 0, WinEvent.SlewExit);
 
             ApplyViewModelSize();
         }
@@ -103,6 +100,13 @@ namespace Uniwill_Control_Utility.Views.Overlay
             if (e.PropertyName == nameof(PerformanceOverlayViewModel.GameActive))
             {
                 HandleGameActiveChanged();
+            }
+
+            // Also track PID changes so the foreground hook checks the right process
+            // even if GameActive stays true (e.g., switching between two games).
+            if (e.PropertyName == nameof(PerformanceOverlayViewModel.GameProcessId))
+            {
+                _targetPid = _viewModel.GameProcessId;
             }
         }
 
@@ -287,7 +291,12 @@ namespace Uniwill_Control_Utility.Views.Overlay
                 return;
             }
 
-            _foregroundTimer?.Stop();
+            // Unregister the WinEvent hook if it was installed.
+                if (_foregroundHook != IntPtr.Zero)
+                {
+                    UnhookWinEvent(_foregroundHook);
+                    _foregroundHook = IntPtr.Zero;
+                }
 
             Loaded -= OnLoaded;
             Closing -= OnClosing;
@@ -561,6 +570,40 @@ namespace Uniwill_Control_Utility.Views.Overlay
         private static partial int GetClassName(IntPtr hWnd, char[]? lpClassName, int nMaxCount);
 
         private const uint GW_OWNER = 4;
+
+        #region WinEvent hook for foreground detection
+
+        private static class WinEvent
+        {
+            public const uint SystemForeground = 3;
+            public const uint SlewExit = 0x0004;
+        }
+
+        [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+        private delegate void WinEventDelegate(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime);
+
+        [LibraryImport("user32.dll")]
+        private static partial IntPtr SetWinEventHook(uint eventMin, uint eventMax, IntPtr hmodWinEventProc,
+            WinEventDelegate lpfnWinEventProc, uint idProcess, uint idThread, uint dwFlags);
+
+        [LibraryImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static partial bool UnhookWinEvent(IntPtr hWinEventHook);
+
+        private void OnForegroundChanged(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
+        {
+            // The hook callback runs on a background thread — marshal to UI thread.
+            Dispatcher.Invoke(() =>
+            {
+                if (IsVisible && _userWantsVisible && _targetPid > 0 && !IsForegroundProcess(_targetPid))
+                {
+                    _userWantsVisible = false;
+                    Hide();
+                }
+            });
+        }
+
+        #endregion
 
         #endregion
     }

@@ -86,6 +86,72 @@ namespace Uniwill_Control_Utility.Services.Performance
         // Win32 file mapping access flags
         private const uint FileMapRead = 0x0004;
 
+        // Cached shared memory mapping to avoid OpenFileMapping/MapViewOfFile on every read.
+        // These are kernel transitions; caching them eliminates 4 P/Invoke calls per sample.
+        // We validate the signature on each read to detect RTSS restart/crash.
+        private static IntPtr _cachedMappingHandle;
+        private static IntPtr _cachedViewPtr;
+
+        private static bool AcquireMapping(out IntPtr viewPtr)
+        {
+            // Try cached handle first.
+            if (_cachedViewPtr != IntPtr.Zero)
+            {
+                // Validate the signature is still correct (RTSS may have restarted).
+                try
+                {
+                    RtssHeader header = Marshal.PtrToStructure<RtssHeader>(_cachedViewPtr);
+                    if (header.Signature == ValidSignature)
+                    {
+                        viewPtr = _cachedViewPtr;
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // Cache corrupted, fall through to recreate.
+                }
+
+                // Dispose cached handles.
+                ReleaseCachedMapping();
+            }
+
+            // Open fresh mapping.
+            IntPtr mappingHandle = OpenFileMapping(FileMapRead, false, SharedMemoryName);
+            if (mappingHandle == IntPtr.Zero)
+            {
+                viewPtr = IntPtr.Zero;
+                return false;
+            }
+
+            viewPtr = MapViewOfFile(mappingHandle, FileMapRead, 0, 0, 0);
+            if (viewPtr == IntPtr.Zero)
+            {
+                CloseHandle(mappingHandle);
+                viewPtr = IntPtr.Zero;
+                return false;
+            }
+
+            // Cache for next call.
+            _cachedMappingHandle = mappingHandle;
+            _cachedViewPtr = viewPtr;
+            return true;
+        }
+
+        private static void ReleaseCachedMapping()
+        {
+            if (_cachedViewPtr != IntPtr.Zero)
+            {
+                UnmapViewOfFile(_cachedViewPtr);
+                _cachedViewPtr = IntPtr.Zero;
+            }
+            if (_cachedMappingHandle != IntPtr.Zero)
+            {
+                CloseHandle(_cachedMappingHandle);
+                _cachedMappingHandle = IntPtr.Zero;
+            }
+        }
+
         // Per-process ring buffers for frame-time percentile calculation.
         // RTSS shared memory only exposes the latest per-frame time (dwFrameTime).
         // We accumulate samples across TryRead calls and compute real 1% / 0.1% lows.
@@ -216,100 +282,65 @@ namespace Uniwill_Control_Utility.Services.Performance
         {
             data = default;
 
-            IntPtr mappingHandle = IntPtr.Zero;
-            IntPtr viewPtr = IntPtr.Zero;
-
-            try
+            if (!AcquireMapping(out IntPtr viewPtr))
             {
-                mappingHandle = OpenFileMapping(FileMapRead, false, SharedMemoryName);
-                if (mappingHandle == IntPtr.Zero)
-                {
-                    LogOnce("OpenFileMapping returned null — RTSS not running or mapping inaccessible");
-                    return false;
-                }
-
-                // Map the entire view (0 size = full mapping)
-                viewPtr = MapViewOfFile(mappingHandle, FileMapRead, 0, 0, 0);
-                if (viewPtr == IntPtr.Zero)
-                {
-                    LogOnce("MapViewOfFile returned null");
-                    return false;
-                }
-
-                // Read header
-                RtssHeader header = Marshal.PtrToStructure<RtssHeader>(viewPtr);
-
-                if (header.Signature != ValidSignature)
-                {
-                    LogOnce($"Signature mismatch: 0x{header.Signature:X8} (expected 0x{ValidSignature:X8})");
-                    return false;
-                }
-
-                // Validate offsets
-                if (header.AppArrOffset == 0 || header.AppEntrySize == 0 || header.AppArrSize == 0)
-                {
-                    LogOnce($"Invalid header offsets: offset={header.AppArrOffset}, entrySize={header.AppEntrySize}, arrSize={header.AppArrSize}");
-                    return false;
-                }
-
-                // Scan app array — collect all apps, look for exact PID match and best fallback.
-                RtssFpsData? bestFallback = null;
-                List<(int Pid, string Name, int FrameTime, int ApiFlag)> allApps = new();
-
-                for (uint i = 0; i < header.AppArrSize; i++)
-                {
-                    IntPtr entryPtr = IntPtr.Add(viewPtr, (int)(header.AppArrOffset + i * header.AppEntrySize));
-                    int pid = Marshal.ReadInt32(entryPtr);
-                    if (pid == 0)
-                        continue; // Empty slot
-
-                    string name = ReadAnsiString(entryPtr, 4, MaxPath);
-                    int flags = Marshal.ReadInt32(entryPtr, 4 + MaxPath);
-                    int dwFrameTime = Marshal.ReadInt32(entryPtr, 268 + 12); // offset 280
-
-                    allApps.Add((pid, name, dwFrameTime, flags & RtssFlags.ApiUsageMask));
-
-                    if (pid == processId)
-                    {
-                        data = ParseAppEntry(entryPtr, (int)header.AppEntrySize, processId);
-                        if (data.Fps > 0)
-                            return true;
-                    }
-
-                    // Collect fallback: best game-like app with FPS > 0.
-                    if (IsGameProcess(name) && dwFrameTime > 0)
-                    {
-                        RtssFpsData candidate = ParseAppEntry(entryPtr, (int)header.AppEntrySize, pid);
-                        if (candidate.Fps > 0 && (bestFallback == null || candidate.Fps > bestFallback.Value.Fps))
-                            bestFallback = candidate;
-                    }
-                }
-
-                // If exact PID wasn't found but we have a game entry with FPS, use it.
-                if (bestFallback != null && bestFallback.Value.Fps > 0)
-                {
-                    data = bestFallback.Value;
-                    LogOnce($"PID {processId} not in RTSS, using fallback [{data.ProcessId}] {System.IO.Path.GetFileName(data.ProcessName)} FPS={data.Fps:F0}");
-                    return true;
-                }
-
-                // Log all apps once for diagnostics (debounced by LogOnce).
-                string appList = string.Join(", ", allApps.Take(5).Select(a => $"[{a.Pid}] {System.IO.Path.GetFileName(a.Name)} ft={a.FrameTime} api=0x{a.ApiFlag:X}"));
-                LogOnce($"RTSS apps ({allApps.Count}): {appList}{(allApps.Count > 5 ? " ..." : "")}");
-
+                LogOnce("Could not acquire RTSS mapping — RTSS not running or mapping inaccessible");
                 return false;
             }
-            catch (Exception ex)
+
+            // Read header (signature already validated by AcquireMapping, but read fields).
+            RtssHeader header = Marshal.PtrToStructure<RtssHeader>(viewPtr);
+
+            if (header.AppArrOffset == 0 || header.AppEntrySize == 0 || header.AppArrSize == 0)
             {
-                LogOnce($"RTSS read failed: {ex.GetType().Name} - {ex.Message}");
+                LogOnce($"Invalid header offsets: offset={header.AppArrOffset}, entrySize={header.AppEntrySize}, arrSize={header.AppArrSize}");
+                return false;
             }
-            finally
+
+            // Scan app array — collect all apps, look for exact PID match and best fallback.
+            RtssFpsData? bestFallback = null;
+            List<(int Pid, string Name, int FrameTime, int ApiFlag)> allApps = new();
+
+            for (uint i = 0; i < header.AppArrSize; i++)
             {
-                if (viewPtr != IntPtr.Zero)
-                    UnmapViewOfFile(viewPtr);
-                if (mappingHandle != IntPtr.Zero)
-                    CloseHandle(mappingHandle);
+                IntPtr entryPtr = IntPtr.Add(viewPtr, (int)(header.AppArrOffset + i * header.AppEntrySize));
+                int pid = Marshal.ReadInt32(entryPtr);
+                if (pid == 0)
+                    continue; // Empty slot
+
+                string name = ReadAnsiString(entryPtr, 4, MaxPath);
+                int flags = Marshal.ReadInt32(entryPtr, 4 + MaxPath);
+                int dwFrameTime = Marshal.ReadInt32(entryPtr, 268 + 12); // offset 280
+
+                allApps.Add((pid, name, dwFrameTime, flags & RtssFlags.ApiUsageMask));
+
+                if (pid == processId)
+                {
+                    data = ParseAppEntry(entryPtr, (int)header.AppEntrySize, processId);
+                    if (data.Fps > 0)
+                        return true;
+                }
+
+                // Collect fallback: best game-like app with FPS > 0.
+                if (IsGameProcess(name) && dwFrameTime > 0)
+                {
+                    RtssFpsData candidate = ParseAppEntry(entryPtr, (int)header.AppEntrySize, pid);
+                    if (candidate.Fps > 0 && (bestFallback == null || candidate.Fps > bestFallback.Value.Fps))
+                        bestFallback = candidate;
+                }
             }
+
+            // If exact PID wasn't found but we have a game entry with FPS, use it.
+            if (bestFallback != null && bestFallback.Value.Fps > 0)
+            {
+                data = bestFallback.Value;
+                LogOnce($"PID {processId} not in RTSS, using fallback [{data.ProcessId}] {System.IO.Path.GetFileName(data.ProcessName)} FPS={data.Fps:F0}");
+                return true;
+            }
+
+            // Log all apps once for diagnostics (debounced by LogOnce).
+            string appList = string.Join(", ", allApps.Take(5).Select(a => $"[{a.Pid}] {System.IO.Path.GetFileName(a.Name)} ft={a.FrameTime} api=0x{a.ApiFlag:X}"));
+            LogOnce($"RTSS apps ({allApps.Count}): {appList}{(allApps.Count > 5 ? " ..." : "")}");
 
             return false;
         }

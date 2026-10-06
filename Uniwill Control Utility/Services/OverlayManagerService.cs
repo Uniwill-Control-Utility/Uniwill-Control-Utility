@@ -426,7 +426,7 @@ namespace Uniwill_Control_Utility.Services
                 int refreshInterval =
                     options.RefreshIntervalMs > 0
                         ? options.RefreshIntervalMs
-                        : 500;
+                        : 250;
 
                 return options with
                 {

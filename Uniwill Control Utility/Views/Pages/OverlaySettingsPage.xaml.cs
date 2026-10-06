@@ -181,10 +181,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             OverlayOptions current = _overlay.CurrentOptions;
 
             int refreshInterval = (int)Math.Round(
-                RefreshIntervalNumberBox.Value ?? 500);
+                RefreshIntervalNumberBox.Value ?? 250);
 
             if (refreshInterval <= 0)
-                refreshInterval = 500;
+                refreshInterval = 250;
 
             double scale = ScaleSlider.Value;
 

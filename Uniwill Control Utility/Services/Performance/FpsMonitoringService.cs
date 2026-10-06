@@ -65,7 +65,7 @@ namespace Uniwill_Control_Utility.Services.Performance
         private async Task SampleAsync(CancellationToken cancellationToken)
         {
             Serilog.Log.Debug("[FPS] SampleAsync entered, creating timer");
-            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
+            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(250));
             int tickCount = 0;
             while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
             {
