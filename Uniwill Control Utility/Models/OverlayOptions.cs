@@ -7,20 +7,37 @@ namespace Uniwill_Control_Utility.Models
         public string ToggleOverlayHotkey { get; init; } = "Ctrl+Shift+O";
         public string ToggleContentsHotkey { get; init; } = "Ctrl+Shift+I";
         public int RefreshIntervalMs { get; init; } = 250;
-        public double Scale { get; init; } = 1;
-        /// <summary>Legacy — kept for backwards compatibility with saved settings. Ignored if BackgroundOpacity or ContentOpacity are set.</summary>
-        public double Opacity { get; init; } = 0.95;
-        public double BackgroundOpacity { get; init; } = 0.95;
-        public double ContentOpacity { get; init; } = 1.0;
+
+        // FPS metrics
         public bool ShowFps { get; init; } = true;
-        public bool ShowFrameTimes { get; init; } = true;
-        public bool ShowGpu { get; init; } = true;
-        public bool ShowCpu { get; init; } = true;
+        public bool ShowFpsOnePercentLow { get; init; } = true;
+        public bool ShowFpsPointOnePercentLow { get; init; } = true;
+
+        // Frame time metrics
+        public bool ShowFrameTimeCurrent { get; init; } = true;
+        public bool ShowFrameTimeOnePercent { get; init; } = true;
+        public bool ShowFrameTimePointOnePercent { get; init; } = true;
+
+        // GPU metrics
+        public bool ShowGpuTemperature { get; init; } = true;
+        public bool ShowGpuUsage { get; init; } = true;
+        public bool ShowGpuPower { get; init; } = true;
+        public bool ShowGpuClock { get; init; } = true;
+        public bool ShowGpuVram { get; init; } = true;
+
+        // CPU metrics
+        public bool ShowCpuTemperature { get; init; } = true;
+        public bool ShowCpuUsage { get; init; } = true;
+        public bool ShowCpuPower { get; init; } = true;
+        public bool ShowCpuClock { get; init; } = true;
+
+        // RAM metrics
         public bool ShowMemory { get; init; } = true;
-        public bool ShowBattery { get; init; } = true;
-        public bool ShowGraphs { get; init; } = true;
-        public bool VisibleOnLastShutdown { get; init; }
-        public double Left { get; init; } = double.NaN;
-        public double Top { get; init; } = double.NaN;
+
+        // Battery metrics
+        public bool ShowBatteryPercent { get; init; } = true;
+        public bool ShowBatteryStatus { get; init; } = true;
+        public bool ShowBatteryTime { get; init; } = true;
+        public bool ShowBatteryPower { get; init; } = true;
     }
 }

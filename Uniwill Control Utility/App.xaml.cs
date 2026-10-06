@@ -8,6 +8,7 @@ using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 using System;
 using System.Configuration;
+using System.Text;
 using System.Diagnostics;
 using System.IO;
 using System.Management;
@@ -91,6 +92,10 @@ namespace Uniwill_Control_Utility
 
             try
             {
+                // Register code page provider so Encoding.GetEncoding(1252) works
+                // (required for RTSS OSD degree symbol rendering).
+                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
                 Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
                 PrepareUserSettings();

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -34,47 +35,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             // Wire up UI update handlers and auto-save after initial load is complete.
-            ScaleSlider.ValueChanged += (_, __) =>
-            {
-                ScaleValueText.Text = ScaleSlider.Value.ToString("P0");
-                SaveOptions();
-            };
-
-            BackgroundOpacitySlider.ValueChanged += (_, __) =>
-            {
-                BackgroundOpacityValueText.Text = BackgroundOpacitySlider.Value.ToString("P0");
-                SaveOptions();
-            };
-
-            ContentOpacitySlider.ValueChanged += (_, __) =>
-            {
-                ContentOpacityValueText.Text = ContentOpacitySlider.Value.ToString("P0");
-                SaveOptions();
-            };
-
-            ScaleValueText.Text = ScaleSlider.Value.ToString("P0");
-            BackgroundOpacityValueText.Text = BackgroundOpacitySlider.Value.ToString("P0");
-            ContentOpacityValueText.Text = ContentOpacitySlider.Value.ToString("P0");
-
             EnabledCheckBox.Checked += (_, __) => SaveOptions();
             EnabledCheckBox.Unchecked += (_, __) => SaveOptions();
             StartupCheckBox.Checked += (_, __) => SaveOptions();
             StartupCheckBox.Unchecked += (_, __) => SaveOptions();
-            ShowFpsCheckBox.Checked += (_, __) => SaveOptions();
-            ShowFpsCheckBox.Unchecked += (_, __) => SaveOptions();
-            ShowFrameTimesCheckBox.Checked += (_, __) => SaveOptions();
-            ShowFrameTimesCheckBox.Unchecked += (_, __) => SaveOptions();
-            ShowGpuCheckBox.Checked += (_, __) => SaveOptions();
-            ShowGpuCheckBox.Unchecked += (_, __) => SaveOptions();
-            ShowCpuCheckBox.Checked += (_, __) => SaveOptions();
-            ShowCpuCheckBox.Unchecked += (_, __) => SaveOptions();
-            ShowMemoryCheckBox.Checked += (_, __) => SaveOptions();
-            ShowMemoryCheckBox.Unchecked += (_, __) => SaveOptions();
-            ShowBatteryCheckBox.Checked += (_, __) => SaveOptions();
-            ShowBatteryCheckBox.Unchecked += (_, __) => SaveOptions();
-            ShowGraphsCheckBox.Checked += (_, __) => SaveOptions();
-            ShowGraphsCheckBox.Unchecked += (_, __) => SaveOptions();
-    
+
             RefreshIntervalNumberBox.ValueChanged += (_, __) => SaveOptions();
 
             // Poll RTSS status every 2 seconds.
@@ -105,6 +70,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
+        #region Options Load / Save
+
         private void LoadOptions(OverlayOptions options)
         {
             EnabledCheckBox.IsChecked = options.Enabled;
@@ -114,66 +81,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             RefreshIntervalNumberBox.Value = options.RefreshIntervalMs > 0
                 ? options.RefreshIntervalMs
                 : 500;
-            ScaleSlider.Value = IsFinitePositive(options.Scale)
-                ? options.Scale
-                : 1.0;
-            BackgroundOpacitySlider.Value = IsFinite(options.BackgroundOpacity)
-                ? Math.Clamp(options.BackgroundOpacity, 0.0, 1.0)
-                : 0.95;
-            ContentOpacitySlider.Value = IsFinite(options.ContentOpacity)
-                ? Math.Clamp(options.ContentOpacity, 0.0, 1.0)
-                : 1.0;
-            ShowFpsCheckBox.IsChecked = options.ShowFps;
-            ShowFrameTimesCheckBox.IsChecked = options.ShowFrameTimes;
-            ShowGpuCheckBox.IsChecked = options.ShowGpu;
-            ShowCpuCheckBox.IsChecked = options.ShowCpu;
-            ShowMemoryCheckBox.IsChecked = options.ShowMemory;
-           ShowBatteryCheckBox.IsChecked = options.ShowBattery;
-            ShowGraphsCheckBox.IsChecked = options.ShowGraphs;
-        }
 
-        private void HotkeyTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            e.Handled = true;
-
-            if (sender is not TextBox textBox)
-                return;
-
-            Key key = e.Key == Key.System
-                ? e.SystemKey
-                : e.Key;
-
-            if (key is
-                Key.LeftCtrl or
-                Key.RightCtrl or
-                Key.LeftAlt or
-                Key.RightAlt or
-                Key.LeftShift or
-                Key.RightShift or
-                Key.LWin or
-                Key.RWin)
-            {
-                return;
-            }
-
-            ModifierKeys modifiers = System.Windows.Input.Keyboard.Modifiers;
-            var value = new StringBuilder();
-
-            if (modifiers.HasFlag(ModifierKeys.Control))
-                value.Append("Ctrl+");
-
-            if (modifiers.HasFlag(ModifierKeys.Alt))
-                value.Append("Alt+");
-
-            if (modifiers.HasFlag(ModifierKeys.Shift))
-                value.Append("Shift+");
-
-            value.Append(key);
-
-            textBox.Text = value.ToString();
-            textBox.CaretIndex = textBox.Text.Length;
-
-            SaveOptions();
+            BuildMetricsList(options);
         }
 
         private OverlayOptions ReadOptions()
@@ -186,21 +95,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (refreshInterval <= 0)
                 refreshInterval = 250;
 
-            double scale = ScaleSlider.Value;
-
-            if (!IsFinitePositive(scale))
-                scale = 1.0;
-
-            double backgroundOpacity = BackgroundOpacitySlider.Value;
-            double contentOpacity = ContentOpacitySlider.Value;
-
-            if (!IsFinite(backgroundOpacity))
-                backgroundOpacity = 0.95;
-            if (!IsFinite(contentOpacity))
-                contentOpacity = 1.0;
-
-            backgroundOpacity = Math.Clamp(backgroundOpacity, 0.0, 1.0);
-            contentOpacity = Math.Clamp(contentOpacity, 0.0, 1.0);
+            // Read tree state into per-metric toggles.
+            var toggles = ReadTreeToggles();
 
             return current with
             {
@@ -209,16 +105,38 @@ namespace Uniwill_Control_Utility.Views.Pages
                 ToggleOverlayHotkey = ToggleOverlayHotkeyTextBox.Text.Trim(),
                 ToggleContentsHotkey = ToggleContentsHotkeyTextBox.Text.Trim(),
                 RefreshIntervalMs = refreshInterval,
-                Scale = scale,
-                BackgroundOpacity = backgroundOpacity,
-                ContentOpacity = contentOpacity,
-                ShowFps = ShowFpsCheckBox.IsChecked == true,
-                ShowFrameTimes = ShowFrameTimesCheckBox.IsChecked == true,
-                ShowGpu = ShowGpuCheckBox.IsChecked == true,
-                ShowCpu = ShowCpuCheckBox.IsChecked == true,
-                ShowMemory = ShowMemoryCheckBox.IsChecked == true,
-                ShowBattery = ShowBatteryCheckBox.IsChecked == true,
-                ShowGraphs = ShowGraphsCheckBox.IsChecked == true
+
+                // FPS
+                ShowFps = toggles["ShowFps"],
+                ShowFpsOnePercentLow = toggles["ShowFpsOnePercentLow"],
+                ShowFpsPointOnePercentLow = toggles["ShowFpsPointOnePercentLow"],
+
+                // Frame times
+                ShowFrameTimeCurrent = toggles["ShowFrameTimeCurrent"],
+                ShowFrameTimeOnePercent = toggles["ShowFrameTimeOnePercent"],
+                ShowFrameTimePointOnePercent = toggles["ShowFrameTimePointOnePercent"],
+
+                // GPU
+                ShowGpuTemperature = toggles["ShowGpuTemperature"],
+                ShowGpuUsage = toggles["ShowGpuUsage"],
+                ShowGpuPower = toggles["ShowGpuPower"],
+                ShowGpuClock = toggles["ShowGpuClock"],
+                ShowGpuVram = toggles["ShowGpuVram"],
+
+                // CPU
+                ShowCpuTemperature = toggles["ShowCpuTemperature"],
+                ShowCpuUsage = toggles["ShowCpuUsage"],
+                ShowCpuPower = toggles["ShowCpuPower"],
+                ShowCpuClock = toggles["ShowCpuClock"],
+
+                // RAM
+                ShowMemory = toggles["ShowMemory"],
+
+                // Battery
+                ShowBatteryPercent = toggles["ShowBatteryPercent"],
+                ShowBatteryStatus = toggles["ShowBatteryStatus"],
+                ShowBatteryTime = toggles["ShowBatteryTime"],
+                ShowBatteryPower = toggles["ShowBatteryPower"]
             };
         }
 
@@ -314,6 +232,118 @@ namespace Uniwill_Control_Utility.Views.Pages
             return false;
         }
 
+        #endregion
+
+        #region Hotkey
+
+        private void HotkeyTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            e.Handled = true;
+
+            if (sender is not TextBox textBox)
+                return;
+
+            Key key = e.Key == Key.System
+                ? e.SystemKey
+                : e.Key;
+
+            if (key is
+                Key.LeftCtrl or
+                Key.RightCtrl or
+                Key.LeftAlt or
+                Key.RightAlt or
+                Key.LeftShift or
+                Key.RightShift or
+                Key.LWin or
+                Key.RWin)
+            {
+                return;
+            }
+
+            ModifierKeys modifiers = System.Windows.Input.Keyboard.Modifiers;
+            var value = new StringBuilder();
+
+            if (modifiers.HasFlag(ModifierKeys.Control))
+                value.Append("Ctrl+");
+
+            if (modifiers.HasFlag(ModifierKeys.Alt))
+                value.Append("Alt+");
+
+            if (modifiers.HasFlag(ModifierKeys.Shift))
+                value.Append("Shift+");
+
+            value.Append(key);
+
+            textBox.Text = value.ToString();
+            textBox.CaretIndex = textBox.Text.Length;
+
+            SaveOptions();
+        }
+
+        #endregion
+
+        #region Metrics CheckBox List
+
+        private void BuildMetricsList(OverlayOptions options)
+        {
+            MetricsCheckPanel.Children.Clear();
+
+            AddMetricCheckBox("Current FPS", "ShowFps", options.ShowFps);
+            AddMetricCheckBox("1% Low FPS", "ShowFpsOnePercentLow", options.ShowFpsOnePercentLow);
+            AddMetricCheckBox("0.1% Low FPS", "ShowFpsPointOnePercentLow", options.ShowFpsPointOnePercentLow);
+            AddMetricCheckBox("Frame time (current)", "ShowFrameTimeCurrent", options.ShowFrameTimeCurrent);
+            AddMetricCheckBox("Frame time (1%)", "ShowFrameTimeOnePercent", options.ShowFrameTimeOnePercent);
+            AddMetricCheckBox("Frame time (0.1%)", "ShowFrameTimePointOnePercent", options.ShowFrameTimePointOnePercent);
+            AddMetricCheckBox("GPU temperature", "ShowGpuTemperature", options.ShowGpuTemperature);
+            AddMetricCheckBox("GPU usage", "ShowGpuUsage", options.ShowGpuUsage);
+            AddMetricCheckBox("GPU power", "ShowGpuPower", options.ShowGpuPower);
+            AddMetricCheckBox("GPU clock", "ShowGpuClock", options.ShowGpuClock);
+            AddMetricCheckBox("GPU VRAM", "ShowGpuVram", options.ShowGpuVram);
+            AddMetricCheckBox("CPU temperature", "ShowCpuTemperature", options.ShowCpuTemperature);
+            AddMetricCheckBox("CPU usage", "ShowCpuUsage", options.ShowCpuUsage);
+            AddMetricCheckBox("CPU power", "ShowCpuPower", options.ShowCpuPower);
+            AddMetricCheckBox("CPU clock", "ShowCpuClock", options.ShowCpuClock);
+            AddMetricCheckBox("RAM used / total", "ShowMemory", options.ShowMemory);
+            AddMetricCheckBox("Battery percentage", "ShowBatteryPercent", options.ShowBatteryPercent);
+            AddMetricCheckBox("Battery charging status", "ShowBatteryStatus", options.ShowBatteryStatus);
+            AddMetricCheckBox("Battery time remaining", "ShowBatteryTime", options.ShowBatteryTime);
+            AddMetricCheckBox("Battery power draw", "ShowBatteryPower", options.ShowBatteryPower);
+        }
+
+        private void AddMetricCheckBox(string label, string optionKey, bool isChecked)
+        {
+            var cb = new CheckBox
+            {
+                IsChecked = isChecked,
+                Content = label,
+                Margin = new Thickness(0, 4, 0, 4),
+                VerticalAlignment = VerticalAlignment.Center,
+                Tag = optionKey
+            };
+            cb.Checked += (_, __) => SaveOptions();
+            cb.Unchecked += (_, __) => SaveOptions();
+            MetricsCheckPanel.Children.Add(cb);
+        }
+
+        private Dictionary<string, bool> ReadTreeToggles()
+        {
+            var result = new Dictionary<string, bool>();
+
+            foreach (var child in MetricsCheckPanel.Children)
+            {
+                if (child is CheckBox cb && cb.Tag is string key)
+                {
+                    result[key] = cb.IsChecked == true;
+                }
+            }
+
+            return result;
+        }
+
+        #endregion
+
+        #region Button Handlers
+
         private void VisibilityButton_Click(object sender, RoutedEventArgs e)
         {
             if (SaveOptionsWithValidation())
@@ -331,21 +361,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             _overlay.HideOverlay();
         }
 
-        private void ContentsVisibilityButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (SaveOptionsWithValidation())
-                _overlay.ToggleContents();
-        }
-
-        private static bool IsFinite(double value)
-        {
-            return !double.IsNaN(value) &&
-                   !double.IsInfinity(value);
-        }
-
-        private static bool IsFinitePositive(double value)
-        {
-            return IsFinite(value) && value > 0;
-        }
+        #endregion
     }
 }

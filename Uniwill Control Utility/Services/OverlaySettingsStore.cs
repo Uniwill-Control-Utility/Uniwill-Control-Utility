@@ -35,9 +35,7 @@ namespace Uniwill_Control_Utility.Services
         {
             OverlayOptions validated = options with
             {
-                RefreshIntervalMs = Math.Clamp(options.RefreshIntervalMs, 100, 5000),
-                Scale = Math.Clamp(options.Scale, 0.5, 2),
-                Opacity = Math.Clamp(options.Opacity, 0.25, 1)
+                RefreshIntervalMs = Math.Clamp(options.RefreshIntervalMs, 100, 5000)
             };
 
             lock (_sync)
@@ -57,7 +55,7 @@ namespace Uniwill_Control_Utility.Services
                 {
                     var loaded = JsonSerializer.Deserialize<OverlayOptions>(File.ReadAllText(_settingsPath));
                     if (loaded is not null)
-                        return ApplyDefaults(loaded);
+                        return loaded;
                 }
             }
             catch
@@ -67,21 +65,5 @@ namespace Uniwill_Control_Utility.Services
 
             return new OverlayOptions();
         }
-
-        /// <summary>Applies default values for properties that may be missing from older saved files.</summary>
-        private static OverlayOptions ApplyDefaults(OverlayOptions options)
-        {
-            return options with
-            {
-                BackgroundOpacity = IsFinite(options.BackgroundOpacity)
-                    ? Math.Clamp(options.BackgroundOpacity, 0.0, 1.0)
-                    : 0.95,
-                ContentOpacity = IsFinite(options.ContentOpacity)
-                    ? Math.Clamp(options.ContentOpacity, 0.0, 1.0)
-                    : 1.0
-            };
-        }
-
-        private static bool IsFinite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
     }
 }
