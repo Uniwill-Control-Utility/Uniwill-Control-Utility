@@ -363,6 +363,19 @@ namespace Uniwill_Control_Utility
                 // window appears instantly without waiting for hardware writes.
                 await ApplyStartupSettingsAsync();
 
+                // Load game library during startup so the FPS overlay and Adaptive
+                // Mode have the installed games list ready immediately. This avoids
+                // a 20+ second delay when the overlay first tries to match a game.
+                await startupProgressReporter.ReportAsync(StartupStage.LoadingGameLibrary);
+                try
+                {
+                    Game_Manager.installedGames = await Task.Run(() => Game_Manager.syncGame_Library());
+                }
+                catch (Exception ex)
+                {
+                    Log.Logger.Error(ex, "Failed to sync game library during startup");
+                }
+
                 await _host.StartAsync(CancellationToken.None);
 
                 await startupProgressReporter.ReportAsync(StartupStage.Complete);
@@ -699,15 +712,6 @@ namespace Uniwill_Control_Utility
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed during deferred update and PawnIO checks");
-            }
-
-            try
-            {
-                Game_Manager.installedGames = await Task.Run(() => Game_Manager.syncGame_Library());
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to sync game library");
             }
 
             // Show the prerequisite checklist on first startup.

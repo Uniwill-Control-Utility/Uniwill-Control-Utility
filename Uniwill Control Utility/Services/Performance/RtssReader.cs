@@ -86,13 +86,33 @@ namespace Uniwill_Control_Utility.Services.Performance
         // Win32 file mapping access flags
         private const uint FileMapRead = 0x0004;
 
-        // Ring buffer for frame-time percentile calculation.
+        // Per-process ring buffers for frame-time percentile calculation.
         // RTSS shared memory only exposes the latest per-frame time (dwFrameTime).
         // We accumulate samples across TryRead calls and compute real 1% / 0.1% lows.
+        // Each process gets its own buffer to avoid cross-process pollution on
+        // multi-monitor setups where desktop compositing noise corrupts percentiles.
         private const int FrameTimeBufferSize = 8192;
-        private static readonly double[] _frameTimeRingBuffer = new double[FrameTimeBufferSize];
-        private static int _ringNext;
-        private static int _ringCount;
+        private static readonly object _perProcessLock = new();
+        private static readonly Dictionary<int, PerProcessBuffer> _perProcessBuffers = new();
+
+        private sealed class PerProcessBuffer
+        {
+            public double[] Timestamps = new double[FrameTimeBufferSize];
+            public int Next;
+            public int Count;
+            public DateTime LastSeen = DateTime.UtcNow;
+        }
+
+        // Remove buffers for processes not seen in the last 30 seconds.
+        private static void EvictStaleBuffers()
+        {
+            var now = DateTime.UtcNow;
+            foreach (var kvp in _perProcessBuffers.ToList())
+            {
+                if (now - kvp.Value.LastSeen > TimeSpan.FromSeconds(30))
+                    _perProcessBuffers.Remove(kvp.Key);
+            }
+        }
 
         [LibraryImport("kernel32.dll", EntryPoint = "OpenFileMappingW", StringMarshalling = StringMarshalling.Utf16)]
         private static partial IntPtr OpenFileMapping(uint dwDesiredAccess, [MarshalAs(UnmanagedType.Bool)] bool bInheritHandle, string lpName);
@@ -364,48 +384,64 @@ namespace Uniwill_Control_Utility.Services.Performance
             double fps = dwFrameTime > 0 ? 1_000_000.0 / dwFrameTime : 0;
             double frameTimeMs = dwFrameTime / 1000.0;
 
-            // Feed valid frame time into the ring buffer for percentile calculation.
-            if (dwFrameTime > 0)
+            // Get or create the per-process ring buffer.
+            PerProcessBuffer? buffer = null;
+            lock (_perProcessLock)
             {
-                _frameTimeRingBuffer[_ringNext] = frameTimeMs;
-                _ringNext = (_ringNext + 1) % FrameTimeBufferSize;
-                if (_ringCount < FrameTimeBufferSize)
-                    _ringCount++;
+                if (!_perProcessBuffers.TryGetValue(expectedPid, out buffer))
+                {
+                    buffer = new PerProcessBuffer();
+                    _perProcessBuffers[expectedPid] = buffer;
+                }
+                buffer.LastSeen = DateTime.UtcNow;
+
+                // Feed valid frame time into this process's ring buffer.
+                if (dwFrameTime > 0)
+                {
+                    buffer.Timestamps[buffer.Next] = frameTimeMs;
+                    buffer.Next = (buffer.Next + 1) % FrameTimeBufferSize;
+                    if (buffer.Count < FrameTimeBufferSize)
+                        buffer.Count++;
+                }
+
+                // Periodically evict stale process buffers.
+                if (_perProcessBuffers.Count > 16)
+                    EvictStaleBuffers();
             }
 
-            // Calculate real 1% and 0.1% lows from the ring buffer.
+            // Calculate real 1% and 0.1% lows from this process's ring buffer.
             double onePercentLowFps = fps;
             double onePercentFrameTimeMs = frameTimeMs;
             double pointOnePercentLowFps = fps;
             double pointOnePercentFrameTimeMs = frameTimeMs;
 
-            if (_ringCount >= 2)
+            if (buffer != null && buffer.Count >= 2)
             {
                 try
                 {
-                    double[] rented = ArrayPool<double>.Shared.Rent(_ringCount);
+                    double[] rented = ArrayPool<double>.Shared.Rent(buffer.Count);
                     try
                     {
                         // Copy ring buffer to linear array.
-                        int oldest = _ringCount == FrameTimeBufferSize ? _ringNext : 0;
-                        for (int i = 0; i < _ringCount; i++)
-                            rented[i] = _frameTimeRingBuffer[(oldest + i) % FrameTimeBufferSize];
+                        int oldest = buffer.Count == FrameTimeBufferSize ? buffer.Next : 0;
+                        for (int i = 0; i < buffer.Count; i++)
+                            rented[i] = buffer.Timestamps[(oldest + i) % FrameTimeBufferSize];
 
                         // Sort ascending — slowest (worst) frames are at the end.
-                        Array.Sort(rented, 0, _ringCount);
+                        Array.Sort(rented, 0, buffer.Count);
 
                         // 1% low: average of the worst 1% of frames (highest frame times).
-                        int count1Percent = Math.Max(1, (int)Math.Ceiling(_ringCount * 0.01));
+                        int count1Percent = Math.Max(1, (int)Math.Ceiling(buffer.Count * 0.01));
                         double sum1Percent = 0;
-                        for (int i = _ringCount - count1Percent; i < _ringCount; i++)
+                        for (int i = buffer.Count - count1Percent; i < buffer.Count; i++)
                             sum1Percent += rented[i];
                         onePercentFrameTimeMs = sum1Percent / count1Percent;
                         onePercentLowFps = 1000.0 / onePercentFrameTimeMs;
 
                         // 0.1% low: average of the worst 0.1% of frames.
-                        int count01Percent = Math.Max(1, (int)Math.Ceiling(_ringCount * 0.001));
+                        int count01Percent = Math.Max(1, (int)Math.Ceiling(buffer.Count * 0.001));
                         double sum01Percent = 0;
-                        for (int i = _ringCount - count01Percent; i < _ringCount; i++)
+                        for (int i = buffer.Count - count01Percent; i < buffer.Count; i++)
                             sum01Percent += rented[i];
                         pointOnePercentFrameTimeMs = sum01Percent / count01Percent;
                         pointOnePercentLowFps = 1000.0 / pointOnePercentFrameTimeMs;

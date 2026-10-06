@@ -1,6 +1,7 @@
 using Microsoft.Win32;
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -34,6 +35,11 @@ namespace Uniwill_Control_Utility.Views.Overlay
         private RECT _lastTargetBounds;
         private bool _userWantsVisible; // true while the user has asked for the overlay to show
         private bool _wasMovingLastTick;  // true if the window moved on the previous tick
+
+        // Fast foreground check: polls at 50ms to hide immediately when the game
+        // loses focus, eliminating the 250-750ms latency of relying on FPS service ticks.
+        private DispatcherTimer? _foregroundTimer;
+        private int _targetPid;
 
         public PerformanceOverlayWindow(PerformanceOverlayViewModel viewModel)
         {
@@ -71,6 +77,18 @@ namespace Uniwill_Control_Utility.Views.Overlay
                 _displaySettingsSubscribed = true;
             }
 
+            // Fast foreground check: polls at 50ms to detect when the game loses
+            // focus so the overlay can hide immediately instead of waiting for the
+            // next FPS service tick (up to 500ms + RefreshIntervalMs latency).
+            _foregroundTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(50), DispatcherPriority.Background, (s, e) =>
+            {
+                if (IsVisible && _userWantsVisible && _targetPid > 0 && !IsForegroundProcess(_targetPid))
+                {
+                    _userWantsVisible = false;
+                    Hide();
+                }
+            }, Dispatcher);
+
             ApplyViewModelSize();
         }
 
@@ -96,6 +114,7 @@ namespace Uniwill_Control_Utility.Views.Overlay
                 {
                     _pendingShow = false;
                     _userWantsVisible = true;
+                    _targetPid = _viewModel.GameProcessId;
                     PositionRelativeToForegroundWindow();
                     Show();
                 }
@@ -105,6 +124,7 @@ namespace Uniwill_Control_Utility.Views.Overlay
                 if (IsVisible && !_pendingShow)
                 {
                     _userWantsVisible = false;
+                    _targetPid = 0;
                     Hide();
                 }
             }
@@ -267,6 +287,8 @@ namespace Uniwill_Control_Utility.Views.Overlay
                 return;
             }
 
+            _foregroundTimer?.Stop();
+
             Loaded -= OnLoaded;
             Closing -= OnClosing;
             SizeChanged -= OnSizeChanged;
@@ -364,6 +386,35 @@ namespace Uniwill_Control_Utility.Views.Overlay
 
             bool targetFullscreen = IsZoomed(target);
 
+            // Determine which monitor the game is on so the overlay stays
+            // on the same display. This avoids DWM cross-monitor composition
+            // stutter on extended dual-monitor setups.
+            IntPtr gameMonitor = MonitorFromWindow(target, MonitorDefaultToNearest);
+            MONITORINFO gameMonitorInfo = new() { cbSize = Marshal.SizeOf<MONITORINFO>() };
+            if (gameMonitor != IntPtr.Zero && GetMonitorInfo(gameMonitor, ref gameMonitorInfo))
+            {
+                RECT work = gameMonitorInfo.rcWork;
+                double gameLeft = work.left;
+                double gameTop = work.top;
+                double gameRight = work.right;
+                double gameBottom = work.bottom;
+
+                if (_hasRelativePosition)
+                {
+                    // Clamp stored relative position to the game's monitor work area.
+                    double rightLimit = Math.Max(gameLeft + 5, gameRight - ActualWidth - 5);
+                    double bottomLimit = Math.Max(gameTop + 5, gameBottom - ActualHeight - 5);
+
+                    Left = Math.Clamp(Left, gameLeft + 5, rightLimit);
+                    Top = Math.Clamp(Top, gameTop + 5, bottomLimit);
+                }
+                else
+                {
+                    Left = gameLeft + 10;
+                    Top = gameTop + 10;
+                }
+            }
+
             if (!targetFullscreen &&
                 (outerRect.right - outerRect.left > 0) &&
                 (outerRect.bottom - outerRect.top > 0))
@@ -389,7 +440,7 @@ namespace Uniwill_Control_Utility.Views.Overlay
                 return;
             }
 
-            // Fullscreen or invalid window — fall back to monitor positioning.
+            // Fullscreen or invalid window — fall back to monitor positioning (already set above).
             _hasRelativePosition = false;
         }
 
@@ -401,6 +452,25 @@ namespace Uniwill_Control_Utility.Views.Overlay
             public int right;
             public int bottom;
         }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct MONITORINFO
+        {
+            public int cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public uint dwFlags;
+        }
+
+        private const uint MonitorDefaultToNearest = 0x2;
+        private const int MonitorInfoFPrimary = 0x1;
+
+        [LibraryImport("user32.dll")]
+        private static partial IntPtr MonitorFromWindow(IntPtr window, uint dwFlags);
+
+        [LibraryImport("user32.dll", EntryPoint = "GetMonitorInfoW", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static partial bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT
@@ -434,6 +504,63 @@ namespace Uniwill_Control_Utility.Views.Overlay
         [LibraryImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static partial bool IsZoomed(IntPtr window);
+
+        [LibraryImport("user32.dll")]
+        private static partial uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+
+        /// <summary>
+        /// Returns true if the foreground window belongs to the given process ID.
+        /// Also returns true if the foreground is the alt-tab overlay (TaskSwitcherWnd),
+        /// in which case the caller should hide the overlay.
+        /// </summary>
+        private static bool IsForegroundProcess(int pid)
+        {
+            IntPtr window = GetForegroundWindow();
+            if (window == IntPtr.Zero)
+                return false;
+
+            // If the foreground is the alt-tab overlay, treat as "not the game"
+            // so the overlay hides immediately.
+            string className = GetWindowClassName(window);
+            if (className.Equals("TaskSwitcherWnd", StringComparison.OrdinalIgnoreCase) ||
+                className.Equals("TaskSwitcherMPHost", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            GetWindowThreadProcessId(window, out uint foregroundPid);
+            int foregroundPidInt = unchecked((int)foregroundPid);
+
+            // The foreground might be a child/owned window of the game.
+            // Walk up the owner chain to find a match.
+            IntPtr current = window;
+            while (current != IntPtr.Zero)
+            {
+                GetWindowThreadProcessId(current, out uint pidCheck);
+                if (unchecked((int)pidCheck) == pid)
+                    return true;
+
+                // Walk to owner window.
+                current = GetWindow(current, GW_OWNER);
+            }
+
+            return false;
+        }
+
+        private static string GetWindowClassName(IntPtr hWnd)
+        {
+            char[] buffer = new char[256];
+            int len = GetClassName(hWnd, buffer, buffer.Length);
+            return len > 0 ? new string(buffer, 0, len).TrimEnd('\0') : string.Empty;
+        }
+
+        [LibraryImport("user32.dll")]
+        private static partial IntPtr GetWindow(IntPtr hWnd, uint uCmd);
+
+        [LibraryImport("user32.dll", SetLastError = true, EntryPoint = "GetClassNameW", StringMarshalling = StringMarshalling.Utf16)]
+        private static partial int GetClassName(IntPtr hWnd, char[]? lpClassName, int nMaxCount);
+
+        private const uint GW_OWNER = 4;
 
         #endregion
     }

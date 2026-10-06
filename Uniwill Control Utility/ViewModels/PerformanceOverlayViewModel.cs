@@ -43,6 +43,7 @@ namespace Uniwill_Control_Utility.ViewModels
 
         [ObservableProperty] private Visibility _contentVisibility = Visibility.Visible;
         [ObservableProperty] private bool _gameActive;
+        [ObservableProperty] private int _gameProcessId;
         [ObservableProperty] private double _windowWidth = BaseDesignWidth;
         [ObservableProperty] private double _windowHeight = BaseDesignHeight;
         [ObservableProperty] private double _backgroundOpacity = 0.95;
@@ -317,6 +318,7 @@ namespace Uniwill_Control_Utility.ViewModels
                 // Track whether a game is actively being monitored.
                 bool wasGameActive = GameActive;
                 GameActive = fps.IsAvailable;
+                GameProcessId = fps.IsAvailable ? fps.ProcessId : 0;
 
                 CurrentFps = fps.Fps;
                 OnePercentLowFps = fps.OnePercentLowFps;

@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,12 +34,9 @@ namespace Uniwill_Control_Utility.Services.Performance
     public sealed partial class FpsMonitoringService : IFpsMonitoringService, IDisposable
     {
         private readonly object _sync = new();
-        private FpsTraceProcessor? _processor;
         private CancellationTokenSource? _cancellation;
         private int _leaseCount;
         private FpsMetricsSnapshot _latest = FpsMetricsSnapshot.Empty;
-        private int _cachedApiPid;
-        private string _cachedApi = "N/A";
         private int _cachedDetailsPid;
         private string _cachedProcessName = string.Empty;
         private string _cachedExecutablePath = string.Empty;
@@ -60,125 +56,206 @@ namespace Uniwill_Control_Utility.Services.Performance
 
         private void Start()
         {
-            try
-            {
-                _processor = new FpsTraceProcessor();
-                _processor.Start();
-            }
-            catch (Exception ex)
-            {
-                try { _processor?.Dispose(); } catch { /* best-effort cleanup */ }
-                _processor = null;
-                DiagnosticLogger.LogError(ex, "Failed to start the ETW FPS monitor");
-            }
-
-            // Always start the sampling loop even if ETW failed — RTSS still works.
             _cancellation = new CancellationTokenSource();
-            Task.Run(() => SampleAsync(_cancellation.Token));
+            Serilog.Log.Debug("[FPS] Start - sampling loop starting");
+            var t = Task.Run(() => SampleAsync(_cancellation.Token));
+            Serilog.Log.Debug("[FPS] Task.Run returned, task status={Status}", t.Status);
         }
 
         private async Task SampleAsync(CancellationToken cancellationToken)
         {
+            Serilog.Log.Debug("[FPS] SampleAsync entered, creating timer");
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
+            int tickCount = 0;
             while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
             {
-                int processId = GetForegroundProcessId();
-
-                // Try RTSS first — it works with DX12, anti-cheat, and all graphics APIs.
-                if (RtssReader.TryRead(processId, out RtssFpsData rtssData) && rtssData.Fps > 0)
+                tickCount++;
+                try
                 {
-                    // Only show the overlay for recognized installed games. If RTSS returned
-                    // a different PID than the foreground (fallback), also verify the
-                    // foreground process itself is a recognized game — otherwise the user
-                    // alt-tabbed away from the game.
-                    if (!IsRecognizedGame(rtssData.ProcessId) ||
-                        (rtssData.ProcessId != processId && !IsRecognizedGame(processId)))
-                    {
-                        Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
-                        continue;
-                    }
+                    int processId = GetForegroundProcessId();
 
-                    // Use the PID from RTSS data (may differ from foreground PID when overlay is on top).
-                    int actualPid = rtssData.ProcessId;
-
-                    // TryGetProcessDetails may fail for anti-cheat-protected games (EAC blocks MainModule access).
-                    // RTSS already provides the process name and executable path, so use those as fallback.
-                    string name = string.Empty;
-                    string path = string.Empty;
-                    if (!TryGetProcessDetailsCached(actualPid, out name, out path))
-                    {
-                        // Extract file name from RTSS-provided path (RTSS stores full path in szName).
-                        path = rtssData.ProcessName;
-                        name = System.IO.Path.GetFileNameWithoutExtension(rtssData.ProcessName);
-                    }
-
-                    Volatile.Write(ref _latest, new FpsMetricsSnapshot
-                    {
-                        IsAvailable = true,
-                        ProcessId = actualPid,
-                        ProcessName = name,
-                        ExecutablePath = path,
-                        GraphicsApi = rtssData.GraphicsApi,
-                        Fps = (int)Math.Round(rtssData.Fps),
-                        FrameTimeMs = rtssData.FrameTimeMs,
-                        OnePercentLowFps = (int)Math.Round(rtssData.OnePercentLowFps),
-                        OnePercentFrameTimeMs = rtssData.OnePercentFrameTimeMs,
-                        PointOnePercentLowFps = (int)Math.Round(rtssData.PointOnePercentLowFps),
-                        PointOnePercentFrameTimeMs = rtssData.PointOnePercentFrameTimeMs
-                    });
-                    continue;
-                }
-
-                // Fall back to ETW when RTSS is not available or has no data for this process.
-                FpsTraceProcessor? processor = _processor;
-                if (processor is null)
+                // Hide during Windows alt-tab — the overlay should not appear
+                // over the task switcher even if a game is running in background.
+                if (IsAltTabActive())
                 {
                     Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
                     continue;
                 }
 
-                try
+                // Try RTSS first — it works with DX12, anti-cheat, and all graphics APIs.
+                if (!RtssReader.TryRead(processId, out RtssFpsData rtssData) || rtssData.Fps <= 0)
                 {
-                    processor.TargetProcessId = processId;
-                    FrameStatistics statistics = processor.GetStatistics(processId);
-                    if (statistics.Fps == 0 || !IsRecognizedGame(processId) ||
-                        !TryGetProcessDetailsCached(processId, out string name, out string path))
+                    if (tickCount % 10 == 0)
+                        Serilog.Log.Debug("[FPS] tick {Tick} fgPid={Pid} - no RTSS data", tickCount, processId);
+                    Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
+                    continue;
+                }
+
+                if (tickCount % 10 == 0)
+                    Serilog.Log.Debug("[FPS] tick {Tick} fgPid={FgPid} rtssPid={RtssPid} name={Name} fps={Fps}", tickCount, processId, rtssData.ProcessId, rtssData.ProcessName, rtssData.Fps);
+
+                // RTSS returned data for a hooked process. We must verify that the
+                // process belongs to a recognized installed game AND that the game
+                // window is actually in focus (or fullscreen) before showing the overlay.
+                //
+                // Two scenarios:
+                //
+                // 1) Exact PID match (rtssData.ProcessId == processId): the foreground
+                //    IS the hooked game. Verify it's a recognized installed game.
+                //
+                // 2) Fallback match (rtssData.ProcessId != processId): the foreground
+                //    is NOT the hooked game. This happens when our overlay (topmost)
+                //    reports itself as foreground. The game is still active behind it.
+                //    We verify the game has a visible, non-minimized window so we
+                //    don't show the overlay when the user has switched to a different
+                //    app (Terminal, browser, etc.).
+
+                int gamePid;
+                string gameHint;
+
+                if (rtssData.ProcessId == processId)
+                {
+                    // Exact match — foreground is the hooked process.
+                    gamePid = processId;
+                    gameHint = rtssData.ProcessName;
+                }
+                else
+                {
+                    // Fallback — foreground is NOT the hooked game (overlay is
+                    // topmost). Verify the game has a visible window that isn't
+                    // minimized, meaning it's still active behind us.
+                    if (!HasVisibleWindow(rtssData.ProcessId))
                     {
                         Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
                         continue;
                     }
 
-                    Volatile.Write(ref _latest, new FpsMetricsSnapshot
-                    {
-                        IsAvailable = true,
-                        ProcessId = processId,
-                        ProcessName = name,
-                        ExecutablePath = path,
-                        GraphicsApi = GetGraphicsApi(processId),
-                        Fps = (int)Math.Round(statistics.Fps),
-                        FrameTimeMs = statistics.FrameTimeMs,
-                        OnePercentLowFps = (int)Math.Round(statistics.OnePercentLowFps),
-                        OnePercentFrameTimeMs = statistics.OnePercentFrameTimeMs,
-                        PointOnePercentLowFps = (int)Math.Round(statistics.PointOnePercentLowFps),
-                        PointOnePercentFrameTimeMs = statistics.PointOnePercentFrameTimeMs
-                    });
+                    gamePid = rtssData.ProcessId;
+                    gameHint = rtssData.ProcessName;
                 }
-                catch
+
+                // Only show for recognized installed games (same list as Adaptive Mode).
+                bool recognized = IsRecognizedGame(gamePid, gameHint);
+                if (!recognized)
                 {
-                    // A transient ETW read failure must not crash the sampling loop.
+                    Volatile.Write(ref _latest, FpsMetricsSnapshot.Empty);
+                    continue;
+                }
+
+                int actualPid = rtssData.ProcessId;
+
+                // TryGetProcessDetails may fail for anti-cheat-protected games (EAC blocks MainModule access).
+                // RTSS already provides the process name and executable path, so use those as fallback.
+                string name = string.Empty;
+                string path = string.Empty;
+                if (!TryGetProcessDetailsCached(actualPid, out name, out path))
+                {
+                    // Extract file name from RTSS-provided path (RTSS stores full path in szName).
+                    path = rtssData.ProcessName;
+                    name = System.IO.Path.GetFileNameWithoutExtension(rtssData.ProcessName);
+                }
+
+                Volatile.Write(ref _latest, new FpsMetricsSnapshot
+                {
+                    IsAvailable = true,
+                    ProcessId = actualPid,
+                    ProcessName = name,
+                    ExecutablePath = path,
+                    GraphicsApi = rtssData.GraphicsApi,
+                    Fps = (int)Math.Round(rtssData.Fps),
+                    FrameTimeMs = rtssData.FrameTimeMs,
+                    OnePercentLowFps = (int)Math.Round(rtssData.OnePercentLowFps),
+                    OnePercentFrameTimeMs = rtssData.OnePercentFrameTimeMs,
+                    PointOnePercentLowFps = (int)Math.Round(rtssData.PointOnePercentLowFps),
+                    PointOnePercentFrameTimeMs = rtssData.PointOnePercentFrameTimeMs
+                });
+                }
+                catch (Exception ex)
+                {
+                    Serilog.Log.Error(ex, "[FPS] tick {Tick} - unhandled exception", tickCount);
                 }
             }
         }
 
-        private string GetGraphicsApi(int processId)
+        /// <summary>
+        /// Returns true if the foreground window appears to be the Windows
+        /// alt-tab overlay (TaskSwitcherWnd). During alt-tab the overlay
+        /// should hide even if a recognized game is running in background.
+        /// </summary>
+        private static bool IsAltTabActive()
         {
-            if (_cachedApiPid == processId)
-                return _cachedApi;
+            IntPtr window = GetForegroundWindow();
+            if (window == IntPtr.Zero)
+                return false;
 
-            _cachedApiPid = processId;
-            _cachedApi = DetectGraphicsApi(processId);
-            return _cachedApi;
+            // The alt-tab window class is "TaskSwitcherWnd" (Windows 10/11).
+            int classNameLen = GetClassName(window, IntPtr.Zero, 0);
+            if (classNameLen <= 0)
+                return false;
+
+            char[] className = new char[classNameLen + 1];
+            GetClassName(window, className, className.Length);
+            string name = new string(className).TrimEnd('\0');
+
+            return name.Equals("TaskSwitcherWnd", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("TaskSwitcherMPHost", StringComparison.OrdinalIgnoreCase);
         }
+
+        [LibraryImport("user32.dll", SetLastError = true, EntryPoint = "GetClassNameW")]
+        private static partial int GetClassName(IntPtr hWnd, IntPtr lpClassName, int nMaxCount);
+
+        [LibraryImport("user32.dll", SetLastError = true, EntryPoint = "GetClassNameW", StringMarshalling = StringMarshalling.Utf16)]
+        private static partial int GetClassName(IntPtr hWnd, char[]? lpClassName, int nMaxCount);
+
+        /// <summary>
+        /// Returns true if the process has a top-level window that is visible
+        /// and not minimized. This is used in the fallback path to verify the
+        /// game is still active behind our topmost overlay, rather than having
+        /// been switched away to a different application.
+        /// </summary>
+        private static bool HasVisibleWindow(int gamePid)
+        {
+            return EnumWindows((hWnd, lParam) =>
+            {
+                if (GetWindowThreadProcessId(hWnd, out uint pid) != 0 && unchecked((int)pid) == gamePid)
+                {
+                    // Check if it's a top-level window (no owner).
+                    IntPtr owner = GetWindow(hWnd, GW_OWNER);
+                    if (owner == IntPtr.Zero && IsWindow(hWnd) && IsWindowVisible(hWnd))
+                    {
+                        // Check if it's not minimized.
+                        if (!IsIconic(hWnd))
+                            return false; // found it, stop enumeration
+                    }
+                }
+                return true; // continue enumeration
+            }, IntPtr.Zero);
+        }
+
+        [LibraryImport("user32.dll")]
+        private static partial IntPtr GetWindow(IntPtr hWnd, uint uCmd);
+
+        private const uint GW_OWNER = 4;
+
+        [LibraryImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static partial bool IsIconic(IntPtr hWnd);
+
+        [LibraryImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static partial bool IsWindow(IntPtr hWnd);
+
+        [LibraryImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static partial bool IsWindowVisible(IntPtr hWnd);
+
+        [LibraryImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static partial bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
         private bool TryGetProcessDetailsCached(int processId, out string name, out string path)
         {
@@ -205,78 +282,86 @@ namespace Uniwill_Control_Utility.Services.Performance
             return found;
         }
 
-        private static string DetectGraphicsApi(int processId)
-        {
-            try
-            {
-                using Process process = Process.GetProcessById(processId);
-                bool dx12 = false, dx11 = false, dx10 = false, dx9 = false, vulkan = false, openGl = false;
-                foreach (ProcessModule module in process.Modules)
-                {
-                    string name = module.ModuleName;
-                    vulkan |= name.Contains("vulkan", StringComparison.OrdinalIgnoreCase) || name.Contains("dxvk", StringComparison.OrdinalIgnoreCase);
-                    openGl |= name.Contains("opengl", StringComparison.OrdinalIgnoreCase);
-                    dx12 |= name.Contains("d3d12", StringComparison.OrdinalIgnoreCase);
-                    dx11 |= name.Contains("d3d11", StringComparison.OrdinalIgnoreCase);
-                    dx10 |= name.Contains("d3d10", StringComparison.OrdinalIgnoreCase);
-                    dx9 |= name.Contains("d3d9", StringComparison.OrdinalIgnoreCase);
-                }
-
-                if (vulkan) return "Vulkan";
-                if (dx12) return "DirectX 12";
-                if (openGl) return "OpenGL";
-                if (dx11) return "DirectX 11";
-                if (dx10) return "DirectX 10";
-                if (dx9) return "DirectX 9";
-            }
-            catch
-            {
-                // Process query failed (access denied, process exited); fall back to N/A.
-            }
-
-            return "N/A";
-        }
-
         /// <summary>
         /// Checks whether the given process ID matches a recognized installed game
         /// from Game_Manager.installedGames (same positive-list used by the Adaptive page).
+        /// Falls back to matching by processNameHint when MainModule is inaccessible
+        /// (EAC-protected games block process.MainModule).
         /// </summary>
-        private static bool IsRecognizedGame(int processId)
+        private static bool IsRecognizedGame(int processId, string processNameHint = "")
         {
             if (processId <= 0)
                 return false;
 
             var games = Game_Manager.installedGames;
-            if (games is null || games.Count == 0)
+            // If the game library hasn't loaded yet (syncGame_Library is async and
+            // runs after the overlay starts), trust RTSS data. Once loaded, filter
+            // by the positive list (same as Adaptive Mode's combobox).
+            if (games is null)
+            {
+                Serilog.Log.Debug("[FPS] IsRecognizedGame pid={Pid} - installedGames is null, allowing", processId);
+                return true;
+            }
+
+            if (games.Count == 0)
+            {
+                Serilog.Log.Debug("[FPS] IsRecognizedGame pid={Pid} - installedGames is empty, blocking", processId);
                 return false;
+            }
+
+            string? exeName = null;
+            string? exePath = null;
 
             try
             {
                 using Process process = Process.GetProcessById(processId);
-                string exeName = process.ProcessName;
-                string? exePath = process.MainModule?.FileName;
-
-                foreach (var game in games)
-                {
-                    // Match by executable path (most reliable).
-                    if (!string.IsNullOrWhiteSpace(game.path) &&
-                        !string.IsNullOrWhiteSpace(exePath) &&
-                        exePath.Contains(game.path, StringComparison.OrdinalIgnoreCase))
-                        return true;
-
-                    // Match by exe name.
-                    if (!string.IsNullOrWhiteSpace(game.exe) &&
-                        exeName.Contains(game.exe, StringComparison.OrdinalIgnoreCase))
-                        return true;
-                }
-
-                return false;
+                exeName = process.ProcessName;
+                exePath = process.MainModule?.FileName;
             }
             catch
             {
-                // Process gone or inaccessible (anti-cheat protection) — can't verify.
-                return false;
+                // Process gone or inaccessible (anti-cheat protection).
+                // Fall back to the hint if provided.
+                if (string.IsNullOrEmpty(processNameHint))
+                    return false;
             }
+
+            foreach (var game in games)
+            {
+                // Match by executable path (most reliable).
+                if (!string.IsNullOrWhiteSpace(game.path) && exePath is not null && exePath.Contains(game.path, StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                // Match RTSS hint path against game's install dir.
+                if (!string.IsNullOrWhiteSpace(game.path) && !string.IsNullOrWhiteSpace(processNameHint) && processNameHint.Contains(game.path, StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                // Match game's install dir exe name (last path segment) against RTSS hint.
+                // game.path is the install dir, but for some launchers it may include the exe.
+                if (!string.IsNullOrWhiteSpace(game.path) && !string.IsNullOrWhiteSpace(processNameHint))
+                {
+                    string pathFileName = System.IO.Path.GetFileNameWithoutExtension(game.path);
+                    if (processNameHint.Contains(pathFileName, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+
+                // Match by exe name.
+                if (!string.IsNullOrWhiteSpace(game.exe) && exeName is not null && exeName.Contains(game.exe, StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                // Match RTSS hint file name against game's exe.
+                if (!string.IsNullOrWhiteSpace(game.exe) && !string.IsNullOrWhiteSpace(processNameHint))
+                {
+                    string hintName = System.IO.Path.GetFileNameWithoutExtension(processNameHint);
+                    if (hintName.Contains(game.exe, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+            }
+
+            // Debug: log why a process wasn't recognized.
+            string hintDisplay = string.IsNullOrWhiteSpace(processNameHint) ? "(no hint)" : processNameHint;
+            Serilog.Log.Debug("[FPS] IsRecognizedGame pid={Pid} - not recognized exeName={ExeName} exePath={ExePath} hint={Hint} games={GameCount}", processId, exeName, exePath, hintDisplay, games.Count);
+            return false;
         }
 
         private static bool TryGetProcessDetails(int processId, out string name, out string path)
@@ -306,13 +391,9 @@ namespace Uniwill_Control_Utility.Services.Performance
                     return;
 
                 _cancellation?.Cancel();
-                _processor?.Dispose();
-                _processor = null;
                 _cancellation?.Dispose();
                 _cancellation = null;
                 _latest = FpsMetricsSnapshot.Empty;
-                _cachedApiPid = 0;
-                _cachedApi = "N/A";
                 _cachedDetailsPid = 0;
                 _cachedProcessName = string.Empty;
                 _cachedExecutablePath = string.Empty;

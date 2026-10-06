@@ -20,6 +20,7 @@ internal enum StartupStage
     StartingServices,
     ConnectingDevices,
     RestoringAdaptiveMode,
+    LoadingGameLibrary,
     PreparingInterface,
     OpeningDashboard,
     Complete
@@ -41,7 +42,8 @@ internal static class StartupProgress
         new StartupProgressState(74, "Starting services"),
         new StartupProgressState(82, "Connecting devices"),
         new StartupProgressState(88, "Restoring adaptive mode"),
-        new StartupProgressState(94, "Preparing interface"),
+        new StartupProgressState(92, "Loading game library"),
+        new StartupProgressState(96, "Preparing interface"),
         new StartupProgressState(98, "Opening dashboard"),
         new StartupProgressState(100, "Ready")
     };
