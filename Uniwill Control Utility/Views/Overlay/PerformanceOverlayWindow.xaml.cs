@@ -14,8 +14,6 @@ namespace Uniwill_Control_Utility.Views.Overlay
     public partial class PerformanceOverlayWindow : Window
     {
         private const int ExtendedStyleIndex = -20;
-        private const int TransparentStyle = 0x20;
-        private const int LayeredStyle = 0x80000;
         private const int ToolWindowStyle = 0x80;
         private const int NoActivateStyle = 0x08000000;
 
@@ -67,10 +65,12 @@ namespace Uniwill_Control_Utility.Views.Overlay
             IntPtr handle = new WindowInteropHelper(this).Handle;
             IntPtr style = GetWindowLongPtr(handle, ExtendedStyleIndex);
             _ = SetWindowLongPtr(handle, ExtendedStyleIndex,
-                style | (IntPtr)TransparentStyle | (IntPtr)LayeredStyle | (IntPtr)ToolWindowStyle | (IntPtr)NoActivateStyle);
+                style | (IntPtr)ToolWindowStyle | (IntPtr)NoActivateStyle);
 
             // Enable input transparency so mouse events pass through to windows below.
-            // ACCENT_ENABLE_TRANSPARENTGRADIENT (3) makes the DWM route input to the window behind us.
+            // ACCENT_ENABLE_TRANSPARENTGRADIENT (3) makes the DWM route input to the
+            // window behind us. This is a Win32 API — it does NOT force CPU rendering
+            // like AllowsTransparency=True does.
             SetWindowInputTransparent(handle);
 
             if (!_displaySettingsSubscribed)
@@ -331,6 +331,8 @@ namespace Uniwill_Control_Utility.Views.Overlay
 
         // SetWindowCompositionAttribute: ACCENT_ENABLE_TRANSPARENTGRADIENT (3)
         // makes the DWM route mouse input through the window to whatever is behind it.
+        // This is a Win32 API that works on any HWND — it does NOT require
+        // AllowsTransparency=True (which forces CPU bitmap rendering).
         private const int WcaAccentPolicy = 19;
         private const int AccentTransparentGradient = 3;
 
@@ -342,16 +344,15 @@ namespace Uniwill_Control_Utility.Views.Overlay
             public int Size;
         }
 
-      [LibraryImport("user32.dll")]
+        [LibraryImport("user32.dll")]
         private static partial void SetWindowCompositionAttribute(IntPtr window, ref WindowCompositionAttributeData data);
 
         private static void SetWindowInputTransparent(IntPtr handle)
         {
             int accent = AccentTransparentGradient;
-            IntPtr accentPtr = IntPtr.Zero;
+            IntPtr accentPtr = Marshal.AllocHGlobal(Marshal.SizeOf<int>());
             try
             {
-                accentPtr = Marshal.AllocHGlobal(Marshal.SizeOf<int>());
                 Marshal.WriteInt32(accentPtr, accent);
 
                 var data = new WindowCompositionAttributeData
