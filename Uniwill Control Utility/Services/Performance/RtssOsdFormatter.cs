@@ -158,7 +158,7 @@ namespace Uniwill_Control_Utility.Services.Performance
                     var cells = new List<Cell>();
 
                     if (options.ShowFps)
-                        cells.Add(new Cell { Text = $"    <FR>", FontSize = FpsFontSize, Color = ColorWhite, IsRaw = true });
+                        cells.Add(FpsCellLarge("<FR>"));
 
                     if (options.ShowFrameTimeCurrent)
                         cells.Add(ValueCell(ColorWhite, fps.FrameTimeMs.ToString("F1"), "ms"));
@@ -176,7 +176,7 @@ namespace Uniwill_Control_Utility.Services.Performance
                     var cells = new List<Cell>();
 
                     if (options.ShowFpsOnePercentLow)
-                        cells.Add(ValueCell(ColorWhite, fps.OnePercentLowFps.ToString(), ""));
+                        cells.Add(FpsCell(fps.OnePercentLowFps.ToString()));
 
                     if (options.ShowFrameTimeOnePercent)
                         cells.Add(ValueCell(ColorWhite, fps.OnePercentFrameTimeMs.ToString("F1"), "ms"));
@@ -193,7 +193,7 @@ namespace Uniwill_Control_Utility.Services.Performance
                     var cells = new List<Cell>();
 
                     if (options.ShowFpsPointOnePercentLow)
-                        cells.Add(ValueCell(ColorWhite, fps.PointOnePercentLowFps.ToString(), ""));
+                        cells.Add(FpsCell(fps.PointOnePercentLowFps.ToString()));
 
                     if (options.ShowFrameTimePointOnePercent)
                         cells.Add(ValueCell(ColorWhite, fps.PointOnePercentFrameTimeMs.ToString("F1"), "ms"));
@@ -242,7 +242,7 @@ namespace Uniwill_Control_Utility.Services.Performance
             return hasContent ? sb.ToString() : null;
         }
 
-        /// <summary>
+       /// <summary>
         /// Builds a cell with a colored value and white unit, each in fixed-width columns.
         /// </summary>
         private static Cell ValueCell(string valueColor, string valueText, string unit)
@@ -252,6 +252,28 @@ namespace Uniwill_Control_Utility.Services.Performance
                 ? new string(' ', UnitWidth)
                 : $"<C={ColorWhite}><S0={UnitFontSize}>{unit.PadRight(UnitWidth)}";
             return new Cell { Text = valuePart + unitPart, FontSize = MetricFontSize, Color = valueColor, IsRaw = true };
+        }
+
+        /// <summary>
+        /// Builds an FPS cell at metric font size with "FPS" unit.
+        /// Uses ValueWidth+1 so the numeric value aligns 1 char right of hardware rows.
+        /// </summary>
+        private static Cell FpsCell(string valueText)
+        {
+            string valuePart = $"<C={ColorWhite}><S0={MetricFontSize}>{valueText.PadLeft(ValueWidth + 1)}";
+            string unitPart = $"<C={ColorWhite}><S0={UnitFontSize}>" + "FPS".PadRight(UnitWidth);
+            return new Cell { Text = valuePart + unitPart, FontSize = MetricFontSize, Color = ColorWhite, IsRaw = true };
+        }
+
+        /// <summary>
+        /// Builds the large current-FPS cell using the &lt;FR&gt; RTSS replacement tag.
+        /// Uses ValueWidth+2 so the value aligns 2 chars right of hardware rows.
+        /// </summary>
+        private static Cell FpsCellLarge(string replacementTag)
+        {
+            string valuePart = $"<C={ColorWhite}><S0={FpsFontSize}>{replacementTag.PadLeft(ValueWidth + 2)}";
+            string unitPart = $"<C={ColorWhite}><S0={UnitFontSize}>" + "FPS".PadRight(UnitWidth);
+            return new Cell { Text = valuePart + unitPart, FontSize = FpsFontSize, Color = ColorWhite, IsRaw = true };
         }
 
         /// <summary>
