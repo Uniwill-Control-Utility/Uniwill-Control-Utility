@@ -73,10 +73,10 @@ namespace Uniwill_Control_Utility.Services.Performance
                     cells.Add(ValueCell(ColorCpu, hardware.CpuUsage.ToString("F0"), "%"));
 
                 if (options.ShowCpuClock && hardware.CpuClockMhz > 0)
-                    cells.Add(ValueCell(ColorCpu, (hardware.CpuClockMhz / 1000).ToString("F1"), "GHz"));
+                    cells.Add(ValueCellShifted(ColorCpu, hardware.CpuClockMhz.ToString(), "MHz"));
 
                 if (options.ShowCpuPower && hardware.CpuPowerWatts > 0)
-                    cells.Add(ValueCell(ColorCpu, hardware.CpuPowerWatts.ToString(), "W"));
+                    cells.Add(ValueCellNarrow(ColorCpu, hardware.CpuPowerWatts.ToString(), "W"));
 
                 if (cells.Count > 0)
                 {
@@ -122,10 +122,10 @@ namespace Uniwill_Control_Utility.Services.Performance
                     cells.Add(ValueCell(ColorGpu, hardware.GpuUsage.ToString("F0"), "%"));
 
                 if (options.ShowGpuClock && hardware.GpuClockMhz > 0)
-                    cells.Add(ValueCell(ColorGpu, (hardware.GpuClockMhz / 1000).ToString("F1"), "GHz"));
+                    cells.Add(ValueCellShifted(ColorGpu, hardware.GpuClockMhz.ToString(), "MHz"));
 
                 if (options.ShowGpuPower && hardware.GpuPowerWatts > 0)
-                    cells.Add(ValueCell(ColorGpu, hardware.GpuPowerWatts.ToString(), "W"));
+                    cells.Add(ValueCellNarrow(ColorGpu, hardware.GpuPowerWatts.ToString(), "W"));
 
                 if (cells.Count > 0)
                 {
@@ -242,12 +242,38 @@ namespace Uniwill_Control_Utility.Services.Performance
             return hasContent ? sb.ToString() : null;
         }
 
-       /// <summary>
+      /// <summary>
         /// Builds a cell with a colored value and white unit, each in fixed-width columns.
         /// </summary>
         private static Cell ValueCell(string valueColor, string valueText, string unit)
         {
             string valuePart = $"<C={valueColor}><S0={MetricFontSize}>{valueText.PadLeft(ValueWidth)}";
+            string unitPart = string.IsNullOrEmpty(unit)
+                ? new string(' ', UnitWidth)
+                : $"<C={ColorWhite}><S0={UnitFontSize}>{unit.PadRight(UnitWidth)}";
+            return new Cell { Text = valuePart + unitPart, FontSize = MetricFontSize, Color = valueColor, IsRaw = true };
+        }
+
+        /// <summary>
+        /// Like ValueCell but with ValueWidth-1 so the frequency column shifts left by 1 character.
+        /// </summary>
+        private static Cell ValueCellShifted(string valueColor, string valueText, string unit)
+        {
+            int shiftedWidth = ValueWidth - 1;
+            string valuePart = $"<C={valueColor}><S0={MetricFontSize}>{valueText.PadLeft(shiftedWidth)}";
+            string unitPart = string.IsNullOrEmpty(unit)
+                ? new string(' ', UnitWidth)
+                : $"<C={ColorWhite}><S0={UnitFontSize}>{unit.PadRight(UnitWidth)}";
+            return new Cell { Text = valuePart + unitPart, FontSize = MetricFontSize, Color = valueColor, IsRaw = true };
+        }
+
+        /// <summary>
+        /// Like ValueCell but with ValueWidth-2 so the power column shifts left by 2 characters.
+        /// </summary>
+        private static Cell ValueCellNarrow(string valueColor, string valueText, string unit)
+        {
+            int narrowWidth = ValueWidth - 2;
+            string valuePart = $"<C={valueColor}><S0={MetricFontSize}>{valueText.PadLeft(narrowWidth)}";
             string unitPart = string.IsNullOrEmpty(unit)
                 ? new string(' ', UnitWidth)
                 : $"<C={ColorWhite}><S0={UnitFontSize}>{unit.PadRight(UnitWidth)}";
