@@ -226,6 +226,7 @@ namespace Uniwill_Control_Utility
                                 provider.GetRequiredService<OverlaySettingsStore>(),
                                 provider.GetRequiredService<IHardwareMonitoringService>(),
                                 provider.GetRequiredService<IFpsMonitoringService>(),
+                                provider.GetService<EcTelemetryService>(),
                                 provider.GetService<HydroUIService>(),
                                 provider.GetService<FlydigiCoolerHidService>()));
                         services.AddHostedService(provider => provider.GetRequiredService<OverlayManagerService>());

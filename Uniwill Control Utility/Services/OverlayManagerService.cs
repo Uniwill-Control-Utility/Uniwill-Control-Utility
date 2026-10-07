@@ -17,6 +17,7 @@ namespace Uniwill_Control_Utility.Services
         private readonly OverlaySettingsStore _settingsStore;
         private readonly IHardwareMonitoringService _hardware;
         private readonly Performance.IFpsMonitoringService _fps;
+        private readonly EcTelemetryService? _ecTelemetry;
         private readonly HydroUIService? _hydroUi;
         private readonly FlydigiCoolerHidService? _flydigi;
 
@@ -41,6 +42,7 @@ namespace Uniwill_Control_Utility.Services
             OverlaySettingsStore settingsStore,
             IHardwareMonitoringService hardware,
             Performance.IFpsMonitoringService fps,
+            EcTelemetryService? ecTelemetry = null,
             HydroUIService? hydroUi = null,
             FlydigiCoolerHidService? flydigi = null)
         {
@@ -59,6 +61,7 @@ namespace Uniwill_Control_Utility.Services
                 throw new ArgumentNullException(
                     nameof(fps));
 
+            _ecTelemetry = ecTelemetry;
             _hydroUi = hydroUi;
             _flydigi = flydigi;
         }
@@ -422,6 +425,17 @@ namespace Uniwill_Control_Utility.Services
                 FpsMetricsSnapshot fps = _fps.Latest;
                 OverlayOptions options = _settingsStore.Current;
                 HardwareMetricsSnapshot hardware = _hardware.ReadSnapshot();
+
+                // Enrich with EC fan duty data (cached, non-blocking read).
+                if (_ecTelemetry is not null)
+                {
+                    EcFanDutySnapshot ecFan = _ecTelemetry.ReadFanDuty();
+                    hardware = hardware with
+                    {
+                        CpuFanSpeed = ecFan.CpuFanPercent,
+                        GpuFanSpeed = ecFan.GpuFanPercent
+                    };
+                }
 
                 // Check if the game lost focus while OSD was showing.
                 // Only release when we were previously showing — don't block

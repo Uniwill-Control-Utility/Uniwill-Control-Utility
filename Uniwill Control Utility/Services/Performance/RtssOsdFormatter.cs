@@ -81,7 +81,7 @@ namespace Uniwill_Control_Utility.Services.Performance
                     cells.Add(ValueCellNarrow(ColorCpu, hardware.CpuPowerWatts.ToString(), "W"));
 
                 if (hardware.CpuFanSpeed > 0)
-                    cells.Add(ValueCell(ColorCpu, hardware.CpuFanSpeed.ToString(), "rpm"));
+                    cells.Add(ValueCellNarrow(ColorCpu, hardware.CpuFanSpeed.ToString(), "%"));
 
                 if (cells.Count > 0)
                 {
@@ -105,7 +105,7 @@ namespace Uniwill_Control_Utility.Services.Performance
                     cells.Add(ValueCellShifted(ColorMemory, hardware.MemoryTemperature0.ToString(), "°C"));
 
                 if (hardware.MemoryTemperature1 > 0)
-                    cells.Add(ValueCellNarrow(ColorMemory, hardware.MemoryTemperature1.ToString(), "°C"));
+                    cells.Add(ValueCellShifted(ColorMemory, hardware.MemoryTemperature1.ToString(), "°C"));
 
                 if (cells.Count > 0)
                 {
@@ -131,7 +131,7 @@ namespace Uniwill_Control_Utility.Services.Performance
                     cells.Add(ValueCellNarrow(ColorGpu, hardware.GpuPowerWatts.ToString(), "W"));
 
                 if (hardware.GpuFanSpeed > 0)
-                    cells.Add(ValueCell(ColorGpu, hardware.GpuFanSpeed.ToString(), "rpm"));
+                    cells.Add(ValueCellNarrow(ColorGpu, hardware.GpuFanSpeed.ToString(), "%"));
 
                 if (cells.Count > 0)
                 {
@@ -229,7 +229,7 @@ namespace Uniwill_Control_Utility.Services.Performance
                         cells.Add(FpsCellLarge("<FR>"));
 
                     if (options.ShowFrameTimeCurrent)
-                        cells.Add(ValueCellShifted(ColorWhite, fps.FrameTimeMs.ToString("F1"), "ms"));
+                        cells.Add(ValueCell(ColorWhite, fps.FrameTimeMs.ToString("F1"), "ms"));
 
                     if (cells.Count > 0)
                     {
@@ -247,7 +247,7 @@ namespace Uniwill_Control_Utility.Services.Performance
                         cells.Add(FpsCell(fps.OnePercentLowFps.ToString()));
 
                     if (options.ShowFrameTimeOnePercent)
-                        cells.Add(ValueCellShifted(ColorWhite, fps.OnePercentFrameTimeMs.ToString("F1"), "ms"));
+                        cells.Add(ValueCell(ColorWhite, fps.OnePercentFrameTimeMs.ToString("F1"), "ms"));
 
                     if (cells.Count > 0)
                     {
@@ -264,7 +264,7 @@ namespace Uniwill_Control_Utility.Services.Performance
                         cells.Add(FpsCell(fps.PointOnePercentLowFps.ToString()));
 
                     if (options.ShowFrameTimePointOnePercent)
-                        cells.Add(ValueCellShifted(ColorWhite, fps.PointOnePercentFrameTimeMs.ToString("F1"), "ms"));
+                        cells.Add(ValueCell(ColorWhite, fps.PointOnePercentFrameTimeMs.ToString("F1"), "ms"));
 
                     if (cells.Count > 0)
                     {
