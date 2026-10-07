@@ -39,5 +39,9 @@ namespace Uniwill_Control_Utility.Models
         public bool ShowBatteryStatus { get; init; } = true;
         public bool ShowBatteryTime { get; init; } = true;
         public bool ShowBatteryPower { get; init; } = true;
+
+        // Peripheral metrics
+        public bool ShowHydroUi { get; init; } = true;
+        public bool ShowFlydigi { get; init; } = true;
     }
 }

@@ -17,6 +17,8 @@ namespace Uniwill_Control_Utility.Services
         private readonly OverlaySettingsStore _settingsStore;
         private readonly IHardwareMonitoringService _hardware;
         private readonly Performance.IFpsMonitoringService _fps;
+        private readonly HydroUIService? _hydroUi;
+        private readonly FlydigiCoolerHidService? _flydigi;
 
         private readonly object _settingsSaveLock = new();
         private readonly object _hookLock = new();
@@ -38,7 +40,9 @@ namespace Uniwill_Control_Utility.Services
         public OverlayManagerService(
             OverlaySettingsStore settingsStore,
             IHardwareMonitoringService hardware,
-            Performance.IFpsMonitoringService fps)
+            Performance.IFpsMonitoringService fps,
+            HydroUIService? hydroUi = null,
+            FlydigiCoolerHidService? flydigi = null)
         {
             _settingsStore =
                 settingsStore ??
@@ -54,6 +58,9 @@ namespace Uniwill_Control_Utility.Services
                 fps ??
                 throw new ArgumentNullException(
                     nameof(fps));
+
+            _hydroUi = hydroUi;
+            _flydigi = flydigi;
         }
 
         public Task StartAsync(
@@ -431,7 +438,28 @@ namespace Uniwill_Control_Utility.Services
                     }
                 }
 
-                string? osdText = RtssOsdFormatter.Build(hardware, fps, options);
+                // Gather Hydro UI data (null when not connected or disabled in options).
+                HydroUiSnapshot? hydroUi = null;
+                if (options.ShowHydroUi && _hydroUi?.IsConnected == true)
+                {
+                    Models.PumpVoltage pump = _hydroUi.IsSmartModeActive
+                        ? _hydroUi.SmartModeCurrentPump
+                        : _hydroUi.GetSettings().GetPumpVoltage();
+                    Models.FanSpeed fan = _hydroUi.IsSmartModeActive
+                        ? _hydroUi.SmartModeCurrentFan
+                        : _hydroUi.GetSettings().GetFanSpeed();
+                    hydroUi = new HydroUiSnapshot(pump, fan);
+                }
+
+                // Gather Flydigi data (null when not connected or disabled in options).
+                FlydigiSnapshot? flydigi = null;
+                if (options.ShowFlydigi && _flydigi?.IsConnected == true && _flydigi.FanRpmData is { } fanData)
+                {
+                    string model = _flydigi.ConnectedDeviceInfo?.ModelName ?? "FLY";
+                    flydigi = new FlydigiSnapshot(fanData.CurrentRpm, model);
+                }
+
+                string? osdText = RtssOsdFormatter.Build(hardware, fps, options, hydroUi, flydigi);
                 if (osdText is not null)
                 {
                     bool wrote = RtssOsdWriter.Update(osdText);
@@ -571,5 +599,13 @@ namespace Uniwill_Control_Utility.Services
                 return true;
             }
         }
+
+        /// <summary>Snapshot of Hydro UI pump and fan state for the RTSS OSD formatter.</summary>
+        internal readonly record struct HydroUiSnapshot(
+            Models.PumpVoltage EffectivePumpVoltage,
+            Models.FanSpeed EffectiveFanSpeed);
+
+        /// <summary>Snapshot of Flydigi cooler state for the RTSS OSD formatter.</summary>
+        internal readonly record struct FlydigiSnapshot(int FanRpm, string ModelName);
     }
 }

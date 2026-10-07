@@ -221,7 +221,13 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<GpuInventoryService>();
                         services.AddSingleton<IFpsMonitoringService, FpsMonitoringService>();
                         services.AddSingleton<OverlaySettingsStore>();
-                        services.AddSingleton<OverlayManagerService>();
+                        services.AddSingleton<OverlayManagerService>(provider =>
+                            new OverlayManagerService(
+                                provider.GetRequiredService<OverlaySettingsStore>(),
+                                provider.GetRequiredService<IHardwareMonitoringService>(),
+                                provider.GetRequiredService<IFpsMonitoringService>(),
+                                provider.GetService<HydroUIService>(),
+                                provider.GetService<FlydigiCoolerHidService>()));
                         services.AddHostedService(provider => provider.GetRequiredService<OverlayManagerService>());
 
                         // Main window with navigation

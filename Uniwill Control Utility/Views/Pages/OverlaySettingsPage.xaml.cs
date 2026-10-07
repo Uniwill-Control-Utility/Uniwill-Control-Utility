@@ -136,7 +136,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 ShowBatteryPercent = toggles["ShowBatteryPercent"],
                 ShowBatteryStatus = toggles["ShowBatteryStatus"],
                 ShowBatteryTime = toggles["ShowBatteryTime"],
-                ShowBatteryPower = toggles["ShowBatteryPower"]
+                ShowBatteryPower = toggles["ShowBatteryPower"],
+
+                // Peripherals
+                ShowHydroUi = toggles["ShowHydroUi"],
+                ShowFlydigi = toggles["ShowFlydigi"]
             };
         }
 
@@ -308,6 +312,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             AddMetricCheckBox("Battery charging status", "ShowBatteryStatus", options.ShowBatteryStatus);
             AddMetricCheckBox("Battery time remaining", "ShowBatteryTime", options.ShowBatteryTime);
             AddMetricCheckBox("Battery power draw", "ShowBatteryPower", options.ShowBatteryPower);
+            AddMetricCheckBox("Hydro UI pump & fan", "ShowHydroUi", options.ShowHydroUi);
+            AddMetricCheckBox("Flydigi cooler RPM", "ShowFlydigi", options.ShowFlydigi);
         }
 
         private void AddMetricCheckBox(string label, string optionKey, bool isChecked)
