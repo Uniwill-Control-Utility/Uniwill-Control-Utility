@@ -57,26 +57,31 @@ namespace Uniwill_Control_Utility.Services.Performance
         internal static string? Build(
             HardwareMetricsSnapshot hardware,
             FpsMetricsSnapshot fps,
-            OverlayOptions options)
+            OverlayOptions options,
+            OverlayManagerService.HydroUiSnapshot? hydroUi = null,
+            OverlayManagerService.FlydigiSnapshot? flydigi = null)
         {
             var sb = new StringBuilder(1024);
             bool hasContent = false;
 
             // --- CPU row ---
             {
-                var cells = new List<Cell>();
+                 var cells = new List<Cell>();
 
                 if (options.ShowCpuTemperature && hardware.CpuTemperature > 0)
                     cells.Add(ValueCell(ColorCpu, hardware.CpuTemperature.ToString(), "°C"));
 
                 if (options.ShowCpuUsage)
-                    cells.Add(ValueCell(ColorCpu, hardware.CpuUsage.ToString("F0"), "%"));
+                    cells.Add(ValueCellShifted(ColorCpu, hardware.CpuUsage.ToString("F0"), "%"));
 
                 if (options.ShowCpuClock && hardware.CpuClockMhz > 0)
                     cells.Add(ValueCellShifted(ColorCpu, hardware.CpuClockMhz.ToString(), "MHz"));
 
                 if (options.ShowCpuPower && hardware.CpuPowerWatts > 0)
                     cells.Add(ValueCellNarrow(ColorCpu, hardware.CpuPowerWatts.ToString(), "W"));
+
+                if (hardware.CpuFanSpeed > 0)
+                    cells.Add(ValueCell(ColorCpu, hardware.CpuFanSpeed.ToString(), "rpm"));
 
                 if (cells.Count > 0)
                 {
@@ -97,10 +102,10 @@ namespace Uniwill_Control_Utility.Services.Performance
 
                 // Memory temperatures (per module, separate columns)
                 if (hardware.MemoryTemperature0 > 0)
-                    cells.Add(ValueCell(ColorMemory, hardware.MemoryTemperature0.ToString(), "°C"));
+                    cells.Add(ValueCellShifted(ColorMemory, hardware.MemoryTemperature0.ToString(), "°C"));
 
                 if (hardware.MemoryTemperature1 > 0)
-                    cells.Add(ValueCellShifted(ColorMemory, hardware.MemoryTemperature1.ToString(), "°C"));
+                    cells.Add(ValueCellNarrow(ColorMemory, hardware.MemoryTemperature1.ToString(), "°C"));
 
                 if (cells.Count > 0)
                 {
@@ -117,13 +122,16 @@ namespace Uniwill_Control_Utility.Services.Performance
                     cells.Add(ValueCell(ColorGpu, hardware.GpuTemperature.ToString(), "°C"));
 
                 if (options.ShowGpuUsage)
-                    cells.Add(ValueCell(ColorGpu, hardware.GpuUsage.ToString("F0"), "%"));
+                    cells.Add(ValueCellShifted(ColorGpu, hardware.GpuUsage.ToString("F0"), "%"));
 
                 if (options.ShowGpuClock && hardware.GpuClockMhz > 0)
                     cells.Add(ValueCellShifted(ColorGpu, hardware.GpuClockMhz.ToString(), "MHz"));
 
                 if (options.ShowGpuPower && hardware.GpuPowerWatts > 0)
                     cells.Add(ValueCellNarrow(ColorGpu, hardware.GpuPowerWatts.ToString(), "W"));
+
+                if (hardware.GpuFanSpeed > 0)
+                    cells.Add(ValueCell(ColorGpu, hardware.GpuFanSpeed.ToString(), "rpm"));
 
                 if (cells.Count > 0)
                 {
@@ -143,6 +151,60 @@ namespace Uniwill_Control_Utility.Services.Performance
                 hasContent = true;
             }
 
+            // --- Hydro UI row ---
+            if (hydroUi is not null)
+            {
+                var cells = new List<Cell>();
+
+                // Pump voltage as value + unit cell (shifted right by 3 from default)
+                string pumpValue;
+                string pumpUnit;
+                switch (hydroUi.Value.EffectivePumpVoltage)
+                {
+                    case Models.PumpVoltage.V7:
+                        pumpValue = "7"; pumpUnit = "V"; break;
+                    case Models.PumpVoltage.V8:
+                        pumpValue = "8"; pumpUnit = "V"; break;
+                    case Models.PumpVoltage.V11:
+                        pumpValue = "11"; pumpUnit = "V"; break;
+                    default:
+                        cells.Add(ValueCell("00FF00", "Off", ""));
+                        pumpValue = null; pumpUnit = null; break;
+                }
+
+                if (pumpValue is not null)
+                {
+                    int pumpWidth = ValueWidth; 
+                    string valuePart = $"<C=00FF00><S={MetricFontSize}>{pumpValue.PadLeft(pumpWidth)}";
+                    string unitPart = $"<A=0><C={ColorWhite}><S={UnitFontSize}> {pumpUnit.PadRight(UnitWidth)}";
+                    cells.Add(new Cell { Text = valuePart + unitPart, FontSize = MetricFontSize, Color = "00FF00", IsRaw = true });
+                }
+
+                // Fan speed as percentage from the FanSpeed enum
+                int fanPercent = hydroUi.Value.EffectiveFanSpeed == Models.FanSpeed.Off
+                    ? 0
+                    : (int)hydroUi.Value.EffectiveFanSpeed;
+                cells.Add(ValueCellShifted("00FF00", fanPercent.ToString(), "%"));
+
+                sb.Append(BuildRow("00FF00", "HUI", cells));
+                hasContent = true;
+            }
+
+            // --- Flydigi row ---
+            if (flydigi is not null)
+            {
+                var cells = new List<Cell>();
+                cells.Add(ValueCell("FF8C00", flydigi.Value.FanRpm.ToString(), "RPM"));
+
+                // Dynamic label from device model: BS2, BS2P, BS3, BS3P
+                string flyLabel = flydigi.Value.ModelName.Replace(" ", "").Replace("PRO", "P");
+                if (flyLabel.Length > 4)
+                    flyLabel = flyLabel[..4];
+
+                sb.Append(BuildRow("FF8C00", flyLabel, cells));
+                hasContent = true;
+            }
+
             // --- FPS rows (with short API label) ---
             // Row 1: current FPS + frame time
             // Row 2: 1% low FPS + frame time
@@ -159,12 +221,12 @@ namespace Uniwill_Control_Utility.Services.Performance
                         cells.Add(FpsCellLarge("<FR>"));
 
                     if (options.ShowFrameTimeCurrent)
-                        cells.Add(ValueCell(ColorWhite, fps.FrameTimeMs.ToString("F1"), "ms"));
+                        cells.Add(ValueCellShifted(ColorWhite, fps.FrameTimeMs.ToString("F1"), "ms"));
 
                     if (cells.Count > 0)
                     {
                         var label = string.IsNullOrEmpty(apiLabel) ? "FPS" : apiLabel;
-                        sb.Append(BuildRow(ColorWhite, label, cells, compactLabel: true));
+                        sb.Append(BuildRow(ColorWhite, label, cells));
                         hasContent = true;
                     }
                 }
@@ -177,11 +239,11 @@ namespace Uniwill_Control_Utility.Services.Performance
                         cells.Add(FpsCell(fps.OnePercentLowFps.ToString()));
 
                     if (options.ShowFrameTimeOnePercent)
-                        cells.Add(ValueCell(ColorWhite, fps.OnePercentFrameTimeMs.ToString("F1"), "ms"));
+                        cells.Add(ValueCellShifted(ColorWhite, fps.OnePercentFrameTimeMs.ToString("F1"), "ms"));
 
                     if (cells.Count > 0)
                     {
-                        sb.Append(BuildRow(ColorWhite, "1%", cells, compactLabel: true));
+                        sb.Append(BuildRow(ColorWhite, "1%", cells));
                         hasContent = true;
                     }
                 }
@@ -194,11 +256,11 @@ namespace Uniwill_Control_Utility.Services.Performance
                         cells.Add(FpsCell(fps.PointOnePercentLowFps.ToString()));
 
                     if (options.ShowFrameTimePointOnePercent)
-                        cells.Add(ValueCell(ColorWhite, fps.PointOnePercentFrameTimeMs.ToString("F1"), "ms"));
+                        cells.Add(ValueCellShifted(ColorWhite, fps.PointOnePercentFrameTimeMs.ToString("F1"), "ms"));
 
                     if (cells.Count > 0)
                     {
-                        sb.Append(BuildRow(ColorWhite, "0.1%", cells, compactLabel: true));
+                        sb.Append(BuildRow(ColorWhite, "0.1%", cells));
                         hasContent = true;
                     }
                 }
@@ -285,18 +347,18 @@ namespace Uniwill_Control_Utility.Services.Performance
         /// </summary>
         private static Cell FpsCell(string valueText)
         {
-            string valuePart = $"<C={ColorWhite}><S={MetricFontSize}>{valueText.PadLeft(ValueWidth + 1)}";
+            string valuePart = $"<C={ColorWhite}><S={MetricFontSize}>{valueText.PadLeft(ValueWidth)}";
             string unitPart = $"<A=0><C={ColorWhite}><S={UnitFontSize}>" + " FPS".PadRight(UnitWidth);
             return new Cell { Text = valuePart + unitPart, FontSize = MetricFontSize, Color = ColorWhite, IsRaw = true };
         }
 
         /// <summary>
         /// Builds the large current-FPS cell using the &lt;FR&gt; RTSS replacement tag.
-        /// Uses ValueWidth+2 so the value aligns 2 chars right of hardware rows.
+        /// Uses ValueWidth+1 so the value aligns 1 char right of hardware rows.
         /// </summary>
         private static Cell FpsCellLarge(string replacementTag)
         {
-            string valuePart = $"<C={ColorWhite}><S={FpsFontSize}>{replacementTag.PadLeft(ValueWidth + 2)}";
+            string valuePart = $"<C={ColorWhite}><S={FpsFontSize}>{replacementTag.PadLeft(ValueWidth + 1)}";
             string unitPart = $"<A=0><C={ColorWhite}><S={UnitFontSize}>" + " FPS".PadRight(UnitWidth);
             return new Cell { Text = valuePart + unitPart, FontSize = FpsFontSize, Color = ColorWhite, IsRaw = true };
         }
@@ -305,15 +367,13 @@ namespace Uniwill_Control_Utility.Services.Performance
         /// Builds a row with a fixed-width label column so all value columns
         /// align horizontally regardless of label length.
         /// </summary>
-        private static string BuildRow(string color, string label, IList<Cell> cells, bool compactLabel = false)
+        private static string BuildRow(string color, string label, IList<Cell> cells)
         {
             var sb = new StringBuilder();
             string paddedLabel = label.PadRight(LabelWidth);
             sb.Append($"<A0=-5>");
             sb.Append($"<C={color}><S={MetricFontSize}>{paddedLabel}");
-
-            int labelGap = compactLabel ? 1 : 2;
-            sb.Append(new string(' ', labelGap));
+            sb.Append("  "); // 2-space label gap — same for all rows
 
             for (int i = 0; i < cells.Count; i++)
             {
