@@ -13,9 +13,9 @@ namespace Uniwill_Control_Utility.Services.Performance
     internal static class RtssOsdFormatter
     {
         // Font sizes
-        private const int FpsFontSize = 48;
-        private const int MetricFontSize = 28;
-        private const int UnitFontSize = 14;
+        private const int FpsFontSize = 100;
+        private const int MetricFontSize = 100;
+        private const int UnitFontSize = 50;
 
         // Colors (hex RGB)
         private const string ColorWhite = "FFFFFF";
@@ -95,14 +95,12 @@ namespace Uniwill_Control_Utility.Services.Performance
                     cells.Add(ValueCell(ColorMemory, usedMb.ToString(), "MB"));
                 }
 
-                // Memory temperatures (per module)
+                // Memory temperatures (per module, separate columns)
                 if (hardware.MemoryTemperature0 > 0)
-                {
-                    if (hardware.MemoryTemperature1 > 0)
-                        cells.Add(ValueCell(ColorMemory, $"{hardware.MemoryTemperature0}/{hardware.MemoryTemperature1}", "°C"));
-                    else
-                        cells.Add(ValueCell(ColorMemory, hardware.MemoryTemperature0.ToString(), "°C"));
-                }
+                    cells.Add(ValueCell(ColorMemory, hardware.MemoryTemperature0.ToString(), "°C"));
+
+                if (hardware.MemoryTemperature1 > 0)
+                    cells.Add(ValueCellShifted(ColorMemory, hardware.MemoryTemperature1.ToString(), "°C"));
 
                 if (cells.Count > 0)
                 {
@@ -242,15 +240,16 @@ namespace Uniwill_Control_Utility.Services.Performance
             return hasContent ? sb.ToString() : null;
         }
 
-      /// <summary>
+     /// <summary>
         /// Builds a cell with a colored value and white unit, each in fixed-width columns.
+        /// Units use top vertical alignment (<A=0>) so they sit at the top of the line.
         /// </summary>
         private static Cell ValueCell(string valueColor, string valueText, string unit)
         {
-            string valuePart = $"<C={valueColor}><S0={MetricFontSize}>{valueText.PadLeft(ValueWidth)}";
+            string valuePart = $"<C={valueColor}><S={MetricFontSize}>{valueText.PadLeft(ValueWidth)}";
             string unitPart = string.IsNullOrEmpty(unit)
                 ? new string(' ', UnitWidth)
-                : $"<C={ColorWhite}><S0={UnitFontSize}>{unit.PadRight(UnitWidth)}";
+                : $"<A=0><C={ColorWhite}><S={UnitFontSize}> {unit.PadRight(UnitWidth)}";
             return new Cell { Text = valuePart + unitPart, FontSize = MetricFontSize, Color = valueColor, IsRaw = true };
         }
 
@@ -260,10 +259,10 @@ namespace Uniwill_Control_Utility.Services.Performance
         private static Cell ValueCellShifted(string valueColor, string valueText, string unit)
         {
             int shiftedWidth = ValueWidth - 1;
-            string valuePart = $"<C={valueColor}><S0={MetricFontSize}>{valueText.PadLeft(shiftedWidth)}";
+            string valuePart = $"<C={valueColor}><S={MetricFontSize}>{valueText.PadLeft(shiftedWidth)}";
             string unitPart = string.IsNullOrEmpty(unit)
                 ? new string(' ', UnitWidth)
-                : $"<C={ColorWhite}><S0={UnitFontSize}>{unit.PadRight(UnitWidth)}";
+                : $"<A=0><C={ColorWhite}><S={UnitFontSize}> {unit.PadRight(UnitWidth)}";
             return new Cell { Text = valuePart + unitPart, FontSize = MetricFontSize, Color = valueColor, IsRaw = true };
         }
 
@@ -273,10 +272,10 @@ namespace Uniwill_Control_Utility.Services.Performance
         private static Cell ValueCellNarrow(string valueColor, string valueText, string unit)
         {
             int narrowWidth = ValueWidth - 2;
-            string valuePart = $"<C={valueColor}><S0={MetricFontSize}>{valueText.PadLeft(narrowWidth)}";
+            string valuePart = $"<C={valueColor}><S={MetricFontSize}>{valueText.PadLeft(narrowWidth)}";
             string unitPart = string.IsNullOrEmpty(unit)
                 ? new string(' ', UnitWidth)
-                : $"<C={ColorWhite}><S0={UnitFontSize}>{unit.PadRight(UnitWidth)}";
+                : $"<A=0><C={ColorWhite}><S={UnitFontSize}> {unit.PadRight(UnitWidth)}";
             return new Cell { Text = valuePart + unitPart, FontSize = MetricFontSize, Color = valueColor, IsRaw = true };
         }
 
@@ -286,8 +285,8 @@ namespace Uniwill_Control_Utility.Services.Performance
         /// </summary>
         private static Cell FpsCell(string valueText)
         {
-            string valuePart = $"<C={ColorWhite}><S0={MetricFontSize}>{valueText.PadLeft(ValueWidth + 1)}";
-            string unitPart = $"<C={ColorWhite}><S0={UnitFontSize}>" + "FPS".PadRight(UnitWidth);
+            string valuePart = $"<C={ColorWhite}><S={MetricFontSize}>{valueText.PadLeft(ValueWidth + 1)}";
+            string unitPart = $"<A=0><C={ColorWhite}><S={UnitFontSize}>" + " FPS".PadRight(UnitWidth);
             return new Cell { Text = valuePart + unitPart, FontSize = MetricFontSize, Color = ColorWhite, IsRaw = true };
         }
 
@@ -297,8 +296,8 @@ namespace Uniwill_Control_Utility.Services.Performance
         /// </summary>
         private static Cell FpsCellLarge(string replacementTag)
         {
-            string valuePart = $"<C={ColorWhite}><S0={FpsFontSize}>{replacementTag.PadLeft(ValueWidth + 2)}";
-            string unitPart = $"<C={ColorWhite}><S0={UnitFontSize}>" + "FPS".PadRight(UnitWidth);
+            string valuePart = $"<C={ColorWhite}><S={FpsFontSize}>{replacementTag.PadLeft(ValueWidth + 2)}";
+            string unitPart = $"<A=0><C={ColorWhite}><S={UnitFontSize}>" + " FPS".PadRight(UnitWidth);
             return new Cell { Text = valuePart + unitPart, FontSize = FpsFontSize, Color = ColorWhite, IsRaw = true };
         }
 
@@ -311,7 +310,7 @@ namespace Uniwill_Control_Utility.Services.Performance
             var sb = new StringBuilder();
             string paddedLabel = label.PadRight(LabelWidth);
             sb.Append($"<A0=-5>");
-            sb.Append($"<C={color}><S0={MetricFontSize}>{paddedLabel}");
+            sb.Append($"<C={color}><S={MetricFontSize}>{paddedLabel}");
 
             int labelGap = compactLabel ? 1 : 2;
             sb.Append(new string(' ', labelGap));
@@ -323,7 +322,7 @@ namespace Uniwill_Control_Utility.Services.Performance
                 sb.Append(cells[i].Text);
             }
 
-            sb.Append("<A><S>\n");
+            sb.Append("<A>\n");
             return sb.ToString();
         }
 
