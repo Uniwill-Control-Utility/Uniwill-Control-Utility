@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using Uniwill_Control_Utility.Models;
+using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Services;
 using Uniwill_Control_Utility.Services.Performance;
 
@@ -14,12 +15,23 @@ namespace Uniwill_Control_Utility.Views.Pages
     public partial class OverlaySettingsPage : Page
     {
         private readonly OverlayManagerService _overlay;
+        private readonly HydroUIService? _hydroUi;
+        private readonly FlydigiCoolerHidService? _flydigi;
         private readonly DispatcherTimer _rtssTimer;
         private bool _saveInProgress;
 
-        public OverlaySettingsPage(OverlayManagerService overlay)
+        // References to peripheral checkboxes so they can be shown/hidden reactively.
+        private CheckBox? _hydroUiCheckBox;
+        private CheckBox? _flydigiCheckBox;
+
+        public OverlaySettingsPage(
+            OverlayManagerService overlay,
+            HydroUIService? hydroUi = null,
+            FlydigiCoolerHidService? flydigi = null)
         {
             _overlay = overlay ?? throw new ArgumentNullException(nameof(overlay));
+            _hydroUi = hydroUi;
+            _flydigi = flydigi;
 
             InitializeComponent();
 
@@ -48,8 +60,21 @@ namespace Uniwill_Control_Utility.Views.Pages
             _rtssTimer.Start();
             UpdateRtssStatus();
 
-            Loaded += (_, __) => _rtssTimer.Start();
-            Unloaded += (_, __) => _rtssTimer.Stop();
+            Loaded += (_, __) =>
+            {
+                _rtssTimer.Start();
+                WirePeripheralConnectionEvents();
+
+                // Feature settings may have changed while this page was in the
+                // background (e.g. user toggled Hydro UI or Flydigi in Settings).
+                // Rebuild the metrics list so newly-enabled checkboxes appear.
+                RefreshPeripheralCheckboxes();
+            };
+            Unloaded += (_, __) =>
+            {
+                _rtssTimer.Stop();
+                UnwirePeripheralConnectionEvents();
+            };
         }
 
         private void UpdateRtssStatus()
@@ -291,6 +316,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void BuildMetricsList(OverlayOptions options)
         {
             MetricsCheckPanel.Children.Clear();
+            _hydroUiCheckBox = null;
+            _flydigiCheckBox = null;
 
             AddMetricCheckBox("Current FPS", "ShowFps", options.ShowFps);
             AddMetricCheckBox("1% Low FPS", "ShowFpsOnePercentLow", options.ShowFpsOnePercentLow);
@@ -312,11 +339,25 @@ namespace Uniwill_Control_Utility.Views.Pages
             AddMetricCheckBox("Battery charging status", "ShowBatteryStatus", options.ShowBatteryStatus);
             AddMetricCheckBox("Battery time remaining", "ShowBatteryTime", options.ShowBatteryTime);
             AddMetricCheckBox("Battery power draw", "ShowBatteryPower", options.ShowBatteryPower);
-            AddMetricCheckBox("Hydro UI pump & fan", "ShowHydroUi", options.ShowHydroUi);
-            AddMetricCheckBox("Flydigi cooler RPM", "ShowFlydigi", options.ShowFlydigi);
+
+            // Hydro UI checkbox — hidden if feature disabled in Settings or device not connected.
+            bool hydroUiFeatureEnabled = Settings.Default.EnableHydroUiNavigation;
+            if (hydroUiFeatureEnabled)
+            {
+                _hydroUiCheckBox = AddMetricCheckBox("Hydro UI pump & fan", "ShowHydroUi", options.ShowHydroUi);
+                UpdateHydroUiCheckBoxVisibility();
+            }
+
+            // Flydigi checkbox — hidden if feature disabled in Settings or device not connected.
+            bool flydigiFeatureEnabled = Settings.Default.EnableFlydigi;
+            if (flydigiFeatureEnabled)
+            {
+                _flydigiCheckBox = AddMetricCheckBox("Flydigi cooler RPM", "ShowFlydigi", options.ShowFlydigi);
+                UpdateFlydigiCheckBoxVisibility();
+            }
         }
 
-        private void AddMetricCheckBox(string label, string optionKey, bool isChecked)
+        private CheckBox AddMetricCheckBox(string label, string optionKey, bool isChecked)
         {
             var cb = new CheckBox
             {
@@ -329,6 +370,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             cb.Checked += (_, __) => SaveOptions();
             cb.Unchecked += (_, __) => SaveOptions();
             MetricsCheckPanel.Children.Add(cb);
+            return cb;
         }
 
         private Dictionary<string, bool> ReadTreeToggles()
@@ -344,6 +386,91 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             return result;
+        }
+
+        #endregion
+
+        #region Peripheral Connection Events
+
+        private void WirePeripheralConnectionEvents()
+        {
+            if (_hydroUi is not null)
+                _hydroUi.ConnectionStateChanged += HydroUi_ConnectionStateChanged;
+
+            if (_flydigi is not null)
+                _flydigi.ConnectionStateChanged += Flydigi_ConnectionStateChanged;
+        }
+
+        private void UnwirePeripheralConnectionEvents()
+        {
+            if (_hydroUi is not null)
+                _hydroUi.ConnectionStateChanged -= HydroUi_ConnectionStateChanged;
+
+            if (_flydigi is not null)
+                _flydigi.ConnectionStateChanged -= Flydigi_ConnectionStateChanged;
+        }
+
+        private void HydroUi_ConnectionStateChanged(object? sender, HydroUIService.WatercoolerConnectionState e)
+        {
+            // Dispatcher.Invoke not needed — ConnectionStateChanged fires on the UI thread.
+            UpdateHydroUiCheckBoxVisibility();
+        }
+
+        private void Flydigi_ConnectionStateChanged(object? sender, bool e)
+        {
+            UpdateFlydigiCheckBoxVisibility();
+        }
+
+        private void UpdateHydroUiCheckBoxVisibility()
+        {
+            if (_hydroUiCheckBox is null)
+                return;
+
+            bool connected = _hydroUi?.IsConnected == true;
+            _hydroUiCheckBox.Visibility = connected ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void UpdateFlydigiCheckBoxVisibility()
+        {
+            if (_flydigiCheckBox is null)
+                return;
+
+            bool connected = _flydigi?.IsConnected == true;
+            _flydigiCheckBox.Visibility = connected ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Ensures peripheral checkboxes exist when their feature is enabled in
+        /// Settings, and hides them when the device is disconnected. Called on
+        /// every Loaded so that toggles made in Settings while this page was in
+        /// the background take effect without restarting the app.
+        /// </summary>
+        private void RefreshPeripheralCheckboxes()
+        {
+            OverlayOptions options = _overlay.CurrentOptions;
+
+            // Hydro UI — create checkbox if feature enabled but checkbox missing.
+            if (Settings.Default.EnableHydroUiNavigation && _hydroUiCheckBox is null)
+            {
+                _saveInProgress = true;
+                try { BuildMetricsList(options); }
+                finally { _saveInProgress = false; }
+                return; // BuildMetricsList creates both, no need to check Flydigi separately.
+            }
+
+            // Flydigi — same logic.
+            if (Settings.Default.EnableFlydigi && _flydigiCheckBox is null)
+            {
+                _saveInProgress = true;
+                try { BuildMetricsList(options); }
+                finally { _saveInProgress = false; }
+                return;
+            }
+
+            // Both checkboxes already exist (or both features disabled) — just
+            // update visibility based on connection state.
+            UpdateHydroUiCheckBoxVisibility();
+            UpdateFlydigiCheckBoxVisibility();
         }
 
         #endregion

@@ -247,7 +247,11 @@ namespace Uniwill_Control_Utility
                         services.AddScoped<Views.Pages.Battery>();
                         services.AddScoped<Views.Pages.SettingsPage>();
                         services.AddScoped<ViewModels.SettingsViewModel>();
-                        services.AddScoped<Views.Pages.OverlaySettingsPage>();
+                        services.AddScoped<Views.Pages.OverlaySettingsPage>(provider =>
+                            new Views.Pages.OverlaySettingsPage(
+                                provider.GetRequiredService<OverlayManagerService>(),
+                                provider.GetService<HydroUIService>(),
+                                provider.GetService<FlydigiCoolerHidService>()));
                         services.AddScoped<Views.Pages.AboutPage>();
 
                         // HydroUI service (singleton for auto-connect)
