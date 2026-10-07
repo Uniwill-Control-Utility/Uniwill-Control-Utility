@@ -1582,6 +1582,95 @@ namespace Uniwill_Control_Utility.Services
             return connected;
         }
 
+        /// <summary>
+        /// Attempts to reconnect when the Hydro UI feature is re-enabled in Settings.
+        /// Unlike <see cref="TryAutoConnectAsync"/> this does not require the per-device
+        /// AutoConnect flag — it always tries. Strategy:
+        ///  1. If already connected, return true immediately.
+        ///  2. If a last device address is saved, connect to it.
+        ///  3. If that fails (or no address), scan for LCT devices and connect to the first.
+        ///  4. On success, restore saved pump/fan/RGB settings.
+        /// </summary>
+        public async Task<bool> TryReconnectOnFeatureEnableAsync()
+        {
+            if (IsConnected)
+                return true;
+
+            StatusChanged?.Invoke(this, "Re-enabling Hydro UI — attempting connection...");
+
+            bool connected = false;
+
+            // Phase 1: try the last known device address.
+            if (!string.IsNullOrEmpty(_settings.LastDeviceAddress))
+            {
+                connected = await ConnectAsync(_settings.LastDeviceAddress);
+            }
+
+            // Phase 2: fallback — scan and connect to the first LCT device found.
+            if (!connected)
+            {
+                StatusChanged?.Invoke(this, "Scanning for LCT coolers...");
+                try
+                {
+                    var devices = await DiscoverDevicesAsync(10000);
+                    if (devices.Count > 0)
+                    {
+                        var first = devices[0];
+                        StatusChanged?.Invoke(this, $"Found {first.Name} — connecting...");
+                        connected = await ConnectAsync(first.Address);
+                    }
+                }
+                catch
+                {
+                    // Scan failed — nothing to fallback to.
+                }
+            }
+
+            if (connected)
+            {
+                // Ensure the per-device AutoConnect flag is set so that future
+                // startup reconnects (via TryAutoConnectAsync) also work.
+                _settings.AutoConnect = true;
+                SaveSettings();
+
+                await Task.Delay(500);
+
+                // Restore saved pump/fan/RGB settings.
+                try
+                {
+                    if (!_settings.SmartModeEnabled)
+                    {
+                        var pumpVoltage = _settings.GetPumpVoltage();
+                        if (pumpVoltage != PumpVoltage.Off)
+                            await WritePumpModeAsync(pumpVoltage);
+
+                        var fanSpeed = _settings.GetFanSpeed();
+                        if (fanSpeed != FanSpeed.Off)
+                            await WriteFanModeAsync(fanSpeed);
+                    }
+
+                    var rgbMode = _settings.GetRgbMode();
+                    var rgbColor = _settings.GetRgbColor();
+                    if (_settings.RgbEnabled)
+                        await WriteRgbModeAsync(rgbMode, rgbColor);
+                    else
+                        await WriteRgbModeAsync(RgbState.Off, RgbColor.Red);
+                }
+                catch
+                {
+                    // Non-critical: failed to restore settings after reconnect.
+                }
+
+                StatusChanged?.Invoke(this, "Hydro UI re-enabled — connected successfully");
+            }
+            else
+            {
+                StatusChanged?.Invoke(this, "Hydro UI re-enabled — no cooler found");
+            }
+
+            return connected;
+        }
+
         private async Task<bool> WriteFrameAsync(byte[] frame)
         {
             if (_txCharacteristic == null)

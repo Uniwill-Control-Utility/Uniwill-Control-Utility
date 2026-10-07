@@ -64,7 +64,7 @@ namespace Uniwill_Control_Utility.ViewModels
         /// Call this from SettingsPage when a feature toggle is switched ON so that
         /// internal service state (e.g. keyboard hooks) is re-enabled.
         /// </summary>
-        internal void EnableFeature(OptionalNavigationFeature feature)
+        internal async Task EnableFeatureAsync(OptionalNavigationFeature feature)
         {
             switch (feature)
             {
@@ -78,8 +78,16 @@ namespace Uniwill_Control_Utility.ViewModels
                     }
                     break;
 
-                case OptionalNavigationFeature.Adaptive:
                 case OptionalNavigationFeature.HydroUi:
+                    // Attempt to reconnect the watercooler when the feature is re-enabled.
+                    var hydroUIService = App.GetService<HydroUIService>();
+                    if (hydroUIService != null)
+                    {
+                        _ = hydroUIService.TryReconnectOnFeatureEnableAsync();
+                    }
+                    break;
+
+                case OptionalNavigationFeature.Adaptive:
                 case OptionalNavigationFeature.LightBar:
                 case OptionalNavigationFeature.Auto:
                     // No re-enable action needed — these features don't hold

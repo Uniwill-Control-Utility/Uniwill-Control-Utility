@@ -583,8 +583,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             if (isVisible)
             {
-                // Restore service-level state (e.g. reinstall keyboard hooks).
-                _mainWindowViewModel.EnableFeature(feature);
+                // Restore service-level state (e.g. reinstall keyboard hooks,
+                // reconnect Hydro UI watercooler). Fire-and-forget to avoid
+                // blocking the Settings UI while BLE connects.
+                _ = _mainWindowViewModel.EnableFeatureAsync(feature);
             }
             else
             {
