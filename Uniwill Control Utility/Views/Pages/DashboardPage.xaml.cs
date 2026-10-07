@@ -284,13 +284,22 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void OnDeviceMetricsUpdated(object? sender, DeviceMetricsSnapshot snapshot)
         {
-            // Only update Hydro UI metrics if the feature toggle is enabled.
-            if (Settings.Default.EnableHydroUiNavigation)
-                _hydroUi.UpdateMetrics(snapshot);
+            // Gate Hydro UI by hardware support and feature toggle.
+            // If either condition changes (e.g. user disables the feature in
+            // Settings while the Dashboard is open), collapse the card immediately.
+            bool hydroEnabled = WaterCoolerHardwareDetector.IsSupportedHardware()
+                && Settings.Default.EnableHydroUiNavigation;
 
-            // Only update Flydigi metrics if the feature toggle is enabled.
+            if (hydroEnabled)
+                _hydroUi.UpdateMetrics(snapshot);
+            else if (_hydroUi.Visibility == Visibility.Visible)
+                _hydroUi.Visibility = Visibility.Collapsed;
+
+            // Gate Flydigi by feature toggle — collapse if disabled at runtime.
             if (Settings.Default.EnableFlydigi)
                 _flydigi.UpdateMetrics(snapshot);
+            else if (_flydigi.Visibility == Visibility.Visible)
+                _flydigi.Visibility = Visibility.Collapsed;
 
             // Adjust layout based on which cards are visible.
             bool hydroVisible = _hydroUi.Visibility == Visibility.Visible;

@@ -173,7 +173,8 @@ namespace Uniwill_Control_Utility.ViewModels
                             PumpVoltage.V11 => 11,
                             _ => 0
                         };
-                        hydroFanSpeed = (int)_hydroUIService.SmartModeCurrentFan;
+                        var smartFan = _hydroUIService.SmartModeCurrentFan;
+                        hydroFanSpeed = smartFan == Models.FanSpeed.Off ? 0 : (int)smartFan;
                     }
                     else
                     {
@@ -185,7 +186,8 @@ namespace Uniwill_Control_Utility.ViewModels
                             PumpVoltage.V11 => 11,
                             _ => 0
                         };
-                        hydroFanSpeed = (int)wcSettings.GetFanSpeed();
+                        var fanSpeed = wcSettings.GetFanSpeed();
+                        hydroFanSpeed = fanSpeed == Models.FanSpeed.Off ? 0 : (int)fanSpeed;
                     }
                 }
                 catch { /* non-critical */ }
