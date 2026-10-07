@@ -95,6 +95,9 @@ namespace Uniwill_Control_Utility.Services.Performance
                     long* dwBusy = (long*)((byte*)basePtr + 32); // offset of dwBusy
                     *dwBusy = 0;
                 }
+
+                // Flush so RTSS sees the new frame immediately.
+                FlushViewOfFile((IntPtr)basePtr, IntPtr.Zero);
             }
 
             try { Log.Information("[RTSS] Update: wrote slot {Slot}, text {TextLength} chars", slot, osdText.Length); } catch { }
@@ -158,6 +161,9 @@ namespace Uniwill_Control_Utility.Services.Performance
                     long* dwBusy = (long*)((byte*)basePtr + 32);
                     *dwBusy = 0;
                 }
+
+                // Flush so RTSS sees the zeroed slot immediately.
+                FlushViewOfFile((IntPtr)basePtr, IntPtr.Zero);
             }
 
             _claimedSlot = -1;
@@ -338,6 +344,10 @@ namespace Uniwill_Control_Utility.Services.Performance
 
         [LibraryImport("kernel32.dll")]
         private static partial int UnmapViewOfFile(IntPtr lpBaseAddress);
+
+        [LibraryImport("kernel32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static partial bool FlushViewOfFile(IntPtr lpBaseAddress, IntPtr dwNumberOfBytesToFlush);
 
         [LibraryImport("kernel32.dll")]
         private static partial int CloseHandle(IntPtr hObject);

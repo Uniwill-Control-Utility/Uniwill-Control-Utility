@@ -168,7 +168,15 @@ namespace Uniwill_Control_Utility.Services.Performance
                     case Models.PumpVoltage.V11:
                         pumpValue = "11"; pumpUnit = "V"; break;
                     default:
-                        cells.Add(ValueCell("00FF00", "Off", ""));
+                        {
+                            string offValue = "Off".PadLeft(ValueWidth);
+                            string offUnit = new string(' ', UnitWidth);
+                            cells.Add(new Cell
+                            {
+                                Text = $"<C=00FF00><S={MetricFontSize}>{offValue}<A=0><C={ColorWhite}><S={UnitFontSize}> {offUnit}",
+                                FontSize = MetricFontSize, Color = "00FF00", IsRaw = true
+                            });
+                        }
                         pumpValue = null; pumpUnit = null; break;
                 }
 
