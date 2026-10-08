@@ -75,8 +75,7 @@ PRs with additional (well-structured and tested) features are welcome.
 
 We do not mind features/code created with the assistance of AI, as long as it's thoroughly tested by the owner of said code and as long as the code is not of bad quality (aka "AI slop").
 
-## Missing features 
- - MUX switching
+## Missing features
  - Power Preset button interception
 
  These are the features I was unable to implement due to various blockers.
@@ -329,5 +328,6 @@ UCU builds on the work of many open-source projects and reverse-engineering effo
 - [tuxedo-drivers (GitLab)](https://gitlab.com/tuxedocomputers/development/packages/tuxedo-drivers) by TUXEDO Computers — Authoritative reference for the ITE 8291 per-key RGB protocol. The Linux kernel driver (`src/ite_8291/ite_8291.c`) provided the exact byte layouts for UserMode entry, row announcement, and the 65-byte BGR-planar output report format. Also provided the EC register definitions (`src/uniwill_interfaces.h`) for NVIDIA GPU power control on Schenker/XMG laptops (cTGP/TPP/DB offset registers and the `0x0743` enable register).
 
 - **MechControl** (decompiled, closed-source) — Original by Okashira (Discord: defty1234), fork by [Heavyfail (GitHub)](https://github.com/Heavyfail). Schenker/Mechrevo utility. Source for the global keyboard effects protocol (zone-based 9-byte HID feature reports), MiniLED Local Dimming control (WMI `AcpiTest_MULong` / `GetSetULong` invocation pattern), and UWACPIDriver.sys IOCTL codes (0x9C40A488/0x9C40A48C) for direct EC access.
-- **XMG Control Center / GCUService.exe** (closed-source) — Official Schenker/XMG utility. Studied for HID device communication patterns, handle acquisition, and GPU power control EC register sequences (via `GPUInfoDLL.dll` and `ACPIDriverDll.dll` binary analysis).
+- **XMG Control Center / GCUService.exe** (closed-source) — Official Schenker/XMG utility. Studied for HID device communication patterns, handle acquisition, GPU power control EC register sequences (via `GPUInfoDLL.dll` and `ACPIDriverDll.dll` binary analysis), and NVRAM GUID/variable names for GPU mode persistence.
+- **[OpenRevo (GitHub)](https://github.com/faintonce/open-revo)** by faintonce — Mechrevo control center (Rust/Tauri). Used for runtime NVRAM probing to determine the correct offset (98) within `OemMagicVariable` for BIOS-visible GPU MUX mode switching. Without this, UCU's NVRAM writes would not have been recognized by the BIOS.
 
