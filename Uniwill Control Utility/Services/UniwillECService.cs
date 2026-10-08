@@ -93,6 +93,20 @@ namespace Uniwill_Control_Utility.Services
         public const byte CTGP_DB_ENABLE_DB = 0x02;
         public const byte CTGP_DB_ENABLE_CTGP = 0x04;
 
+        // --- GPU MUX / Direct Connect (from XMG CC GCUService.exe decompilation) ---
+        public const ushort REG_GPU_STATUS = 0x072A;     // MUX mode control: 0=Hybrid, 1=dGPU-only, 2=iGPU-only
+        public const ushort REG_MODULE_ID_GPU = 0x07D2;  // GPU module ID (read-only, 0x1B for RTX 5090)
+        public const ushort REG_MUX_STATE_LO = 0x0402;   // MUX hardware state low byte (read-only)
+        public const ushort REG_MUX_STATE_HI = 0x0403;   // MUX hardware state high byte (read-only)
+        public const ushort REG_DISPLAY_VARIANT_LO = 0x0408; // Display variant low byte (read-only)
+        public const ushort REG_DISPLAY_VARIANT_HI = 0x0409; // Display variant high byte (read-only)
+
+        // MUX mode values (Define.DGgpuDirectConnectionMode from GCUService.exe)
+        // On AMD platforms: 0=Hybrid, 1=dGPU-only, 2=iGPU-only
+        public const byte MUX_MODE_HYBRID = 0x00;       // MS Hybrid (MUX open, both GPUs active)
+        public const byte MUX_MODE_DGPU_ONLY = 0x01;    // dGPU only (MUX closed, discrete GPU)
+        public const byte MUX_MODE_IGPU_ONLY = 0x02;    // iGPU only (MUX open, integrated GPU)
+
         // --- PWM readback ---
         public const ushort REG_PWM_1 = 0x075B;
         public const ushort REG_PWM_2 = 0x075C;
@@ -675,6 +689,102 @@ namespace Uniwill_Control_Utility.Services
         public void SetTccOffset(int value)
         {
             WriteECRegister(REG_TCC_OFFSET, (byte)Math.Clamp(value, 0, 255));
+        }
+
+        #endregion
+
+        #region GPU MUX / Direct Connect
+
+        /// <summary>
+        /// GPU MUX mode. On AMD platforms: 0=Hybrid, 1=dGPU-only, 2=iGPU-only.
+        /// (From Define.DGgpuDirectConnectionMode in GCUService.exe)
+        /// </summary>
+        public enum GpuMuxMode
+        {
+            Hybrid = 0x00,      // MS Hybrid (MUX open, both GPUs active)
+            DgpuOnly = 0x01,   // dGPU only (MUX closed, discrete GPU)
+            IgpuOnly = 0x02,   // iGPU only (MUX open, integrated GPU)
+        }
+
+        /// <summary>
+        /// Reads the current GPU MUX mode from the EC.
+        /// </summary>
+        public GpuMuxMode GetCurrentGpuMuxMode()
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                byte status = ReadECInternal(REG_GPU_STATUS);
+                return (GpuMuxMode)status;
+            }
+        }
+
+        /// <summary>
+        /// Sets the GPU MUX mode on the EC.
+        /// WARNING: This write persists in EC but the physical MUX switch
+        /// only takes effect after a system restart (BIOS configures hardware during POST).
+        /// 
+        /// To apply the change fully:
+        /// 1. Call SetGpuMuxMode() to write the EC register
+        /// 2. Optionally perform GPU hotswap (Enable-PnpDevice/Disable-PnpDevice) for runtime effect
+        /// 3. Restart the system for the physical MUX to switch
+        /// </summary>
+        /// <param name="mode">Target MUX mode</param>
+        public void SetGpuMuxMode(GpuMuxMode mode)
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                byte current = ReadECInternal(REG_GPU_STATUS);
+                DebugLog($"SetGpuMuxMode: current=0x{current:X2} ({(GpuMuxMode)current}), target=0x{(byte)mode:X2} ({mode})");
+
+                if (current == (byte)mode)
+                {
+                    DebugLog("SetGpuMuxMode: already at target mode, skipping write");
+                    return;
+                }
+
+                WriteECInternal(REG_GPU_STATUS, (byte)mode);
+                Thread.Sleep(EcDelayMs);
+
+                // Verify write
+                byte verify = ReadECInternal(REG_GPU_STATUS);
+                DebugLog($"SetGpuMuxMode: wrote 0x{(byte)mode:X2}, verified 0x{verify:X2}");
+
+                if (verify != (byte)mode)
+                {
+                    DebugLog($"[WARN] SetGpuMuxMode: write verification failed. Expected 0x{(byte)mode:X2}, got 0x{verify:X2}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Reads the GPU module ID from the EC (read-only hardware identifier).
+        /// Returns 0x1B (27) for RTX 5090 Laptop GPU on NB02 platform.
+        /// </summary>
+        public byte GetGpuModuleId()
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                return ReadECInternal(REG_MODULE_ID_GPU);
+            }
+        }
+
+        /// <summary>
+        /// Reads the MUX hardware state from the EC (read-only, reflects physical MUX position).
+        /// Returns a 16-bit value where byte1 is at 0x0402 and byte2 is at 0x0403.
+        /// Typically 0x1900 on NB02 platform regardless of MUX mode.
+        /// </summary>
+        public ushort GetMuxHardwareState()
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                byte lo = ReadECInternal(REG_MUX_STATE_LO);
+                byte hi = ReadECInternal(REG_MUX_STATE_HI);
+                return (ushort)((hi << 8) | lo);
+            }
         }
 
         #endregion
