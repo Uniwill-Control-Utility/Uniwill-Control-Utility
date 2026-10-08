@@ -1,7 +1,23 @@
-<Page x:Class="Uniwill_Control_Utility.Views.Pages.Display" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml" mc:Ignorable="d" d:DesignHeight="650" d:DesignWidth="900" Title="Display" Loaded="Page_Loaded" Unloaded="Page_Unloaded" SnapsToDevicePixels="True" UseLayoutRounding="True" ScrollViewer.CanContentScroll="False">
+<Page x:Class="Uniwill_Control_Utility.Views.Pages.Display"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      mc:Ignorable="d"
+      d:DesignHeight="650" d:DesignWidth="900"
+      Title="Display"
+      Loaded="Page_Loaded"
+      Unloaded="Page_Unloaded"
+      SnapsToDevicePixels="True"
+      UseLayoutRounding="True"
+      ScrollViewer.CanContentScroll="False">
+
     <Page.Resources>
         <!-- Inactive GPU mode card button -->
-        <Style x:Key="GpuModeButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource DefaultButtonStyle}">
+        <Style x:Key="GpuModeButtonStyle"
+		       TargetType="{x:Type Button}"
+		       BasedOn="{StaticResource DefaultButtonStyle}">
             <Setter Property="Height" Value="200"/>
             <Setter Property="Margin" Value="4"/>
             <Setter Property="Padding" Value="12,8"/>
@@ -9,8 +25,10 @@
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
+
         <!-- Active (selected) GPU mode card button with hover/press states -->
-        <Style x:Key="GpuModeButtonActiveStyle" TargetType="{x:Type Button}">
+        <Style x:Key="GpuModeButtonActiveStyle"
+		       TargetType="{x:Type Button}">
             <Setter Property="Height" Value="200"/>
             <Setter Property="Margin" Value="4"/>
             <Setter Property="Padding" Value="12,8"/>
@@ -29,27 +47,42 @@
                                     <VisualState x:Name="Normal"/>
                                     <VisualState x:Name="MouseOver">
                                         <Storyboard>
-                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="BackgroundBorder" Storyboard.TargetProperty="Background">
-                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{DynamicResource AccentFillColorSecondaryBrush}"/>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="BackgroundBorder"
+											                               Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0"
+												                        Value="{DynamicResource AccentFillColorSecondaryBrush}"/>
                                             </ObjectAnimationUsingKeyFrames>
                                         </Storyboard>
                                     </VisualState>
                                     <VisualState x:Name="Pressed">
                                         <Storyboard>
-                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="BackgroundBorder" Storyboard.TargetProperty="Background">
-                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{DynamicResource AccentFillColorTertiaryBrush}"/>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="BackgroundBorder"
+											                               Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0"
+												                        Value="{DynamicResource AccentFillColorTertiaryBrush}"/>
                                             </ObjectAnimationUsingKeyFrames>
                                         </Storyboard>
                                     </VisualState>
                                     <VisualState x:Name="Disabled">
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Opacity" To="0.5" Duration="0"/>
+                                            <DoubleAnimation Storyboard.TargetName="ContentPresenter"
+											                 Storyboard.TargetProperty="Opacity"
+											                 To="0.5" Duration="0"/>
                                         </Storyboard>
                                     </VisualState>
                                 </VisualStateGroup>
                             </VisualStateManager.VisualStateGroups>
-                            <Border x:Name="BackgroundBorder" Background="{TemplateBinding Background}" CornerRadius="4">
-                                <ContentPresenter x:Name="ContentPresenter" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" ContentStringFormat="{TemplateBinding ContentStringFormat}" RecognizesAccessKey="True" TextElement.Foreground="{TemplateBinding Foreground}"/>
+                            <Border x:Name="BackgroundBorder"
+							        Background="{TemplateBinding Background}"
+							        CornerRadius="4">
+                                <ContentPresenter x:Name="ContentPresenter"
+								                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+								                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+								                  Content="{TemplateBinding Content}"
+								                  ContentTemplate="{TemplateBinding ContentTemplate}"
+								                  ContentStringFormat="{TemplateBinding ContentStringFormat}"
+								                  RecognizesAccessKey="True"
+								                  TextElement.Foreground="{TemplateBinding Foreground}"/>
                             </Border>
                         </Grid>
                     </ControlTemplate>
@@ -57,30 +90,49 @@
             </Setter>
         </Style>
     </Page.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
+
         <!-- Row 0: Scrollable content -->
-        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="False" PanningMode="VerticalOnly" IsDeferredScrollingEnabled="False">
+        <ScrollViewer Grid.Row="0"
+		              VerticalScrollBarVisibility="Auto"
+		              HorizontalScrollBarVisibility="Disabled"
+		              CanContentScroll="False"
+		              PanningMode="VerticalOnly"
+		              IsDeferredScrollingEnabled="False">
             <ScrollViewer.Style>
                 <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource {x:Type ScrollViewer}}">
                     <Setter Property="Padding" Value="0"/>
                 </Style>
             </ScrollViewer.Style>
+
             <Grid MaxWidth="1080" HorizontalAlignment="Stretch">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
+
                 <!-- Page title block -->
                 <StackPanel Orientation="Vertical" Grid.Row="0" Margin="0,16,0,0">
-                    <TextBlock FontSize="26" FontWeight="Medium" Margin="12,0,16,0" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Text="Display"/>
-                    <TextBlock Margin="12,8,16,12" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="Manage GPU MUX switching and display mode." TextWrapping="Wrap"/>
+                    <TextBlock FontSize="26"
+					           FontWeight="Medium"
+					           Margin="12,0,16,0"
+					           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+					           Text="Display"/>
+                    <TextBlock Margin="12,8,16,12"
+					           FontSize="12"
+					           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+					           Text="Manage GPU modes and other display-related features."
+					           TextWrapping="Wrap"/>
                 </StackPanel>
+
                 <!-- Content cards -->
                 <StackPanel Grid.Row="1" Margin="12,16,16,18">
+
                     <!-- Unavailable state -->
                     <ui:CardControl x:Name="DisplayUnavailable" Visibility="Collapsed" Margin="0,0,0,8">
                         <ui:CardControl.Icon>
@@ -89,167 +141,343 @@
                         <ui:CardControl.Header>
                             <StackPanel>
                                 <ui:TextBlock FontTypography="Body" Text="Display control unavailable"/>
-                                <ui:TextBlock Margin="0,2,0,0" FontTypography="Caption" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="GPU MUX control is not available on this device"/>
+                                <ui:TextBlock Margin="0,2,0,0"
+								              FontTypography="Caption"
+								              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+								              Text="GPU MUX control is not available on this device"/>
                             </StackPanel>
                         </ui:CardControl.Header>
                     </ui:CardControl>
+
                     <!-- Available content -->
                     <StackPanel x:Name="DisplayAvailable">
-                        <!-- GPU Mode Selector Card -->
-                        <ui:Card Margin="0,0,0,8" Padding="8" SnapsToDevicePixels="True">
-                            <Grid>
+
+                        <!-- GPU Display Mode — header + buttons in one Card -->
+                        <ui:Card Margin="0,0,0,8"
+						         Padding="0"
+						         SnapsToDevicePixels="True">
+                            <StackPanel>
+                                <!-- Header row: icon, title, caption -->
+                                <Grid Margin="24,16,16,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ui:FontIcon Grid.Column="0"
+									             FontFamily="Segoe Fluent Icons"
+									             Glyph="&#xF211;"
+									             FontSize="20"
+									             Margin="-6,0,18,0"
+									             VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1">
+                                        <ui:TextBlock FontTypography="Body" Text="GPU Display Mode"/>
+                                        <ui:TextBlock Margin="0,2,0,0"
+										              FontTypography="Caption"
+										              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+										              Text="Select how the display connects to the GPU"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Divider -->
+                                <Border Height="1" Margin="0,12,0,0" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                                <!-- GPU Mode Selector -->
+                                    <Grid >
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
+
                                 <!-- iGPU Only -->
-                                <Button Grid.Column="0" x:Name="btnIgpuOnly" Style="{StaticResource GpuModeButtonStyle}" Click="btnGpuMode_Click" Tag="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
+                                <Button Grid.Column="0"
+								        x:Name="btnIgpuOnly"
+								        Style="{StaticResource GpuModeButtonStyle}"
+								        Click="btnGpuMode_Click"
+								        Tag="2"
+								        HorizontalContentAlignment="Stretch"
+								        VerticalContentAlignment="Stretch"
+								        Padding="0"
+                                        Margin="8,12">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="*"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
+
                                         <!-- TOP SECTION: Graphic Vector -->
-                                        <Viewbox Grid.Row="0" Width="240" Height="120" Stretch="Uniform" Margin="0,10,0,10">
+                                        <Viewbox Grid.Row="0" Width="240" Height="140" Stretch="Uniform" Margin="0,0,0,10">
                                             <Canvas Width="200" Height="115">
                                                 <!-- TOP: Laptop Display -->
-                                                <Border Canvas.Left="70" Canvas.Top="15" Width="60" Height="38" CornerRadius="4" BorderThickness="2" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                                                <Border Canvas.Left="63" Canvas.Top="54" Width="74" Height="5" CornerRadius="0,0,2,2" BorderThickness="2" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                                <Border Canvas.Left="70" Canvas.Top="15" Width="60" Height="38" CornerRadius="4"
+												        BorderThickness="2" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                                <Border Canvas.Left="63" Canvas.Top="54" Width="74" Height="5" CornerRadius="0,0,2,2"
+												        BorderThickness="2" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+
                                                 <!-- BOTTOM ROW: iGPU Component (Active) -->
-                                                <Border Canvas.Left="25" Canvas.Top="85" Width="40" Height="24" CornerRadius="3" BorderThickness="1.5" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
-                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5" FontWeight="SemiBold" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="iGPU"/>
+                                                <Border Canvas.Left="25" Canvas.Top="85" Width="40" Height="24" CornerRadius="3"
+												        BorderThickness="1.5" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5" FontWeight="SemiBold"
+													           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="iGPU"/>
                                                 </Border>
+
                                                 <!-- BOTTOM ROW: MUX Switch Component (Active) -->
-                                                <Border Canvas.Left="80" Canvas.Top="85" Width="40" Height="24" CornerRadius="3" BorderThickness="1.5" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
-                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5" FontWeight="Bold" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="MUX"/>
+                                                <Border Canvas.Left="80" Canvas.Top="85" Width="40" Height="24" CornerRadius="3"
+												        BorderThickness="1.5" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5" FontWeight="Bold"
+													           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="MUX"/>
                                                 </Border>
+
                                                 <!-- BOTTOM ROW: dGPU Component (Inactive / Dimmed) -->
-                                                <Border Canvas.Left="135" Canvas.Top="85" Width="40" Height="24" CornerRadius="3" Opacity="0.3" BorderThickness="1.5" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
-                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="dGPU"/>
+                                                <Border Canvas.Left="135" Canvas.Top="85" Width="40" Height="24" CornerRadius="3" Opacity="0.3"
+												        BorderThickness="1.5" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5"
+													           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="dGPU"/>
                                                 </Border>
+
                                                 <!-- PATHWAYS: Straight Horizontal Arrow (iGPU -> MUX) -->
-                                                <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 65,97 L 75,97"/>
+                                                <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+												      Data="M 65,97 L 75,97"/>
                                                 <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Data="M 80,97 L 75,94 L 75,100 Z"/>
+
                                                 <!-- PATHWAYS: Output Arrow (MUX -> Laptop Base) -->
-                                                <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 100,85 L 100,64"/>
+                                                <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+												      Data="M 100,85 L 100,64"/>
                                                 <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Data="M 100,60 L 96,66 L 104,66 Z"/>
                                             </Canvas>
                                         </Viewbox>
+
                                         <!-- BOTTOM SECTION: Full Span Background Text Area -->
-                                        <Border x:Name="borderIgpuLabel" Grid.Row="1" Background="{DynamicResource SmokeFillColorDefaultBrush}" Padding="0,10,0,10" BorderThickness="0,1,0,0" Opacity="0.85">
-                                            <TextBlock FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="iGPU Only"/>
+                                        <Border x:Name="borderIgpuLabel"
+										        Grid.Row="1"
+										        Background="{DynamicResource SmokeFillColorDefaultBrush}"
+										        Padding="0,10,0,10"
+										        BorderThickness="0,1,0,0"
+										        Opacity="0.85">
+                                            <TextBlock FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+											           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+											           Text="iGPU Only"/>
                                         </Border>
                                     </Grid>
                                 </Button>
+
                                 <!-- Hybrid -->
-                                <Button Grid.Column="1" x:Name="btnHybrid" Style="{StaticResource GpuModeButtonStyle}" Click="btnGpuMode_Click" Tag="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
+                                <Button Grid.Column="1"
+								        x:Name="btnHybrid"
+								        Style="{StaticResource GpuModeButtonStyle}"
+								        Click="btnGpuMode_Click"
+								        Tag="0"
+								        HorizontalContentAlignment="Stretch"
+								        VerticalContentAlignment="Stretch"
+								        Padding="0"
+                                        Margin="0,12,8,12">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="*"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
+
                                         <!-- TOP SECTION: Graphic Vector -->
-                                        <Viewbox Grid.Row="0" Width="240" Height="120" Stretch="Uniform" Margin="0,10,0,10">
+                                        <Viewbox Grid.Row="0" Width="240" Height="140" Stretch="Uniform" Margin="0,0,0,10">
                                             <Canvas Width="200" Height="115">
                                                 <!-- TOP: Laptop Display -->
-                                                <Border Canvas.Left="70" Canvas.Top="15" Width="60" Height="38" CornerRadius="4" BorderThickness="2" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                                                <Border Canvas.Left="63" Canvas.Top="54" Width="74" Height="5" CornerRadius="0,0,2,2" BorderThickness="2" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                                <Border Canvas.Left="70" Canvas.Top="15" Width="60" Height="38" CornerRadius="4"
+												        BorderThickness="2" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                                <Border Canvas.Left="63" Canvas.Top="54" Width="74" Height="5" CornerRadius="0,0,2,2"
+												        BorderThickness="2" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+
                                                 <!-- BOTTOM ROW: iGPU Component (Active) -->
-                                                <Border Canvas.Left="25" Canvas.Top="85" Width="40" Height="24" CornerRadius="3" BorderThickness="1.5" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
-                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5" FontWeight="SemiBold" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="iGPU"/>
+                                                <Border Canvas.Left="25" Canvas.Top="85" Width="40" Height="24" CornerRadius="3"
+												        BorderThickness="1.5" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5" FontWeight="SemiBold"
+													           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="iGPU"/>
                                                 </Border>
+
                                                 <!-- BOTTOM ROW: MUX Switch Component (Active) -->
-                                                <Border Canvas.Left="80" Canvas.Top="85" Width="40" Height="24" CornerRadius="3" BorderThickness="1.5" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
-                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5" FontWeight="Bold" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="MUX"/>
+                                                <Border Canvas.Left="80" Canvas.Top="85" Width="40" Height="24" CornerRadius="3"
+												        BorderThickness="1.5" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5" FontWeight="Bold"
+													           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="MUX"/>
                                                 </Border>
+
                                                 <!-- BOTTOM ROW: dGPU Component (Active) -->
-                                                <Border Canvas.Left="135" Canvas.Top="85" Width="40" Height="24" CornerRadius="3" BorderThickness="1.5" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
-                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5" FontWeight="SemiBold" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="dGPU"/>
+                                                <Border Canvas.Left="135" Canvas.Top="85" Width="40" Height="24" CornerRadius="3"
+												        BorderThickness="1.5" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5" FontWeight="SemiBold"
+													           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="dGPU"/>
                                                 </Border>
+
                                                 <!-- PATHWAYS: Straight Horizontal Arrow (iGPU -> MUX) -->
-                                                <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 65,97 L 75,97"/>
+                                                <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+												      Data="M 65,97 L 75,97"/>
                                                 <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Data="M 80,97 L 75,94 L 75,100 Z"/>
+
                                                 <!-- PATHWAYS: Straight Horizontal Arrow (dGPU -> MUX) -->
-                                                <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 135,97 L 125,97"/>
+                                                <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+												      Data="M 135,97 L 125,97"/>
                                                 <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Data="M 120,97 L 125,94 L 125,100 Z"/>
+
                                                 <!-- PATHWAYS: Output Arrow (MUX -> Laptop Base) -->
-                                                <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 100,85 L 100,64"/>
+                                                <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+												      Data="M 100,85 L 100,64"/>
                                                 <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Data="M 100,60 L 96,66 L 104,66 Z"/>
                                             </Canvas>
                                         </Viewbox>
+
                                         <!-- BOTTOM SECTION: Full Span Background Text Area -->
-                                        <Border x:Name="borderHybridLabel" Grid.Row="1" Background="{DynamicResource SmokeFillColorDefaultBrush}" Padding="0,10,0,10" BorderThickness="0,1,0,0" Opacity="0.85">
-                                            <TextBlock FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="Hybrid"/>
+                                        <Border x:Name="borderHybridLabel"
+										        Grid.Row="1"
+										        Background="{DynamicResource SmokeFillColorDefaultBrush}"
+										        Padding="0,10,0,10"
+										        BorderThickness="0,1,0,0"
+										        Opacity="0.85">
+                                            <TextBlock FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+											           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+											           Text="Hybrid (NVIDIA Optimus)"/>
                                         </Border>
                                     </Grid>
                                 </Button>
+
+
                                 <!-- dGPU Only -->
-                                <Button Grid.Column="2" x:Name="btnDgpuOnly" Style="{StaticResource GpuModeButtonStyle}" Click="btnGpuMode_Click" Tag="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
+                                <Button Grid.Column="2"
+								        x:Name="btnDgpuOnly"
+								        Style="{StaticResource GpuModeButtonStyle}"
+								        Click="btnGpuMode_Click"
+								        Tag="1"
+								        HorizontalContentAlignment="Stretch"
+								        VerticalContentAlignment="Stretch"
+								        Padding="0"
+                                        Margin="0,12,8,12">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="*"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
+
                                         <!-- TOP SECTION: Graphic Vector -->
-                                        <Viewbox Grid.Row="0" Width="240" Height="120" Stretch="Uniform" Margin="0,10,0,10">
+                                        <Viewbox Grid.Row="0" Width="240" Height="140" Stretch="Uniform" Margin="0,0,0,10">
                                             <Canvas Width="200" Height="115">
                                                 <!-- TOP: Laptop Display -->
-                                                <Border Canvas.Left="70" Canvas.Top="15" Width="60" Height="38" CornerRadius="4" BorderThickness="2" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                                                <Border Canvas.Left="63" Canvas.Top="54" Width="74" Height="5" CornerRadius="0,0,2,2" BorderThickness="2" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                                <Border Canvas.Left="70" Canvas.Top="15" Width="60" Height="38" CornerRadius="4"
+												        BorderThickness="2" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                                <Border Canvas.Left="63" Canvas.Top="54" Width="74" Height="5" CornerRadius="0,0,2,2"
+												        BorderThickness="2" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+
                                                 <!-- BOTTOM ROW: iGPU Component (Inactive / Dimmed) -->
-                                                <Border Canvas.Left="25" Canvas.Top="85" Width="40" Height="24" CornerRadius="3" Opacity="0.3" BorderThickness="1.5" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
-                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="iGPU"/>
+                                                <Border Canvas.Left="25" Canvas.Top="85" Width="40" Height="24" CornerRadius="3" Opacity="0.3"
+												        BorderThickness="1.5" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5"
+													           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="iGPU"/>
                                                 </Border>
+
                                                 <!-- BOTTOM ROW: MUX Switch Component (Active) -->
-                                                <Border Canvas.Left="80" Canvas.Top="85" Width="40" Height="24" CornerRadius="3" BorderThickness="1.5" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
-                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5" FontWeight="Bold" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="MUX"/>
+                                                <Border Canvas.Left="80" Canvas.Top="85" Width="40" Height="24" CornerRadius="3"
+												        BorderThickness="1.5" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5" FontWeight="Bold"
+													           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="MUX"/>
                                                 </Border>
+
                                                 <!-- BOTTOM ROW: dGPU Component (Active) -->
-                                                <Border Canvas.Left="135" Canvas.Top="85" Width="40" Height="24" CornerRadius="3" BorderThickness="2" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
-                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5" FontWeight="Bold" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="dGPU"/>
+                                                <Border Canvas.Left="135" Canvas.Top="85" Width="40" Height="24" CornerRadius="3"
+												        BorderThickness="2" BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}">
+                                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9.5" FontWeight="Bold"
+													           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="dGPU"/>
                                                 </Border>
+
                                                 <!-- PATHWAYS: Straight Horizontal Arrow (dGPU -> MUX) -->
-                                                <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 135,97 L 125,97"/>
+                                                <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+												      Data="M 135,97 L 125,97"/>
                                                 <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Data="M 120,97 L 125,94 L 125,100 Z"/>
+
                                                 <!-- PATHWAYS: Output Arrow (MUX -> Laptop Base) -->
-                                                <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 100,85 L 100,64"/>
+                                                <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+												      Data="M 100,85 L 100,64"/>
                                                 <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Data="M 100,60 L 96,66 L 104,66 Z"/>
                                             </Canvas>
                                         </Viewbox>
+
                                         <!-- BOTTOM SECTION: Full Span Background Text Area -->
-                                        <Border x:Name="borderDgpuLabel" Grid.Row="1" Background="{DynamicResource SmokeFillColorDefaultBrush}" Padding="0,10,0,10" BorderThickness="0,1,0,0" Opacity="0.85">
-                                            <TextBlock FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Text="dGPU Only"/>
+                                        <Border x:Name="borderDgpuLabel"
+										        Grid.Row="1"
+										        Background="{DynamicResource SmokeFillColorDefaultBrush}"
+										        Padding="0,10,0,10"
+										        BorderThickness="0,1,0,0"
+										        Opacity="0.85">
+                                            <TextBlock FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+											           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+											           Text="dGPU Only"/>
                                         </Border>
                                     </Grid>
                                 </Button>
-                            </Grid>
+
+
+                                    </Grid>
+                            </StackPanel>
                         </ui:Card>
+
                         <!-- Reboot warning -->
-                        <ui:CardControl Margin="0,0,0,8" Visibility="Collapsed" x:Name="cardRebootWarning" Background="{DynamicResource SystemFillColorCautionBackgroundBrush}">
+                        <ui:CardControl Margin="0,0,0,8"
+						                Visibility="Collapsed"
+						                x:Name="cardRebootWarning"
+						                Background="{DynamicResource SystemFillColorCautionBackgroundBrush}">
                             <ui:CardControl.Icon>
                                 <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BA;" FontSize="20" Margin="4,0,6,0"/>
                             </ui:CardControl.Icon>
                             <ui:CardControl.Header>
                                 <StackPanel>
                                     <ui:TextBlock FontTypography="Body" Text="Reboot required"/>
-                                    <ui:TextBlock Margin="0,2,0,0" FontTypography="Caption" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="The MUX switch change will take effect after a system restart"/>
+                                    <ui:TextBlock Margin="0,2,0,0"
+									              FontTypography="Caption"
+									              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+									              Text="The MUX switch change will take effect after a system restart"/>
                                 </StackPanel>
                             </ui:CardControl.Header>
-                            <ui:Button x:Name="btnRestartNow" Content="Restart now" Appearance="Caution" Click="btnRestartNow_Click"/>
+                            <ui:Button x:Name="btnRestartNow"
+							           Content="Restart now"
+							           Appearance="Caution"
+							           Click="btnRestartNow_Click"/>
                         </ui:CardControl>
+
+                        <!-- MiniLED Local Dimming (hidden for non-MiniLED panels) -->
+                        <ui:CardControl x:Name="CardLocalDimming" Margin="0,0,0,8" Visibility="Collapsed">
+                            <ui:CardControl.Icon>
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE706;" FontSize="20" Margin="4,0,6,0"/>
+                            </ui:CardControl.Icon>
+                            <ui:CardControl.Header>
+                                <StackPanel>
+                                    <ui:TextBlock FontTypography="Body" Text="MiniLED local dimming"/>
+                                    <ui:TextBlock Margin="0,2,0,0"
+									              FontTypography="Caption"
+									              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+									              Text="Enable or disable MiniLED local dimming on the display"/>
+                                </StackPanel>
+                            </ui:CardControl.Header>
+                            <ui:ToggleSwitch x:Name="tsLocalDimming"
+                                             LabelPosition="Left"
+                                             OnContent="On"
+                                             OffContent="Off"
+                                             Checked="TsLocalDimming_Toggled"
+                                             Unchecked="TsLocalDimming_Toggled"/>
+                        </ui:CardControl>
+
                         <!-- GPU Information CardExpander -->
-                        <ui:CardExpander Margin="0,0,0,8" IsExpanded="True">
+                        <ui:CardExpander Margin="0,0,0,8"
+						                 IsExpanded="False">
                             <ui:CardExpander.Icon>
                                 <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="20" Margin="4,0,6,0"/>
                             </ui:CardExpander.Icon>
                             <ui:CardExpander.Header>
                                 <StackPanel>
                                     <ui:TextBlock FontTypography="Body" Text="GPU Information"/>
-                                    <ui:TextBlock Margin="0,2,0,0" FontTypography="Caption" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="GPU hardware state from the EC"/>
+                                    <ui:TextBlock Margin="0,2,0,0"
+									              FontTypography="Caption"
+									              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+									              Text="GPU hardware state from the EC"/>
                                 </StackPanel>
                             </ui:CardExpander.Header>
                             <StackPanel>
+
                                 <!-- Current Mode -->
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -258,12 +486,23 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
                                         <ui:TextBlock FontTypography="Body" Text="Current Mode"/>
-                                        <ui:TextBlock Margin="0,2,0,0" FontTypography="Caption" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Active GPU mode from the EC"/>
+                                        <ui:TextBlock Margin="0,2,0,0"
+										              FontTypography="Caption"
+										              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+										              Text="Active GPU mode from the EC"/>
                                     </StackPanel>
-                                    <TextBlock x:Name="tbCurrentMode" Grid.Column="1" VerticalAlignment="Center" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Text="--"/>
+                                    <TextBlock x:Name="tbCurrentMode"
+									           Grid.Column="1"
+									           VerticalAlignment="Center"
+									           FontSize="13"
+									           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+									           Text="--"/>
                                 </Grid>
+
                                 <!-- Divider -->
-                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"/>
+                                <Border Height="1" Margin="-58,12,-46,12"
+								        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"/>
+
                                 <!-- GPU Module ID -->
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -272,12 +511,23 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
                                         <ui:TextBlock FontTypography="Body" Text="GPU Module ID"/>
-                                        <ui:TextBlock Margin="0,2,0,0" FontTypography="Caption" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Hardware GPU module identifier"/>
+                                        <ui:TextBlock Margin="0,2,0,0"
+										              FontTypography="Caption"
+										              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+										              Text="Hardware GPU module identifier"/>
                                     </StackPanel>
-                                    <TextBlock x:Name="tbGpuModuleId" Grid.Column="1" VerticalAlignment="Center" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Text="--"/>
+                                    <TextBlock x:Name="tbGpuModuleId"
+									           Grid.Column="1"
+									           VerticalAlignment="Center"
+									           FontSize="13"
+									           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+									           Text="--"/>
                                 </Grid>
+
                                 <!-- Divider -->
-                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"/>
+                                <Border Height="1" Margin="-58,12,-46,12"
+								        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"/>
+
                                 <!-- MUX Hardware State -->
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -286,12 +536,23 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
                                         <ui:TextBlock FontTypography="Body" Text="MUX Hardware State"/>
-                                        <ui:TextBlock Margin="0,2,0,0" FontTypography="Caption" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Physical MUX position from the EC"/>
+                                        <ui:TextBlock Margin="0,2,0,0"
+										              FontTypography="Caption"
+										              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+										              Text="Physical MUX position from the EC"/>
                                     </StackPanel>
-                                    <TextBlock x:Name="tbMuxHardwareState" Grid.Column="1" VerticalAlignment="Center" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Text="--"/>
+                                    <TextBlock x:Name="tbMuxHardwareState"
+									           Grid.Column="1"
+									           VerticalAlignment="Center"
+									           FontSize="13"
+									           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+									           Text="--"/>
                                 </Grid>
+
                                 <!-- Divider -->
-                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"/>
+                                <Border Height="1" Margin="-58,12,-46,12"
+								        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"/>
+
                                 <!-- NVRAM Persistence -->
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -300,9 +561,17 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0">
                                         <ui:TextBlock FontTypography="Body" Text="NVRAM Persistence"/>
-                                        <ui:TextBlock Margin="0,2,0,0" FontTypography="Caption" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="UEFI NVRAM mode value (survives restart)"/>
+                                        <ui:TextBlock Margin="0,2,0,0"
+										              FontTypography="Caption"
+										              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+										              Text="UEFI NVRAM mode value (survives restart)"/>
                                     </StackPanel>
-                                    <TextBlock x:Name="tbNvramMode" Grid.Column="1" VerticalAlignment="Center" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Text="--"/>
+                                    <TextBlock x:Name="tbNvramMode"
+									           Grid.Column="1"
+									           VerticalAlignment="Center"
+									           FontSize="13"
+									           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+									           Text="--"/>
                                 </Grid>
                             </StackPanel>
                         </ui:CardExpander>
@@ -310,6 +579,7 @@
                 </StackPanel>
             </Grid>
         </ScrollViewer>
+
         <!-- Row 1: Bottom bar — Refresh button anchored right -->
         <ui:Card x:Name="bottomBar" Grid.Row="1" MaxWidth="1052" HorizontalAlignment="Stretch" Margin="12,8,16,12" Padding="12,8" SnapsToDevicePixels="True">
             <Grid>
@@ -317,7 +587,9 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <ui:Button Grid.Column="1" x:Name="btnRefresh" Click="btnRefresh_Click">
+                <ui:Button Grid.Column="1"
+				           x:Name="btnRefresh"
+				           Click="btnRefresh_Click">
                     <StackPanel Orientation="Horizontal">
                         <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" Margin="0,0,12,0"/>
                         <TextBlock Text="Refresh" Margin="0,0,0,1"/>

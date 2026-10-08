@@ -71,28 +71,6 @@
                 <!-- Content cards -->
                 <StackPanel Grid.Row="1" Margin="12,16,16,18">
 
-                    <!-- MiniLED Local Dimming (hidden for non-MiniLED panels) -->
-                    <ui:CardControl x:Name="CardLocalDimming" Margin="0,0,0,8" Visibility="Collapsed">
-                        <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE706;" FontSize="20" Margin="4,0,6,0" />
-                        </ui:CardControl.Icon>
-                        <ui:CardControl.Header>
-                            <StackPanel>
-                                <ui:TextBlock FontTypography="Body" Text="MiniLED local dimming" />
-                                <ui:TextBlock Margin="0,2,0,0"
-                                               FontTypography="Caption"
-                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Enable or disable MiniLED local dimming on the display" />
-                            </StackPanel>
-                        </ui:CardControl.Header>
-                        <ui:ToggleSwitch x:Name="tsLocalDimming"
-                                         LabelPosition="Left"
-                                         OnContent="On"
-                                         OffContent="Off"
-                                         Checked="TsLocalDimming_Toggled"
-                                         Unchecked="TsLocalDimming_Toggled" />
-                    </ui:CardControl>
-
                     <!-- Application behaviour -->
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="True">

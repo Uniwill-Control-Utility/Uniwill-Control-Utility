@@ -54,20 +54,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         private int _ramSpeed = 0, _ramType = 0, _ramWidth = 0, _ramSlots = 0;
         private string _ramProducer = "", _ramModel = "";
 
-        // MiniLED Local Dimming
-        private const string WmiClassName = "AcpiTest_MULong";
-        private const string DefaultInstanceName = @"ACPI\PNP0C14\1_1";
-        private const ulong CmdEnableStep1 = 0x50000000002;
-        private const ulong CmdEnableStep2 = 0x5000000000E;
-        private const ulong CmdDisableStep1 = 0x50000000001;
-        private const ulong CmdDisableStep2 = 0x5000000000D;
-        private const byte ExpectedEnableStep1 = 0xBB;
-        private const byte ExpectedEnableStep2 = 0x0E;
-        private const byte ExpectedDisableStep1 = 0xAA;
-        private const byte ExpectedDisableStep2 = 0x0D;
-        private const ushort EcLocalDimmingRegister = 0x072B;
-        private const byte EcLocalDimmingBit = 0x02;
-        private bool _localDimmingToggling;
         private UniwillECService? _ecService;
 
         public ViewModels.SettingsViewModel ViewModel
@@ -85,12 +71,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             _logger = logger;
 
             InitializeComponent();
-
-            // Get EC service for Local Dimming readback verification.
-            _ecService = App.GetService<UniwillECService>();
-
-            // Show/hide Local Dimming card based on panel type (detected at startup).
-            CardLocalDimming.Visibility = App.HasMiniLEDPanel ? Visibility.Visible : Visibility.Collapsed;
 
             cbxLanguage.ItemsSource = LocalizationService.SupportedLanguages;
             cbxLanguage.SelectedItem = LocalizationService.SupportedLanguages.First(language => language.CultureName == LocalizationService.CurrentCultureName);
@@ -698,9 +678,6 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async void UiPage_Loaded(object sender, RoutedEventArgs e)
         {
-            // Load Local Dimming state from settings.
-            tsLocalDimming.IsChecked = Settings.Default.DisplayLocalDimming;
-
             await LoadSystemInfoAsync();
         }
 
@@ -913,158 +890,5 @@ namespace Uniwill_Control_Utility.Views.Pages
             PresetBackupStatus.IsOpen = true;
         }
 
-        #region MiniLED Local Dimming
-
-        /// <summary>
-        /// Calls GetSetULong via WMI using the correct GetMethodParameters pattern.
-        /// This matches the pattern used by MechControl (Heavyfail fork) on Uniwill IDY/Tongfang X6 laptops.
-        /// </summary>
-        private static byte WmiCall(ManagementObject mo, ulong data)
-        {
-            using var input = mo.GetMethodParameters("GetSetULong");
-            input["Data"] = data;
-
-            using var output = (ManagementBaseObject)mo.InvokeMethod("GetSetULong", input, null);
-            return (byte)(uint)output["Return"];
-        }
-
-        private void TsLocalDimming_Toggled(object sender, RoutedEventArgs e)
-        {
-            if (_localDimmingToggling)
-                return;
-
-            bool isOn = tsLocalDimming.IsChecked == true;
-
-            _localDimmingToggling = true;
-            tsLocalDimming.IsEnabled = false;
-
-            // WMI ManagementObject has apartment threading affinity — must be called on a dedicated thread.
-            _ = System.Threading.Tasks.Task.Run(() =>
-            {
-                try
-                {
-                    bool success = SetLocalDimming(isOn);
-                    _logger.LogInformation("[Display] Local Dimming {State}: {Result}",
-                        isOn ? "enabled" : "disabled", success ? "success" : "failed");
-
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        if (!success)
-                        {
-                            tsLocalDimming.IsChecked = !isOn;
-                        }
-                        tsLocalDimming.IsEnabled = true;
-                        _localDimmingToggling = false;
-
-                        Settings.Default.DisplayLocalDimming = tsLocalDimming.IsChecked == true;
-                        Settings.Default.Save();
-                    });
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "[Display] Local Dimming toggle failed");
-
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        tsLocalDimming.IsChecked = !isOn;
-                        tsLocalDimming.IsEnabled = true;
-                        _localDimmingToggling = false;
-
-                        Settings.Default.DisplayLocalDimming = tsLocalDimming.IsChecked == true;
-                        Settings.Default.Save();
-                    });
-                }
-            });
-        }
-
-        private bool SetLocalDimming(bool enable)
-        {
-            try
-            {
-                var instancePath = $@"{WmiClassName}.InstanceName='{DefaultInstanceName}'";
-                using var mo = new ManagementObject(@"root\WMI", instancePath, null);
-
-                if (enable)
-                {
-                    _logger.LogDebug("[Display] Sending enable step 1: 0x{Cmd:X}", CmdEnableStep1);
-                    byte result1 = WmiCall(mo, CmdEnableStep1);
-                    _logger.LogDebug("[Display] Enable step 1 returned 0x{Result:X2}", result1);
-
-                    if (result1 != ExpectedEnableStep1)
-                    {
-                        _logger.LogWarning("[Display] Enable step 1 returned 0x{Result:X2} (expected 0x{Expected:X2})",
-                            result1, ExpectedEnableStep1);
-                        return false;
-                    }
-
-                    _logger.LogDebug("[Display] Sending enable step 2: 0x{Cmd:X}", CmdEnableStep2);
-                    byte result2 = WmiCall(mo, CmdEnableStep2);
-                    _logger.LogDebug("[Display] Enable step 2 returned 0x{Result:X2}", result2);
-
-                    if (result2 != ExpectedEnableStep2)
-                    {
-                        _logger.LogWarning("[Display] Enable step 2 returned 0x{Result:X2} (expected 0x{Expected:X2})",
-                            result2, ExpectedEnableStep2);
-                        return false;
-                    }
-                }
-                else
-                {
-                    _logger.LogDebug("[Display] Sending disable step 1: 0x{Cmd:X}", CmdDisableStep1);
-                    byte result1 = WmiCall(mo, CmdDisableStep1);
-                    _logger.LogDebug("[Display] Disable step 1 returned 0x{Result:X2}", result1);
-
-                    if (result1 != ExpectedDisableStep1)
-                    {
-                        _logger.LogWarning("[Display] Disable step 1 returned 0x{Result:X2} (expected 0x{Expected:X2})",
-                            result1, ExpectedDisableStep1);
-                        return false;
-                    }
-
-                    _logger.LogDebug("[Display] Sending disable step 2: 0x{Cmd:X}", CmdDisableStep2);
-                    byte result2 = WmiCall(mo, CmdDisableStep2);
-                    _logger.LogDebug("[Display] Disable step 2 returned 0x{Result:X2}", result2);
-
-                    if (result2 != ExpectedDisableStep2)
-                    {
-                        _logger.LogWarning("[Display] Disable step 2 returned 0x{Result:X2} (expected 0x{Expected:X2})",
-                            result2, ExpectedDisableStep2);
-                        return false;
-                    }
-                }
-
-                Thread.Sleep(100);
-
-                // Verify via EC readback.
-                if (_ecService != null && _ecService.Initialize())
-                {
-                    byte ecValue = _ecService.ReadECRegister(EcLocalDimmingRegister);
-                    bool actualState = (ecValue & EcLocalDimmingBit) != 0;
-
-                    if (actualState != enable)
-                    {
-                        _logger.LogWarning("[Display] EC 0x72B readback 0x{EcValue:X2} shows {Actual}, expected {Expected} — mismatch",
-                            ecValue, actualState ? "ON" : "OFF", enable ? "ON" : "OFF");
-                        return false;
-                    }
-
-                    _logger.LogInformation("[Display] EC 0x72B readback 0x{EcValue:X2} confirms Local Dimming {State}",
-                        ecValue, enable ? "ON" : "OFF");
-                }
-                else
-                {
-                    _logger.LogInformation("[Display] EC service unavailable — skipping readback verification");
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "[Display] WMI/ACPI call failed");
-                return false;
-            }
-        }
-
-        #endregion
-    }
+     }
 }

@@ -1,11 +1,14 @@
 using System;
 using System.Diagnostics;
+using System.Management;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Abstractions.Controls;
 
@@ -28,8 +31,23 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool _isLoaded;
         private bool _isAdministrator;
         private bool _isNvramAvailable;
+        private bool _localDimmingToggling;
 
         // Delayed refresh timer created after each user change.
+
+        // --- MiniLED Local Dimming ---
+        private const string WmiClassName = "AcpiTest_MULong";
+        private const string DefaultInstanceName = @"ACPI\PNP0C14\1_1";
+        private const ulong CmdEnableStep1 = 0x50000000002;
+        private const ulong CmdEnableStep2 = 0x5000000000E;
+        private const ulong CmdDisableStep1 = 0x50000000001;
+        private const ulong CmdDisableStep2 = 0x5000000000D;
+        private const byte ExpectedEnableStep1 = 0xBB;
+        private const byte ExpectedEnableStep2 = 0x0E;
+        private const byte ExpectedDisableStep1 = 0xAA;
+        private const byte ExpectedDisableStep2 = 0x0D;
+        private const ushort EcLocalDimmingRegister = 0x072B;
+        private const byte EcLocalDimmingBit = 0x02;
         private DispatcherTimer? _delayTimer;
 
         // Shared across page instances (AddScoped creates a new page on each navigation).
@@ -105,6 +123,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _isNvramAvailable = ReadNvram("OemMagicVariable") is not null;
                 Debug.WriteLine($"[Display] NVRAM available: {_isNvramAvailable}");
             }
+
+            // Show MiniLED card only on MiniLED panels
+            CardLocalDimming.Visibility = App.HasMiniLEDPanel ? Visibility.Visible : Visibility.Collapsed;
         }
 
         /// <inheritdoc />
@@ -207,6 +228,12 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             UpdateGpuModeButtons(mode);
 
+            // Load Local Dimming state from settings
+            if (App.HasMiniLEDPanel)
+            {
+                tsLocalDimming.IsChecked = Settings.Default.DisplayLocalDimming;
+            }
+
             RefreshAll();
             _isLoaded = true;
         }
@@ -248,6 +275,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
 
             if (!int.TryParse(tag, out int mode))
+                return;
+
+            // Ignore click if this mode is already active
+            Style? activeStyle = (Style?)Resources["GpuModeButtonActiveStyle"];
+            if (btn.Style == activeStyle)
                 return;
 
             try
@@ -526,6 +558,136 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return result;
             }
             return null;
+        }
+
+        #endregion
+
+        #region MiniLED Local Dimming
+
+        /// <summary>
+        /// Calls GetSetULong via WMI using the correct GetMethodParameters pattern.
+        /// </summary>
+        private static byte WmiCall(ManagementObject mo, ulong data)
+        {
+            using var input = mo.GetMethodParameters("GetSetULong");
+            input["Data"] = data;
+
+            using var output = (ManagementBaseObject)mo.InvokeMethod("GetSetULong", input, null);
+            return (byte)(uint)output["Return"];
+        }
+
+        private void TsLocalDimming_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_localDimmingToggling)
+                return;
+
+            bool isOn = tsLocalDimming.IsChecked == true;
+
+            _localDimmingToggling = true;
+            tsLocalDimming.IsEnabled = false;
+
+            // WMI ManagementObject has apartment threading affinity — must be called on a dedicated thread.
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    bool success = SetLocalDimming(isOn);
+                    Debug.WriteLine($"[Display] Local Dimming {(isOn ? "enabled" : "disabled")}: {(success ? "success" : "failed")}");
+
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        if (!success)
+                        {
+                            tsLocalDimming.IsChecked = !isOn;
+                        }
+                        tsLocalDimming.IsEnabled = true;
+                        _localDimmingToggling = false;
+
+                        Settings.Default.DisplayLocalDimming = tsLocalDimming.IsChecked == true;
+                        Settings.Default.Save();
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Display] Local Dimming toggle failed: {ex.Message}");
+
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        tsLocalDimming.IsChecked = !isOn;
+                        tsLocalDimming.IsEnabled = true;
+                        _localDimmingToggling = false;
+
+                        Settings.Default.DisplayLocalDimming = tsLocalDimming.IsChecked == true;
+                        Settings.Default.Save();
+                    });
+                }
+            });
+        }
+
+        private bool SetLocalDimming(bool enable)
+        {
+            try
+            {
+                var instancePath = $@"{WmiClassName}.InstanceName='{DefaultInstanceName}'";
+                using var mo = new ManagementObject(@"root\WMI", instancePath, null);
+
+                if (enable)
+                {
+                    byte result1 = WmiCall(mo, CmdEnableStep1);
+                    if (result1 != ExpectedEnableStep1)
+                    {
+                        Debug.WriteLine($"[Display] Enable step 1 returned 0x{result1:X2} (expected 0x{ExpectedEnableStep1:X2})");
+                        return false;
+                    }
+
+                    byte result2 = WmiCall(mo, CmdEnableStep2);
+                    if (result2 != ExpectedEnableStep2)
+                    {
+                        Debug.WriteLine($"[Display] Enable step 2 returned 0x{result2:X2} (expected 0x{ExpectedEnableStep2:X2})");
+                        return false;
+                    }
+                }
+                else
+                {
+                    byte result1 = WmiCall(mo, CmdDisableStep1);
+                    if (result1 != ExpectedDisableStep1)
+                    {
+                        Debug.WriteLine($"[Display] Disable step 1 returned 0x{result1:X2} (expected 0x{ExpectedDisableStep1:X2})");
+                        return false;
+                    }
+
+                    byte result2 = WmiCall(mo, CmdDisableStep2);
+                    if (result2 != ExpectedDisableStep2)
+                    {
+                        Debug.WriteLine($"[Display] Disable step 2 returned 0x{result2:X2} (expected 0x{ExpectedDisableStep2:X2})");
+                        return false;
+                    }
+                }
+
+                Thread.Sleep(100);
+
+                // Verify via EC readback.
+                if (_ecService != null && _isEcAvailable)
+                {
+                    byte ecValue = _ecService.ReadECRegister(EcLocalDimmingRegister);
+                    bool actualState = (ecValue & EcLocalDimmingBit) != 0;
+
+                    if (actualState != enable)
+                    {
+                        Debug.WriteLine($"[Display] EC 0x72B readback 0x{ecValue:X2} shows {(actualState ? "ON" : "OFF")}, expected {(enable ? "ON" : "OFF")} — mismatch");
+                        return false;
+                    }
+
+                    Debug.WriteLine($"[Display] EC 0x72B readback 0x{ecValue:X2} confirms Local Dimming {(enable ? "ON" : "OFF")}");
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Display] WMI/ACPI call failed: {ex.Message}");
+                return false;
+            }
         }
 
         #endregion
