@@ -429,11 +429,17 @@ namespace Uniwill_Control_Utility.Services
                     gameInFocus = foregroundPid == fps.ProcessId;
                 }
 
-                // If the game is not in focus, release the OSD slot so RTSS stops
-                // injecting text into the game. The mapping stays alive so the
-                // next Update() can re-claim a slot immediately.
+                // If the game is not in focus, write a single-space OSD to hide
+                // the metrics while keeping the slot claimed. RTSS renders this
+                // as a blank line, effectively hiding the overlay. The slot stays
+                // claimed so the next Update() can overwrite without re-claiming.
+                // After hiding, also call Release() to fully clear the slot.
                 if (!gameInFocus)
                 {
+                    // First write a space so RTSS renders a blank frame, then
+                    // release the slot. The two-step approach ensures RTSS sees
+                    // the buffer change before the slot goes unowned.
+                    RtssOsdWriter.Update(" ");
                     RtssOsdWriter.Release();
                     _rtssOsdWasShowing = false;
                     return;

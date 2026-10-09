@@ -126,9 +126,10 @@ namespace Uniwill_Control_Utility.Services.Performance
             unsafe
             {
                 void* basePtr = (void*)viewPtr.ToPointer();
-                int lastSlot = -1;
 
                 // Scan all slots to find every UCU-owned entry and zero it.
+                // Do NOT re-claim — let the slot go fully empty so RTSS sees
+                // an unowned slot and clears any cached rendered text.
                 for (int slot = 1; slot < header.OsdArrSize; slot++)
                 {
                     byte* entryPtr = ((byte*)basePtr) + header.OsdArrOffset + (ulong)(slot * header.OsdEntrySize);
@@ -147,19 +148,13 @@ namespace Uniwill_Control_Utility.Services.Performance
                     if (!isOurs)
                         continue;
 
-                    lastSlot = slot;
-
                     // Zero out the entire entry (including owner name) so RTSS
-                    // sees a fully empty slot and clears the rendered OSD text.
+                    // sees a fully empty, unowned slot and clears the rendered OSD.
                     for (int i = 0; i < header.OsdEntrySize; i++)
                         entryPtr[i] = 0;
-
-                    // Re-claim the slot immediately so the next Update() finds
-                    // it in Pass 1 and reuses the same slot index.
-                    ClaimSlot(entryPtr);
                 }
 
-                // Increment frame counter.
+                // Increment frame counter to signal RTSS that the slot changed.
                 RtssHeader* hdr = (RtssHeader*)basePtr;
                 hdr->OsdFrame++;
 
@@ -173,9 +168,8 @@ namespace Uniwill_Control_Utility.Services.Performance
                 FlushViewOfFile((IntPtr)basePtr, IntPtr.Zero);
             }
 
-            // Keep the last slot we found — it's already re-claimed so
-            // the next Update() will find it in Pass 1.
-            _claimedSlot = _claimedSlot >= 0 ? _claimedSlot : -1;
+            // Reset so the next Update() claims a fresh slot via Pass 2.
+            _claimedSlot = -1;
             // NOTE: deliberately NOT calling ReleaseCachedMapping() — the
             // mapping stays alive so the next tick can AcquireMapping instantly.
         }
