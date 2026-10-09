@@ -15,6 +15,7 @@ namespace Uniwill_Control_Utility.Services
         private readonly Func<CancellationToken, Task<T>> _refresh;
         private readonly TimeProvider _timeProvider;
         private readonly Action<Exception>? _onRefreshError;
+        private readonly Action? _onRefreshSuccess;
         private readonly CancellationTokenSource _disposeToken = new();
         private CacheEntry _entry;
         private Task? _refreshTask;
@@ -26,7 +27,8 @@ namespace Uniwill_Control_Utility.Services
             TimeSpan maxAge,
             Func<CancellationToken, Task<T>> refresh,
             TimeProvider? timeProvider = null,
-            Action<Exception>? onRefreshError = null)
+            Action<Exception>? onRefreshError = null,
+            Action? onRefreshSuccess = null)
         {
             if (maxAge <= TimeSpan.Zero)
                 throw new ArgumentOutOfRangeException(nameof(maxAge));
@@ -35,6 +37,7 @@ namespace Uniwill_Control_Utility.Services
             _refresh = refresh ?? throw new ArgumentNullException(nameof(refresh));
             _timeProvider = timeProvider ?? TimeProvider.System;
             _onRefreshError = onRefreshError;
+            _onRefreshSuccess = onRefreshSuccess;
             _entry = new CacheEntry(initialValue, DateTimeOffset.MinValue);
         }
 
@@ -102,6 +105,8 @@ namespace Uniwill_Control_Utility.Services
                         Volatile.Write(
                             ref _entry,
                             new CacheEntry(value, _timeProvider.GetUtcNow()));
+                        try { _onRefreshSuccess?.Invoke(); }
+                        catch { /* Success callback must not fault. */ }
                     }
                 }
             }
