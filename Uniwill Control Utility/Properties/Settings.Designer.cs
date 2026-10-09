@@ -882,5 +882,13 @@ namespace Uniwill_Control_Utility.Properties {
             get { return ((bool)(this["ShowStartupProgressOverlay"])); }
             set { this["ShowStartupProgressOverlay"] = value; }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("2")]
+        public int GpuPowerSavingMode {
+            get { return ((int)(this["GpuPowerSavingMode"])); }
+            set { this["GpuPowerSavingMode"] = value; }
+        }
     }
 }

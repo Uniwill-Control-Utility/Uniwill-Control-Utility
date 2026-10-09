@@ -7,8 +7,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using Serilog;
 using System.Windows.Threading;
 using Uniwill_Control_Utility.Properties;
+using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Abstractions.Controls;
 
@@ -228,6 +231,14 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             UpdateGpuModeButtons(mode);
 
+            // Show/hide GPU Power Saving card — only available in Hybrid mode
+            bool isHybrid = mode == 0;
+            CardGpuPowerSaving.Visibility = isHybrid ? Visibility.Visible : Visibility.Collapsed;
+
+            // Load GPU Power Saving mode from settings
+            int powerSavingMode = Settings.Default.GpuPowerSavingMode;
+            UpdatePowerSavingButtons(powerSavingMode);
+
             // Load Local Dimming state from settings
             if (App.HasMiniLEDPanel)
             {
@@ -317,6 +328,75 @@ namespace Uniwill_Control_Utility.Views.Pages
             catch (Exception ex)
             {
                 Debug.WriteLine($"[Display] Failed to apply mode: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Updates the visual state of the three power saving buttons.
+        /// </summary>
+        private void UpdatePowerSavingButtons(int mode)
+        {
+            Style? inactiveStyle = (Style)Resources["GpuModeButtonStyle"];
+            Style? activeStyle = (Style)Resources["GpuModeButtonActiveStyle"];
+
+            // Reset all to inactive
+            btnPowerSavingOn.Style = inactiveStyle;
+            btnPowerSavingOff.Style = inactiveStyle;
+            btnPowerSavingAuto.Style = inactiveStyle;
+
+            // Activate the matching button
+            switch (mode)
+            {
+                case 0: // On (Power Saving)
+                    btnPowerSavingOn.Style = activeStyle;
+                    break;
+                case 1: // Off (Performance)
+                    btnPowerSavingOff.Style = activeStyle;
+                    break;
+                case 2: // Auto
+                default:
+                    btnPowerSavingAuto.Style = activeStyle;
+                    break;
+            }
+        }
+
+        private async void btnPowerSaving_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_isLoaded)
+                return;
+
+            if (sender is not Button btn || btn.Tag is not string tag)
+                return;
+
+            if (!int.TryParse(tag, out int mode))
+                return;
+
+            // Ignore click if this mode is already active
+            Style? activeStyle = (Style?)Resources["GpuModeButtonActiveStyle"];
+            if (btn.Style == activeStyle)
+                return;
+
+            try
+            {
+                // Update button visual state immediately
+                UpdatePowerSavingButtons(mode);
+
+                // Persist to settings
+                Settings.Default.GpuPowerSavingMode = mode;
+                Settings.Default.Save();
+
+                // Apply the power saving mode (always uses PnP hotswap)
+                var powerSavingMode = (GpuPowerSavingMode)mode;
+                string pnpStatusBefore = GpuPowerSaving.GetDgpuPnpStatus();
+                await GpuPowerSaving.ApplyAsync(powerSavingMode);
+                string pnpStatusAfter = GpuPowerSaving.GetDgpuPnpStatus();
+
+                Log.Information("[Display] GPU Power Saving set to {Mode}, dGPU PnP: {Before} -> {After}, GuardBlocked: {Blocked}, IsAdmin: {IsAdmin}",
+                    GpuPowerSaving.GetModeDisplayName(powerSavingMode), pnpStatusBefore, pnpStatusAfter, GpuInteropGuard.IsBlocked, _isAdministrator);
+            }
+            catch (Exception ex)
+            {
+                Log.Information("[Display] [ERROR] Failed to apply GPU power saving mode: {Message}", ex.Message);
             }
         }
 
