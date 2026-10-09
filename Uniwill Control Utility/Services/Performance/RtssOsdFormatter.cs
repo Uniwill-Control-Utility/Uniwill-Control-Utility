@@ -65,19 +65,19 @@ namespace Uniwill_Control_Utility.Services.Performance
             bool hasContent = false;
 
             // --- CPU row ---
+            if (options.ShowCpuRow)
             {
-                 var cells = new List<Cell>();
+                var cells = new List<Cell>();
 
-                if (options.ShowCpuTemperature && hardware.CpuTemperature > 0)
+                if (hardware.CpuTemperature > 0)
                     cells.Add(ValueCell(ColorCpu, hardware.CpuTemperature.ToString(), "°C"));
 
-                if (options.ShowCpuUsage)
-                    cells.Add(ValueCellShifted(ColorCpu, hardware.CpuUsage.ToString("F0"), "%"));
+                cells.Add(ValueCellShifted(ColorCpu, hardware.CpuUsage.ToString("F0"), "%"));
 
-                if (options.ShowCpuClock && hardware.CpuClockMhz > 0)
+                if (hardware.CpuClockMhz > 0)
                     cells.Add(ValueCellShifted(ColorCpu, hardware.CpuClockMhz.ToString(), "MHz"));
 
-                if (options.ShowCpuPower && hardware.CpuPowerWatts > 0)
+                if (hardware.CpuPowerWatts > 0)
                     cells.Add(ValueCellNarrow(ColorCpu, hardware.CpuPowerWatts.ToString(), "W"));
 
                 if (hardware.CpuFanSpeed > 0)
@@ -91,16 +91,16 @@ namespace Uniwill_Control_Utility.Services.Performance
             }
 
             // --- RAM row ---
+            if (options.ShowRamRow)
             {
                 var cells = new List<Cell>();
 
-                if (options.ShowMemory && hardware.SystemMemoryTotalGb > 0)
+                if (hardware.SystemMemoryTotalGb > 0)
                 {
                     int usedMb = (int)(hardware.SystemMemoryUsedGb * 1024);
                     cells.Add(ValueCell(ColorMemory, usedMb.ToString(), "MB"));
                 }
 
-                // Memory temperatures (per module, separate columns)
                 if (hardware.MemoryTemperature0 > 0)
                     cells.Add(ValueCellShifted(ColorMemory, hardware.MemoryTemperature0.ToString(), "°C"));
 
@@ -115,19 +115,19 @@ namespace Uniwill_Control_Utility.Services.Performance
             }
 
             // --- GPU row ---
+            if (options.ShowGpuRow)
             {
                 var cells = new List<Cell>();
 
-                if (options.ShowGpuTemperature && hardware.GpuTemperature > 0)
+                if (hardware.GpuTemperature > 0)
                     cells.Add(ValueCell(ColorGpu, hardware.GpuTemperature.ToString(), "°C"));
 
-                if (options.ShowGpuUsage)
-                    cells.Add(ValueCellShifted(ColorGpu, hardware.GpuUsage.ToString("F0"), "%"));
+                cells.Add(ValueCellShifted(ColorGpu, hardware.GpuUsage.ToString("F0"), "%"));
 
-                if (options.ShowGpuClock && hardware.GpuClockMhz > 0)
+                if (hardware.GpuClockMhz > 0)
                     cells.Add(ValueCellShifted(ColorGpu, hardware.GpuClockMhz.ToString(), "MHz"));
 
-                if (options.ShowGpuPower && hardware.GpuPowerWatts > 0)
+                if (hardware.GpuPowerWatts > 0)
                     cells.Add(ValueCellNarrow(ColorGpu, hardware.GpuPowerWatts.ToString(), "W"));
 
                 if (hardware.GpuFanSpeed > 0)
@@ -141,7 +141,7 @@ namespace Uniwill_Control_Utility.Services.Performance
             }
 
             // --- VRAM row ---
-            if (options.ShowGpuVram && hardware.GpuMemoryTotalGb > 0)
+            if (options.ShowVramRow && hardware.GpuMemoryTotalGb > 0)
             {
                 var cells = new List<Cell>();
                 int usedMb = (int)(hardware.GpuMemoryUsedGb * 1024);
@@ -214,97 +214,69 @@ namespace Uniwill_Control_Utility.Services.Performance
             }
 
             // --- FPS rows (with short API label) ---
-            // Row 1: current FPS + frame time
-            // Row 2: 1% low FPS + frame time
-            // Row 3: 0.1% low FPS + frame time
             if (fps.IsAvailable)
             {
                 string apiLabel = ShortApiLabel(fps.GraphicsApi);
 
                 // Row 1: current FPS + frame time
+                if (options.ShowFpsCurrent)
                 {
                     var cells = new List<Cell>();
+                    cells.Add(FpsCellLarge("<FR>"));
+                    cells.Add(ValueCell(ColorWhite, fps.FrameTimeMs.ToString("F1"), "ms"));
 
-                    if (options.ShowFps)
-                        cells.Add(FpsCellLarge("<FR>"));
-
-                    if (options.ShowFrameTimeCurrent)
-                        cells.Add(ValueCell(ColorWhite, fps.FrameTimeMs.ToString("F1"), "ms"));
-
-                    if (cells.Count > 0)
-                    {
-                        var label = string.IsNullOrEmpty(apiLabel) ? "FPS" : apiLabel;
-                        sb.Append(BuildRow(ColorWhite, label, cells));
-                        hasContent = true;
-                    }
+                    var label = string.IsNullOrEmpty(apiLabel) ? "FPS" : apiLabel;
+                    sb.Append(BuildRow(ColorWhite, label, cells));
+                    hasContent = true;
                 }
 
                 // Row 2: 1% low FPS + frame time
+                if (options.ShowFpsOnePercentLow)
                 {
                     var cells = new List<Cell>();
+                    cells.Add(FpsCell(fps.OnePercentLowFps.ToString()));
+                    cells.Add(ValueCell(ColorWhite, fps.OnePercentFrameTimeMs.ToString("F1"), "ms"));
 
-                    if (options.ShowFpsOnePercentLow)
-                        cells.Add(FpsCell(fps.OnePercentLowFps.ToString()));
-
-                    if (options.ShowFrameTimeOnePercent)
-                        cells.Add(ValueCell(ColorWhite, fps.OnePercentFrameTimeMs.ToString("F1"), "ms"));
-
-                    if (cells.Count > 0)
-                    {
-                        sb.Append(BuildRow(ColorWhite, "1%", cells));
-                        hasContent = true;
-                    }
+                    sb.Append(BuildRow(ColorWhite, "1%", cells));
+                    hasContent = true;
                 }
 
                 // Row 3: 0.1% low FPS + frame time
+                if (options.ShowFpsPointOnePercentLow)
                 {
                     var cells = new List<Cell>();
+                    cells.Add(FpsCell(fps.PointOnePercentLowFps.ToString()));
+                    cells.Add(ValueCell(ColorWhite, fps.PointOnePercentFrameTimeMs.ToString("F1"), "ms"));
 
-                    if (options.ShowFpsPointOnePercentLow)
-                        cells.Add(FpsCell(fps.PointOnePercentLowFps.ToString()));
-
-                    if (options.ShowFrameTimePointOnePercent)
-                        cells.Add(ValueCell(ColorWhite, fps.PointOnePercentFrameTimeMs.ToString("F1"), "ms"));
-
-                    if (cells.Count > 0)
-                    {
-                        sb.Append(BuildRow(ColorWhite, "0.1%", cells));
-                        hasContent = true;
-                    }
+                    sb.Append(BuildRow(ColorWhite, "0.1%", cells));
+                    hasContent = true;
                 }
             }
 
             // --- Battery row ---
-            if (hardware.HasBattery)
+            if (options.ShowBatteryRow && hardware.HasBattery)
             {
                 var cells = new List<Cell>();
 
-                if (options.ShowBatteryPercent)
-                    cells.Add(ValueCell(ColorBattery, hardware.BatteryPercent.ToString(), "%"));
+                cells.Add(ValueCell(ColorBattery, hardware.BatteryPercent.ToString(), "%"));
 
-                if (options.ShowBatteryPower && hardware.BatteryPowerWatts > 0)
+                if (hardware.BatteryPowerWatts > 0)
                     cells.Add(ValueCell(ColorBattery, hardware.BatteryPowerWatts.ToString("F1"), "W"));
 
-                if (options.ShowBatteryStatus)
-                {
-                    string status = hardware.IsBatteryFullyCharged ? "Full"
-                        : hardware.IsBatteryCharging ? "Charging"
-                        : "Discharging";
-                    cells.Add(new Cell { Text = status.PadLeft(ValueWidth + UnitWidth), FontSize = MetricFontSize, Color = ColorBattery, IsRaw = true });
-                }
+                string status = hardware.IsBatteryFullyCharged ? "Full"
+                    : hardware.IsBatteryCharging ? "Charging"
+                    : "Discharging";
+                cells.Add(new Cell { Text = status.PadLeft(ValueWidth + UnitWidth), FontSize = MetricFontSize, Color = ColorBattery, IsRaw = true });
 
-                if (options.ShowBatteryTime && hardware.BatteryTimeRemainingMinutes > 0 && !hardware.IsBatteryCharging)
+                if (hardware.BatteryTimeRemainingMinutes > 0 && !hardware.IsBatteryCharging)
                 {
                     int hours = hardware.BatteryTimeRemainingMinutes / 60;
                     int mins = hardware.BatteryTimeRemainingMinutes % 60;
                     cells.Add(new Cell { Text = $"{hours}h {mins:D2}m".PadLeft(ValueWidth + UnitWidth), FontSize = MetricFontSize, Color = ColorBattery, IsRaw = true });
                 }
 
-                if (cells.Count > 0)
-                {
-                    sb.Append(BuildRow(ColorBattery, "BAT", cells));
-                    hasContent = true;
-                }
+                sb.Append(BuildRow(ColorBattery, "BAT", cells));
+                hasContent = true;
             }
 
             return hasContent ? sb.ToString() : null;

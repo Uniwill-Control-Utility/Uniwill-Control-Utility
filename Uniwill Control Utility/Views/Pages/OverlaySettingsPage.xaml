@@ -177,61 +177,47 @@
                     </ui:CardExpander>
 
                     <!-- OSD Metrics - single card with scrollable CheckBox list -->
-                    <ui:Card Margin="0,0,0,8" Padding="0">
+                    <ui:Card Margin="0,0,0,8" Padding="0" SnapsToDevicePixels="True">
                         <StackPanel>
-                            <!-- Header -->
-                            <StackPanel Margin="12,12,12,0">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <ui:FontIcon Grid.Column="0" FontFamily="Segoe Fluent Icons" Glyph="&#xE9D4;" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center" />
-                                    <StackPanel Grid.Column="1">
-                                        <ui:TextBlock FontTypography="Body" Text="OSD Metrics" />
-                                        <ui:TextBlock Margin="0,2,0,0"
-                                                       FontTypography="Caption"
-                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                       Text="Select which metrics appear in the in-game overlay" />
-                                    </StackPanel>
-                                </Grid>
-                            </StackPanel>
-
-                            <!-- Scrollable CheckBox list -->
-                            <ScrollViewer x:Name="MetricsScrollViewer"
-                                          Height="260"
-                                          Margin="12,8,12,12"
-                                          VerticalScrollBarVisibility="Auto"
-                                          HorizontalScrollBarVisibility="Disabled"
-                                          CanContentScroll="False"
-                                          PanningMode="VerticalOnly"
-                                          IsDeferredScrollingEnabled="False"
-                                          Background="Transparent">
-                                <StackPanel x:Name="MetricsCheckPanel" Margin="0">
-                                    <!-- populated from code-behind -->
+                            <!-- Header row -->
+                            <Grid Margin="24,16,16,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <ui:FontIcon Grid.Column="0"
+						             FontFamily="Segoe Fluent Icons"
+						             Glyph="&#xF404;"
+						             FontSize="20"
+						             Margin="-4,0,18,0"
+						             VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1">
+                                    <ui:TextBlock FontTypography="Body" Text="OSD Metrics"/>
+                                    <ui:TextBlock Margin="0,2,0,0"
+							              FontTypography="Caption"
+							              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+							              Text="Select which metrics appear in the in-game overlay"/>
                                 </StackPanel>
-                            </ScrollViewer>
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="0,12,0,0" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!--  CheckBox list -->
+                            <StackPanel x:Name="MetricsCheckPanel" Margin="48,12,0,12">
+                                <!-- populated from code-behind -->
+                            </StackPanel>
                         </StackPanel>
                     </ui:Card>
 
                     <!-- Refresh rate -->
-                    <ui:CardExpander Margin="0,0,0,8"
-                                     IsExpanded="True">
-                        <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF404;" FontSize="20" Margin="4,0,6,0" />
-                        </ui:CardExpander.Icon>
-                        <ui:CardExpander.Header>
-                            <StackPanel>
-                                <ui:TextBlock FontTypography="Body" Text="Refresh rate" />
-                                <ui:TextBlock Margin="0,2,0,0"
-                                               FontTypography="Caption"
-                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Adjust how often the overlay updates its metrics" />
-                            </StackPanel>
-                        </ui:CardExpander.Header>
-                        <StackPanel>
-                            <!-- Refresh interval -->
-                            <Grid Margin="0,-2,0,0">
+                    <ui:CardControl x:Name="CardGpuPowerSavingPluggedIn"
+                Margin="0,0,0,8">
+                        <ui:CardControl.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE916;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardControl.Icon>
+                        <ui:CardControl.Header>
+                            <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -239,22 +225,24 @@
                                 <StackPanel Grid.Column="0">
                                     <ui:TextBlock FontTypography="Body" Text="Refresh interval" />
                                     <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Longer intervals reduce monitoring overhead"
-                                                   TextWrapping="Wrap" />
+                   FontTypography="Caption"
+                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                   Text="Longer intervals reduce monitoring overhead"
+                   TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ui:NumberBox x:Name="RefreshIntervalNumberBox"
-                                              Grid.Column="1"
-                                              Width="180"
-                                              HorizontalAlignment="Right"
-                                              Minimum="100"
-                                              Maximum="5000"
-                                              SmallChange="100"
-                                              MaxDecimalPlaces="0" />
+                                    Grid.Column="1"
+                                    Width="180"
+                                    HorizontalAlignment="Right"
+                                    Minimum="100"
+                                    Maximum="5000"
+                                    SmallChange="100"
+                                    MaxDecimalPlaces="0" />   
                             </Grid>
-                        </StackPanel>
-                    </ui:CardExpander>
+                        </ui:CardControl.Header>
+                    </ui:CardControl>
+                    
+
 
                 </StackPanel>
             </Grid>

@@ -120,7 +120,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (refreshInterval <= 0)
                 refreshInterval = 250;
 
-            // Read tree state into per-metric toggles.
+            // Read tree state into per-row toggles.
             var toggles = ReadTreeToggles();
 
             return current with
@@ -131,37 +131,15 @@ namespace Uniwill_Control_Utility.Views.Pages
                 ToggleContentsHotkey = ToggleContentsHotkeyTextBox.Text.Trim(),
                 RefreshIntervalMs = refreshInterval,
 
-                // FPS
-                ShowFps = toggles["ShowFps"],
+                // Row toggles
+                ShowCpuRow = toggles["ShowCpuRow"],
+                ShowRamRow = toggles["ShowRamRow"],
+                ShowGpuRow = toggles["ShowGpuRow"],
+                ShowVramRow = toggles["ShowVramRow"],
+                ShowFpsCurrent = toggles["ShowFpsCurrent"],
                 ShowFpsOnePercentLow = toggles["ShowFpsOnePercentLow"],
                 ShowFpsPointOnePercentLow = toggles["ShowFpsPointOnePercentLow"],
-
-                // Frame times
-                ShowFrameTimeCurrent = toggles["ShowFrameTimeCurrent"],
-                ShowFrameTimeOnePercent = toggles["ShowFrameTimeOnePercent"],
-                ShowFrameTimePointOnePercent = toggles["ShowFrameTimePointOnePercent"],
-
-                // GPU
-                ShowGpuTemperature = toggles["ShowGpuTemperature"],
-                ShowGpuUsage = toggles["ShowGpuUsage"],
-                ShowGpuPower = toggles["ShowGpuPower"],
-                ShowGpuClock = toggles["ShowGpuClock"],
-                ShowGpuVram = toggles["ShowGpuVram"],
-
-                // CPU
-                ShowCpuTemperature = toggles["ShowCpuTemperature"],
-                ShowCpuUsage = toggles["ShowCpuUsage"],
-                ShowCpuPower = toggles["ShowCpuPower"],
-                ShowCpuClock = toggles["ShowCpuClock"],
-
-                // RAM
-                ShowMemory = toggles["ShowMemory"],
-
-                // Battery
-                ShowBatteryPercent = toggles["ShowBatteryPercent"],
-                ShowBatteryStatus = toggles["ShowBatteryStatus"],
-                ShowBatteryTime = toggles["ShowBatteryTime"],
-                ShowBatteryPower = toggles["ShowBatteryPower"],
+                ShowBatteryRow = toggles["ShowBatteryRow"],
 
                 // Peripherals
                 ShowHydroUi = toggles["ShowHydroUi"],
@@ -319,26 +297,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             _hydroUiCheckBox = null;
             _flydigiCheckBox = null;
 
-            AddMetricCheckBox("Current FPS", "ShowFps", options.ShowFps);
+            AddMetricCheckBox("CPU row", "ShowCpuRow", options.ShowCpuRow);
+            AddMetricCheckBox("RAM row", "ShowRamRow", options.ShowRamRow);
+            AddMetricCheckBox("GPU row", "ShowGpuRow", options.ShowGpuRow);
+            AddMetricCheckBox("VRAM row", "ShowVramRow", options.ShowVramRow);
+            AddMetricCheckBox("Current FPS", "ShowFpsCurrent", options.ShowFpsCurrent);
             AddMetricCheckBox("1% Low FPS", "ShowFpsOnePercentLow", options.ShowFpsOnePercentLow);
             AddMetricCheckBox("0.1% Low FPS", "ShowFpsPointOnePercentLow", options.ShowFpsPointOnePercentLow);
-            AddMetricCheckBox("Frame time (current)", "ShowFrameTimeCurrent", options.ShowFrameTimeCurrent);
-            AddMetricCheckBox("Frame time (1%)", "ShowFrameTimeOnePercent", options.ShowFrameTimeOnePercent);
-            AddMetricCheckBox("Frame time (0.1%)", "ShowFrameTimePointOnePercent", options.ShowFrameTimePointOnePercent);
-            AddMetricCheckBox("GPU temperature", "ShowGpuTemperature", options.ShowGpuTemperature);
-            AddMetricCheckBox("GPU usage", "ShowGpuUsage", options.ShowGpuUsage);
-            AddMetricCheckBox("GPU power", "ShowGpuPower", options.ShowGpuPower);
-            AddMetricCheckBox("GPU clock", "ShowGpuClock", options.ShowGpuClock);
-            AddMetricCheckBox("GPU VRAM", "ShowGpuVram", options.ShowGpuVram);
-            AddMetricCheckBox("CPU temperature", "ShowCpuTemperature", options.ShowCpuTemperature);
-            AddMetricCheckBox("CPU usage", "ShowCpuUsage", options.ShowCpuUsage);
-            AddMetricCheckBox("CPU power", "ShowCpuPower", options.ShowCpuPower);
-            AddMetricCheckBox("CPU clock", "ShowCpuClock", options.ShowCpuClock);
-            AddMetricCheckBox("RAM used / total", "ShowMemory", options.ShowMemory);
-            AddMetricCheckBox("Battery percentage", "ShowBatteryPercent", options.ShowBatteryPercent);
-            AddMetricCheckBox("Battery charging status", "ShowBatteryStatus", options.ShowBatteryStatus);
-            AddMetricCheckBox("Battery time remaining", "ShowBatteryTime", options.ShowBatteryTime);
-            AddMetricCheckBox("Battery power draw", "ShowBatteryPower", options.ShowBatteryPower);
+            AddMetricCheckBox("Battery row", "ShowBatteryRow", options.ShowBatteryRow);
 
             // Hydro UI checkbox — hidden if feature disabled in Settings or device not connected.
             bool hydroUiFeatureEnabled = Settings.Default.EnableHydroUiNavigation;

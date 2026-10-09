@@ -363,36 +363,24 @@ namespace Uniwill_Control_Utility.Services
             }
 
             // Acquire hardware monitoring categories needed.
-            // Check if any per-metric toggle within each category is enabled.
             HardwareMonitoringCategory categories = HardwareMonitoringCategory.None;
 
-            bool anyCpu = options.ShowCpuTemperature || options.ShowCpuUsage ||
-                          options.ShowCpuPower || options.ShowCpuClock;
-            if (anyCpu)
+            if (options.ShowCpuRow)
                 categories |= HardwareMonitoringCategory.Cpu;
 
-            if (options.ShowMemory)
+            if (options.ShowRamRow)
                 categories |= HardwareMonitoringCategory.Memory;
 
-            bool anyGpu = options.ShowGpuTemperature || options.ShowGpuUsage ||
-                          options.ShowGpuPower || options.ShowGpuClock ||
-                          options.ShowGpuVram;
-            if (anyGpu)
+            if (options.ShowGpuRow || options.ShowVramRow)
                 categories |= HardwareMonitoringCategory.Gpu;
 
-            bool anyBattery = options.ShowBatteryPercent || options.ShowBatteryStatus ||
-                              options.ShowBatteryTime || options.ShowBatteryPower;
-            if (anyBattery)
+            if (options.ShowBatteryRow)
                 categories |= HardwareMonitoringCategory.Battery;
 
             if (categories != HardwareMonitoringCategory.None)
                 _rtssOsdHardwareLease = _hardware.Acquire(categories);
 
-            bool anyFps = options.ShowFps || options.ShowFpsOnePercentLow ||
-                          options.ShowFpsPointOnePercentLow;
-            bool anyFrameTime = options.ShowFrameTimeCurrent || options.ShowFrameTimeOnePercent ||
-                                options.ShowFrameTimePointOnePercent;
-            if (anyFps || anyFrameTime)
+            if (options.ShowFpsCurrent || options.ShowFpsOnePercentLow || options.ShowFpsPointOnePercentLow)
                 _fps.Acquire();
 
             _rtssOsdTimer = new System.Timers.Timer(options.RefreshIntervalMs > 0 ? options.RefreshIntervalMs : 250);
