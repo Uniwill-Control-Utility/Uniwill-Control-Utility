@@ -201,7 +201,7 @@ namespace Uniwill_Control_Utility.ViewModels
                     createNavItem("Light Bar", "lightbar", "\uED39", typeof(Views.Pages.LightBar), false);
                 }
 
-                createNavItem("Battery", "battery", "\uEBC0", typeof(Views.Pages.Battery), false);
+                createNavItem("Battery", "battery", "\uEBAA", typeof(Views.Pages.Battery), false);
                 createNavItem("Display", "display", "\uE7F8", typeof(Views.Pages.Display), false);
             }
 

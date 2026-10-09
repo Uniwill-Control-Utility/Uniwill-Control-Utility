@@ -3,9 +3,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Serilog;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
+using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Uniwill_Control_Utility.Services;
 
 namespace Uniwill_Control_Utility.Views.Pages
@@ -13,11 +15,14 @@ namespace Uniwill_Control_Utility.Views.Pages
     public partial class Automations : Page
     {
         bool setup = false;
+        private readonly UniwillECService? _ecService;
 
         public Automations()
         {
             InitializeComponent();
             _ = Tablet.TabletDevices;
+
+            _ecService = App.GetService<UniwillECService>();
 
             PopulateComboBox(cbxCharge, ActivePresetMode);
             PopulateComboBox(cbxDischarge, ActivePresetMode);
@@ -27,6 +32,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             getAcPreset(Settings.Default.acPreset);
             getDcPreset(Settings.Default.dcPreset);
             getResumePreset(Settings.Default.resumePreset);
+
+            // Populate GPU Power Saving ComboBoxes
+            PopulateGpuPowerSavingComboBoxes();
+
+            // Restore GPU Power Saving selections from settings
+            setGpuPowerSavingBattery(Settings.Default.GpuPowerSavingBattery);
+            setGpuPowerSavingPluggedIn(Settings.Default.GpuPowerSavingPluggedIn);
 
             setup = true;
         }
@@ -255,5 +267,103 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             // Intentionally empty: checkbox state is managed by data binding.
         }
+
+        #region GPU Power Saving
+
+        private static void PopulateGpuPowerSavingComboBox(ComboBox comboBox)
+        {
+            comboBox.Items.Add("iGPU");
+            comboBox.Items.Add("dGPU");
+            comboBox.Items.Add("Auto");
+        }
+
+        private void PopulateGpuPowerSavingComboBoxes()
+        {
+            PopulateGpuPowerSavingComboBox(cbxGpuPowerSavingBattery);
+            PopulateGpuPowerSavingComboBox(cbxGpuPowerSavingPluggedIn);
+
+            // Check if we're in Hybrid mode and show/hide cards accordingly
+            UpdateGpuPowerSavingVisibility();
+        }
+
+        private void UpdateGpuPowerSavingVisibility()
+        {
+            bool isHybrid = false;
+
+            try
+            {
+                if (_ecService is not null)
+                {
+                    var mode = _ecService.GetCurrentGpuMuxMode();
+                    isHybrid = mode == UniwillECService.GpuMuxMode.Hybrid;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Information("[Automations] Failed to read GPU MUX mode: {Message}", ex.Message);
+            }
+
+            Visibility visibility = isHybrid ? Visibility.Visible : Visibility.Collapsed;
+            CardGpuPowerSavingBattery.Visibility = visibility;
+            CardGpuPowerSavingPluggedIn.Visibility = visibility;
+        }
+
+        private void cbxGpuPowerSavingBattery_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!setup) return;
+
+            int mode = cbxGpuPowerSavingBattery.SelectedIndex;
+            Settings.Default.GpuPowerSavingBattery = mode;
+            Settings.Default.Save();
+
+            // Apply immediately if currently on battery
+            var powerStatus = System.Windows.Forms.SystemInformation.PowerStatus;
+            if (powerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline)
+            {
+                _ = GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
+            }
+        }
+
+        private void cbxGpuPowerSavingPluggedIn_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!setup) return;
+
+            int mode = cbxGpuPowerSavingPluggedIn.SelectedIndex;
+            Settings.Default.GpuPowerSavingPluggedIn = mode;
+            Settings.Default.Save();
+
+            // Apply immediately if currently plugged in
+            var powerStatus = System.Windows.Forms.SystemInformation.PowerStatus;
+            if (powerStatus.PowerLineStatus != System.Windows.Forms.PowerLineStatus.Offline)
+            {
+                _ = GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
+            }
+        }
+
+        private void setGpuPowerSavingBattery(int mode)
+        {
+            if (mode >= 0 && mode <= 2)
+            {
+                cbxGpuPowerSavingBattery.SelectedIndex = mode;
+            }
+            else
+            {
+                cbxGpuPowerSavingBattery.SelectedIndex = 2; // Default to Auto
+            }
+        }
+
+        private void setGpuPowerSavingPluggedIn(int mode)
+        {
+            if (mode >= 0 && mode <= 2)
+            {
+                cbxGpuPowerSavingPluggedIn.SelectedIndex = mode;
+            }
+            else
+            {
+                cbxGpuPowerSavingPluggedIn.SelectedIndex = 2; // Default to Auto
+            }
+        }
+
+        #endregion
     }
 }

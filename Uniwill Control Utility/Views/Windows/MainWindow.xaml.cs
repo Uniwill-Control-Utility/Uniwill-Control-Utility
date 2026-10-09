@@ -30,6 +30,7 @@ using MenuItem = System.Windows.Controls.MenuItem;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
+using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Uniwill_Control_Utility.Scripts.Intel_Backend;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
@@ -341,6 +342,21 @@ namespace Uniwill_Control_Utility.Views.Windows
 
                 // Keyboard RGB startup apply moved to mainWindow_Loaded (AsyncApplyKeyboardOnStart)
                 // so it fires regardless of whether the app starts minimized to tray.
+
+                // Apply GPU Power Saving based on current power state
+                try
+                {
+                    var powerStatus = System.Windows.Forms.SystemInformation.PowerStatus;
+                    int mode = (powerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline)
+                        ? Settings.Default.GpuPowerSavingBattery
+                        : Settings.Default.GpuPowerSavingPluggedIn;
+                    await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
+                    Log.Information("[Startup] GPU Power Saving applied: {Mode}", (GpuPowerSavingMode)mode);
+                }
+                catch (Exception ex)
+                {
+                    Log.Information("[Startup] GPU Power Saving apply failed: {Message}", ex.Message);
+                }
             }
             catch (Exception ex)
             {
@@ -892,6 +908,34 @@ namespace Uniwill_Control_Utility.Views.Windows
                             if (lastAppliedState != "dc") ToastNotification.ShowToastNotification("Discharge Preset Applied!", $"Your discharge preset settings have been applied!");
                             lastAppliedState = "dc";
                         }
+
+                        // Apply GPU Power Saving setting for battery
+                        try
+                        {
+                            int mode = Settings.Default.GpuPowerSavingBattery;
+                            await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
+                            Log.Information("[Automations] GPU Power Saving applied for battery: {Mode}", (GpuPowerSavingMode)mode);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Information("[Automations] GPU Power Saving battery apply failed: {Message}", ex.Message);
+                        }
+                    }
+
+                    // Apply GPU Power Saving setting for AC (plugged in)
+                    if (statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
+                        || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery)
+                    {
+                        try
+                        {
+                            int mode = Settings.Default.GpuPowerSavingPluggedIn;
+                            await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
+                            Log.Information("[Automations] GPU Power Saving applied for plugged in: {Mode}", (GpuPowerSavingMode)mode);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Information("[Automations] GPU Power Saving plugged-in apply failed: {Message}", ex.Message);
+                        }
                     }
                 }
 
@@ -1000,6 +1044,21 @@ namespace Uniwill_Control_Utility.Views.Windows
                             catch (Exception ex)
                             {
                                 Debug.WriteLine($"[Resume] Battery re-apply failed: {ex.Message}");
+                            }
+
+                            // Re-apply GPU Power Saving based on current power state
+                            try
+                            {
+                                var powerStatus = System.Windows.Forms.SystemInformation.PowerStatus;
+                                int mode = (powerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline)
+                                    ? Settings.Default.GpuPowerSavingBattery
+                                    : Settings.Default.GpuPowerSavingPluggedIn;
+                                await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
+                                Log.Information("[Resume] GPU Power Saving re-applied: {Mode}", (GpuPowerSavingMode)mode);
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[Resume] GPU Power Saving re-apply failed: {ex.Message}");
                             }
 
                             // Re-apply Fan Control EC duties or restart Smart Fan Mode

@@ -427,7 +427,7 @@
                                     </Grid.ColumnDefinitions>
                                     <ui:FontIcon Grid.Column="0"
 									             FontFamily="Segoe Fluent Icons"
-									             Glyph="&#xE932;"
+									             Glyph="&#xEBC0;"
 									             FontSize="20"
 									             Margin="-6,0,18,0"
 									             VerticalAlignment="Center"/>

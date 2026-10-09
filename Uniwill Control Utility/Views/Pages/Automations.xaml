@@ -79,7 +79,7 @@
                 <!-- Preset on Battery Charge -->
                 <ui:CardControl Margin="0,0,0,8">
                     <ui:CardControl.Icon>
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE897;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEBB5;" FontSize="20" Margin="4,0,6,0" />
                     </ui:CardControl.Icon>
                     <ui:CardControl.Header>
                         <Grid>
@@ -117,7 +117,7 @@
                 <!-- Preset on Battery Discharge -->
                 <ui:CardControl Margin="0,0,0,8">
                     <ui:CardControl.Icon>
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE97E;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xECBC;" FontSize="20" Margin="4,0,6,0" />
                     </ui:CardControl.Icon>
                     <ui:CardControl.Header>
                         <Grid>
@@ -155,7 +155,7 @@
                 <!-- Preset on System Resume -->
                 <ui:CardControl Margin="0,0,0,8">
                     <ui:CardControl.Icon>
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7C5;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF83D;" FontSize="20" Margin="4,0,6,0" />
                     </ui:CardControl.Icon>
                     <ui:CardControl.Header>
                         <Grid>
@@ -186,6 +186,68 @@
                                     <ui:SymbolIcon Symbol="ArrowSync20" FontSize="20" />
                                 </ui:Button>
                             </StackPanel>
+                        </Grid>
+                    </ui:CardControl.Header>
+                </ui:CardControl>
+
+                <!-- GPU Preference on Battery — only visible in Hybrid mode -->
+                <ui:CardControl x:Name="CardGpuPowerSavingBattery"
+                                Margin="0,0,0,8"
+                                Visibility="Collapsed">
+                    <ui:CardControl.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xECBF;" FontSize="20" Margin="4,0,6,0" />
+                    </ui:CardControl.Icon>
+                    <ui:CardControl.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="GPU Preference on Battery" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Control GPU preference when running on battery power"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ComboBox x:Name="cbxGpuPowerSavingBattery"
+                                      Grid.Column="1"
+                                      MinWidth="150"
+                                      Height="37"
+                                      SelectedIndex="0"
+                                      SelectionChanged="cbxGpuPowerSavingBattery_SelectionChanged" />
+                        </Grid>
+                    </ui:CardControl.Header>
+                </ui:CardControl>
+
+                <!-- GPU Preference when Plugged In — only visible in Hybrid mode -->
+                <ui:CardControl x:Name="CardGpuPowerSavingPluggedIn"
+                                Margin="0,0,0,8"
+                                Visibility="Collapsed">
+                    <ui:CardControl.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE95F;" FontSize="20" Margin="4,0,6,0" />
+                    </ui:CardControl.Icon>
+                    <ui:CardControl.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="GPU Preference when Plugged In" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Control GPU preference when the system is connected to power"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ComboBox x:Name="cbxGpuPowerSavingPluggedIn"
+                                      Grid.Column="1"
+                                      MinWidth="150"
+                                      Height="37"
+                                      SelectedIndex="0"
+                                      SelectionChanged="cbxGpuPowerSavingPluggedIn_SelectionChanged" />
                         </Grid>
                     </ui:CardControl.Header>
                 </ui:CardControl>

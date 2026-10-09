@@ -215,5 +215,11 @@
     <Setting Name="GpuPowerSavingMode" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">2</Value>
     </Setting>
+    <Setting Name="GpuPowerSavingBattery" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="GpuPowerSavingPluggedIn" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">1</Value>
+    </Setting>
    </Settings>
 </SettingsFile>
