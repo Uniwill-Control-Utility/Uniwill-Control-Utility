@@ -71,18 +71,20 @@ namespace Uniwill_Control_Utility.Services.Performance
                 void* basePtr = (void*)viewPtr.ToPointer();
                 byte* entryPtr = ((byte*)basePtr) + header.OsdArrOffset + (ulong)(slot * header.OsdEntrySize);
 
-                // Write to extended or regular buffer.
+                // Write to extended or regular buffer. When the text is empty,
+                // zero the entire buffer so RTSS clears any previously rendered
+                // OSD text (including live replacement tags like <FR>).
                 if (version >= ExtendedTextVersion)
                 {
                     byte* szOsdEx = entryPtr + 512; // szOSD[256] + szOSDOwner[256] = 512
-                    for (int i = 0; i < textBytes.Length; i++)
-                        szOsdEx[i] = textBytes[i];
+                    for (int i = 0; i < 4096; i++)
+                        szOsdEx[i] = textBytes.Length > i ? textBytes[i] : (byte)0;
                 }
                 else
                 {
                     byte* szOsd = entryPtr;
-                    for (int i = 0; i < textBytes.Length; i++)
-                        szOsd[i] = textBytes[i];
+                    for (int i = 0; i < 256; i++)
+                        szOsd[i] = textBytes.Length > i ? textBytes[i] : (byte)0;
                 }
 
                 // Increment the global OSD frame counter to signal RTSS.
@@ -105,8 +107,9 @@ namespace Uniwill_Control_Utility.Services.Performance
         }
 
         /// <summary>
-        /// Release the OSD slot by zeroing it out and incrementing dwOSDFrame.
-        /// Call this when the overlay is being disabled or the app is shutting down.
+        /// Release the OSD slot by zeroing the entire entry so RTSS clears the
+        /// rendered text. Keeps the shared-memory mapping alive and remembers
+        /// which slot was used so the next Update() can re-claim the same slot.
         /// </summary>
         internal static void Release()
         {
@@ -123,13 +126,10 @@ namespace Uniwill_Control_Utility.Services.Performance
             unsafe
             {
                 void* basePtr = (void*)viewPtr.ToPointer();
+                int lastSlot = -1;
 
-                // If we have a cached slot, release it directly. Otherwise scan all.
-                int[] slotsToRelease = _claimedSlot >= 0
-                    ? new[] { _claimedSlot }
-                    : EnumerableRange(1, (int)header.OsdArrSize - 1);
-
-                foreach (int slot in slotsToRelease)
+                // Scan all slots to find every UCU-owned entry and zero it.
+                for (int slot = 1; slot < header.OsdArrSize; slot++)
                 {
                     byte* entryPtr = ((byte*)basePtr) + header.OsdArrOffset + (ulong)(slot * header.OsdEntrySize);
 
@@ -147,9 +147,16 @@ namespace Uniwill_Control_Utility.Services.Performance
                     if (!isOurs)
                         continue;
 
-                    // Zero out the entire entry.
+                    lastSlot = slot;
+
+                    // Zero out the entire entry (including owner name) so RTSS
+                    // sees a fully empty slot and clears the rendered OSD text.
                     for (int i = 0; i < header.OsdEntrySize; i++)
                         entryPtr[i] = 0;
+
+                    // Re-claim the slot immediately so the next Update() finds
+                    // it in Pass 1 and reuses the same slot index.
+                    ClaimSlot(entryPtr);
                 }
 
                 // Increment frame counter.
@@ -166,8 +173,11 @@ namespace Uniwill_Control_Utility.Services.Performance
                 FlushViewOfFile((IntPtr)basePtr, IntPtr.Zero);
             }
 
-            _claimedSlot = -1;
-            ReleaseCachedMapping();
+            // Keep the last slot we found — it's already re-claimed so
+            // the next Update() will find it in Pass 1.
+            _claimedSlot = _claimedSlot >= 0 ? _claimedSlot : -1;
+            // NOTE: deliberately NOT calling ReleaseCachedMapping() — the
+            // mapping stays alive so the next tick can AcquireMapping instantly.
         }
 
         private static bool AcquireMapping(out IntPtr viewPtr, out uint version)

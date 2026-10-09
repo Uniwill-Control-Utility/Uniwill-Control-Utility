@@ -34,6 +34,7 @@ namespace Uniwill_Control_Utility.Services
         private System.Timers.Timer? _rtssOsdTimer;
         private IDisposable? _rtssOsdHardwareLease;
         private bool _rtssOsdWasShowing; // tracks if OSD was last showing for focus-loss detection
+        private readonly object _rtssOsdLock = new(); // prevents concurrent ticks from System.Timers.Timer thread-pool dispatch
 
         public OverlayOptions CurrentOptions =>
             _settingsStore.Current;
@@ -402,16 +403,43 @@ namespace Uniwill_Control_Utility.Services
             _rtssOsdHardwareLease?.Dispose();
             _rtssOsdHardwareLease = null;
 
-            _rtssOsdWasShowing = false;
-            RtssOsdWriter.Release();
+            lock (_rtssOsdLock)
+            {
+                _rtssOsdWasShowing = false;
+                RtssOsdWriter.Release();
+            }
         }
 
         private void OnRtssOsdTick(object? sender, ElapsedEventArgs e)
         {
-            try
+            lock (_rtssOsdLock)
             {
-                FpsMetricsSnapshot fps = _fps.Latest;
-                OverlayOptions options = _settingsStore.Current;
+                try
+                {
+                    FpsMetricsSnapshot fps = _fps.Latest;
+                    OverlayOptions options = _settingsStore.Current;
+
+                // Determine whether the target game is currently in focus.
+                // The OSD should only render when the game window is foreground.
+                bool gameInFocus = false;
+
+                if (fps.IsAvailable && fps.ProcessId > 0)
+                {
+                    int foregroundPid = GetForegroundProcessId();
+                    gameInFocus = foregroundPid == fps.ProcessId;
+                }
+
+                // If the game is not in focus, release the OSD slot so RTSS stops
+                // injecting text into the game. The mapping stays alive so the
+                // next Update() can re-claim a slot immediately.
+                if (!gameInFocus)
+                {
+                    RtssOsdWriter.Release();
+                    _rtssOsdWasShowing = false;
+                    return;
+                }
+
+                // Game is in focus — build and write the OSD.
                 HardwareMetricsSnapshot hardware = _hardware.ReadSnapshot();
 
                 // Enrich with EC fan duty data (cached, non-blocking read).
@@ -423,21 +451,6 @@ namespace Uniwill_Control_Utility.Services
                         CpuFanSpeed = ecFan.CpuFanPercent,
                         GpuFanSpeed = ecFan.GpuFanPercent
                     };
-                }
-
-                // Check if the game lost focus while OSD was showing.
-                // Only release when we were previously showing — don't block
-                // the OSD from starting when the user explicitly clicks Show.
-                if (_rtssOsdWasShowing && fps.IsAvailable && fps.ProcessId > 0)
-                {
-                    int foregroundPid = GetForegroundProcessId();
-                    if (foregroundPid != fps.ProcessId)
-                    {
-                        // Game lost focus — clear the OSD.
-                        RtssOsdWriter.Release();
-                        _rtssOsdWasShowing = false;
-                        return;
-                    }
                 }
 
                 // Gather Hydro UI data (null when not connected or disabled in options).
@@ -477,6 +490,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 // Transient read failure must not crash the timer loop.
                 try { Serilog.Log.Warning(ex, "[Overlay] RtssOsdTick failed"); } catch { }
+            }
             }
         }
 
