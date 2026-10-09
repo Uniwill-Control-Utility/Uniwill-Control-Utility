@@ -33,6 +33,7 @@ namespace Uniwill_Control_Utility.Services
         // directly into RTSS shared memory for in-game rendering.
         private System.Timers.Timer? _rtssOsdTimer;
         private IDisposable? _rtssOsdHardwareLease;
+        private IDisposable? _rtssOsdFpsLease;
         private bool _rtssOsdWasShowing; // tracks if OSD was last showing for focus-loss detection
         private readonly object _rtssOsdLock = new(); // prevents concurrent ticks from System.Timers.Timer thread-pool dispatch
 
@@ -381,8 +382,10 @@ namespace Uniwill_Control_Utility.Services
             if (categories != HardwareMonitoringCategory.None)
                 _rtssOsdHardwareLease = _hardware.Acquire(categories);
 
-            if (options.ShowFpsCurrent || options.ShowFpsOnePercentLow || options.ShowFpsPointOnePercentLow)
-                _fps.Acquire();
+            // Always acquire FPS monitoring — we need fps.IsAvailable and
+            // fps.ProcessId for game focus detection even when no FPS rows
+            // are shown in the OSD. Store the lease so it isn't GC'd.
+            _rtssOsdFpsLease = _fps.Acquire();
 
             _rtssOsdTimer = new System.Timers.Timer(options.RefreshIntervalMs > 0 ? options.RefreshIntervalMs : 250);
             _rtssOsdTimer.AutoReset = true;
@@ -403,6 +406,9 @@ namespace Uniwill_Control_Utility.Services
             _rtssOsdHardwareLease?.Dispose();
             _rtssOsdHardwareLease = null;
 
+            _rtssOsdFpsLease?.Dispose();
+            _rtssOsdFpsLease = null;
+
             lock (_rtssOsdLock)
             {
                 _rtssOsdWasShowing = false;
@@ -421,12 +427,35 @@ namespace Uniwill_Control_Utility.Services
 
                 // Determine whether the target game is currently in focus.
                 // The OSD should only render when the game window is foreground.
+                //
+                // fps.IsAvailable may be false even when a game is running, because
+                // IsRecognizedGame() in FpsMonitoringService blocks processes not in
+                // the installed game library (e.g. Wallpaper Engine). In that case
+                // fall back to a direct RTSS read for the foreground PID so the OSD
+                // still shows hardware metrics for hooked processes outside the
+                // game library.
                 bool gameInFocus = false;
 
                 if (fps.IsAvailable && fps.ProcessId > 0)
                 {
                     int foregroundPid = GetForegroundProcessId();
                     gameInFocus = foregroundPid == fps.ProcessId;
+                }
+                else
+                {
+                    // FpsMonitoringService rejected the process (IsRecognizedGame
+                    // returned false). Fall back to a direct RTSS read for the
+                    // foreground PID — but only accept an exact PID match.
+                    // TryRead has an internal fallback to any hooked process with
+                    // FPS > 0, which would make gameInFocus always true when any
+                    // game is running. We verify the returned PID matches the
+                    // foreground to avoid that.
+                    int foregroundPid = GetForegroundProcessId();
+                    if (foregroundPid > 0 && RtssReader.TryRead(foregroundPid, out RtssFpsData fallbackData) && fallbackData.Fps > 0
+                        && fallbackData.ProcessId == foregroundPid)
+                    {
+                        gameInFocus = true;
+                    }
                 }
 
                 // If the game is not in focus, write a single-space OSD to hide

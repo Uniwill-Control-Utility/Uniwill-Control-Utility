@@ -214,6 +214,20 @@ namespace Uniwill_Control_Utility.Services.Performance
             }
 
             // --- FPS rows (with short API label) ---
+            // RTSS requires the <FR> replacement tag in the OSD stream for the slot
+            // to render at all. Without it, RTSS treats the entry as static text and
+            // may not paint it inside the game.
+            //
+            // When all FPS rows are hidden by the user, we embed a zero-size <FR>
+            // tag at the end of the string so RTSS still has a live replacement tag
+            // to drive rendering — but the tag renders at font size 0 so it's
+            // invisible to the user.
+            bool anyFpsVisible = options.ShowFpsCurrent || options.ShowFpsOnePercentLow || options.ShowFpsPointOnePercentLow;
+            // When FPS rows are hidden, inject a zero-size <FR> tag so RTSS still
+            // has a live replacement tag to drive rendering regardless of whether
+            // FPS data is available (IsRecognizedGame may block it).
+            bool needsHiddenFr = !anyFpsVisible;
+
             if (fps.IsAvailable)
             {
                 string apiLabel = ShortApiLabel(fps.GraphicsApi);
@@ -277,6 +291,14 @@ namespace Uniwill_Control_Utility.Services.Performance
 
                 sb.Append(BuildRow(ColorBattery, "BAT", cells));
                 hasContent = true;
+            }
+
+            // When FPS rows are hidden but data is available, inject a zero-size <FR>
+            // tag so RTSS still has a live replacement tag to drive rendering.
+            // The font size 0 makes it invisible to the user.
+            if (needsHiddenFr)
+            {
+                sb.Append("<S=0><FR><S=100>");
             }
 
             return hasContent ? sb.ToString() : null;
