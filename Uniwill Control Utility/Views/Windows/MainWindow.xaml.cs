@@ -1223,34 +1223,50 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// </summary>
         private const int WM_DISPLAYCHANGE = 0x007E;
 
+        // SM_CMONITORS for GetSystemMetrics — tracks how many displays are active
+        // so we only reset GPU driver state on real topology changes, not fullscreen alt-tabs.
+        private const int SM_CMONITORS = 80;
+        private int _lastMonitorCount = -1;
+
+        [System.Runtime.InteropServices.LibraryImport("user32.dll")]
+        private static partial int GetSystemMetrics(int nIndex);
+
         private IntPtr OnWindowMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
             if (msg == WM_DISPLAYCHANGE)
             {
-                // Don't mark as handled — other WPF code may need this message.
-                // ResetComputer() only closes the Computer and invalidates the cache.
-                // The actual reopen happens on the next background refresh cycle, so
-                // we don't need to delay or run on a separate thread.
-                try
-                {
-                    var monitoring = App.GetService<IHardwareMonitoringService>();
-                    monitoring?.ResetComputer();
-                    Debug.WriteLine("[Display] LHM Computer reset after display topology change");
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[Display] LHM reset failed: {ex.Message}");
-                }
+                int currentMonitorCount = GetSystemMetrics(SM_CMONITORS);
+                bool topologyChanged = _lastMonitorCount < 0 || currentMonitorCount != _lastMonitorCount;
+                _lastMonitorCount = currentMonitorCount;
 
-                // Also reset NvTuning's NVML context — separate from LHM.
-                try
+                // Don't mark as handled — other WPF code may need this message.
+                // Only reset GPU driver state when the monitor count actually changes.
+                // Fullscreen alt-tabs fire WM_DISPLAYCHANGE but don't change the
+                // monitor count — resetting on those causes a 15-second NVML
+                // blackout (GpuInteropGuard cooldown) and metrics show zeros.
+                if (topologyChanged)
                 {
-                    Scripts.GPUs.NVIDIA.Nvml.Reset();
-                    Debug.WriteLine("[Display] NVML reset for NvTuning");
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[Display] NVML reset failed: {ex.Message}");
+                    try
+                    {
+                        var monitoring = App.GetService<IHardwareMonitoringService>();
+                        monitoring?.ResetComputer();
+                        Debug.WriteLine($"[Display] LHM Computer reset after display topology change ({_lastMonitorCount} monitors)");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[Display] LHM reset failed: {ex.Message}");
+                    }
+
+                    // Also reset NvTuning's NVML context — separate from LHM.
+                    try
+                    {
+                        Scripts.GPUs.NVIDIA.Nvml.Reset();
+                        Debug.WriteLine("[Display] NVML reset for NvTuning");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[Display] NVML reset failed: {ex.Message}");
+                    }
                 }
             }
 
