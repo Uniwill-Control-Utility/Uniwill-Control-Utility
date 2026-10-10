@@ -530,6 +530,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 }
 
                 ApplyKeyboardOnStartWithService(hidService);
+                ApplyLightBarOnStartWithService(hidService);
             }
             catch (Exception ex)
             {
@@ -591,6 +592,45 @@ namespace Uniwill_Control_Utility.Views.Windows
             {
                 hidService.TurnOff();
                 System.Diagnostics.Debug.WriteLine("[KBD] Startup apply: keyboard OFF");
+            }
+        }
+
+        /// <summary>Applies persisted LightBar settings at app startup using a pre-opened HID service.</summary>
+        private static void ApplyLightBarOnStartWithService(KeyboardHidService hidService)
+        {
+            try
+            {
+                if (!Settings.Default.LightBarEnabled)
+                {
+                    System.Diagnostics.Debug.WriteLine("[LB] Startup apply: LightBar disabled, skipping");
+                    return;
+                }
+
+                if (!hidService.IsLightBarAvailable)
+                {
+                    System.Diagnostics.Debug.WriteLine("[LB] Startup apply: LightBar not available on this device");
+                    return;
+                }
+
+                byte r = Settings.Default.LightBarR;
+                byte g = Settings.Default.LightBarG;
+                byte b = Settings.Default.LightBarB;
+                int brightness = Settings.Default.LightBarBrightness;
+                int effectIndex = Math.Clamp(Settings.Default.LightBarEffectIndex, 0, 5);
+                int speed = Math.Clamp(Settings.Default.LightBarSpeed, 0, 11);
+
+                byte[] effectValues = new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 };
+                byte effect = effectValues[effectIndex];
+                byte hidSpeed = (byte)(11 - speed);
+
+                hidService.LightBarTurnOn(r, g, b, brightness);
+                hidService.LightBarSetEffect(effect, hidSpeed, brightness);
+
+                System.Diagnostics.Debug.WriteLine($"[LB] Startup apply: color=({r},{g},{b}), brightness={brightness}, effect=0x{effect:X2}, hidSpeed={hidSpeed}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LB] Startup apply failed: {ex.Message}");
             }
         }
 
