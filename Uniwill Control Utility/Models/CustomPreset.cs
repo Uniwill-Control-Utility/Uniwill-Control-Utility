@@ -70,14 +70,64 @@ namespace Uniwill_Control_Utility.Models
         /// <summary> V-F curve offsets: pointIndex → frequencyOffsetMHz </summary>
         public Dictionary<int, int> VfCurveOffsets { get; set; } = new();
 
+        #region Fan Control Settings
+        /// <summary> Whether Unified Fan Curve mode is enabled (stored per-preset). </summary>
+        public bool FanUnifiedMode { get; set; }
+
+        /// <summary> Unified preset name (Silent, Balanced, Performance, Full Speed, Off, Custom). </summary>
+        public string? FanUnifiedPreset { get; set; }
+
+        /// <summary> Custom duty values (0-100%) for unified mode, 11 zone indices. </summary>
+        public int[]? FanUnifiedDuties { get; set; }
+
+        /// <summary> Custom temperature thresholds for unified mode, 11 zone indices. </summary>
+        public int[]? FanUnifiedTempThresholds { get; set; }
+
+        /// <summary> CPU preset name (split mode). </summary>
+        public string? FanCpuPreset { get; set; }
+
+        /// <summary> Custom duty values (0-100%) for CPU, 11 zone indices. </summary>
+        public int[]? FanCpuDuties { get; set; }
+
+        /// <summary> Custom temperature thresholds for CPU, 11 zone indices. </summary>
+        public int[]? FanCpuTempThresholds { get; set; }
+
+        /// <summary> GPU preset name (split mode). </summary>
+        public string? FanGpuPreset { get; set; }
+
+        /// <summary> Custom duty values (0-100%) for GPU, 11 zone indices. </summary>
+        public int[]? FanGpuDuties { get; set; }
+
+        /// <summary> Custom temperature thresholds for GPU, 11 zone indices. </summary>
+        public int[]? FanGpuTempThresholds { get; set; }
+
+        /// <summary> Whether Smart Fan Mode is enabled. </summary>
+        public bool FanSmartFanMode { get; set; }
+
+        /// <summary> Temperature source for Smart Fan Mode: "cpu", "gpu", or "max". </summary>
+        public string? FanSmartFanTempSource { get; set; }
+        #endregion
+
         private static bool Differs(double value, double defaultValue) => Math.Abs(value - defaultValue) > 1e-9;
+
+        /// <summary>True when any fan control field differs from its default (empty/false/null). </summary>
+        public bool HasFanChanges => FanUnifiedMode ||
+            !string.IsNullOrEmpty(FanUnifiedPreset) ||
+            FanUnifiedDuties != null || FanUnifiedTempThresholds != null ||
+            !string.IsNullOrEmpty(FanCpuPreset) ||
+            FanCpuDuties != null || FanCpuTempThresholds != null ||
+            !string.IsNullOrEmpty(FanGpuPreset) ||
+            FanGpuDuties != null || FanGpuTempThresholds != null ||
+            FanSmartFanMode ||
+            !string.IsNullOrEmpty(FanSmartFanTempSource);
 
         public bool HasChanges => Differs(CpuSustained, 75) || Differs(CpuBoost, 85) || Differs(CpuTjMax, 95) ||
             Differs(CpuCoCcd0, 0) || Differs(CpuCoCcd1, 0) ||
             Differs(IntelPl1, 45) || Differs(IntelPl2, 60) || Differs(IntelVolt, 0) ||
             Differs(GpuTgp, 150) || GpuDynamicBoost || Differs(GpuDbOffset, 0) ||
             Differs(GpuCoreOffset, 0) || Differs(GpuMemOffset, 0) ||
-            VfCurveOffsets.Any(p => p.Value != 0);
+            VfCurveOffsets.Any(p => p.Value != 0) ||
+            HasFanChanges;
     }
 
     /// <summary>

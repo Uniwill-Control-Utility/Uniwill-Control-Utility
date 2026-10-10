@@ -243,6 +243,16 @@ namespace Uniwill_Control_Utility.Services
                     ec.ApplyCpuPowerLimits(pl1, pl2);
                 }
             }
+
+            // 4. Fan control settings (Custom presets only)
+            if (customSlot >= 0)
+            {
+                var presets = CustomPresetStore.Load(customMode);
+                if (customSlot < presets.Length && presets[customSlot].HasFanChanges)
+                {
+                    ApplyFanSettingsFromPreset(presets[customSlot]);
+                }
+            }
         }
 
         private static void ApplyVfCurve()
@@ -507,5 +517,113 @@ namespace Uniwill_Control_Utility.Services
                 _ => profileName
             };
         }
+
+        #region Fan Control Settings from Custom Presets
+
+        /// <summary>
+        /// Applies the fan control settings stored in a CustomPreset.
+        /// Writes to FanControlSettingsService (triggers UI sync via SettingsChanged event)
+        /// and pushes the curve to the EC hardware.
+        /// </summary>
+        public static void ApplyFanSettingsFromPreset(CustomPreset preset)
+        {
+            if (!preset.HasFanChanges)
+                return;
+
+            // 1. Write to FanControlSettingsService so the Fan Control page UI syncs.
+            var settings = FanControlSettingsService.Load();
+            settings.UnifiedMode = preset.FanUnifiedMode;
+            settings.UnifiedPreset = preset.FanUnifiedPreset ?? settings.UnifiedPreset;
+            settings.UnifiedDuties = preset.FanUnifiedDuties;
+            settings.UnifiedTempThresholds = preset.FanUnifiedTempThresholds;
+            settings.CpuPreset = preset.FanCpuPreset ?? settings.CpuPreset;
+            settings.CpuDuties = preset.FanCpuDuties;
+            settings.CpuTempThresholds = preset.FanCpuTempThresholds;
+            settings.GpuPreset = preset.FanGpuPreset ?? settings.GpuPreset;
+            settings.GpuDuties = preset.FanGpuDuties;
+            settings.GpuTempThresholds = preset.FanGpuTempThresholds;
+            settings.EcSmartFanMode = preset.FanSmartFanMode;
+            settings.EcSmartFanTempSource = preset.FanSmartFanTempSource ?? settings.EcSmartFanTempSource;
+            FanControlSettingsService.Save(settings);
+
+            // 2. Push curve to EC hardware.
+            ApplyFanCurveToEc(preset);
+        }
+
+        private static void ApplyFanCurveToEc(CustomPreset preset)
+        {
+            var ec = RyzenAdj_To_UCU.EcService;
+            if (ec is null)
+                return;
+
+            EcFanCurve cpuCurve;
+            EcFanCurve gpuCurve;
+            int[] cpuTemps;
+            int[] gpuTemps;
+
+            if (preset.FanUnifiedMode)
+            {
+                cpuTemps = preset.FanUnifiedTempThresholds ?? EcFanCurve.CpuTemperatures;
+                gpuTemps = cpuTemps;
+
+                string unifiedPreset = preset.FanUnifiedPreset ?? "Balanced";
+                if (unifiedPreset == "Custom" && preset.FanUnifiedDuties?.Length == 11)
+                {
+                    cpuCurve = BuildCurveFromDuties(preset.FanUnifiedDuties, unifiedPreset);
+                }
+                else
+                {
+                    cpuCurve = GetPresetCurve(unifiedPreset);
+                }
+                gpuCurve = cpuCurve;
+            }
+            else
+            {
+                cpuTemps = preset.FanCpuTempThresholds ?? EcFanCurve.CpuTemperatures;
+                gpuTemps = preset.FanGpuTempThresholds ?? EcFanCurve.GpuTemperatures;
+
+                string cpuPreset = preset.FanCpuPreset ?? "Balanced";
+                string gpuPreset = preset.FanGpuPreset ?? "Balanced";
+
+                cpuCurve = preset.FanCpuDuties?.Length == 11
+                    ? BuildCurveFromDuties(preset.FanCpuDuties, cpuPreset)
+                    : GetPresetCurve(cpuPreset);
+
+                gpuCurve = preset.FanGpuDuties?.Length == 11
+                    ? BuildCurveFromDuties(preset.FanGpuDuties, gpuPreset)
+                    : GetPresetCurve(gpuPreset);
+            }
+
+            try
+            {
+                ec.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                Debug.WriteLine($"[PresetProfileApplier] Fan curve applied from preset: unified={preset.FanUnifiedMode}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[PresetProfileApplier] Fan curve apply failed: {ex.Message}");
+            }
+        }
+
+        private static EcFanCurve BuildCurveFromDuties(int[] duties, string name)
+        {
+            var curve = new EcFanCurve { Name = name };
+            curve.Duties.Clear();
+            foreach (var d in duties)
+                curve.Duties.Add(Math.Clamp(d, 0, 100));
+            return curve;
+        }
+
+        private static EcFanCurve GetPresetCurve(string? name) => name switch
+        {
+            "Silent" => EcFanCurve.CreateSilent(),
+            "Balanced" => EcFanCurve.CreateBalanced(),
+            "Performance" => EcFanCurve.CreatePerformance(),
+            "Full Speed" => EcFanCurve.CreateFullSpeed(),
+            "Off" => EcFanCurve.CreateOff(),
+            _ => EcFanCurve.CreateBalanced()
+        };
+
+        #endregion
     }
 }

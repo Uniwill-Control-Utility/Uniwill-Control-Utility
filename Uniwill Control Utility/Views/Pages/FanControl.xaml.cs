@@ -209,6 +209,19 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     var settings = FanControlSettingsService.Load();
 
+                    // Sync unified/split mode if it changed (e.g., from a custom preset apply)
+                    bool unifiedWasChecked = tsUnifiedCurve.IsChecked == true;
+                    if (unifiedWasChecked != settings.UnifiedMode)
+                    {
+                        // Full reload needed — apply all settings including curve editors
+                        _loadingSettings = true;
+                        ApplySettings(settings);
+                        InitializeTempThresholdInputs();
+                        _loadingSettings = false;
+                        UpdateBanner();
+                        return;
+                    }
+
                     // Sync Smart Fan Mode toggle
                     _loadingSettings = true;
                     bool smartFanWasChecked = tsSmartFanMode.IsChecked == true;
@@ -249,6 +262,23 @@ namespace Uniwill_Control_Utility.Views.Pages
                             // No need to ApplyCurveNow() — the tray handler already
                             // applied the normal fan curve when it stopped Smart Fan.
                         }
+                    }
+
+                    // Sync preset combo boxes if they changed (e.g., from a custom preset apply)
+                    string unifiedPreset = GetSelectedPresetName(cbPreset);
+                    string cpuPreset = GetSelectedPresetName(cbCpuPreset);
+                    string gpuPreset = GetSelectedPresetName(cbGpuPreset);
+
+                    bool presetChanged =
+                        (settings.UnifiedMode && unifiedPreset != settings.UnifiedPreset) ||
+                        (!settings.UnifiedMode && (cpuPreset != settings.CpuPreset || gpuPreset != settings.GpuPreset));
+
+                    if (presetChanged)
+                    {
+                        // Reload curve editors with the new preset selections
+                        ApplySettings(settings);
+                        InitializeTempThresholdInputs();
+                        UpdateBanner();
                     }
 
                     // Sync temp source dropdown
