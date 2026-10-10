@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -64,10 +65,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         // Custom profile fan curve persistence
         private FanControlSettings? _savedCustomFanSettings;
 
-        // Diagnostic logging (visible in Visual Studio Output / debug console)
+        // Diagnostic logging (visible in Serilog log file)
         private static void DebugLog(string message)
         {
-            Debug.WriteLine($"[Presets] {message}");
+            try { Log.Information("[Presets] {Message}", message); } catch { }
         }
 
         // Adaptive Mode override snackbar
@@ -128,13 +129,27 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     var presets = Models.CustomPresetStore.Load(ActivePresetMode);
                     int slot = _customPresetSlot;
+                    DebugLog($"OnNavigatedToAsync Custom: _customPresetSlot={slot}, presets[{slot}].HasChanges={slot < presets.Length && presets[slot].HasChanges}");
                     if (slot < 0 || slot >= presets.Length || !presets[slot].HasChanges)
                     {
                         // Slot empty — fall back to Settings.Default values saved by last Apply.
+                        DebugLog($"OnNavigatedToAsync Custom: Falling back to LoadCustomValues()");
                         LoadCustomValues();
                     }
                     updateStatus();
                     updateAllLabels();
+
+                    // Force a visual refresh on cached pages. WPF doesn't re-render
+                    // TextBlock elements when .Text is set programmatically on a
+                    // page that was previously displayed with different values.
+                    // Defer a second pass to the next dispatcher cycle so the visual
+                    // tree has processed the initial changes.
+                    _ = this.Dispatcher.InvokeAsync(() =>
+                    {
+                        updateStatus();
+                        updateAllLabels();
+                        this.UpdateLayout();
+                    }, DispatcherPriority.Background);
                 }
 
                 // After ALL slider value assignments (profile load + Custom fallback),
@@ -815,14 +830,19 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Handle custom preset names saved by the tray widget (e.g. "Custom 2", "Custom 3 (Boost)")
             if (Services.TrayPresetOptions.IsCustomPreset(saved))
             {
+                DebugLog($"loadSavedProfile: saved='{saved}', ActivePresetSlot={ActivePresetSlot}, customPresetSlot={Settings.Default.customPresetSlot}, customPresetSlotBoost={Settings.Default.customPresetSlotBoost}");
+
                 // Parse slot from "Custom N" or "Custom N (Boost)"
-                int slot = 0;
                 var parts = saved.Replace("(Boost)", "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length >= 2 && int.TryParse(parts[1], out int parsed))
-                    slot = Math.Clamp(parsed - 1, 0, Models.CustomPreset.MaxSlots - 1);
+                {
+                    int slot = Math.Clamp(parsed - 1, 0, Models.CustomPreset.MaxSlots - 1);
+                    // Only overwrite ActivePresetSlot when the saved name contains an explicit slot number.
+                    // When saved is just "Custom", the slot is already persisted in customPresetSlot/customPresetSlotBoost.
+                    ActivePresetSlot = slot;
+                    DebugLog($"loadSavedProfile: Parsed slot {slot} from '{saved}'");
+                }
 
-                // Ensure ActivePresetSlot is synced so selectProfile picks up the correct slot
-                ActivePresetSlot = slot;
                 selectProfile("Custom", apply: false);
             }
             else
@@ -971,6 +991,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (_customPresetSlot < 0 || _customPresetSlot >= Models.CustomPreset.MaxSlots)
                     _customPresetSlot = 0;
 
+                DebugLog($"selectProfile Custom: _customPresetSlot={_customPresetSlot}, ActivePresetSlot={ActivePresetSlot}, customPresetSlot={Settings.Default.customPresetSlot}");
+
                 LoadCustomPreset(_customPresetSlot);
                 updateAllLabels();
                 updateRadioButtonStyles();
@@ -1002,11 +1024,23 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     if (profile == "Custom")
                     {
-                        if (_savedCustomFanSettings is not null)
+                        // Check if the active custom preset slot has fan settings stored.
+                        var customPresets = Models.CustomPresetStore.Load(ActivePresetMode);
+                        bool presetHasFanSettings = _customPresetSlot >= 0 &&
+                            _customPresetSlot < customPresets.Length &&
+                            customPresets[_customPresetSlot].HasFanChanges;
+
+                        if (presetHasFanSettings)
                         {
-                            // Restore Custom fan settings and apply to EC
+                            // Apply fan settings from the custom preset slot
+                            PresetProfileApplier.ApplyFanSettingsFromPreset(customPresets[_customPresetSlot]);
+                            DebugLog($"selectProfile: Applied fan settings from Custom preset slot {_customPresetSlot + 1}");
+                        }
+                        else if (_savedCustomFanSettings is not null)
+                        {
+                            // Fallback: restore saved Custom fan settings and apply to EC
                             FanControlSettingsService.Save(_savedCustomFanSettings);
-                            DebugLog($"selectProfile: Restored and applying Custom fan settings");
+                            DebugLog($"selectProfile: Restored and applying saved Custom fan settings");
                             ApplyCustomFanCurveFromSettings(_savedCustomFanSettings);
                         }
                         else
@@ -1243,6 +1277,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 // For Custom profile, update stored values from sliders so the status
                 // card reflects what was just applied (not whatever was loaded on startup).
+                // Also apply fan control settings stored in the custom preset.
                 if (_currentProfile == "Custom")
                 {
                     _profileSustained = sdSustained.Value;
@@ -1255,6 +1290,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                      _profileGpuTgp = sdNvPower.Value;
                     _profileGpuDb = togDynamicBoost.IsChecked == true;
                     _profileGpuDbOffset = sdNvDbOffset.Value;
+
+                    // Apply fan control settings from the saved custom preset slot.
+                    var customPresets = Models.CustomPresetStore.Load(ActivePresetMode);
+                    if (_customPresetSlot >= 0 && _customPresetSlot < customPresets.Length)
+                    {
+                        PresetProfileApplier.ApplyFanSettingsFromPreset(customPresets[_customPresetSlot]);
+                    }
                 }
 
                 // Update status after apply
@@ -1371,6 +1413,24 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
             }
 
+            // Capture current Fan Control page settings from the global FanControlSettings.
+            // This lets each custom preset store its own copy of fan curves, unified/split
+            // mode, temp thresholds, and Smart Fan Mode state.
+            var fanSettings = FanControlSettingsService.Load();
+            var p = presets[slotIndex];
+            p.FanUnifiedMode = fanSettings.UnifiedMode;
+            p.FanUnifiedPreset = fanSettings.UnifiedPreset;
+            p.FanUnifiedDuties = fanSettings.UnifiedDuties?.Clone() as int[];
+            p.FanUnifiedTempThresholds = fanSettings.UnifiedTempThresholds?.Clone() as int[];
+            p.FanCpuPreset = fanSettings.CpuPreset;
+            p.FanCpuDuties = fanSettings.CpuDuties?.Clone() as int[];
+            p.FanCpuTempThresholds = fanSettings.CpuTempThresholds?.Clone() as int[];
+            p.FanGpuPreset = fanSettings.GpuPreset;
+            p.FanGpuDuties = fanSettings.GpuDuties?.Clone() as int[];
+            p.FanGpuTempThresholds = fanSettings.GpuTempThresholds?.Clone() as int[];
+            p.FanSmartFanMode = fanSettings.EcSmartFanMode;
+            p.FanSmartFanTempSource = fanSettings.EcSmartFanTempSource;
+
             Models.CustomPresetStore.Save(presets, ActivePresetMode);
             DebugLog($"SaveCustomPreset: slot {slotIndex + 1} saved (mode={ActivePresetMode})");
             updateRadioButtonStyles();
@@ -1412,6 +1472,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 updateCoVisibility();
 
                 // Restore stored profile values for status card
+                DebugLog($"LoadCustomPreset slot {slotIndex + 1}: setting sliders Sustained={preset.CpuSustained}, Boost={preset.CpuBoost}, TjMax={preset.CpuTjMax}");
                 _profileSustained = preset.CpuSustained;
                 _profileBoost = preset.CpuBoost;
                 _profileTjMax = (int)preset.CpuTjMax;
@@ -1465,6 +1526,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             var buttons = new RadioButton[] { rbProfile1, rbProfile2, rbProfile3, rbProfile4, rbProfile5 };
             int newSlot = Array.IndexOf(buttons, sender as RadioButton);
+            DebugLog($"rbProfile_Click: newSlot={newSlot}, _customPresetSlot={_customPresetSlot}, customPresetSlot={Settings.Default.customPresetSlot}");
             if (newSlot < 0 || newSlot == _customPresetSlot) return;
 
             // Save current slot before switching (in case user made unsaved changes)
@@ -1473,12 +1535,21 @@ namespace Uniwill_Control_Utility.Views.Pages
             _customPresetSlot = newSlot;
             ActivePresetSlot = newSlot;
             Settings.Default.Save();
+            DebugLog($"rbProfile_Click: Saved _customPresetSlot={_customPresetSlot}, customPresetSlot={Settings.Default.customPresetSlot}");
 
             // Load the new slot's preset if it has data
             LoadCustomPreset(newSlot);
             updateAllLabels();
             updateStatus();
             updateRadioButtonStyles();
+
+            // Apply fan settings from the new preset slot if it has any stored.
+            var customPresets = Models.CustomPresetStore.Load(ActivePresetMode);
+            if (newSlot < customPresets.Length && customPresets[newSlot].HasFanChanges)
+            {
+                PresetProfileApplier.ApplyFanSettingsFromPreset(customPresets[newSlot]);
+                DebugLog($"rbProfile_Click: Applied fan settings from slot {newSlot + 1}");
+            }
         }
 
         private void btnSave_Click(object sender, RoutedEventArgs e)
@@ -1685,14 +1756,28 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _customPresetSlot = 0;
 
             var presets = Models.CustomPresetStore.Load(ActivePresetMode);
-            for (int i = 0; i < presets.Length; i++)
+
+            // Check the active slot first — if it has a V-F curve, activate it and stop.
+            if (_customPresetSlot < presets.Length && presets[_customPresetSlot].VfCurveOffsets.Count > 0)
             {
-                if (presets[i].VfCurveOffsets.Count > 0)
+                _vfActivePreset = 0;
+                DebugLog($"V-F curve active on current slot {_customPresetSlot + 1} (mode={ActivePresetMode})");
+                return;
+            }
+
+            // Only auto-switch to another slot if the current slot is empty (no HasChanges).
+            // This avoids stealing the slot away from a preset that has fan/VF settings but no V-F curve.
+            if (!presets[_customPresetSlot].HasChanges)
+            {
+                for (int i = 0; i < presets.Length; i++)
                 {
-                    _vfActivePreset = 0;
-                    _customPresetSlot = i;
-                    DebugLog($"V-F curve auto-detected on Custom preset slot {i + 1} (mode={ActivePresetMode})");
-                    return;
+                    if (presets[i].VfCurveOffsets.Count > 0)
+                    {
+                        _vfActivePreset = 0;
+                        _customPresetSlot = i;
+                        DebugLog($"V-F curve auto-detected on Custom preset slot {i + 1} (mode={ActivePresetMode})");
+                        return;
+                    }
                 }
             }
         }
