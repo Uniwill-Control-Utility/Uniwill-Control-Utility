@@ -1172,5 +1172,14 @@ namespace Uniwill_Control_Utility
             }
             catch { /* non-critical — falls back to default taskbar behavior */ }
         }
+
+        /// <summary>
+        /// Re-asserts the AppUserModelID after a GPU driver reset.
+        /// Call this from the UI thread after PnP hotswap to restore the taskbar icon.
+        /// </summary>
+        public static void ReassertAppUserModelID()
+        {
+            SetAppUserModelID("UniwillControlUtility.UCU");
+        }
     }
 }

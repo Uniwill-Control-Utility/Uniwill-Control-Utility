@@ -405,6 +405,18 @@ namespace Uniwill_Control_Utility.Views.Pages
                     Log.Information("[Display] LHM reset after power saving change failed: {Message}", resetEx.Message);
                 }
 
+                // After a PnP hotswap the GPU driver reinitializes, which can break
+                // the taskbar icon association. Wait for the driver to settle then
+                // re-assert the AppUserModelID to restore the taskbar icon.
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(2000);
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        App.ReassertAppUserModelID();
+                    });
+                });
+
                 Log.Information("[Display] GPU Power Saving set to {Mode}, dGPU PnP: {Before} -> {After}, GuardBlocked: {Blocked}, IsAdmin: {IsAdmin}",
                     GpuPowerSaving.GetModeDisplayName(powerSavingMode), pnpStatusBefore, pnpStatusAfter, GpuInteropGuard.IsBlocked, _isAdministrator);
             }
