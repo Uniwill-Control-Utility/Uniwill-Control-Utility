@@ -562,7 +562,8 @@ namespace Uniwill_Control_Utility.Views.Windows
                 {
                     System.Threading.Thread.Sleep(200);
                     int brightnessPercent = (settings.Brightness * 100) / 7;
-                    hidService.SetPerKeyBrightness(brightnessPercent);
+                    hidService.TurnOn(settings.ColorR, settings.ColorG, settings.ColorB, brightnessPercent);
+                    hidService.SetEffect(Uniwill_Control_Utility.Models.KeyboardEffect.Static);
                     var colors = settings.GetPerKeyColors();
                     hidService.SendAllPerKeyColorsFromDict(colors);
                     System.Diagnostics.Debug.WriteLine("[KBD] Startup apply: per-key mode");
@@ -572,29 +573,40 @@ namespace Uniwill_Control_Utility.Views.Windows
                     int brightnessPercent = (settings.Brightness * 100) / 7;
                     byte speed = (byte)Math.Clamp((int)settings.Speed, 0, 11);
 
-                    if (settings.Direction != KeyboardDirection.LeftRight)
-                        System.Threading.Thread.Sleep(500);
-
-                    hidService.TurnOnWithEffect(settings.ColorR, settings.ColorG, settings.ColorB,
-                        brightnessPercent, settings.EffectMode, speed, settings.Direction, settings.TouchReactive);
-
-                    if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor7Effect(settings.EffectMode))
+                    if (settings.EffectMode == Uniwill_Control_Utility.Models.KeyboardEffect.Rainbow)
                     {
-                        var colors = ParseKeyboardColorString(settings.MultiColors, 7);
-                        if (colors.Count > 0)
+                        // Rainbow: use software-driven per-key gradient.
+                        // The ITE firmware's built-in Rainbow (0x05) leaves the
+                        // leftmost columns dark due to a hardcoded LED layout mismatch.
+                        hidService.SendRainbowEffect(brightnessPercent);
+                        System.Diagnostics.Debug.WriteLine("[KBD] Startup apply: Rainbow (software gradient)");
+                    }
+                    else
+                    {
+                        if (settings.Direction != KeyboardDirection.LeftRight)
+                            System.Threading.Thread.Sleep(500);
+
+                        hidService.TurnOnWithEffect(settings.ColorR, settings.ColorG, settings.ColorB,
+                            brightnessPercent, settings.EffectMode, speed, settings.Direction, settings.TouchReactive);
+
+                        if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor7Effect(settings.EffectMode))
                         {
-                            if (settings.EffectMode == Uniwill_Control_Utility.Models.KeyboardEffect.Marquee)
-                                colors = colors.AsEnumerable().Reverse().ToList();
-                            hidService.SetMultiColor(colors);
+                            var colors = ParseKeyboardColorString(settings.MultiColors, 7);
+                            if (colors.Count > 0)
+                            {
+                                if (settings.EffectMode == Uniwill_Control_Utility.Models.KeyboardEffect.Marquee)
+                                    colors = colors.AsEnumerable().Reverse().ToList();
+                                hidService.SetMultiColor(colors);
+                            }
                         }
+                        else if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor4Effect(settings.EffectMode))
+                        {
+                            var colors = ParseKeyboardColorString(settings.MultiColors, 4);
+                            if (colors.Count > 0)
+                                hidService.SetMultiColor(colors);
+                        }
+                        System.Diagnostics.Debug.WriteLine($"[KBD] Startup apply: effect {settings.EffectMode}");
                     }
-                    else if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor4Effect(settings.EffectMode))
-                    {
-                        var colors = ParseKeyboardColorString(settings.MultiColors, 4);
-                        if (colors.Count > 0)
-                            hidService.SetMultiColor(colors);
-                    }
-                    System.Diagnostics.Debug.WriteLine($"[KBD] Startup apply: effect {settings.EffectMode}");
                 }
             }
             else
