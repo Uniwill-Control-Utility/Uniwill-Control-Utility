@@ -387,35 +387,44 @@ namespace Uniwill_Control_Utility.Views.Pages
                             // a visible flash of intermediate Static color.
                             bool touchReactive = Application.Current.Dispatcher.Invoke(
                                 () => tsTouchReactive.IsChecked ?? false);
-                            _hidService.TurnOnWithEffect(
-                                color.R, color.G, color.B, brightnessPercent,
-                                effect, speed, _currentDirection, touchReactive);
 
-                            // Multi-color palette (if needed for this effect)
-                            if (s_multiColor7Effects.Contains(effect))
+                            if (effect == KeyboardEffect.Rainbow)
                             {
-                                var colors = effect == KeyboardEffect.Marquee
-                                    ? Application.Current.Dispatcher.Invoke(
-                                        () => MultiColorPicker.GetColors().AsEnumerable().Reverse().ToList())
-                                    : Application.Current.Dispatcher.Invoke(
-                                        () => MultiColorPicker.GetColors().ToList());
-                                _hidService.SetMultiColor(colors);
-                            }
-                            else if (s_multiColor4Effects.Contains(effect))
-                            {
-                                var colors = Application.Current.Dispatcher.Invoke(
-                                    () => MultiColorPicker.GetColors().ToList());
-                                _hidService.SetMultiColor(colors.Take(4));
+                                // Rainbow: use software-driven per-key gradient.
+                                // The ITE firmware's built-in Rainbow (0x05) leaves the
+                                // leftmost columns dark due to a hardcoded LED layout mismatch.
+                                _hidService.SendRainbowEffect();
                             }
                             else
                             {
-                                // Rainbow and other non-multi-color effects still need the
-                                // firmware color palette reset after per-key mode. Sending the
-                                // default palette clears corrupted per-key color data that
-                                // would otherwise break the effect's internal gradient.
-                                var colors = Application.Current.Dispatcher.Invoke(
-                                    () => MultiColorPicker.GetColors().ToList());
-                                _hidService.SetMultiColor(colors);
+                                _hidService.TurnOnWithEffect(
+                                    color.R, color.G, color.B, brightnessPercent,
+                                    effect, speed, _currentDirection, touchReactive);
+
+                                // Multi-color palette (if needed for this effect)
+                                if (s_multiColor7Effects.Contains(effect))
+                                {
+                                    var colors = effect == KeyboardEffect.Marquee
+                                        ? Application.Current.Dispatcher.Invoke(
+                                            () => MultiColorPicker.GetColors().AsEnumerable().Reverse().ToList())
+                                        : Application.Current.Dispatcher.Invoke(
+                                            () => MultiColorPicker.GetColors().ToList());
+                                    _hidService.SetMultiColor(colors);
+                                }
+                                else if (s_multiColor4Effects.Contains(effect))
+                                {
+                                    var colors = Application.Current.Dispatcher.Invoke(
+                                        () => MultiColorPicker.GetColors().ToList());
+                                    _hidService.SetMultiColor(colors.Take(4));
+                                }
+                                else
+                                {
+                                    // Non-multi-color effects still need the firmware color
+                                    // palette reset after per-key mode to clear corrupted data.
+                                    var colors = Application.Current.Dispatcher.Invoke(
+                                        () => MultiColorPicker.GetColors().ToList());
+                                    _hidService.SetMultiColor(colors);
+                                }
                             }
                         }
 
@@ -800,6 +809,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                         // Static: use SetColor to update color and brightness without
                         // the off/reset/on cycle that TurnOnWithEffect causes (visible blackout).
                         _hidService.SetColor(color.R, color.G, color.B, brightnessPercent);
+                    }
+                    else if (effect == KeyboardEffect.Rainbow)
+                    {
+                        // Rainbow: use software-driven per-key gradient.
+                        // The ITE firmware's built-in Rainbow (0x05) leaves the leftmost
+                        // columns dark due to a hardcoded LED layout mismatch.
+                        _hidService.SendRainbowEffect();
                     }
                     else
                     {

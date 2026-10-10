@@ -1229,6 +1229,107 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
+        /// Sends a software-driven static Rainbow gradient across all keyboard zones.
+        ///
+        /// The ITE firmware's built-in Rainbow effect (0x05) has a hardcoded LED layout
+        /// that leaves the leftmost columns (cols 0-1) dark. This method bypasses the
+        /// firmware effect engine and computes the gradient in software using per-key
+        /// UserMode, so every physical key gets a correct hue based on its column position.
+        ///
+        /// The hue spans 0-360° across columns 0..20 (full keyboard width including numpad).
+        /// </summary>
+        public void SendRainbowEffect()
+        {
+            EnsureAvailable();
+
+            lock (_lock)
+            {
+                // Build a 6x21 color array with rainbow gradient based on column position.
+                var rows = new (byte R, byte G, byte B)[ITE_NR_ROWS, ITE_LEDS_PER_ROW];
+
+                for (int col = 0; col < ITE_LEDS_PER_ROW; col++)
+                {
+                    // Map column 0..20 to hue 0..360
+                    double hue = (col * 360.0) / (ITE_LEDS_PER_ROW - 1);
+                    var rgb = HslToRgb(hue / 360.0, 1.0, 0.5);
+
+                    for (int row = 0; row < ITE_NR_ROWS; row++)
+                        rows[row, col] = rgb;
+                }
+
+                // Step 1: Enter UserMode
+                byte scaledBrightness = (byte)Math.Min(_brightness, ITE_MAX_PERKEY_BRIGHTNESS);
+                SendControlReport(0x08, new byte[]
+                {
+                    0x08, 0x02, ITE_PARAM_MODE_USER, 0x00,
+                    scaledBrightness, 0x00, 0x00, 0x00
+                });
+
+                // Step 2: Send each row
+                for (int row = 0; row < ITE_NR_ROWS; row++)
+                {
+                    SendControlReport(0x16, new byte[]
+                    {
+                        0x16, 0x00, (byte)row, 0x00, 0x00, 0x00, 0x00, 0x00
+                    });
+
+                    byte[] rowData = new byte[ITE_OUTPUT_REPORT_SIZE];
+                    int bOffset = 2;
+                    int gOffset = 2 + ITE_LEDS_PER_ROW;
+                    int rOffset = 2 + 2 * ITE_LEDS_PER_ROW;
+
+                    for (int col = 0; col < ITE_LEDS_PER_ROW; col++)
+                    {
+                        var c = rows[row, col];
+                        rowData[bOffset + col] = c.B;
+                        rowData[gOffset + col] = c.G;
+                        rowData[rOffset + col] = c.R;
+                    }
+
+                    SendOutputReport(rowData);
+                }
+
+                DebugLog("[KBD-HID] Software Rainbow gradient sent (6x21, all columns lit)");
+            }
+        }
+
+        /// <summary>
+        /// Converts HSL color to RGB. Hue in 0..1, Saturation and Lightness in 0..1.
+        /// </summary>
+        private static (byte R, byte G, byte B) HslToRgb(double h, double s, double l)
+        {
+            double r, g, b;
+
+            if (s == 0.0)
+            {
+                r = g = b = l;
+            }
+            else
+            {
+                var (q, p) = l < 0.5
+                    ? (l * (1.0 + s), l + l * s)
+                    : (l + s - l * s, 2.0 * l - s);
+
+                r = HueToRgb(p, q, h + 1.0 / 3.0);
+                g = HueToRgb(p, q, h);
+                b = HueToRgb(p, q, h - 1.0 / 3.0);
+            }
+
+            return ((byte)Math.Round(r * 255), (byte)Math.Round(g * 255), (byte)Math.Round(b * 255));
+        }
+
+        private static double HueToRgb(double p, double q, double t)
+        {
+            if (t < 0) t += 1.0;
+            if (t > 1) t -= 1.0;
+
+            if (t < 1.0 / 6.0) return p + (q - p) * 6.0 * t;
+            if (t < 1.0 / 2.0) return q;
+            if (t < 2.0 / 3.0) return p + (q - p) * (2.0 / 3.0 - t) * 6.0;
+            return p;
+        }
+
+        /// <summary>
         /// Sends an arbitrary 9-byte feature report to the HID controller.
         /// Use for testing/reverse-engineering effects.
         /// </summary>

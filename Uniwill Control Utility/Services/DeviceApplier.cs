@@ -752,7 +752,17 @@ namespace Uniwill_Control_Utility.Services
                     // Effects mode: use TurnOnWithEffect to combine power-on and
                     // effect into one sequence, avoiding a visible flash of
                     // intermediate Static color.
-                    hid.TurnOnWithEffect(r, g, b, brightnessPercent, effect, effectSpeed, direction, touchReactive);
+                    // Rainbow effect has a firmware bug that leaves the leftmost
+                    // columns dark, so we bypass the firmware effect and send a
+                    // software-driven per-key gradient instead.
+                    if (effect == KeyboardEffect.Rainbow)
+                    {
+                        hid.SendRainbowEffect();
+                    }
+                    else
+                    {
+                        hid.TurnOnWithEffect(r, g, b, brightnessPercent, effect, effectSpeed, direction, touchReactive);
+                    }
 
                     // Multi-color effects need additional color reports after effect is set.
                     if (!string.IsNullOrEmpty(multiColors))
