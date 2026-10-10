@@ -70,8 +70,13 @@ namespace Uniwill_Control_Utility.Views.Controls
                 _slidersGrid.Children.Add(slider);
             }
 
-            // Force ArrangeOverride to fire so DrawGraph runs after layout settles.
-            InvalidateArrange();
+            // Clear the old curve line immediately so it doesn't persist while
+            // new sliders measure and arrange. Then defer the redraw to Background
+            // priority so the layout system has fully processed all value changes
+            // and thumbs are at their final positions before DrawGraph samples them.
+            _canvas.Children.Clear();
+
+            Dispatcher.InvokeAsync(() => InvalidateArrange(), DispatcherPriority.Background);
         }
 
         /// <summary>

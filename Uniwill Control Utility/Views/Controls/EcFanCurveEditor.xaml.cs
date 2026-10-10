@@ -153,8 +153,15 @@ namespace Uniwill_Control_Utility.Views.Controls
                 _sliders[i].Value = curve.Duties[i];
             }
 
-            // Force ArrangeOverride to fire so DrawGraph runs after layout is settled.
-            InvalidateArrange();
+            // Clear the old curve line immediately so it doesn't persist while
+            // slider thumbs animate to their new positions. Then defer the redraw
+            // to Background priority so the layout system has fully processed all
+            // value changes and thumbs are at their final positions before DrawGraph
+            // samples them. Using InvalidateArrange directly would fire ArrangeOverride
+            // before the thumbs reposition, drawing a line at the stale curve shape.
+            _canvas.Children.Clear();
+
+            Dispatcher.InvokeAsync(() => InvalidateArrange(), DispatcherPriority.Background);
         }
 
         /// <summary>Read the current slider values into an EcFanCurve.</summary>
