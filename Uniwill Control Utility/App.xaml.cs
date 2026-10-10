@@ -94,6 +94,12 @@ namespace Uniwill_Control_Utility
 
             try
             {
+                // Set a stable AppUserModelID so the taskbar button stays pinned
+                // to this app even after GPU driver resets (PnP hotswap).
+                // Without this, Windows loses the taskbar association and shows
+                // a generic icon after dGPU disable/enable.
+                SetAppUserModelID("UniwillControlUtility.UCU");
+
                 // Register code page provider so Encoding.GetEncoding(1252) works
                 // (required for RTSS OSD degree symbol rendering).
                 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
@@ -957,6 +963,9 @@ namespace Uniwill_Control_Utility
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
+        [DllImport("shell32.dll")]
+        private static extern int SetCurrentProcessExplicitAppUserModelID(string appId);
+
         public static async Task CheckForUpdate()
         {
             var updateManager = new UpdateManager("jgudec", "Uniwill-Control-Utility", App.version, "C:\\");
@@ -1148,6 +1157,20 @@ namespace Uniwill_Control_Utility
                     process.Dispose();
                 }
             }
+        }
+
+        /// <summary>
+        /// Sets a stable AppUserModelID so the taskbar button stays pinned to this app
+        /// even after GPU driver resets (PnP hotswap). Must be called before any windows
+        /// are shown.
+        /// </summary>
+        private static void SetAppUserModelID(string appId)
+        {
+            try
+            {
+                SetCurrentProcessExplicitAppUserModelID(appId);
+            }
+            catch { /* non-critical — falls back to default taskbar behavior */ }
         }
     }
 }
