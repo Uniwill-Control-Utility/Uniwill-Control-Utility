@@ -52,6 +52,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private const ushort EcLocalDimmingRegister = 0x072B;
         private const byte EcLocalDimmingBit = 0x02;
         private DispatcherTimer? _delayTimer;
+        private DispatcherTimer? _cooldownTimer;
 
         // Shared across page instances (AddScoped creates a new page on each navigation).
         private static DateTime _lastUserApplyTime;
@@ -158,6 +159,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             _delayTimer?.Stop();
             _delayTimer = null;
+            _cooldownTimer?.Stop();
+            borderPowerSavingCooldown.Visibility = Visibility.Collapsed;
             _isLoaded = false;
         }
 
@@ -376,6 +379,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (btn.Style == activeStyle)
                 return;
 
+            // Block clicks during GPU driver transition cooldown
+            if (GpuInteropGuard.IsBlocked)
+                return;
+
             try
             {
                 // Update button visual state immediately
@@ -410,12 +417,15 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // re-assert the AppUserModelID to restore the taskbar icon.
                 _ = Task.Run(async () =>
                 {
-                    await Task.Delay(2000);
+                    await Task.Delay(3000);
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         App.ReassertAppUserModelID();
                     });
                 });
+
+                // Start cooldown overlay to block user clicks during the guard window
+                StartCooldownOverlay();
 
                 Log.Information("[Display] GPU Power Saving set to {Mode}, dGPU PnP: {Before} -> {After}, GuardBlocked: {Blocked}, IsAdmin: {IsAdmin}",
                     GpuPowerSaving.GetModeDisplayName(powerSavingMode), pnpStatusBefore, pnpStatusAfter, GpuInteropGuard.IsBlocked, _isAdministrator);
@@ -424,6 +434,32 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 Log.Information("[Display] [ERROR] Failed to apply GPU power saving mode: {Message}", ex.Message);
             }
+        }
+
+        private void StartCooldownOverlay()
+        {
+            _cooldownTimer?.Stop();
+
+            int remainingSeconds = 15;
+            txtCooldownCountdown.Text = remainingSeconds.ToString();
+            borderPowerSavingCooldown.Visibility = Visibility.Visible;
+
+            _cooldownTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            _cooldownTimer.Tick += (s, e) =>
+            {
+                remainingSeconds--;
+                if (remainingSeconds <= 0)
+                {
+                    _cooldownTimer?.Stop();
+                    borderPowerSavingCooldown.Visibility = Visibility.Collapsed;
+                    txtCooldownCountdown.Text = string.Empty;
+                }
+                else
+                {
+                    txtCooldownCountdown.Text = remainingSeconds.ToString();
+                }
+            };
+            _cooldownTimer.Start();
         }
 
         private void btnRefresh_Click(object sender, RoutedEventArgs e)
