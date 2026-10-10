@@ -89,8 +89,9 @@ internal sealed class StartupProgressReporter
 
 /// <summary>
 /// Tracks parallel Phase 1 tasks and reports the current blocker via callbacks.
-/// Each task is identified by a localization key. When a task completes, the label callback
-/// fires with remaining tasks as a bullet list. The progress callback fires with the updated percent.
+/// Each task is identified by its original index in the tasks array passed to the constructor.
+/// When a task completes, the label callback fires with remaining tasks as a bullet list.
+/// The progress callback fires with the updated percent.
 /// Uses callbacks to avoid a circular dependency on the Views layer.
 /// </summary>
 internal sealed class ParallelPhaseTracker
@@ -98,8 +99,10 @@ internal sealed class ParallelPhaseTracker
     private readonly Action<string, string?> _setLabel;
     private readonly Action<int> _setProgress;
     private readonly string _phaseLabel;
-    private readonly string[] _tasks;
-    private int _completed = 0;
+    // Maps original index -> display label (null for invisible tasks)
+    private readonly Dictionary<int, string> _taskMap;
+    private readonly HashSet<int> _done = new();
+    private readonly int _visibleCount;
     private int _startPercent;
     private int _endPercent;
 
@@ -114,26 +117,48 @@ internal sealed class ParallelPhaseTracker
         _setLabel = setLabel;
         _setProgress = setProgress;
         _phaseLabel = phaseLabel;
-        _tasks = tasks.Where(t => t.Visible).Select(t => LocalizationService.Get(t.LabelKey)).ToArray();
         _startPercent = startPercent;
         _endPercent = endPercent;
+
+        int index = 0;
+        _taskMap = new Dictionary<int, string>();
+        foreach (var t in tasks)
+        {
+            if (t.Visible)
+            {
+                _taskMap[index] = LocalizationService.Get(t.LabelKey);
+            }
+            index++;
+        }
+        _visibleCount = _taskMap.Count;
+
         UpdateLabel();
         _setProgress(_startPercent);
     }
 
     /// <summary>
-    /// Call when one of the tracked tasks completes. Updates the label and progress bar.
+    /// Call when a tracked task completes. The index must match the original position
+    /// in the tasks array passed to the constructor (0-based).
+    /// Invisible tasks are no-ops.
     /// </summary>
-    internal void TaskCompleted()
+    internal void TaskCompleted(int originalIndex)
     {
-        _completed++;
+        if (_taskMap.ContainsKey(originalIndex))
+        {
+            _done.Add(originalIndex);
+        }
         UpdateLabel();
         UpdateProgress();
     }
 
     private void UpdateLabel()
     {
-        var remainingList = _tasks.Skip(_completed).ToList();
+        var remainingList = _taskMap
+            .OrderBy(kv => kv.Key)
+            .Where(kv => !_done.Contains(kv.Key))
+            .Select(kv => kv.Value)
+            .ToList();
+
         _setLabel(_phaseLabel, FormatRemaining(remainingList));
     }
 
@@ -142,7 +167,6 @@ internal sealed class ParallelPhaseTracker
         if (remaining.Count == 0)
             return string.Empty;
 
-        // Use bullet points (hyphen) separated by line breaks for the detail row.
         var lines = remaining.Select(t => $"- {t}").ToArray();
         return string.Join("\n", lines);
     }
@@ -150,7 +174,7 @@ internal sealed class ParallelPhaseTracker
     private void UpdateProgress()
     {
         var range = _endPercent - _startPercent;
-        var percent = _startPercent + (int)((double)_completed / _tasks.Length * range);
+        var percent = _startPercent + (int)((double)_done.Count / _visibleCount * range);
         _setProgress(percent);
     }
 }

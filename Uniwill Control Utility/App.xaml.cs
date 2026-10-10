@@ -387,7 +387,11 @@ namespace Uniwill_Control_Utility
                     }
                     finally
                     {
-                        _ = startupWindow.Dispatcher.InvokeAsync(() => tracker.TaskCompleted());
+                        _ = startupWindow.Dispatcher.InvokeAsync(() =>
+                        {
+                            tracker.TaskCompleted(0); // Detecting hardware
+                            tracker.TaskCompleted(1); // Initializing sensors (runs inside DetectHardwareAsync)
+                        });
                     }
                 }));
 
@@ -405,7 +409,7 @@ namespace Uniwill_Control_Utility
                     }
                     finally
                     {
-                        _ = startupWindow.Dispatcher.InvokeAsync(() => tracker.TaskCompleted());
+                        _ = startupWindow.Dispatcher.InvokeAsync(() => tracker.TaskCompleted(2));
                     }
                 }));
 
@@ -424,7 +428,7 @@ namespace Uniwill_Control_Utility
                     }
                     finally
                     {
-                        _ = startupWindow.Dispatcher.InvokeAsync(() => tracker.TaskCompleted());
+                        _ = startupWindow.Dispatcher.InvokeAsync(() => tracker.TaskCompleted(3));
                     }
                 }));
 
@@ -442,7 +446,7 @@ namespace Uniwill_Control_Utility
                     }
                     finally
                     {
-                        _ = startupWindow.Dispatcher.InvokeAsync(() => tracker.TaskCompleted());
+                        _ = startupWindow.Dispatcher.InvokeAsync(() => tracker.TaskCompleted(4));
                     }
                 }));
 
