@@ -2411,7 +2411,18 @@ namespace Uniwill_Control_Utility.Views.Windows
             int tgp = (int)p.GpuTgp;
             int dbOffset = p.GpuDynamicBoost ? (int)p.GpuDbOffset : 0;
             int totalWatts = tgp + dbOffset;
-            parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
+
+            // When a V-F curve is active, ApplyCustomOnStart handles the power limit
+            // around the curve write. Emit only the clock tokens here to avoid a
+            // redundant SetPowerLimit call from the translator.
+            if (p.VfCurveOffsets.Count > 0)
+            {
+                parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}");
+            }
+            else
+            {
+                parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
+            }
 
             return string.Join(" ", parts) + " ";
         }

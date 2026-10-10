@@ -375,8 +375,20 @@ namespace Uniwill_Control_Utility
                 }
                 await RestoreAdaptiveModeAsync();
 
+                // Wire the EC service to the static field before startup preset apply.
+                // The MainWindowViewModel constructor also sets this field (idempotent —
+                // same singleton instance), but ApplyOnStart() runs here in the pre-loader
+                // phase _before_ _host.StartAsync() creates the MainWindow.
+                // Without this, RyzenAdj_To_UCU.EcService is null during startup preset
+                // apply and GPU power limit writes fail silently.
+                var ecService = _host.Services.GetService<UniwillECService>();
+                if (ecService != null)
+                {
+                    Scripts.RyzenAdj_To_UCU.EcService = ecService;
+                }
+
                 // Apply startup settings (presets, keyboard RGB, EC fan curve,
-                // battery charge limit) during the pre-loading phase so the main
+                // battery charge limit) during the pre-loader phase so the main
                 // window appears instantly without waiting for hardware writes.
                 await ApplyStartupSettingsAsync();
 
