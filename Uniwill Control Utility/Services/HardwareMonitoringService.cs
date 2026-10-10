@@ -46,6 +46,19 @@ namespace Uniwill_Control_Utility.Services
         public string FlydigiModelName { get; init; } = string.Empty;
     }
 
+    /// <summary>
+    /// Which GPU type is currently providing sensor data.
+    /// Used to update the GPU metric card label when the active GPU changes
+    /// (e.g., dGPU disabled by MUX switch or iGPU Power Saving Mode).
+    /// </summary>
+    public enum ActiveGpuType
+    {
+        None = 0,
+        Nvidia = 1,
+        Amd = 2,
+        Intel = 3
+    }
+
     public sealed record HardwareMetricsSnapshot
     {
         public int CpuTemperature { get; init; }
@@ -60,6 +73,8 @@ namespace Uniwill_Control_Utility.Services
         public int GpuFanSpeed { get; init; }
         public double GpuMemoryUsedGb { get; init; }
         public double GpuMemoryTotalGb { get; init; }
+        /// <summary>Which GPU type is currently providing sensor data.</summary>
+        public ActiveGpuType ActiveGpuType { get; init; }
         public double SystemMemoryUsedGb { get; init; }
         public double SystemMemoryTotalGb { get; init; }
         public double SystemMemoryCommittedGb { get; init; }
@@ -322,7 +337,7 @@ namespace Uniwill_Control_Utility.Services
         private HardwareMetricsSnapshot BuildMetricsSnapshot()
         {
             IHardware? cpu = FindHardware(HardwareType.Cpu);
-            IHardware? gpu = FindPreferredGpu();
+            (IHardware? gpu, ActiveGpuType gpuType) = FindPreferredGpuWithFallback();
             IHardware? battery = FindHardware(HardwareType.Battery);
             GetSystemPowerStatus(out SystemPowerStatus powerStatus);
 
@@ -339,11 +354,12 @@ namespace Uniwill_Control_Utility.Services
                 CpuPowerWatts = Round(ReadFirstValue(cpu, SensorType.Power, "CPU Package", "Package")),
                 CpuClockMhz = Round(ReadAverage(cpu, SensorType.Clock, "Core")),
                 GpuTemperature = Round(ReadFirstValue(gpu, SensorType.Temperature, "GPU Core", "Core")),
-                GpuUsage = Round(ReadFirstValue(gpu, SensorType.Load, "GPU Core", "Core")),
+                GpuUsage = Round(ReadFirstValue(gpu, SensorType.Load, "GPU Core", "D3D 3D", "Core")),
                 GpuPowerWatts = Round(ReadFirstValue(gpu, SensorType.Power, "GPU Package", "GPU Power", "Core")),
                 GpuClockMhz = Round(ReadFirstValue(gpu, SensorType.Clock, "GPU Core", "Core")),
                 GpuMemoryUsedGb = gpuMemoryUsedMb / 1024d,
                 GpuMemoryTotalGb = gpuMemoryTotalMb / 1024d,
+                ActiveGpuType = gpuType,
                 SystemMemoryUsedGb = memoryUsed,
                 SystemMemoryTotalGb = memoryTotal,
                 SystemMemoryCommittedGb = memoryCommitted,
@@ -505,14 +521,70 @@ namespace Uniwill_Control_Utility.Services
         private IHardware? FindHardware(HardwareType type) =>
             _computer?.Hardware.FirstOrDefault(hardware => hardware.HardwareType == type);
 
-        private IHardware? FindPreferredGpu()
+        /// <summary>
+        /// Finds the best GPU that has valid sensors.
+        /// Priority: NVIDIA → AMD → Intel. If a GPU is enumerated but returns
+        /// zero values (e.g., dGPU disabled by MUX switch or PnP hotswap),
+        /// falls through to the next candidate.
+        /// </summary>
+        private (IHardware? hardware, ActiveGpuType type) FindPreferredGpuWithFallback()
         {
             if (_computer is null)
-                return null;
+                return (null, ActiveGpuType.None);
 
-            return _computer.Hardware.FirstOrDefault(hardware => hardware.HardwareType == HardwareType.GpuNvidia)
-                ?? _computer.Hardware.FirstOrDefault(hardware => hardware.HardwareType == HardwareType.GpuAmd)
-                ?? _computer.Hardware.FirstOrDefault(hardware => hardware.HardwareType == HardwareType.GpuIntel);
+            // Try NVIDIA first
+            IHardware? nvidia = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.GpuNvidia);
+            if (nvidia is not null && HasValidSensors(nvidia))
+                return (nvidia, ActiveGpuType.Nvidia);
+
+            // Try AMD second (covers both dGPU Radeon RX and iGPU Radeon 610M)
+            IHardware? amd = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.GpuAmd);
+            if (amd is not null && HasValidSensors(amd))
+                return (amd, ActiveGpuType.Amd);
+
+            // Try Intel third
+            IHardware? intel = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.GpuIntel);
+            if (intel is not null && HasValidSensors(intel))
+                return (intel, ActiveGpuType.Intel);
+
+            // Fallback: return whatever GPU exists even without valid sensors,
+            // so the UI still shows the hardware name. Prefer by same priority.
+            if (nvidia is not null)
+                return (nvidia, ActiveGpuType.Nvidia);
+            if (amd is not null)
+                return (amd, ActiveGpuType.Amd);
+            if (intel is not null)
+                return (intel, ActiveGpuType.Intel);
+
+            return (null, ActiveGpuType.None);
+        }
+
+        /// <summary>
+        /// Returns true if the hardware has a valid temperature sensor AND a valid load sensor.
+        /// Used to detect GPUs that are enumerated but have no active driver.
+        /// A PnP-disabled dGPU still reports temperature (voltage regulation stays active)
+        /// but returns 0 for load/power/clock — so we require both to consider a GPU "active".
+        /// </summary>
+        private static bool HasValidSensors(IHardware hardware)
+        {
+            bool hasTemperature = false;
+            bool hasLoad = false;
+
+            foreach (ISensor sensor in EnumerateSensors(hardware))
+            {
+                if (sensor.Value.HasValue && sensor.Value.Value > 0)
+                {
+                    if (sensor.SensorType == SensorType.Temperature)
+                        hasTemperature = true;
+                    if (sensor.SensorType == SensorType.Load)
+                        hasLoad = true;
+                }
+
+                if (hasTemperature && hasLoad)
+                    return true;
+            }
+
+            return false;
         }
 
         private static double ReadFirstValue(IHardware? hardware, SensorType type, params string[] names)

@@ -391,6 +391,20 @@ namespace Uniwill_Control_Utility.Views.Pages
                 await GpuPowerSaving.ApplyAsync(powerSavingMode);
                 string pnpStatusAfter = GpuPowerSaving.GetDgpuPnpStatus();
 
+                // Reset LHM Computer so it re-probes with fresh driver handles.
+                // After a PnP hotswap the GPU availability changes and LHM needs
+                // to re-enumerate to pick up the new active GPU (iGPU fallback).
+                try
+                {
+                    var monitoring = App.GetService<IHardwareMonitoringService>();
+                    monitoring?.ResetComputer();
+                    Log.Information("[Display] LHM Computer reset after GPU power saving mode change");
+                }
+                catch (Exception resetEx)
+                {
+                    Log.Information("[Display] LHM reset after power saving change failed: {Message}", resetEx.Message);
+                }
+
                 Log.Information("[Display] GPU Power Saving set to {Mode}, dGPU PnP: {Before} -> {After}, GuardBlocked: {Blocked}, IsAdmin: {IsAdmin}",
                     GpuPowerSaving.GetModeDisplayName(powerSavingMode), pnpStatusBefore, pnpStatusAfter, GpuInteropGuard.IsBlocked, _isAdministrator);
             }

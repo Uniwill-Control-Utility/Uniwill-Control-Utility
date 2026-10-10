@@ -352,6 +352,15 @@ namespace Uniwill_Control_Utility.Views.Windows
                         : Settings.Default.GpuPowerSavingPluggedIn;
                     await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
                     Log.Information("[Startup] GPU Power Saving applied: {Mode}", (GpuPowerSavingMode)mode);
+
+                    // Reset LHM so it re-probes GPU availability after the PnP hotswap.
+                    // This ensures the dashboard shows the correct active GPU (iGPU fallback).
+                    try
+                    {
+                        var monitoring = App.GetService<IHardwareMonitoringService>();
+                        monitoring?.ResetComputer();
+                    }
+                    catch { /* non-critical */ }
                 }
                 catch (Exception ex)
                 {

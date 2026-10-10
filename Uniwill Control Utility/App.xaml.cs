@@ -602,6 +602,19 @@ namespace Uniwill_Control_Utility
 
                 await Task.WhenAll(wmiTask, lhmTask);
 
+                // Check GPU availability after LHM warms up. If the dGPU is offline
+                // (MUX=iGPU-only or PnP-disabled by iGPU Power Saving Mode), log the
+                // active GPU type so downstream code can adapt.
+                try
+                {
+                    var snapshot = monitoring.ReadSnapshot();
+                    if (snapshot.ActiveGpuType != Services.ActiveGpuType.Nvidia)
+                    {
+                        Log.Information("[Startup] Active GPU is {GpuType} (NVIDIA dGPU unavailable — MUX switch or iGPU Power Saving Mode)", snapshot.ActiveGpuType);
+                    }
+                }
+                catch { /* non-critical — LHM may not be ready yet */ }
+
                 // Notify subscribers that hardware detection is done.
                 HardwareDetectionCompleted?.Invoke();
             }
