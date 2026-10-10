@@ -396,7 +396,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
                         if (settings.EffectMode == Uniwill_Control_Utility.Models.KeyboardEffect.Rainbow)
                         {
-                            hidService.SendRainbowEffect();
+                            hidService.SendRainbowEffect(brightnessPercent);
                             System.Diagnostics.Debug.WriteLine("[KBD] Resume apply: Rainbow (software gradient)");
                         }
                         else
@@ -687,7 +687,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                             // Rainbow: use software-driven per-key gradient.
                             // The ITE firmware's built-in Rainbow (0x05) leaves the
                             // leftmost columns dark due to a hardcoded LED layout mismatch.
-                            hidService.SendRainbowEffect();
+                            hidService.SendRainbowEffect(brightnessPercent);
                             System.Diagnostics.Debug.WriteLine("[KBD] Startup apply: Rainbow (software gradient)");
                         }
                         else

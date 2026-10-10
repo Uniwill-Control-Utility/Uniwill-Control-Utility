@@ -393,7 +393,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                                 // Rainbow: use software-driven per-key gradient.
                                 // The ITE firmware's built-in Rainbow (0x05) leaves the
                                 // leftmost columns dark due to a hardcoded LED layout mismatch.
-                                _hidService.SendRainbowEffect();
+                                _hidService.SendRainbowEffect(brightnessPercent);
                             }
                             else
                             {
@@ -815,7 +815,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         // Rainbow: use software-driven per-key gradient.
                         // The ITE firmware's built-in Rainbow (0x05) leaves the leftmost
                         // columns dark due to a hardcoded LED layout mismatch.
-                        _hidService.SendRainbowEffect();
+                        _hidService.SendRainbowEffect(brightnessPercent);
                     }
                     else
                     {

@@ -757,7 +757,7 @@ namespace Uniwill_Control_Utility.Services
                     // software-driven per-key gradient instead.
                     if (effect == KeyboardEffect.Rainbow)
                     {
-                        hid.SendRainbowEffect();
+                        hid.SendRainbowEffect(brightnessPercent);
                     }
                     else
                     {

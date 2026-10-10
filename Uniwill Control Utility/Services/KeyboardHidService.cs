@@ -1238,9 +1238,11 @@ namespace Uniwill_Control_Utility.Services
         ///
         /// The hue spans 0-360° across columns 0..20 (full keyboard width including numpad).
         /// </summary>
-        public void SendRainbowEffect()
+        /// <param name="brightness">Brightness 0-100 to apply.</param>
+        public void SendRainbowEffect(int brightness)
         {
             EnsureAvailable();
+            brightness = Math.Clamp(brightness, 0, 100);
 
             lock (_lock)
             {
@@ -1257,15 +1259,27 @@ namespace Uniwill_Control_Utility.Services
                         rows[row, col] = rgb;
                 }
 
-                // Step 1: Enter UserMode
-                byte scaledBrightness = (byte)Math.Min(_brightness, ITE_MAX_PERKEY_BRIGHTNESS);
+                // Power on the keyboard first. The firmware must be in an enabled state
+                // before UserMode commands take effect. Turn off any cached state from
+                // a previous session to avoid a visible flash.
+                SendReport(new byte[] { 0x00, CMD_KEYBOARD_OFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });
+                SendReport(new byte[] { 0x00, CMD_ZONE_RESET, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 });
+
+                // Enable zone and initialize effect engine with Static (required before UserMode).
+                SendReport(new byte[] { 0x00, CMD_ZONE_ON_OFF, (byte)ZoneKeyboard, 0x01, 0x04, 0x00, 0x00, 0x00, 0x01 });
+                SendReport(new byte[] { 0x00, CMD_SET_COLOR, (byte)ZoneKeyboard, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00 });
+                SendReport(new byte[] { 0x00, CMD_MODE_BRIGHTNESS, 0x00, 0x01, 0x05, (byte)brightness, 0x00, 0x00, 0x00 });
+                SendReport(new byte[] { 0x00, CMD_MODE_BRIGHTNESS, ZoneMaskKeyboard, 0x01, 0x05, (byte)brightness, 0x08, 0x00, 0x00 });
+
+                // Enter UserMode with the requested brightness.
+                byte scaledBrightness = (byte)Math.Min(brightness, ITE_MAX_PERKEY_BRIGHTNESS);
                 SendControlReport(0x08, new byte[]
                 {
                     0x08, 0x02, ITE_PARAM_MODE_USER, 0x00,
                     scaledBrightness, 0x00, 0x00, 0x00
                 });
 
-                // Step 2: Send each row
+                // Send each row of rainbow colors.
                 for (int row = 0; row < ITE_NR_ROWS; row++)
                 {
                     SendControlReport(0x16, new byte[]
@@ -1289,7 +1303,10 @@ namespace Uniwill_Control_Utility.Services
                     SendOutputReport(rowData);
                 }
 
-                DebugLog("[KBD-HID] Software Rainbow gradient sent (6x21, all columns lit)");
+                _brightness = brightness;
+                IsOn = true;
+
+                DebugLog($"[KBD-HID] Software Rainbow gradient sent (6x21, brightness={brightness})");
             }
         }
 
