@@ -1258,6 +1258,18 @@ namespace Uniwill_Control_Utility.Views.Windows
                     {
                         Debug.WriteLine($"[Display] NVML reset failed: {ex.Message}");
                     }
+
+                    // Re-assert AppUserModelID to restore taskbar icon after display
+                    // topology change (dGPU disable/enable invalidates DWM composition).
+                    try
+                    {
+                        App.ReassertAppUserModelID();
+                        Debug.WriteLine("[Display] AppUserModelID re-asserted after display change");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[Display] AppUserModelID reassert failed: {ex.Message}");
+                    }
                 }
             }
 

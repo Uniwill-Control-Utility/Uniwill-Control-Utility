@@ -1176,10 +1176,76 @@ namespace Uniwill_Control_Utility
         /// <summary>
         /// Re-asserts the AppUserModelID after a GPU driver reset.
         /// Call this from the UI thread after PnP hotswap to restore the taskbar icon.
+        /// When the dGPU is PnP-disabled, WPF's D3D device is lost and DWM can no
+        /// longer render the taskbar thumbnail. This method forces DWM to re-query
+        /// the window by re-sending WM_SETICON and invalidating the composition.
         /// </summary>
         public static void ReassertAppUserModelID()
         {
             SetAppUserModelID("UniwillControlUtility.UCU");
+
+            var window = System.Windows.Application.Current.MainWindow;
+            if (window is not null)
+            {
+                try
+                {
+                    var hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+                    if (hwnd != IntPtr.Zero)
+                    {
+                        // Re-send WM_SETICON so DWM picks up the icon handles again
+                        // after the GPU driver reinitialization invalidated them.
+                        // Get the current class icons, then re-apply them to force
+                        // DWM to re-render the taskbar button.
+                        IntPtr bigIcon = GetClassLong(hwnd, GCL_HICON);
+                        IntPtr smallIcon = GetClassLong(hwnd, GCL_HICONSM);
+                        if (bigIcon != IntPtr.Zero)
+                        {
+                            SendMessage(hwnd, WM_SETICON, ICON_BIG, bigIcon);
+                        }
+                        if (smallIcon != IntPtr.Zero)
+                        {
+                            SendMessage(hwnd, WM_SETICON, ICON_SMALL, smallIcon);
+                        }
+
+                        // Force DWM to flush pending composition and re-render
+                        DwmFlush();
+
+                        // Force a full redraw without moving or resizing
+                        // SWP_NOMOVE | SWP_NOSIZE | NOACTIVATE | NOSENDCHANGING | SWP_FRAMECHANGED
+                        SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, 0x0037);
+
+                        // Force the window to repaint immediately
+                        RedrawWindow(hwnd, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+                    }
+                }
+                catch { /* non-critical */ }
+            }
         }
+
+        private const int WM_SETICON = 0x0080;
+        private const int ICON_BIG = 0;
+        private const int ICON_SMALL = 1;
+
+        private const int GCL_HICON = -14;
+        private const int GCL_HICONSM = -34;
+
+        private const uint RDW_INVALIDATE = 0x0001;
+        private const uint RDW_UPDATENOW = 0x0100;
+        private const uint RDW_ALLCHILDREN = 0x0080;
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr GetClassLong(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, int wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool RedrawWindow(IntPtr hwnd, IntPtr lprc, IntPtr hrgn, uint flags);
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmFlush();
+
+        [DllImport("user32.dll")]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
     }
 }
