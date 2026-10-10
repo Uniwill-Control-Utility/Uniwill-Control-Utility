@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Uniwill_Control_Utility.Services;
@@ -84,4 +85,72 @@ internal sealed class StartupProgressReporter
         _report?.Invoke(stage) ?? Task.CompletedTask;
 
     internal void Detach() => _report = null;
+}
+
+/// <summary>
+/// Tracks parallel Phase 1 tasks and reports the current blocker via callbacks.
+/// Each task is identified by a localization key. When a task completes, the label callback
+/// fires with remaining tasks as a bullet list. The progress callback fires with the updated percent.
+/// Uses callbacks to avoid a circular dependency on the Views layer.
+/// </summary>
+internal sealed class ParallelPhaseTracker
+{
+    private readonly Action<string, string?> _setLabel;
+    private readonly Action<int> _setProgress;
+    private readonly string _phaseLabel;
+    private readonly string[] _tasks;
+    private int _completed = 0;
+    private int _startPercent;
+    private int _endPercent;
+
+    internal ParallelPhaseTracker(
+        string phaseLabel,
+        IEnumerable<(string LabelKey, bool Visible)> tasks,
+        int startPercent,
+        int endPercent,
+        Action<string, string?> setLabel,
+        Action<int> setProgress)
+    {
+        _setLabel = setLabel;
+        _setProgress = setProgress;
+        _phaseLabel = phaseLabel;
+        _tasks = tasks.Where(t => t.Visible).Select(t => LocalizationService.Get(t.LabelKey)).ToArray();
+        _startPercent = startPercent;
+        _endPercent = endPercent;
+        UpdateLabel();
+        _setProgress(_startPercent);
+    }
+
+    /// <summary>
+    /// Call when one of the tracked tasks completes. Updates the label and progress bar.
+    /// </summary>
+    internal void TaskCompleted()
+    {
+        _completed++;
+        UpdateLabel();
+        UpdateProgress();
+    }
+
+    private void UpdateLabel()
+    {
+        var remainingList = _tasks.Skip(_completed).ToList();
+        _setLabel(_phaseLabel, FormatRemaining(remainingList));
+    }
+
+    private static string FormatRemaining(IList<string> remaining)
+    {
+        if (remaining.Count == 0)
+            return string.Empty;
+
+        // Use bullet points (hyphen) separated by line breaks for the detail row.
+        var lines = remaining.Select(t => $"- {t}").ToArray();
+        return string.Join("\n", lines);
+    }
+
+    private void UpdateProgress()
+    {
+        var range = _endPercent - _startPercent;
+        var percent = _startPercent + (int)((double)_completed / _tasks.Length * range);
+        _setProgress(percent);
+    }
 }

@@ -787,7 +787,9 @@ namespace Uniwill_Control_Utility.Services
             if (!_settings.AutoConnect || string.IsNullOrEmpty(_settings.LastDevicePath) || _userDisconnected)
                 return false;
 
-            for (int attempt = 0; attempt < 3; attempt++)
+            // Limited attempts for pre-loading auto-connect. Background reconnect
+            // loops handle retries later if the device appears after startup.
+            for (int attempt = 0; attempt < 2; attempt++)
             {
                 try
                 {
@@ -800,10 +802,9 @@ namespace Uniwill_Control_Utility.Services
                     // Retry after backoff
                 }
 
-                if (attempt < 2)
+                if (attempt < 1)
                 {
-                    int delay = 1000 * (attempt + 1); // 1s, 2s
-                    await Task.Delay(delay, CancellationToken.None);
+                    await Task.Delay(1000, CancellationToken.None);
                 }
             }
 

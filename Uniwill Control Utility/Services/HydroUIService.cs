@@ -354,7 +354,9 @@ namespace Uniwill_Control_Utility.Services
         private async Task<bool> ConnectAsyncCore(string deviceAddress)
         {
             ClearUserDisconnected();
-            const int maxRetries = 3;
+            // Limited attempts for pre-loading auto-connect. Background reconnect
+            // loops handle retries later if the device appears after startup.
+            const int maxRetries = 2;
 
             // If somehow still connected, disconnect first to avoid stacking connections.
             // Windows BLE creates a NEW connection handle per FromBluetoothAddressAsync call —
@@ -1495,8 +1497,10 @@ namespace Uniwill_Control_Utility.Services
 
             StatusChanged?.Invoke(this, "Attempting auto-connect...");
 
+            // Limited attempts for pre-loading auto-connect. If the device is offline, we don't
+            // want to block startup for ~117s. Background reconnect loops handle retries later.
             bool autoConnected = false;
-            const int maxAttempts = 3;
+            const int maxAttempts = 2;
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
                 // Scan for BLE devices before connecting. On cold boot, FromBluetoothAddressAsync

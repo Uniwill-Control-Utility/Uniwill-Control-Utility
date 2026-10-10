@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media.Animation;
@@ -28,6 +29,36 @@ public partial class StartupProgressWindow : FluentWindow
 
     internal Task WaitForProgressPlaybackAsync() => _playbackTask;
 
+    /// <summary>
+    /// Updates the title and detail rows directly, bypassing the queued animation.
+    /// Used for dynamic blocker labels during parallel startup phases.
+    /// </summary>
+    internal void SetStatusLabel(string title, string? detail = null)
+    {
+        StatusTitle.Text = title;
+        StatusDetail.Text = detail ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Single-string overload for non-tracker status updates (sets title only, clears detail).
+    /// </summary>
+    internal void SetStatusLabelSingle(string text)
+    {
+        StatusTitle.Text = text;
+        StatusDetail.Text = string.Empty;
+    }
+
+    /// <summary>
+    /// Updates the progress bar value directly without animation.
+    /// Used for phase-level progress tracking during parallel startup.
+    /// </summary>
+    internal void SetProgressValue(int percent)
+    {
+        StartupProgressBar.BeginAnimation(RangeBase.ValueProperty, null);
+        StartupProgressBar.Value = percent;
+        PercentageText.Text = $"{percent}%";
+    }
+
     private async Task PlayPendingStatesAsync()
     {
         while (_pendingStates.TryDequeue(out var state))
@@ -39,7 +70,8 @@ public partial class StartupProgressWindow : FluentWindow
 
     private void ApplyProgress(StartupProgressState state)
     {
-        StatusText.Text = LocalizationService.Get(state.StatusKey);
+        StatusTitle.Text = LocalizationService.Get(state.StatusKey);
+        StatusDetail.Text = string.Empty;
         PercentageText.Text = $"{state.Percent}%";
 
         var currentValue = StartupProgressBar.Value;

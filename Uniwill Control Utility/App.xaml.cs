@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -7,7 +7,9 @@ using RyzenSmu;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 using System;
+using System.Collections.Generic;
 using System.Configuration;
+using System.Linq;
 using System.Text;
 using System.Diagnostics;
 using System.IO;
@@ -330,15 +332,121 @@ namespace Uniwill_Control_Utility
                 if (File.Exists("C:\\Uniwill.Control.Utility.msi"))
                     File.Delete("C:\\Uniwill.Control.Utility.msi");
 
-                // Run hardware detection and LHM init before building the UI.
-                // Both run in parallel on background threads so the total wait
-                // is max(WMI, LHM) — the window only shows when all data is ready.
-                await startupProgressReporter.ReportAsync(StartupStage.DetectingHardware);
-                await startupProgressReporter.ReportAsync(StartupStage.InitializingSensors);
-                await DetectHardwareAsync(_host.Services.GetRequiredService<IHardwareMonitoringService>());
+                // --- Phase 1: independent startup tasks (all run in parallel) ---
+                // Hardware detection + sensor init, device connections, startup settings
+                // apply, and game library sync are all independent and can run concurrently.
+                // The total wait is the slowest individual task, not the sum.
 
-                await startupProgressReporter.ReportAsync(StartupStage.ApplyingStartupSettings);
+                var monitoring = _host.Services.GetRequiredService<IHardwareMonitoringService>();
 
+                // Wire the EC service to the static field before startup preset apply.
+                // The MainWindowViewModel constructor also sets this field (idempotent —
+                // same singleton instance), but ApplyOnStart() runs here in the pre-loader
+                // phase _before_ _host.StartAsync() creates the MainWindow.
+                // Without this, RyzenAdj_To_UCU.EcService is null during startup preset
+                // apply and GPU power limit writes fail silently.
+                var ecService = _host.Services.GetService<UniwillECService>();
+                if (ecService != null)
+                {
+                    Scripts.RyzenAdj_To_UCU.EcService = ecService;
+                }
+
+                var phase1TasksList = new[]
+                {
+                    ("Detecting hardware", true),
+                    ("Initializing sensors", true),
+                    ("Connecting devices", Settings.Default.EnableHydroUiNavigation || Settings.Default.EnableFlydigi),
+                    ("Applying startup settings", true),
+                    ("Loading game library", true),
+                };
+
+                // Wait for any queued pre-Phase-1 animations to finish so the tracker
+                // doesn't fight with the playback loop over StatusTitle.
+                await startupWindow.WaitForProgressPlaybackAsync();
+
+                var tracker = new ParallelPhaseTracker(
+                    "Initializing",
+                    phase1TasksList,
+                    50,
+                    92,
+                    (title, detail) => startupWindow.SetStatusLabel(title, detail),
+                    startupWindow.SetProgressValue);
+
+                var phase1Tasks = new List<Task>();
+
+                // Hardware detection + sensor initialization (WMI + LHM).
+                phase1Tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        await DetectHardwareAsync(monitoring);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Failed to detect hardware");
+                    }
+                    finally
+                    {
+                        _ = startupWindow.Dispatcher.InvokeAsync(() => tracker.TaskCompleted());
+                    }
+                }));
+
+                // Auto-connect devices (Hydro UI, Flydigi cooler) so the dashboard
+                // shows connected state on open.
+                phase1Tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        await AutoConnectDevicesAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Failed during device auto-connect");
+                    }
+                    finally
+                    {
+                        _ = startupWindow.Dispatcher.InvokeAsync(() => tracker.TaskCompleted());
+                    }
+                }));
+
+                // Apply startup settings (presets, keyboard RGB, EC fan curve,
+                // battery charge limit) so the main window appears instantly
+                // without waiting for hardware writes.
+                phase1Tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        await ApplyStartupSettingsAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Failed to apply startup settings");
+                    }
+                    finally
+                    {
+                        _ = startupWindow.Dispatcher.InvokeAsync(() => tracker.TaskCompleted());
+                    }
+                }));
+
+                // Load game library so the FPS overlay and Adaptive Mode have the
+                // installed games list ready immediately.
+                phase1Tasks.Add(Task.Run(() =>
+                {
+                    try
+                    {
+                        Game_Manager.installedGames = Game_Manager.syncGame_Library();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Logger.Error(ex, "Failed to sync game library during startup");
+                    }
+                    finally
+                    {
+                        _ = startupWindow.Dispatcher.InvokeAsync(() => tracker.TaskCompleted());
+                    }
+                }));
+
+                // Save install path on first boot (runs inline, near-instant).
                 string? entryLocation = System.Reflection.Assembly.GetEntryAssembly()?.Location;
                 string path = System.IO.Path.GetDirectoryName(entryLocation)!;
 
@@ -358,52 +466,16 @@ namespace Uniwill_Control_Utility
                     }
                 }
 
-                // Auto-connect devices (Hydro UI, Flydigi cooler) during the
-                // pre-loading phase so the dashboard shows connected state on open.
-                // Only show the progress step if at least one device feature is enabled.
-                if (Settings.Default.EnableHydroUiNavigation || Settings.Default.EnableFlydigi)
-                {
-                    await startupProgressReporter.ReportAsync(StartupStage.ConnectingDevices);
-                }
-                await AutoConnectDevicesAsync();
+                // Wait for all independent Phase 1 tasks to complete.
+                await Task.WhenAll(phase1Tasks);
+                startupWindow.SetProgressValue(92);
 
-                // Restore Adaptive Mode override state from previous session.
-                // Only show the progress step if adaptive mode was actually running.
+                // --- Phase 2: restore Adaptive Mode (depends on devices being connected) ---
                 if (Settings.Default.isAdaptiveModeRunning)
                 {
                     await startupProgressReporter.ReportAsync(StartupStage.RestoringAdaptiveMode);
                 }
                 await RestoreAdaptiveModeAsync();
-
-                // Wire the EC service to the static field before startup preset apply.
-                // The MainWindowViewModel constructor also sets this field (idempotent —
-                // same singleton instance), but ApplyOnStart() runs here in the pre-loader
-                // phase _before_ _host.StartAsync() creates the MainWindow.
-                // Without this, RyzenAdj_To_UCU.EcService is null during startup preset
-                // apply and GPU power limit writes fail silently.
-                var ecService = _host.Services.GetService<UniwillECService>();
-                if (ecService != null)
-                {
-                    Scripts.RyzenAdj_To_UCU.EcService = ecService;
-                }
-
-                // Apply startup settings (presets, keyboard RGB, EC fan curve,
-                // battery charge limit) during the pre-loader phase so the main
-                // window appears instantly without waiting for hardware writes.
-                await ApplyStartupSettingsAsync();
-
-                // Load game library during startup so the FPS overlay and Adaptive
-                // Mode have the installed games list ready immediately. This avoids
-                // a 20+ second delay when the overlay first tries to match a game.
-                await startupProgressReporter.ReportAsync(StartupStage.LoadingGameLibrary);
-                try
-                {
-                    Game_Manager.installedGames = await Task.Run(() => Game_Manager.syncGame_Library());
-                }
-                catch (Exception ex)
-                {
-                    Log.Logger.Error(ex, "Failed to sync game library during startup");
-                }
 
                 await _host.StartAsync(CancellationToken.None);
 
@@ -625,53 +697,74 @@ namespace Uniwill_Control_Utility
 
         private static async Task AutoConnectDevicesAsync()
         {
+            // Auto-connect devices in parallel during the pre-loading phase.
+            // Each TryAutoConnectAsync has internal guards (AutoConnect flag,
+            // LastDeviceAddress, _userDisconnected) and is wrapped in try/catch
+            // so one failure does not block the others.
+            var tasks = new List<Task>();
+
             // Auto-connect watercooler on startup if enabled.
-            // Runs during the pre-loading phase so the dashboard shows connected
-            // state on open. Each TryAutoConnectAsync has internal guards:
-            // checks AutoConnect flag, LastDeviceAddress, and _userDisconnected.
-            try
+            if (Settings.Default.EnableHydroUiNavigation)
             {
-                if (Settings.Default.EnableHydroUiNavigation)
+                var hydroUIService = _host?.Services.GetService<HydroUIService>();
+                if (hydroUIService != null && WaterCoolerHardwareDetector.IsSupportedHardware())
                 {
-                    var hydroUIService = _host?.Services.GetService<HydroUIService>();
-                    if (hydroUIService != null && WaterCoolerHardwareDetector.IsSupportedHardware())
-                        await hydroUIService.TryAutoConnectAsync();
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await hydroUIService.TryAutoConnectAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogError(ex, "Failed to auto-connect watercooler");
+                        }
+                    }));
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to auto-connect watercooler");
             }
 
-            // Auto-connect Flydigi BS2 Pro cooling pad on startup if enabled.
-            try
+            // Auto-connect Flydigi BS2 Pro/BS3 Pro cooling pad on startup if enabled.
+            if (Settings.Default.EnableFlydigi)
             {
-                if (Settings.Default.EnableFlydigi)
+                var flydigiCoolerService = _host?.Services.GetService<FlydigiCoolerHidService>();
+                if (flydigiCoolerService != null && FlydigiCoolerHidService.IsDeviceAvailable())
                 {
-                    var flydigiCoolerService = _host?.Services.GetService<FlydigiCoolerHidService>();
-                    if (flydigiCoolerService != null && FlydigiCoolerHidService.IsDeviceAvailable())
-                        await flydigiCoolerService.TryAutoConnectAsync();
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await flydigiCoolerService.TryAutoConnectAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogError(ex, "Failed to auto-connect Flydigi cooler");
+                        }
+                    }));
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to auto-connect Flydigi cooler");
             }
 
             // Auto-connect Flydigi BS1 (BLE) cooling pad on startup if enabled.
-            try
+            if (Settings.Default.EnableFlydigi)
             {
-                if (Settings.Default.EnableFlydigi)
+                var bs1Service = _host?.Services.GetService<FlydigiCoolerBleService>();
+                if (bs1Service != null)
                 {
-                    var bs1Service = _host?.Services.GetService<FlydigiCoolerBleService>();
-                    if (bs1Service != null)
-                        await bs1Service.TryAutoConnectAsync();
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await bs1Service.TryAutoConnectAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogError(ex, "Failed to auto-connect Flydigi BS1");
+                        }
+                    }));
                 }
             }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to auto-connect Flydigi BS1");
-            }
+
+            if (tasks.Count > 0)
+                await Task.WhenAll(tasks);
         }
 
         private static async Task RestoreAdaptiveModeAsync()
