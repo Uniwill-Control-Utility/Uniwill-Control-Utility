@@ -370,13 +370,18 @@ namespace Uniwill_Control_Utility
                 // doesn't fight with the playback loop over StatusTitle.
                 await startupWindow.WaitForProgressPlaybackAsync();
 
+                // The tracker keeps the detail row hidden ("Initializing" only)
+                // and surfaces "Connecting devices…" in it if that task is still
+                // running 3 seconds after the phase starts.
                 var tracker = new ParallelPhaseTracker(
                     "Initializing",
                     phase1TasksList,
                     50,
                     92,
                     (title, detail) => startupWindow.SetStatusLabel(title, detail),
-                    startupWindow.SetProgressValue);
+                    startupWindow.SetProgressValue,
+                    action => startupWindow.Dispatcher.InvokeAsync(action),
+                    slowTaskLabelKey: "Connecting devices");
 
                 var phase1Tasks = new List<Task>();
 

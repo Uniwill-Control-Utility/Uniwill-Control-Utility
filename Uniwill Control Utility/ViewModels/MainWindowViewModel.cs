@@ -127,12 +127,15 @@ namespace Uniwill_Control_Utility.ViewModels
                     break;
 
                 case OptionalNavigationFeature.HydroUi:
-                    // Disconnect the watercooler if connected.
+                    // Stop all auto-connect logic (reconnect loop and pending
+                    // device watcher) even when not connected, then disconnect
+                    // the watercooler if it is.
                     var hydroUIService = App.GetService<HydroUIService>();
-                    if (hydroUIService?.IsConnected == true)
+                    if (hydroUIService != null)
                     {
                         hydroUIService.SetUserDisconnected();
-                        await hydroUIService.DisconnectAsync();
+                        if (hydroUIService.IsConnected)
+                            await hydroUIService.DisconnectAsync();
                     }
                     break;
 

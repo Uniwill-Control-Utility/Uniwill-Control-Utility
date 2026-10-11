@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Uniwill_Control_Utility.Services;
@@ -88,23 +88,32 @@ internal sealed class StartupProgressReporter
 }
 
 /// <summary>
-/// Tracks parallel Phase 1 tasks and reports the current blocker via callbacks.
-/// Each task is identified by its original index in the tasks array passed to the constructor.
-/// When a task completes, the label callback fires with remaining tasks as a bullet list.
-/// The progress callback fires with the updated percent.
-/// Uses callbacks to avoid a circular dependency on the Views layer.
+/// Tracks parallel Phase 1 tasks and reports their state via callbacks.
+/// The title always shows the phase label; the detail row stays hidden unless
+/// a tracked task is still running past the slow-task threshold, in which case
+/// the detail row shows that task's label (e.g. "Connecting devices…").
+/// Each task is identified by its original index in the tasks array passed to
+/// the constructor. Uses callbacks to avoid a circular dependency on the Views layer.
 /// </summary>
 internal sealed class ParallelPhaseTracker
 {
     private readonly Action<string, string?> _setLabel;
     private readonly Action<int> _setProgress;
+    private readonly Action<Action> _postToUiThread;
     private readonly string _phaseLabel;
-    // Maps original index -> display label (null for invisible tasks)
+    // Maps original index -> display label (no entry for invisible tasks)
     private readonly Dictionary<int, string> _taskMap;
+    private readonly object _stateLock = new();
     private readonly HashSet<int> _done = new();
     private readonly int _visibleCount;
-    private int _startPercent;
-    private int _endPercent;
+    private readonly int _startPercent;
+    private readonly int _endPercent;
+    private readonly int? _slowTaskIndex;
+    private readonly string? _slowDetail;
+    private string? _activeDetail;
+    private Timer? _slowWatchdog;
+
+    private static readonly TimeSpan DefaultSlowTaskThreshold = TimeSpan.FromSeconds(3);
 
     internal ParallelPhaseTracker(
         string phaseLabel,
@@ -112,25 +121,49 @@ internal sealed class ParallelPhaseTracker
         int startPercent,
         int endPercent,
         Action<string, string?> setLabel,
-        Action<int> setProgress)
+        Action<int> setProgress,
+        Action<Action> postToUiThread,
+        string? slowTaskLabelKey = null,
+        TimeSpan? slowTaskThreshold = null)
     {
+        var threshold = slowTaskThreshold ?? DefaultSlowTaskThreshold;
+
         _setLabel = setLabel;
         _setProgress = setProgress;
+        _postToUiThread = postToUiThread;
         _phaseLabel = phaseLabel;
         _startPercent = startPercent;
         _endPercent = endPercent;
 
         int index = 0;
         _taskMap = new Dictionary<int, string>();
+        int? slowTaskIndex = null;
         foreach (var t in tasks)
         {
             if (t.Visible)
             {
                 _taskMap[index] = LocalizationService.Get(t.LabelKey);
             }
+            if (slowTaskLabelKey is not null && t.LabelKey == slowTaskLabelKey)
+            {
+                slowTaskIndex = index;
+            }
             index++;
         }
         _visibleCount = _taskMap.Count;
+
+        // Arm the watchdog only for visible slow tasks so disabled features
+        // (e.g. both device integrations off) can never surface a stale label.
+        if (slowTaskIndex is int slowIndex && _taskMap.TryGetValue(slowIndex, out string slowLabel))
+        {
+            _slowTaskIndex = slowIndex;
+            _slowDetail = slowLabel + "…";
+            _slowWatchdog = new Timer(
+                _ => OnSlowTaskThreshold(),
+                null,
+                threshold,
+                Timeout.InfiniteTimeSpan);
+        }
 
         UpdateLabel();
         _setProgress(_startPercent);
@@ -143,38 +176,61 @@ internal sealed class ParallelPhaseTracker
     /// </summary>
     internal void TaskCompleted(int originalIndex)
     {
-        if (_taskMap.ContainsKey(originalIndex))
+        bool slowCompleted;
+        lock (_stateLock)
         {
-            _done.Add(originalIndex);
+            slowCompleted = originalIndex == _slowTaskIndex;
+            if (_taskMap.ContainsKey(originalIndex))
+            {
+                _done.Add(originalIndex);
+            }
         }
+
+        if (slowCompleted)
+        {
+            _slowWatchdog?.Dispose();
+            _slowWatchdog = null;
+            _activeDetail = null;
+        }
+
         UpdateLabel();
         UpdateProgress();
     }
 
-    private void UpdateLabel()
+    private void OnSlowTaskThreshold()
     {
-        var remainingList = _taskMap
-            .OrderBy(kv => kv.Key)
-            .Where(kv => !_done.Contains(kv.Key))
-            .Select(kv => kv.Value)
-            .ToList();
-
-        _setLabel(_phaseLabel, FormatRemaining(remainingList));
+        // Re-check on the UI thread so a task that completed between the timer
+        // firing and this callback running cannot revive the slow-task label.
+        _postToUiThread(() =>
+        {
+            bool pending;
+            lock (_stateLock)
+            {
+                pending = _slowTaskIndex is int idx && !_done.Contains(idx);
+            }
+            if (pending)
+            {
+                _activeDetail = _slowDetail;
+                UpdateLabel();
+            }
+        });
     }
 
-    private static string FormatRemaining(IList<string> remaining)
+    private void UpdateLabel()
     {
-        if (remaining.Count == 0)
-            return string.Empty;
-
-        var lines = remaining.Select(t => $"- {t}").ToArray();
-        return string.Join("\n", lines);
+        _setLabel(_phaseLabel, _activeDetail);
     }
 
     private void UpdateProgress()
     {
+        int doneCount;
+        lock (_stateLock)
+        {
+            doneCount = _done.Count;
+        }
+
         var range = _endPercent - _startPercent;
-        var percent = _startPercent + (int)((double)_done.Count / _visibleCount * range);
+        var percent = _startPercent + (int)((double)doneCount / _visibleCount * range);
         _setProgress(percent);
     }
 }
