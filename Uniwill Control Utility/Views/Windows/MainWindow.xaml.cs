@@ -1052,11 +1052,17 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 Debug.WriteLine($"[Resume] GPU Power Saving re-apply failed: {ex.Message}");
                             }
 
-                            // Re-apply Fan Control EC duties or restart Smart Fan Mode
+                            // Re-apply Fan Control EC duties or restart Smart Fan Mode.
+                            // Stock presets own their fans in firmware, so re-writing a
+                            // custom EC curve after resume would undo the OEM mode engine.
                             try
                             {
                                 var ecService = App.GetService<UniwillECService>();
-                                if (ecService != null)
+                                if (ecService != null && !IsFanCustomizationAllowed())
+                                {
+                                    Debug.WriteLine("[Resume] Stock preset active — EC fan duties not re-applied");
+                                }
+                                else if (ecService != null)
                                 {
                                     var fanSettings = FanControlSettingsService.Load();
                                     EcFanCurve cpuCurve;
@@ -1919,7 +1925,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             // Apply the curve
             var ec = App.GetService<UniwillECService>();
-            if (ec != null)
+            if (ec != null && IsFanCustomizationAllowed())
             {
                 var curve = GetFanPresetCurve(settings.UnifiedPreset);
                 if (enabled)
@@ -1962,7 +1968,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             FanControlSettingsService.Save(settings);
 
             var ec = App.GetService<UniwillECService>();
-            if (ec != null)
+            if (ec != null && IsFanCustomizationAllowed())
             {
                 Models.EcFanCurve curve = presetName == "Custom"
                     ? GetFanCustomCurve(settings.UnifiedDuties)
@@ -1997,7 +2003,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             FanControlSettingsService.Save(settings);
 
             var ec = App.GetService<UniwillECService>();
-            if (ec != null)
+            if (ec != null && IsFanCustomizationAllowed())
             {
                 Models.EcFanCurve cpuCurve = presetName == "Custom"
                     ? GetFanCustomCurve(settings.CpuDuties)
@@ -2028,7 +2034,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             FanControlSettingsService.Save(settings);
 
             var ec = App.GetService<UniwillECService>();
-            if (ec != null)
+            if (ec != null && IsFanCustomizationAllowed())
             {
                 Models.EcFanCurve cpuCurve = settings.CpuPreset == "Custom"
                     ? GetFanCustomCurve(settings.CpuDuties)
@@ -2069,6 +2075,11 @@ namespace Uniwill_Control_Utility.Views.Windows
             return EcFanCurve.CreatePerformance();
         }
 
+        /// Fan Control customization (page, tray, resume) is Custom-preset-only:
+        /// stock presets leave fans to the firmware's per-mode table.
+        private static bool IsFanCustomizationAllowed() =>
+            !PresetProfileApplier.IsBuiltInProfile(Settings.Default.presetProfile);
+
         private void TrayFanSmartMode_Click(object? sender, RoutedEventArgs e)
         {
             if (sender is not MenuItem item)
@@ -2080,7 +2091,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             FanControlSettingsService.Save(settings);
 
             var ec = App.GetService<UniwillECService>();
-            if (ec == null)
+            if (ec == null || !IsFanCustomizationAllowed())
                 return;
 
             if (enabled)
@@ -2352,6 +2363,8 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// <summary>
         /// Disables or enables tray controls based on Adaptive Mode override state.
         /// Only applies when Adaptive Mode is actually running (isAdaptiveModeRunning = true).
+        /// Fan Control is additionally disabled while a stock power preset is active,
+        /// since stock presets own their fan curves in firmware.
         /// </summary>
         private void UpdateTrayAdaptiveOverrideState()
         {
@@ -2361,7 +2374,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 // All controls enabled when Adaptive Mode is off
                 miSectionPresets.IsEnabled = true;
                 miSectionHydro.IsEnabled = true;
-                miSectionFanControl.IsEnabled = true;
+                miSectionFanControl.IsEnabled = IsFanCustomizationAllowed();
                 return;
             }
 
@@ -2378,7 +2391,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             // Fan Control: disable if EC fan override is active
             bool ecFanOverridden = deviceApplier != null && deviceApplier.IsEcFanOverridden;
-            miSectionFanControl.IsEnabled = !ecFanOverridden;
+            miSectionFanControl.IsEnabled = !ecFanOverridden && IsFanCustomizationAllowed();
         }
 
         #endregion

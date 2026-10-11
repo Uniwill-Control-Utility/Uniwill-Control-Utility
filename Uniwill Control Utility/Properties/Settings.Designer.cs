@@ -906,5 +906,21 @@ namespace Uniwill_Control_Utility.Properties {
             get { return ((int)(this["GpuPowerSavingPluggedIn"])); }
             set { this["GpuPowerSavingPluggedIn"] = value; }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool EnableQKeyButtonIntercept {
+            get { return ((bool)(this["EnableQKeyButtonIntercept"])); }
+            set { this["EnableQKeyButtonIntercept"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool EnableQKeyLedSync {
+            get { return ((bool)(this["EnableQKeyLedSync"])); }
+            set { this["EnableQKeyLedSync"] = value; }
+        }
     }
 }

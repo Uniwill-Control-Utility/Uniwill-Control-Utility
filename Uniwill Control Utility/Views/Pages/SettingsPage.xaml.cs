@@ -95,6 +95,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbShowLightBarNavigation.IsChecked = Settings.Default.EnableLightBarNavigation;
             cbShowOverlayNavigation.IsChecked = Settings.Default.EnableOverlayNavigation;
             cbShowAutoNavigation.IsChecked = Settings.Default.EnableAutoNavigation;
+            cbQKeyIntercept.IsChecked = Settings.Default.EnableQKeyButtonIntercept;
+            cbQKeyLedSync.IsChecked = Settings.Default.EnableQKeyLedSync;
             _featureNavigationControlsReady = true;
 
             cbxLogLevel.SelectedIndex = Settings.Default.DiagnosticLogLevel;
@@ -416,6 +418,30 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             var pageService = App.GetService<Wpf.Ui.Abstractions.INavigationViewPageProvider>() as PageService;
             pageService?.InvalidateBoostDependentPages();
+        }
+
+        private void cbQKeyIntercept_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.EnableQKeyButtonIntercept = true;
+            Settings.Default.Save();
+        }
+
+        private void cbQKeyIntercept_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.EnableQKeyButtonIntercept = false;
+            Settings.Default.Save();
+        }
+
+        private void cbQKeyLedSync_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.EnableQKeyLedSync = true;
+            Settings.Default.Save();
+        }
+
+        private void cbQKeyLedSync_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.EnableQKeyLedSync = false;
+            Settings.Default.Save();
         }
 
         private void cbHideFlydigi_Checked(object sender, RoutedEventArgs e)

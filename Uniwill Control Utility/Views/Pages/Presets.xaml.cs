@@ -443,7 +443,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             lblNvDbOffset.Text = $"{sdNvDbOffset.Value:F0} W";
             // Show "Curve" only if curve is active AND user hasn't touched the slider.
             // If the user manually changes the slider, the curve is ignored for Apply.
-            lblNvCore.Text = (VfCurveActive && !_userTouchedCoreSlider) ? "Curve" : $"{sdNvCore.Value:F0} MHz";
+            bool stockPreset = Services.PresetProfileApplier.IsBuiltInProfile(_currentProfile);
+            lblNvCore.Text = (!stockPreset && VfCurveActive && !_userTouchedCoreSlider) ? "Curve" : $"{sdNvCore.Value:F0} MHz";
             lblNvMem.Text = $"{sdNvMem.Value:F0} MHz";
         }
 
@@ -1059,15 +1060,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                             DebugLog($"selectProfile: Saved Custom fan settings before switching to {profile}");
                         }
 
-                        // Apply mapped fan curve for default profiles
-                        string fanPreset = profile switch
-                        {
-                            "Office" => "Silent",
-                            "Gaming" => "Balanced",
-                            "Turbo" => "Performance",
-                            _ => "Balanced"
-                        };
-                        ApplyFanCurveFromPreset(fanPreset);
+                        // Stock presets leave fans to the firmware's per-mode table:
+                        // ApplyOemStockMode clears 0x727 bit6, which makes the EC ignore
+                        // custom fan tables and hands the OEM mode engine back. Writing a
+                        // mapped curve here would re-arm manual fan control instead.
+                        DebugLog($"selectProfile: {profile} is a stock preset — fan curves left to the firmware");
                     }
                 }
 
@@ -1100,12 +1097,18 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Curve Optimizer
             sdCoCcd0.Value = coCcd0;
             sdCoCcd1.Value = coCcd1;
+            sdCoUnified.Value = 0;
 
             // GPU
             sdNvPower.Value = gpuTgp;
             togDynamicBoost.IsChecked = gpuDb;
             sdNvDbOffset.Value = Math.Max(0, gpuDbOffset);
             spNvDbOffset.Visibility = gpuDb ? Visibility.Visible : Visibility.Collapsed;
+
+            // Stock presets own no GPU clock offsets: clearing here keeps the Custom
+            // preset's core/mem offsets from leaking into a stock apply.
+            sdNvCore.Value = 0;
+            sdNvMem.Value = 0;
 
             // Reset the flag when loading profile values — start fresh.
             _userTouchedCoreSlider = false;
@@ -1124,7 +1127,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (sdNvidia.Visibility == Visibility.Visible && Settings.Default.EnableGpuClockControl)
             {
                 string coreText;
-                if (VfCurveActive && !_userTouchedCoreSlider)
+                if (!Services.PresetProfileApplier.IsBuiltInProfile(_currentProfile)
+                    && VfCurveActive && !_userTouchedCoreSlider)
                 {
                     coreText = "Curve";
                 }
@@ -1197,6 +1201,22 @@ namespace Uniwill_Control_Utility.Views.Pages
                 await RyzenAdj_To_UCU.TranslateAsync(command, appliedName: _currentProfile + " Profile", localizeAppliedName: false);
                 DebugLog($"  TranslateAsync completed");
 
+                // Stock presets are applied the OpenRevo way: assert the OEM mode
+                // engine (mode index + trigger + the 0x045B flag) and clear the
+                // custom power/profile enable bits, which yields CPU limits, GPU
+                // TGP and fans to the firmware's own per-mode factory table. Runs
+                // before anything else EC-side so no stale GPU ceiling can be left
+                // behind, and ApplyOemStockMode clears 0x0741 bit0, which re-arms the
+                // physical Performance button (bit0 set disarms it on NB02).
+                if (PresetProfileApplier.IsBuiltInProfile(_currentProfile))
+                {
+                    var ecGate = RyzenAdj_To_UCU.EcService;
+                    if (ecGate != null && ecGate.ApplyOemStockMode(PresetProfileApplier.OemModeIndexFor(_currentProfile)))
+                    {
+                        DeviceApplier.ReassertKeyboardBrightnessAfterHandback();
+                    }
+                }
+
                 // Apply V-F curve offsets only on Custom profile.
                 // Stock profiles (Office/Gaming/Turbo) always use the slider values (0 MHz),
                 // even if a curve exists on disk from a previous Custom session.
@@ -1244,10 +1264,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                     }
                 }
 
-                // Apply EC CPU power limits AFTER SMU commands. The EC enforces a hardware
-                // ceiling that clamps SMU settings from above. Without these
-                // EC writes, the CPU is capped at ~130W regardless of SMU power limit values.
-                if (Family.TYPE == Family.ProcessorType.Amd_Apu)
+                // Apply EC CPU power limits AFTER SMU commands, for Custom presets
+                // only — stock presets yield PL1/PL2/PL4 to the EC's native factory
+                // table (OpenRevo's approach).
+                if (Family.TYPE == Family.ProcessorType.Amd_Apu && !PresetProfileApplier.IsBuiltInProfile(_currentProfile))
                 {
                     var ec = RyzenAdj_To_UCU.EcService;
                     if (ec != null)
@@ -1703,14 +1723,23 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 else
                 {
-                    int core = Settings.Default.EnableGpuClockControl ? (int)sdNvCore.Value : 0;
-                    int mem = Settings.Default.EnableGpuClockControl ? (int)sdNvMem.Value : 0;
-                    int tgp = (int)sdNvPower.Value;
-                    bool boostEnabled = Settings.Default.EnablePowerBoostMode;
-                    bool dbEnabled = !boostEnabled && togDynamicBoost.IsChecked == true;
-                    int dbOffset = dbEnabled ? (int)sdNvDbOffset.Value : 0;
-                    int totalWatts = tgp + dbOffset;
-                    parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
+                    if (PresetProfileApplier.IsBuiltInProfile(_currentProfile))
+                    {
+                        // Stock presets yield GPU power to the firmware's per-mode
+                        // table (OpenRevo's approach) and own no clock offsets.
+                        parts.Add("--NVIDIA-Clocks=0-0-0");
+                    }
+                    else
+                    {
+                        int core = Settings.Default.EnableGpuClockControl ? (int)sdNvCore.Value : 0;
+                        int mem = Settings.Default.EnableGpuClockControl ? (int)sdNvMem.Value : 0;
+                        int tgp = (int)sdNvPower.Value;
+                        bool boostEnabled = Settings.Default.EnablePowerBoostMode;
+                        bool dbEnabled = !boostEnabled && togDynamicBoost.IsChecked == true;
+                        int dbOffset = dbEnabled ? (int)sdNvDbOffset.Value : 0;
+                        int totalWatts = tgp + dbOffset;
+                        parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
+                    }
                 }
             }
 

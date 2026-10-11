@@ -282,6 +282,11 @@ namespace Uniwill_Control_Utility
                         });
                         services.AddSingleton<EcTelemetryService>();
 
+                        // Hardware Performance / Q-key button intercept: polls the EC
+                        // TCC offset register for button presses and cycles UCU presets.
+                        services.AddSingleton<QKeyButtonService>();
+                        services.AddHostedService(provider => provider.GetRequiredService<QKeyButtonService>());
+
                         // Centralized device applier (singleton)
                         services.AddSingleton<DeviceApplier>();
                         services.AddSingleton<TrayQuickControlService>();

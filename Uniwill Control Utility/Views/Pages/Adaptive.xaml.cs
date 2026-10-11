@@ -256,6 +256,25 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
+        /// <summary>
+        /// Disables the EC fan card and the GPU power (TGP + Dynamic Boost) controls while
+        /// the EC manual-control gate is locked. The firmware makes manual EC control and
+        /// the OEM Performance-button engine mutually exclusive, so a stock preset ignores
+        /// custom fan tables and cTGP/DB offsets — only a Custom preset unlocks them.
+        /// </summary>
+        private void ApplyManualControlLockGates()
+        {
+            bool enabled = _deviceApplier?.IsManualControlLocked != true;
+
+            sdEcFan.IsEnabled = enabled;
+            AdpGpuPowerPanel.IsEnabled = enabled;
+        }
+
+        private void OnManualControlLockChanged(object? sender, bool isLocked)
+        {
+            Dispatcher.Invoke(ApplyManualControlLockGates);
+        }
+
         // Named constants for repeated magic strings
         private const string AdaptivePresetsFile = "adaptivePresets.json";
 
@@ -309,6 +328,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 // Initialize DeviceApplier for centralized device commands
                 _deviceApplier = App.GetService<DeviceApplier>();
+                if (_deviceApplier is not null)
+                    _deviceApplier.ManualControlLockChanged += OnManualControlLockChanged;
                 _ = await gpuInventory.GetSnapshotAsync();
 
                 cbExcludeFromSwitching.IsChecked = false;
@@ -1969,6 +1990,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Apply dynamic power limit max and update GPU boost indicator
             ApplyAdpPowerLimitMax();
+
+            // Re-read the EC manual-control gate on navigation — a preset may have been
+            // applied while this page was hidden, and the event only fires on change.
+            _deviceApplier?.SyncManualControlLock();
+            ApplyManualControlLockGates();
 
             // Update bottom bar boost mode label
             UpdateAdpPresetModeLabel(Settings.Default.EnablePowerBoostMode);

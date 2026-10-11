@@ -75,12 +75,6 @@ PRs with additional (well-structured and tested) features are welcome.
 
 We do not mind features/code created with the assistance of AI, as long as it's thoroughly tested by the owner of said code and as long as the code is not of bad quality (aka "AI slop").
 
-## Missing features
- - Power Preset button interception
-
- These are the features I was unable to implement due to various blockers.
- PRs are more than welcome.
-
 ## Features replicated from XMG's Control Center
  - Performance profiles
  - Keyboard global/per-key RGB control
@@ -89,6 +83,9 @@ We do not mind features/code created with the assistance of AI, as long as it's 
  - CPU and GPU Fan Control
  - Battery control
  - MiniLED Local Dimming control
+ - GPU MUX switch control (Hybrid / dGPU Only / iGPU Only)
+ - GPU Power Saving (On / Off / Auto)
+ - Performance button preset switching (physical Performance/Q-key button)
 
 ## Features replicated from Flydigi Space Center
  - Flydigi BS1, BS2, BS2 Pro, BS3 and BS3 Pro support
@@ -99,11 +96,14 @@ We do not mind features/code created with the assistance of AI, as long as it's 
 ## Additional features 
  - Per-game presets of above features (except the battery, of course)
  - Automatic performance profile application based on the charger being (un)plugged
+ - Automatic GPU preference application based on the charger being (un)plugged (Hybrid mode)
  - Extra RGB effects/directions for the keyboard
- - Live metric overlay (WIP)
- - System tray controls for Power profile, Hydro UI, Fan and FLydigi control
+ - System tray controls for Power profile, Hydro UI, Fan and Flydigi control
  - Smart Hydro UI - turn the pump on/off and the fan up/down (noise optimization)
  - Smart Fan Mode - all fans now use one temperature sensor as the reference
+ - Stock presets assert through the EC's own OEM mode engine (no power-register writes), so their power limits come from the firmware's factory table exactly like the official Control Center
+ - Manual-control gating: Fan Control and the Adaptive GPU power controls are disabled while a stock preset is active, since the firmware ignores custom fan tables and cTGP/Dynamic Boost offsets then
+ - Keyboard brightness re-assert after UCU hands EC manual control back to the firmware, so the firmware's own restore leaves no visible brightness flash
 
 # App Features
 
@@ -118,7 +118,7 @@ Simple metrics and toggles for quick changes.
 At-a-glance system overview showing your device's specifications and live hardware metrics.
 
 - Device identification with laptop image (XMG, PC Specialist Recoil, and more)
-- Live CPU, GPU, memory, and battery telemetry cards
+- Live CPU, GPU, memory, and battery telemetry cards (GPU metrics fall back to the iGPU when the dGPU is unavailable)
 - Quick-launch device controls for Flydigi coolers and Hydro UI watercoolers (when supported)
 
 ![Dashboard](screenshots/dashboard.png)
@@ -127,7 +127,7 @@ At-a-glance system overview showing your device's specifications and live hardwa
 
 One-click tuning profiles and granular hardware controls for CPU, GPU, and system power management. This is a mix of XMG Control Center's and MSI Afterburner main features.
 
-- **Built-in profiles** — Office, Gaming, and Turbo presets optimized for common use cases
+- **Built-in profiles** — Office, Gaming, and Turbo presets optimized for common use cases, asserted through the EC's own OEM mode engine so their power limits stay in the firmware's factory table
 - **Custom profiles** — Save and load your own tuned configurations
 - **Status card** — Shows active values for CPU power limits, TjMax, Curve Optimizer, GPU TGP, and Dynamic Boost
 - **CPU Power Tuning** (AMD) — Sustained Power Limit (SPL), Fast Power Limit (FPL), TjMax, and Curve Optimizer
@@ -138,6 +138,16 @@ One-click tuning profiles and granular hardware controls for CPU, GPU, and syste
 
 ![Presets](screenshots/presets.png)
 ![GPU Curve](screenshots/gpu-curve.png)
+
+### **Performance Button**
+
+Interception of the laptop's physical Performance / Q-key button (Uniwill NB02 hardware), so the button cycles UCU's own presets instead of the firmware's.
+
+- **Preset cycling** — Each press advances to the next preset (Office → Gaming → Turbo → saved Custom slots, wrapping) through the same apply path the Presets page uses, and the selection is persisted so the tray, Presets page, and resume handlers stay in sync
+- **Q-key LED** — The EC firmware drives the LED from its own internal mode state and the OEM button already cycles it (white → red → yellow), which stays aligned with the Office → Gaming → Turbo order; no LED color register is written by default
+- **Detection** — The firmware re-latches the TCC offset register (`0x0786`) on *every* mode change, physical press and software-induced alike, so the poll tracks UCU's own mode asserts and ignores their re-latches, leaving only changes the firmware made on its own. WMI power-management events stay silent on this hardware, which makes EC polling the only reliable path
+- **Manual-control trade-off** — The firmware makes EC manual control and the OEM Performance-button engine mutually exclusive: a Custom preset (custom fan tables, cTGP/Dynamic Boost offsets, CPU power limits) disarms the button, and a stock preset hands control back to the firmware. UCU re-asserts the saved keyboard brightness after each hand-back so the firmware's restore leaves no visible flash
+- **Settings** — "Q-Key button preset switching" (default ON) and "Q-Key LED sync (experimental)" (default OFF, mirrors the active preset into the EC mode index register for firmware that drives the LED from it)
 
 ### **Adaptive Mode**
 
@@ -157,13 +167,23 @@ Intelligent, game-aware performance optimization that automatically adjusts sett
 
 ### **Game Overlay**
 
-Click-through hardware monitoring overlay for real-time performance tracking while gaming.
+Click-through in-game performance overlay, rendered natively by RivaTuner Statistics Server (RTSS) for real-time tracking while gaming.
 
-- Configurable sensor tiles — CPU temp, GPU temp, RAM usage, FPS, and more
-- Customizable overlay scale (50–200%) and panel opacity
-- Adjustable refresh interval to balance accuracy and overhead
-- Global keyboard shortcuts to toggle overlay visibility and sensor polling
-- Relies on RTSS for safe metric retrieval (thus avoiding the risk of EAC game bans and such)
+- **OSD metric rows** — toggle any combination of these rows (each row shows its sub-metrics):
+  - **CPU** — temperature, usage, clock (MHz), power (W), fan speed
+  - **RAM** — used (MB) and per-DIMM temperatures
+  - **GPU** — temperature, usage, clock (MHz), power (W), fan speed
+  - **VRAM** — used (MB)
+  - **Current FPS** — live FPS + frame time (ms), labelled with the graphics API (DX12 / DX11 / Vulkan)
+  - **1% Low** — 1% low FPS + frame time (ms)
+  - **0.1% Low** — 0.1% low FPS + frame time (ms)
+  - **Battery** — charge %, power (W), status, and time remaining
+  - **Hydro UI** — pump voltage and fan % (when a cooler is connected)
+  - **Flydigi cooler** — fan RPM (when a cooler is connected)
+- **Refresh interval** — configurable (100–5000 ms) to balance accuracy and overhead
+- **Global shortcuts** — show/hide the overlay, plus a secondary alias shortcut
+- **Rendered by RTSS** — UCU writes the metric data into RTSS's on-screen display; positioning, scale, and opacity are configured in RTSS, and its native hooking keeps the overlay safe in anti-cheat (e.g. EAC) protected games
+- **RTSS required** — the overlay and FPS data depend on RTSS being installed and running
 
 ![Overlay](screenshots/overlay.png)
 
@@ -174,6 +194,8 @@ Set-and-forget rules that apply presets automatically when system state changes.
 - **Preset on Battery Charge** — Apply a preset when the system switches to AC power
 - **Preset on Battery Discharge** — Apply a preset when running on battery
 - **Preset on System Resume** — Reapply settings after sleep or hibernation
+- **GPU Preference on Battery** — Set the GPU preference (iGPU / dGPU / Auto) when running on battery (Hybrid mode only)
+- **GPU Preference when Plugged In** — Set the GPU preference when connected to power (Hybrid mode only)
 
 ![Auto](screenshots/auto.png)
 
@@ -187,6 +209,7 @@ Full control over system fan curves with real-time temperature monitoring.
 - Turbo mode (100% fans) and Restore Auto to return control to the EC firmware
 - Live CPU/GPU temperature display
 - **Smart Fan Mode** — forces all the fans to use the same temperature source - CPU,GPU or the Hottest of the two
+- **Stock-preset gating** — fan curve customization (page, tray, resume) is Custom-preset only; stock presets leave the fans to the firmware's own per-mode table and show a "Stock Preset Active" notice
 
 
 ![Fan Control](screenshots/fan-control.png)
@@ -231,6 +254,17 @@ Battery charging management and live telemetry from the EC.
 
 ![Battery](screenshots/battery.png)
 
+### **Display**
+
+GPU display mode, GPU power management, and display panel controls (Uniwill EC hardware only).
+
+- **GPU Display Mode** (MUX switch) — Choose **Hybrid (NVIDIA Optimus)**, **dGPU Only**, or **iGPU Only**, with a visual MUX diagram. The choice is persisted to UEFI NVRAM so it survives restarts, and a system reboot is required for the physical MUX change to take effect.
+- **GPU Power Saving** (Hybrid mode only) — Live discrete-GPU power control without rebooting: **On (Power Saving)** disables the dGPU via PnP hotswap and routes rendering to the iGPU for maximum savings, **Off (Performance)** re-enables the dGPU, and **Auto** lets Windows/NVIDIA Optimus decide per application.
+- **MiniLED Local Dimming** (MiniLED panels only) — Toggle the panel's local dimming, verified with an EC register readback.
+- **GPU Information** — Live readout of the active MUX mode, GPU module ID, physical MUX hardware state, and the persisted NVRAM mode.
+
+![Display](screenshots/display.png)
+
 ### Flydigi Cooler
 
 Control Flydigi laptop cooling pads via BLE (BS1) and HID (BS2, BS2 Pro, BS3, BS3 Pro).
@@ -272,6 +306,14 @@ Application preferences, diagnostics, updates, and embedded system information.
 
 ![Settings](screenshots/settings.png)
 
+### **About**
+
+Application info and project resources.
+
+- **App info** — Version and copyright
+- **Links** — GitHub repository, latest release, and community
+- **Third-party libraries** — The open-source libraries UCU builds on
+- **Support** — An optional way to support the project
 
 ## Prerequisites
 
@@ -295,7 +337,7 @@ If the file exists, you're good to go. If it doesn't, install the official Contr
 
 ### RivaTuner Statistics Server (RTSS)
 
-RTSS is required for the **Game Overlay** FPS sensor. The overlay integrates with RTSS to display real-time frame rates. Download it from the [RivaTuner website](https://www.guru3d.com/download/rivatuner-statistics-server-download/).
+RTSS is required for the **Game Overlay**. UCU writes its metrics into RTSS's on-screen display (OSD), which handles all in-game rendering — so the entire overlay (including FPS) depends on RTSS being installed and running. Download it from the [RivaTuner website](https://www.guru3d.com/download/rivatuner-statistics-server-download/).
 
 ## Installation
 
@@ -329,5 +371,5 @@ UCU builds on the work of many open-source projects and reverse-engineering effo
 
 - **MechControl** (decompiled, closed-source) — Original by Okashira (Discord: defty1234), fork by [Heavyfail (GitHub)](https://github.com/Heavyfail). Schenker/Mechrevo utility. Source for the global keyboard effects protocol (zone-based 9-byte HID feature reports), MiniLED Local Dimming control (WMI `AcpiTest_MULong` / `GetSetULong` invocation pattern), and UWACPIDriver.sys IOCTL codes (0x9C40A488/0x9C40A48C) for direct EC access.
 - **XMG Control Center / GCUService.exe** (closed-source) — Official Schenker/XMG utility. Studied for HID device communication patterns, handle acquisition, GPU power control EC register sequences (via `GPUInfoDLL.dll` and `ACPIDriverDll.dll` binary analysis), and NVRAM GUID/variable names for GPU mode persistence.
-- **[OpenRevo (GitHub)](https://github.com/faintonce/open-revo)** by faintonce — Mechrevo control center (Rust/Tauri). Used for runtime NVRAM probing to determine the correct offset (98) within `OemMagicVariable` for BIOS-visible GPU MUX mode switching. Without this, UCU's NVRAM writes would not have been recognized by the BIOS.
+- **[OpenRevo (GitHub)](https://github.com/faintonce/open-revo)** by faintonce — Mechrevo control center (Rust/Tauri), a sibling of UCU's target on the same Uniwill EC family. Used for runtime NVRAM probing to determine the correct offset (98) within `OemMagicVariable` for BIOS-visible GPU MUX mode switching — without this, UCU's NVRAM writes would not have been recognized by the BIOS. Its mode-apply path was also decompiled for the EC OEM mode engine (the per-mode `0x0751` fan-control literals that recolor the Q-key LED, the `0x0787` commit write, the `0x0741` manual-control gate, and the fact that stock modes write **no** power registers at all), which is what UCU's stock presets now assert through, and for the Performance-button intercept architecture behind UCU's own button handling.
 

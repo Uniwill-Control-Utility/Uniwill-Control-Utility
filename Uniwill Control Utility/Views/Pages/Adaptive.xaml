@@ -450,6 +450,10 @@
                             </Grid>
                         </ui:CardExpander.Header>
                         <StackPanel>
+                            <!-- GPU power controls (TGP + Dynamic Boost). Wrapped so the
+                                 page can disable them as a unit while the EC manual-control
+                                 gate is locked by a stock preset. -->
+                            <StackPanel x:Name="AdpGpuPowerPanel">
                             <!-- GPU TGP -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -532,6 +536,7 @@
                                         </StackPanel>
                                     </Grid>
                                 </StackPanel>
+                            </StackPanel>
                             </StackPanel>
                             <!-- GPU Clock Controls (hidden when EnableGpuClockControl is OFF) -->
                             <StackPanel x:Name="AdpGpuClockControlsPanel">

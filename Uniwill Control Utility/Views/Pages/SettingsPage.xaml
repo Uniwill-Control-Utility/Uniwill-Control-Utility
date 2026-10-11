@@ -561,6 +561,50 @@
                                                  Checked="cbPowerBoostMode_Checked"
                                                  Unchecked="cbPowerBoostMode_Unchecked" />
                             </Grid>
+                            <!-- Row: Q-Key button preset switching -->
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Q-Key button preset switching" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Lets the physical Performance button cycle UCU power presets (Office to Gaming to Turbo and saved custom presets). The button LED keeps following its own hardware cycle."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbQKeyIntercept"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbQKeyIntercept_Checked"
+                                                 Unchecked="cbQKeyIntercept_Unchecked" />
+                            </Grid>
+                            <!-- Row: Q-Key LED sync -->
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Q-Key LED sync (experimental)" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Writes the active preset to the EC mode index register so firmware that drives the Q-key LED from it changes color. Only needed when your preset order differs from the button's LED cycle."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbQKeyLedSync"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbQKeyLedSync_Checked"
+                                                 Unchecked="cbQKeyLedSync_Unchecked" />
+                            </Grid>
                         </StackPanel>
                     </ui:CardExpander>
 

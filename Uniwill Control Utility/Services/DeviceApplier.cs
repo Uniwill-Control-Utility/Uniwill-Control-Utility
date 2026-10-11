@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Serilog;
 using System.Windows.Media;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Scripts.Misc;
@@ -28,6 +29,13 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>Whether Adaptive Mode is currently overriding EC Fan Control.</summary>
         public bool IsEcFanOverridden { get; private set; }
+
+        /// <summary>
+        /// Whether EC manual control is unavailable: the firmware's 0x0741 bit0 is clear,
+        /// so a stock preset (Office/Gaming/Turbo) is active and the OEM Performance-button
+        /// engine is armed. Manual control and the button engine are mutually exclusive.
+        /// </summary>
+        public bool IsManualControlLocked { get; private set; }
 
         /// <summary>Whether Adaptive Mode is currently overriding Keyboard RGB.</summary>
         public bool IsKeyboardOverridden { get; private set; }
@@ -76,6 +84,12 @@ namespace Uniwill_Control_Utility.Services
         /// Args: (isOverridden)
         /// </summary>
         public event EventHandler<bool>? EcFanOverrideChanged;
+
+        /// <summary>
+        /// Raised when the EC manual-control lock state changes.
+        /// Args: (isLocked)
+        /// </summary>
+        public event EventHandler<bool>? ManualControlLockChanged;
 
         /// <summary>
         /// Raised when profile-specific EC Fan settings have been applied and the Fan Control
@@ -322,6 +336,56 @@ namespace Uniwill_Control_Utility.Services
             }
 
             EcFanOverrideChanged?.Invoke(this, false);
+        }
+
+        /// <summary>
+        /// Marks EC manual control as unavailable — a stock preset is active and the OEM
+        /// Performance-button engine is armed instead.
+        /// </summary>
+        public void EnableManualControlLock()
+        {
+            if (IsManualControlLocked)
+                return;
+
+            IsManualControlLocked = true;
+            ManualControlLockChanged?.Invoke(this, true);
+        }
+
+        /// <summary>
+        /// Marks EC manual control as available — a custom preset has unlocked 0x0741 bit0,
+        /// which disarms the OEM Performance-button engine.
+        /// </summary>
+        public void DisableManualControlLock()
+        {
+            if (!IsManualControlLocked)
+                return;
+
+            IsManualControlLocked = false;
+            ManualControlLockChanged?.Invoke(this, false);
+        }
+
+        /// <summary>
+        /// Re-reads the EC manual-mode gate and raises ManualControlLockChanged when the
+        /// firmware disagrees with our cached view. Called from the preset-apply flow
+        /// (page navigation) rather than on a timer — only a preset apply or the OEM
+        /// button ever flips the gate.
+        /// </summary>
+        public void SyncManualControlLock()
+        {
+            if (_uniwillEc is null)
+                return;
+
+            try
+            {
+                if (_uniwillEc.IsCustomProfileActive())
+                    DisableManualControlLock();
+                else
+                    EnableManualControlLock();
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to read EC manual-mode lock state");
+            }
         }
 
         /// <summary>
@@ -703,6 +767,77 @@ namespace Uniwill_Control_Utility.Services
             {
                 DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to apply Keyboard preset from profile");
             }
+        }
+
+        /// Re-assert ladder as (delayMs, rungs) tiers: the dip the user sees is the gap
+        /// between the firmware's brightness change and the next rung, so halving a tier's
+        /// delay halves the dip at the cost of twice the HID traffic. The 2–10s tail is
+        /// load-bearing, not insurance: with coverage cut to 2 s the user saw an un-returned
+        /// flash, so the firmware's commit can land well after the hand-back.
+        private static readonly (int delayMs, int rungs)[] KeyboardReassertLadder =
+        {
+            (62, 32),   // first 2 s
+            (125, 16),  // 2–4 s
+            (375, 16),  // 4–10 s
+        };
+
+        /// Re-asserts the saved keyboard brightness through HID after UCU handed EC
+        /// manual control back (0x0741 bit0 1→0). The firmware pushes its own brightness
+        /// some time after that transition and no EC register reflects it — 0x78C keeps
+        /// reading back unchanged — so HID is the only counter. SetBrightness changes the
+        /// level without turning the zone off or restarting the effect, so re-sending it
+        /// is visually neutral.
+        /// <remarks>Must be called only when ApplyOemStockMode actually cleared bit0.</remarks>
+        public static void ReassertKeyboardBrightnessAfterHandback()
+        {
+            Task.Run(async () =>
+            {
+                try
+                {
+                    var hid = new KeyboardHidService();
+                    try
+                    {
+                        if (!hid.Open())
+                            return;
+
+                        var totalRungs = KeyboardReassertLadder.Sum(t => t.rungs);
+                        Log.Information($"[KBD] DeviceApplier: EC manual control handed back to firmware — starting the keyboard brightness re-assert ladder ({string.Join(", ", KeyboardReassertLadder.Select(t => $"{t.delayMs}ms x{t.rungs}"))}, {totalRungs} rungs)");
+
+                        var rung = 0;
+                        foreach (var (delayMs, rungs) in KeyboardReassertLadder)
+                        {
+                            for (var i = 0; i < rungs; i++)
+                            {
+                                await Task.Delay(delayMs);
+
+                                var settings = KeyboardSettingsService.Load();
+                                var brightnessPercent = (Math.Clamp(settings.Brightness, 0, 7) * 100) / 7;
+
+                                if (settings.PerKeyMode)
+                                {
+                                    hid.SetPerKeyBrightness(brightnessPercent);
+                                    hid.SendAllPerKeyColorsFromDict(settings.GetPerKeyColors());
+                                }
+                                else
+                                {
+                                    hid.SetBrightness(brightnessPercent, (byte)settings.EffectMode,
+                                        settings.Speed, (byte)settings.Direction);
+                                }
+
+                                Log.Debug($"[KBD] DeviceApplier: re-assert rung {++rung}/{totalRungs} — brightness level {settings.Brightness} ({brightnessPercent}%)");
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        hid.Dispose();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to re-assert keyboard brightness after the EC hand-back");
+                }
+            });
         }
 
         // Effects that need 7 multi-color slots

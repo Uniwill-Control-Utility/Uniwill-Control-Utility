@@ -121,6 +121,23 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
+        /// Maps a stock preset to OpenRevo's mode-apply case selector (0=Office,
+        /// 1=Balance, 2=Beast). This is NOT the value written to 0x7AB: the per-mode
+        /// signal is the literal written to 0x751 plus the 0x45B flag and the 0x7AB
+        /// bit4 force, all derived inside UniwillECService.ApplyOemStockMode.
+        /// </summary>
+        public static int OemModeIndexFor(string profileName)
+        {
+            return profileName.ToLowerInvariant() switch
+            {
+                "office" => 0,
+                "gaming" => 1,
+                "turbo" => 2,
+                _ => 0
+            };
+        }
+
+        /// <summary>
         /// Checks if a V-F curve preset is currently active on disk.
         /// </summary>
         public static bool HasActiveVfCurve()
@@ -188,6 +205,22 @@ namespace Uniwill_Control_Utility.Services
             // 1. RyzenAdj / SMU commands
             await RyzenAdj_To_UCU.TranslateAsync(command, appliedName: display, localizeAppliedName: false);
 
+            // 1b. Stock presets are applied the OpenRevo way: assert the OEM mode
+            // engine (mode index + trigger + the 0x045B flag) and clear the custom
+            // power/profile enable bits, which yields CPU limits, GPU TGP and fans
+            // to the firmware's own per-mode factory table. No cTGP/DB or EC PL
+            // writes happen for stock presets, so nothing can leave a stale GPU
+            // ceiling behind, and ApplyOemStockMode clears 0x0741 bit0, which re-arms
+            // the physical Performance button (bit0 set disarms it on NB02).
+            if (IsBuiltInProfile(profileName))
+            {
+                var ecGate = RyzenAdj_To_UCU.EcService;
+                if (ecGate is not null && ecGate.ApplyOemStockMode(OemModeIndexFor(profileName)))
+                {
+                    DeviceApplier.ReassertKeyboardBrightnessAfterHandback();
+                }
+            }
+
             // 2. V-F curve (Custom profile only, if active)
             var (customSlot, customMode) = TryParseCustomSlotExtended(profileName);
             if (customSlot >= 0)
@@ -203,8 +236,9 @@ namespace Uniwill_Control_Utility.Services
                 ApplyVfCurve();
             }
 
-            // 3. EC CPU power limits (AMD APU only)
-            if (Family.TYPE == Family.ProcessorType.Amd_Apu)
+            // 3. EC CPU power limits (AMD APU only, Custom presets only — stock
+            // presets yield PL1/PL2/PL4 to the EC's native factory table)
+            if (Family.TYPE == Family.ProcessorType.Amd_Apu && !IsBuiltInProfile(profileName))
             {
                 var ec = RyzenAdj_To_UCU.EcService;
                 if (ec != null)
@@ -370,27 +404,23 @@ namespace Uniwill_Control_Utility.Services
         private static void BuildSkuProfileCommand(string profileName, List<string> parts)
         {
             var skuProfile = SkuResolver.GetProfile(profileName.ToLowerInvariant());
-            int cpuPl1, cpuPl2, gpuTgp;
-            bool gpuDb;
-            int gpuDbOffset;
+            int cpuPl1, cpuPl2;
 
             if (skuProfile != null)
             {
                 cpuPl1 = skuProfile.CpuPl1;
                 cpuPl2 = skuProfile.CpuPl2;
-                gpuTgp = skuProfile.GpuTgp;
-                gpuDb = skuProfile.DynamicBoost;
-                gpuDbOffset = skuProfile.DynamicBoostOffset;
             }
             else
             {
-                // Fallback defaults if SKU not resolved
-                (cpuPl1, cpuPl2, gpuTgp, gpuDb, gpuDbOffset) = profileName.ToLowerInvariant() switch
+                // Fallback defaults if SKU not resolved (GPU power is firmware-owned
+                // for stock presets, so only the CPU limits are carried here).
+                (cpuPl1, cpuPl2) = profileName.ToLowerInvariant() switch
                 {
-                    "office" => (45, 45, 95, false, 0),
-                    "gaming" => (75, 85, 150, false, 0),
-                    "turbo" => (135, 135, 150, true, 25),
-                    _ => (75, 85, 150, false, 0)
+                    "office" => (45, 45),
+                    "gaming" => (75, 85),
+                    "turbo" => (135, 135),
+                    _ => (75, 85)
                 };
             }
 
@@ -409,11 +439,12 @@ namespace Uniwill_Control_Utility.Services
                 parts.Add($"--intel-pl={cpuPl1},{cpuPl2}");
             }
 
-            // NVIDIA GPU power
+            // NVIDIA GPU power: stock presets yield GPU power to the firmware's
+            // per-mode factory table (OpenRevo's approach), so only the clock
+            // fields are emitted and no cTGP/DB write happens.
             if (!string.IsNullOrEmpty(NvTuning.GetGpuName()))
             {
-                int totalWatts = gpuTgp + (gpuDb ? gpuDbOffset : 0);
-                parts.Add($"--NVIDIA-Clocks=0-0-0-{totalWatts}-{(gpuDb ? gpuDbOffset : 0)}");
+                parts.Add("--NVIDIA-Clocks=0-0-0");
             }
         }
 
