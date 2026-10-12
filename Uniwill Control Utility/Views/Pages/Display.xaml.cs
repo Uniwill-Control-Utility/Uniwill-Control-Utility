@@ -653,7 +653,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (nvram == null || nvram.Length <= OffsetOemDisplayMode)
                 return null;
 
-            return nvram[OffsetOemDisplayMode];
+            // The NVRAM byte uses the same platform-specific encoding as the EC
+            // register; return the semantic mode so callers can compare it directly
+            // against the button tags / GpuMuxMode values.
+            return (byte)UniwillECService.RawToMode(nvram[OffsetOemDisplayMode]);
         }
 
         /// <summary>
@@ -673,8 +676,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 throw new InvalidOperationException("Cannot read OemMagicVariable for NVRAM write");
             }
 
+            // The caller passes the semantic mode; the firmware expects the
+            // platform-specific raw byte (swapped on Intel platforms).
+            byte raw = UniwillECService.ModeToRaw((UniwillECService.GpuMuxMode)mode);
             byte[] modified = (byte[])nvram.Clone();
-            modified[OffsetOemDisplayMode] = mode;
+            modified[OffsetOemDisplayMode] = raw;
 
             bool ok = SetFirmwareEnvironmentVariable("OemMagicVariable", NvramGuidStr, modified, (uint)modified.Length);
             if (!ok)
@@ -683,7 +689,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 throw new InvalidOperationException($"NVRAM OemMagicVariable write failed with error {error}");
             }
 
-            Debug.WriteLine($"[Display] NVRAM OemDisplayMode set to {mode} at offset {OffsetOemDisplayMode}");
+            Debug.WriteLine($"[Display] NVRAM OemDisplayMode set to {raw} (mode {mode}) at offset {OffsetOemDisplayMode}");
         }
 
         /// <summary>

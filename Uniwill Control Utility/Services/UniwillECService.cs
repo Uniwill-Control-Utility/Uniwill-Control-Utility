@@ -765,6 +765,36 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
+        /// On Intel platforms the EC/NVRAM encoding of the dGPU-only and iGPU-only
+        /// modes is swapped relative to AMD platforms (observed on Intel NB02 units):
+        /// the firmware reads raw 1 as iGPU-only and raw 2 as dGPU-only, the inverse
+        /// of the AMD mapping. Hybrid (0) is unaffected. These helpers translate between
+        /// the semantic <see cref="GpuMuxMode"/> used by the UI and the raw byte the
+        /// firmware expects on the current platform.
+        /// </summary>
+        private static bool IsIntelPlatform()
+        {
+            return Uniwill_Control_Utility.Scripts.Family.TYPE == Uniwill_Control_Utility.Scripts.Family.ProcessorType.Intel;
+        }
+
+        /// Semantic mode -> raw EC/NVRAM byte for the current platform.
+        public static byte ModeToRaw(GpuMuxMode mode)
+        {
+            byte raw = (byte)mode;
+            if (IsIntelPlatform() && (raw == MUX_MODE_DGPU_ONLY || raw == MUX_MODE_IGPU_ONLY))
+                return (byte)(MUX_MODE_DGPU_ONLY + MUX_MODE_IGPU_ONLY - raw); // swap 1 <-> 2
+            return raw;
+        }
+
+        /// Raw EC/NVRAM byte -> semantic mode for the current platform.
+        public static GpuMuxMode RawToMode(byte raw)
+        {
+            if (IsIntelPlatform() && (raw == MUX_MODE_DGPU_ONLY || raw == MUX_MODE_IGPU_ONLY))
+                return (GpuMuxMode)(MUX_MODE_DGPU_ONLY + MUX_MODE_IGPU_ONLY - raw);
+            return (GpuMuxMode)raw;
+        }
+
+        /// <summary>
         /// Reads the current GPU MUX mode from the EC.
         /// </summary>
         public GpuMuxMode GetCurrentGpuMuxMode()
@@ -773,7 +803,7 @@ namespace Uniwill_Control_Utility.Services
             lock (_lock)
             {
                 byte status = ReadECInternal(REG_GPU_STATUS);
-                return (GpuMuxMode)status;
+                return RawToMode(status);
             }
         }
 
@@ -793,25 +823,26 @@ namespace Uniwill_Control_Utility.Services
             EnsureInitialized();
             lock (_lock)
             {
+                byte target = ModeToRaw(mode);
                 byte current = ReadECInternal(REG_GPU_STATUS);
-                DebugLog($"SetGpuMuxMode: current=0x{current:X2} ({(GpuMuxMode)current}), target=0x{(byte)mode:X2} ({mode})");
+                DebugLog($"SetGpuMuxMode: current=0x{current:X2} ({RawToMode(current)}), target=0x{target:X2} ({mode})");
 
-                if (current == (byte)mode)
+                if (current == target)
                 {
                     DebugLog("SetGpuMuxMode: already at target mode, skipping write");
                     return;
                 }
 
-                WriteECInternal(REG_GPU_STATUS, (byte)mode);
+                WriteECInternal(REG_GPU_STATUS, target);
                 Thread.Sleep(EcDelayMs);
 
                 // Verify write
                 byte verify = ReadECInternal(REG_GPU_STATUS);
-                DebugLog($"SetGpuMuxMode: wrote 0x{(byte)mode:X2}, verified 0x{verify:X2}");
+                DebugLog($"SetGpuMuxMode: wrote 0x{target:X2}, verified 0x{verify:X2}");
 
-                if (verify != (byte)mode)
+                if (verify != target)
                 {
-                    DebugLog($"[WARN] SetGpuMuxMode: write verification failed. Expected 0x{(byte)mode:X2}, got 0x{verify:X2}");
+                    DebugLog($"[WARN] SetGpuMuxMode: write verification failed. Expected 0x{target:X2}, got 0x{verify:X2}");
                 }
             }
         }
