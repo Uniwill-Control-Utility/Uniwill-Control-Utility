@@ -83,7 +83,6 @@ VerticalAlignment="Center"/>
 
             <ui:TitleBar.TrailingContent>
                 <StackPanel Orientation="Horizontal">
-                    
 
                     <!-- Laptop name card -->
                     <ui:Card x:Name="LaptopNameCard"
@@ -104,6 +103,23 @@ VerticalAlignment="Center"/>
                                VerticalAlignment="Center"/>
                         </StackPanel>
                     </ui:Card>
+
+                    <!--  Hand-over button: minimizes this window and opens the mini-tray.  -->
+                    <!--  Plain ui:Button — ui:TitleBarButton's template only draws the four  -->
+                    <!--  built-in caption glyphs and ignores custom content/icons.          -->
+                    <ui:Button x:Name="BtnMinimizeToTray"
+                               Click="BtnMinimizeToTray_Click"
+                               Height="28"
+                               Padding="8,4"
+                               Background="Transparent"
+                               BorderThickness="0"
+                               VerticalAlignment="Center">
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                     Glyph="&#xE73F;"
+                                     FontSize="14"
+                                     Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                     VerticalAlignment="Center" />
+                    </ui:Button>
                 </StackPanel>
             </ui:TitleBar.TrailingContent>
         </ui:TitleBar>

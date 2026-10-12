@@ -23,6 +23,9 @@ namespace Uniwill_Control_Utility.Views.Windows
         private bool _loading;
         private bool _applying;
         private bool _showing;
+        // The show path produces one spurious Deactivated right after activation; swallow
+        // exactly that one so a later real focus change can still hide the tray.
+        private bool _ignoreNextDeactivation;
         private bool _displayPage;
         private bool _syncingToggle;
         private System.Drawing.Point _placementAnchor;
@@ -52,6 +55,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             CapturePlacementAnchor();
             _loading = true;
             _showing = true;
+            _ignoreNextDeactivation = true;
 
             Show();
             UpdateLayout();
@@ -452,7 +456,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                     StringComparison.OrdinalIgnoreCase)) ?? Screen.FromHandle(handle);
 
             var tbBounds = FindTaskbarBounds(screen.Bounds);
-            TrayWidgetPlacementResult placement = TrayWidgetPlacement.Calculate(
+            System.Drawing.Point location = TrayWidgetPlacement.CalculateCorner(
                 screen.Bounds,
                 screen.WorkingArea,
                 _placementAnchor,
@@ -463,8 +467,8 @@ namespace Uniwill_Control_Utility.Views.Windows
             SetWindowPos(
                 handle,
                 IntPtr.Zero,
-                placement.Location.X,
-                placement.Location.Y,
+                location.X,
+                location.Y,
                 0,
                 0,
                 SetWindowPosFlags.NoSize |
@@ -546,6 +550,12 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void Window_Deactivated(object sender, EventArgs e)
         {
+            if (_ignoreNextDeactivation)
+            {
+                _ignoreNextDeactivation = false;
+                return;
+            }
+
             if (_showing || _applying)
                 return;
 

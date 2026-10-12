@@ -56,6 +56,9 @@ namespace Uniwill_Control_Utility.Views.Windows
         private static INavigationService _navigationService;
         private bool _isTrayPresetApplying;
         private readonly TrayWidgetController _trayWidget;
+        // Debounce for the tray-icon left click — the shell can send the LBUTTONDOWN
+        // message twice per click (press + release).
+        private DateTime _lastTrayIconClick;
         public static bool IsPageSelected(Type pageType) =>
             _mainWindowNav?.SelectedItem is INavigationViewItem item && item.TargetPageType == pageType;
 
@@ -93,6 +96,13 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// <summary>Toggles the compact quick-control widget when the tray icon is left-clicked.</summary>
         private void NotifyIcon_LeftClick(Wpf.Ui.Tray.Controls.NotifyIcon sender, RoutedEventArgs e)
         {
+            // The shell can deliver the tray LBUTTONDOWN message twice (press and release);
+            // debounce so the second arrival doesn't re-show a tray we just hid.
+            var now = DateTime.Now;
+            if ((now - _lastTrayIconClick).TotalMilliseconds < 300)
+                return;
+            _lastTrayIconClick = now;
+
             // If the main window is open on the desktop, just hide the tray widget
             // instead of toggling it open (main window takes priority).
             // WindowState, not IsActive: a window minimized right after startup keeps a
@@ -100,6 +110,14 @@ namespace Uniwill_Control_Utility.Views.Windows
             // the first left-click until a right-click forced the focus change.
             if (this.WindowState != WindowState.Minimized && this.IsVisible)
             {
+                // Open but not in focus (another window owns the desktop) — the click
+                // brings the main window back to the front instead of doing nothing.
+                if (!this.IsActive)
+                {
+                    this.Activate();
+                    _ = this.Focus();
+                }
+
                 _trayWidget.HideIfVisible();
                 return;
             }
@@ -111,6 +129,19 @@ namespace Uniwill_Control_Utility.Views.Windows
         private void MainWindow_Activated(object? sender, EventArgs e)
         {
             _trayWidget.HideIfVisible();
+        }
+
+        /// <summary>Title-bar hand-over: minimize the main window and open the mini-tray widget.</summary>
+        private void BtnMinimizeToTray_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Wpf.Ui.Controls.Button)
+                return;
+
+            // Minimize first so the tray-icon left-click guard sees a minimized window,
+            // then show the mini-tray near the tray icon — the cursor sits on the title
+            // bar here, so anchoring on it would drop the tray at the button's axis.
+            this.WindowState = WindowState.Minimized;
+            _ = _trayWidget.ToggleAsync();
         }
 
         private void TrayMenu_Opened(object sender, RoutedEventArgs e)

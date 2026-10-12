@@ -58,6 +58,47 @@ internal static class TrayWidgetPlacement
         return new TrayWidgetPlacementResult(location, edge);
     }
 
+    /// <summary>
+    /// Corner placement keyed to the taskbar edge: bottom edge → bottom-right corner,
+    /// top edge → top-right, left edge → bottom-left, right edge → bottom-right.
+    /// </summary>
+    internal static Point CalculateCorner(
+        Rectangle monitorBounds,
+        Rectangle workingArea,
+        Point cursor,
+        Size windowSize,
+        int gap,
+        Rectangle? taskbarBounds = null)
+    {
+        TrayEdge edge;
+        if (taskbarBounds is Rectangle taskbar && taskbar.IntersectsWith(monitorBounds))
+        {
+            edge = DetectTaskbarEdge(monitorBounds, taskbar);
+            workingArea = ExcludeTaskbar(monitorBounds, taskbar, edge);
+        }
+        else
+        {
+            edge = DetectTaskbarEdge(monitorBounds, workingArea, cursor);
+        }
+
+        int inset = Math.Max(0, gap);
+        return edge switch
+        {
+            TrayEdge.Top => new Point(
+                workingArea.Right - windowSize.Width - inset,
+                workingArea.Top + inset),
+            TrayEdge.Left => new Point(
+                workingArea.Left + inset,
+                workingArea.Bottom - windowSize.Height - inset),
+            TrayEdge.Right => new Point(
+                workingArea.Right - windowSize.Width - inset,
+                workingArea.Bottom - windowSize.Height - inset),
+            _ => new Point(
+                workingArea.Right - windowSize.Width - inset,
+                workingArea.Bottom - windowSize.Height - inset)
+        };
+    }
+
     internal static Rectangle NormalizeTaskbarBounds(
         Rectangle monitorBounds,
         Rectangle taskbarBounds,
