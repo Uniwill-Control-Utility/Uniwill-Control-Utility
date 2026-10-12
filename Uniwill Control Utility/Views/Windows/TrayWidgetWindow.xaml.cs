@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -22,6 +23,8 @@ namespace Uniwill_Control_Utility.Views.Windows
         private bool _loading;
         private bool _applying;
         private bool _showing;
+        private bool _displayPage;
+        private bool _syncingToggle;
         private System.Drawing.Point _placementAnchor;
         private string? _placementScreenDeviceName;
 
@@ -56,6 +59,10 @@ namespace Uniwill_Control_Utility.Views.Windows
             Activate();
             _refreshTimer.Start();
 
+            // A re-shown tray always opens on the main QuickSettings grid.
+            _displayPage = false;
+            UpdateTrayPage();
+
             try
             {
                 TrayQuickControlSnapshot snapshot = await Task.Run(_quickControl.GetSnapshot);
@@ -89,9 +96,23 @@ namespace Uniwill_Control_Utility.Views.Windows
             ApplyToggle(SlotKeyboardBacklight, BtnKeyboardBacklight, policy.ShowKeyboardBacklight, snapshot.KeyboardRgbOn, policy.DisableKeyboardBacklight);
             ApplyToggle(SlotLightBar, BtnLightBar, policy.ShowLightBar, snapshot.LightBarOn, policy.DisableLightBar);
             ApplyToggle(SlotFanSmartMode, BtnFanSmartMode, policy.ShowFanSmartMode, snapshot.FanSmartMode, policy.DisableFanSmartMode);
-            ApplyToggle(SlotLocalDimming, BtnLocalDimming, policy.ShowLocalDimming, snapshot.LocalDimmingOn, false);
             ApplyToggle(SlotOverlay, BtnOverlay, policy.ShowOverlay, snapshot.OverlayOn, false);
             ApplyToggle(SlotFlydigiRgb, BtnFlydigiRgb, policy.ShowFlydigiRgb, snapshot.FlydigiRgbOn, policy.DisableFlydigiRgb);
+
+            // Display navigation slot — always visible.
+            SlotDisplay.Visibility = Visibility.Visible;
+
+            // In-tray Display page sections (harmless to sync while PageDisplay is collapsed).
+            OptimusSection.Visibility = snapshot.GpuModeHybrid ? Visibility.Visible : Visibility.Collapsed;
+            MiniLedSection.Visibility = policy.ShowLocalDimming ? Visibility.Visible : Visibility.Collapsed;
+
+            // Sync the local dimming switch state; the flag fences the Checked/Unchecked
+            // event handlers so this programmatic write does not re-apply the setting.
+            _syncingToggle = true;
+            TrayTsLocalDimming.IsChecked = snapshot.LocalDimmingOn;
+            _syncingToggle = false;
+
+            UpdateTrayPowerSavingButtons(snapshot.GpuPowerSavingMode);
 
             // Recalculate UniformGrid rows based on visible children so collapsed
             // items don't leave gaps and buttons flow left-to-right, top-to-bottom.
@@ -155,6 +176,29 @@ namespace Uniwill_Control_Utility.Views.Windows
                     System.Windows.Controls.Grid.SetRow(child, -1);
                 }
             }
+        }
+
+        /// <summary>
+        /// Sole owner of the QuickSettings page state — never touched by ApplySnapshot.
+        /// </summary>
+        private void UpdateTrayPage()
+        {
+            ButtonsGrid.Visibility = _displayPage ? Visibility.Collapsed : Visibility.Visible;
+            PageDisplay.Visibility = _displayPage ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Swaps the active/inactive styles of the tray's iGPU/Auto/dGPU power saving
+        /// buttons, mirroring the Display page's UpdatePowerSavingButtons.
+        /// </summary>
+        private void UpdateTrayPowerSavingButtons(int mode)
+        {
+            Style? inactiveStyle = (Style)Resources["TrayModeButtonStyle"];
+            Style? activeStyle = (Style)Resources["TrayModeButtonActiveStyle"];
+
+            BtnTrayPowerSavingOn.Style = mode == 0 ? activeStyle : inactiveStyle;
+            BtnTrayPowerSavingAuto.Style = mode == 2 ? activeStyle : inactiveStyle;
+            BtnTrayPowerSavingOff.Style = mode == 1 ? activeStyle : inactiveStyle;
         }
 
         #region Toggle Handlers
@@ -234,19 +278,64 @@ namespace Uniwill_Control_Utility.Views.Windows
             });
         }
 
-        private async void BtnLocalDimming_Click(object sender, RoutedEventArgs e)
+        private void BtnDisplay_Click(object sender, RoutedEventArgs e)
         {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
+            if (_loading || _applying || sender is not System.Windows.Controls.Button btn)
+                return;
+            if (btn != BtnDisplay || _displayPage)
                 return;
 
-            bool enabled = btn.IsChecked == true;
+            _displayPage = true;
+            UpdateTrayPage();
+            UpdateLayout();
+        }
+
+        private void BtnTrayBack_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Button btn)
+                return;
+            if (btn != BtnTrayBack || !_displayPage)
+                return;
+
+            _displayPage = false;
+            UpdateTrayPage();
+            UpdateLayout();
+        }
+
+        private async void BtnTrayPowerSaving_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Button btn)
+                return;
+            if (btn.Tag is not string tag || !int.TryParse(tag, out int mode))
+                return;
+
+            await ApplyAsync(async () =>
+            {
+                // On failure the persisted mode is untouched, so the snapshot re-fetch
+                // inside ApplyAsync restores the previous active style.
+                _ = await _quickControl.SetGpuPowerSavingAsync(mode);
+            });
+        }
+
+        private async void TrayTsLocalDimming_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || _syncingToggle || sender is not Wpf.Ui.Controls.ToggleSwitch sw)
+                return;
+
+            bool enabled = sw.IsChecked == true;
             await ApplyAsync(async () =>
             {
                 bool success = await _quickControl.SetLocalDimmingAsync(enabled);
                 if (!success)
                 {
-                    // Revert toggle on failure
-                    Application.Current.Dispatcher.Invoke(() => btn.IsChecked = !enabled);
+                    // Revert the toggle on failure. The revert re-fires this handler,
+                    // so fence it with _syncingToggle.
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        _syncingToggle = true;
+                        sw.IsChecked = !enabled;
+                        _syncingToggle = false;
+                    });
                 }
             });
         }
@@ -481,8 +570,13 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             // Store the source button's Tag in the context menu so the click handler
             // knows which page to navigate to.
-            if (sender is System.Windows.Controls.ContextMenu menu && menu.PlacementTarget is System.Windows.Controls.Primitives.ToggleButton btn)
-                menu.Tag = btn.Tag;
+            if (sender is System.Windows.Controls.ContextMenu menu)
+            {
+                if (menu.PlacementTarget is System.Windows.Controls.Primitives.ToggleButton btn)
+                    menu.Tag = btn.Tag;
+                else if (menu.PlacementTarget is System.Windows.Controls.Button btn2)
+                    menu.Tag = btn2.Tag;
+            }
         }
 
         private void GoToUcuMenuItem_Click(object sender, RoutedEventArgs e)
@@ -512,6 +606,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 "FanControl" => typeof(Views.Pages.FanControl),
                 "SettingsPage" => typeof(Views.Pages.SettingsPage),
                 "OverlaySettingsPage" => typeof(Views.Pages.OverlaySettingsPage),
+                "Display" => typeof(Views.Pages.Display),
                 "FlydigiCooler" => typeof(Views.Pages.FlydigiCooler),
                 _ => null
             };

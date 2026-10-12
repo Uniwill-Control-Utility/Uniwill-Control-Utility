@@ -103,6 +103,131 @@
             </Setter>
         </Style>
 
+        <!-- Regular (non-toggle) quick button: same look as QuickToggleStyle minus checked state -->
+        <Style x:Key="QuickButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background"
+                    Value="{DynamicResource ControlFillColorDefaultBrush}" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid IsHitTestVisible="{TemplateBinding IsEnabled}">
+                            <!-- Base background -->
+                            <Border x:Name="BaseBackground"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="4">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="Black"
+                                                      Opacity="0.08"
+                                                      BlurRadius="3"
+                                                      ShadowDepth="1"
+                                                      Direction="270" />
+                                </Border.Effect>
+                            </Border>
+                            <!-- Hover overlay -->
+                            <Border x:Name="HoverOverlay"
+                                    Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                    CornerRadius="4"
+                                    Visibility="Collapsed" />
+                            <!-- Content -->
+                            <ContentPresenter x:Name="ContentPresenter"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="HoverOverlay" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <!-- Disabled state: dim background, off-state foreground -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Background"
+                                        Value="{DynamicResource ControlFillColorDisabledBrush}" />
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource TextFillColorDisabledBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Inactive mode-selector button (tray-sized clone of the Display page's GpuModeButtonStyle) -->
+        <Style x:Key="TrayModeButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Width" Value="95" />
+            <Setter Property="Height" Value="46" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <!-- Active (selected) mode-selector button with hover/press states -->
+        <Style x:Key="TrayModeButtonActiveStyle" TargetType="Button">
+            <Setter Property="Width" Value="95" />
+            <Setter Property="Height" Value="46" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="CommonStates">
+                                    <VisualState x:Name="Normal" />
+                                    <VisualState x:Name="MouseOver">
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="BackgroundBorder"
+                                                                           Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0"
+                                                                        Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </VisualState>
+                                    <VisualState x:Name="Pressed">
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="BackgroundBorder"
+                                                                           Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0"
+                                                                        Value="{DynamicResource AccentFillColorTertiaryBrush}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </VisualState>
+                                    <VisualState x:Name="Disabled">
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="ContentPresenter"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="0.5" Duration="0" />
+                                        </Storyboard>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <Border x:Name="BackgroundBorder"
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="4">
+                                <ContentPresenter x:Name="ContentPresenter"
+                                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                  RecognizesAccessKey="True"
+                                                  TextElement.Foreground="{TemplateBinding Foreground}" />
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Metrics styles -->
         <Style x:Key="LabelStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="9" />
@@ -336,8 +461,10 @@
         <Border Grid.Row="2" Margin="0,0,0,0"
                 Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
                 BorderThickness="0"
-                Padding="20,22,20,22">
-            <Grid x:Name="ButtonsGrid">
+                Padding="20,22,20,22"
+                Height="308">
+            <Grid x:Name="PagesHost">
+                <Grid x:Name="ButtonsGrid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
@@ -485,32 +612,44 @@
                                    Text="Overlay" />
                 </StackPanel>
 
-                <!-- Local Dimming (dynamic circumstance) -->
-                <StackPanel x:Name="SlotLocalDimming"
+                <!-- Display (navigation page — regular button, not a toggle) -->
+                <StackPanel x:Name="SlotDisplay"
                             Orientation="Vertical"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
-                    <ToggleButton x:Name="BtnLocalDimming"
-                                   Width="95"
-                                   Height="46"
-                                   Style="{StaticResource QuickToggleStyle}"
-                                   Tag="SettingsPage"
-                                   ContextMenu="{StaticResource NavigateContextMenu}"
-                                   Click="BtnLocalDimming_Click">
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons"
-                                      Glyph="&#xE7F4;"
-                                      FontSize="16">
-                            <ui:FontIcon.Foreground>
-                                <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
-                                         Path="Foreground" />
-                            </ui:FontIcon.Foreground>
-                        </ui:FontIcon>
-                    </ToggleButton>
+                    <Button x:Name="BtnDisplay"
+                            Width="95"
+                            Height="46"
+                            Style="{StaticResource QuickButtonStyle}"
+                            Tag="Display"
+                            ContextMenu="{StaticResource NavigateContextMenu}"
+                            Click="BtnDisplay_Click">
+                        <StackPanel Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xE7F4;"
+                                          FontSize="16">
+                                <ui:FontIcon.Foreground>
+                                    <Binding RelativeSource="{RelativeSource AncestorType=Button}"
+                                             Path="Foreground" />
+                                </ui:FontIcon.Foreground>
+                            </ui:FontIcon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xE974;"
+                                          FontSize="12"
+                                          Margin="4,0,0,0">
+                                <ui:FontIcon.Foreground>
+                                    <Binding RelativeSource="{RelativeSource AncestorType=Button}"
+                                             Path="Foreground" />
+                                </ui:FontIcon.Foreground>
+                            </ui:FontIcon>
+                        </StackPanel>
+                    </Button>
                     <ui:TextBlock FontSize="11"
                                    Margin="0,8,0,0"
                                    HorizontalAlignment="Center"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                   Text="Local Dimming" />
+                                   Text="Display" />
                 </StackPanel>
 
                 <!-- Smart Hydro (dynamic circumstance) -->
@@ -598,20 +737,178 @@
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                    Text="Flydigi RGB" />
                 </StackPanel>
+                </Grid>
+
+                <!-- ===== DISPLAY PAGE (in-tray navigation page) ===== -->
+                <StackPanel x:Name="PageDisplay" Visibility="Collapsed" Height="290" Margin="-12,-22,-22,-20">
+
+                    <!-- Row 1: back button + page title -->
+                    <Grid >
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="BtnTrayBack"
+                                Grid.Column="0"
+                                Width="40"
+                                Height="40"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Padding="8"
+                                Margin="0,0,4,0"
+                                Click="BtnTrayBack_Click">
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="&#xE72B;"
+                                          FontSize="12">
+                                <ui:FontIcon.Foreground>
+                                    <Binding RelativeSource="{RelativeSource AncestorType=Button}"
+                                             Path="Foreground" />
+                                </ui:FontIcon.Foreground>
+                            </ui:FontIcon>
+                        </Button>
+                        <ui:TextBlock Grid.Column="1"
+                                      FontSize="16"
+                                      FontWeight="Regular"
+                                      Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                      Text="Display" 
+                                      VerticalAlignment="Center"
+                                      Margin="0,-4,0,0"/>
+                    </Grid>
+
+                    <!-- Nvidia Optimus runtime switch (Hybrid display mode only) -->
+                    <StackPanel x:Name="OptimusSection" Visibility="Collapsed" Margin="0,12,0,12">
+                        <ui:TextBlock FontSize="14"
+                                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                      Text="Nvidia Optimus" 
+                                      FontWeight="SemiBold"
+                                      Margin="16,0,2,8"/>
+                        <!-- Compensate PageDisplay's asymmetric -12/-22 horizontal margin
+                             (vs the card's 20/20 padding) so the row centers on the card.
+                             Width 320 = the ButtonsGrid width, so the three 95px buttons
+                             get the same ~11.7px gaps as the QuickSettings grid. -->
+                        <Grid Width="320" HorizontalAlignment="Center" Margin="-5,8,5,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrayPowerSavingOn"
+                                        Style="{StaticResource TrayModeButtonStyle}"
+                                        Tag="0"
+                                        Click="BtnTrayPowerSaving_Click">
+                                    <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                                  Glyph="&#xEC0A;"
+                                                  FontSize="16">
+                                        <ui:FontIcon.Foreground>
+                                            <Binding RelativeSource="{RelativeSource AncestorType=Button}"
+                                                     Path="Foreground" />
+                                        </ui:FontIcon.Foreground>
+                                    </ui:FontIcon>
+                                </Button>
+                                <ui:TextBlock FontSize="11"
+                                              Margin="0,8,0,0"
+                                              HorizontalAlignment="Center"
+                                              Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                              Text="iGPU" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrayPowerSavingAuto"
+                                        Style="{StaticResource TrayModeButtonStyle}"
+                                        Tag="2"
+                                        Click="BtnTrayPowerSaving_Click">
+                                    <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                                  Glyph="&#xE8AB;"
+                                                  FontSize="16">
+                                        <ui:FontIcon.Foreground>
+                                            <Binding RelativeSource="{RelativeSource AncestorType=Button}"
+                                                     Path="Foreground" />
+                                        </ui:FontIcon.Foreground>
+                                    </ui:FontIcon>
+                                </Button>
+                                <ui:TextBlock FontSize="11"
+                                              Margin="0,8,0,0"
+                                              HorizontalAlignment="Center"
+                                              Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                              Text="Auto" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrayPowerSavingOff"
+                                        Style="{StaticResource TrayModeButtonStyle}"
+                                        Tag="1"
+                                        Click="BtnTrayPowerSaving_Click">
+                                    <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                                  Glyph="&#xEC4A;"
+                                                  FontSize="16">
+                                        <ui:FontIcon.Foreground>
+                                            <Binding RelativeSource="{RelativeSource AncestorType=Button}"
+                                                     Path="Foreground" />
+                                        </ui:FontIcon.Foreground>
+                                    </ui:FontIcon>
+                                </Button>
+                                <ui:TextBlock FontSize="11"
+                                              Margin="0,8,0,0"
+                                              HorizontalAlignment="Center"
+                                              Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                              Text="dGPU" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- MiniLED local dimming (MiniLED panels only) -->
+                    <!-- "MiniLED" caption above the control row, mirroring how the
+                         Optimus section captions its button row -->
+                    <StackPanel x:Name="MiniLedSection" Visibility="Collapsed" Margin="16,10,0,0">
+                        <ui:TextBlock FontSize="14"
+                                      FontWeight="SemiBold"
+                                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                      Text="MiniLED"
+                                      Margin="0,0,16,8"/>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:FontIcon Grid.Column="0"
+                                         FontFamily="Segoe Fluent Icons"
+                                         Glyph="&#xE706;"
+                                         FontSize="14"
+                                         VerticalAlignment="Center"
+                                         Margin="0,0,16,0"/>
+                            <ui:TextBlock Grid.Column="1"
+                                          FontSize="14"
+                                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                          Text="Local Dimming"
+                                          VerticalAlignment="Center"/>
+                            <ui:ToggleSwitch Grid.Column="2"
+                                             x:Name="TrayTsLocalDimming"
+                                             LabelPosition="Left"
+                                             OnContent="On"
+                                             OffContent="Off"
+                                             VerticalAlignment="Center"
+                                             Checked="TrayTsLocalDimming_Toggled"
+                                             Unchecked="TrayTsLocalDimming_Toggled" 
+                                             Margin="0,0,30,0"/>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
             </Grid>
         </Border>
 
         <!-- Divider -->
-        <Border Grid.Row="3" Background="{DynamicResource SurfaceStrokeColorFlyoutBrush}" />
+        <Border Grid.Row="3" Background="{DynamicResource SurfaceStrokeColorFlyoutBrush}" BorderThickness="0" />
 
         <!-- ===== FOOTER ===== -->
-        <Grid Grid.Row="4" Margin="12,12,12,12">
+        <Grid Grid.Row="4" Margin="12,3,12,0" >
             <Button HorizontalAlignment="Right"
                     Background="Transparent"
                     BorderThickness="0"
                     Padding="8"
                     Click="OpenUcuButton_Click"
-                    ToolTip="Open UCU" >
+                    ToolTip="Open UCU" 
+                    Width="36"
+                    Height="36">
                 <ui:FontIcon FontFamily="Segoe Fluent Icons"
                               FontSize="14"
                               Glyph="&#xE740;"

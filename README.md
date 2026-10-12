@@ -111,6 +111,8 @@ We do not mind features/code created with the assistance of AI, as long as it's 
 
 Simple metrics and toggles for quick changes.
 
+- **Display navigation page** — a Display button in the QuickSettings grid opens an in-tray page with the runtime Nvidia Optimus switch (iGPU / Auto / dGPU power saving, Hybrid mode only) and the MiniLED local dimming toggle (MiniLED panels only); a back button returns to the grid
+
 ![Tray](screenshots/tray.png)
 
 ### **Dashboard**

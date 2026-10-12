@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Serilog;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
@@ -21,7 +22,9 @@ namespace Uniwill_Control_Utility.Services
         bool FanSmartMode,
         bool LocalDimmingOn,
         bool OverlayOn,
-        bool FlydigiRgbOn);
+        bool FlydigiRgbOn,
+        bool GpuModeHybrid,
+        int GpuPowerSavingMode);
 
     public sealed class TrayQuickControlService
     {
@@ -67,6 +70,20 @@ namespace Uniwill_Control_Utility.Services
             bool hasMiniLed = App.HasMiniLEDPanel;
             bool flydigiAvailable = FlydigiCoolerHidService.IsDeviceAvailable();
             bool flydigiEnabled = Properties.Settings.Default.EnableFlydigi;
+
+            // Runtime GPU mux mode — the tray's Display page shows the Nvidia Optimus
+            // (power saving) row only while the runtime mode is Hybrid. The EC runtime
+            // read is the right condition here (not the persisted NVRAM value): power
+            // saving is a runtime feature and NVRAM access is admin-gated.
+            bool gpuModeHybrid = true;
+            try
+            {
+                gpuModeHybrid = _ec.GetCurrentGpuMuxMode() == UniwillECService.GpuMuxMode.Hybrid;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Tray] GPU mux mode read failed: {Message}", ex.Message);
+            }
 
             var features = new FeatureNavigationPreferences(
                 Adaptive: Settings.Default.EnableAdaptiveNavigation,
@@ -114,7 +131,9 @@ namespace Uniwill_Control_Utility.Services
                 FanSmartMode: fanSettings.EcSmartFanMode,
                 LocalDimmingOn: Settings.Default.DisplayLocalDimming,
                 OverlayOn: overlayOptions.Enabled,
-                FlydigiRgbOn: flydigiSettings.RgbMode != "Off");
+                FlydigiRgbOn: flydigiSettings.RgbMode != "Off",
+                GpuModeHybrid: gpuModeHybrid,
+                GpuPowerSavingMode: Settings.Default.GpuPowerSavingMode);
         }
 
         #region Toggle Handlers
@@ -322,6 +341,45 @@ namespace Uniwill_Control_Utility.Services
                     return false;
                 }
             });
+        }
+
+        /// <summary>
+        /// Switches the runtime iGPU Power Saving mode (Hybrid/Nvidia Optimus only).
+        /// Mirrors the Display page's btnPowerSaving_Click core: persist, PnP hotswap,
+        /// LHM reset. Returns true if the switch was applied.
+        /// </summary>
+        public async Task<bool> SetGpuPowerSavingAsync(int mode)
+        {
+            // Block during GPU driver transition cooldown (same guard as the Display page).
+            if (GpuInteropGuard.IsBlocked)
+                return false;
+
+            try
+            {
+                Settings.Default.GpuPowerSavingMode = mode;
+                Settings.Default.Save();
+
+                await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
+
+                // Reset LHM Computer so metrics re-probe with fresh driver handles.
+                try
+                {
+                    App.GetService<IHardwareMonitoringService>()?.ResetComputer();
+                }
+                catch
+                {
+                    // Best-effort — metrics refresh on their own schedule.
+                }
+
+                Log.Information("[Tray] GPU power saving mode set to {Mode} ({Name})",
+                    mode, GpuPowerSaving.GetModeDisplayName((GpuPowerSavingMode)mode));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Tray] GPU power saving switch failed: {Message}", ex.Message);
+                return false;
+            }
         }
 
         /// <remarks>
