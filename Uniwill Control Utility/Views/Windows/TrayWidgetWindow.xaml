@@ -8,13 +8,12 @@
                  mc:Ignorable="d"
     Title="UCU Quick Control"
     Width="360"
-    Height="520"
+    MaxHeight="510"
     MinWidth="0"
     MaxWidth="414"
-    MinHeight="100"
+    MinHeight="420"
     ResizeMode="NoResize"
     ShowInTaskbar="False"
-    Topmost="True"
     WindowStartupLocation="Manual"
     WindowCornerPreference="Round"
     WindowBackdropType="Mica"
@@ -461,8 +460,7 @@
         <Border Grid.Row="2" Margin="0,0,0,0"
                 Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
                 BorderThickness="0"
-                Padding="20,22,20,22"
-                Height="308">
+                Padding="20,22,20,22">
             <Grid x:Name="PagesHost">
                 <Grid x:Name="ButtonsGrid">
                 <Grid.ColumnDefinitions>
@@ -740,7 +738,7 @@
                 </Grid>
 
                 <!-- ===== DISPLAY PAGE (in-tray navigation page) ===== -->
-                <StackPanel x:Name="PageDisplay" Visibility="Collapsed" Height="290" Margin="-12,-22,-22,-20">
+                <StackPanel x:Name="PageDisplay" Visibility="Collapsed" Height="298" Margin="-12,-16,-22,-20">
 
                     <!-- Row 1: back button + page title -->
                     <Grid >
