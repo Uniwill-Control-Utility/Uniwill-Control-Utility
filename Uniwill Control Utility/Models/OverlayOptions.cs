@@ -16,7 +16,6 @@ namespace Uniwill_Control_Utility.Models
         public bool ShowFpsCurrent { get; init; } = true;
         public bool ShowFpsOnePercentLow { get; init; } = true;
         public bool ShowFpsPointOnePercentLow { get; init; } = true;
-        public bool ShowBatteryRow { get; init; } = true;
 
         // Peripheral rows
         public bool ShowHydroUi { get; init; } = true;

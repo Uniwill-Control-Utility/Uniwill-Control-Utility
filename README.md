@@ -177,7 +177,6 @@ Click-through in-game performance overlay, rendered natively by RivaTuner Statis
   - **Current FPS** — live FPS + frame time (ms), labelled with the graphics API (DX12 / DX11 / Vulkan)
   - **1% Low** — 1% low FPS + frame time (ms)
   - **0.1% Low** — 0.1% low FPS + frame time (ms)
-  - **Battery** — charge %, power (W), status, and time remaining
   - **Hydro UI** — pump voltage and fan % (when a cooler is connected)
   - **Flydigi cooler** — fan RPM (when a cooler is connected)
 - **Refresh interval** — configurable (100–5000 ms) to balance accuracy and overhead

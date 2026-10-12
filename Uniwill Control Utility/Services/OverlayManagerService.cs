@@ -376,9 +376,6 @@ namespace Uniwill_Control_Utility.Services
             if (options.ShowGpuRow || options.ShowVramRow)
                 categories |= HardwareMonitoringCategory.Gpu;
 
-            if (options.ShowBatteryRow)
-                categories |= HardwareMonitoringCategory.Battery;
-
             if (categories != HardwareMonitoringCategory.None)
                 _rtssOsdHardwareLease = _hardware.Acquire(categories);
 

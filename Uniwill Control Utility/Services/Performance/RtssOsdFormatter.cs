@@ -23,7 +23,6 @@ namespace Uniwill_Control_Utility.Services.Performance
         private const string ColorCpu = "F13CFF";
         private const string ColorMemory = "80FF80";
         private const string ColorVram = "FFD700";
-        private const string ColorBattery = "39FF14";
 
         // Column widths
         private const int ValueWidth = 5;  // width for the numeric value (right-aligned)
@@ -265,32 +264,6 @@ namespace Uniwill_Control_Utility.Services.Performance
                     sb.Append(BuildRow(ColorWhite, "0.1%", cells));
                     hasContent = true;
                 }
-            }
-
-            // --- Battery row ---
-            if (options.ShowBatteryRow && hardware.HasBattery)
-            {
-                var cells = new List<Cell>();
-
-                cells.Add(ValueCell(ColorBattery, hardware.BatteryPercent.ToString(), "%"));
-
-                if (hardware.BatteryPowerWatts > 0)
-                    cells.Add(ValueCell(ColorBattery, hardware.BatteryPowerWatts.ToString("F1"), "W"));
-
-                string status = hardware.IsBatteryFullyCharged ? "Full"
-                    : hardware.IsBatteryCharging ? "Charging"
-                    : "Discharging";
-                cells.Add(new Cell { Text = status.PadLeft(ValueWidth + UnitWidth), FontSize = MetricFontSize, Color = ColorBattery, IsRaw = true });
-
-                if (hardware.BatteryTimeRemainingMinutes > 0 && !hardware.IsBatteryCharging)
-                {
-                    int hours = hardware.BatteryTimeRemainingMinutes / 60;
-                    int mins = hardware.BatteryTimeRemainingMinutes % 60;
-                    cells.Add(new Cell { Text = $"{hours}h {mins:D2}m".PadLeft(ValueWidth + UnitWidth), FontSize = MetricFontSize, Color = ColorBattery, IsRaw = true });
-                }
-
-                sb.Append(BuildRow(ColorBattery, "BAT", cells));
-                hasContent = true;
             }
 
             // When FPS rows are hidden but data is available, inject a zero-size <FR>

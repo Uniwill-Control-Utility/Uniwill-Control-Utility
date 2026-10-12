@@ -139,7 +139,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 ShowFpsCurrent = toggles["ShowFpsCurrent"],
                 ShowFpsOnePercentLow = toggles["ShowFpsOnePercentLow"],
                 ShowFpsPointOnePercentLow = toggles["ShowFpsPointOnePercentLow"],
-                ShowBatteryRow = toggles["ShowBatteryRow"],
 
                 // Peripherals
                 ShowHydroUi = toggles["ShowHydroUi"],
@@ -304,7 +303,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             AddMetricCheckBox("Current FPS", "ShowFpsCurrent", options.ShowFpsCurrent);
             AddMetricCheckBox("1% Low FPS", "ShowFpsOnePercentLow", options.ShowFpsOnePercentLow);
             AddMetricCheckBox("0.1% Low FPS", "ShowFpsPointOnePercentLow", options.ShowFpsPointOnePercentLow);
-            AddMetricCheckBox("Battery row", "ShowBatteryRow", options.ShowBatteryRow);
 
             // Hydro UI checkbox — hidden if feature disabled in Settings or device not connected.
             bool hydroUiFeatureEnabled = Settings.Default.EnableHydroUiNavigation;
