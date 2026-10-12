@@ -42,7 +42,8 @@ namespace Uniwill_Control_Utility.Services
                     var gpuInventory = _serviceProvider.GetService(typeof(Services.GpuInventoryService)) as Services.GpuInventoryService;
                     var waterCooler = _serviceProvider.GetService(typeof(Services.HydroUIService)) as Services.HydroUIService;
                     var deviceApplier = _serviceProvider.GetService(typeof(Services.DeviceApplier)) as Services.DeviceApplier;
-                    _presetsInstance = new Views.Pages.Presets(logger!, navRequest!, gpuInventory, waterCooler, deviceApplier);
+                    var qKeyButton = _serviceProvider.GetService(typeof(Services.QKeyButtonService)) as Services.QKeyButtonService;
+                    _presetsInstance = new Views.Pages.Presets(logger!, navRequest!, gpuInventory, waterCooler, deviceApplier, qKeyButton!);
                 }
                 return _presetsInstance;
             }

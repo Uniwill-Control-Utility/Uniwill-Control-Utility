@@ -55,6 +55,29 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
+        /// Profile names the Performance-button cycle may visit: the built-ins plus the
+        /// saved Custom slots of the pool Power Boost Mode selects (Normal when off, Boost
+        /// when on). A Custom slot saved in the inactive pool is not a cycle member because
+        /// its power limits only take effect while that mode is enabled.
+        /// </summary>
+        public static string[] GetCycleProfileNames()
+        {
+            var list = new List<string>(BuiltInProfileNames);
+            Models.PresetMode mode = Settings.Default.EnablePowerBoostMode
+                ? Models.PresetMode.Boost
+                : Models.PresetMode.Normal;
+            var presets = CustomPresetStore.Load(mode);
+            for (int i = 0; i < presets.Length; i++)
+            {
+                if (presets[i].HasChanges)
+                {
+                    list.Add(CustomProfileKey(i, mode));
+                }
+            }
+            return list.ToArray();
+        }
+
+        /// <summary>
         /// Returns the profile key for a custom preset slot (0-based) in the given mode.
         /// e.g. slot 0, Normal → "Custom 1", slot 0, Boost → "Custom 1 (Boost)"
         /// </summary>
@@ -210,14 +233,15 @@ namespace Uniwill_Control_Utility.Services
             // power/profile enable bits, which yields CPU limits, GPU TGP and fans
             // to the firmware's own per-mode factory table. No cTGP/DB or EC PL
             // writes happen for stock presets, so nothing can leave a stale GPU
-            // ceiling behind, and ApplyOemStockMode clears 0x0741 bit0, which re-arms
-            // the physical Performance button (bit0 set disarms it on NB02).
+            // ceiling behind. 0x0741 bit0 stays armed everywhere: the EC only raises
+            // the AcpiTest_EventULong press echo while manual control is set, which is
+            // what keeps the Performance button live under a Custom preset.
             if (IsBuiltInProfile(profileName))
             {
                 var ecGate = RyzenAdj_To_UCU.EcService;
-                if (ecGate is not null && ecGate.ApplyOemStockMode(OemModeIndexFor(profileName)))
+                if (ecGate is not null)
                 {
-                    DeviceApplier.ReassertKeyboardBrightnessAfterHandback();
+                    ecGate.ApplyOemStockMode(OemModeIndexFor(profileName));
                 }
             }
 

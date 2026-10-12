@@ -143,10 +143,10 @@ One-click tuning profiles and granular hardware controls for CPU, GPU, and syste
 
 Interception of the laptop's physical Performance / Q-key button (Uniwill NB02 hardware), so the button cycles UCU's own presets instead of the firmware's.
 
-- **Preset cycling** — Each press advances to the next preset (Office → Gaming → Turbo → saved Custom slots, wrapping) through the same apply path the Presets page uses, and the selection is persisted so the tray, Presets page, and resume handlers stay in sync
+- **Preset cycling** — Each press advances to the next preset (Office → Gaming → Turbo → every saved Custom preset of the pool Power Boost Mode selects, wrapping) through the same apply path the Presets page uses, and the selection is persisted so the tray, Presets page, and resume handlers stay in sync
 - **Q-key LED** — The EC firmware drives the LED from its own internal mode state and the OEM button already cycles it (white → red → yellow), which stays aligned with the Office → Gaming → Turbo order; no LED color register is written by default
-- **Detection** — The firmware re-latches the TCC offset register (`0x0786`) on *every* mode change, physical press and software-induced alike, so the poll tracks UCU's own mode asserts and ignores their re-latches, leaving only changes the firmware made on its own. WMI power-management events stay silent on this hardware, which makes EC polling the only reliable path
-- **Manual-control trade-off** — The firmware makes EC manual control and the OEM Performance-button engine mutually exclusive: a Custom preset (custom fan tables, cTGP/Dynamic Boost offsets, CPU power limits) disarms the button, and a stock preset hands control back to the firmware. UCU re-asserts the saved keyboard brightness after each hand-back so the firmware's restore leaves no visible flash
+- **Detection** — The EC's ACPI WMI provider raises an `AcpiTest_EventULong` event whose `ULong` payload is `176` for every physical press, so the press is read from the EC itself rather than inferred from a register latch; UCU's own preset applies therefore cannot be mistaken for a press
+- **Manual-control gate** — The press echo only fires while the EC manual-control gate (`0x0741` bit0) is set, so UCU keeps it armed permanently: the button stays live while a Custom preset, custom fan curves, GPU power control or Smart Fan Mode holds manual control, and the EC — not the firmware — owns the mode state
 - **Settings** — "Q-Key button preset switching" (default ON) and "Q-Key LED sync (experimental)" (default OFF, mirrors the active preset into the EC mode index register for firmware that drives the LED from it)
 
 ### **Adaptive Mode**

@@ -1,9 +1,14 @@
 using Microsoft.Extensions.Hosting;
 using Serilog;
+using System.Management;
+using System.Windows.Threading;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
+using Uniwill_Control_Utility.Scripts.Misc;
+using Uniwill_Control_Utility.Views.Pages;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -11,94 +16,102 @@ namespace Uniwill_Control_Utility.Services
     /// Detects presses of the hardware Performance / Q-key button on Uniwill
     /// NB02-platform laptops and cycles UCU's power presets.
     ///
-    /// Detection: the OEM EC firmware re-latches the TCC offset register (0x0786),
-    /// alternating 0x5F / 0xDF, on EVERY mode change — a physical button press AND
-    /// a software-induced one. UCU's own preset applies move the mode state, so a
-    /// change alone is not a press: the poll tracks
-    /// <see cref="UniwillECService.SelfModeChangeCount"/> and re-baselines while a
-    /// self-induced change is in flight, which leaves only changes the firmware made
-    /// on its own. WMI power-management events stay silent on this hardware, so EC
-    /// polling remains the only reliable path.
+    /// Detection: the EC's ACPI WMI provider — the same one UCU's Display page
+    /// instantiates for MiniLED Local Dimming — raises an AcpiTest_EventULong event
+    /// whose ULong payload is 176 (0xB0) for every physical press. That echo only
+    /// fires while 0x0741 bit0 is set: with bit0 clear the firmware consumes the
+    /// press itself (it walks its own 0x0751 cycle of 0xA0 / 0x20 / 0x30) and emits
+    /// nothing, so UCU keeps manual control armed permanently and arms it here at
+    /// startup. Verified 2026-10-12 by docs\acpi\WmiProbe.
+    ///
+    /// Because the press arrives as an event from the EC rather than as a register
+    /// latch, UCU's own preset applies can never be mistaken for a press and the
+    /// button stays live while a Custom preset holds manual control. Saved Custom
+    /// presets are therefore cycle members, matching OpenRevo's Office -> Gaming
+    /// -> Turbo -> Custom order.
     ///
     /// On a confirmed press the service advances to the next profile from
-    /// <see cref="PresetProfileApplier.GetProfileNames"/> (Office -> Gaming -> Turbo
-    /// -> saved Custom slots, wrapping), applies it through the same code path
-    /// the UI uses, and persists the selection in Settings so the Presets page
-    /// and resume handlers pick it up.
+    /// <see cref="PresetProfileApplier.GetCycleProfileNames"/> (the built-ins plus the
+    /// saved Custom slots of the pool Power Boost Mode selects, wrapping), applies it
+    /// through the same code path the UI
+    /// uses, and persists the selection in Settings so the Presets page and resume
+    /// handlers pick it up. A toast notification matching the UI and tray apply
+    /// paths announces the switch.
     ///
-    /// Q-key LED: the EC firmware drives the LED from its own internal mode
-    /// state, and the OEM button already cycles it (white -> red -> yellow),
-    /// which stays aligned with the Office -> Gaming -> Turbo preset order.
-    /// When <c>EnableQKeyLedSync</c> is on, the service additionally mirrors
-    /// the selected preset into the EC mode index register (0x07AB) and pokes
-    /// the trigger register (0x0767) so firmware that honors the mode index
-    /// (e.g. Mechrevo/Uniwill EC per OpenRevo) changes the LED to match.
+    /// Q-key LED: the EC firmware drives the LED from its own internal mode state,
+    /// and the 0x0751 literal in UniwillECService.ApplyOemStockMode is what recolors
+    /// it (Office white / Gaming yellow / Turbo red). When <c>EnableQKeyLedSync</c>
+    /// is on, the service additionally mirrors the selected preset into the EC mode
+    /// index register (0x07AB) and pokes the trigger register (0x0767) for firmware
+    /// that honors the mode index instead.
     /// </summary>
     public sealed class QKeyButtonService : IHostedService, IDisposable
     {
+        private const string WmiNamespace = @"root\WMI";
+        private const string PressEventQuery = "SELECT * FROM AcpiTest_EventULong";
+
         /// <summary>
-        /// EC reads are fast (~1 ms via IOCTL); 50 ms keeps button response
-        /// snappy while staying far below any EC throttle limit.
+        /// The EC's ULong payload for a physical Performance-button press. The same
+        /// provider raises other codes that are echoes of something else (168 = mode
+        /// state written programmatically, 240 = keyboard brightness) and they are
+        /// ignored.
         /// </summary>
-        private const int PollIntervalMs = 50;
+        private const uint PressEchoCode = 176;
+
+        /// OpenRevo ignores presses closer together than this (its log prints
+        /// "Q-Key debounced (elapsed < 500ms)"), so a double-tap counts once.
+        private const int PressDebounceMs = 500;
+
+        /// Idle wait that only keeps the watcher alive until shutdown; the press
+        /// itself arrives through the EventArrived callback, never through this loop.
+        private const int ShutdownHeartbeatMs = 1000;
 
         /// <summary>
-        /// A register change must persist this many consecutive reads
-        /// (~200 ms) before it counts as a press. Rejects EC noise while
-        /// still feeling instant to a user.
-        /// </summary>
-        private const int StableReadsForPress = 4;
-
-        /// A UCU mode assert re-latches 0x786 within ~300 ms of its EC writes
-        /// (measured 2026-10-11: 95 ms and 295 ms after the write). Suppress this
-        /// many poll ticks (1 s at 50 ms) so the re-latch can never count as a press.
-        private const int SelfChangeSuppressTicks = 20;
-
-        /// <summary>
-        /// Wait this long after host start before polling. Phase 1 startup
-        /// (startup settings apply) touches the EC; polling in parallel with
+        /// Wait this long after host start before subscribing. Phase 1 startup
+        /// (startup settings apply) touches the EC; subscribing in parallel with
         /// the handshake would race it.
         /// </summary>
         private const int StartupDelayMs = 4000;
 
         private readonly UniwillECService _ec;
         private readonly CancellationTokenSource _cts = new();
-        private Task? _pollTask;
+        private Task? _watchTask;
 
-        private volatile bool _ecUnavailableLogged;
-        private byte _lastValue;
-        private byte _candidateValue;
-        private int _candidateReads;
-        private int _selfModeChanges;
-        private int _selfChangeTicks;
-        private bool _hasBaseline;
-        private bool _pendingPress;
-        private bool _handlingPress;
+        private volatile bool _providerUnavailableLogged;
+        private volatile bool _handlingPress;
+        private DateTime _lastPressAt = DateTime.MinValue;
         private bool _disposed;
+        private Presets? _presetsPage;
 
         public QKeyButtonService(UniwillECService ec)
         {
             _ec = ec;
         }
 
+        /// <summary>
+        /// Registers the Presets page instance so a preset applied through the button
+        /// updates the page's own selection state, not just the persisted setting.
+        /// </summary>
+        public void RegisterPresetsPage(Presets page) => _presetsPage = page;
+
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            _pollTask = Task.Run(() => PollLoop(_cts.Token));
+            _watchTask = Task.Run(() => WatchLoop(_cts.Token));
             return Task.CompletedTask;
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             _cts.Cancel();
-            if (_pollTask is not null)
+            if (_watchTask is not null)
             {
                 try
                 {
-                    await Task.WhenAny(_pollTask, Task.Delay(2000, CancellationToken.None));
+                    await Task.WhenAny(_watchTask, Task.Delay(3000, CancellationToken.None));
                 }
                 catch (Exception ex)
                 {
-                    Log.Warning("[QKey] {ExceptionType} while stopping poll loop: {Message}",
+                    Log.Warning("[QKey] {ExceptionType} while stopping event watcher: {Message}",
                         ex.GetType().Name, ex.Message);
                 }
             }
@@ -113,139 +126,116 @@ namespace Uniwill_Control_Utility.Services
             _cts.Dispose();
         }
 
-        private async Task PollLoop(CancellationToken ct)
+        private async Task WatchLoop(CancellationToken ct)
         {
             await Task.Delay(StartupDelayMs, ct);
 
             if (!_ec.Initialize())
             {
-                if (!_ecUnavailableLogged)
+                if (!_providerUnavailableLogged)
                 {
-                    _ecUnavailableLogged = true;
+                    _providerUnavailableLogged = true;
                     Log.Information("[QKey] EC driver unavailable - Performance button intercept disabled on this machine");
                 }
                 return;
             }
 
-            Log.Information("[QKey] Performance button monitor started (polling 0x786 every {Interval}ms)", PollIntervalMs);
+            // The EC raises the press echo only while 0x0741 bit0 is set, so arm
+            // manual control before subscribing: a machine that booted at the
+            // firmware's own gate (0x04) would otherwise leave the listener deaf.
+            _ec.UnlockManualMode();
 
-            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(PollIntervalMs));
-            long ticks = 0;
-            long consecutiveReadFailures = 0;
             try
             {
-                while (await timer.WaitForNextTickAsync(ct))
+                using ManagementEventWatcher watcher = new(WmiNamespace, PressEventQuery);
+                watcher.EventArrived += (sender, arrived) => OnEventArrived(arrived);
+                watcher.Start();
+
+                Log.Information("[QKey] Performance button monitor started (WMI {Namespace}, {Query})",
+                    WmiNamespace, PressEventQuery);
+
+                try
                 {
-                    ticks++;
-                    byte value;
-                    try
-                    {
-                        value = _ec.ReadECRegister(UniwillECService.REG_TCC_OFFSET);
-                        if (consecutiveReadFailures > 0)
-                            Log.Information("[QKey] EC reads recovered after {Failures} failures", consecutiveReadFailures);
-                        consecutiveReadFailures = 0;
-                    }
-                    catch
-                    {
-                        // Transient driver/driver-handle hiccup - skip this tick.
-                        consecutiveReadFailures++;
-                        if (consecutiveReadFailures == 1)
-                            Log.Warning("[QKey] EC read of 0x786 failed (driver handle may be dead) - will keep retrying");
-                        else if (consecutiveReadFailures % 200 == 0)
-                            Log.Warning("[QKey] EC reads still failing ({Count} consecutive)", consecutiveReadFailures);
-                        continue;
-                    }
-
-                    OnTick(value);
-
-                    if (ticks % 1200 == 0) // ~60s heartbeat so silence is diagnosable
-                        Log.Information("[QKey] heartbeat: ticks={Ticks} value=0x{Value:X2} readFailures={Failures}",
-                            ticks, value, consecutiveReadFailures);
-
-                    if (_pendingPress)
-                    {
-                        _pendingPress = false;
-                        if (!_handlingPress)
-                        {
-                            _handlingPress = true;
-                            _ = HandlePressAsync();
-                        }
-                    }
+                    while (true)
+                        await Task.Delay(ShutdownHeartbeatMs, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    // normal shutdown
+                }
+                finally
+                {
+                    watcher.Stop();
                 }
             }
-            catch (OperationCanceledException)
+            catch (ManagementException ex)
             {
-                // normal shutdown
+                if (!_providerUnavailableLogged)
+                {
+                    _providerUnavailableLogged = true;
+                    Log.Warning("[QKey] WMI event provider unavailable ({ExceptionType}: {Message}) - " +
+                        "Performance button intercept needs the EC's AcpiTest_EventULong channel and stays off on this machine",
+                        ex.GetType().Name, ex.Message);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "[QKey] Performance button event watcher failed - intercept stopped");
             }
         }
 
-        /// <summary>
-        /// Edge detector: a new value that persists for
-        /// <see cref="StableReadsForPress"/> consecutive reads is a button press.
-        /// The OEM firmware alternates 0x5F / 0xDF per press, but any
-        /// sustained change counts, so firmware updates that change the value
-        /// pattern are still detected.
-        /// </summary>
-        private void OnTick(byte value)
+        private void OnEventArrived(EventArrivedEventArgs arrived)
         {
-            if (!_hasBaseline)
+            using ManagementBaseObject evt = arrived.NewEvent;
+
+            var code = ReadEventCode(evt);
+            if (code != PressEchoCode)
             {
-                _hasBaseline = true;
-                _lastValue = value;
-                Log.Information("[QKey] baseline 0x786 = 0x{Baseline:X2}", value);
+                Log.Debug("[QKey] Ignoring AcpiTest_EventULong echo {Code} (not a press)", code);
                 return;
             }
 
-            if (_ec.SelfModeChangeCount() != _selfModeChanges)
+            var sinceLastMs = (int)(DateTime.Now - _lastPressAt).TotalMilliseconds;
+            if (sinceLastMs < PressDebounceMs)
             {
-                _selfModeChanges = _ec.SelfModeChangeCount();
-                _selfChangeTicks = SelfChangeSuppressTicks;
-            }
-
-            if (_selfChangeTicks > 0)
-            {
-                _selfChangeTicks--;
-                if (value != _lastValue)
-                    Log.Information("[QKey] 0x786 re-latched by UCU's own mode assert (0x{From:X2} -> 0x{To:X2}) - not a button press",
-                        _lastValue, value);
-                _lastValue = value;
-                _candidateValue = value;
-                _candidateReads = 0;
+                Log.Information("[QKey] Performance button press debounced (previous press {Elapsed}ms ago)",
+                    sinceLastMs);
                 return;
             }
 
-            if (value == _lastValue)
-            {
-                _candidateReads = 0;
-                return;
-            }
+            _lastPressAt = DateTime.Now;
+            Log.Information("[QKey] Performance button press detected (AcpiTest_EventULong ULong={Code})", code);
+            _ = HandlePressAsync();
+        }
 
-            if (value != _candidateValue)
+        /// <summary>
+        /// Reads the ULong payload of an AcpiTest_EventULong event. The MOF binding
+        /// hands property values back as <c>object</c>, so accept any integral width
+        /// rather than assuming the declared UInt32 arrives boxed as one type.
+        /// </summary>
+        private static uint ReadEventCode(ManagementBaseObject evt)
+        {
+            var raw = evt.GetPropertyValue("ULong");
+            return raw switch
             {
-                _candidateValue = value;
-                _candidateReads = 1;
-                return;
-            }
-
-            _candidateReads++;
-            if (_candidateReads == 2)
-            {
-                // Change persisted >=100ms: log it immediately so a register that
-                // moves but never hits the press threshold is still visible.
-                Log.Information("[QKey] 0x786 changed: 0x{From:X2} -> 0x{To:X2}", _lastValue, value);
-            }
-            if (_candidateReads >= StableReadsForPress)
-            {
-                byte from = _lastValue;
-                _lastValue = value;
-                _candidateReads = 0;
-                _pendingPress = true;
-                Log.Information("[QKey] Performance button press detected (0x786: 0x{From:X2} -> 0x{To:X2})", from, value);
-            }
+                uint value => value,
+                int value => (uint)value,
+                ulong value => (uint)value,
+                ushort value => value,
+                byte value => value,
+                _ => 0,
+            };
         }
 
         private async Task HandlePressAsync()
         {
+            if (_handlingPress)
+            {
+                Log.Information("[QKey] Press arrived while a preset apply is still running - ignored");
+                return;
+            }
+
+            _handlingPress = true;
             try
             {
                 if (!Settings.Default.EnableQKeyButtonIntercept)
@@ -257,11 +247,21 @@ namespace Uniwill_Control_Utility.Services
                     return;
                 }
 
-                string[] names = PresetProfileApplier.GetProfileNames();
-                if (names.Length == 0)
-                    return;
+                string[] names = PresetProfileApplier.GetCycleProfileNames();
 
                 string? current = Settings.Default.presetProfile;
+
+                // The Presets page and the tray persist the bare "Custom" instead of the
+                // slot-qualified cycle key, so a Custom preset would otherwise restart
+                // the walk at Office. Resolve it from the active mode's saved slot.
+                if (string.Equals(current, "Custom", StringComparison.OrdinalIgnoreCase))
+                {
+                    bool boostMode = Settings.Default.EnablePowerBoostMode;
+                    current = PresetProfileApplier.CustomProfileKey(
+                        boostMode ? Settings.Default.customPresetSlotBoost : Settings.Default.customPresetSlot,
+                        boostMode ? Models.PresetMode.Boost : Models.PresetMode.Normal);
+                }
+
                 int idx = -1;
                 for (int i = 0; i < names.Length; i++)
                 {
@@ -272,11 +272,10 @@ namespace Uniwill_Control_Utility.Services
                     }
                 }
 
-                // Unknown or never-set profile (including legacy bare "Custom"):
-                // start the cycle from the first profile.
+                // Built-ins plus the saved Custom slots of the active pool, wrapping: the
+                // press comes from the EC event rather than a firmware latch, so a Custom
+                // preset never takes the button dead and can sit in the cycle.
                 string next = names[(idx + 1) % names.Length];
-                if (names.Length > 1 && string.Equals(next, current, StringComparison.OrdinalIgnoreCase))
-                    next = names[(idx + 2) % names.Length];
 
                 string displayName = PresetProfileApplier.DisplayName(next);
                 await PresetProfileApplier.ApplyProfileAsync(next, displayName);
@@ -284,8 +283,29 @@ namespace Uniwill_Control_Utility.Services
                 Settings.Default.presetProfile = next;
                 Settings.Default.Save();
 
+                // The Presets page keeps its own selected-profile state, and its render
+                // tree may only be touched from the render thread: post the re-sync
+                // through the page's dispatcher, which runs it there. Calling
+                // loadSavedProfile directly faults at the first Style assignment in
+                // selectProfile, because this handler runs on the WMI callback thread.
+                _presetsPage?.Dispatcher.BeginInvoke(
+                    () =>
+                    {
+                        _presetsPage?.loadSavedProfile();
+
+                        // selectProfile persists the page's own profile name, which is
+                        // the bare "Custom" for a custom slot; the cycle needs the
+                        // slot-qualified key to keep walking.
+                        Settings.Default.presetProfile = next;
+                        Settings.Default.Save();
+                    },
+                    DispatcherPriority.Normal);
+
                 if (Settings.Default.EnableQKeyLedSync)
                     SyncQKeyLed(next);
+
+                ToastNotification.ShowToastNotification($"{displayName} Applied!",
+                    $"{displayName} has been applied!");
 
                 Log.Information("[QKey] Cycled to {Profile} preset", displayName);
             }
@@ -314,8 +334,6 @@ namespace Uniwill_Control_Utility.Services
             {
                 int modeIndex = PresetProfileApplier.OemModeIndexFor(profileName);
 
-                // Read-modify-write: bit 4 is the mode engine's arm bit, so a bare
-                // mode write disarms the OEM button engine.
                 byte prevMode = _ec.ReadECRegister(UniwillECService.REG_MODE_INDEX);
                 _ec.WriteECRegister(UniwillECService.REG_MODE_INDEX,
                     (byte)((prevMode & 0xE0) | modeIndex | UniwillECService.MODE_INDEX_ARM));
@@ -324,7 +342,6 @@ namespace Uniwill_Control_Utility.Services
                 byte trigger = _ec.ReadECRegister(UniwillECService.REG_TRIGGER);
                 _ec.WriteECRegister(UniwillECService.REG_TRIGGER,
                     (byte)(trigger | UniwillECService.TRIGGER_RGB_APPLY_COLOR));
-                _ec.MarkSelfModeChange();
 
                 Log.Information("[QKey] LED sync: mode index {Mode} written to 0x7AB", modeIndex);
             }

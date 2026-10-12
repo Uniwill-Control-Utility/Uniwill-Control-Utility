@@ -96,13 +96,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             PresetsNavigationRequest navigationRequest,
             GpuInventoryService? gpuInventory = null,
             HydroUIService? waterCooler = null,
-            DeviceApplier? deviceApplier = null)
+            DeviceApplier? deviceApplier = null,
+            QKeyButtonService? qKeyButton = null)
         {
             _logger = logger;
             _navigationRequest = navigationRequest;
             _gpuInventory = gpuInventory;
             _waterCooler = waterCooler;
             _deviceApplier = deviceApplier;
+            // Lets a preset applied by the physical button drive this page's selection state.
+            qKeyButton?.RegisterPresetsPage(this);
             InitializeComponent();
             _ = Tablet.TabletDevices;
         }
@@ -809,7 +812,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             return $"{profile}\n\n{cpuSection}\n{cpuValues}\n\n{gpuSection}\n{gpuValues}";
         }
 
-        private void loadSavedProfile()
+        public void loadSavedProfile()
         {
             // Restore last selected profile.
             // Try the new string property first; fall back to the legacy int property.
@@ -996,6 +999,13 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 LoadCustomPreset(_customPresetSlot);
                 updateAllLabels();
+
+                // Page_Loaded only fires once, so a profile switch — including one
+                // driven by the Performance button — has to move the checked slot too.
+                var slotButtons = new RadioButton[] { rbProfile1, rbProfile2, rbProfile3, rbProfile4, rbProfile5 };
+                for (int i = 0; i < slotButtons.Length; i++)
+                    slotButtons[i].IsChecked = i == _customPresetSlot;
+
                 updateRadioButtonStyles();
             }
 
@@ -1206,14 +1216,15 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // custom power/profile enable bits, which yields CPU limits, GPU
                 // TGP and fans to the firmware's own per-mode factory table. Runs
                 // before anything else EC-side so no stale GPU ceiling can be left
-                // behind, and ApplyOemStockMode clears 0x0741 bit0, which re-arms the
-                // physical Performance button (bit0 set disarms it on NB02).
+                // behind. 0x0741 bit0 stays armed: the EC only raises the
+                // AcpiTest_EventULong press echo while manual control is set, which
+                // is what keeps the Performance button live under a Custom preset.
                 if (PresetProfileApplier.IsBuiltInProfile(_currentProfile))
                 {
                     var ecGate = RyzenAdj_To_UCU.EcService;
-                    if (ecGate != null && ecGate.ApplyOemStockMode(PresetProfileApplier.OemModeIndexFor(_currentProfile)))
+                    if (ecGate != null)
                     {
-                        DeviceApplier.ReassertKeyboardBrightnessAfterHandback();
+                        ecGate.ApplyOemStockMode(PresetProfileApplier.OemModeIndexFor(_currentProfile));
                     }
                 }
 
@@ -1435,21 +1446,26 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Capture current Fan Control page settings from the global FanControlSettings.
             // This lets each custom preset store its own copy of fan curves, unified/split
-            // mode, temp thresholds, and Smart Fan Mode state.
-            var fanSettings = FanControlSettingsService.Load();
+            // mode, temp thresholds, and Smart Fan Mode state — but only for slots that
+            // carry tuning changes: stamping the global fan state into a slot the user
+            // just cleared would make it look saved again right after Clear.
             var p = presets[slotIndex];
-            p.FanUnifiedMode = fanSettings.UnifiedMode;
-            p.FanUnifiedPreset = fanSettings.UnifiedPreset;
-            p.FanUnifiedDuties = fanSettings.UnifiedDuties?.Clone() as int[];
-            p.FanUnifiedTempThresholds = fanSettings.UnifiedTempThresholds?.Clone() as int[];
-            p.FanCpuPreset = fanSettings.CpuPreset;
-            p.FanCpuDuties = fanSettings.CpuDuties?.Clone() as int[];
-            p.FanCpuTempThresholds = fanSettings.CpuTempThresholds?.Clone() as int[];
-            p.FanGpuPreset = fanSettings.GpuPreset;
-            p.FanGpuDuties = fanSettings.GpuDuties?.Clone() as int[];
-            p.FanGpuTempThresholds = fanSettings.GpuTempThresholds?.Clone() as int[];
-            p.FanSmartFanMode = fanSettings.EcSmartFanMode;
-            p.FanSmartFanTempSource = fanSettings.EcSmartFanTempSource;
+            if (p.HasTuningChanges)
+            {
+                var fanSettings = FanControlSettingsService.Load();
+                p.FanUnifiedMode = fanSettings.UnifiedMode;
+                p.FanUnifiedPreset = fanSettings.UnifiedPreset;
+                p.FanUnifiedDuties = fanSettings.UnifiedDuties?.Clone() as int[];
+                p.FanUnifiedTempThresholds = fanSettings.UnifiedTempThresholds?.Clone() as int[];
+                p.FanCpuPreset = fanSettings.CpuPreset;
+                p.FanCpuDuties = fanSettings.CpuDuties?.Clone() as int[];
+                p.FanCpuTempThresholds = fanSettings.CpuTempThresholds?.Clone() as int[];
+                p.FanGpuPreset = fanSettings.GpuPreset;
+                p.FanGpuDuties = fanSettings.GpuDuties?.Clone() as int[];
+                p.FanGpuTempThresholds = fanSettings.GpuTempThresholds?.Clone() as int[];
+                p.FanSmartFanMode = fanSettings.EcSmartFanMode;
+                p.FanSmartFanTempSource = fanSettings.EcSmartFanTempSource;
+            }
 
             Models.CustomPresetStore.Save(presets, ActivePresetMode);
             DebugLog($"SaveCustomPreset: slot {slotIndex + 1} saved (mode={ActivePresetMode})");
@@ -1554,6 +1570,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             _customPresetSlot = newSlot;
             ActivePresetSlot = newSlot;
+
+            // The Performance-button cycle keys off presetProfile, so the slot switch
+            // has to move that key too or the walk resumes from the old slot.
+            Settings.Default.presetProfile = Services.PresetProfileApplier.CustomProfileKey(newSlot, ActivePresetMode);
             Settings.Default.Save();
             DebugLog($"rbProfile_Click: Saved _customPresetSlot={_customPresetSlot}, customPresetSlot={Settings.Default.customPresetSlot}");
 

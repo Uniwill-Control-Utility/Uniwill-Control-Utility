@@ -121,13 +121,15 @@ namespace Uniwill_Control_Utility.Models
             FanSmartFanMode ||
             !string.IsNullOrEmpty(FanSmartFanTempSource);
 
-        public bool HasChanges => Differs(CpuSustained, 75) || Differs(CpuBoost, 85) || Differs(CpuTjMax, 95) ||
+        /// <summary>True when any CPU/GPU/V-F tuning control differs from its default.</summary>
+        public bool HasTuningChanges => Differs(CpuSustained, 75) || Differs(CpuBoost, 85) || Differs(CpuTjMax, 95) ||
             Differs(CpuCoCcd0, 0) || Differs(CpuCoCcd1, 0) ||
             Differs(IntelPl1, 45) || Differs(IntelPl2, 60) || Differs(IntelVolt, 0) ||
             Differs(GpuTgp, 150) || GpuDynamicBoost || Differs(GpuDbOffset, 0) ||
             Differs(GpuCoreOffset, 0) || Differs(GpuMemOffset, 0) ||
-            VfCurveOffsets.Any(p => p.Value != 0) ||
-            HasFanChanges;
+            VfCurveOffsets.Any(p => p.Value != 0);
+
+        public bool HasChanges => HasTuningChanges || HasFanChanges;
     }
 
     /// <summary>

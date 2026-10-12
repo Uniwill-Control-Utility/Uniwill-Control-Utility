@@ -572,7 +572,7 @@
                                     <ui:TextBlock Margin="0,2,0,2"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Lets the physical Performance button cycle UCU power presets (Office to Gaming to Turbo and saved custom presets). The button LED keeps following its own hardware cycle."
+                                                   Text="Lets the physical Performance button cycle UCU power presets (Office to Gaming to Turbo to every saved Custom preset of the pool Power Boost Mode selects, wrapping). The press is read from the EC's own event channel, so the button stays usable while a Custom preset is active."
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="cbQKeyIntercept"
