@@ -373,12 +373,17 @@ namespace Uniwill_Control_Utility
 
                 // Wait for any queued pre-Phase-1 animations to finish so the tracker
                 // doesn't fight with the playback loop over StatusTitle.
-                await startupWindow.WaitForProgressPlaybackAsync();
+                // The window is null when the startup progress overlay is disabled.
+                if (startupWindow is not null)
+                    await startupWindow.WaitForProgressPlaybackAsync();
 
                 // The tracker keeps the detail row hidden ("Initializing" only)
                 // and surfaces "Connecting devices…" in it if that task is still
                 // running 3 seconds after the phase starts.
-                var tracker = new ParallelPhaseTracker(
+                // Null when the startup progress overlay is disabled — nothing to drive.
+                ParallelPhaseTracker? tracker = startupWindow is null
+                    ? null
+                    : new ParallelPhaseTracker(
                     "Initializing",
                     phase1TasksList,
                     50,
@@ -403,10 +408,10 @@ namespace Uniwill_Control_Utility
                     }
                     finally
                     {
-                        _ = startupWindow.Dispatcher.InvokeAsync(() =>
+                        _ = startupWindow?.Dispatcher.InvokeAsync(() =>
                         {
-                            tracker.TaskCompleted(0); // Detecting hardware
-                            tracker.TaskCompleted(1); // Initializing sensors (runs inside DetectHardwareAsync)
+                            tracker?.TaskCompleted(0); // Detecting hardware
+                            tracker?.TaskCompleted(1); // Initializing sensors (runs inside DetectHardwareAsync)
                         });
                     }
                 }));
@@ -425,7 +430,7 @@ namespace Uniwill_Control_Utility
                     }
                     finally
                     {
-                        _ = startupWindow.Dispatcher.InvokeAsync(() => tracker.TaskCompleted(2));
+                        _ = startupWindow?.Dispatcher.InvokeAsync(() => tracker?.TaskCompleted(2));
                     }
                 }));
 
@@ -444,7 +449,7 @@ namespace Uniwill_Control_Utility
                     }
                     finally
                     {
-                        _ = startupWindow.Dispatcher.InvokeAsync(() => tracker.TaskCompleted(3));
+                        _ = startupWindow?.Dispatcher.InvokeAsync(() => tracker?.TaskCompleted(3));
                     }
                 }));
 
@@ -462,7 +467,7 @@ namespace Uniwill_Control_Utility
                     }
                     finally
                     {
-                        _ = startupWindow.Dispatcher.InvokeAsync(() => tracker.TaskCompleted(4));
+                        _ = startupWindow?.Dispatcher.InvokeAsync(() => tracker?.TaskCompleted(4));
                     }
                 }));
 
@@ -488,7 +493,7 @@ namespace Uniwill_Control_Utility
 
                 // Wait for all independent Phase 1 tasks to complete.
                 await Task.WhenAll(phase1Tasks);
-                startupWindow.SetProgressValue(92);
+                startupWindow?.SetProgressValue(92);
 
                 // --- Phase 2: restore Adaptive Mode (depends on devices being connected) ---
                 if (Settings.Default.isAdaptiveModeRunning)
