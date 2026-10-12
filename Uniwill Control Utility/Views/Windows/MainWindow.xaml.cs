@@ -93,9 +93,12 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// <summary>Toggles the compact quick-control widget when the tray icon is left-clicked.</summary>
         private void NotifyIcon_LeftClick(Wpf.Ui.Tray.Controls.NotifyIcon sender, RoutedEventArgs e)
         {
-            // If the main window is already visible and active, just hide the tray widget
+            // If the main window is open on the desktop, just hide the tray widget
             // instead of toggling it open (main window takes priority).
-            if (this.IsActive && this.Visibility == Visibility.Visible)
+            // WindowState, not IsActive: a window minimized right after startup keeps a
+            // stale active flag (minimizing sends no WM_CLEARFOCUS), which used to swallow
+            // the first left-click until a right-click forced the focus change.
+            if (this.WindowState != WindowState.Minimized && this.IsVisible)
             {
                 _trayWidget.HideIfVisible();
                 return;
