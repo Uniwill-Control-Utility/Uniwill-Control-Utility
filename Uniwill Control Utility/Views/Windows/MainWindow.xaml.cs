@@ -412,14 +412,22 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             try
             {
+                var settings = KeyboardSettingsService.Load();
+
+                // BetterRGB: the streamer owns the keyboard handle — resume it instead
+                // of opening a fresh one and re-sending firmware reports.
+                if (settings.Engine == KeyboardEngine.BetterRGB)
+                {
+                    App.GetService<BetterRgbStreamService>()?.ResumeAfterWake();
+                    return;
+                }
+
                 var hidService = new KeyboardHidService();
                 if (!hidService.Open())
                 {
                     hidService.Dispose();
                     return;
                 }
-
-                var settings = KeyboardSettingsService.Load();
 
                 if (settings.PowerOn)
                 {
@@ -581,8 +589,26 @@ namespace Uniwill_Control_Utility.Views.Windows
                     return;
                 }
 
-                ApplyKeyboardOnStartWithService(hidService);
-                ApplyLightBarOnStartWithService(hidService);
+                var settings = KeyboardSettingsService.Load();
+                if (settings.Engine == KeyboardEngine.BetterRGB)
+                {
+                    // BetterRGB: the streamer owns the keyboard-zone handle — skip the
+                    // firmware keyboard apply. The light bar rides the usage-2 device
+                    // and is unaffected by the engine choice.
+                    var streamer = App.GetService<BetterRgbStreamService>();
+                    if (streamer != null)
+                    {
+                        streamer.SetParams(settings);
+                        streamer.StartEngine("startup");
+                    }
+                    Log.Information("[BetterRGB] Startup lighting presets successfully restored to hardware & BetterRGB Streamer");
+                    ApplyLightBarOnStartWithService(hidService);
+                }
+                else
+                {
+                    ApplyKeyboardOnStartWithService(hidService);
+                    ApplyLightBarOnStartWithService(hidService);
+                }
             }
             catch (Exception ex)
             {
@@ -961,6 +987,20 @@ namespace Uniwill_Control_Utility.Views.Windows
                         {
                             Log.Information("[Automations] GPU Power Saving plugged-in apply failed: {Message}", ex.Message);
                         }
+                    }
+
+                    // BetterRGB streamer AC policy (OpenRevo's auto-policy):
+                    // plugged in → restore the 60FPS streamer; battery → hardware
+                    // firmware effects at the same params (0% CPU).
+                    try
+                    {
+                        bool acPlugged = statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
+                            || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery;
+                        App.GetService<BetterRgbStreamService>()?.ApplyAcPolicy(acPlugged);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Information("[BetterRGB] AC policy apply failed: {Message}", ex.Message);
                     }
                 }
 

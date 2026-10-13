@@ -115,6 +115,31 @@
                                  Unchecked="ModeToggle_Checked" />
                         </ui:CardControl>
 
+                        <!-- BetterRGB streamer engine (port of OpenRevo's BetterRGB):
+                             software-rendered frames streamed at high FPS; on battery
+                             the AC policy auto-falls back to hardware MCU effects. -->
+                        <ui:CardControl Margin="0,0,0,8">
+                            <ui:CardControl.Icon>
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
+                            </ui:CardControl.Icon>
+                            <ui:CardControl.Header>
+                                <StackPanel>
+                                    <ui:TextBlock FontTypography="Body" Text="BetterRGB Streamer Engine" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Render effects in software and stream them to the controller at high FPS; on battery, auto-falls back to hardware effects"
+                                           TextWrapping="Wrap" />
+                                </StackPanel>
+                            </ui:CardControl.Header>
+                            <ui:ToggleSwitch x:Name="tsBetterRgbEngine"
+                                 LabelPosition="Left"
+                                 OnContent="On"
+                                 OffContent="Off"
+                                 Checked="EngineToggle_Toggled"
+                                 Unchecked="EngineToggle_Toggled" />
+                        </ui:CardControl>
+
                         <!-- Idle Timer (common to both modes) -->
                         <ui:CardExpander x:Name="IdleTimerCard"
                              Margin="0,0,0,8"
@@ -234,7 +259,7 @@
                                 <StackPanel>
 
                                     <!-- Brightness (always visible at top) -->
-                                    <Grid>
+                                    <Grid x:Name="BrightnessRow">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
@@ -332,7 +357,7 @@
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0">
                                             <ui:TextBlock FontTypography="Body" Text="Speed" />
-                                            <ui:TextBlock Margin="0,2,0,0"
+                                            <ui:TextBlock x:Name="SpeedSubtitle" Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                                    Text="Control the animation speed" />
@@ -435,6 +460,755 @@
 
                                </StackPanel>
                             </ui:CardExpander>
+
+                            <!-- ===== BETTERRGB EFFECTS CARD (separate from the
+                                 firmware Effects card above — the two engines no
+                                 longer share controls) ===== -->
+                            <ui:CardExpander x:Name="BetterRgbEffectsCardExpander"
+                                 Margin="0,0,0,0"
+                                 IsExpanded="True"
+                                 Visibility="Collapsed">
+                                <ui:CardExpander.Icon>
+                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
+                                </ui:CardExpander.Icon>
+                                <ui:CardExpander.Header>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body" Text="BetterRGB Effects" />
+                                            <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Software-rendered effects streamed on the ITE 0xFF03 RGB interface"
+                                               TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ComboBox x:Name="cmbBetterRgbEffect"
+                                          Grid.Column="1"
+                                          Width="180"
+                                          Margin="2,0,12,0"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          SelectionChanged="CmbBetterRgbEffect_SelectionChanged"
+                                          MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown" />
+                                    </Grid>
+                                </ui:CardExpander.Header>
+                                <StackPanel>
+
+                                    <!-- Global: brightness 0-100 (software multiplier, g_brightness).
+                                         First row of the card - no divider above it. -->
+                                    <Grid x:Name="BrightnessPercentRow"
+                                        Visibility="Collapsed" >
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" >
+                                            <ui:TextBlock FontTypography="Body" Text="Brightness" />
+                                            <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="How bright the streamed effect is (0-100)" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                            <TextBlock x:Name="BrightnessPercentValueText"
+                                               Width="40"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="100" />
+                                            <Slider x:Name="BrightnessPercentSlider"
+                                                Width="140"
+                                                Minimum="2"
+                                                Maximum="100"
+                                                Value="100"
+                                                IsSnapToTickEnabled="False"
+                                                TickFrequency="25"
+                                                TickPlacement="Both"
+                                                IsMoveToPointEnabled="False"
+                                                ValueChanged="BrightnessPercentSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Global: FPS 15-60 (reference TARGET_FPS_MIN/MAX;
+                                         the pacer self-degrades when the device cannot
+                                         sustain the target) -->
+                                    <Border x:Name="FpsSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="FpsRow"
+                                        Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body" Text="FPS" />
+                                            <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Target stream rate (15-60); the pacer lowers it if the device lags" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
+                                            <ui:Button x:Name="btnFps15" Width="52" Height="30" Margin="0,0,4,0" Appearance="Transparent"
+                                                Click="FpsButton_Click" Tag="15"><TextBlock Text="15" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
+                                            <ui:Button x:Name="btnFps30" Width="52" Height="30" Margin="0,0,4,0" Appearance="Transparent"
+                                                Click="FpsButton_Click" Tag="30"><TextBlock Text="30" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
+                                            <ui:Button x:Name="btnFps45" Width="52" Height="30" Margin="0,0,4,0" Appearance="Transparent"
+                                                Click="FpsButton_Click" Tag="45"><TextBlock Text="45" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
+                                            <ui:Button x:Name="btnFps60" Width="52" Height="30" Margin="0,0,0,0" Appearance="Transparent"
+                                                Click="FpsButton_Click" Tag="60"><TextBlock Text="60" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Per-effect controls follow; only the selected
+                                         effect's rows are shown (UpdateBetterRgbEffectUi) -->
+                                    <Border x:Name="BetterRgbEffectSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+
+                                    <!-- Breathing: color, speed 1-40, smoothness 2-150, random -->
+                                    <Grid x:Name="BcColorRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Color" VerticalAlignment="Center" />
+                                        <controls:ColorPickerControl x:Name="BcColorPicker"
+                                            Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                            SelectedColor="#FF0078FF" ColorChangedDelayed="BcColorPicker_ColorChangedDelayed" />
+                                    </Grid>
+                                    <Border x:Name="BcSpeedSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="BcSpeedRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Breath speed" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="BcSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="12" />
+                                            <Slider x:Name="BcSpeedSlider" Width="140" Minimum="1" Maximum="40" Value="12"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="BcSpeedSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="BcSmoothSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="BcSmoothRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Smoothness" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="BcSmoothValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="60" />
+                                            <Slider x:Name="BcSmoothSlider" Width="140" Minimum="2" Maximum="150" Value="60"
+                                                IsSnapToTickEnabled="True" TickFrequency="2" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="BcSmoothSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="BcRandomSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="BcRandomRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Random color" VerticalAlignment="Center" />
+                                        <ui:ToggleSwitch x:Name="tsBcRandom" Grid.Column="1" LabelPosition="Left"
+                                            OnContent="On" OffContent="Off"
+                                            Checked="TsBcRandom_Toggled" Unchecked="TsBcRandom_Toggled" />
+                                    </Grid>
+
+                                    <!-- Wave: direction arrow buttons (45-degree steps,
+                                         mirrors the firmware Wave DirectionRow) + speed -->
+                                    <Grid x:Name="WvAngleRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body" Text="Wave angle" />
+                                            <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Direction the wave sweeps (45-degree steps)" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,4,0,0">
+                                            <ui:Button x:Name="btnWvA0" Width="40" Height="36" Margin="0,0,4,0" Appearance="Transparent"
+                                                Click="WvAngleButton_Click" Tag="0"><TextBlock Text="&#x2190;" FontSize="18" HorizontalAlignment="Center"/></ui:Button>
+                                            <ui:Button x:Name="btnWvA45" Width="40" Height="36" Margin="0,0,4,0" Appearance="Transparent"
+                                                Click="WvAngleButton_Click" Tag="45"><TextBlock Text="&#x2196;" FontSize="18" HorizontalAlignment="Center"/></ui:Button>
+                                            <ui:Button x:Name="btnWvA90" Width="40" Height="36" Margin="0,0,4,0" Appearance="Transparent"
+                                                Click="WvAngleButton_Click" Tag="90"><TextBlock Text="&#x2191;" FontSize="18" HorizontalAlignment="Center"/></ui:Button>
+                                            <ui:Button x:Name="btnWvA135" Width="40" Height="36" Margin="0,0,4,0" Appearance="Transparent"
+                                                Click="WvAngleButton_Click" Tag="135"><TextBlock Text="&#x2197;" FontSize="18" HorizontalAlignment="Center"/></ui:Button>
+                                            <ui:Button x:Name="btnWvA180" Width="40" Height="36" Margin="0,0,4,0" Appearance="Transparent"
+                                                Click="WvAngleButton_Click" Tag="180"><TextBlock Text="&#x2192;" FontSize="18" HorizontalAlignment="Center"/></ui:Button>
+                                            <ui:Button x:Name="btnWvA225" Width="40" Height="36" Margin="0,0,4,0" Appearance="Transparent"
+                                                Click="WvAngleButton_Click" Tag="225"><TextBlock Text="&#x2198;" FontSize="18" HorizontalAlignment="Center"/></ui:Button>
+                                            <ui:Button x:Name="btnWvA270" Width="40" Height="36" Margin="0,0,4,0" Appearance="Transparent"
+                                                Click="WvAngleButton_Click" Tag="270"><TextBlock Text="&#x2193;" FontSize="18" HorizontalAlignment="Center"/></ui:Button>
+                                            <ui:Button x:Name="btnWvA315" Width="40" Height="36" Margin="0,0,0,0" Appearance="Transparent"
+                                                Click="WvAngleButton_Click" Tag="315"><TextBlock Text="&#x2199;" FontSize="18" HorizontalAlignment="Center"/></ui:Button>
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="WvSpeedSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="WvSpeedRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Speed" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="WvSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="4" />
+                                            <Slider x:Name="WvSpeedSlider" Width="140" Minimum="1" Maximum="20" Value="4"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="WvSpeedSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Sparkle: speed 1-10, density 3-20 -->
+                                    <Grid x:Name="SpSpeedRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Spark rate" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="SpSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
+                                            <Slider x:Name="SpSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="SpSpeedSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="SpDensitySeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="SpDensityRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Density" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="SpDensityValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="8" />
+                                            <Slider x:Name="SpDensitySlider" Width="140" Minimum="3" Maximum="20" Value="8"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="SpDensitySlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Reactive: color + random, duration buttons Short/Medium/Long -->
+                                    <Grid x:Name="RcColorRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Color" VerticalAlignment="Center" />
+                                        <controls:ColorPickerControl x:Name="RcColorPicker"
+                                            Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                            SelectedColor="#FFFFFFFF" ColorChangedDelayed="RcColorPicker_ColorChangedDelayed" />
+                                    </Grid>
+                                    <Border x:Name="RcRandomSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="RcRandomRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Random color" VerticalAlignment="Center" />
+                                        <ui:ToggleSwitch x:Name="tsRcRandom" Grid.Column="1" LabelPosition="Left"
+                                            OnContent="On" OffContent="Off" IsChecked="True"
+                                            Checked="TsRcRandom_Toggled" Unchecked="TsRcRandom_Toggled" />
+                                    </Grid>
+                                    <Border x:Name="RcDurationSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="RcDurationRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Fade duration" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <ui:Button x:Name="btnRcShort" Width="52" Height="30" Margin="0,0,4,0" Appearance="Transparent"
+                                                Click="RcDurationButton_Click" Tag="Short"><TextBlock Text="Short" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
+                                            <ui:Button x:Name="btnRcMedium" Width="60" Height="30" Margin="0,0,4,0" Appearance="Transparent"
+                                                Click="RcDurationButton_Click" Tag="Medium"><TextBlock Text="Medium" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
+                                            <ui:Button x:Name="btnRcLong" Width="52" Height="30" Margin="0,0,0,0" Appearance="Transparent"
+                                                Click="RcDurationButton_Click" Tag="Long"><TextBlock Text="Long" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Wheel: reverse toggle, speed 1-20 -->
+                                    <Grid x:Name="WhReverseRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Reverse" VerticalAlignment="Center" />
+                                        <ui:ToggleSwitch x:Name="tsWhReverse" Grid.Column="1" LabelPosition="Left"
+                                            OnContent="On" OffContent="Off"
+                                            Checked="TsWhReverse_Toggled" Unchecked="TsWhReverse_Toggled" />
+                                    </Grid>
+                                    <Border x:Name="WhSpeedSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="WhSpeedRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Speed" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="WhSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="4" />
+                                            <Slider x:Name="WhSpeedSlider" Width="140" Minimum="1" Maximum="20" Value="4"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="WhSpeedSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Lightning: speed, smoothness, width, concurrent bolts -->
+                                    <Grid x:Name="LtSpeedRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Strike speed" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="LtSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
+                                            <Slider x:Name="LtSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="LtSpeedSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="LtSmoothSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="LtSmoothRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Smoothness" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="LtSmoothValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="10" />
+                                            <Slider x:Name="LtSmoothSlider" Width="140" Minimum="1" Maximum="20" Value="10"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="LtSmoothSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="LtWidthSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="LtWidthRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Bolt width" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="LtWidthValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="2" />
+                                            <Slider x:Name="LtWidthSlider" Width="140" Minimum="1" Maximum="4" Value="2"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="LtWidthSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="LtConcurrentSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="LtConcurrentRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Concurrent bolts" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="LtConcurrentValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="1" />
+                                            <Slider x:Name="LtConcurrentSlider" Width="140" Minimum="1" Maximum="4" Value="1"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="LtConcurrentSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Flame: flicker speed, smoothness -->
+                                    <Grid x:Name="FlSpeedRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Flicker speed" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="FlSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
+                                            <Slider x:Name="FlSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="FlSpeedSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="FlSmoothSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="FlSmoothRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Smoothness" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="FlSmoothValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="8" />
+                                            <Slider x:Name="FlSmoothSlider" Width="140" Minimum="1" Maximum="20" Value="8"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="FlSmoothSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Raindrop: falling speed, density, palette 1-5 + swatches -->
+                                    <Grid x:Name="RnSpeedRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Falling speed" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="RnSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
+                                            <Slider x:Name="RnSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="RnSpeedSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="RnDensitySeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="RnDensityRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Density" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="RnDensityValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="3" />
+                                            <Slider x:Name="RnDensitySlider" Width="140" Minimum="1" Maximum="5" Value="3"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="RnDensitySlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="RnColorsSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="RnColorsRow" Visibility="Collapsed" Margin="0,2,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body" Text="Effect colors" />
+                                            <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Tap '+' to add a color, '-' to remove one (up to 5)" />
+                                        </StackPanel>
+                                        <controls:MultiColorPickerControl x:Name="RnPicker"
+                                            Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                            MaxColors="5" ColorsChanged="RnPicker_ColorsChanged" />
+                                    </Grid>
+
+                                    <!-- Matrix: style buttons, speed, density, palette 1-3 + swatches -->
+                                    <Grid x:Name="MtStyleRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Style" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <ui:Button x:Name="btnMtDiagonal" Width="70" Height="30" Margin="0,0,4,0" Appearance="Transparent"
+                                                Click="MtStyleButton_Click" Tag="Diagonal"><TextBlock Text="Diagonal" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
+                                            <ui:Button x:Name="btnMtColumns" Width="70" Height="30" Margin="0,0,4,0" Appearance="Transparent"
+                                                Click="MtStyleButton_Click" Tag="Columns"><TextBlock Text="Columns" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
+                                            <ui:Button x:Name="btnMtLasers" Width="62" Height="30" Margin="0,0,4,0" Appearance="Transparent"
+                                                Click="MtStyleButton_Click" Tag="Lasers"><TextBlock Text="Lasers" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
+                                            <ui:Button x:Name="btnMtRings" Width="56" Height="30" Margin="0,0,0,0" Appearance="Transparent"
+                                                Click="MtStyleButton_Click" Tag="Rings"><TextBlock Text="Rings" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="MtSpeedSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="MtSpeedRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Speed" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="MtSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
+                                            <Slider x:Name="MtSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="MtSpeedSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="MtDensitySeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="MtDensityRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Density" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="MtDensityValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="2" />
+                                            <Slider x:Name="MtDensitySlider" Width="140" Minimum="1" Maximum="5" Value="2"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="MtDensitySlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="MtColorsSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="MtColorsRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body" Text="Effect colors" />
+                                            <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Tap '+' to add a color, '-' to remove one (up to 3)" />
+                                        </StackPanel>
+                                        <controls:MultiColorPickerControl x:Name="MtPicker"
+                                            Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                            MaxColors="3" ColorsChanged="MtPicker_ColorsChanged" />
+                                    </Grid>
+
+                                    <!-- Static: layout buttons, zone count, zone swatches -->
+                                    <Grid x:Name="StLayoutRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Layout" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <ui:Button x:Name="btnStHorizontal" Width="82" Height="30" Margin="0,0,4,0" Appearance="Transparent"
+                                                Click="StLayoutButton_Click" Tag="Horizontal"><TextBlock Text="Horizontal" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
+                                            <ui:Button x:Name="btnStVertical" Width="66" Height="30" Margin="0,0,0,0" Appearance="Transparent"
+                                                Click="StLayoutButton_Click" Tag="Vertical"><TextBlock Text="Vertical" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="StZonesSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="StZonesRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Zones" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="StZonesValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="1" />
+                                            <Slider x:Name="StZonesSlider" Width="140" Minimum="1" Maximum="7" Value="1"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="StZonesSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="StColorsSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="StColorsRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Zone colors" VerticalAlignment="Center" />
+                                        <controls:KeyboardMultiColorPickerControl x:Name="StPicker"
+                                            Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                            ColorsChanged="StPicker_ColorsChanged" />
+                                    </Grid>
+
+                                    <!-- Ripple: color + random, spread speed, wave width -->
+                                    <Grid x:Name="RpColorRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Color" VerticalAlignment="Center" />
+                                        <controls:ColorPickerControl x:Name="RpColorPicker"
+                                            Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                            SelectedColor="#FF00B4FF" ColorChangedDelayed="RpColorPicker_ColorChangedDelayed" />
+                                    </Grid>
+                                    <Border x:Name="RpRandomSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="RpRandomRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Random color" VerticalAlignment="Center" />
+                                        <ui:ToggleSwitch x:Name="tsRpRandom" Grid.Column="1" LabelPosition="Left"
+                                            OnContent="On" OffContent="Off" IsChecked="True"
+                                            Checked="TsRpRandom_Toggled" Unchecked="TsRpRandom_Toggled" />
+                                    </Grid>
+                                    <Border x:Name="RpSpeedSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="RpSpeedRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Spread speed" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="RpSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
+                                            <Slider x:Name="RpSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="RpSpeedSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="RpWidthSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="RpWidthRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Wave width" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="RpWidthValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="2" />
+                                            <Slider x:Name="RpWidthSlider" Width="140" Minimum="1" Maximum="4" Value="2"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="RpWidthSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Rainbow: color-change speed 1-20 -->
+                                    <Grid x:Name="RbSpeedRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Color-change speed" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="RbSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="6" />
+                                            <Slider x:Name="RbSpeedSlider" Width="140" Minimum="1" Maximum="20" Value="6"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="RbSpeedSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Quicksand: palette + swatches, falling speed, band width -->
+                                    <Grid x:Name="QsColorsRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Effect colors" VerticalAlignment="Center" />
+                                        <controls:MultiColorPickerControl x:Name="QsPicker"
+                                            Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                            MaxColors="3" ColorsChanged="QsPicker_ColorsChanged" />
+                                    </Grid>
+                                    <Border x:Name="QsSpeedSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="QsSpeedRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Falling speed" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="QsSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
+                                            <Slider x:Name="QsSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="QsSpeedSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="QsScaleSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="QsScaleRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Sand band width" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="QsScaleValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
+                                            <Slider x:Name="QsScaleSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="QsScaleSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Current: palette, flow speed, current length 2-8 -->
+                                    <Grid x:Name="CuColorsRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Effect colors" VerticalAlignment="Center" />
+                                        <controls:MultiColorPickerControl x:Name="CuPicker"
+                                            Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                            MaxColors="3" ColorsChanged="CuPicker_ColorsChanged" />
+                                    </Grid>
+                                    <Border x:Name="CuSpeedSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="CuSpeedRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Flow speed" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="CuSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
+                                            <Slider x:Name="CuSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="CuSpeedSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="CuWidthSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="CuWidthRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Current length" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="CuWidthValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="4" />
+                                            <Slider x:Name="CuWidthSlider" Width="140" Minimum="2" Maximum="8" Value="4"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="CuWidthSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Touch Current: palette, spread speed, current width 1-5 -->
+                                    <Grid x:Name="TcColorsRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Effect colors" VerticalAlignment="Center" />
+                                        <controls:MultiColorPickerControl x:Name="TcPicker"
+                                            Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                            MaxColors="3" ColorsChanged="TcPicker_ColorsChanged" />
+                                    </Grid>
+                                    <Border x:Name="TcSpeedSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="TcSpeedRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Spread speed" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="TcSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
+                                            <Slider x:Name="TcSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="TcSpeedSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="TcWidthSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="TcWidthRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Current width" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="TcWidthValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="2" />
+                                            <Slider x:Name="TcWidthSlider" Width="140" Minimum="1" Maximum="5" Value="2"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="TcWidthSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Screen Ambient: spatial blur, screen response -->
+                                    <Grid x:Name="SaBlurRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Spatial blur" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="SaBlurValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="3" />
+                                            <Slider x:Name="SaBlurSlider" Width="140" Minimum="1" Maximum="8" Value="3"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="SaBlurSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border x:Name="SaResponseSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="SaResponseRow" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Screen response" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <TextBlock x:Name="SaResponseValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
+                                            <Slider x:Name="SaResponseSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
+                                                ValueChanged="SaResponseSlider_ValueChanged" />
+                                        </StackPanel>
+                                    </Grid>
+
+                               </StackPanel>
+                            </ui:CardExpander>
                         </StackPanel>
 
                         <!-- ===== PER-KEY MODE CONTENT ===== -->
@@ -484,11 +1258,12 @@
         </ScrollViewer>
 
         <!-- Row 1: Bottom bar for per-key mode action row (glued to bottom, content scrolls under) -->
+        <!-- Always visible; content shifts between per-key actions (per-key on) and
+             BetterRGB streamer status (per-key off). -->
         <ui:Card x:Name="PerKeyBottomBar"
               Grid.Row="1"
               MaxWidth="1052"
               HorizontalAlignment="Stretch"
-              Visibility="Collapsed"
               Margin="15,8,15,12"
               Padding="12,8">
             <Grid>
@@ -506,11 +1281,12 @@
                            Text="Select keys to edit their color."
                            VerticalAlignment="Center" />
 
-                <!-- Action buttons (center) -->
-                <StackPanel Grid.Column="1"
+                <!-- Action buttons (center, per-key mode only) -->
+                <StackPanel x:Name="PerKeyActionButtons" Grid.Column="1"
                             Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Margin="12,0,12,0">
+                            Margin="12,0,12,0"
+                            Visibility="Collapsed">
                     <ui:Button x:Name="_selectAllBtn"
                                Appearance="Transparent"
                                Content="Select All"
@@ -527,10 +1303,11 @@
                                Click="FillAll_Click" />
                 </StackPanel>
 
-                <!-- Color picker + Apply (right) -->
-                <StackPanel Grid.Column="2"
+                <!-- Color picker + Apply (right, per-key mode only) -->
+                <StackPanel x:Name="PerKeyPickerPanel" Grid.Column="2"
                             Orientation="Horizontal"
-                            VerticalAlignment="Center">
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed">
                     <controls:ColorPickerControl x:Name="_colorPicker"
                                                  Margin="0,0,12,0"
                                                  SelectedColor="White"

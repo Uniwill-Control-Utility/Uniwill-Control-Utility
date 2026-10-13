@@ -497,6 +497,11 @@ namespace Uniwill_Control_Utility.Services
             }
 
             IsKeyboardOverridden = true;
+
+            // Pause the streamer while Adaptive Mode owns the keyboard; the preset
+            // apply below either re-params it (BetterRGB) or uses a temporary handle.
+            App.GetService<BetterRgbStreamService>()?.SuspendForOverride();
+
             KeyboardOverrideChanged?.Invoke(this, true);
         }
 
@@ -534,10 +539,21 @@ namespace Uniwill_Control_Utility.Services
             if (saved != null)
             {
                 var s = saved;
+                var streamer = App.GetService<BetterRgbStreamService>();
                 _ = Task.Run(() =>
                 {
-                    ApplyKeyboardHid(s.PerKeyMode, s.Brightness, s.EffectMode, s.Speed,
-                        s.Direction, s.ColorR, s.ColorG, s.ColorB, s.MultiColors, s.PerKeyColors);
+                    if (streamer != null && s.Engine == KeyboardEngine.BetterRGB)
+                    {
+                        // Restore the user's BetterRGB engine instead of a firmware
+                        // apply (the streamer owns the handle).
+                        streamer.SetParams(s);
+                        streamer.ResumeFromOverride();
+                    }
+                    else
+                    {
+                        ApplyKeyboardHid(s.PerKeyMode, s.Brightness, s.EffectMode, s.Speed,
+                            s.Direction, s.ColorR, s.ColorG, s.ColorB, s.MultiColors, s.PerKeyColors);
+                    }
                 });
             }
         }
@@ -751,6 +767,16 @@ namespace Uniwill_Control_Utility.Services
                     colorR, colorG, colorB, multiColors, perKeyColors);
                 LastAppliedKeyboardPreset = args;
                 KeyboardPresetApplied?.Invoke(this, args);
+
+                // BetterRGB: route the preset through the streamer's parameter
+                // snapshot — opening a second handle mid-stream would interleave
+                // reports on the same endpoint and corrupt the row pairing.
+                var streamer = App.GetService<BetterRgbStreamService>();
+                if (streamer != null && settings.Engine == KeyboardEngine.BetterRGB && streamer.IsRunning)
+                {
+                    streamer.SetParams(settings);
+                    return;
+                }
 
                 // Send HID commands directly so the keyboard updates immediately even when
                 // the Keyboard page is not visible. The Keyboard page's debounce timer will

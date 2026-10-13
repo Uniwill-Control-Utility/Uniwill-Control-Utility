@@ -1,3 +1,4 @@
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -72,7 +73,7 @@ namespace Uniwill_Control_Utility.Services
         ///
         /// Numpad rows 1-4 use cols 15-18 (shifted -1 from row 5 which uses 16-19).
         /// </summary>
-        private static readonly Dictionary<int, (int Row, int Col)> zoneToIteMapping = new()
+        internal static readonly Dictionary<int, (int Row, int Col)> zoneToIteMapping = new()
         {
             // === ITE Row 5 (top): Esc + F1-F12 + PrtSc/Ins/Del + Home/End/PgUp/PgDn ===
             // Reference grid: X=0,36,72,...,690 → cols 0-19
@@ -312,6 +313,16 @@ namespace Uniwill_Control_Utility.Services
         private SafeFileHandle? _lightBarHandle;
         private bool _disposed;
 
+        // BetterRGB streamer handle: the reference (better_rgb.c resolve_device_path,
+        // lines 968-1004) negotiates the per-key RGB runtime mode on the UsagePage
+        // 0xFF03 collection (MI_01; PID 0x600B preferred) — NOT the caps.Usage==1
+        // collection the firmware-effect path uses. When the best-scoring interface
+        // happens to be the same device path as the keyboard handle, we reuse that
+        // handle instead of holding two on one endpoint (one-live-consumer rule).
+        private SafeFileHandle? _streamHandle;
+        private bool _streamOnKeyboardHandle;
+        public bool HasRgbStreamInterface { get; private set; }
+
         #endregion
 
         /// <summary>
@@ -350,8 +361,12 @@ namespace Uniwill_Control_Utility.Services
                 var devicePaths = FindIteDevicePaths();
                 DebugLog($"[KBD-HID] Found {devicePaths.Count} ITE HID device paths");
 
-                // Find devices with 9-byte feature reports
-                var lightingDevices = new List<(string Path, ushort Usage)>();
+                // Find devices with 9-byte feature reports (the firmware collections).
+                // The RGB runtime interface is scored SEPARATELY over every caps-readable
+                // ITE path — the reference's resolve_device_path applies no caps-length
+                // filter, and the RGB interface's reports are 65-byte, not 9-byte.
+                var lightingDevices = new List<(string Path, ushort Usage, ushort UsagePage)>();
+                var streamCandidates = new List<(string Path, ushort UsagePage)>();
                 foreach (var path in devicePaths)
                 {
                     DebugLog($"[KBD-HID] Probing: {path}");
@@ -373,11 +388,17 @@ namespace Uniwill_Control_Utility.Services
                         try
                         {
                             int status = HidP_GetCaps(preparsedData, out HidpCaps caps);
-                            DebugLog($"[KBD-HID]   GetCaps status=0x{status:X8} feature={caps.FeatureReportByteLength} usage=0x{caps.Usage:X4}");
+                            Log.Information("[KBD-HID] enum caps: path={Path}, feature={Feature}, output={Output}, usage=0x{Usage:X4}, usage_page=0x{UsagePage:X4}",
+                                path, caps.FeatureReportByteLength, caps.OutputReportByteLength, caps.Usage, caps.UsagePage);
 
-                            if (status == HIDP_STATUS_SUCCESS && caps.FeatureReportByteLength == FEATURE_REPORT_SIZE)
+                            if (status != HIDP_STATUS_SUCCESS)
+                                continue;
+
+                            streamCandidates.Add((path, caps.UsagePage));
+
+                            if (caps.FeatureReportByteLength == FEATURE_REPORT_SIZE)
                             {
-                                lightingDevices.Add((path, caps.Usage));
+                                lightingDevices.Add((path, caps.Usage, caps.UsagePage));
                                 DebugLog("[KBD-HID]   -> Lighting controller");
                             }
                         }
@@ -396,17 +417,18 @@ namespace Uniwill_Control_Utility.Services
 
                 // Map by usage: usage 1 = keyboard (zone 0), usage 2 = light bar + logo
                 var usageMap = new Dictionary<ushort, string>();
-                foreach (var (path, usage) in lightingDevices)
+                foreach (var (path, usage, _) in lightingDevices)
                 {
                     usageMap.TryAdd(usage, path);
                 }
 
                 bool found = false;
+                string? keyboardPath = null;
 
                 if (usageMap.ContainsKey(1) || usageMap.ContainsKey(2))
                 {
                     found = true;
-                    if (usageMap.TryGetValue(1, out string? keyboardPath))
+                    if (usageMap.TryGetValue(1, out keyboardPath))
                     {
                         _keyboardHandle = OpenWriteHandle(keyboardPath);
                         DebugLog($"[KBD-HID] Zone 0 (keyboard): {(_keyboardHandle != null && !_keyboardHandle.IsInvalid ? "opened" : "FAILED")}");
@@ -416,6 +438,57 @@ namespace Uniwill_Control_Utility.Services
                     {
                         _lightBarHandle = OpenWriteHandle(lightBarPath);
                         DebugLog($"[KBD-HID] Zone 2 (light bar): {(_lightBarHandle != null && !_lightBarHandle.IsInvalid ? "opened" : "FAILED")}");
+                    }
+                }
+
+                // BetterRGB streamer interface selection — mirrors the reference's
+                // resolve_device_path scoring (better_rgb.c:968-1004): UsagePage 0xFF03
+                // wins (score 3), interface_number 1 (MI_01) is the fallback (score 2),
+                // PID 0x600B adds +1. MI_00 is never the RGB data interface
+                // (docs/RGB_PROTOCOL__EN.md), so it scores 0 and is never selected.
+                string? streamPath = null;
+                int streamScore = 0;
+                foreach (var (path, usagePage) in streamCandidates)
+                {
+                    int iface = ParseHidInterfaceNumber(path);
+                    ushort pid = ParseHidProductId(path);
+                    int score = usagePage == 0xFF03 ? 3 : iface == 1 ? 2 : 0;
+                    if (score != 0 && pid == 0x600B)
+                        score++;
+                    Log.Information("[KBD-HID] enum: usage_page=0x{UsagePage:X4} iface={Iface} pid=0x{Pid:X4} score={Score} path={Path}",
+                        usagePage, iface, pid, score, path);
+                    if (score > streamScore)
+                    {
+                        streamScore = score;
+                        streamPath = path;
+                    }
+                }
+                if (streamScore > 0)
+                    Log.Information("[KBD-HID] RGB stream interface selected: score={Score}, path={Path}", streamScore, streamPath);
+                else
+                    Log.Warning("[KBD-HID] RGB stream interface (0xFF03/MI_01) not found among {Count} ITE paths", streamCandidates.Count);
+
+                if (streamScore > 0 && streamPath != null)
+                {
+                    if (keyboardPath != null && streamPath == keyboardPath)
+                    {
+                        // Same endpoint as the firmware handle — reuse it (never hold
+                        // two handles on one HID path).
+                        _streamOnKeyboardHandle = _keyboardHandle != null && !_keyboardHandle.IsInvalid;
+                        HasRgbStreamInterface = _streamOnKeyboardHandle;
+                        Log.Information("[KBD-HID] RGB stream interface (score {Score}) reuses the usage-1 keyboard handle", streamScore);
+                    }
+                    else
+                    {
+                        _streamHandle = OpenWriteHandle(streamPath);
+                        if (_streamHandle != null && _streamHandle.IsInvalid)
+                        {
+                            _streamHandle.Dispose();
+                            _streamHandle = null;
+                        }
+                        HasRgbStreamInterface = _streamHandle != null;
+                        Log.Information("[KBD-HID] RGB stream interface (score {Score}): {Result}",
+                            streamScore, HasRgbStreamInterface ? "opened" : "FAILED");
                     }
                 }
 
@@ -476,6 +549,55 @@ namespace Uniwill_Control_Utility.Services
             }
 
             return list;
+        }
+
+        /// <summary>Manual hex parse of a SetupAPI token (MI_xx / PID_xxxx) —
+        /// avoids the radix TryParse overloads, which differ across CLIs.</summary>
+        private static int ParseHexToken(string token)
+        {
+            int value = 0;
+            for (int i = 0; i < token.Length; i++)
+            {
+                var c = token[i];
+                int digit;
+                if (c >= '0' && c <= '9')
+                    digit = c - '0';
+                else if (c >= 'A' && c <= 'F')
+                    digit = c - 'A' + 10;
+                else if (c >= 'a' && c <= 'f')
+                    digit = c - 'a' + 10;
+                else
+                    return -1;
+                value = value * 16 + digit;
+            }
+            return value;
+        }
+
+        /// <summary>
+        /// Parses the interface number from the MI_xx token of a SetupAPI device
+        /// path — hidapi fills hid_device_info.interface_number the same way
+        /// (third_party\hidapi\windows\hid.c:526-530). -1 when the token is absent.
+        /// </summary>
+        private static int ParseHidInterfaceNumber(string path)
+        {
+            var i = path.IndexOf("MI_", StringComparison.OrdinalIgnoreCase);
+            if (i + 5 > path.Length)
+                return -1;
+            var v = ParseHexToken(path.Substring(i + 3, 2));
+            return v < 0 ? -1 : v;
+        }
+
+        /// <summary>
+        /// Parses the PID_xxxx token of a SetupAPI device path (hidapi's
+        /// hid_device_info.product_id equivalent). 0 when absent.
+        /// </summary>
+        private static ushort ParseHidProductId(string path)
+        {
+            var i = path.IndexOf("PID_", StringComparison.OrdinalIgnoreCase);
+            if (i + 8 > path.Length)
+                return 0;
+            var v = ParseHexToken(path.Substring(i + 4, 4));
+            return v < 0 ? (ushort)0 : (ushort)v;
         }
 
         private static SafeFileHandle? TryOpenHandle(string path)
@@ -1309,6 +1431,256 @@ namespace Uniwill_Control_Utility.Services
                 DebugLog($"[KBD-HID] Software Rainbow gradient sent (6x21, brightness={brightness})");
             }
         }
+
+        #region BetterRGB Streamer Primitives
+
+        /// <summary>
+        /// The handle the streamer talks to: the UsagePage 0xFF03 / MI_01 RGB data
+        /// interface selected in Open() (the reference's resolve_device_path target),
+        /// or the usage-1 keyboard handle when that IS the best-scoring interface.
+        /// Null when no RGB stream interface exists — the streamer then refuses to
+        /// start (no announce-path fallback).
+        /// </summary>
+        private SafeFileHandle? StreamHandle()
+        {
+            if (_streamOnKeyboardHandle)
+                return _keyboardHandle != null && !_keyboardHandle.IsInvalid ? _keyboardHandle : null;
+            return _streamHandle != null && !_streamHandle.IsInvalid ? _streamHandle : null;
+        }
+
+        /// <summary>
+        /// Feature-report send on an explicit handle (the streamer's fast path).
+        /// </summary>
+        private bool SendCheckedOn(SafeFileHandle h, byte[] report)
+        {
+            if (report.Length != FEATURE_REPORT_SIZE || h.IsInvalid)
+                return false;
+            return HidD_SetFeature(h, report, report.Length);
+        }
+
+        /// <summary>
+        /// The reference's enter_custom_mode (better_rgb.c:939-947) verbatim on the
+        /// RGB stream interface: zone-reset feature report, one all-zero 65-byte
+        /// output write (clears the plane), then the UserMode ctrl report. Byte[5]
+        /// is the CONSTANT 0x32 (50) — the reference never sends brightness to the
+        /// device; brightness is a software multiplier applied in send_frame
+        /// (better_rgb.c:1711-1715). Re-sent on every mode switch and reconnect,
+        /// like the reference's start_mode (4268) and reconnect_device (1032).
+        /// </summary>
+        public bool EnterCustomModeC()
+        {
+            EnsureAvailable();
+
+            lock (_lock)
+            {
+                var h = StreamHandle();
+                if (h == null)
+                    return false;
+
+                if (!SendCheckedOn(h, new byte[] { 0x00, CMD_ZONE_RESET, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 }))
+                    return false;
+
+                var clear = new byte[ITE_OUTPUT_REPORT_SIZE];
+                if (!WriteFile(h, clear, (uint)ITE_OUTPUT_REPORT_SIZE, out uint cleared, nint.Zero))
+                {
+                    DebugLog($"[KBD-HID] BetterRGB stream: clear-frame WriteFile failed (error {Marshal.GetLastWin32Error()})");
+                    return false;
+                }
+
+                if (!SendCheckedOn(h, new byte[] { 0x00, 0x08, 0x02, ITE_PARAM_MODE_USER, 0x00, 0x32, 0x00, 0x00, 0x00 }))
+                    return false;
+
+                DebugLog("[KBD-HID] BetterRGB stream: entered UserMode on the RGB stream interface (C-exact handshake)");
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Legacy announce-path handshake (rich preamble on the usage-1 handle).
+        /// Kept for reference/documentation — the shipped streamer uses
+        /// EnterCustomModeC on the 0xFF03/MI_01 interface instead.
+        /// </summary>
+        public bool EnterUserModeStream(int brightnessPercent)
+        {
+            EnsureAvailable();
+            brightnessPercent = Math.Clamp(brightnessPercent, 0, 100);
+
+            lock (_lock)
+            {
+                if (_keyboardHandle == null || _keyboardHandle.IsInvalid)
+                    return false;
+
+                // Proven UCU preamble (the C-exact enter_custom_mode + 512-byte
+                // interleaved writes stayed black on this controller from UCU's
+                // endpoint — C resolves a usage_page 0xFF03 / PID 600B interface
+                // that UCU's announce path doesn't use). Off/reset to clear any
+                // cached firmware state (anti-flash).
+                if (!SendChecked(new byte[] { 0x00, CMD_KEYBOARD_OFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }))
+                    return false;
+                if (!SendChecked(new byte[] { 0x00, CMD_ZONE_RESET, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 }))
+                    return false;
+
+                // Enable zone and initialize the effect engine with Static.
+                if (!SendChecked(new byte[] { 0x00, CMD_ZONE_ON_OFF, (byte)ZoneKeyboard, 0x01, 0x04, 0x00, 0x00, 0x00, 0x01 }))
+                    return false;
+                if (!SendChecked(new byte[] { 0x00, CMD_SET_COLOR, (byte)ZoneKeyboard, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00 }))
+                    return false;
+                if (!SendChecked(new byte[] { 0x00, CMD_MODE_BRIGHTNESS, 0x00, 0x01, 0x05, (byte)brightnessPercent, 0x00, 0x00, 0x00 }))
+                    return false;
+                if (!SendChecked(new byte[] { 0x00, CMD_MODE_BRIGHTNESS, ZoneMaskKeyboard, 0x01, 0x05, (byte)brightnessPercent, 0x08, 0x00, 0x00 }))
+                    return false;
+
+                // Enter UserMode with the requested brightness (per-key range caps at 50).
+                byte scaledBrightness = (byte)Math.Min(brightnessPercent, ITE_MAX_PERKEY_BRIGHTNESS);
+                if (!SendControlChecked(0x08, new byte[]
+                {
+                    0x08, 0x02, ITE_PARAM_MODE_USER, 0x00,
+                    scaledBrightness, 0x00, 0x00, 0x00
+                }))
+                    return false;
+
+                _brightness = brightnessPercent;
+                IsOn = true;
+                DebugLog($"[KBD-HID] BetterRGB stream: entered UserMode (brightness={brightnessPercent})");
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// LEGACY announce-path frame (6 x row announce 0x16 + planar WriteFile on
+        /// the usage-1 handle). Kept for documentation/reference only — the shipped
+        /// streamer uses SendStreamFrameInterleaved on the 0xFF03/MI_01 RGB data
+        /// interface, which is what paces cleanly above 15 FPS.
+        /// </summary>
+        public bool SendStreamFrame(byte[][] rowBuffersPlanar6)
+        {
+            EnsureAvailable();
+
+            lock (_lock)
+            {
+                if (_keyboardHandle == null || _keyboardHandle.IsInvalid)
+                    return false;
+
+                for (int row = 0; row < ITE_NR_ROWS; row++)
+                {
+                    var buf = rowBuffersPlanar6[row];
+                    if (buf == null || buf.Length != ITE_OUTPUT_REPORT_SIZE)
+                        return false;
+
+                    if (!SendControlChecked(0x16, new byte[]
+                    {
+                        0x16, 0x00, (byte)row, 0x00, 0x00, 0x00, 0x00, 0x00
+                    }))
+                        return false;
+
+                    if (!WriteFile(_keyboardHandle, buf, (uint)ITE_OUTPUT_REPORT_SIZE, out uint bytesWritten, nint.Zero))
+                    {
+                        int error = Marshal.GetLastWin32Error();
+                        DebugLog($"[KBD-HID] Stream frame row {row} WriteFile failed (error {error})");
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// The reference's send_frame (better_rgb.c:1708-1745) on the RGB stream
+        /// interface: ONE per-frame feature report (00 12 00 00 08 00 00 00 00)
+        /// followed by 8 x 65-byte output writes (report-ID byte 0x00 + 64 payload
+        /// bytes) covering the 512-byte interleaved frame. The KEYMAP offsets
+        /// (better_rgb.c:227-253) place each key's RGB triple at
+        /// 24*physicalCol + 1 + 4*(5-row) with AUX mirrors for the wide Shift/Enter
+        /// keys. All 9 calls run under one lock — the reference's single-device-lock
+        /// rule (EnterCriticalSection(&g_deviceLock)) — so the pacer's callTime
+        /// measures the whole frame, exactly like the reference's tDone - tLocked.
+        /// </summary>
+        public bool SendStreamFrameInterleaved(byte[] frame512)
+        {
+            EnsureAvailable();
+
+            lock (_lock)
+            {
+                var h = StreamHandle();
+                if (h == null)
+                    return false;
+                if (frame512 == null || frame512.Length != 512)
+                    return false;
+
+                if (!SendCheckedOn(h, new byte[] { 0x00, 0x12, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00 }))
+                    return false;
+
+                var chunk = new byte[65];
+                for (int i = 0; i < 8; i++)
+                {
+                    chunk[0] = 0x00;
+                    Array.Copy(frame512, i * 64, chunk, 1, 64);
+                    if (!WriteFile(h, chunk, 65, out uint bytesWritten, nint.Zero))
+                    {
+                        int error = Marshal.GetLastWin32Error();
+                        DebugLog($"[KBD-HID] BetterRGB stream: chunk {i} WriteFile failed (error {error})");
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Exits UserMode and turns the keyboard off, clearing the streamer state so
+        /// firmware effect commands work again (the ITE controller ignores effect
+        /// commands while in UserMode).
+        /// </summary>
+        public void ExitUserModeStream()
+        {
+            EnsureAvailable();
+
+            lock (_lock)
+            {
+                // Exit on the interface the streamer actually entered UserMode on
+                // (the 0xFF03/MI_01 collection), not the firmware handle.
+                var h = StreamHandle();
+                if (h != null)
+                {
+                    SendCheckedOn(h, new byte[] { 0x00, CMD_KEYBOARD_OFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });
+                    SendCheckedOn(h, new byte[] { 0x00, CMD_ZONE_RESET, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 });
+                    SendCheckedOn(h, new byte[] { 0x00, CMD_MODE_BRIGHTNESS, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });
+                    SendCheckedOn(h, new byte[] { 0x00, CMD_ZONE_ON_OFF, (byte)ZoneKeyboard, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 });
+                }
+                else
+                {
+                    SendReport(new byte[] { 0x00, CMD_KEYBOARD_OFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });
+                    SendReport(new byte[] { 0x00, CMD_ZONE_RESET, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00 });
+                    SendReport(new byte[] { 0x00, CMD_MODE_BRIGHTNESS, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });
+                    SendReport(new byte[] { 0x00, CMD_ZONE_ON_OFF, (byte)ZoneKeyboard, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 });
+                }
+                IsOn = false;
+                DebugLog("[KBD-HID] BetterRGB stream: exited UserMode");
+            }
+        }
+
+        /// <summary>
+        /// Success-returning variants of the two send primitives, for the streamer
+        /// fast path (the void versions swallow failures).
+        /// </summary>
+        private bool SendChecked(byte[] report)
+        {
+            if (report.Length != FEATURE_REPORT_SIZE || _keyboardHandle == null || _keyboardHandle.IsInvalid)
+                return false;
+            return HidD_SetFeature(_keyboardHandle, report, report.Length);
+        }
+
+        private bool SendControlChecked(byte reportId, byte[] data)
+        {
+            if (data.Length != 8 || _keyboardHandle == null || _keyboardHandle.IsInvalid)
+                return false;
+            byte[] report = new byte[9];
+            report[0] = reportId;
+            Array.Copy(data, 0, report, 1, 8);
+            return HidD_SetFeature(_keyboardHandle, report, report.Length);
+        }
+
+        #endregion
 
         /// <summary>
         /// Converts HSL color to RGB. Hue in 0..1, Saturation and Lightness in 0..1.

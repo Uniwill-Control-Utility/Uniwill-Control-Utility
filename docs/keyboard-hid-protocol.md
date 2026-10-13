@@ -21,11 +21,12 @@ This protocol was reverse-engineered from multiple sources:
 1. **[tuxedo-drivers](https://gitlab.com/tuxedocomputers/development/packages/tuxedo-drivers)** (`src/ite_8291/ite_8291.c`) — Linux kernel HID driver by TUXEDO Computers. This is the **authoritative reference** for the per-key RGB protocol. The `ite8291_write_rows()` function provided the exact byte layouts for UserMode entry, row announcement, and the 65-byte BGR-planar output report format.
 2. **[UCC (Uniwill Control Center)](https://github.com/nanomatters/ucc)** — XMG Control Center reverse-engineering project by nanomatters. Provided insight into the HID device enumeration, ACPI interface, and zone-based control commands used by the official XMG Control Center.
 3. **[LenovoLegionToolkit](https://github.com/LenovoLegionToolkit/LenovoLegionToolkit)** — Used for keyboard visualizer UI layout patterns, color picker UX, and zone index mapping approach. **Not** used for protocol details (Lenovo uses different hardware).
+4. **[BetterRGB-ITE8291-Adaptive](https://github.com/ZavierChen/BetterRGB-ITE8291-Adaptive)** by ZavierChen — Authoritative reference for the software streamer engine (Section 3): the 0xFF03/MI_01 interface-selection scoring, the `enter_custom_mode`/`send_frame` interleaved 512-byte framing, the 102-entry KEYMAP layout, and all 16 effect algorithms.
 
 ### Closed-Source References
 
-4. **MechControl.dll** (decompiled) — Schenker/Mechrevo utility. Source for the global effects protocol (zone-based 9-byte feature reports: CMD_SET_COLOR `0x14`, CMD_MODE_BRIGHTNESS `0x08`, CMD_ZONE_ON_OFF `0x1A`).
-5. **XMG Control Center (GCUService.exe)** — Official Schenker/XMG utility. Studied for device communication patterns and HID handle acquisition.
+5. **MechControl.dll** (decompiled) — Schenker/Mechrevo utility. Source for the global effects protocol (zone-based 9-byte feature reports: CMD_SET_COLOR `0x14`, CMD_MODE_BRIGHTNESS `0x08`, CMD_ZONE_ON_OFF `0x1A`).
+6. **XMG Control Center (GCUService.exe)** — Official Schenker/XMG utility. Studied for device communication patterns and HID handle acquisition.
 
 ## Communication Methods
 
@@ -391,6 +392,120 @@ HidD_SetFeature(handle, new byte[] { 0x00, 0x08, 0x02, 0x01, speed, brightness, 
 ```
 
 Or turn the keyboard off entirely using the global off sequence.
+
+---
+
+## 3. BetterRGB Streamer Engine (Software Effects)
+
+The **BetterRGB** engine (UCU's `BetterRgbStreamService` + `BetterRgbFrameRenderer` + `BetterRgbFrameState`) is a byte-level port of the open-source BetterRGB-ITE8291-Adaptive engine (`better_rgb.c`): instead of delegating animation to the keyboard MCU's firmware effects, UCU renders one 512-byte interleaved frame per tick in software and streams it over the **dedicated RGB runtime interface** (Section 3.0) at an adaptive 15–60 FPS (default 30). The wire bytes follow the reference's `enter_custom_mode` / `send_frame` framing exactly.
+
+### 3.0 The 0xFF03 RGB data interface (interface selection)
+
+The ITE device exposes several SetupAPI collection paths; the RGB runtime mode lives on its OWN interface, not the per-key UserMode collection. `resolve_device_path` (better_rgb.c:968–1004) scores every ITE VID `0x048D` path whose `FeatureReportByteLength == 9`:
+
+| Rule | Score |
+|------|-------|
+| `caps.UsagePage == 0xFF03` | +3 |
+| else interface number `MI_01` (parsed from the path) | +2 |
+| PID `0x600B` in the path | +1 |
+| `MI_00` | never selectable |
+
+UCU's `KeyboardHidService.Open()` enumerates every candidate (`[KBD-HID] enum: usage_page=… iface=… pid=… score=…`), opens the best-scoring path into `_streamHandle`, and exposes `HasRgbStreamInterface`. If no path scores, the streamer refuses to start and the watchdog falls back to the Hardware MCU engine. The firmware usage-1/usage-2 mapping (Sections 1–2) is untouched. **On the XMG NEO A25 the best-scoring path is the SAME HID endpoint as the firmware usage-1 handle** (`hid#vid_048d&pid_600b&mi_01`, usage `0x0001`, usage page `0xFF03`, score 4) — so when `streamPath == keyboardPath`, `Open()` sets `_streamOnKeyboardHandle` and the streamer reuses the single keyboard handle instead of opening a second one on the same path (one live consumer per HID endpoint; two handles on one path would fight over the runtime mode).
+
+### Handshake (before the first frame) — `enter_custom_mode`, verbatim
+
+| Step | Report | Purpose |
+|------|--------|---------|
+| 1 | `0x12` feature, `00 12 00 03 00 00 00 00 00` | Enter custom/RGB runtime mode |
+| 2 | 65-byte `WriteFile`, all zero | Clear the RGB frame buffer |
+| 3 | `0x08` feature, `00 08 02 33 00 32 00 00 00` | RGB-mode control — byte[5] is the **constant 0x32**; brightness is NEVER sent to the device (software multiplier only) |
+
+Per frame, `send_frame` (better_rgb.c:1708–1745) ships NINE synchronous HID calls under one device lock: one feature report `00 12 00 00 08 00 00 00 00` followed by 8 × 65-byte `WriteFile` (leading `0x00` + 64 payload bytes of the 512-byte interleaved frame). The frame is RGB-triple-per-key at `offset = col·24 + 1 + 4·(5−row)` per the reference's 102-entry `KEYMAP` (Esc offset 21, CtrlL 1, ShiftL 5, Enter 321, End 477; `set_key` mirrors wide ShiftL→AUX 29 and Enter→AUX 345). The call time feeds the pacer. The old announce-`0x16` + BGR-planar row scheme (Section 2) remains ONLY for firmware per-key mode; the streamer no longer uses it.
+
+### Frame pacing and drop-frame policy
+
+- `periodMs = 1000/fps`; the loop targets a monotonic deadline (`DateTime.UtcNow.Ticks / 10_000L`), never wall-clock drift. If the deadline falls behind by more than two periods it resyncs to `now` (the C pacer's catch-up guard) instead of firing a burst of backlogged frames — that burst was what made 30/60 FPS "reset visually".
+- **Adaptive effective FPS** (port of the C pacer's `set_effective_fps` / `record_transport_result`): the loop paces at `effectiveFps`, not the target.
+- **Timeline is WALL CLOCK** — C computes `seconds = (GetTickCount64() - startedAt)/1000` fresh every frame inside each effect loop; UCU passes `(monotonic now - streamStartMs)/1000` per frame. Animation speed is therefore constant real-time and the frame rate only changes sampling density. An accumulated `Σ 1/fps` timeline drifts slow/fast exactly when the pacer degrades/recovers — that drift was the residual smoothness gap; a multiplicative `frameIndex/fps` timeline additionally jumps on every pacer step. `frameIndex` stays as the frame-count timeline for stochastic effects and the noise seed.
+- A failed send or a send call taking ≥90 % of the frame budget for 3 consecutive frames drops `effectiveFps` by 5 (floor: the static keepalive cap); `effectiveFps × 10` consecutive healthy frames raise it back by 1 toward the target. Clamped to `[15, target]`. A user FPS change snaps it (`set_effective_fps(value, "target changed by user")`).
+- **FPS is a set of four UI buttons — 15/30/45/60, default 30** (`btnFps15/30/45/60`; the reference's `TARGET_FPS_MIN`/`MAX`/`DEFAULT` still bounds the range), persisted as `BetterRgbFps` (snapped to the nearest 15 on apply). The pacing artifacts that forced the old 15-FPS hardcode were on the WRONG interface (announce framing on the per-key collection); on the 0xFF03/MI_01 RGB interface the reference's framing paces cleanly at 30/60. The pacer self-degrades (−5 steps) if the device cannot sustain the target, so exposing 60 is safe.
+- **Brightness** is a dedicated **2–100 continuous slider** (`BrightnessPercentSlider`, `Minimum="2"`; the C engine's `g_brightness` range is 0–100, the UI floor is raised to 2) — applied as a `BrightnessPercent/100` multiplier on every final pixel of the frame (HSV effects included), exactly like the C engine, not baked into the palette. The firmware `Brightness` field (1–7 levels) stays for the hardware path only. The UserMode ctrl report still caps at 50 (`ITE_MAX_PERKEY_BRIGHTNESS`).
+- **The BetterRGB engine has its own control card** (`BetterRgbEffectsCardExpander`, shown only while the engine is on — the firmware Effects card is hidden then; the two engines no longer share controls). Every reference control is a first-class UI control with the reference's range/default: per-effect sliders (breath speed 1–40 def 12, smoothness 2–150 def 60, sparkle rate 1–10 + density 3–20, lightning speed/smoothness/width/concurrent, flame, rain speed/density, matrix speed/density, ripple spread/width, quicksand speed/scale, current speed/length 2–8, touch-current speed/width, ambient blur 1–8 + response 1–10), **wave/wheel speed 1–10 and rainbow speed 1–20**, **wave angle as 8 direction arrow buttons at 45° increments** (0–315, mirroring the firmware Wave direction buttons), **multi-color palettes as the Flydigi-style `MultiColorPickerControl`** (one picker + "+" button; "-" appears once more than one color is set and enters delete mode, which auto-exits at 1 color — never 0) with per-effect `MaxColors` caps (5 for Raindrop, 3 for Matrix/Quicksand/Current/Touch Current), static layout buttons + zones + zone swatches, single-color pickers (breathing/reactive/ripple), random-color toggles, and reactive fade-duration buttons (Short 10 / Medium 20 / Long 45 ms). The firmware Speed slider keeps its 1–10 firmware convention for the hardware path only.
+- Static/per-key sources cap the keepalive at ~10 FPS (identical frames; no point burning 720 reports/s).
+- Logging only on failures and every Nth frame — per-call logging at 60 FPS × 12 reports would emit ~720 lines/s.
+
+### Effect model (1:1 with the BetterRGB C engine)
+
+All **16 reference effects** are ported 1:1 (`BetterRgbEffect` enum in `MODE_*` order), each with the reference's per-effect globals and slider semantics:
+
+| Effect | C function | Notes |
+|--------|-----------|-------|
+| Breathing | `effect_breathing` | `t += speed/100` per frame, quantized smooth levels, random-cycle color option |
+| Wave | `effect_wave` | `hue = t + (x·cosA + y·sinA)·15`, `t += speed` per frame |
+| Sparkle | `effect_sparkle` | age/duration per key, sin² envelope, random HSV spawn, life `max(18, 70−5·speed)` |
+| Reactive | `effect_reactive` | `GetAsyncKeyState` keypress hook; held keys full color, fade `fadeLife/duration`; random = per-channel bytes |
+| Wheel | `effect_wheel` | hue = `t·dirMul + atan2` about the keyboard centroid |
+| Lightning | `effect_lightning` | bolts: `speed=0.05+0.08s`, band/xSigma widths, phosphor EMA attack/release, up to 4 concurrent |
+| Flame | `effect_flame` | heat EMA, quantized update interval `max(1, 11−speed)`, ramp palette |
+| Raindrop | `effect_rain` | gaussian splats, `speed=0.05+0.03s`, drops = density·3 ≤ 20 |
+| Matrix | `effect_matrix` | 4 styles: diagonal streaks (5), columns (24), lasers (3), rings (3) |
+| Static | `effect_static` | horizontal zone table / vertical x-rank split, up to 7 zone colors |
+| Ripple | `effect_ripple` | keypress-spawned rings, `0.006+0.0015s` key-units/ms, lifetime `2300−120s` ms |
+| Rainbow | `effect_rainbow` | wall-clock hue `+= (4+2s) deg/s` |
+| Quicksand | `effect_quicksand` | `0.22+0.16s`, wavelength `1.15+0.42·scale`, linear-light palette, 4-sample AA |
+| Current | `effect_current` | per-row comets, `0.50+0.40s`, cycle `22+width`, 8-sample AA |
+| Touch Current | `effect_touch_current` | row comets from keypresses, `0.75+0.58s`, sigma `0.20+0.20w` |
+| Screen Ambient | `effect_screen_ambient` | GDI desktop grab → 96×54 DIB, disc blur 1–8, EMA `0.08+0.052·response` |
+
+The keypress hook polls `GetAsyncKeyState` over the reference's tracked VK list (letters/digits + the specials table) and maps VK → KEYMAP index → physical (x, y) via the reference's `get_key_x`/`get_key_y` geometry (one-key pitches incl. numpad and row stagger).
+
+### Determinism and reconnect semantics
+
+Animation state lives in an explicit **`BetterRgbFrameState`** (the C effect threads' locals: spawn lists, phosphor EMA, fire heights, matrix columns, wall-clock hue accumulators) owned by the service and **kept across in-place reconnects** — the animation resumes mid-motion with no timeline reset, matching the reference's thread-local continuity. Thread-prologue inits (lightning head/bolt seeds, flame heat, rain/matrix spawn seeds) mirror the C thread bodies. Randomness uses a splitmix64 stream seeded from the clock (same role as C's `srand(time(NULL))` + `rand()`: spawn positions/colors only, deterministic per session and testable).
+
+### Watchdog and fallback semantics
+
+| Trigger | Policy |
+|---------|--------|
+| 3 failed start attempts (open+handshake+first frame) | Mark streamer unsupported, stop, one-shot hardware apply at same params |
+| Send-failure streak ≥ 3 | In-place reconnect keeping `frameIndex`; give up after the ladder |
+| AC unplugged (`PowerModeChangedEventArgs`) | Stop streamer + one-shot hardware apply (0% CPU); replug → `StartEngine("ac-restore")` |
+| Sleep/wake | `ResumeAfterWake()` — 8 open attempts (controller may be slow after wake) |
+| Adaptive override | `SuspendForOverride()` / `ResumeFromOverride()` |
+
+### Shutdown fallback (normal app exit)
+
+On a normal UCU exit (`App.xaml` `Exit="OnExit"`), `OnExit` synchronously calls
+`BetterRgbStreamService.StopEngine("shutdown")` **before** the fire-and-forget host
+`StopAsync`, so the push happens while the process is still alive:
+
+1. **Release the HID endpoint first** — `ExitUserModeStream()` (CMD_KEYBOARD_OFF / CMD_ZONE_RESET /
+   CMD_MODE_BRIGHTNESS / CMD_ZONE_ON_OFF on the 0xFF03 handle) then `_hid.Dispose()`. A fresh
+   `KeyboardHidService.Open()` for the fallback would fail while the stream handle still holds
+   the shared endpoint (one live consumer per HID endpoint).
+2. **Push a firmware effect, in memory only** — ALWAYS Static white at firmware brightness
+   level 2 (second-lowest on the 1–7 scale; `ApplyHardwareFallback` maps it to
+   `2 × 100 / 7 ≈ 28`), so the keyboard never goes black or keeps a frozen BetterRGB frame.
+   The saved settings are never touched — next startup still boots BetterRGB.
+3. **Once-guard** — `_shutdownFallbackDone` makes the push run at most once per process even
+   though `StopEngine("shutdown")` is reached twice (OnExit + host `StopAsync` teardown); it
+   runs regardless of whether the stream loop was running.
+
+The abrupt-close case (process killed, no `OnExit` handler runs) is out of scope — nothing
+can push a replacement effect.
+
+### One live consumer rule
+
+While streaming, `BetterRgbStreamService` owns the **only** keyboard-zone HID consumer. The Keyboard page and `DeviceApplier` never send keyboard-zone reports while `IsRunning` — concurrent traffic would corrupt the announce→`WriteFile` row pairing. Param changes route through `SetParams` (atomic snapshot swap). The light bar (usage page 2) is untouched.
+
+### OpenRevo concept mapping
+
+| OpenRevo (Rust/Tauri) | UCU (C#) |
+|----------------------|----------|
+| `src/driver/streamer/effects.rs` (ports BetterRGB's `source/better_rgb.c`) | `Models/BetterRgbFrameRenderer.cs` |
+| streamer loop + watchdog + reconnect tracker | `Services/BetterRgbStreamService.cs` |
+| BRFX Rhai script effects | **future work** — not ported |
+| low-level keypress hook (touch-reactive effects) | `GetAsyncKeyState` hook over the reference VK list (VK → KEYMAP → physical x,y) |
 
 ---
 

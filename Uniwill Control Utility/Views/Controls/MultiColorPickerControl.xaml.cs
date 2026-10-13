@@ -19,7 +19,13 @@ namespace Uniwill_Control_Utility.Views.Controls;
 /// </summary>
 public partial class MultiColorPickerControl : UserControl
 {
-    private const int MaxColors = 6;
+    /// <summary>Upper bound on color chips (default 6; BetterRGB sets 4 via XAML).</summary>
+    private int _maxColors = 6;
+    public int MaxColors
+    {
+        get => _maxColors;
+        set { if (value >= 1) _maxColors = value; }
+    }
 
     private readonly Random _randomColor = new();
     private Border? _removeButton;
@@ -96,8 +102,14 @@ public partial class MultiColorPickerControl : UserControl
     private void RemoveColor(ColorPickerControl picker)
     {
         ColorChipsPanel.Children.Remove(picker);
-        UpdateAddRemoveButtons();
         ColorsChanged?.Invoke(this, EventArgs.Empty);
+
+        // Never allow the last chip to be deleted: once one color remains, leave
+        // deletion mode (restoring the +/- buttons) so the count can't reach 0.
+        if (ColorChipsPanel.Children.OfType<ColorPickerControl>().Count() <= 1)
+            ExitDeleteMode();
+        else
+            UpdateAddRemoveButtons();
     }
 
     private void EnterDeleteMode()

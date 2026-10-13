@@ -287,6 +287,12 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<QKeyButtonService>();
                         services.AddHostedService(provider => provider.GetRequiredService<QKeyButtonService>());
 
+                        // BetterRGB streamer engine: software-rendered keyboard RGB
+                        // streamed to the ITE controller at up to 60 FPS (port of
+                        // OpenRevo's BetterRGB). Hosted so shutdown stops the loop.
+                        services.AddSingleton<BetterRgbStreamService>();
+                        services.AddHostedService(provider => provider.GetRequiredService<BetterRgbStreamService>());
+
                         // Centralized device applier (singleton)
                         services.AddSingleton<DeviceApplier>();
                         services.AddSingleton<TrayQuickControlService>();
@@ -1073,6 +1079,17 @@ namespace Uniwill_Control_Utility
                 bs1Service?.Dispose();
             }
             catch { /* Non-critical: dispose during teardown is best-effort */ }
+
+            // Stop the BetterRGB stream synchronously (not fire-and-forget) so its
+            // shutdown firmware fallback — which pushes a regular RGB effect so the
+            // keyboard isn't left black or stuck on the last BetterRGB frame — runs
+            // to completion before the process exits. StopEngine touches only HID and
+            // logging (no Dispatcher.Invoke), so this cannot deadlock the UI thread.
+            try
+            {
+                App._host?.Services.GetService<BetterRgbStreamService>()?.StopEngine("shutdown");
+            }
+            catch { /* best-effort during teardown */ }
 
             // Stop the host on a background thread to avoid deadlock with Dispatcher.Invoke
             // calls from hosted services' StopAsync. The host's cancellation token ensures

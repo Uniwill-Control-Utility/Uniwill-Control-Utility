@@ -46,6 +46,23 @@ namespace Uniwill_Control_Utility.Views.Pages
         };
         private bool _pendingApply;
 
+        // FPS presets for the BetterRGB streamer engine.
+
+        /// <summary>
+        /// Returns the streamer engine when it is the live consumer of the keyboard
+        /// HID (engine persisted as BetterRGB AND the loop is running) — every HID
+        /// apply path routes through it instead of sending reports itself, so only
+        /// one consumer ever touches the endpoint.
+        /// </summary>
+        private BetterRgbStreamService? GetRunningStreamer()
+        {
+            var streamer = App.GetService<BetterRgbStreamService>();
+            if (streamer == null || !streamer.IsRunning)
+                return null;
+            var disk = KeyboardSettingsService.Load();
+            return disk.Engine == KeyboardEngine.BetterRGB ? streamer : null;
+        }
+
         // Idle timer
         private readonly DispatcherTimer _idleCheckTimer = new()
         {
@@ -64,6 +81,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             InitializeComponent();
             InitializeDebounce();
             InitializeIdleTimer();
+
+            // BetterRGB streamer FPS presets (SelectedIndex 2 = 60, OpenRevo's default).
 
             // Subscribe to override state changes so the UI updates when Adaptive
             // Mode activates (which may happen after Page_Loaded at startup).
@@ -91,9 +110,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                             KeyboardAvailable.Visibility = Visibility.Visible;
                             KeyboardUnavailable.Visibility = Visibility.Collapsed;
 
-                            PopulateEffects();
-
                             var settings = KeyboardSettingsService.Load();
+                            PopulateEffects(settings.Engine);
                             Debug.WriteLine($"[KBD] Loaded settings: PerKeyMode={settings.PerKeyMode}, PerKeyColors={(string.IsNullOrEmpty(settings.PerKeyColors) ? "null" : settings.PerKeyColors.Length + " chars")}");
                             ApplySettings(settings);
 
@@ -126,6 +144,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             _visualizer.RefreshLayout();
             UpdateEffectUi();
             UpdateDirectionButtons();
+            UpdateBetterRgbStatus();
             _isFirstLoad = false;
 
             // Reconcile DeviceApplier override state with UI.
@@ -228,6 +247,20 @@ namespace Uniwill_Control_Utility.Views.Pages
                         // Give the firmware time to settle after HID open.
                         // Without this delay, the direction byte is ignored on startup.
                         Thread.Sleep(200);
+
+                        // BetterRGB: start the streamer instead of firmware applies
+                        // (idempotent — MainWindow's startup path may have started it).
+                        var diskSettings = KeyboardSettingsService.Load();
+                        if (diskSettings.Engine == KeyboardEngine.BetterRGB)
+                        {
+                            var streamer = App.GetService<BetterRgbStreamService>();
+                            if (streamer != null)
+                            {
+                                streamer.SetParams(diskSettings);
+                                streamer.StartEngine("page-load");
+                            }
+                            return;
+                        }
 
                         Debug.WriteLine($"[KBD] Page_Loaded apply: isPerKey={isPerKey}");
                         if (isPerKey)
@@ -334,7 +367,21 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool isPerKey = ModeToggle.IsChecked == true;
             EffectsContent.Visibility = isPerKey ? Visibility.Collapsed : Visibility.Visible;
             PerKeyContent.Visibility = isPerKey ? Visibility.Visible : Visibility.Collapsed;
-            PerKeyBottomBar.Visibility = isPerKey ? Visibility.Visible : Visibility.Collapsed;
+
+            // The bottom bar is always visible; its content shifts with the mode.
+            PerKeyActionButtons.Visibility = isPerKey ? Visibility.Visible : Visibility.Collapsed;
+            PerKeyPickerPanel.Visibility = isPerKey ? Visibility.Visible : Visibility.Collapsed;
+
+            // The BetterRGB engine is a global-effects feature: hidden while Per-Key
+            // RGB owns the keyboard-zone consumer.
+            tsBetterRgbEngine.Visibility = isPerKey ? Visibility.Collapsed : Visibility.Visible;
+            tsBetterRgbEngine.IsEnabled = !isPerKey;
+            UpdateStreamerRowsVisibility();
+            UpdateSpeedSliderRange();
+            if (isPerKey)
+                _statusText.Text = "Select keys to edit their color.";
+            else
+                UpdateBetterRgbStatus();
 
             if (_isFirstLoad)
                 return;
@@ -343,6 +390,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Auto-apply the active mode when switching
             if (isPerKey)
             {
+                // One live consumer rule: the streamer owns the keyboard-zone HID
+                // handle while running — stop it before the per-key apply opens its
+                // own. The engine is also hidden/disabled in per-key mode.
+                App.GetService<BetterRgbStreamService>()?.StopEngine("mode-switch-per-key");
                 LoadPerKeyColors();
                 ApplyPerKeyColorsToHid();
             }
@@ -359,6 +410,20 @@ namespace Uniwill_Control_Utility.Views.Pages
                         if (_hidService == null || !_hidService.IsAvailable) return;
 
                         Thread.Sleep(100);
+
+                        // BetterRGB: no firmware power cycle needed — the renderer
+                        // switches effects on its own timeline.
+                        var diskEngine = KeyboardSettingsService.Load();
+                        if (diskEngine.Engine == KeyboardEngine.BetterRGB)
+                        {
+                            var streamer = App.GetService<BetterRgbStreamService>();
+                            if (streamer != null)
+                            {
+                                streamer.SetParams(diskEngine);
+                                streamer.StartEngine("mode-switch");
+                            }
+                            return;
+                        }
 
                         // Full power cycle: turn off completely, wait, then turn on.
                         // This ensures per-key color cache is cleared and the effect
@@ -441,10 +506,579 @@ namespace Uniwill_Control_Utility.Views.Pages
             SaveSettings();
         }
 
+        private void EngineToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isFirstLoad || !_isInitialized) return;
+
+            SaveSettings();
+
+            // The effect list depends on the engine — refresh it on the toggle.
+            PopulateEffects(tsBetterRgbEngine.IsChecked == true
+                ? KeyboardEngine.BetterRGB : KeyboardEngine.Hardware);
+            PopulateBetterRgbEffects();
+            UpdateBetterRgbEffectUi();
+
+            var streamer = App.GetService<BetterRgbStreamService>();
+            if (tsBetterRgbEngine.IsChecked == true)
+            {
+                // Engine on: start the streamer (idempotent if already running).
+                streamer?.SetParams(KeyboardSettingsService.Load());
+                streamer?.StartEngine("user");
+            }
+            else
+            {
+                // Engine off: stop the loop, then let the debounce re-apply the
+                // current settings through the firmware path (the persisted engine
+                // is Hardware now, so ApplySettingsToHid is no longer routed).
+                streamer?.StopEngine("user");
+                _pendingApply = true;
+            }
+
+            UpdateStreamerRowsVisibility();
+            UpdateSpeedSliderRange();
+            UpdateBetterRgbStatus();
+        }
+
+        /// <summary>
+        /// Mirrors the streamer engine state in the bottom bar's status slot
+        /// (OpenRevo's "total rendered frames" diagnostic). Only while Per-Key
+        /// RGB is off — per-key mode owns the bottom bar content then.
+        /// </summary>
+        private void UpdateBetterRgbStatus()
+        {
+            if (ModeToggle.IsChecked == true)
+                return;
+
+            var streamer = App.GetService<BetterRgbStreamService>();
+            if (streamer == null)
+            {
+                _statusText.Text = "Hardware MCU";
+                return;
+            }
+            if (streamer.IsUnsupported)
+            {
+                _statusText.Text = "Streamer unsupported (hardware fallback active)";
+                return;
+            }
+            if (streamer.IsRunning)
+                _statusText.Text = $"Streamer: running @{streamer.EffectiveFps} FPS — {streamer.TotalRenderedFrames:N0} frames";
+            else
+                _statusText.Text = "Hardware MCU";
+        }
+
+        /// <summary>
+        /// The streamer FPS and brightness rows are only meaningful while the
+        /// engine card is shown and the engine is on. While the engine IS on, the
+        /// firmware Brightness row (1-7 levels) is hidden and disabled — the
+        /// streamer's own 0-100 Brightness row replaces it.
+        /// </summary>
+        /// <summary>
+        /// The two Effects cards are mutually exclusive: the firmware card while the
+        /// streamer engine is off, the BetterRGB card while it is on; both hidden in
+        /// per-key mode. The streamer's 0-100 brightness row lives in the BetterRGB
+        /// card, the firmware 1-7 Brightness row in the hardware card.
+        /// </summary>
+        private void UpdateStreamerRowsVisibility()
+        {
+            bool visible = ModeToggle.IsChecked != true && tsBetterRgbEngine.IsChecked == true;
+            EffectsCardExpander.Visibility = visible ? Visibility.Collapsed : Visibility.Visible;
+            BetterRgbEffectsCardExpander.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+
+            BrightnessPercentRow.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            FpsRow.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            FpsSeparator.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+
+            BrightnessRow.Visibility = visible ? Visibility.Collapsed : Visibility.Visible;
+            BrightnessSlider.IsEnabled = !visible;
+            // The divider below the firmware Brightness row follows the effect rule
+            // (Rainbow has no controls below it) once the row is back on screen.
+            if (visible)
+                BrightnessSeparator.Visibility = Visibility.Collapsed;
+            else
+                BrightnessSeparator.Visibility = cmbEffect.SelectedItem is KeyboardEffect.Rainbow
+                    ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private bool BetterRgbActive() => tsBetterRgbEngine.IsChecked == true && ModeToggle.IsChecked != true;
+
+        #region BetterRGB effects card (separate control surface)
+
+        /// <summary>Discrete BetterRGB choices tracked in fields (buttons have no
+        /// value to read back): reactive duration ms, matrix style index, static
+        /// layout index.</summary>
+        private int _brDuration = 20;
+        private int _brStyle;
+        private int _brLayout;
+        private int _brAngle; // BetterRGB Wave angle, degrees (0-315, 45-degree steps)
+        private int _brFps = 30; // BetterRGB target stream rate (15/30/45/60)
+
+        private void PopulateBetterRgbEffects()
+        {
+            cmbBetterRgbEffect.ItemsSource = Enum.GetValues<BetterRgbEffect>();
+        }
+
+        private void CmbBetterRgbEffect_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isFirstLoad || !_isInitialized) return;
+            UpdateBetterRgbEffectUi();
+            if (!_isSyncingFromPreset)
+            {
+                SaveSettings();
+                _pendingApply = true;
+            }
+        }
+
+        /// <summary>Shows only the selected BetterRGB effect's control rows
+        /// (mirrors UpdateEffectUi for the separate BetterRGB card).</summary>
+        private void UpdateBetterRgbEffectUi()
+        {
+            var m = cmbBetterRgbEffect.SelectedItem is BetterRgbEffect e ? e : BetterRgbEffect.Breathing;
+            bool sel(BetterRgbEffect x) => m == x;
+
+            // Each divider sits above its row and shows only when that row does (the
+            // first row of every effect has no divider - BetterRgbEffectSeparator
+            // already separates the FPS row from the selected effect's block).
+            // Each divider sits above its row and shows only when that row does (the
+            // first row of every effect has no divider - BetterRgbEffectSeparator
+            // already separates the FPS row from the selected effect's block).
+            BcColorRow.Visibility = sel(BetterRgbEffect.Breathing) ? Visibility.Visible : Visibility.Collapsed;
+            BcSpeedRow.Visibility = sel(BetterRgbEffect.Breathing) ? Visibility.Visible : Visibility.Collapsed;
+            BcSpeedSeparator.Visibility = BcSpeedRow.Visibility;
+            BcSmoothRow.Visibility = sel(BetterRgbEffect.Breathing) ? Visibility.Visible : Visibility.Collapsed;
+            BcSmoothSeparator.Visibility = BcSmoothRow.Visibility;
+            BcRandomRow.Visibility = sel(BetterRgbEffect.Breathing) ? Visibility.Visible : Visibility.Collapsed;
+            BcRandomSeparator.Visibility = BcRandomRow.Visibility;
+
+            WvAngleRow.Visibility = sel(BetterRgbEffect.Wave) ? Visibility.Visible : Visibility.Collapsed;
+            WvSpeedRow.Visibility = sel(BetterRgbEffect.Wave) ? Visibility.Visible : Visibility.Collapsed;
+            WvSpeedSeparator.Visibility = WvSpeedRow.Visibility;
+
+            SpSpeedRow.Visibility = sel(BetterRgbEffect.Sparkle) ? Visibility.Visible : Visibility.Collapsed;
+            SpDensityRow.Visibility = sel(BetterRgbEffect.Sparkle) ? Visibility.Visible : Visibility.Collapsed;
+            SpDensitySeparator.Visibility = SpDensityRow.Visibility;
+
+            RcColorRow.Visibility = sel(BetterRgbEffect.Reactive) ? Visibility.Visible : Visibility.Collapsed;
+            RcRandomRow.Visibility = sel(BetterRgbEffect.Reactive) ? Visibility.Visible : Visibility.Collapsed;
+            RcRandomSeparator.Visibility = RcRandomRow.Visibility;
+            RcDurationRow.Visibility = sel(BetterRgbEffect.Reactive) ? Visibility.Visible : Visibility.Collapsed;
+            RcDurationSeparator.Visibility = RcDurationRow.Visibility;
+
+            WhReverseRow.Visibility = sel(BetterRgbEffect.Wheel) ? Visibility.Visible : Visibility.Collapsed;
+            WhSpeedRow.Visibility = sel(BetterRgbEffect.Wheel) ? Visibility.Visible : Visibility.Collapsed;
+            WhSpeedSeparator.Visibility = WhSpeedRow.Visibility;
+
+            LtSpeedRow.Visibility = sel(BetterRgbEffect.Lightning) ? Visibility.Visible : Visibility.Collapsed;
+            LtSmoothRow.Visibility = sel(BetterRgbEffect.Lightning) ? Visibility.Visible : Visibility.Collapsed;
+            LtSmoothSeparator.Visibility = LtSmoothRow.Visibility;
+            LtWidthRow.Visibility = sel(BetterRgbEffect.Lightning) ? Visibility.Visible : Visibility.Collapsed;
+            LtWidthSeparator.Visibility = LtWidthRow.Visibility;
+            LtConcurrentRow.Visibility = sel(BetterRgbEffect.Lightning) ? Visibility.Visible : Visibility.Collapsed;
+            LtConcurrentSeparator.Visibility = LtConcurrentRow.Visibility;
+
+            FlSpeedRow.Visibility = sel(BetterRgbEffect.Flame) ? Visibility.Visible : Visibility.Collapsed;
+            FlSmoothRow.Visibility = sel(BetterRgbEffect.Flame) ? Visibility.Visible : Visibility.Collapsed;
+            FlSmoothSeparator.Visibility = FlSmoothRow.Visibility;
+
+            RnSpeedRow.Visibility = sel(BetterRgbEffect.Raindrop) ? Visibility.Visible : Visibility.Collapsed;
+            RnDensityRow.Visibility = sel(BetterRgbEffect.Raindrop) ? Visibility.Visible : Visibility.Collapsed;
+            RnDensitySeparator.Visibility = RnDensityRow.Visibility;
+            RnColorsRow.Visibility = sel(BetterRgbEffect.Raindrop) ? Visibility.Visible : Visibility.Collapsed;
+            RnColorsSeparator.Visibility = RnColorsRow.Visibility;
+
+            MtStyleRow.Visibility = sel(BetterRgbEffect.Matrix) ? Visibility.Visible : Visibility.Collapsed;
+            MtSpeedRow.Visibility = sel(BetterRgbEffect.Matrix) ? Visibility.Visible : Visibility.Collapsed;
+            MtSpeedSeparator.Visibility = MtSpeedRow.Visibility;
+            MtDensityRow.Visibility = sel(BetterRgbEffect.Matrix) ? Visibility.Visible : Visibility.Collapsed;
+            MtDensitySeparator.Visibility = MtDensityRow.Visibility;
+            MtColorsRow.Visibility = sel(BetterRgbEffect.Matrix) ? Visibility.Visible : Visibility.Collapsed;
+            MtColorsSeparator.Visibility = MtColorsRow.Visibility;
+
+            StLayoutRow.Visibility = sel(BetterRgbEffect.Static) ? Visibility.Visible : Visibility.Collapsed;
+            StZonesRow.Visibility = sel(BetterRgbEffect.Static) ? Visibility.Visible : Visibility.Collapsed;
+            StZonesSeparator.Visibility = StZonesRow.Visibility;
+            StColorsRow.Visibility = sel(BetterRgbEffect.Static) ? Visibility.Visible : Visibility.Collapsed;
+            StColorsSeparator.Visibility = StColorsRow.Visibility;
+
+            RpColorRow.Visibility = sel(BetterRgbEffect.Ripple) ? Visibility.Visible : Visibility.Collapsed;
+            RpRandomRow.Visibility = sel(BetterRgbEffect.Ripple) ? Visibility.Visible : Visibility.Collapsed;
+            RpRandomSeparator.Visibility = RpRandomRow.Visibility;
+            RpSpeedRow.Visibility = sel(BetterRgbEffect.Ripple) ? Visibility.Visible : Visibility.Collapsed;
+            RpSpeedSeparator.Visibility = RpSpeedRow.Visibility;
+            RpWidthRow.Visibility = sel(BetterRgbEffect.Ripple) ? Visibility.Visible : Visibility.Collapsed;
+            RpWidthSeparator.Visibility = RpWidthRow.Visibility;
+
+            RbSpeedRow.Visibility = sel(BetterRgbEffect.Rainbow) ? Visibility.Visible : Visibility.Collapsed;
+
+            QsColorsRow.Visibility = sel(BetterRgbEffect.Quicksand) ? Visibility.Visible : Visibility.Collapsed;
+            QsSpeedRow.Visibility = sel(BetterRgbEffect.Quicksand) ? Visibility.Visible : Visibility.Collapsed;
+            QsSpeedSeparator.Visibility = QsSpeedRow.Visibility;
+            QsScaleRow.Visibility = sel(BetterRgbEffect.Quicksand) ? Visibility.Visible : Visibility.Collapsed;
+            QsScaleSeparator.Visibility = QsScaleRow.Visibility;
+
+            CuColorsRow.Visibility = sel(BetterRgbEffect.Current) ? Visibility.Visible : Visibility.Collapsed;
+            CuSpeedRow.Visibility = sel(BetterRgbEffect.Current) ? Visibility.Visible : Visibility.Collapsed;
+            CuSpeedSeparator.Visibility = CuSpeedRow.Visibility;
+            CuWidthRow.Visibility = sel(BetterRgbEffect.Current) ? Visibility.Visible : Visibility.Collapsed;
+            CuWidthSeparator.Visibility = CuWidthRow.Visibility;
+
+            TcColorsRow.Visibility = sel(BetterRgbEffect.TouchCurrent) ? Visibility.Visible : Visibility.Collapsed;
+            TcSpeedRow.Visibility = sel(BetterRgbEffect.TouchCurrent) ? Visibility.Visible : Visibility.Collapsed;
+            TcSpeedSeparator.Visibility = TcSpeedRow.Visibility;
+            TcWidthRow.Visibility = sel(BetterRgbEffect.TouchCurrent) ? Visibility.Visible : Visibility.Collapsed;
+            TcWidthSeparator.Visibility = TcWidthRow.Visibility;
+
+            SaBlurRow.Visibility = sel(BetterRgbEffect.ScreenAmbient) ? Visibility.Visible : Visibility.Collapsed;
+            SaResponseRow.Visibility = sel(BetterRgbEffect.ScreenAmbient) ? Visibility.Visible : Visibility.Collapsed;
+            SaResponseSeparator.Visibility = SaResponseRow.Visibility;
+
+            BetterRgbEffectSeparator.Visibility = BetterRgbActive() ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void MarkBetterRgbChanged()
+        {
+            if (_isFirstLoad) return;
+            if (!_isSyncingFromPreset)
+            {
+                SaveSettings();
+                _pendingApply = true;
+            }
+        }
+
+        private void RcDurationButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isFirstLoad) return;
+            if (sender is System.Windows.Controls.Button btn && btn.Tag is string tag)
+                _brDuration = tag switch
+                {
+                    "Short" => 10,
+                    "Long" => 45,
+                    _ => 20,
+                };
+            MarkBetterRgbChanged();
+        }
+
+        private void MtStyleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isFirstLoad) return;
+            if (sender is System.Windows.Controls.Button btn && btn.Tag is string tag)
+                _brStyle = tag switch
+                {
+                    "Columns" => 1,
+                    "Lasers" => 2,
+                    "Rings" => 3,
+                    _ => 0,
+                };
+            MarkBetterRgbChanged();
+        }
+
+        private void StLayoutButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isFirstLoad) return;
+            if (sender is System.Windows.Controls.Button btn && btn.Tag is string tag)
+                _brLayout = tag == "Vertical" ? 1 : 0;
+            MarkBetterRgbChanged();
+        }
+
+        // ---- BetterRGB card control handlers (each refreshes its value label,
+        // then marks the settings dirty) ------------------------------------------
+        private void FpsButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isFirstLoad) return;
+            if (sender is System.Windows.Controls.Button btn && btn.Tag is string tag && tag is not null)
+                _brFps = int.Parse(tag);
+            UpdateFpsButtons();
+            MarkBetterRgbChanged();
+        }
+
+        /// <summary>Highlights the FPS button matching the current target rate.</summary>
+        private void UpdateFpsButtons()
+        {
+            bool isActive(int f) => _brFps == f;
+
+            SetDirStyle(btnFps15, isActive(15));
+            SetDirStyle(btnFps30, isActive(30));
+            SetDirStyle(btnFps45, isActive(45));
+            SetDirStyle(btnFps60, isActive(60));
+        }
+
+        private void BcSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            BcSpeedValueText.Text = ((int)BcSpeedSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void BcSmoothSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            BcSmoothValueText.Text = ((int)BcSmoothSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void WvAngleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isFirstLoad) return;
+            if (sender is System.Windows.Controls.Button btn && btn.Tag is string tag && tag is not null)
+                _brAngle = int.Parse(tag);
+            UpdateWaveAngleButtons();
+            MarkBetterRgbChanged();
+        }
+
+        /// <summary>Highlights the direction button matching the current Wave angle.</summary>
+        private void UpdateWaveAngleButtons()
+        {
+            bool isActive(int a) => _brAngle == a;
+
+            SetDirStyle(btnWvA0, isActive(0));
+            SetDirStyle(btnWvA45, isActive(45));
+            SetDirStyle(btnWvA90, isActive(90));
+            SetDirStyle(btnWvA135, isActive(135));
+            SetDirStyle(btnWvA180, isActive(180));
+            SetDirStyle(btnWvA225, isActive(225));
+            SetDirStyle(btnWvA270, isActive(270));
+            SetDirStyle(btnWvA315, isActive(315));
+        }
+
+        private void WvSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            WvSpeedValueText.Text = ((int)WvSpeedSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void SpSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            SpSpeedValueText.Text = ((int)SpSpeedSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void SpDensitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            SpDensityValueText.Text = ((int)SpDensitySlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void WhSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            WhSpeedValueText.Text = ((int)WhSpeedSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void LtSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            LtSpeedValueText.Text = ((int)LtSpeedSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void LtSmoothSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            LtSmoothValueText.Text = ((int)LtSmoothSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void LtWidthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            LtWidthValueText.Text = ((int)LtWidthSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void LtConcurrentSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            LtConcurrentValueText.Text = ((int)LtConcurrentSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void FlSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            FlSpeedValueText.Text = ((int)FlSpeedSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void FlSmoothSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            FlSmoothValueText.Text = ((int)FlSmoothSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void RnSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            RnSpeedValueText.Text = ((int)RnSpeedSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void RnDensitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            RnDensityValueText.Text = ((int)RnDensitySlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void MtSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            MtSpeedValueText.Text = ((int)MtSpeedSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void MtDensitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            MtDensityValueText.Text = ((int)MtDensitySlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void StZonesSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            StZonesValueText.Text = ((int)StZonesSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void RpSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            RpSpeedValueText.Text = ((int)RpSpeedSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void RpWidthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            RpWidthValueText.Text = ((int)RpWidthSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void RbSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            RbSpeedValueText.Text = ((int)RbSpeedSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void QsSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            QsSpeedValueText.Text = ((int)QsSpeedSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void QsScaleSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            QsScaleValueText.Text = ((int)QsScaleSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void CuSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            CuSpeedValueText.Text = ((int)CuSpeedSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void CuWidthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            CuWidthValueText.Text = ((int)CuWidthSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void TcSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            TcSpeedValueText.Text = ((int)TcSpeedSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void TcWidthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            TcWidthValueText.Text = ((int)TcWidthSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void SaBlurSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            SaBlurValueText.Text = ((int)SaBlurSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void SaResponseSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            SaResponseValueText.Text = ((int)SaResponseSlider.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void TsBcRandom_Toggled(object sender, RoutedEventArgs e) => MarkBetterRgbChanged();
+        private void TsRcRandom_Toggled(object sender, RoutedEventArgs e) => MarkBetterRgbChanged();
+        private void TsWhReverse_Toggled(object sender, RoutedEventArgs e) => MarkBetterRgbChanged();
+        private void TsRpRandom_Toggled(object sender, RoutedEventArgs e) => MarkBetterRgbChanged();
+
+        private void BcColorPicker_ColorChangedDelayed(object sender, EventArgs e) => MarkBetterRgbChanged();
+        private void RcColorPicker_ColorChangedDelayed(object sender, EventArgs e) => MarkBetterRgbChanged();
+        private void RpColorPicker_ColorChangedDelayed(object sender, EventArgs e) => MarkBetterRgbChanged();
+
+        private void RnPicker_ColorsChanged(object sender, EventArgs e) => MarkBetterRgbChanged();
+        private void MtPicker_ColorsChanged(object sender, EventArgs e) => MarkBetterRgbChanged();
+        private void StPicker_ColorsChanged(object sender, EventArgs e) => MarkBetterRgbChanged();
+        private void QsPicker_ColorsChanged(object sender, EventArgs e) => MarkBetterRgbChanged();
+        private void CuPicker_ColorsChanged(object sender, EventArgs e) => MarkBetterRgbChanged();
+        private void TcPicker_ColorsChanged(object sender, EventArgs e) => MarkBetterRgbChanged();
+
+        #endregion
+
+        /// <summary>
+        /// OpenRevo/BetterRGB speed slider ranges are PER EFFECT (mk_slider in
+        /// better_rgb.c): breathing 1-40, wave/rainbow/wheel 1-20, everything
+        /// else 1-10 — all higher = faster.
+        /// </summary>
+        private static int SpeedRangeMax(KeyboardEffect e) => e switch
+        {
+            KeyboardEffect.Breathing => 40,
+            KeyboardEffect.Wave or KeyboardEffect.Rainbow or KeyboardEffect.Wheel => 20,
+            _ => 10,
+        };
+
+        /// <summary>
+        /// While the streamer engine is on, the Speed slider adopts the current
+        /// effect's C range (higher = faster, like OpenRevo); off, it keeps the
+        /// firmware 1-10 convention (1 = fastest).
+        /// </summary>
+        private void UpdateSpeedSliderRange()
+        {
+            bool engineOn = BetterRgbActive();
+            var effect = cmbEffect.SelectedItem is KeyboardEffect e ? e : KeyboardEffect.Static;
+            int max = engineOn ? SpeedRangeMax(effect) : 10;
+            SpeedSlider.Minimum = 1;
+            SpeedSlider.Maximum = max;
+            SpeedSlider.TickFrequency = max / 10.0;
+            var v = Math.Clamp((int)SpeedSlider.Value, 1, max);
+            SpeedSlider.Value = v;
+            SpeedValueText.Text = v.ToString();
+            SpeedSubtitle.Text = engineOn
+                ? $"Effect speed 1-{max}, higher = faster"
+                : "Control the animation speed";
+        }
+
+        /// <summary>
+        /// Streamer brightness 0-100 — OpenRevo/BetterRGB's g_brightness slider
+        /// range (continuous integers), not the firmware 1-7 levels.
+        /// </summary>
+        private int CurrentBrightnessPercent() => Math.Clamp((int)BrightnessPercentSlider.Value, 0, 100);
+
+        private void BrightnessPercentSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            BrightnessPercentValueText.Text = CurrentBrightnessPercent().ToString();
+            if (_isFirstLoad) return;
+            if (!_isSyncingFromPreset)
+            {
+                SaveSettings();
+                _pendingApply = true;
+            }
+            UpdateBetterRgbStatus();
+        }
+
         private void ApplyPerKeyColorsToHid()
         {
             if (_hidService == null || !_hidService.IsAvailable || _settings == null)
                 return;
+
+            // BetterRGB: the streamer owns the handle — re-param it with the current
+            // settings (the per-key grid is rebuilt from PerKeyColors in the snapshot).
+            var streamer = App.GetService<BetterRgbStreamService>();
+            if (streamer != null && KeyboardSettingsService.Load().Engine == KeyboardEngine.BetterRGB)
+            {
+                SaveSettings();
+                var snapshot = KeyboardSettingsService.Load();
+                streamer.SetParams(snapshot);
+                if (snapshot.PowerOn)
+                    streamer.StartEngine("per-key-apply");
+                return;
+            }
 
             try
             {
@@ -473,14 +1107,28 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         #region Effects Mode
 
-        private void PopulateEffects()
+        /// <summary>
+        /// Effects the ITE firmware MCU understands (the hardware engine's list).
+        /// </summary>
+        internal static readonly HashSet<KeyboardEffect> s_softwareOnlyEffects = new()
+        {
+            KeyboardEffect.Matrix,
+            KeyboardEffect.Lightning,
+            KeyboardEffect.Flame,
+            KeyboardEffect.Wheel,
+        };
+
+        private void PopulateEffects(KeyboardEngine engine)
         {
             // Filter out TouchRipple, TouchAurora, TouchSpark — the touch-reactive
             // toggle covers those variants for Ripple, Aurora, and Spark respectively.
+            // Software-only effects (BetterRGB engine) are hidden for Hardware.
             cmbEffect.ItemsSource = Enum.GetValues<KeyboardEffect>()
                 .Where(e => e != KeyboardEffect.TouchRipple
                          && e != KeyboardEffect.TouchAurora
-                         && e != KeyboardEffect.TouchSpark);
+                         && e != KeyboardEffect.TouchSpark
+                         && (engine == KeyboardEngine.BetterRGB
+                             || !s_softwareOnlyEffects.Contains(e)));
         }
 
         /// <summary>Effects that support a 7-color palette.</summary>
@@ -497,6 +1145,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             KeyboardEffect.TouchAurora,
             KeyboardEffect.TouchSpark,
             KeyboardEffect.Spark,
+            KeyboardEffect.Matrix,
         };
 
         internal static readonly HashSet<KeyboardEffect> s_multiColor4Effects = new()
@@ -527,6 +1176,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             KeyboardEffect.Raindrop,
             KeyboardEffect.Aurora,
             KeyboardEffect.TouchAurora,
+            KeyboardEffect.Matrix,
+            KeyboardEffect.Lightning,
+            KeyboardEffect.Flame,
+            KeyboardEffect.Wheel,
             KeyboardEffect.TouchSpark,
             KeyboardEffect.Spark,
         };
@@ -559,6 +1212,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void UpdateEffectUi()
         {
+            UpdateSpeedSliderRange();
             if (cmbEffect.SelectedItem is not KeyboardEffect effect)
             {
                 BrightnessSeparator.Visibility = Visibility.Collapsed;
@@ -585,8 +1239,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
             }
 
-            // Non-Rainbow effects have controls below Brightness — show the divider.
-            BrightnessSeparator.Visibility = Visibility.Visible;
+            // Non-Rainbow effects have controls below Brightness — show the divider,
+            // except while the BetterRGB engine is on: the firmware Brightness row
+            // (and its divider) are hidden then.
+            BrightnessSeparator.Visibility = tsBetterRgbEngine.IsChecked == true && ModeToggle.IsChecked != true
+                ? Visibility.Collapsed : Visibility.Visible;
 
             if (s_multiColor7Effects.Contains(effect))
             {
@@ -693,7 +1350,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                     if (tsKeyboardPower.IsChecked == true)
                         ApplyPerKeyColorsToHid();
                     else
-                        _hidService.TurnOff();
+                    {
+                        var streamer = App.GetService<BetterRgbStreamService>();
+                        if (streamer != null && KeyboardSettingsService.Load().Engine == KeyboardEngine.BetterRGB)
+                            streamer.StopEngine("power-off");
+                        else
+                            _hidService.TurnOff();
+                    }
                 }
                 SaveSettings();
             }
@@ -789,6 +1452,22 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void ApplySettingsToHid()
         {
+            // BetterRGB: route to the streamer's parameter snapshot instead of
+            // firmware reports. Engine-based (not IsRunning-based) so a manual
+            // power-off stops the loop and a power-on restarts it.
+            var streamer = App.GetService<BetterRgbStreamService>();
+            if (streamer != null && KeyboardSettingsService.Load().Engine == KeyboardEngine.BetterRGB)
+            {
+                SaveSettings();
+                var snapshot = KeyboardSettingsService.Load();
+                streamer.SetParams(snapshot);
+                if (snapshot.PowerOn)
+                    streamer.StartEngine("apply"); // no-op when already running
+                else
+                    streamer.StopEngine("power-off");
+                return;
+            }
+
             if (_hidService is null || !_hidService.IsAvailable) return;
 
             try
@@ -938,8 +1617,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _settings.PerKeyMode = true;
                 KeyboardSettingsService.Save(_settings);
 
-                // Send all per-key colors in one batch (enters UserMode internally).
-                _hidService.SendAllPerKeyColorsFromDict(colors);
+                // Send all per-key colors in one batch (enters UserMode internally),
+                // or re-param the streamer when it owns the endpoint.
+                var streamer = GetRunningStreamer();
+                if (streamer != null)
+                    streamer.SetParams(_settings);
+                else
+                    _hidService.SendAllPerKeyColorsFromDict(colors);
 
                 _visualizer.ClearSelection();
                 _statusText.Text = $"All keys set to {color}.";
@@ -999,7 +1683,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 KeyboardSettingsService.Save(_settings);
                 Debug.WriteLine($"[KBD-PERKEY] Saved: PerKeyMode={_settings.PerKeyMode}, PerKeyColors length={_settings.PerKeyColors?.Length ?? 0}");
 
-                _hidService.SendAllPerKeyColorsFromDict(allColors);
+                var streamer = GetRunningStreamer();
+                if (streamer != null)
+                    streamer.SetParams(_settings);
+                else
+                    _hidService.SendAllPerKeyColorsFromDict(allColors);
 
                 Debug.WriteLine($"[KBD-PERKEY] Applied {color} to zones: {string.Join(", ", selected)}");
                 _statusText.Text = $"Applied {color} to {selected.Count} key{(selected.Count > 1 ? "s" : "")}.";
@@ -1075,7 +1763,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 if (idleMs >= timeoutMs && _hidService?.IsAvailable == true)
                 {
-                    _hidService.TurnOff();
+                    var streamer = GetRunningStreamer();
+                    if (streamer != null)
+                        streamer.RequestIdleOff(); // stops the loop, then turns off
+                    else
+                        _hidService.TurnOff();
                     _keyboardWasIdleOff = true;
                     _idleCheckTimer.IsEnabled = false;
                     _idleWakeTimer.IsEnabled = true;
@@ -1165,15 +1857,30 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void ApplySettings(KeyboardSettings settings)
         {
+            // The effect list depends on the engine (software-only effects for
+            // BetterRGB). Re-populate so preset/engine switches refresh it.
+            PopulateEffects(settings.Engine);
+
             tsKeyboardPower.IsChecked = settings.PowerOn;
             BrightnessSlider.Value = Math.Clamp(settings.Brightness, 1, 7);
             BrightnessValueText.Text = Math.Clamp(settings.Brightness, 1, 7).ToString();
             BrightnessSliderPerKey.Value = Math.Clamp(settings.Brightness, 1, 7);
             BrightnessValueTextPerKey.Text = Math.Clamp(settings.Brightness, 1, 7).ToString();
 
-            int hidSpeed = Math.Clamp((int)settings.Speed, 1, 10);
-            SpeedSlider.Value = 10 - hidSpeed;
-            SpeedValueText.Text = (10 - hidSpeed).ToString();
+            if (settings.Engine == KeyboardEngine.BetterRGB && settings.PerKeyMode != true)
+            {
+                // Streamer path: the slider carries the raw C speed for the saved
+                // effect's range (higher = faster).
+                var cSpeed = Math.Clamp(settings.BetterRgbSpeed, 1, SpeedRangeMax(settings.EffectMode));
+                SpeedSlider.Value = cSpeed;
+                SpeedValueText.Text = cSpeed.ToString();
+            }
+            else
+            {
+                int hidSpeed = Math.Clamp((int)settings.Speed, 1, 10);
+                SpeedSlider.Value = 10 - hidSpeed;
+                SpeedValueText.Text = (10 - hidSpeed).ToString();
+            }
 
             ColorPicker.SelectedColor = Color.FromRgb(settings.ColorR, settings.ColorG, settings.ColorB);
             cmbEffect.SelectedItem = settings.EffectMode;
@@ -1193,6 +1900,98 @@ namespace Uniwill_Control_Utility.Views.Pages
             tsIdleTimer.IsChecked = settings.IdleTimerEnabled;
             IdleTimerCard.IsExpanded = settings.IdleTimerEnabled;
             tsTouchReactive.IsChecked = settings.TouchReactive;
+
+            // BetterRGB engine + FPS sync from disk.
+            tsBetterRgbEngine.IsChecked = settings.Engine == KeyboardEngine.BetterRGB;
+            var savedBrightness = Math.Clamp(settings.BrightnessPercent, 2, 100);
+            BrightnessPercentSlider.Value = savedBrightness;
+            BrightnessPercentValueText.Text = savedBrightness.ToString();
+
+            // BetterRGB card: restore mode, sliders, toggles and palettes.
+            PopulateBetterRgbEffects();
+            cmbBetterRgbEffect.SelectedItem = settings.BetterRgbMode;
+            var savedFps = Math.Clamp(settings.BetterRgbFps, 15, 60);
+            _brFps = Math.Clamp((int)Math.Round(savedFps / 15.0) * 15, 15, 60);
+            UpdateFpsButtons();
+            BcSpeedSlider.Value = Math.Clamp(settings.BetterRgbBreathSpeed, 1, 40);
+            BcSpeedValueText.Text = Math.Clamp(settings.BetterRgbBreathSpeed, 1, 40).ToString();
+            BcSmoothSlider.Value = Math.Clamp(settings.BetterRgbBreathSmooth, 2, 150);
+            BcSmoothValueText.Text = Math.Clamp(settings.BetterRgbBreathSmooth, 2, 150).ToString();
+            tsBcRandom.IsChecked = settings.BetterRgbBreathRandom;
+            BcColorPicker.SelectedColor = ParseColorOr(settings.BetterRgbBreathColor, Color.FromRgb(0x00, 0x78, 0xFF));
+            _brAngle = Math.Clamp(settings.BetterRgbWaveAngle, 0, 315);
+            UpdateWaveAngleButtons();
+            WvSpeedSlider.Value = Math.Clamp(settings.BetterRgbWaveSpeed, 1, 10);
+            WvSpeedValueText.Text = Math.Clamp(settings.BetterRgbWaveSpeed, 1, 10).ToString();
+            SpSpeedSlider.Value = Math.Clamp(settings.BetterRgbSparkleSpeed, 1, 10);
+            SpSpeedValueText.Text = Math.Clamp(settings.BetterRgbSparkleSpeed, 1, 10).ToString();
+            SpDensitySlider.Value = Math.Clamp(settings.BetterRgbSparkleDensity, 3, 20);
+            SpDensityValueText.Text = Math.Clamp(settings.BetterRgbSparkleDensity, 3, 20).ToString();
+            tsRcRandom.IsChecked = settings.BetterRgbReactiveRandom;
+            RcColorPicker.SelectedColor = ParseColorOr(settings.BetterRgbReactiveColor, Color.FromRgb(0xFF, 0xFF, 0xFF));
+            _brDuration = Math.Clamp(settings.BetterRgbReactiveDuration, 10, 45);
+            WhSpeedSlider.Value = Math.Clamp(settings.BetterRgbWheelSpeed, 1, 10);
+            WhSpeedValueText.Text = Math.Clamp(settings.BetterRgbWheelSpeed, 1, 10).ToString();
+            tsWhReverse.IsChecked = settings.BetterRgbWheelReverse;
+            LtSpeedSlider.Value = Math.Clamp(settings.BetterRgbLightningSpeed, 1, 10);
+            LtSpeedValueText.Text = Math.Clamp(settings.BetterRgbLightningSpeed, 1, 10).ToString();
+            LtSmoothSlider.Value = Math.Clamp(settings.BetterRgbLightningSmooth, 1, 20);
+            LtSmoothValueText.Text = Math.Clamp(settings.BetterRgbLightningSmooth, 1, 20).ToString();
+            LtWidthSlider.Value = Math.Clamp(settings.BetterRgbLightningWidth, 1, 4);
+            LtWidthValueText.Text = Math.Clamp(settings.BetterRgbLightningWidth, 1, 4).ToString();
+            LtConcurrentSlider.Value = Math.Clamp(settings.BetterRgbLightningConcurrent, 1, 4);
+            LtConcurrentValueText.Text = Math.Clamp(settings.BetterRgbLightningConcurrent, 1, 4).ToString();
+            FlSpeedSlider.Value = Math.Clamp(settings.BetterRgbFlameSpeed, 1, 10);
+            FlSpeedValueText.Text = Math.Clamp(settings.BetterRgbFlameSpeed, 1, 10).ToString();
+            FlSmoothSlider.Value = Math.Clamp(settings.BetterRgbFlameSmooth, 1, 20);
+            FlSmoothValueText.Text = Math.Clamp(settings.BetterRgbFlameSmooth, 1, 20).ToString();
+            RnSpeedSlider.Value = Math.Clamp(settings.BetterRgbRainSpeed, 1, 10);
+            RnSpeedValueText.Text = Math.Clamp(settings.BetterRgbRainSpeed, 1, 10).ToString();
+            RnDensitySlider.Value = Math.Clamp(settings.BetterRgbRainDensity, 1, 5);
+            RnDensityValueText.Text = Math.Clamp(settings.BetterRgbRainDensity, 1, 5).ToString();
+            RnPicker.SetColors(ParseColorString(settings.BetterRgbRainColors));
+            MtSpeedSlider.Value = Math.Clamp(settings.BetterRgbMatrixSpeed, 1, 10);
+            MtSpeedValueText.Text = Math.Clamp(settings.BetterRgbMatrixSpeed, 1, 10).ToString();
+            _brStyle = Math.Clamp(settings.BetterRgbMatrixStyle, 0, 3);
+            MtDensitySlider.Value = Math.Clamp(settings.BetterRgbMatrixDensity, 1, 5);
+            MtDensityValueText.Text = Math.Clamp(settings.BetterRgbMatrixDensity, 1, 5).ToString();
+            MtPicker.SetColors(ParseColorString(settings.BetterRgbMatrixColors));
+            _brLayout = Math.Clamp(settings.BetterRgbStaticLayout, 0, 1);
+            StZonesSlider.Value = Math.Clamp(settings.BetterRgbStaticZones, 1, 7);
+            StZonesValueText.Text = Math.Clamp(settings.BetterRgbStaticZones, 1, 7).ToString();
+            StPicker.SetColors(ParseColorString(settings.BetterRgbStaticZoneColors), 7);
+            RpSpeedSlider.Value = Math.Clamp(settings.BetterRgbRippleSpeed, 1, 10);
+            RpSpeedValueText.Text = Math.Clamp(settings.BetterRgbRippleSpeed, 1, 10).ToString();
+            RpWidthSlider.Value = Math.Clamp(settings.BetterRgbRippleWidth, 1, 4);
+            RpWidthValueText.Text = Math.Clamp(settings.BetterRgbRippleWidth, 1, 4).ToString();
+            tsRpRandom.IsChecked = settings.BetterRgbRippleRandom;
+            RpColorPicker.SelectedColor = ParseColorOr(settings.BetterRgbRippleColor, Color.FromRgb(0x00, 0xB4, 0xFF));
+            RbSpeedSlider.Value = Math.Clamp(settings.BetterRgbRainbowSpeed, 1, 20);
+            RbSpeedValueText.Text = Math.Clamp(settings.BetterRgbRainbowSpeed, 1, 20).ToString();
+            QsSpeedSlider.Value = Math.Clamp(settings.BetterRgbQuicksandSpeed, 1, 10);
+            QsSpeedValueText.Text = Math.Clamp(settings.BetterRgbQuicksandSpeed, 1, 10).ToString();
+            QsScaleSlider.Value = Math.Clamp(settings.BetterRgbQuicksandScale, 1, 10);
+            QsScaleValueText.Text = Math.Clamp(settings.BetterRgbQuicksandScale, 1, 10).ToString();
+            QsPicker.SetColors(ParseColorString(settings.BetterRgbQuicksandColors));
+            CuSpeedSlider.Value = Math.Clamp(settings.BetterRgbCurrentSpeed, 1, 10);
+            CuSpeedValueText.Text = Math.Clamp(settings.BetterRgbCurrentSpeed, 1, 10).ToString();
+            CuWidthSlider.Value = Math.Clamp(settings.BetterRgbCurrentWidth, 2, 8);
+            CuWidthValueText.Text = Math.Clamp(settings.BetterRgbCurrentWidth, 2, 8).ToString();
+            CuPicker.SetColors(ParseColorString(settings.BetterRgbCurrentColors));
+            TcSpeedSlider.Value = Math.Clamp(settings.BetterRgbTouchCurrentSpeed, 1, 10);
+            TcSpeedValueText.Text = Math.Clamp(settings.BetterRgbTouchCurrentSpeed, 1, 10).ToString();
+            TcWidthSlider.Value = Math.Clamp(settings.BetterRgbTouchCurrentWidth, 1, 5);
+            TcWidthValueText.Text = Math.Clamp(settings.BetterRgbTouchCurrentWidth, 1, 5).ToString();
+            TcPicker.SetColors(ParseColorString(settings.BetterRgbTouchCurrentColors));
+            SaBlurSlider.Value = Math.Clamp(settings.BetterRgbAmbientBlur, 1, 8);
+            SaBlurValueText.Text = Math.Clamp(settings.BetterRgbAmbientBlur, 1, 8).ToString();
+            SaResponseSlider.Value = Math.Clamp(settings.BetterRgbAmbientResponse, 1, 10);
+            SaResponseValueText.Text = Math.Clamp(settings.BetterRgbAmbientResponse, 1, 10).ToString();
+
+            UpdateStreamerRowsVisibility();
+            UpdateSpeedSliderRange();
+            UpdateBetterRgbEffectUi();
+
             int savedSeconds = settings.IdleTimerMinutes * 60;
             int closestIndex = 0;
             int closestDiff = int.MaxValue;
@@ -1271,7 +2070,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                 ColorB = ColorPicker.SelectedColor.B,
                 Brightness = (int)BrightnessSlider.Value,
                 EffectMode = (KeyboardEffect)cmbEffect.SelectedItem,
-                Speed = SliderToHidSpeed((int)SpeedSlider.Value),
+                // While the streamer engine is on, the slider carries the raw C
+                // speed (saved as BetterRgbSpeed); the firmware Speed byte keeps
+                // its last hardware-path value.
+                Speed = BetterRgbActive()
+                    ? (byte)Math.Clamp((int)(_settings?.Speed ?? 5), 1, 10)
+                    : SliderToHidSpeed((int)SpeedSlider.Value),
                 Direction = _currentDirection,
                 MultiColors = SerializeColors(MultiColorPicker.GetColors()),
                 IdleTimerEnabled = tsIdleTimer.IsChecked == true,
@@ -1282,9 +2086,76 @@ namespace Uniwill_Control_Utility.Views.Pages
                 PerKeyMode = ModeToggle.IsChecked == true,
                 PerKeyColors = savedPerKeyColors,
                 PerKeyPickerColor = $"{pickerColor.R},{pickerColor.G},{pickerColor.B}",
+                Engine = tsBetterRgbEngine.IsChecked == true && ModeToggle.IsChecked != true
+                    ? KeyboardEngine.BetterRGB : KeyboardEngine.Hardware,
+                TargetFps = _brFps,
+                BrightnessPercent = CurrentBrightnessPercent(),
+                BetterRgbSpeed = BetterRgbActive()
+                    ? Math.Clamp((int)SpeedSlider.Value, 1, SpeedRangeMax((KeyboardEffect)cmbEffect.SelectedItem))
+                    : 10,
+
+                // BetterRGB card controls (separate from the firmware card above).
+                BetterRgbMode = cmbBetterRgbEffect.SelectedItem is BetterRgbEffect brMode
+                    ? brMode : BetterRgbEffect.Breathing,
+                BetterRgbFps = _brFps,
+                BetterRgbBreathSpeed = Math.Clamp((int)BcSpeedSlider.Value, 1, 40),
+                BetterRgbBreathSmooth = Math.Clamp((int)BcSmoothSlider.Value, 2, 150),
+                BetterRgbBreathRandom = tsBcRandom.IsChecked == true,
+                BetterRgbBreathColor = SerializeColor1(BcColorPicker.SelectedColor),
+                BetterRgbWaveAngle = _brAngle,
+                BetterRgbWaveSpeed = Math.Clamp((int)WvSpeedSlider.Value, 1, 10),
+                BetterRgbSparkleSpeed = Math.Clamp((int)SpSpeedSlider.Value, 1, 10),
+                BetterRgbSparkleDensity = Math.Clamp((int)SpDensitySlider.Value, 3, 20),
+                BetterRgbReactiveRandom = tsRcRandom.IsChecked == true,
+                BetterRgbReactiveColor = SerializeColor1(RcColorPicker.SelectedColor),
+                BetterRgbReactiveDuration = _brDuration,
+                BetterRgbWheelSpeed = Math.Clamp((int)WhSpeedSlider.Value, 1, 10),
+                BetterRgbWheelReverse = tsWhReverse.IsChecked == true,
+                BetterRgbLightningSpeed = Math.Clamp((int)LtSpeedSlider.Value, 1, 10),
+                BetterRgbLightningSmooth = Math.Clamp((int)LtSmoothSlider.Value, 1, 20),
+                BetterRgbLightningWidth = Math.Clamp((int)LtWidthSlider.Value, 1, 4),
+                BetterRgbLightningConcurrent = Math.Clamp((int)LtConcurrentSlider.Value, 1, 4),
+                BetterRgbFlameSpeed = Math.Clamp((int)FlSpeedSlider.Value, 1, 10),
+                BetterRgbFlameSmooth = Math.Clamp((int)FlSmoothSlider.Value, 1, 20),
+                BetterRgbRainSpeed = Math.Clamp((int)RnSpeedSlider.Value, 1, 10),
+                BetterRgbRainDensity = Math.Clamp((int)RnDensitySlider.Value, 1, 5),
+                BetterRgbRainColorCount = Math.Clamp(RnPicker.GetColors().Count, 1, 5),
+                BetterRgbRainColors = SerializeColors(RnPicker.GetColors()),
+                BetterRgbMatrixSpeed = Math.Clamp((int)MtSpeedSlider.Value, 1, 10),
+                BetterRgbMatrixStyle = _brStyle,
+                BetterRgbMatrixDensity = Math.Clamp((int)MtDensitySlider.Value, 1, 5),
+                BetterRgbMatrixColorCount = Math.Clamp(MtPicker.GetColors().Count, 1, 3),
+                BetterRgbMatrixColors = SerializeColors(MtPicker.GetColors()),
+                BetterRgbStaticLayout = _brLayout,
+                BetterRgbStaticZones = Math.Clamp((int)StZonesSlider.Value, 1, 7),
+                BetterRgbStaticZoneColors = SerializeColors(StPicker.GetColors()),
+                BetterRgbRippleSpeed = Math.Clamp((int)RpSpeedSlider.Value, 1, 10),
+                BetterRgbRippleWidth = Math.Clamp((int)RpWidthSlider.Value, 1, 4),
+                BetterRgbRippleRandom = tsRpRandom.IsChecked == true,
+                BetterRgbRippleColor = SerializeColor1(RpColorPicker.SelectedColor),
+                BetterRgbRainbowSpeed = Math.Clamp((int)RbSpeedSlider.Value, 1, 20),
+                BetterRgbQuicksandSpeed = Math.Clamp((int)QsSpeedSlider.Value, 1, 10),
+                BetterRgbQuicksandScale = Math.Clamp((int)QsScaleSlider.Value, 1, 10),
+                BetterRgbQuicksandColors = SerializeColors(QsPicker.GetColors()),
+                BetterRgbCurrentSpeed = Math.Clamp((int)CuSpeedSlider.Value, 1, 10),
+                BetterRgbCurrentWidth = Math.Clamp((int)CuWidthSlider.Value, 2, 8),
+                BetterRgbCurrentColors = SerializeColors(CuPicker.GetColors()),
+                BetterRgbTouchCurrentSpeed = Math.Clamp((int)TcSpeedSlider.Value, 1, 10),
+                BetterRgbTouchCurrentWidth = Math.Clamp((int)TcWidthSlider.Value, 1, 5),
+                BetterRgbTouchCurrentColors = SerializeColors(TcPicker.GetColors()),
+                BetterRgbAmbientBlur = Math.Clamp((int)SaBlurSlider.Value, 1, 8),
+                BetterRgbAmbientResponse = Math.Clamp((int)SaResponseSlider.Value, 1, 10),
             };
             KeyboardSettingsService.Save(settings);
             Debug.WriteLine($"[KBD] SaveSettings: PerKeyMode={settings.PerKeyMode}, PerKeyColors={(string.IsNullOrEmpty(savedPerKeyColors) ? "null" : "saved")}");
+        }
+
+        private static string SerializeColor1(Color c) => $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+
+        private static Color ParseColorOr(string data, Color fallback)
+        {
+            var colors = ParseColorString(data);
+            return colors.Count > 0 ? colors[0] : fallback;
         }
 
         private static string SerializeColors(List<Color> colors)
@@ -1542,9 +2413,12 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             ModeToggle.IsEnabled = enabled;
             tsIdleTimer.IsEnabled = enabled;
+            tsBetterRgbEngine.IsEnabled = enabled;
             IdleTimerCard.IsEnabled = enabled;
             cmbIdleTimer.IsEnabled = enabled;
-            BrightnessSlider.IsEnabled = enabled;
+            // The firmware Brightness row is replaced by the streamer's 0-100 row
+            // while the engine is on — keep it disabled in that case.
+            BrightnessSlider.IsEnabled = enabled && tsBetterRgbEngine.IsChecked != true;
             BrightnessSliderPerKey.IsEnabled = enabled;
             tsKeyboardPower.IsEnabled = enabled;
             cmbEffect.IsEnabled = enabled;

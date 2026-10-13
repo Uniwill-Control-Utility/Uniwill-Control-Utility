@@ -78,6 +78,7 @@ We do not mind features/code created with the assistance of AI, as long as it's 
 ## Features replicated from XMG's Control Center
  - Performance profiles
  - Keyboard global/per-key RGB control
+ - BetterRGB software streamer engine (adaptive 15–60 FPS, default 30, on the ITE 0xFF03 RGB interface, AC auto-policy, wake resume)
  - Light Bar RGB control
  - Liquid Cooler control
  - CPU and GPU Fan Control
@@ -226,6 +227,7 @@ Per-key and global RGB keyboard backlight control via the ITE HID controller.
 - Touch reactive toggle for Ripple, Aurora, Spark, and Random effects
 - Idle timer — Auto-turn-off backlight after configurable inactivity
 - On/off toggle and brightness slider
+- **BetterRGB Streamer Engine** — opt-in software mode ported from the open-source [BetterRGB-ITE8291-Adaptive](https://github.com/ZavierChen/BetterRGB-ITE8291-Adaptive) engine: all 16 effects (breathing, wave, sparkle, reactive, wheel, lightning, flame, raindrop, matrix, static, ripple, rainbow, quicksand, current, touch current, screen ambient) rendered in software and streamed on the dedicated ITE 0xFF03 RGB interface with the reference's interleaved 512-byte framing, at 15/30/45/60 FPS (button-selected, default 30; the pacer self-degrades if the device lags). Its own Effects card carries the full reference control set per effect (speeds, smoothness, widths, densities, multi-color palettes capped per effect — up to 5 for Raindrop, 3 for Matrix/Quicksand/Current/Touch Current, random-color toggles, reactive duration, matrix styles, ambient blur/response, and Wave direction arrow buttons at 45° increments) — the firmware Effects card stays separate. 2–100 software brightness, keypress-driven reactive/ripple/touch-current via the system key-state hook, AC auto-policy (plugged → streamer, on battery → firmware effects at 0% CPU), sleep/wake resume, a 3-attempt watchdog that falls back to Hardware MCU, and a live status line (running FPS + frame counter). On a normal UCU exit the engine hands the keyboard a static white firmware effect at the second-lowest brightness (in-memory only, never persisted) so the keyboard never goes black. Off by default — the hardware path is byte-identical
 - White-backlight-only mode for keyboards without RGB
 
 ![Keyboard](screenshots/keyboard.png)
@@ -370,6 +372,7 @@ UCU builds on the work of many open-source projects and reverse-engineering effo
 - [watercooler-manager (GitHub)](https://github.com/tomups/watercooler-manager) by tomups — Primary reference for the LCT watercooler BLE protocol. The Python implementation confirmed the Nordic UART UUIDs, frame format, and command byte values.
 - [UCC (GitHub)](https://github.com/nanomatters/ucc) by nanomatters — Reference for the LCT watercooler protocol (BLE connection lifecycle, error recovery, state management) and for the ITE 8291 keyboard HID controller protocol (HID device enumeration, ACPI interface, zone-based control commands).
 - [tuxedo-drivers (GitLab)](https://gitlab.com/tuxedocomputers/development/packages/tuxedo-drivers) by TUXEDO Computers — Authoritative reference for the ITE 8291 per-key RGB protocol. The Linux kernel driver (`src/ite_8291/ite_8291.c`) provided the exact byte layouts for UserMode entry, row announcement, and the 65-byte BGR-planar output report format. Also provided the EC register definitions (`src/uniwill_interfaces.h`) for NVIDIA GPU power control on Schenker/XMG laptops (cTGP/TPP/DB offset registers and the `0x0743` enable register).
+- [BetterRGB-ITE8291-Adaptive (GitHub)](https://github.com/ZavierChen/BetterRGB-ITE8291-Adaptive) by ZavierChen — Primary reference for UCU's BetterRGB software streamer engine. Its `better_rgb.c` established the RGB runtime-mode negotiation on the ITE 0xFF03/MI_01 HID interface, the synchronous interleaved 512-byte frame transport (one SetFeature + eight 65-byte writes per frame), the 102-entry KEYMAP frame layout, and the full per-effect animation math for all 16 effects, all ported into UCU's software renderer.
 
 - **MechControl** (decompiled, closed-source) — Original by Okashira (Discord: defty1234), fork by [Heavyfail (GitHub)](https://github.com/Heavyfail). Schenker/Mechrevo utility. Source for the global keyboard effects protocol (zone-based 9-byte HID feature reports), MiniLED Local Dimming control (WMI `AcpiTest_MULong` / `GetSetULong` invocation pattern), and UWACPIDriver.sys IOCTL codes (0x9C40A488/0x9C40A48C) for direct EC access.
 - **XMG Control Center / GCUService.exe** (closed-source) — Official Schenker/XMG utility. Studied for HID device communication patterns, handle acquisition, GPU power control EC register sequences (via `GPUInfoDLL.dll` and `ACPIDriverDll.dll` binary analysis), and NVRAM GUID/variable names for GPU mode persistence.
