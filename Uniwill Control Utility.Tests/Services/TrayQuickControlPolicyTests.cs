@@ -22,9 +22,11 @@ public sealed class TrayQuickControlPolicyTests
             hasMiniLedPanel: false,
             flydigiDeviceAvailable: false,
             flydigiEnabled: false,
+            refreshRateSwitchable: false,
             features: new FeatureNavigationPreferences(false, false, false, false, false));
 
         Assert.False(policy.ShowTgp);
+        Assert.False(policy.ShowRefreshRate);
         Assert.False(policy.ShowHydro);
         Assert.True(policy.PresetEnabled);
         Assert.True(policy.TdpEnabled);
@@ -48,9 +50,11 @@ public sealed class TrayQuickControlPolicyTests
             hasMiniLedPanel: false,
             flydigiDeviceAvailable: false,
             flydigiEnabled: false,
+            refreshRateSwitchable: true,
             features: new FeatureNavigationPreferences(false, false, false, false, false));
 
         Assert.True(policy.ShowTgp);
+        Assert.True(policy.ShowRefreshRate);
         Assert.True(policy.ShowHydro);
         Assert.False(policy.PresetEnabled);
         Assert.False(policy.TdpEnabled);

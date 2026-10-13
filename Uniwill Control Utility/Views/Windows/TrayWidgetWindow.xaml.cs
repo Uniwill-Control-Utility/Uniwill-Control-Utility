@@ -12,6 +12,7 @@ using System.Windows.Threading;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
+using Serilog;
 using Screen = System.Windows.Forms.Screen;
 
 namespace Uniwill_Control_Utility.Views.Windows
@@ -106,6 +107,13 @@ namespace Uniwill_Control_Utility.Views.Windows
             // Display navigation slot — always visible.
             SlotDisplay.Visibility = Visibility.Visible;
 
+            // Recalculate UniformGrid rows based on visible children so collapsed
+            // items don't leave gaps and buttons flow left-to-right, top-to-bottom.
+            // Runs before the Display-page sync below: the slots carry no Grid.Row/
+            // Column in XAML, so the quicksettings grid must be placed even if a
+            // later sync fails.
+            UpdateButtonGridRows();
+
             // In-tray Display page sections (harmless to sync while PageDisplay is collapsed).
             OptimusSection.Visibility = snapshot.GpuModeHybrid ? Visibility.Visible : Visibility.Collapsed;
             MiniLedSection.Visibility = policy.ShowLocalDimming ? Visibility.Visible : Visibility.Collapsed;
@@ -118,9 +126,16 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             UpdateTrayPowerSavingButtons(snapshot.GpuPowerSavingMode);
 
-            // Recalculate UniformGrid rows based on visible children so collapsed
-            // items don't leave gaps and buttons flow left-to-right, top-to-bottom.
-            UpdateButtonGridRows();
+            // Fenced: a refresh-rate sync failure must never skip the grid placement above.
+            try
+            {
+                RefreshRateSection.Visibility = policy.ShowRefreshRate ? Visibility.Visible : Visibility.Collapsed;
+                UpdateTrayRefreshRateButtons(snapshot.RefreshRateHz, snapshot.GpuModeDgpuOnly);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Tray] Refresh rate sync failed: {Message}", ex.Message);
+            }
         }
 
         private static void ApplyToggle(
@@ -189,6 +204,9 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             ButtonsGrid.Visibility = _displayPage ? Visibility.Collapsed : Visibility.Visible;
             PageDisplay.Visibility = _displayPage ? Visibility.Visible : Visibility.Collapsed;
+
+            // Grow the page when the refresh-rate section is present (up to two rows) so it does not clip.
+            PageDisplay.Height = 298 + (RefreshRateSection.Visibility == Visibility.Visible ? 130 : 0);
         }
 
         /// <summary>
@@ -203,6 +221,69 @@ namespace Uniwill_Control_Utility.Views.Windows
             BtnTrayPowerSavingOn.Style = mode == 0 ? activeStyle : inactiveStyle;
             BtnTrayPowerSavingAuto.Style = mode == 2 ? activeStyle : inactiveStyle;
             BtnTrayPowerSavingOff.Style = mode == 1 ? activeStyle : inactiveStyle;
+        }
+
+        /// <summary>
+        /// Shows exactly the rates the display in use offers (collapsed otherwise),
+        /// styles the active one, and reflows the visible buttons into the 5-column
+        /// grid — mirroring the Display page's UpdateRefreshRateButtons.
+        /// </summary>
+        private void UpdateTrayRefreshRateButtons(int currentHz, bool dGpuOnly)
+        {
+            Style? inactiveStyle = (Style)Resources["TrayModeButtonStyle"];
+            Style? activeStyle = (Style)Resources["TrayModeButtonActiveStyle"];
+
+            System.Windows.Controls.StackPanel[] slots =
+                new System.Windows.Controls.StackPanel[]
+                {
+                    SlotTrayRefreshRate60, SlotTrayRefreshRate75, SlotTrayRefreshRate90,
+                    SlotTrayRefreshRate100, SlotTrayRefreshRate120, SlotTrayRefreshRate144,
+                    SlotTrayRefreshRate165, SlotTrayRefreshRate240, SlotTrayRefreshRate300
+                };
+            System.Windows.Controls.Button[] buttons =
+                new System.Windows.Controls.Button[]
+                {
+                    BtnTrayRefreshRate60, BtnTrayRefreshRate75, BtnTrayRefreshRate90,
+                    BtnTrayRefreshRate100, BtnTrayRefreshRate120, BtnTrayRefreshRate144,
+                    BtnTrayRefreshRate165, BtnTrayRefreshRate240, BtnTrayRefreshRate300
+                };
+            int[] hzValues = new int[] { 60, 75, 90, 100, 120, 144, 165, 240, 300 };
+
+            for (int i = 0; i < slots.Length; i++)
+            {
+                buttons[i].Style = currentHz == hzValues[i] ? activeStyle : inactiveStyle;
+                slots[i].Visibility = TrayRefreshRateAvailable(hzValues[i], dGpuOnly) ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            // Reflow visible slots left-to-right, wrapping at 5 per row (the Grid's
+            // children are the StackPanel wrappers, not the buttons). Collapsed slots
+            // are left untouched — they render nothing, and -1 indices are rejected
+            // by this WPF's grid placement validation.
+            const int Columns = 5;
+            int slot = 0;
+            foreach (System.Windows.Controls.StackPanel panel in slots)
+            {
+                if (panel.Visibility != Visibility.Visible)
+                    continue;
+
+                System.Windows.Controls.Grid.SetRow(panel, slot / Columns);
+                System.Windows.Controls.Grid.SetColumn(panel, slot % Columns);
+                slot++;
+            }
+        }
+
+        private static bool TrayRefreshRateAvailable(int hz, bool dGpuOnly)
+        {
+            try
+            {
+                var rates = Uniwill_Control_Utility.Scripts.Misc.Display.GetOfferedRefreshRates(
+                    Uniwill_Control_Utility.Scripts.Misc.Display.CurrentDisplayName(), dGpuOnly);
+                return rates.Contains(hz);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         #region Toggle Handlers
@@ -318,6 +399,21 @@ namespace Uniwill_Control_Utility.Views.Windows
                 // On failure the persisted mode is untouched, so the snapshot re-fetch
                 // inside ApplyAsync restores the previous active style.
                 _ = await _quickControl.SetGpuPowerSavingAsync(mode);
+            });
+        }
+
+        private async void BtnTrayRefreshRate_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Button btn)
+                return;
+            if (btn.Tag is not string tag || !int.TryParse(tag, out int hz))
+                return;
+
+            await ApplyAsync(async () =>
+            {
+                // On failure the live rate is unchanged, so the snapshot re-fetch
+                // inside ApplyAsync restores the previous active style.
+                _ = await _quickControl.SetRefreshRateAsync(hz);
             });
         }
 

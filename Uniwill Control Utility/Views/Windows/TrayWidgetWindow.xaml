@@ -773,6 +773,126 @@
                                       Margin="0,-4,0,0"/>
                     </Grid>
 
+                    <!-- Display refresh rate (panels offering multiple rates only) -->
+                    <StackPanel x:Name="RefreshRateSection" Visibility="Collapsed" Margin="0,16,0,0">
+                        <ui:TextBlock FontSize="14"
+                                      FontWeight="SemiBold"
+                                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                      Text="Refresh Rate"
+                                      Margin="16,0,2,8"/>
+                        <Grid Width="320" HorizontalAlignment="Center" Margin="-5,8,5,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel x:Name="SlotTrayRefreshRate60" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrayRefreshRate60" Width="60" Height="42"
+                                        Style="{StaticResource TrayModeButtonStyle}"
+                                        Tag="60"
+                                        Click="BtnTrayRefreshRate_Click">
+                                    <ui:TextBlock FontSize="10"
+                                                  HorizontalAlignment="Center"
+                                                  Text="60 Hz"
+                                                  Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel x:Name="SlotTrayRefreshRate75" Grid.Row="0" Grid.Column="1" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrayRefreshRate75" Width="60" Height="42"
+                                        Style="{StaticResource TrayModeButtonStyle}"
+                                        Tag="75"
+                                        Click="BtnTrayRefreshRate_Click">
+                                    <ui:TextBlock FontSize="10"
+                                                  HorizontalAlignment="Center"
+                                                  Text="75 Hz"
+                                                  Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel x:Name="SlotTrayRefreshRate90" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrayRefreshRate90" Width="60" Height="42"
+                                        Style="{StaticResource TrayModeButtonStyle}"
+                                        Tag="90"
+                                        Click="BtnTrayRefreshRate_Click">
+                                    <ui:TextBlock FontSize="10"
+                                                  HorizontalAlignment="Center"
+                                                  Text="90 Hz"
+                                                  Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel x:Name="SlotTrayRefreshRate100" Grid.Row="0" Grid.Column="3" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrayRefreshRate100" Width="60" Height="42"
+                                        Style="{StaticResource TrayModeButtonStyle}"
+                                        Tag="100"
+                                        Click="BtnTrayRefreshRate_Click">
+                                    <ui:TextBlock FontSize="10"
+                                                  HorizontalAlignment="Center"
+                                                  Text="100 Hz"
+                                                  Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel x:Name="SlotTrayRefreshRate120" Grid.Row="0" Grid.Column="4" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrayRefreshRate120" Width="60" Height="42"
+                                        Style="{StaticResource TrayModeButtonStyle}"
+                                        Tag="120"
+                                        Click="BtnTrayRefreshRate_Click">
+                                    <ui:TextBlock FontSize="10"
+                                                  HorizontalAlignment="Center"
+                                                  Text="120 Hz"
+                                                  Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel x:Name="SlotTrayRefreshRate144" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrayRefreshRate144" Width="60" Height="42"
+                                        Style="{StaticResource TrayModeButtonStyle}"
+                                        Tag="144"
+                                        Click="BtnTrayRefreshRate_Click">
+                                    <ui:TextBlock FontSize="10"
+                                                  HorizontalAlignment="Center"
+                                                  Text="144 Hz"
+                                                  Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel x:Name="SlotTrayRefreshRate165" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrayRefreshRate165" Width="60" Height="42"
+                                        Style="{StaticResource TrayModeButtonStyle}"
+                                        Tag="165"
+                                        Click="BtnTrayRefreshRate_Click">
+                                    <ui:TextBlock FontSize="10"
+                                                  HorizontalAlignment="Center"
+                                                  Text="165 Hz"
+                                                  Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel x:Name="SlotTrayRefreshRate240" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrayRefreshRate240" Width="60" Height="42"
+                                        Style="{StaticResource TrayModeButtonStyle}"
+                                        Tag="240"
+                                        Click="BtnTrayRefreshRate_Click">
+                                    <ui:TextBlock FontSize="10"
+                                                  HorizontalAlignment="Center"
+                                                  Text="240 Hz"
+                                                  Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel x:Name="SlotTrayRefreshRate300" Grid.Row="1" Grid.Column="3" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrayRefreshRate300" Width="60" Height="42"
+                                        Style="{StaticResource TrayModeButtonStyle}"
+                                        Tag="300"
+                                        Click="BtnTrayRefreshRate_Click">
+                                    <ui:TextBlock FontSize="10"
+                                                  HorizontalAlignment="Center"
+                                                  Text="300 Hz"
+                                                  Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
                     <!-- Nvidia Optimus runtime switch (Hybrid display mode only) -->
                     <StackPanel x:Name="OptimusSection" Visibility="Collapsed" Margin="0,12,0,12">
                         <ui:TextBlock FontSize="14"
@@ -886,10 +1006,11 @@
                                              OffContent="Off"
                                              VerticalAlignment="Center"
                                              Checked="TrayTsLocalDimming_Toggled"
-                                             Unchecked="TrayTsLocalDimming_Toggled" 
+                                             Unchecked="TrayTsLocalDimming_Toggled"
                                              Margin="0,0,30,0"/>
                         </Grid>
                     </StackPanel>
+
                 </StackPanel>
             </Grid>
         </Border>

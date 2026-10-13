@@ -221,6 +221,12 @@
     <Setting Name="GpuPowerSavingPluggedIn" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">1</Value>
     </Setting>
+    <Setting Name="RefreshRateBattery" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="RefreshRatePluggedIn" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
     <Setting Name="EnableQKeyButtonIntercept" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>

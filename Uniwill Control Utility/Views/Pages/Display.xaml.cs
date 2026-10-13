@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Management;
 using System.Runtime.InteropServices;
@@ -35,6 +36,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool _isAdministrator;
         private bool _isNvramAvailable;
         private bool _localDimmingToggling;
+        private bool _refreshRateBusy;
 
         // Delayed refresh timer created after each user change.
 
@@ -53,6 +55,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private const byte EcLocalDimmingBit = 0x02;
         private DispatcherTimer? _delayTimer;
         private DispatcherTimer? _cooldownTimer;
+        private DispatcherTimer? _statusTimer;
 
         // Shared across page instances (AddScoped creates a new page on each navigation).
         private static DateTime _lastUserApplyTime;
@@ -130,12 +133,21 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Show MiniLED card only on MiniLED panels
             CardLocalDimming.Visibility = App.HasMiniLEDPanel ? Visibility.Visible : Visibility.Collapsed;
+
+            // Show the refresh-rate card only when the panel offers more than one rate
+            CardRefreshRate.Visibility = AvailableRefreshRates().Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         /// <inheritdoc />
         public async Task OnNavigatedToAsync()
         {
             SyncFromEcAndRefresh();
+
+            // Keep the bottom-bar monitor status live: follows display switches
+            // (internal panel <-> external monitor) and resolution changes.
+            _statusTimer ??= new DispatcherTimer(TimeSpan.FromSeconds(5), DispatcherPriority.Normal,
+                (s, e) => tbRefreshRateTarget.Text = RefreshRateLabel(), Dispatcher);
+            _statusTimer.Start();
         }
 
         /// <inheritdoc />
@@ -247,6 +259,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 tsLocalDimming.IsChecked = Settings.Default.DisplayLocalDimming;
             }
+
+            // Sync the refresh-rate combo from the live Windows display mode
+            UpdateRefreshRateCombo(GetRefreshRateSafe());
 
             RefreshAll();
             _isLoaded = true;
@@ -467,6 +482,161 @@ namespace Uniwill_Control_Utility.Views.Pages
             RefreshAll();
         }
 
+        #region Display Refresh Rate
+
+        /// <summary>
+        /// The display in use — the primary (taskbar) display. Follows the user to an
+        /// external monitor when that monitor is primary, mirroring OpenRevo's
+        /// is_primary/is_internal monitor model.
+        /// </summary>
+        private string? RefreshRateTarget()
+        {
+            try
+            {
+                return Uniwill_Control_Utility.Scripts.Misc.Display.CurrentDisplayName();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private int GetRefreshRateSafe()
+        {
+            try
+            {
+                return Uniwill_Control_Utility.Scripts.Misc.Display.GetCurrentRefreshRate(RefreshRateTarget());
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        /// <summary>True while the runtime mux mode is dGPU-only (unlocks the 300 Hz internal-panel mode).</summary>
+        private bool IsDgpuOnlyMode()
+        {
+            try
+            {
+                return _ecService is not null
+                    && _ecService.GetCurrentGpuMuxMode() == UniwillECService.GpuMuxMode.DgpuOnly;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private List<int> AvailableRefreshRates()
+        {
+            try
+            {
+                return Uniwill_Control_Utility.Scripts.Misc.Display.GetOfferedRefreshRates(
+                    RefreshRateTarget(), IsDgpuOnlyMode());
+            }
+            catch
+            {
+                return new List<int>();
+            }
+        }
+
+        /// <summary>
+        /// "Internal panel — 2560×1600" / "External monitor — 1920×1080" for the display in use.
+        /// </summary>
+        private string RefreshRateLabel()
+        {
+            var target = RefreshRateTarget();
+            if (target is null)
+                return "--";
+
+            bool isInternalPanel = Uniwill_Control_Utility.Scripts.Misc.Display.IsInternalDisplay(target);
+            var resolution = Uniwill_Control_Utility.Scripts.Misc.Display.GetDisplayResolution(target);
+            var size = resolution.Length > 0 ? $" — {resolution}" : string.Empty;
+            return (isInternalPanel ? "Internal panel" : "External monitor") + size;
+        }
+
+        /// <summary>
+        /// Rebuilds the combo box with exactly the rates the display in use offers,
+        /// selected at the current one. The programmatic selection detaches the
+        /// handler so the sync does not re-apply the setting.
+        /// </summary>
+        private void UpdateRefreshRateCombo(int currentHz)
+        {
+            var rates = AvailableRefreshRates();
+
+            cbRefreshRate.Items.Clear();
+            int selectedIndex = -1;
+            for (int i = 0; i < rates.Count; i++)
+            {
+                cbRefreshRate.Items.Add(new ComboBoxItem { Content = $"{rates[i]} Hz", Tag = rates[i] });
+                if (rates[i] == currentHz)
+                    selectedIndex = i;
+            }
+
+            // Monitor status first — it must refresh even if the selection sync below fails.
+            tbRefreshRateTarget.Text = RefreshRateLabel();
+
+            if (selectedIndex >= 0)
+            {
+                cbRefreshRate.SelectionChanged -= cbRefreshRate_SelectionChanged;
+                try
+                {
+                    cbRefreshRate.SelectedIndex = selectedIndex;
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("[Display] Refresh rate selection sync failed: {Message}", ex.Message);
+                }
+                finally
+                {
+                    cbRefreshRate.SelectionChanged += cbRefreshRate_SelectionChanged;
+                }
+            }
+        }
+
+        private void cbRefreshRate_SelectionChanged(object sender, EventArgs e)
+        {
+            if (!_isLoaded || _refreshRateBusy)
+                return;
+
+            if (cbRefreshRate.SelectedItem is not ComboBoxItem item || item.Tag is not int hz)
+                return;
+
+            // Ignore selection of the rate that is already active
+            if (hz == GetRefreshRateSafe())
+                return;
+
+            _refreshRateBusy = true;
+
+            // The GDI mode switch can take ~1s — keep it off the UI thread.
+            _ = Task.Run(() =>
+            {
+                var target = RefreshRateTarget();
+                try
+                {
+                    Uniwill_Control_Utility.Scripts.Misc.Display.ChangeDisplaySettings(target, hz);
+                }
+                catch (Exception ex)
+                {
+                    Log.Information("[Display] [ERROR] Refresh rate apply failed: {Message}", ex.Message);
+                }
+
+                // Verify via readback — ApplySettings reports failures only to the console.
+                int applied = GetRefreshRateSafe();
+                bool success = applied == hz;
+                Log.Information("[Display] Refresh rate set to {Applied} Hz (requested {Hz} Hz, success: {Success})",
+                    applied, hz, success);
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    UpdateRefreshRateCombo(applied);
+                    _refreshRateBusy = false;
+                });
+            });
+        }
+
+        #endregion
+
         private void btnRestartNow_Click(object sender, RoutedEventArgs e)
         {
             // Initiate system restart
@@ -516,6 +686,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                     Debug.WriteLine($"[Display] Failed to read MUX mode: {ex.Message}");
                 }
             }
+
+            // The refresh-rate combo tracks the live Windows display mode
+            UpdateRefreshRateCombo(GetRefreshRateSafe());
 
             RefreshGpuInfo();
         }

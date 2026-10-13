@@ -29,6 +29,8 @@ namespace Uniwill_Control_Utility.Services
         bool ShowOverlay,
         /// <summary>Whether the Flydigi RGB toggle should be visible (device + feature enabled).</summary>
         bool ShowFlydigiRgb,
+        /// <summary>Whether the in-tray refresh-rate row should be visible (panel offers multiple rates).</summary>
+        bool ShowRefreshRate,
         /// <summary>Whether the Fan Smart Mode toggle should be disabled (adaptive mode controls it).</summary>
         bool DisableFanSmartMode,
         /// <summary>Whether the Hydro UI Smart Mode toggle should be disabled (adaptive mode controls it).</summary>
@@ -56,6 +58,7 @@ namespace Uniwill_Control_Utility.Services
             bool hasMiniLedPanel,
             bool flydigiDeviceAvailable,
             bool flydigiEnabled,
+            bool refreshRateSwitchable,
             FeatureNavigationPreferences features)
         {
             return new TrayQuickControlPolicy(
@@ -77,6 +80,7 @@ namespace Uniwill_Control_Utility.Services
                 ShowLocalDimming: hasMiniLedPanel,
                 ShowOverlay: features.Overlay,
                 ShowFlydigiRgb: flydigiEnabled && flydigiDeviceAvailable,
+                ShowRefreshRate: refreshRateSwitchable,
                 DisableFanSmartMode: adaptiveFanEnabled,
                 DisableHydroSmartMode: adaptiveWaterCoolerEnabled,
                 DisableHydroRgb: adaptiveWaterCoolerEnabled,

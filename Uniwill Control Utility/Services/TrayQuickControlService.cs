@@ -24,7 +24,9 @@ namespace Uniwill_Control_Utility.Services
         bool OverlayOn,
         bool FlydigiRgbOn,
         bool GpuModeHybrid,
-        int GpuPowerSavingMode);
+        bool GpuModeDgpuOnly,
+        int GpuPowerSavingMode,
+        int RefreshRateHz);
 
     public sealed class TrayQuickControlService
     {
@@ -76,13 +78,30 @@ namespace Uniwill_Control_Utility.Services
             // read is the right condition here (not the persisted NVRAM value): power
             // saving is a runtime feature and NVRAM access is admin-gated.
             bool gpuModeHybrid = true;
+            bool gpuModeDgpuOnly = false;
             try
             {
-                gpuModeHybrid = _ec.GetCurrentGpuMuxMode() == UniwillECService.GpuMuxMode.Hybrid;
+                var muxMode = _ec.GetCurrentGpuMuxMode();
+                gpuModeHybrid = muxMode == UniwillECService.GpuMuxMode.Hybrid;
+                gpuModeDgpuOnly = muxMode == UniwillECService.GpuMuxMode.DgpuOnly;
             }
             catch (Exception ex)
             {
                 Log.Warning("[Tray] GPU mux mode read failed: {Message}", ex.Message);
+            }
+
+            // Live Windows display mode refresh rate for the display in use (primary).
+            int refreshRateHz = 0;
+            bool refreshRateSwitchable = false;
+            try
+            {
+                var refreshTarget = Display.CurrentDisplayName();
+                refreshRateHz = Display.GetCurrentRefreshRate(refreshTarget);
+                refreshRateSwitchable = Display.GetOfferedRefreshRates(refreshTarget, gpuModeDgpuOnly).Count > 1;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Tray] Refresh rate read failed: {Message}", ex.Message);
             }
 
             var features = new FeatureNavigationPreferences(
@@ -113,6 +132,7 @@ namespace Uniwill_Control_Utility.Services
                 hasMiniLedPanel: hasMiniLed,
                 flydigiDeviceAvailable: flydigiAvailable,
                 flydigiEnabled: flydigiEnabled,
+                refreshRateSwitchable: refreshRateSwitchable,
                 features: features);
 
             var waterSettings = _waterCooler.GetSettings();
@@ -133,7 +153,9 @@ namespace Uniwill_Control_Utility.Services
                 OverlayOn: overlayOptions.Enabled,
                 FlydigiRgbOn: flydigiSettings.RgbMode != "Off",
                 GpuModeHybrid: gpuModeHybrid,
-                GpuPowerSavingMode: Settings.Default.GpuPowerSavingMode);
+                GpuModeDgpuOnly: gpuModeDgpuOnly,
+                GpuPowerSavingMode: Settings.Default.GpuPowerSavingMode,
+                RefreshRateHz: refreshRateHz);
         }
 
         #region Toggle Handlers
@@ -378,6 +400,32 @@ namespace Uniwill_Control_Utility.Services
             catch (Exception ex)
             {
                 Log.Warning("[Tray] GPU power saving switch failed: {Message}", ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Switches the internal panel's refresh rate via the Windows display-mode
+        /// pathway (mirrors the Display page's btnRefreshRate_Click core). Returns
+        /// true when the readback confirms the requested rate.
+        /// </summary>
+        public async Task<bool> SetRefreshRateAsync(int hz)
+        {
+            try
+            {
+                var target = Display.CurrentDisplayName();
+                Display.ChangeDisplaySettings(target, hz);
+
+                // Verify via readback — the engine reports failures only to the console.
+                int applied = Display.GetCurrentRefreshRate(target);
+                bool success = applied == hz;
+                Log.Information("[Tray] Display refresh rate set to {Applied} Hz (requested {Hz} Hz, success: {Success})",
+                    applied, hz, success);
+                return success;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Tray] Display refresh rate apply failed: {Message}", ex.Message);
                 return false;
             }
         }

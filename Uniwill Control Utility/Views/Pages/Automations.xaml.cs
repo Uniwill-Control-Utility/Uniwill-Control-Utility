@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Threading.Tasks;
 using Serilog;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
@@ -39,6 +40,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Restore GPU Power Saving selections from settings
             setGpuPowerSavingBattery(Settings.Default.GpuPowerSavingBattery);
             setGpuPowerSavingPluggedIn(Settings.Default.GpuPowerSavingPluggedIn);
+
+            // Populate internal-panel refresh-rate ComboBoxes and restore selections
+            PopulateRefreshRateComboBoxes();
+            setRefreshRateBattery(Settings.Default.RefreshRateBattery);
+            setRefreshRatePluggedIn(Settings.Default.RefreshRatePluggedIn);
+            UpdateRefreshRateVisibility();
 
             setup = true;
         }
@@ -361,6 +368,109 @@ namespace Uniwill_Control_Utility.Views.Pages
             else
             {
                 cbxGpuPowerSavingPluggedIn.SelectedIndex = 2; // Default to Auto
+            }
+        }
+
+        #endregion
+
+        #region Internal Panel Refresh Rate
+
+        private void PopulateRefreshRateComboBoxes()
+        {
+            PopulateRefreshRateComboBox(cbxRefreshRateBattery);
+            PopulateRefreshRateComboBox(cbxRefreshRatePluggedIn);
+        }
+
+        /// <summary>True while the runtime mux mode is dGPU-only (unlocks the 300 Hz mode).</summary>
+        private bool IsDgpuOnlyMode()
+        {
+            try
+            {
+                return _ecService is not null
+                    && _ecService.GetCurrentGpuMuxMode() == UniwillECService.GpuMuxMode.DgpuOnly;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Fills a ComboBox with the internal panel's offered rates (Tag carries the Hz
+        /// value so selection handlers never re-parse the label). 300 Hz appears only
+        /// while dGPU-only mux is active — Windows does not enumerate it otherwise.
+        /// </summary>
+        private void PopulateRefreshRateComboBox(ComboBox comboBox)
+        {
+            comboBox.Items.Clear();
+            foreach (int hz in Uniwill_Control_Utility.Scripts.Misc.Display.GetInternalRefreshRates(IsDgpuOnlyMode()))
+            {
+                comboBox.Items.Add(new ComboBoxItem { Content = $"{hz} Hz", Tag = hz });
+            }
+        }
+
+        // These target the internal panel only — always available, regardless of
+        // which display is in use (an external monitor never affects them).
+        private void UpdateRefreshRateVisibility()
+        {
+            CardRefreshRateBattery.Visibility = Visibility.Visible;
+            CardRefreshRatePluggedIn.Visibility = Visibility.Visible;
+        }
+
+        private static int SelectedRefreshRateHz(ComboBox comboBox)
+        {
+            return comboBox.SelectedItem is ComboBoxItem item && item.Tag is int hz ? hz : 0;
+        }
+
+        private static int IndexOfRefreshRateHz(ComboBox comboBox, int hz)
+        {
+            for (int i = 0; i < comboBox.Items.Count; i++)
+            {
+                if (comboBox.Items[i] is ComboBoxItem item && item.Tag is int tag && tag == hz)
+                    return i;
+            }
+            return -1;
+        }
+
+        private void setRefreshRateBattery(int hz)
+        {
+            cbxRefreshRateBattery.SelectedIndex = IndexOfRefreshRateHz(cbxRefreshRateBattery, hz);
+        }
+
+        private void setRefreshRatePluggedIn(int hz)
+        {
+            cbxRefreshRatePluggedIn.SelectedIndex = IndexOfRefreshRateHz(cbxRefreshRatePluggedIn, hz);
+        }
+
+        private void cbxRefreshRateBattery_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!setup) return;
+
+            int hz = SelectedRefreshRateHz(cbxRefreshRateBattery);
+            Settings.Default.RefreshRateBattery = hz;
+            Settings.Default.Save();
+
+            // Apply immediately if currently on battery
+            var powerStatus = System.Windows.Forms.SystemInformation.PowerStatus;
+            if (powerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline && hz > 0)
+            {
+                _ = Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyInternalRefreshRate(hz));
+            }
+        }
+
+        private void cbxRefreshRatePluggedIn_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!setup) return;
+
+            int hz = SelectedRefreshRateHz(cbxRefreshRatePluggedIn);
+            Settings.Default.RefreshRatePluggedIn = hz;
+            Settings.Default.Save();
+
+            // Apply immediately if currently plugged in
+            var powerStatus = System.Windows.Forms.SystemInformation.PowerStatus;
+            if (powerStatus.PowerLineStatus != System.Windows.Forms.PowerLineStatus.Offline && hz > 0)
+            {
+                _ = Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyInternalRefreshRate(hz));
             }
         }
 

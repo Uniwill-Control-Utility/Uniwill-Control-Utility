@@ -216,7 +216,170 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 : 0;
         }
 
+        /// <summary>
+        /// The display currently in use — the primary (taskbar) display. Unlike
+        /// FindLaptopScreen (always the internal panel), this follows the user to an
+        /// external monitor when that monitor is primary, mirroring OpenRevo's
+        /// per-monitor is_primary/is_internal monitor model.
+        /// </summary>
+        public static string? CurrentDisplayName()
+        {
+            return Screen.PrimaryScreen?.DeviceName ?? DefaultDevice;
+        }
+
+        /// <summary>
+        /// True when the given GDI device name is the laptop's internal panel, per the
+        /// DirectX display-device topology (Internal / DisplayportEmbedded output
+        /// technology). More robust than OpenRevo's monitor-name/resolution table.
+        /// </summary>
+        public static bool IsInternalDisplay(string? deviceName)
+        {
+            if (deviceName is null)
+                return false;
+
+            try
+            {
+                var screens = Screen.AllScreens;
+                var devices = GetAllDevices().ToArray();
+                for (int i = 0; i < devices.Length && i < screens.Length; i++)
+                {
+                    if (screens[i].DeviceName == deviceName)
+                    {
+                        return devices[i].outputTechnology == DisplayConfigOutputTechnology.Internal
+                            || devices[i].outputTechnology == DisplayConfigOutputTechnology.DisplayportEmbedded;
+                    }
+                }
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static int GetCurrentRefreshRate(string? targetDisplayName)
+        {
+            if (string.IsNullOrEmpty(targetDisplayName))
+                return 0;
+
+            DEVMODE devMode = new DEVMODE
+            {
+                dmSize = (short)Marshal.SizeOf<DEVMODE>()
+            };
+
+            return EnumDisplaySettings(targetDisplayName, EnumCurrentSettings, ref devMode)
+                ? devMode.dmDisplayFrequency
+                : 0;
+        }
+
+        public static List<int> GetAvailableRefreshRates(string? targetDisplayName)
+        {
+            return GetSupportedRefreshRates(targetDisplayName)
+                .Distinct()
+                .OrderByDescending(x => x)
+                .ToList();
+        }
+
+        /// <summary>Current mode resolution of the given display, e.g. "2560×1600".</summary>
+        public static string GetDisplayResolution(string? targetDisplayName)
+        {
+            if (string.IsNullOrEmpty(targetDisplayName))
+                return string.Empty;
+
+            DEVMODE devMode = new DEVMODE
+            {
+                dmSize = (short)Marshal.SizeOf<DEVMODE>()
+            };
+
+            return EnumDisplaySettings(targetDisplayName, EnumCurrentSettings, ref devMode)
+                ? $"{devMode.dmPelsWidth}×{devMode.dmPelsHeight}"
+                : string.Empty;
+        }
+
+        /// <summary>
+        /// The laptop's internal panel (null when the device has none). Matches each
+        /// GDI screen against the DirectX topology (Internal / DisplayportEmbedded),
+        /// so it never follows an external monitor when that one is primary.
+        /// </summary>
+        public static string? InternalPanelName()
+        {
+            try
+            {
+                var screens = Screen.AllScreens;
+                var devices = GetAllDevices().ToArray();
+                for (int i = 0; i < devices.Length && i < screens.Length; i++)
+                {
+                    if (devices[i].outputTechnology == DisplayConfigOutputTechnology.Internal
+                        || devices[i].outputTechnology == DisplayConfigOutputTechnology.DisplayportEmbedded)
+                    {
+                        return screens[i].DeviceName;
+                    }
+                }
+                return null;
+            }
+            catch
+            {
+                return FindLaptopScreen();
+            }
+        }
+
+        /// <summary>
+        /// Rates offered for a display: the GDI-enumerated set, plus the 300 Hz
+        /// internal-panel mode that Windows hides unless dGPU-only mux is active.
+        /// </summary>
+        public static List<int> GetOfferedRefreshRates(string? targetDisplayName, bool dGpuOnlyActive)
+        {
+            var rates = GetAvailableRefreshRates(targetDisplayName);
+            if (dGpuOnlyActive && IsInternalDisplay(targetDisplayName) && !rates.Contains(DgpuOnlyRefreshRate))
+                rates.Insert(0, DgpuOnlyRefreshRate);
+            return rates;
+        }
+
+        /// <summary>
+        /// Refresh rates offered for the internal panel (descending). When the panel
+        /// is not enumerable (lid closed / external-only — GDI hides a display that
+        /// is off), fall back to the panel's known mode set — the same offering XMG
+        /// Control Center shows. 300 Hz only while dGPU-only mux is active.
+        /// </summary>
+        public static List<int> GetInternalRefreshRates(bool dGpuOnlyActive)
+        {
+            var rates = GetOfferedRefreshRates(InternalPanelName(), dGpuOnlyActive);
+            if (rates.Count == 0)
+            {
+                rates = new List<int> { InternalPanelHighRefreshRate, InternalPanelBaseRefreshRate };
+                if (dGpuOnlyActive)
+                    rates.Insert(0, DgpuOnlyRefreshRate);
+            }
+            return rates;
+        }
+
+        /// <summary>Current refresh rate of the internal panel (0 when unavailable).</summary>
+        public static int GetInternalRefreshRate()
+        {
+            return GetCurrentRefreshRate(InternalPanelName());
+        }
+
+        /// <summary>
+        /// Applies a refresh rate to the internal panel only (0 = disabled, no-op).
+        /// Returns the applied rate verified by readback (0 when skipped).
+        /// </summary>
+        public static int ApplyInternalRefreshRate(int hz)
+        {
+            if (hz <= 0)
+                return 0;
+
+            var panel = InternalPanelName();
+            if (string.IsNullOrEmpty(panel))
+                return 0;
+
+            ChangeDisplaySettings(panel, hz);
+            return GetCurrentRefreshRate(panel);
+        }
+
         const int DispChangeSuccessful = 0;
+        const int DgpuOnlyRefreshRate = 300;
+        const int InternalPanelBaseRefreshRate = 60;
+        const int InternalPanelHighRefreshRate = 240;
         internal const uint EnumCurrentSettings = 0xFFFFFFFF;
 
         [Flags]

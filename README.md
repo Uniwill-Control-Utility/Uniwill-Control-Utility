@@ -84,6 +84,7 @@ We do not mind features/code created with the assistance of AI, as long as it's 
  - CPU and GPU Fan Control
  - Battery control
  - MiniLED Local Dimming control
+ - Display refresh rate control (display in use)
  - GPU MUX switch control (Hybrid / dGPU Only / iGPU Only)
  - GPU Power Saving (On / Off / Auto)
  - Performance button preset switching (physical Performance/Q-key button)
@@ -112,7 +113,7 @@ We do not mind features/code created with the assistance of AI, as long as it's 
 
 Simple metrics and toggles for quick changes.
 
-- **Display navigation page** — a Display button in the QuickSettings grid opens an in-tray page with the runtime Nvidia Optimus switch (iGPU / Auto / dGPU power saving, Hybrid mode only) and the MiniLED local dimming toggle (MiniLED panels only); a back button returns to the grid
+- **Display navigation page** — a Display button in the QuickSettings grid opens an in-tray page with the runtime Nvidia Optimus switch (iGPU / Auto / dGPU power saving, Hybrid mode only), the MiniLED local dimming toggle (MiniLED panels only), and the display refresh-rate row (panels offering multiple rates); a back button returns to the grid
 - **Title-bar hand-over button** — a button in the main window's title bar minimizes the main window and opens the mini-tray, mirroring a left-click on the tray icon
 
 ![Tray](screenshots/tray.png)
@@ -199,6 +200,8 @@ Set-and-forget rules that apply presets automatically when system state changes.
 - **Preset on System Resume** — Reapply settings after sleep or hibernation
 - **GPU Preference on Battery** — Set the GPU preference (iGPU / dGPU / Auto) when running on battery (Hybrid mode only)
 - **GPU Preference when Plugged In** — Set the GPU preference when connected to power (Hybrid mode only)
+- **Refresh Rate on Battery** — Set the internal panel's refresh rate when running on battery (internal panel only; 0 = off)
+- **Refresh Rate when Plugged In** — Set the internal panel's refresh rate when connected to power (internal panel only; 0 = off)
 
 ![Auto](screenshots/auto.png)
 
@@ -265,6 +268,7 @@ GPU display mode, GPU power management, and display panel controls (Uniwill EC h
 - **GPU Display Mode** (MUX switch) — Choose **Hybrid (NVIDIA Optimus)**, **dGPU Only**, or **iGPU Only**, with a visual MUX diagram. The choice is persisted to UEFI NVRAM so it survives restarts, and a system reboot is required for the physical MUX change to take effect.
 - **GPU Power Saving** (Hybrid mode only) — Live discrete-GPU power control without rebooting: **On (Power Saving)** disables the dGPU via PnP hotswap and routes rendering to the iGPU for maximum savings, **Off (Performance)** re-enables the dGPU, and **Auto** lets Windows/NVIDIA Optimus decide per application.
 - **MiniLED Local Dimming** (MiniLED panels only) — Toggle the panel's local dimming, verified with an EC register readback.
+- **Display Refresh Rate** (displays offering multiple rates) — Switch the refresh rate of the display in use (the primary/taskbar display — internal panel or external monitor) through the Windows display-mode pathway (`EnumDisplaySettings`/`ChangeDisplaySettingsEx`). The card header names the target and its current resolution; rates the display does not report are hidden and the visible buttons spread evenly across the row. The selection is persisted by Windows itself.
 - **GPU Information** — Live readout of the active MUX mode, GPU module ID, physical MUX hardware state, and the persisted NVRAM mode.
 
 ![Display](screenshots/display.png)

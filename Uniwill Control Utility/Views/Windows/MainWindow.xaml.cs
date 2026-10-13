@@ -400,6 +400,24 @@ namespace Uniwill_Control_Utility.Views.Windows
                 {
                     Log.Information("[Startup] GPU Power Saving apply failed: {Message}", ex.Message);
                 }
+
+                // Apply internal-panel refresh rate for the current power state (0 = off)
+                try
+                {
+                    var powerStatus = System.Windows.Forms.SystemInformation.PowerStatus;
+                    int hz = (powerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline)
+                        ? Settings.Default.RefreshRateBattery
+                        : Settings.Default.RefreshRatePluggedIn;
+                    if (hz > 0)
+                    {
+                        int applied = await Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyInternalRefreshRate(hz));
+                        Log.Information("[Startup] Internal panel refresh rate applied: {Hz} Hz", applied);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("[Startup] Internal panel refresh rate apply failed: {Message}", ex.Message);
+                }
             }
             catch (Exception ex)
             {
@@ -971,6 +989,21 @@ namespace Uniwill_Control_Utility.Views.Windows
                         {
                             Log.Information("[Automations] GPU Power Saving battery apply failed: {Message}", ex.Message);
                         }
+
+                        // Apply internal-panel refresh rate for battery (0 = off)
+                        try
+                        {
+                            int hz = Settings.Default.RefreshRateBattery;
+                            if (hz > 0)
+                            {
+                                int applied = await Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyInternalRefreshRate(hz));
+                                Log.Information("[Automations] Internal panel refresh rate applied for battery: {Hz} Hz", applied);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning("[Automations] Internal panel refresh rate battery apply failed: {Message}", ex.Message);
+                        }
                     }
 
                     // Apply GPU Power Saving setting for AC (plugged in)
@@ -986,6 +1019,21 @@ namespace Uniwill_Control_Utility.Views.Windows
                         catch (Exception ex)
                         {
                             Log.Information("[Automations] GPU Power Saving plugged-in apply failed: {Message}", ex.Message);
+                        }
+
+                        // Apply internal-panel refresh rate for plugged in (0 = off)
+                        try
+                        {
+                            int hz = Settings.Default.RefreshRatePluggedIn;
+                            if (hz > 0)
+                            {
+                                int applied = await Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyInternalRefreshRate(hz));
+                                Log.Information("[Automations] Internal panel refresh rate applied for plugged in: {Hz} Hz", applied);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning("[Automations] Internal panel refresh rate plugged-in apply failed: {Message}", ex.Message);
                         }
                     }
 
@@ -1124,6 +1172,24 @@ namespace Uniwill_Control_Utility.Views.Windows
                             catch (Exception ex)
                             {
                                 Debug.WriteLine($"[Resume] GPU Power Saving re-apply failed: {ex.Message}");
+                            }
+
+                            // Re-apply internal-panel refresh rate for the current power state (0 = off)
+                            try
+                            {
+                                var powerStatus = System.Windows.Forms.SystemInformation.PowerStatus;
+                                int hz = (powerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline)
+                                    ? Settings.Default.RefreshRateBattery
+                                    : Settings.Default.RefreshRatePluggedIn;
+                                if (hz > 0)
+                                {
+                                    int applied = await Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyInternalRefreshRate(hz));
+                                    Log.Information("[Resume] Internal panel refresh rate re-applied: {Hz} Hz", applied);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[Resume] Internal panel refresh rate re-apply failed: {ex.Message}");
                             }
 
                             // Re-apply Fan Control EC duties or restart Smart Fan Mode.

@@ -909,6 +909,22 @@ namespace Uniwill_Control_Utility.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int RefreshRateBattery {
+            get { return ((int)(this["RefreshRateBattery"])); }
+            set { this["RefreshRateBattery"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int RefreshRatePluggedIn {
+            get { return ((int)(this["RefreshRatePluggedIn"])); }
+            set { this["RefreshRatePluggedIn"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool EnableQKeyButtonIntercept {
             get { return ((bool)(this["EnableQKeyButtonIntercept"])); }

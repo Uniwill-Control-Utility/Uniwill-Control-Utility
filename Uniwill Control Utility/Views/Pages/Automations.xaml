@@ -252,6 +252,66 @@
                     </ui:CardControl.Header>
                 </ui:CardControl>
 
+                <!-- Internal-panel refresh rate on battery (hidden when the panel offers one rate) -->
+                <ui:CardControl x:Name="CardRefreshRateBattery"
+                                Margin="0,0,0,8"
+                                Visibility="Collapsed">
+                    <ui:CardControl.Icon>
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE717;" FontSize="20" Margin="4,0,6,0" />
+                    </ui:CardControl.Icon>
+                    <ui:CardControl.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="Refresh Rate on Battery" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Set the internal panel's refresh rate when running on battery power"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ComboBox x:Name="cbxRefreshRateBattery"
+                                      Grid.Column="1"
+                                      MinWidth="150"
+                                      Height="37"
+                                      SelectionChanged="cbxRefreshRateBattery_SelectionChanged" />
+                        </Grid>
+                    </ui:CardControl.Header>
+                </ui:CardControl>
+
+                <!-- Internal-panel refresh rate when plugged in -->
+                <ui:CardControl x:Name="CardRefreshRatePluggedIn"
+                                Margin="0,0,0,8"
+                                Visibility="Collapsed">
+                    <ui:CardControl.Icon>
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE95F;" FontSize="20" Margin="4,0,6,0" />
+                    </ui:CardControl.Icon>
+                    <ui:CardControl.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="Refresh Rate when Plugged In" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Set the internal panel's refresh rate when connected to power"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ComboBox x:Name="cbxRefreshRatePluggedIn"
+                                      Grid.Column="1"
+                                      MinWidth="150"
+                                      Height="37"
+                                      SelectionChanged="cbxRefreshRatePluggedIn_SelectionChanged" />
+                        </Grid>
+                    </ui:CardControl.Header>
+                </ui:CardControl>
+
                 </StackPanel>
             </Grid>
         </ScrollViewer>
