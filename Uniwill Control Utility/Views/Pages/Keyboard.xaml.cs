@@ -632,6 +632,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// (mirrors UpdateEffectUi for the separate BetterRGB card).</summary>
         private void UpdateBetterRgbEffectUi()
         {
+            // CardExpander content instantiates lazily; toggle handlers can fire
+            // mid-instantiation while sibling controls are still null.
+            if (BcColorRow == null || RpWidthRow == null || SaResponseRow == null)
+                return;
+
             var m = cmbBetterRgbEffect.SelectedItem is BetterRgbEffect e ? e : BetterRgbEffect.Breathing;
             bool sel(BetterRgbEffect x) => m == x;
 
@@ -644,9 +649,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Random color replaces the fixed color: with the toggle ON, the color
             // row (and the block separator above it — the next row brings its own)
             // is hidden.
-            bool bcRandomOn = tsBcRandom.IsChecked == true;
-            bool rcRandomOn = tsRcRandom.IsChecked == true;
-            bool rpRandomOn = tsRpRandom.IsChecked == true;
+            // The toggles live inside the CardExpander body — null until expanded.
+            bool bcRandomOn = tsBcRandom?.IsChecked == true;
+            bool rcRandomOn = tsRcRandom?.IsChecked == true;
+            bool rpRandomOn = tsRpRandom?.IsChecked == true;
 
             BcColorRow.Visibility = sel(BetterRgbEffect.Breathing) && !bcRandomOn ? Visibility.Visible : Visibility.Collapsed;
             BcSpeedRow.Visibility = sel(BetterRgbEffect.Breathing) ? Visibility.Visible : Visibility.Collapsed;
