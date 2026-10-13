@@ -59,7 +59,7 @@ namespace Uniwill_Control_Utility.Models
         public byte[] SparkleB = new byte[KeyCount];
 
         // ---- Keypress hook (GetAsyncKeyState over the tracked VK list) ----------
-        // Shared wasDown + fresh-press event buffer; Reactive/Ripple/TouchCurrent
+        // Shared wasDown + fresh-press event buffer; Reactive/Ripple
         // consume it each frame, exactly like their per-thread polling loops.
         public int[] WasDown = new int[KeyCount];
         public int EventCount;
@@ -133,165 +133,10 @@ namespace Uniwill_Control_Utility.Models
         public byte[] RippleB = new byte[MaxTouchRipples];
         public int RippleNextSlot;
 
-        // ---- Touch Current (MAX_TOUCH_CURRENTS 20 row comets) -------------------
-        public const int MaxTouchCurrents = 20;
-        public bool[] TouchCurrentActive = new bool[MaxTouchCurrents];
-        public int[] TouchCurrentRow = new int[MaxTouchCurrents];
-        public double[] TouchCurrentOriginX = new double[MaxTouchCurrents];
-        public double[] TouchCurrentPalettePhase = new double[MaxTouchCurrents];
-        public double[] TouchCurrentStartedAtMs = new double[MaxTouchCurrents];
-        public int TouchCurrentNextSlot;
-
         // ---- Current (per-row comet EMA) ----------------------------------------
         public double[] CurrentPrevR = new double[KeyCount];
         public double[] CurrentPrevG = new double[KeyCount];
         public double[] CurrentPrevB = new double[KeyCount];
-
-        // ---- Screen Ambient (GDI desktop capture, effect_screen_ambient) --------
-        public double[] AmbientPrevR = new double[KeyCount];
-        public double[] AmbientPrevG = new double[KeyCount];
-        public double[] AmbientPrevB = new double[KeyCount];
-        public bool AmbientInitialized;
-        public bool AmbientCaptureFailed;
-        private nint _screenDc;
-        private nint _memoryDc;
-        private nint _bitmapObj;
-        private nint _infoBuf;      // BITMAPINFO (40-byte header + RGBQUAD)
-        private nint _bitsOutBuf;   // the void** slot CreateDIBSection writes into
-        private nint _bitsPtr;      // returned DIB pixel buffer (96*54*4 bytes)
-
-        [DllImport("gdi.dll")]
-        private static extern nint GetDC(nint hWnd);
-        [DllImport("gdi.dll")]
-        private static extern nint CreateCompatibleDC(nint hDC);
-        [DllImport("gdi.dll")]
-        private static extern nint CreateDIBSection(nint hdc, nint pBitmapInfo, int ilUseColor,
-            nint ppvBits, nint hPalette, int dwUsage);
-        [DllImport("gdi.dll")]
-        private static extern nint SelectObject(nint hDC, nint hObj);
-        [DllImport("gdi.dll")]
-        private static extern int DeleteObject(nint hDC, nint hObj);
-        [DllImport("gdi.dll")]
-        private static extern int DeleteDC(nint hDC);
-        [DllImport("gdi.dll")]
-        private static extern int ReleaseDC(nint hWnd, nint hDC);
-        [DllImport("gdi.dll")]
-        private static extern int GetDeviceCaps(nint hDC, int nIndex);
-        [DllImport("gdi.dll")]
-        private static extern int SetStretchBltMode(nint hDC, int mode);
-        [DllImport("gdi.dll")]
-        private static extern int SetBrushOrgEx(nint hDC, int x, int y, nint lppt);
-        [DllImport("gdi.dll")]
-        private static extern int StretchBlt(nint hdcDest, int x, int y, int w, int h,
-            nint hdcSrc, int srcX, int srcY, int srcW, int srcH, uint rop);
-        [DllImport("kernel32.dll")]
-        private static extern int GetSystemMetrics(int nIndex);
-
-        public const int CaptureWidth = 96;
-        public const int CaptureHeight = 54;
-        private const uint RopCapture = 0x00CC0020 | 0x40000000; // SRCCOPY | CAPTUREBLT
-        private const int Halftone = 4;
-        private const int DesktopHorzRes = 118;
-        private const int DesktopVertRes = 117;
-        private const int SmCxScreen = 0;
-        private const int SmCyScreen = 1;
-        private static readonly byte[] ZeroBytes = new byte[64];
-
-
-        /// <summary>
-        /// Lazily runs the C thread-prologue GDI init (GetDC/CreateCompatibleDC/
-        /// CreateDIBSection/SelectObject/SetStretchBltMode). Returns false when
-        /// capture failed — the C thread stops (g_stopFlag=1); the service treats
-        /// false as "render black and stop".
-        /// </summary>
-        public bool EnsureAmbientCapture()
-        {
-            if (AmbientCaptureFailed)
-                return false;
-            if (_bitmapObj != 0)
-                return true;
-
-            _screenDc = GetDC(0);
-            _memoryDc = _screenDc != 0 ? CreateCompatibleDC(_screenDc) : 0;
-            if (_memoryDc == 0)
-            {
-                AmbientCaptureFailed = true;
-                return false;
-            }
-
-            // BITMAPINFO: zeroed header, 96 x -54 (top-down), 32-bit BI_RGB.
-            _infoBuf = Marshal.AllocHGlobal(44);
-            Marshal.Copy(ZeroBytes, 0, _infoBuf, 44);
-            Marshal.WriteInt32(_infoBuf, 40);              // biSize
-            Marshal.WriteInt32(_infoBuf + 4, CaptureWidth);   // biWidth
-            Marshal.WriteInt32(_infoBuf + 8, -CaptureHeight); // biHeight (top-down)
-            Marshal.WriteInt32(_infoBuf + 12, 1);          // biPlanes
-            Marshal.WriteInt32(_infoBuf + 16, 32);         // biBitCount (BI_RGB=0)
-
-            _bitsOutBuf = Marshal.AllocHGlobal(8);
-            Marshal.Copy(ZeroBytes, 0, _bitsOutBuf, 8);
-            _bitmapObj = CreateDIBSection(_memoryDc, _infoBuf, 0, _bitsOutBuf, 0, 0);
-            if (_bitmapObj == 0)
-            {
-                AmbientCaptureFailed = true;
-                return false;
-            }
-            long bitsLo = Marshal.ReadInt32(_bitsOutBuf, 0);
-            long bitsHi = Marshal.ReadInt32(_bitsOutBuf, 4);
-            _bitsPtr = (nint)(bitsLo | (bitsHi << 32));
-            if (_bitsPtr == 0)
-            {
-                AmbientCaptureFailed = true;
-                return false;
-            }
-
-            SelectObject(_memoryDc, _bitmapObj);
-            SetStretchBltMode(_memoryDc, Halftone);
-            SetBrushOrgEx(_memoryDc, 0, 0, 0);
-            return true;
-        }
-
-        /// <summary>One desktop grab into the DIB (StretchBlt SRCCOPY|CAPTUREBLT,
-        /// physical pixels via GetDeviceCaps like the reference).</summary>
-        public bool AmbientGrab()
-        {
-            if (_bitmapObj == 0)
-                return false;
-            int sw = GetDeviceCaps(_screenDc, DesktopHorzRes);
-            int sh = GetDeviceCaps(_screenDc, DesktopVertRes);
-            if (sw <= 0) sw = GetSystemMetrics(SmCxScreen);
-            if (sh <= 0) sh = GetSystemMetrics(SmCyScreen);
-            if (sw <= 0 || sh <= 0)
-                return false;
-            return StretchBlt(_memoryDc, 0, 0, CaptureWidth, CaptureHeight,
-                _screenDc, 0, 0, sw, sh, RopCapture) != 0;
-        }
-
-        public byte AmbientPixelAt(int index)
-        {
-            return Marshal.ReadByte(_bitsPtr + (nint)index);
-        }
-
-        /// <summary>Cleanup mirroring the C thread epilogue (restore old bitmap,
-        /// delete objects, release the screen DC).</summary>
-        public void CloseCapture()
-        {
-            if (_memoryDc != 0 && _bitmapObj != 0)
-                SelectObject(_memoryDc, _bitmapObj);
-            if (_bitmapObj != 0)
-                DeleteObject(_memoryDc, _bitmapObj);
-            if (_memoryDc != 0)
-                DeleteDC(_memoryDc);
-            if (_screenDc != 0)
-                ReleaseDC(0, _screenDc);
-            if (_infoBuf != 0)
-                Marshal.FreeHGlobal(_infoBuf);
-            if (_bitsOutBuf != 0)
-                Marshal.FreeHGlobal(_bitsOutBuf);
-            _bitmapObj = 0;
-            _memoryDc = 0;
-            _screenDc = 0;
-        }
 
         // ---- Thread-prologue inits (C thread bodies) ----------------------------
         public BetterRgbFrameState()

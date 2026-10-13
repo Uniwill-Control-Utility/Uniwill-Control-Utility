@@ -869,10 +869,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 SetKbBrSlider(sdKbBrQsScale, brCfg.QuicksandScale, 1, 10);
                 SetKbBrSlider(sdKbBrCuSpeed, brCfg.CurrentSpeed, 1, 10);
                 SetKbBrSlider(sdKbBrCuWidth, brCfg.CurrentWidth, 2, 8);
-                SetKbBrSlider(sdKbBrTcSpeed, brCfg.TouchCurrentSpeed, 1, 10);
-                SetKbBrSlider(sdKbBrTcWidth, brCfg.TouchCurrentWidth, 1, 5);
-                SetKbBrSlider(sdKbBrSaBlur, brCfg.AmbientBlur, 1, 8);
-                SetKbBrSlider(sdKbBrSaResponse, brCfg.AmbientResponse, 1, 10);
 
                 // Shared pickers: load the selected effect's own color fields.
                 string eff = brCfg.Mode;
@@ -886,7 +882,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                     "Static" => brCfg.StaticZoneColors,
                     "Quicksand" => brCfg.QuicksandColors,
                     "Current" => brCfg.CurrentColors,
-                    "Touch Current" => brCfg.TouchCurrentColors,
                     _ => "",
                 };
                 if (!string.IsNullOrEmpty(multiCsv))
@@ -1457,7 +1452,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private static readonly string[] s_kbBrEffects =
         {
             "Breathing", "Wave", "Sparkle", "Reactive", "Wheel", "Lightning", "Flame", "Raindrop",
-            "Matrix", "Static", "Ripple", "Rainbow", "Quicksand", "Current", "Touch Current", "Screen Ambient",
+            "Matrix", "Static", "Ripple", "Rainbow", "Quicksand", "Current",
         };
         // CPU diff-tracking
         private int lastCpuSustained = 0;
@@ -3063,13 +3058,13 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// the Keyboard page's UpdateBetterRgbEffectUi: every effect's full control
         /// block is visible only while selected. The shared single-color picker
         /// serves Breathing/Reactive/Ripple; the shared multi-color picker serves
-        /// Raindrop (5), Static zones (7), Matrix/Quicksand/Current/Touch Current (3).
+        /// Raindrop (5), Static zones (7), Matrix/Quicksand/Current (3).
         /// </summary>
         private void UpdateKbBetterRgbUi()
         {
             if (grKbBrColor == null || grKbBrMulti == null || grKbBrFps == null || grKbBrBright == null)
                 return;
-            if (BrBcSpeedRow == null || BrSaResponseRow == null)
+            if (BrBcSpeedRow == null || BrCuWidthRow == null)
                 return;
 
             string effect = GetKbBrEffectFromIndex(cbxKbBrEffect.SelectedIndex);
@@ -3082,7 +3077,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 || (effect == "Reactive" && !rcRandomOn)
                 || (effect == "Ripple" && !rpRandomOn);
             bool multi = effect == "Raindrop" || effect == "Matrix" || effect == "Static"
-                || effect == "Quicksand" || effect == "Current" || effect == "Touch Current";
+                || effect == "Quicksand" || effect == "Current";
 
             grKbBrColor.Visibility = single ? Visibility.Visible : Visibility.Collapsed;
             sepKbBrColor.Visibility = single ? Visibility.Visible : Visibility.Collapsed;
@@ -3192,18 +3187,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             sepKbBrCuSpeed.Visibility = cu ? Visibility.Visible : Visibility.Collapsed;
             BrCuWidthRow.Visibility = cu ? Visibility.Visible : Visibility.Collapsed;
             sepKbBrCuWidth.Visibility = cu ? Visibility.Visible : Visibility.Collapsed;
-
-            bool tc = effect == "Touch Current";
-            BrTcSpeedRow.Visibility = tc ? Visibility.Visible : Visibility.Collapsed;
-            sepKbBrTcSpeed.Visibility = tc ? Visibility.Visible : Visibility.Collapsed;
-            BrTcWidthRow.Visibility = tc ? Visibility.Visible : Visibility.Collapsed;
-            sepKbBrTcWidth.Visibility = tc ? Visibility.Visible : Visibility.Collapsed;
-
-            bool sa = effect == "Screen Ambient";
-            BrSaBlurRow.Visibility = sa ? Visibility.Visible : Visibility.Collapsed;
-            sepKbBrSaBlur.Visibility = sa ? Visibility.Visible : Visibility.Collapsed;
-            BrSaResponseRow.Visibility = sa ? Visibility.Visible : Visibility.Collapsed;
-            sepKbBrSaResponse.Visibility = sa ? Visibility.Visible : Visibility.Collapsed;
 
             grKbBrFps.Visibility = Visibility.Visible;
             sepKbBrFps.Visibility = Visibility.Visible;
@@ -3391,14 +3374,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         { tbKbBrCuSpeedValue.Text = ((int)sdKbBrCuSpeed.Value).ToString(); MarkBetterRgbChanged(); }
         private void sdKbBrCuWidth_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         { tbKbBrCuWidthValue.Text = ((int)sdKbBrCuWidth.Value).ToString(); MarkBetterRgbChanged(); }
-        private void sdKbBrTcSpeed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        { tbKbBrTcSpeedValue.Text = ((int)sdKbBrTcSpeed.Value).ToString(); MarkBetterRgbChanged(); }
-        private void sdKbBrTcWidth_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        { tbKbBrTcWidthValue.Text = ((int)sdKbBrTcWidth.Value).ToString(); MarkBetterRgbChanged(); }
-        private void sdKbBrSaBlur_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        { tbKbBrSaBlurValue.Text = ((int)sdKbBrSaBlur.Value).ToString(); MarkBetterRgbChanged(); }
-        private void sdKbBrSaResponse_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        { tbKbBrSaResponseValue.Text = ((int)sdKbBrSaResponse.Value).ToString(); MarkBetterRgbChanged(); }
 
         // Per-effect toggle handlers (value read from IsChecked at apply time).
         // The random toggles also re-evaluate the color row's visibility.
@@ -3465,11 +3440,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 CurrentSpeed = (int)sdKbBrCuSpeed.Value,
                 CurrentWidth = (int)sdKbBrCuWidth.Value,
                 CurrentColors = multi,
-                TouchCurrentSpeed = (int)sdKbBrTcSpeed.Value,
-                TouchCurrentWidth = (int)sdKbBrTcWidth.Value,
-                TouchCurrentColors = multi,
-                AmbientBlur = (int)sdKbBrSaBlur.Value,
-                AmbientResponse = (int)sdKbBrSaResponse.Value,
             };
         }
 

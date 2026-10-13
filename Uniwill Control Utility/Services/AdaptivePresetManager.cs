@@ -208,14 +208,6 @@ namespace Uniwill_Control_Utility.Services
         public int CurrentWidth { get; set; } = 4;            // 2-8
         public string CurrentColors { get; set; } = "";       // CSV, up to 3
 
-        // Touch Current
-        public int TouchCurrentSpeed { get; set; } = 5;       // 1-10
-        public int TouchCurrentWidth { get; set; } = 2;       // 1-5
-        public string TouchCurrentColors { get; set; } = "";  // CSV, up to 3
-
-        // Screen Ambient
-        public int AmbientBlur { get; set; } = 3;             // 1-8
-        public int AmbientResponse { get; set; } = 5;         // 1-10
     }
 
     public class AdaptivePresetManager
@@ -314,8 +306,7 @@ namespace Uniwill_Control_Utility.Services
                     ["MatrixColors"] = preset["KbBetterRgbMultiColors"] ?? "",
                     ["StaticZoneColors"] = preset["KbBetterRgbMultiColors"] ?? "",
                     ["QuicksandColors"] = preset["KbBetterRgbMultiColors"] ?? "",
-                    ["CurrentColors"] = preset["KbBetterRgbMultiColors"] ?? "",
-                    ["TouchCurrentColors"] = preset["KbBetterRgbMultiColors"] ?? ""
+                    ["CurrentColors"] = preset["KbBetterRgbMultiColors"] ?? ""
                 };
 
                 preset.Remove("KbBetterRgbEnabled");

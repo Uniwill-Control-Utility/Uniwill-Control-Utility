@@ -142,8 +142,6 @@ namespace Uniwill_Control_Utility.Models
                 case BetterRgbEffect.Rainbow: RenderRainbow(p, st, elapsedMs, frame512); break;
                 case BetterRgbEffect.Quicksand: RenderQuicksand(p, st, elapsedMs, frame512); break;
                 case BetterRgbEffect.Current: RenderCurrent(p, st, elapsedMs, frame512); break;
-                case BetterRgbEffect.TouchCurrent: RenderTouchCurrent(p, st, elapsedMs, frame512); break;
-                case BetterRgbEffect.ScreenAmbient: RenderScreenAmbient(p, st, frame512); break;
             }
         }
 
@@ -824,132 +822,6 @@ namespace Uniwill_Control_Utility.Models
             }
         }
 
-        /// <summary>C effect_touch_current (2962-3032): keypress spawns a comet on
-        /// the pressed key's physical row; gaussian band, edge fade, 4-sample AA.</summary>
-        private static void RenderTouchCurrent(BetterRgbFrameParams p, BetterRgbFrameState st,
-            double elapsedMs, byte[] frame512)
-        {
-            PollFreshPresses(st);
-
-            for (int e = 0; e < st.EventCount; e++)
-            {
-                int idx = st.EventIdx[e];
-                int slot = st.TouchCurrentNextSlot;
-                st.TouchCurrentNextSlot = (st.TouchCurrentNextSlot + 1) % BetterRgbFrameState.MaxTouchCurrents;
-                st.TouchCurrentActive[slot] = true;
-                st.TouchCurrentRow[slot] = KeyVisualRow[idx];
-                st.TouchCurrentOriginX[slot] = st.EventX[e];
-                st.TouchCurrentPalettePhase[slot] = st.RandInt(10000) / 10000.0;
-                st.TouchCurrentStartedAtMs[slot] = elapsedMs;
-            }
-
-            double travelSpeed = 0.75 + p.TouchCurrentSpeed * 0.58;
-            double sigma = 0.20 + p.TouchCurrentWidth * 0.20;
-            double lifetimeSeconds = (21.0 + sigma * 3.0) / travelSpeed;
-
-            for (int i = 0; i < KeyCount; i++)
-            {
-                double sumR = 0, sumG = 0, sumB = 0;
-                int row = KeyVisualRow[i];
-                for (int sample = 0; sample < 4; sample++)
-                {
-                    double sampleR = 0, sampleG = 0, sampleB = 0;
-                    double x = KeyX[i] + SampleX[sample];
-                    for (int e = 0; e < BetterRgbFrameState.MaxTouchCurrents; e++)
-                    {
-                        if (!st.TouchCurrentActive[e] || st.TouchCurrentRow[e] != row) continue;
-                        double elapsed = (elapsedMs - st.TouchCurrentStartedAtMs[e]) / 1000.0;
-                        if (elapsed >= lifetimeSeconds)
-                        {
-                            st.TouchCurrentActive[e] = false;
-                            continue;
-                        }
-                        double radius = elapsed * travelSpeed;
-                        double delta = Math.Abs(Math.Abs(x - st.TouchCurrentOriginX[e]) - radius);
-                        double intensity = Math.Exp(-(delta * delta) / (2.0 * sigma * sigma));
-                        double edgeFade = 1.0 - SmoothUnit(elapsed / lifetimeSeconds);
-                        double phase = st.TouchCurrentPalettePhase[e] +
-                            (x - st.TouchCurrentOriginX[e]) * 0.045 + elapsed * 0.12;
-                        var (r, g, b) = SamplePaletteLinear(p.TouchCurrentColors, phase);
-                        sampleR += r * intensity * edgeFade;
-                        sampleG += g * intensity * edgeFade;
-                        sampleB += b * intensity * edgeFade;
-                    }
-                    if (sampleR > 1.0) sampleR = 1.0;
-                    if (sampleG > 1.0) sampleG = 1.0;
-                    if (sampleB > 1.0) sampleB = 1.0;
-                    sumR += sampleR;
-                    sumG += sampleG;
-                    sumB += sampleB;
-                }
-                SetKeyFromLinear(frame512, i, sumR / 4.0, sumG / 4.0, sumB / 4.0);
-            }
-        }
-
-        /// <summary>C effect_screen_ambient (3034-3137): GDI desktop grab to 96x54,
-        /// weighted disc blur, EMA response.</summary>
-        private static void RenderScreenAmbient(BetterRgbFrameParams p, BetterRgbFrameState st,
-            byte[] frame512)
-        {
-            if (!st.EnsureAmbientCapture())
-                return; // capture init failed — leave black (C stops the thread)
-
-            int radius = Math.Clamp(p.AmbientBlur, 1, 8);
-            double response = 0.08 + Math.Clamp(p.AmbientResponse, 1, 10) * 0.052;
-
-            if (!st.AmbientGrab())
-                return;
-
-            int captureWidth = BetterRgbFrameState.CaptureWidth;
-            int captureHeight = BetterRgbFrameState.CaptureHeight;
-
-            for (int i = 0; i < KeyCount; i++)
-            {
-                double keyX = KeyX[i], keyY = KeyY[i];
-                int centerX = (int)(keyX / 19.0 * (captureWidth - 1) + 0.5);
-                int centerY = (int)(keyY / 5.25 * (captureHeight - 1) + 0.5);
-                centerX = Math.Clamp(centerX, 0, captureWidth - 1);
-                centerY = Math.Clamp(centerY, 0, captureHeight - 1);
-
-                double sumR = 0, sumG = 0, sumB = 0, sumWeight = 0;
-                for (int dy = -radius; dy <= radius; dy++)
-                {
-                    int sy = centerY + dy;
-                    if (sy < 0 || sy >= captureHeight) continue;
-                    for (int dx = -radius; dx <= radius; dx++)
-                    {
-                        int sx = centerX + dx;
-                        if (sx < 0 || sx >= captureWidth) continue;
-                        double distance = Math.Sqrt((double)(dx * dx + dy * dy));
-                        double weight = 1.0 - distance / (radius + 1);
-                        if (weight <= 0.0) continue;
-                        int pixel = (sy * captureWidth + sx) * 4;
-                        sumB += SrgbToLinear(st.AmbientPixelAt(pixel)) * weight;
-                        sumG += SrgbToLinear(st.AmbientPixelAt(pixel + 1)) * weight;
-                        sumR += SrgbToLinear(st.AmbientPixelAt(pixel + 2)) * weight;
-                        sumWeight += weight;
-                    }
-                }
-                double targetR = sumWeight > 0.0 ? sumR / sumWeight : 0.0;
-                double targetG = sumWeight > 0.0 ? sumG / sumWeight : 0.0;
-                double targetB = sumWeight > 0.0 ? sumB / sumWeight : 0.0;
-                if (!st.AmbientInitialized)
-                {
-                    st.AmbientPrevR[i] = targetR;
-                    st.AmbientPrevG[i] = targetG;
-                    st.AmbientPrevB[i] = targetB;
-                }
-                else
-                {
-                    st.AmbientPrevR[i] += (targetR - st.AmbientPrevR[i]) * response;
-                    st.AmbientPrevG[i] += (targetG - st.AmbientPrevG[i]) * response;
-                    st.AmbientPrevB[i] += (targetB - st.AmbientPrevB[i]) * response;
-                }
-                SetKeyFromLinear(frame512, i, st.AmbientPrevR[i], st.AmbientPrevG[i], st.AmbientPrevB[i]);
-            }
-            st.AmbientInitialized = true;
-        }
-
         // ---- Frame writing (set_key + AUX mirror, 1755-1766) --------------------
         private static void SetKey(byte[] frame, int offset, byte r, byte g, byte b)
         {
@@ -1239,7 +1111,7 @@ namespace Uniwill_Control_Utility.Models
         /// <summary>
         /// Polls the tracked VK list with GetAsyncKeyState (system-wide, exactly like
         /// the reference's effect threads) and records freshly-pressed keys into the
-        /// state event buffer. Reactive/Ripple/TouchCurrent call this once per frame.
+        /// state event buffer. Reactive/Ripple call this once per frame.
         /// </summary>
         private static void PollFreshPresses(BetterRgbFrameState st)
         {

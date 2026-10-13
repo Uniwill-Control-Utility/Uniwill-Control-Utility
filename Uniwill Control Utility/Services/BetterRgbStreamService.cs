@@ -105,7 +105,6 @@ namespace Uniwill_Control_Utility.Services
             _loopCts?.Dispose();
             _hid?.Dispose();
             _hid = null;
-            _frameState?.CloseCapture();
             _frameState = null;
         }
 
@@ -206,7 +205,6 @@ namespace Uniwill_Control_Utility.Services
                     }
                 }
 
-                _frameState?.CloseCapture();
                 _frameState = null;
             }
         }
@@ -309,7 +307,10 @@ namespace Uniwill_Control_Utility.Services
 
             var frame = new BetterRgbFrameParams
             {
-                Mode = settings.BetterRgbMode,
+                // Presets saved before Touch Current / Screen Ambient were removed
+                // can carry the retired mode values 14/15 — fall back to Current.
+                Mode = settings.BetterRgbMode <= BetterRgbEffect.Current
+                    ? settings.BetterRgbMode : BetterRgbEffect.Current,
                 BreathSpeed = Math.Clamp(settings.BetterRgbBreathSpeed, 1, 40),
                 BreathSmooth = Math.Clamp(settings.BetterRgbBreathSmooth, 2, 150),
                 BreathRandom = settings.BetterRgbBreathRandom,
@@ -357,12 +358,6 @@ namespace Uniwill_Control_Utility.Services
                 CurrentWidth = Math.Clamp(settings.BetterRgbCurrentWidth, 2, 8),
                 CurrentColors = ParseColorsPadded(settings.BetterRgbCurrentColors, 3,
                     Color.FromRgb(0xFF, 0x00, 0x00)),
-                TouchCurrentSpeed = Math.Clamp(settings.BetterRgbTouchCurrentSpeed, 1, 10),
-                TouchCurrentWidth = Math.Clamp(settings.BetterRgbTouchCurrentWidth, 1, 5),
-                TouchCurrentColors = ParseColorsPadded(settings.BetterRgbTouchCurrentColors, 3,
-                    Color.FromRgb(0xFF, 0x00, 0x00)),
-                AmbientBlur = Math.Clamp(settings.BetterRgbAmbientBlur, 1, 8),
-                AmbientResponse = Math.Clamp(settings.BetterRgbAmbientResponse, 1, 10),
             };
 
             // Brightness is NOT baked into the palettes: the C engine applies
@@ -512,6 +507,7 @@ namespace Uniwill_Control_Utility.Services
         {
             BetterRgbFrameRenderer.Render(prm.Frame.Mode, prm.Frame, st, frameIndex, elapsedMs, frame512);
             BetterRgbFrameRenderer.ApplyBrightness(frame512, prm.BrightnessPercent);
+
         }
 
         /// <summary>

@@ -871,11 +871,6 @@ namespace Uniwill_Control_Utility.Services
                 settings.BetterRgbCurrentSpeed = Math.Clamp(cfg.CurrentSpeed, 1, 10);
                 settings.BetterRgbCurrentWidth = Math.Clamp(cfg.CurrentWidth, 2, 8);
                 settings.BetterRgbCurrentColors = cfg.CurrentColors;
-                settings.BetterRgbTouchCurrentSpeed = Math.Clamp(cfg.TouchCurrentSpeed, 1, 10);
-                settings.BetterRgbTouchCurrentWidth = Math.Clamp(cfg.TouchCurrentWidth, 1, 5);
-                settings.BetterRgbTouchCurrentColors = cfg.TouchCurrentColors;
-                settings.BetterRgbAmbientBlur = Math.Clamp(cfg.AmbientBlur, 1, 8);
-                settings.BetterRgbAmbientResponse = Math.Clamp(cfg.AmbientResponse, 1, 10);
                 KeyboardSettingsService.Save(settings);
 
                 // The Keyboard page's preset-sync event carries the selected effect's
@@ -894,7 +889,6 @@ namespace Uniwill_Control_Utility.Services
                     BetterRgbEffect.Static => settings.BetterRgbStaticZoneColors,
                     BetterRgbEffect.Quicksand => settings.BetterRgbQuicksandColors,
                     BetterRgbEffect.Current => settings.BetterRgbCurrentColors,
-                    BetterRgbEffect.TouchCurrent => settings.BetterRgbTouchCurrentColors,
                     _ => "",
                 };
 
@@ -940,8 +934,6 @@ namespace Uniwill_Control_Utility.Services
             "Rainbow" => BetterRgbEffect.Rainbow,
             "Quicksand" => BetterRgbEffect.Quicksand,
             "Current" => BetterRgbEffect.Current,
-            "Touch Current" => BetterRgbEffect.TouchCurrent,
-            "Screen Ambient" => BetterRgbEffect.ScreenAmbient,
             _ => BetterRgbEffect.Breathing,
         };
 

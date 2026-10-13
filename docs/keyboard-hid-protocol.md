@@ -430,13 +430,13 @@ Per frame, `send_frame` (better_rgb.c:1708–1745) ships NINE synchronous HID ca
 - A failed send or a send call taking ≥90 % of the frame budget for 3 consecutive frames drops `effectiveFps` by 5 (floor: the static keepalive cap); `effectiveFps × 10` consecutive healthy frames raise it back by 1 toward the target. Clamped to `[15, target]`. A user FPS change snaps it (`set_effective_fps(value, "target changed by user")`).
 - **FPS is a set of four UI buttons — 15/30/45/60, default 30** (`btnFps15/30/45/60`; the reference's `TARGET_FPS_MIN`/`MAX`/`DEFAULT` still bounds the range), persisted as `BetterRgbFps` (snapped to the nearest 15 on apply). The pacing artifacts that forced the old 15-FPS hardcode were on the WRONG interface (announce framing on the per-key collection); on the 0xFF03/MI_01 RGB interface the reference's framing paces cleanly at 30/60. The pacer self-degrades (−5 steps) if the device cannot sustain the target, so exposing 60 is safe.
 - **Brightness** is a dedicated **2–100 continuous slider** (`BrightnessPercentSlider`, `Minimum="2"`; the C engine's `g_brightness` range is 0–100, the UI floor is raised to 2) — applied as a `BrightnessPercent/100` multiplier on every final pixel of the frame (HSV effects included), exactly like the C engine, not baked into the palette. The firmware `Brightness` field (1–7 levels) stays for the hardware path only. The UserMode ctrl report still caps at 50 (`ITE_MAX_PERKEY_BRIGHTNESS`).
-- **The BetterRGB engine has its own control card** (`BetterRgbEffectsCardExpander`, shown only while the engine is on — the firmware Effects card is hidden then; the two engines no longer share controls). Every reference control is a first-class UI control with the reference's range/default: per-effect sliders (breath speed 1–40 def 12, smoothness 2–150 def 60, sparkle rate 1–10 + density 3–20, lightning speed/smoothness/width/concurrent, flame, rain speed/density, matrix speed/density, ripple spread/width, quicksand speed/scale, current speed/length 2–8, touch-current speed/width, ambient blur 1–8 + response 1–10), **wave/wheel speed 1–10 and rainbow speed 1–20**, **wave angle as 8 direction arrow buttons at 45° increments** (0–315, mirroring the firmware Wave direction buttons), **multi-color palettes as the Flydigi-style `MultiColorPickerControl`** (one picker + "+" button; "-" appears once more than one color is set and enters delete mode, which auto-exits at 1 color — never 0) with per-effect `MaxColors` caps (5 for Raindrop, 3 for Matrix/Quicksand/Current/Touch Current), static layout buttons + zones + zone swatches, single-color pickers (breathing/reactive/ripple), random-color toggles, and reactive fade-duration buttons (Short 10 / Medium 20 / Long 45 ms). The firmware Speed slider keeps its 1–10 firmware convention for the hardware path only.
+- **The BetterRGB engine has its own control card** (`BetterRgbEffectsCardExpander`, shown only while the engine is on — the firmware Effects card is hidden then; the two engines no longer share controls). Every reference control is a first-class UI control with the reference's range/default: per-effect sliders (breath speed 1–40 def 12, smoothness 2–150 def 60, sparkle rate 1–10 + density 3–20, lightning speed/smoothness/width/concurrent, flame, rain speed/density, matrix speed/density, ripple spread/width, quicksand speed/scale, current speed/length 2–8), **wave/wheel speed 1–10 and rainbow speed 1–20**, **wave angle as 8 direction arrow buttons at 45° increments** (0–315, mirroring the firmware Wave direction buttons), **multi-color palettes as the Flydigi-style `MultiColorPickerControl`** (one picker + "+" button; "-" appears once more than one color is set and enters delete mode, which auto-exits at 1 color — never 0) with per-effect `MaxColors` caps (5 for Raindrop, 3 for Matrix/Quicksand/Current), static layout buttons + zones + zone swatches, single-color pickers (breathing/reactive/ripple), random-color toggles, and reactive fade-duration buttons (Short 10 / Medium 20 / Long 45 ms). The firmware Speed slider keeps its 1–10 firmware convention for the hardware path only.
 - Static/per-key sources cap the keepalive at ~10 FPS (identical frames; no point burning 720 reports/s).
 - Logging only on failures and every Nth frame — per-call logging at 60 FPS × 12 reports would emit ~720 lines/s.
 
 ### Effect model (1:1 with the BetterRGB C engine)
 
-All **16 reference effects** are ported 1:1 (`BetterRgbEffect` enum in `MODE_*` order), each with the reference's per-effect globals and slider semantics:
+All **14 shipped effects** are ported 1:1 (`BetterRgbEffect` enum in reference `MODE_*` order — the reference's Touch Current and Screen Ambient were dropped from UCU), each with the reference's per-effect globals and slider semantics:
 
 | Effect | C function | Notes |
 |--------|-----------|-------|
@@ -454,8 +454,6 @@ All **16 reference effects** are ported 1:1 (`BetterRgbEffect` enum in `MODE_*` 
 | Rainbow | `effect_rainbow` | wall-clock hue `+= (4+2s) deg/s` |
 | Quicksand | `effect_quicksand` | `0.22+0.16s`, wavelength `1.15+0.42·scale`, linear-light palette, 4-sample AA |
 | Current | `effect_current` | per-row comets, `0.50+0.40s`, cycle `22+width`, 8-sample AA |
-| Touch Current | `effect_touch_current` | row comets from keypresses, `0.75+0.58s`, sigma `0.20+0.20w` |
-| Screen Ambient | `effect_screen_ambient` | GDI desktop grab → 96×54 DIB, disc blur 1–8, EMA `0.08+0.052·response` |
 
 The keypress hook polls `GetAsyncKeyState` over the reference's tracked VK list (letters/digits + the specials table) and maps VK → KEYMAP index → physical (x, y) via the reference's `get_key_x`/`get_key_y` geometry (one-key pitches incl. numpad and row stagger).
 
@@ -472,6 +470,7 @@ Animation state lives in an explicit **`BetterRgbFrameState`** (the C effect thr
 | AC unplugged (`PowerModeChangedEventArgs`) | Stop streamer + one-shot hardware apply (0% CPU); replug → `StartEngine("ac-restore")` |
 | Sleep/wake | `ResumeAfterWake()` — 8 open attempts (controller may be slow after wake) |
 | Adaptive override | `SuspendForOverride()` / `ResumeFromOverride()` |
+| Adaptive BetterRGB preset | `DeviceApplier.ApplyBetterRgbFromPreset` forces `Engine=BetterRGB` for the override duration, routes the preset's effect/colors/FPS/brightness into the BetterRgb* fields, then `SetParams` + `StartEngine`; firmware presets force `Engine=Hardware` so the HID apply is visible. The user's engine is restored on override lift |
 
 ### Shutdown fallback (normal app exit)
 

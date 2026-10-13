@@ -97,14 +97,5 @@ namespace Uniwill_Control_Utility.Models
         public int CurrentWidth = 4;
         public Color[] CurrentColors = new Color[3];
 
-        // Touch Current: g_touchCurrentSpeed 1-10 def 5, g_touchCurrentWidth 1-5
-        // def 2, g_touchCurrentColors[3].
-        public int TouchCurrentSpeed = 5;
-        public int TouchCurrentWidth = 2;
-        public Color[] TouchCurrentColors = new Color[3];
-
-        // Screen Ambient: g_ambientBlur 1-8 def 3, g_ambientResponse 1-10 def 5.
-        public int AmbientBlur = 3;
-        public int AmbientResponse = 5;
     }
 }

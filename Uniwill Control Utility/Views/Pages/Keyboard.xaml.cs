@@ -634,7 +634,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             // CardExpander content instantiates lazily; toggle handlers can fire
             // mid-instantiation while sibling controls are still null.
-            if (BcColorRow == null || RpWidthRow == null || SaResponseRow == null)
+            if (BcColorRow == null || RpWidthRow == null || CuWidthRow == null)
                 return;
 
             var m = cmbBetterRgbEffect.SelectedItem is BetterRgbEffect e ? e : BetterRgbEffect.Breathing;
@@ -733,16 +733,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             CuSpeedSeparator.Visibility = CuSpeedRow.Visibility;
             CuWidthRow.Visibility = sel(BetterRgbEffect.Current) ? Visibility.Visible : Visibility.Collapsed;
             CuWidthSeparator.Visibility = CuWidthRow.Visibility;
-
-            TcColorsRow.Visibility = sel(BetterRgbEffect.TouchCurrent) ? Visibility.Visible : Visibility.Collapsed;
-            TcSpeedRow.Visibility = sel(BetterRgbEffect.TouchCurrent) ? Visibility.Visible : Visibility.Collapsed;
-            TcSpeedSeparator.Visibility = TcSpeedRow.Visibility;
-            TcWidthRow.Visibility = sel(BetterRgbEffect.TouchCurrent) ? Visibility.Visible : Visibility.Collapsed;
-            TcWidthSeparator.Visibility = TcWidthRow.Visibility;
-
-            SaBlurRow.Visibility = sel(BetterRgbEffect.ScreenAmbient) ? Visibility.Visible : Visibility.Collapsed;
-            SaResponseRow.Visibility = sel(BetterRgbEffect.ScreenAmbient) ? Visibility.Visible : Visibility.Collapsed;
-            SaResponseSeparator.Visibility = SaResponseRow.Visibility;
 
             // Hidden when the selected effect's first row (its color row) is hidden —
             // the next row in the block brings its own separator.
@@ -987,30 +977,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             MarkBetterRgbChanged();
         }
 
-        private void TcSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            TcSpeedValueText.Text = ((int)TcSpeedSlider.Value).ToString();
-            MarkBetterRgbChanged();
-        }
-
-        private void TcWidthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            TcWidthValueText.Text = ((int)TcWidthSlider.Value).ToString();
-            MarkBetterRgbChanged();
-        }
-
-        private void SaBlurSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            SaBlurValueText.Text = ((int)SaBlurSlider.Value).ToString();
-            MarkBetterRgbChanged();
-        }
-
-        private void SaResponseSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            SaResponseValueText.Text = ((int)SaResponseSlider.Value).ToString();
-            MarkBetterRgbChanged();
-        }
-
         private void TsBcRandom_Toggled(object sender, RoutedEventArgs e)
         { UpdateBetterRgbEffectUi(); MarkBetterRgbChanged(); }
         private void TsRcRandom_Toggled(object sender, RoutedEventArgs e)
@@ -1028,7 +994,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void StPicker_ColorsChanged(object sender, EventArgs e) => MarkBetterRgbChanged();
         private void QsPicker_ColorsChanged(object sender, EventArgs e) => MarkBetterRgbChanged();
         private void CuPicker_ColorsChanged(object sender, EventArgs e) => MarkBetterRgbChanged();
-        private void TcPicker_ColorsChanged(object sender, EventArgs e) => MarkBetterRgbChanged();
 
         #endregion
 
@@ -1999,15 +1964,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             CuWidthSlider.Value = Math.Clamp(settings.BetterRgbCurrentWidth, 2, 8);
             CuWidthValueText.Text = Math.Clamp(settings.BetterRgbCurrentWidth, 2, 8).ToString();
             CuPicker.SetColors(ParseColorString(settings.BetterRgbCurrentColors));
-            TcSpeedSlider.Value = Math.Clamp(settings.BetterRgbTouchCurrentSpeed, 1, 10);
-            TcSpeedValueText.Text = Math.Clamp(settings.BetterRgbTouchCurrentSpeed, 1, 10).ToString();
-            TcWidthSlider.Value = Math.Clamp(settings.BetterRgbTouchCurrentWidth, 1, 5);
-            TcWidthValueText.Text = Math.Clamp(settings.BetterRgbTouchCurrentWidth, 1, 5).ToString();
-            TcPicker.SetColors(ParseColorString(settings.BetterRgbTouchCurrentColors));
-            SaBlurSlider.Value = Math.Clamp(settings.BetterRgbAmbientBlur, 1, 8);
-            SaBlurValueText.Text = Math.Clamp(settings.BetterRgbAmbientBlur, 1, 8).ToString();
-            SaResponseSlider.Value = Math.Clamp(settings.BetterRgbAmbientResponse, 1, 10);
-            SaResponseValueText.Text = Math.Clamp(settings.BetterRgbAmbientResponse, 1, 10).ToString();
 
             UpdateStreamerRowsVisibility();
             UpdateSpeedSliderRange();
@@ -2161,11 +2117,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 BetterRgbCurrentSpeed = Math.Clamp((int)CuSpeedSlider.Value, 1, 10),
                 BetterRgbCurrentWidth = Math.Clamp((int)CuWidthSlider.Value, 2, 8),
                 BetterRgbCurrentColors = SerializeColors(CuPicker.GetColors()),
-                BetterRgbTouchCurrentSpeed = Math.Clamp((int)TcSpeedSlider.Value, 1, 10),
-                BetterRgbTouchCurrentWidth = Math.Clamp((int)TcWidthSlider.Value, 1, 5),
-                BetterRgbTouchCurrentColors = SerializeColors(TcPicker.GetColors()),
-                BetterRgbAmbientBlur = Math.Clamp((int)SaBlurSlider.Value, 1, 8),
-                BetterRgbAmbientResponse = Math.Clamp((int)SaResponseSlider.Value, 1, 10),
             };
             KeyboardSettingsService.Save(settings);
             Debug.WriteLine($"[KBD] SaveSettings: PerKeyMode={settings.PerKeyMode}, PerKeyColors={(string.IsNullOrEmpty(savedPerKeyColors) ? "null" : "saved")}");
@@ -2411,7 +2362,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 case BetterRgbEffect.Matrix: if (colors.Count > 0) MtPicker.SetColors(colors); break;
                 case BetterRgbEffect.Quicksand: if (colors.Count > 0) QsPicker.SetColors(colors); break;
                 case BetterRgbEffect.Current: if (colors.Count > 0) CuPicker.SetColors(colors); break;
-                case BetterRgbEffect.TouchCurrent: if (colors.Count > 0) TcPicker.SetColors(colors); break;
             }
 
             _brFps = Math.Clamp((int)Math.Round(Math.Clamp(e.BetterRgbFps, 15, 60) / 15.0) * 15, 15, 60);

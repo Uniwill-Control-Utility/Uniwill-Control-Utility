@@ -1144,69 +1144,6 @@
                                         </StackPanel>
                                     </Grid>
 
-                                    <!-- Touch Current: palette, spread speed, current width 1-5 -->
-                                    <Grid x:Name="TcColorsRow" Visibility="Collapsed">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Effect colors" VerticalAlignment="Center" />
-                                        <controls:MultiColorPickerControl x:Name="TcPicker"
-                                            Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                            MaxColors="3" ColorsChanged="TcPicker_ColorsChanged" />
-                                    </Grid>
-                                    <Border x:Name="TcSpeedSeparator" Height="1" Margin="-58,12,-46,12"
-                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
-                                        Visibility="Collapsed" />
-                                    <Grid x:Name="TcSpeedRow" Visibility="Collapsed">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Spread speed" VerticalAlignment="Center" />
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                            <TextBlock x:Name="TcSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                            <Slider x:Name="TcSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
-                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
-                                                ValueChanged="TcSpeedSlider_ValueChanged" />
-                                        </StackPanel>
-                                    </Grid>
-                                    <Border x:Name="TcWidthSeparator" Height="1" Margin="-58,12,-46,12"
-                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
-                                        Visibility="Collapsed" />
-                                    <Grid x:Name="TcWidthRow" Visibility="Collapsed">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Current width" VerticalAlignment="Center" />
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                            <TextBlock x:Name="TcWidthValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="2" />
-                                            <Slider x:Name="TcWidthSlider" Width="140" Minimum="1" Maximum="5" Value="2"
-                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
-                                                ValueChanged="TcWidthSlider_ValueChanged" />
-                                        </StackPanel>
-                                    </Grid>
-
-                                    <!-- Screen Ambient: spatial blur, screen response -->
-                                    <Grid x:Name="SaBlurRow" Visibility="Collapsed">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Spatial blur" VerticalAlignment="Center" />
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                            <TextBlock x:Name="SaBlurValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="3" />
-                                            <Slider x:Name="SaBlurSlider" Width="140" Minimum="1" Maximum="8" Value="3"
-                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
-                                                ValueChanged="SaBlurSlider_ValueChanged" />
-                                        </StackPanel>
-                                    </Grid>
-                                    <Border x:Name="SaResponseSeparator" Height="1" Margin="-58,12,-46,12"
-                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
-                                        Visibility="Collapsed" />
-                                    <Grid x:Name="SaResponseRow" Visibility="Collapsed">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                        <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Screen response" VerticalAlignment="Center" />
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                            <TextBlock x:Name="SaResponseValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                            <Slider x:Name="SaResponseSlider" Width="140" Minimum="1" Maximum="10" Value="5"
-                                                IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
-                                                ValueChanged="SaResponseSlider_ValueChanged" />
-                                        </StackPanel>
-                                    </Grid>
-
                                </StackPanel>
                             </ui:CardExpander>
                         </StackPanel>

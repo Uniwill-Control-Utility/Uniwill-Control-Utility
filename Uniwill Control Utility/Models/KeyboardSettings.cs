@@ -210,20 +210,6 @@ namespace Uniwill_Control_Utility.Models
         /// <summary>Current 3 gradient colors, default red/green/blue (g_currentColors).</summary>
         public string BetterRgbCurrentColors { get; set; } = "#FF0000,#00FF00,#0000FF";
 
-        /// <summary>Touch Current "Spread speed:" slider 1-10, default 5 (g_touchCurrentSpeed).</summary>
-        public int BetterRgbTouchCurrentSpeed { get; set; } = 5;
-
-        /// <summary>Touch Current "Current width:" slider 1-5, default 2 (g_touchCurrentWidth).</summary>
-        public int BetterRgbTouchCurrentWidth { get; set; } = 2;
-
-        /// <summary>Touch Current 3 gradient colors, default red/green/blue (g_touchCurrentColors).</summary>
-        public string BetterRgbTouchCurrentColors { get; set; } = "#FF0000,#00FF00,#0000FF";
-
-        /// <summary>Screen Ambient "Spatial blur range:" slider 1-8, default 3 (g_ambientBlur).</summary>
-        public int BetterRgbAmbientBlur { get; set; } = 3;
-
-        /// <summary>Screen Ambient "Screen response speed:" slider 1-10, default 5 (g_ambientResponse).</summary>
-        public int BetterRgbAmbientResponse { get; set; } = 5;
         #endregion
 
         /// <summary>
@@ -467,12 +453,6 @@ namespace Uniwill_Control_Utility.Models
 
         /// <summary>Per-row comet currents with exponential tails (MODE_CURRENT).</summary>
         Current = 13,
-
-        /// <summary>Keypress-swept currents along physical rows (MODE_TOUCH_CURRENT).</summary>
-        TouchCurrent = 14,
-
-        /// <summary>Desktop screen capture mapped onto the keybed (MODE_SCREEN_AMBIENT).</summary>
-        ScreenAmbient = 15,
     }
 
     /// <summary>

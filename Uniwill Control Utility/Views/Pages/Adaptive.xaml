@@ -1578,8 +1578,6 @@
                                         <ComboBoxItem>Rainbow</ComboBoxItem>
                                         <ComboBoxItem>Quicksand</ComboBoxItem>
                                         <ComboBoxItem>Current</ComboBoxItem>
-                                        <ComboBoxItem>Touch Current</ComboBoxItem>
-                                        <ComboBoxItem>Screen Ambient</ComboBoxItem>
                                     </ComboBox>
                                 </Grid>
 
@@ -1608,7 +1606,7 @@
                                 <!-- Divider before Effect Colors -->
                                 <Border Name="sepKbBrMulti" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
 
-                                <!-- Effect Colors (Raindrop / Matrix / Quicksand / Current / Touch Current) -->
+                                <!-- Effect Colors (Raindrop / Matrix / Quicksand / Current) -->
                                 <Grid Name="grKbBrMulti" Visibility="Collapsed">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -1992,46 +1990,6 @@
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <TextBlock Name="tbKbBrCuWidthValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="4" />
                                         <Slider Name="sdKbBrCuWidth" Width="140" Minimum="2" Maximum="8" Value="4" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrCuWidth_ValueChanged" />
-                                    </StackPanel>
-                                </Grid>
-
-                                <!-- Touch Current: spread speed + current width 1-5 (colors in shared row) -->
-                                <Border Name="sepKbBrTcSpeed" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
-                                <Grid Name="BrTcSpeedRow" Visibility="Collapsed">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Spread speed" VerticalAlignment="Center" />
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <TextBlock Name="tbKbBrTcSpeedValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                        <Slider Name="sdKbBrTcSpeed" Width="140" Minimum="1" Maximum="10" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrTcSpeed_ValueChanged" />
-                                    </StackPanel>
-                                </Grid>
-                                <Border Name="sepKbBrTcWidth" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
-                                <Grid Name="BrTcWidthRow" Visibility="Collapsed">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Current width" VerticalAlignment="Center" />
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <TextBlock Name="tbKbBrTcWidthValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="2" />
-                                        <Slider Name="sdKbBrTcWidth" Width="140" Minimum="1" Maximum="5" Value="2" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrTcWidth_ValueChanged" />
-                                    </StackPanel>
-                                </Grid>
-
-                                <!-- Screen Ambient: spatial blur + screen response -->
-                                <Border Name="sepKbBrSaBlur" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
-                                <Grid Name="BrSaBlurRow" Visibility="Collapsed">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Spatial blur" VerticalAlignment="Center" />
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <TextBlock Name="tbKbBrSaBlurValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="3" />
-                                        <Slider Name="sdKbBrSaBlur" Width="140" Minimum="1" Maximum="8" Value="3" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrSaBlur_ValueChanged" />
-                                    </StackPanel>
-                                </Grid>
-                                <Border Name="sepKbBrSaResponse" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
-                                <Grid Name="BrSaResponseRow" Visibility="Collapsed">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Screen response" VerticalAlignment="Center" />
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <TextBlock Name="tbKbBrSaResponseValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                        <Slider Name="sdKbBrSaResponse" Width="140" Minimum="1" Maximum="10" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrSaResponse_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                             </StackPanel>
