@@ -620,7 +620,7 @@
                                     <Border x:Name="BcRandomSeparator" Height="1" Margin="-58,12,-46,12"
                                         Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
                                         Visibility="Collapsed" />
-                                    <Grid x:Name="BcRandomRow" Visibility="Collapsed">
+                                    <Grid x:Name="BcRandomRow" Visibility="Collapsed" Margin="0,8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
@@ -726,7 +726,7 @@
                                     <Border x:Name="RcRandomSeparator" Height="1" Margin="-58,12,-46,12"
                                         Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
                                         Visibility="Collapsed" />
-                                    <Grid x:Name="RcRandomRow" Visibility="Collapsed">
+                                    <Grid x:Name="RcRandomRow" Visibility="Collapsed" Margin="0,8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
@@ -1019,7 +1019,7 @@
                                     <Border x:Name="RpRandomSeparator" Height="1" Margin="-58,12,-46,12"
                                         Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
                                         Visibility="Collapsed" />
-                                    <Grid x:Name="RpRandomRow" Visibility="Collapsed">
+                                    <Grid x:Name="RpRandomRow" Visibility="Collapsed" Margin="0,8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />

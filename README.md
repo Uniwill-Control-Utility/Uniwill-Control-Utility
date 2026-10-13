@@ -162,7 +162,7 @@ Intelligent, game-aware performance optimization that automatically adjusts sett
 - **GPU controls** — TGP, Dynamic Boost, V-F Curve Editor, Core/Memory Clock Offsets
 - **Fan Control** — Custom EC fan curves per game
 - **Flydigi cooler** — Custom fan curves and RGB speed per game
-- **Keyboard RGB** — Per-game multi-color lighting profiles with auto-detection of running games
+- **Keyboard RGB** — Per-game lighting profiles with auto-detection of running games: firmware Effects, Per-Key RGB, or the BetterRGB streamer (effect, colors, FPS and software brightness per game; the Adaptive page mirrors the Keyboard page's full per-effect control set — direction buttons, speed/smoothness sliders, random/reverse toggles, style/layout buttons — all saved per profile)
 - **Hydro UI** - per-game configuration of the liquid cooler RGB and fan/pump speed
 - **Light Bar** - per-game customization of the light bar
 - **Per-game presets** — Automatic profile switching when games launch or close

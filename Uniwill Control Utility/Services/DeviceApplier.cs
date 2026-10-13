@@ -551,6 +551,17 @@ namespace Uniwill_Control_Utility.Services
                     }
                     else
                     {
+                        // A BetterRGB preset may have left the streamer running even
+                        // though the restored user engine is firmware — release the
+                        // endpoint before the firmware apply, and clear the suspend
+                        // flag so the AC policy can manage the engine afterwards.
+                        if (streamer != null)
+                        {
+                            if (streamer.IsRunning)
+                                streamer.StopEngine("override-lift");
+                            streamer.ResumeFromOverride();
+                        }
+
                         ApplyKeyboardHid(s.PerKeyMode, s.Brightness, s.EffectMode, s.Speed,
                             s.Direction, s.ColorR, s.ColorG, s.ColorB, s.MultiColors, s.PerKeyColors);
                     }
@@ -743,6 +754,11 @@ namespace Uniwill_Control_Utility.Services
                 // to Effects mode — we don't want to wipe saved per-key data.
                 var settings = KeyboardSettingsService.Load();
                 settings.PowerOn = true;
+                // A firmware preset means firmware lighting for the duration of the
+                // override: force the hardware engine so the HID apply below is
+                // visible. BetterRGB presets route through ApplyBetterRgbFromPreset
+                // instead, and the user's engine is restored on override lift.
+                settings.Engine = KeyboardEngine.Hardware;
                 settings.PerKeyMode = perKeyMode;
                 settings.Brightness = brightness;
                 settings.IdleTimerEnabled = idleTimerEnabled;
@@ -768,15 +784,12 @@ namespace Uniwill_Control_Utility.Services
                 LastAppliedKeyboardPreset = args;
                 KeyboardPresetApplied?.Invoke(this, args);
 
-                // BetterRGB: route the preset through the streamer's parameter
-                // snapshot — opening a second handle mid-stream would interleave
-                // reports on the same endpoint and corrupt the row pairing.
+                // Stop the streamer if it somehow still runs — the firmware apply
+                // below opens a temporary handle and must not fight the stream
+                // endpoint (EnableKeyboardOverride already suspended it).
                 var streamer = App.GetService<BetterRgbStreamService>();
-                if (streamer != null && settings.Engine == KeyboardEngine.BetterRGB && streamer.IsRunning)
-                {
-                    streamer.SetParams(settings);
-                    return;
-                }
+                if (streamer != null && streamer.IsRunning)
+                    streamer.StopEngine("adaptive-override");
 
                 // Send HID commands directly so the keyboard updates immediately even when
                 // the Keyboard page is not visible. The Keyboard page's debounce timer will
@@ -794,6 +807,143 @@ namespace Uniwill_Control_Utility.Services
                 DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to apply Keyboard preset from profile");
             }
         }
+
+        /// <summary>
+        /// Applies a BetterRGB streamer preset from an Adaptive profile: forces the
+        /// BetterRGB engine for the override duration, maps the profile's full
+        /// per-effect parameter set (AdaptiveBetterRgbSettings) into the matching
+        /// BetterRgb* settings fields, and re-params (or starts) the streamer.
+        /// Clamps mirror the Keyboard page's SaveSettings so the Adaptive override
+        /// and the Keyboard card produce identical renderer parameters.
+        /// </summary>
+        public void ApplyBetterRgbFromPreset(AdaptiveBetterRgbSettings cfg)
+        {
+            try
+            {
+                var settings = KeyboardSettingsService.Load();
+                settings.Engine = KeyboardEngine.BetterRGB;
+                settings.PowerOn = true;
+                settings.BetterRgbMode = ParseBetterRgbEffect(cfg.Mode);
+                settings.BetterRgbFps = Math.Clamp((int)Math.Round(Math.Clamp(cfg.Fps, 15, 60) / 15.0) * 15, 15, 60);
+                settings.TargetFps = settings.BetterRgbFps;
+                settings.BrightnessPercent = Math.Clamp(cfg.BrightnessPercent, 2, 100);
+
+                // Per-effect parameters — clamps mirror the Keyboard page's SaveSettings.
+                settings.BetterRgbBreathSpeed = Math.Clamp(cfg.BreathSpeed, 1, 40);
+                settings.BetterRgbBreathSmooth = Math.Clamp(cfg.BreathSmooth, 2, 150);
+                settings.BetterRgbBreathRandom = cfg.BreathRandom;
+                settings.BetterRgbBreathColor = cfg.BreathColor;
+                settings.BetterRgbWaveAngle = Math.Clamp(cfg.WaveAngle, 0, 315);
+                settings.BetterRgbWaveSpeed = Math.Clamp(cfg.WaveSpeed, 1, 10);
+                settings.BetterRgbSparkleSpeed = Math.Clamp(cfg.SparkleSpeed, 1, 10);
+                settings.BetterRgbSparkleDensity = Math.Clamp(cfg.SparkleDensity, 3, 20);
+                settings.BetterRgbReactiveRandom = cfg.ReactiveRandom;
+                settings.BetterRgbReactiveColor = cfg.ReactiveColor;
+                settings.BetterRgbReactiveDuration = Math.Clamp(cfg.ReactiveDuration, 10, 45);
+                settings.BetterRgbWheelReverse = cfg.WheelReverse;
+                settings.BetterRgbWheelSpeed = Math.Clamp(cfg.WheelSpeed, 1, 10);
+                settings.BetterRgbLightningSpeed = Math.Clamp(cfg.LightningSpeed, 1, 10);
+                settings.BetterRgbLightningSmooth = Math.Clamp(cfg.LightningSmooth, 1, 20);
+                settings.BetterRgbLightningWidth = Math.Clamp(cfg.LightningWidth, 1, 4);
+                settings.BetterRgbLightningConcurrent = Math.Clamp(cfg.LightningConcurrent, 1, 4);
+                settings.BetterRgbFlameSpeed = Math.Clamp(cfg.FlameSpeed, 1, 10);
+                settings.BetterRgbFlameSmooth = Math.Clamp(cfg.FlameSmooth, 1, 20);
+                settings.BetterRgbRainSpeed = Math.Clamp(cfg.RainSpeed, 1, 10);
+                settings.BetterRgbRainDensity = Math.Clamp(cfg.RainDensity, 1, 5);
+                settings.BetterRgbRainColors = cfg.RainColors;
+                settings.BetterRgbRainColorCount = CountColors(cfg.RainColors);
+                settings.BetterRgbMatrixStyle = Math.Clamp(cfg.MatrixStyle, 0, 3);
+                settings.BetterRgbMatrixSpeed = Math.Clamp(cfg.MatrixSpeed, 1, 10);
+                settings.BetterRgbMatrixDensity = Math.Clamp(cfg.MatrixDensity, 1, 5);
+                settings.BetterRgbMatrixColors = cfg.MatrixColors;
+                settings.BetterRgbMatrixColorCount = CountColors(cfg.MatrixColors);
+                settings.BetterRgbStaticLayout = Math.Clamp(cfg.StaticLayout, 0, 1);
+                settings.BetterRgbStaticZones = Math.Clamp(cfg.StaticZones, 1, 7);
+                settings.BetterRgbStaticZoneColors = cfg.StaticZoneColors;
+                settings.BetterRgbRippleRandom = cfg.RippleRandom;
+                settings.BetterRgbRippleSpeed = Math.Clamp(cfg.RippleSpeed, 1, 10);
+                settings.BetterRgbRippleWidth = Math.Clamp(cfg.RippleWidth, 1, 4);
+                settings.BetterRgbRippleColor = cfg.RippleColor;
+                settings.BetterRgbRainbowSpeed = Math.Clamp(cfg.RainbowSpeed, 1, 20);
+                settings.BetterRgbQuicksandSpeed = Math.Clamp(cfg.QuicksandSpeed, 1, 10);
+                settings.BetterRgbQuicksandScale = Math.Clamp(cfg.QuicksandScale, 1, 10);
+                settings.BetterRgbQuicksandColors = cfg.QuicksandColors;
+                settings.BetterRgbCurrentSpeed = Math.Clamp(cfg.CurrentSpeed, 1, 10);
+                settings.BetterRgbCurrentWidth = Math.Clamp(cfg.CurrentWidth, 2, 8);
+                settings.BetterRgbCurrentColors = cfg.CurrentColors;
+                settings.BetterRgbTouchCurrentSpeed = Math.Clamp(cfg.TouchCurrentSpeed, 1, 10);
+                settings.BetterRgbTouchCurrentWidth = Math.Clamp(cfg.TouchCurrentWidth, 1, 5);
+                settings.BetterRgbTouchCurrentColors = cfg.TouchCurrentColors;
+                settings.BetterRgbAmbientBlur = Math.Clamp(cfg.AmbientBlur, 1, 8);
+                settings.BetterRgbAmbientResponse = Math.Clamp(cfg.AmbientResponse, 1, 10);
+                KeyboardSettingsService.Save(settings);
+
+                // The Keyboard page's preset-sync event carries the selected effect's
+                // colors so its pickers land on the profile's values.
+                string color = settings.BetterRgbMode switch
+                {
+                    BetterRgbEffect.Breathing => settings.BetterRgbBreathColor,
+                    BetterRgbEffect.Reactive => settings.BetterRgbReactiveColor,
+                    BetterRgbEffect.Ripple => settings.BetterRgbRippleColor,
+                    _ => "",
+                };
+                string multiColors = settings.BetterRgbMode switch
+                {
+                    BetterRgbEffect.Raindrop => settings.BetterRgbRainColors,
+                    BetterRgbEffect.Matrix => settings.BetterRgbMatrixColors,
+                    BetterRgbEffect.Static => settings.BetterRgbStaticZoneColors,
+                    BetterRgbEffect.Quicksand => settings.BetterRgbQuicksandColors,
+                    BetterRgbEffect.Current => settings.BetterRgbCurrentColors,
+                    BetterRgbEffect.TouchCurrent => settings.BetterRgbTouchCurrentColors,
+                    _ => "",
+                };
+
+                var args = new KeyboardPresetAppliedEventArgs(
+                    false, 5, false, 0, "", 10, KeyboardDirection.LeftRight,
+                    0, 0, 0, "", null,
+                    true, settings.BetterRgbMode, settings.BetterRgbFps,
+                    settings.BrightnessPercent, color, multiColors);
+                LastAppliedKeyboardPreset = args;
+                KeyboardPresetApplied?.Invoke(this, args);
+
+                var streamer = App.GetService<BetterRgbStreamService>();
+                if (streamer == null)
+                    return;
+
+                streamer.SetParams(settings);
+                if (!streamer.IsRunning)
+                    streamer.StartEngine("adaptive-better-rgb");
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to apply BetterRGB preset from profile");
+            }
+        }
+
+        /// <summary>Counts the colors in a "#RRGGBB,#RRGGBB,..." CSV (min 1).</summary>
+        private static int CountColors(string csv) =>
+            string.IsNullOrEmpty(csv) ? 1 : csv.Split(',').Length;
+
+        /// <summary>Parses a BetterRGB effect display name to the enum.</summary>
+        private static BetterRgbEffect ParseBetterRgbEffect(string name) => name switch
+        {
+            "Wave" => BetterRgbEffect.Wave,
+            "Sparkle" => BetterRgbEffect.Sparkle,
+            "Reactive" => BetterRgbEffect.Reactive,
+            "Wheel" => BetterRgbEffect.Wheel,
+            "Lightning" => BetterRgbEffect.Lightning,
+            "Flame" => BetterRgbEffect.Flame,
+            "Raindrop" => BetterRgbEffect.Raindrop,
+            "Matrix" => BetterRgbEffect.Matrix,
+            "Static" => BetterRgbEffect.Static,
+            "Ripple" => BetterRgbEffect.Ripple,
+            "Rainbow" => BetterRgbEffect.Rainbow,
+            "Quicksand" => BetterRgbEffect.Quicksand,
+            "Current" => BetterRgbEffect.Current,
+            "Touch Current" => BetterRgbEffect.TouchCurrent,
+            "Screen Ambient" => BetterRgbEffect.ScreenAmbient,
+            _ => BetterRgbEffect.Breathing,
+        };
 
         // Effects that need 7 multi-color slots
         private static readonly HashSet<KeyboardEffect> s_multiColor7Effects = new()
@@ -1315,11 +1465,22 @@ namespace Uniwill_Control_Utility.Services
         public string MultiColors { get; }
         public string? PerKeyColors { get; }
 
+        /// <summary>Set when the applied preset is a BetterRGB streamer preset.</summary>
+        public bool BetterRgbMode { get; }
+        public BetterRgbEffect BetterRgbEffectMode { get; }
+        public int BetterRgbFps { get; }
+        public int BetterRgbBrightness { get; }
+        public string BetterRgbColor { get; }
+        public string BetterRgbMultiColors { get; }
+
         public KeyboardPresetAppliedEventArgs(
             bool perKeyMode, int brightness, bool idleTimerEnabled, int idleTimerMinutes,
             string effectMode, byte effectSpeed, KeyboardDirection direction,
             byte colorR, byte colorG, byte colorB,
-            string multiColors, string? perKeyColors)
+            string multiColors, string? perKeyColors,
+            bool betterRgbMode = false, BetterRgbEffect betterRgbEffect = BetterRgbEffect.Breathing,
+            int betterRgbFps = 30, int betterRgbBrightness = 100,
+            string betterRgbColor = "", string betterRgbMultiColors = "")
         {
             PerKeyMode = perKeyMode;
             Brightness = brightness;
@@ -1333,6 +1494,12 @@ namespace Uniwill_Control_Utility.Services
             ColorB = colorB;
             MultiColors = multiColors;
             PerKeyColors = perKeyColors;
+            BetterRgbMode = betterRgbMode;
+            BetterRgbEffectMode = betterRgbEffect;
+            BetterRgbFps = betterRgbFps;
+            BetterRgbBrightness = betterRgbBrightness;
+            BetterRgbColor = betterRgbColor;
+            BetterRgbMultiColors = betterRgbMultiColors;
         }
     }
 

@@ -641,7 +641,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Each divider sits above its row and shows only when that row does (the
             // first row of every effect has no divider - BetterRgbEffectSeparator
             // already separates the FPS row from the selected effect's block).
-            BcColorRow.Visibility = sel(BetterRgbEffect.Breathing) ? Visibility.Visible : Visibility.Collapsed;
+            // Random color replaces the fixed color: with the toggle ON, the color
+            // row (and the block separator above it — the next row brings its own)
+            // is hidden.
+            bool bcRandomOn = tsBcRandom.IsChecked == true;
+            bool rcRandomOn = tsRcRandom.IsChecked == true;
+            bool rpRandomOn = tsRpRandom.IsChecked == true;
+
+            BcColorRow.Visibility = sel(BetterRgbEffect.Breathing) && !bcRandomOn ? Visibility.Visible : Visibility.Collapsed;
             BcSpeedRow.Visibility = sel(BetterRgbEffect.Breathing) ? Visibility.Visible : Visibility.Collapsed;
             BcSpeedSeparator.Visibility = BcSpeedRow.Visibility;
             BcSmoothRow.Visibility = sel(BetterRgbEffect.Breathing) ? Visibility.Visible : Visibility.Collapsed;
@@ -657,7 +664,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             SpDensityRow.Visibility = sel(BetterRgbEffect.Sparkle) ? Visibility.Visible : Visibility.Collapsed;
             SpDensitySeparator.Visibility = SpDensityRow.Visibility;
 
-            RcColorRow.Visibility = sel(BetterRgbEffect.Reactive) ? Visibility.Visible : Visibility.Collapsed;
+            RcColorRow.Visibility = sel(BetterRgbEffect.Reactive) && !rcRandomOn ? Visibility.Visible : Visibility.Collapsed;
             RcRandomRow.Visibility = sel(BetterRgbEffect.Reactive) ? Visibility.Visible : Visibility.Collapsed;
             RcRandomSeparator.Visibility = RcRandomRow.Visibility;
             RcDurationRow.Visibility = sel(BetterRgbEffect.Reactive) ? Visibility.Visible : Visibility.Collapsed;
@@ -699,7 +706,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             StColorsRow.Visibility = sel(BetterRgbEffect.Static) ? Visibility.Visible : Visibility.Collapsed;
             StColorsSeparator.Visibility = StColorsRow.Visibility;
 
-            RpColorRow.Visibility = sel(BetterRgbEffect.Ripple) ? Visibility.Visible : Visibility.Collapsed;
+            RpColorRow.Visibility = sel(BetterRgbEffect.Ripple) && !rpRandomOn ? Visibility.Visible : Visibility.Collapsed;
             RpRandomRow.Visibility = sel(BetterRgbEffect.Ripple) ? Visibility.Visible : Visibility.Collapsed;
             RpRandomSeparator.Visibility = RpRandomRow.Visibility;
             RpSpeedRow.Visibility = sel(BetterRgbEffect.Ripple) ? Visibility.Visible : Visibility.Collapsed;
@@ -731,7 +738,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             SaResponseRow.Visibility = sel(BetterRgbEffect.ScreenAmbient) ? Visibility.Visible : Visibility.Collapsed;
             SaResponseSeparator.Visibility = SaResponseRow.Visibility;
 
-            BetterRgbEffectSeparator.Visibility = BetterRgbActive() ? Visibility.Visible : Visibility.Collapsed;
+            // Hidden when the selected effect's first row (its color row) is hidden —
+            // the next row in the block brings its own separator.
+            bool firstRowHidden = (sel(BetterRgbEffect.Breathing) && bcRandomOn)
+                || (sel(BetterRgbEffect.Reactive) && rcRandomOn)
+                || (sel(BetterRgbEffect.Ripple) && rpRandomOn);
+            BetterRgbEffectSeparator.Visibility = BetterRgbActive() && !firstRowHidden ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void MarkBetterRgbChanged()
@@ -993,10 +1005,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             MarkBetterRgbChanged();
         }
 
-        private void TsBcRandom_Toggled(object sender, RoutedEventArgs e) => MarkBetterRgbChanged();
-        private void TsRcRandom_Toggled(object sender, RoutedEventArgs e) => MarkBetterRgbChanged();
+        private void TsBcRandom_Toggled(object sender, RoutedEventArgs e)
+        { UpdateBetterRgbEffectUi(); MarkBetterRgbChanged(); }
+        private void TsRcRandom_Toggled(object sender, RoutedEventArgs e)
+        { UpdateBetterRgbEffectUi(); MarkBetterRgbChanged(); }
         private void TsWhReverse_Toggled(object sender, RoutedEventArgs e) => MarkBetterRgbChanged();
-        private void TsRpRandom_Toggled(object sender, RoutedEventArgs e) => MarkBetterRgbChanged();
+        private void TsRpRandom_Toggled(object sender, RoutedEventArgs e)
+        { UpdateBetterRgbEffectUi(); MarkBetterRgbChanged(); }
 
         private void BcColorPicker_ColorChangedDelayed(object sender, EventArgs e) => MarkBetterRgbChanged();
         private void RcColorPicker_ColorChangedDelayed(object sender, EventArgs e) => MarkBetterRgbChanged();
@@ -2291,6 +2306,12 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void SyncUiFromPreset(KeyboardPresetAppliedEventArgs e)
         {
+            if (e.BetterRgbMode)
+            {
+                SyncBetterRgbUiFromPreset(e);
+                return;
+            }
+
             // Set mode toggle
             ModeToggle.IsChecked = e.PerKeyMode;
 
@@ -2360,6 +2381,41 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _currentDirection = e.Direction;
                 UpdateDirectionButtons();
             }
+        }
+
+        /// <summary>
+        /// Syncs the BetterRGB card (and engine toggle) from a BetterRGB preset
+        /// applied by Adaptive Mode.
+        /// </summary>
+        private void SyncBetterRgbUiFromPreset(KeyboardPresetAppliedEventArgs e)
+        {
+            tsBetterRgbEngine.IsChecked = true;
+
+            PopulateBetterRgbEffects();
+            cmbBetterRgbEffect.SelectedItem = e.BetterRgbEffectMode;
+
+            var color = ParseColorOr(e.BetterRgbColor, Color.FromRgb(0xFF, 0xFF, 0xFF));
+            var colors = ParseColorString(e.BetterRgbMultiColors);
+            switch (e.BetterRgbEffectMode)
+            {
+                case BetterRgbEffect.Breathing: BcColorPicker.SelectedColor = color; break;
+                case BetterRgbEffect.Reactive: RcColorPicker.SelectedColor = color; break;
+                case BetterRgbEffect.Ripple: RpColorPicker.SelectedColor = color; break;
+                case BetterRgbEffect.Raindrop: if (colors.Count > 0) RnPicker.SetColors(colors); break;
+                case BetterRgbEffect.Matrix: if (colors.Count > 0) MtPicker.SetColors(colors); break;
+                case BetterRgbEffect.Quicksand: if (colors.Count > 0) QsPicker.SetColors(colors); break;
+                case BetterRgbEffect.Current: if (colors.Count > 0) CuPicker.SetColors(colors); break;
+                case BetterRgbEffect.TouchCurrent: if (colors.Count > 0) TcPicker.SetColors(colors); break;
+            }
+
+            _brFps = Math.Clamp((int)Math.Round(Math.Clamp(e.BetterRgbFps, 15, 60) / 15.0) * 15, 15, 60);
+            UpdateFpsButtons();
+
+            var brightness = Math.Clamp(e.BetterRgbBrightness, 2, 100);
+            BrightnessPercentSlider.Value = brightness;
+            BrightnessPercentValueText.Text = brightness.ToString();
+
+            UpdateBetterRgbEffectUi();
         }
 
         /// <summary>
