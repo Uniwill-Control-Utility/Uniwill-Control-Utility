@@ -893,6 +893,68 @@
                             </StackPanel>
                         </Grid>
                     </StackPanel>
+                    <!-- Display color calibration (hidden when only Default is available) -->
+                    <StackPanel x:Name="ColorCalSection" Visibility="Collapsed" Margin="0,16,0,0">
+                        <ui:TextBlock FontSize="14"
+                                      FontWeight="SemiBold"
+                                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                      Text="Color Calibration"
+                                      Margin="16,0,2,8"/>
+                        <Grid Width="260" HorizontalAlignment="Center" Margin="-5,8,5,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel x:Name="SlotTrayColorDefault" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrayColorDefault" Width="60" Height="42"
+                                        Style="{StaticResource TrayModeButtonStyle}"
+                                        Tag="Default.icm"
+                                        Click="BtnTrayColorCal_Click">
+                                    <ui:TextBlock FontSize="10"
+                                                  HorizontalAlignment="Center"
+                                                  Text="Default"
+                                                  Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel x:Name="SlotTrayColorSrgb" Grid.Row="0" Grid.Column="1" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrayColorSrgb" Width="60" Height="42"
+                                        Style="{StaticResource TrayModeButtonStyle}"
+                                        Tag="sRGB.icm"
+                                        Click="BtnTrayColorCal_Click">
+                                    <ui:TextBlock FontSize="10"
+                                                  HorizontalAlignment="Center"
+                                                  Text="sRGB"
+                                                  Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel x:Name="SlotTrayColorP3" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrayColorP3" Width="60" Height="42"
+                                        Style="{StaticResource TrayModeButtonStyle}"
+                                        Tag="DCIP3.icm"
+                                        Click="BtnTrayColorCal_Click">
+                                    <ui:TextBlock FontSize="10"
+                                                  HorizontalAlignment="Center"
+                                                  Text="P3"
+                                                  Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel x:Name="SlotTrayColorAdobe" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center">
+                                <Button x:Name="BtnTrayColorAdobe" Width="60" Height="42"
+                                        Style="{StaticResource TrayModeButtonStyle}"
+                                        Tag="AdobeRGB.icm"
+                                        Click="BtnTrayColorCal_Click">
+                                    <ui:TextBlock FontSize="10"
+                                                  HorizontalAlignment="Center"
+                                                  Text="Adobe RGB"
+                                                  Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
                     <!-- Nvidia Optimus runtime switch (Hybrid display mode only) -->
                     <StackPanel x:Name="OptimusSection" Visibility="Collapsed" Margin="0,12,0,12">
                         <ui:TextBlock FontSize="14"

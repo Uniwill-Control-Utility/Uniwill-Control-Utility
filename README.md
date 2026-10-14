@@ -85,6 +85,7 @@ We do not mind features/code created with the assistance of AI, as long as it's 
  - Battery control
  - MiniLED Local Dimming control
  - Display refresh rate control (display in use)
+ - Display color calibration control (Default / sRGB / P3 / Adobe RGB)
  - GPU MUX switch control (Hybrid / dGPU Only / iGPU Only)
  - GPU Power Saving (On / Off / Auto)
  - Performance button preset switching (physical Performance/Q-key button)
@@ -269,6 +270,7 @@ GPU display mode, GPU power management, and display panel controls (Uniwill EC h
 - **GPU Power Saving** (Hybrid mode only) — Live discrete-GPU power control without rebooting: **On (Power Saving)** disables the dGPU via PnP hotswap and routes rendering to the iGPU for maximum savings, **Off (Performance)** re-enables the dGPU, and **Auto** lets Windows/NVIDIA Optimus decide per application.
 - **MiniLED Local Dimming** (MiniLED panels only) — Toggle the panel's local dimming, verified with an EC register readback.
 - **Display Refresh Rate** (displays offering multiple rates) — Switch the refresh rate of the display in use (the primary/taskbar display — internal panel or external monitor) through the Windows display-mode pathway (`EnumDisplaySettings`/`ChangeDisplaySettingsEx`). The card header names the target and its current resolution; rates the display does not report are hidden and the visible buttons spread evenly across the row. The selection is persisted by Windows itself.
+- **Color Calibration** (displays with Windows' ICC profiles) — Associate a Windows ICC color profile with the display in use: **Default** (uncalibrated), **sRGB**, **P3** (Display P3), or **Adobe RGB**, applied through the genuine Windows color-engine switch — `mscms.dll` `InstallColorProfile` + `WcsSetDefaultColorProfile` at SYSTEM_WIDE and CURRENT_USER scope (the exact sequence XMG Control Center's `GCUUtil.exe` runs), against the built-in spool profiles (`sRGB.icm`, `DCIP3.icm`, `AdobeRGB.icm`). Unlike a bare `ICM\ProfileAssociations` registry write (which only relabels the selection), this forces Windows' color engine to reload and actually repaint the panel. The selection is persisted by Windows itself.
 - **GPU Information** — Live readout of the active MUX mode, GPU module ID, physical MUX hardware state, and the persisted NVRAM mode.
 
 ![Display](screenshots/display.png)

@@ -22,6 +22,21 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         internal static extern int ChangeDisplaySettingsEx([MarshalAs(UnmanagedType.LPWStr)] string lpszDeviceName, ref DEVMODE lpDevMode, IntPtr hwnd, uint dwflags, IntPtr lParam);
+
+        // XMG Control Center's color engine (GCUUtil.exe, MonitorProfile class) drives the
+        // genuine ICC switch through mscms.dll. Mirrored verbatim from the decompiled
+        // declarations so the P/Invoke marshalling — and therefore the native call bytes —
+        // match what XMG CC ships. AssociateColorProfileWithDeviceA is imported by GCUUtil
+        // but never called; the apply path is Uninstall → Install → WcsSetDefaultColorProfile.
+        [DllImport("mscms.dll")]
+        internal static extern bool InstallColorProfile(IntPtr hdc, string path);
+
+        [DllImport("mscms.dll")]
+        internal static extern bool UninstallColorProfile(IntPtr hdc, string path, bool bDelete);
+
+        [DllImport("mscms.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        internal static extern bool WcsSetDefaultColorProfile(uint scope, string deviceName, uint profileType, uint subtype, uint profileID, string profileName);
+
 #pragma warning restore SYSLIB1054
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -375,6 +390,274 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             ChangeDisplaySettings(panel, hz);
             return GetCurrentRefreshRate(panel);
         }
+
+        /// <summary>
+        /// The ICM display-profile association subkey for a GDI device name — the
+        /// trailing component of EnumDisplayDevices(dwFlags=1) DeviceKey
+        /// ("\Registry\Machine\...\Class\{4d36e96e-...}\0002" → "0002"). Same
+        /// numbering Windows' own calibrator and OpenRevo use.
+        /// </summary>
+        private static string IcmDeviceId(string? deviceName)
+        {
+            if (string.IsNullOrEmpty(deviceName))
+                return string.Empty;
+
+            DISPLAY_DEVICE displayDevice = new DISPLAY_DEVICE();
+            displayDevice.cb = (uint)Marshal.SizeOf(displayDevice);
+            if (!EnumDisplayDevices(deviceName, 0, ref displayDevice, 1))
+                return string.Empty;
+
+            int sep = displayDevice.DeviceKey.LastIndexOf('\\');
+            return sep < 0 ? string.Empty : displayDevice.DeviceKey.Substring(sep + 1);
+        }
+
+        /// <summary>
+        /// The device identifier XMG Control Center passes to WcsSetDefaultColorProfile:
+        /// the DeviceKey of the (attached + multi-driver) sub-device found under the
+        /// (attached + primary) display — GCUUtil.exe SetMonitorProfile's two-loop
+        /// EnumDisplayDevices walk (dwFlags = EDD_GET_DEVICE_INTERFACE_NAME).
+        /// </summary>
+        private static string WcsDeviceKey()
+        {
+            DISPLAY_DEVICE dd = new DISPLAY_DEVICE();
+            dd.cb = (uint)Marshal.SizeOf(dd);
+
+            string? primary = null;
+            for (uint i = 0; ; i++)
+            {
+                if (!EnumDisplayDevices(null, i, ref dd, 1))
+                    break;
+                if ((dd.StateFlags & 1u) != 0 && (dd.StateFlags & 4u) != 0) // AttachedToDesktop | PrimaryDevice
+                {
+                    primary = dd.DeviceName;
+                    break;
+                }
+            }
+            if (primary is null)
+                return string.Empty;
+
+            for (uint i = 0; ; i++)
+            {
+                if (!EnumDisplayDevices(primary, i, ref dd, 1))
+                    break;
+                if ((dd.StateFlags & 1u) != 0 && (dd.StateFlags & 2u) != 0) // AttachedToDesktop | MultiDriver
+                    return dd.DeviceKey;
+            }
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// The display's active ICC profile as stored in the ICM association
+        /// (HKCU\...\ICM\ProfileAssociations\Display\{GUID}\&lt;id&gt; value ICMProfile,
+        /// REG_MULTI_SZ single element, bare filename resolved against the spool
+        /// color folder — exactly what OpenRevo and XMG CC write). Null when no
+        /// association exists (uncalibrated).
+        /// </summary>
+        public static string? GetCurrentColorProfile(string? deviceName)
+        {
+            string id = IcmDeviceId(deviceName);
+            if (string.IsNullOrEmpty(id))
+                return null;
+
+            string? output = RunReg("query", IcmAssociationRoot + @"\" + id, "/v", IcmProfileValueName);
+            return output is null ? null : ParseActiveColorProfile(output);
+        }
+
+        /// <summary>Current ICC profile filename of the internal panel (null = uncalibrated).</summary>
+        public static string? GetInternalColorProfile()
+        {
+            return GetCurrentColorProfile(InternalPanelName());
+        }
+
+        /// <summary>
+        /// Associates an ICC profile with the internal panel ("" removes the
+        /// association = uncalibrated). Returns the applied profile verified by
+        /// readback (null when removed or failed).
+        /// </summary>
+        public static string? ApplyInternalColorProfile(string profileFileName)
+        {
+            var panel = InternalPanelName();
+            if (string.IsNullOrEmpty(panel))
+                return null;
+
+            if (!ApplyColorProfile(panel, profileFileName))
+                return null;
+
+            return GetCurrentColorProfile(panel);
+        }
+
+        /// <summary>
+        /// Associates an ICC profile with a display ("" removes the association).
+        /// Returns true when the write/readback succeeded.
+        /// </summary>
+        public static bool ApplyColorProfile(string? deviceName, string profileFileName)
+        {
+            // "" = uncalibrated: drop the association. XMG CC has no removal path (it only
+            // ever installs a profile); Windows treats "no association" as the uncalibrated
+            // state, so a plain delete is the faithful equivalent here.
+            if (string.IsNullOrEmpty(profileFileName))
+            {
+                string id = IcmDeviceId(deviceName);
+                if (string.IsNullOrEmpty(id))
+                    return false;
+                RunReg("delete", IcmAssociationRoot + @"\" + id, "/v", IcmProfileValueName, "/f");
+                return GetCurrentColorProfile(deviceName) is null;
+            }
+
+            string fullPath = IcmProfilesFolder + @"\" + profileFileName;
+            if (!System.IO.File.Exists(fullPath))
+                return false;
+
+            string key = WcsDeviceKey();
+            if (string.IsNullOrEmpty(key))
+                return false;
+
+            // XMG Control Center's exact apply sequence (GCUUtil.exe SetMonitorProfile):
+            // uninstall the target, install it fresh, then set it as the WCS default profile
+            // for the panel at SYSTEM_WIDE then CURRENT_USER scope. The WcsSetDefaultColorProfile
+            // pair is what forces Windows' color engine to reload and actually repaint the
+            // panel — a bare ProfileAssociations registry write only relabels the selection.
+            // Non-destructive. XMG CC's UninstallColorProfile(bDelete=true) DELETES the .icm
+            // from the spool — fine for their own bundled profiles, but pointed at Windows'
+            // spool files it wipes them one by one. We only need the profile registered, so
+            // install (no-op if already present) then set it as the WCS default at both scopes.
+            InstallColorProfile(IntPtr.Zero, fullPath);
+            WcsSetDefaultColorProfile(0u, key, 0u, 5u, 0u, fullPath); // SYSTEM_WIDE, CPT_ICC, CPST_RGB_WORKING_SPACE
+            bool currentUser = WcsSetDefaultColorProfile(1u, key, 0u, 5u, 0u, fullPath); // CURRENT_USER
+            return currentUser;
+        }
+
+        /// <summary>
+        /// Profile filenames offered for the color-calibration control, in display
+        /// order. Files are Windows' own (C:\Windows\System32\spool\drivers\color),
+        /// the same set OpenRevo and XMG Control Center offer.
+        /// </summary>
+        public static List<string> GetOfferedColorProfileFiles()
+        {
+            List<string> offered = new();
+            foreach (string file in ColorProfileFiles)
+            {
+                if (file == DefaultColorProfileFile || System.IO.File.Exists(IcmProfilesFolder + @"\" + file))
+                    offered.Add(file);
+            }
+            return offered;
+        }
+
+        /// <summary>Display label for a profile filename ("sRGB.icm" → "sRGB").</summary>
+        public static string ColorProfileLabel(string file)
+        {
+            for (int i = 0; i < ColorProfileFiles.Length; i++)
+            {
+                if (ColorProfileFiles[i] == file)
+                    return ColorProfileLabels[i];
+            }
+            return file;
+        }
+
+        /// <summary>
+        /// Runs reg.exe with the given arguments and returns its stdout decoded from
+        /// UTF-16LE (reg.exe emits UTF-16LE with a BOM when piped), or null on failure.
+        /// </summary>
+        private static string? RunReg(params string[] args)
+        {
+            try
+            {
+                var startInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = @"C:\Windows\System32\reg.exe",
+                    Arguments = string.Join(" ", args.Select(a => a.Contains(' ') ? "\"" + a + "\"" : a)),
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true
+                };
+                using var process = System.Diagnostics.Process.Start(startInfo);
+                if (process is null)
+                    return null;
+                string output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit();
+                return output is null ? null : output.Replace("\uFEFF", string.Empty).Replace("\0", string.Empty);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// First element of a reg.exe query line for the ICMProfile value (printed as
+        /// "ICMProfile    REG_MULTI_SZ    name\0rest"), null when the value is absent.
+        /// </summary>
+        private static string? ParseFirstMultiSz(string regQueryOutput)
+        {
+            foreach (string line in regQueryOutput.Split('\n'))
+            {
+                string trimmed = line.Trim();
+                if (!trimmed.StartsWith(IcmProfileValueName))
+                    continue;
+
+                int typePos = trimmed.IndexOf("REG_");
+                if (typePos < 0)
+                    continue;
+
+                int i = typePos;
+                while (i < trimmed.Length && (char.IsLetterOrDigit(trimmed[i]) || trimmed[i] == '_'))
+                    i++;
+                while (i < trimmed.Length && trimmed[i] == ' ')
+                    i++;
+
+                string value = trimmed.Substring(i);
+                int sep = value.IndexOf("\\0");
+                if (sep >= 0)
+                    value = value.Substring(0, sep);
+                return value.Length == 0 ? null : value;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// The active ICC profile from a reg.exe query of the ICM association: the LAST
+        /// element of the ICMProfile MULTI_SZ (XMG CC appends the requested profile last and
+        /// that is the one in effect), reduced to its bare filename so the value matches
+        /// ColorProfileFiles whether Windows stored a full path or a name.
+        /// </summary>
+        private static string? ParseActiveColorProfile(string regQueryOutput)
+        {
+            foreach (string line in regQueryOutput.Split('\n'))
+            {
+                string trimmed = line.Trim();
+                if (!trimmed.StartsWith(IcmProfileValueName))
+                    continue;
+
+                int typePos = trimmed.IndexOf("REG_");
+                if (typePos < 0)
+                    continue;
+
+                int i = typePos;
+                while (i < trimmed.Length && (char.IsLetterOrDigit(trimmed[i]) || trimmed[i] == '_'))
+                    i++;
+                while (i < trimmed.Length && trimmed[i] == ' ')
+                    i++;
+
+                string value = trimmed.Substring(i);
+                int lastSep = value.LastIndexOf("\\0");
+                if (lastSep >= 0)
+                    value = value.Substring(lastSep + 2);
+
+                int slash = value.LastIndexOf('\\');
+                if (slash >= 0)
+                    value = value.Substring(slash + 1);
+
+                return value.Length == 0 ? null : value;
+            }
+            return null;
+        }
+
+        internal const string DefaultColorProfileFile = "Default.icm";
+        internal static readonly string[] ColorProfileLabels = new string[] { "Default", "sRGB", "P3", "AdobeRGB" };
+        internal static readonly string[] ColorProfileFiles = new string[] { DefaultColorProfileFile, "sRGB.icm", "DCIP3.icm", "AdobeRGB.icm" };
+        internal const string IcmProfileValueName = "ICMProfile";
+        internal const string IcmAssociationRoot = @"HKCU\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ICM\ProfileAssociations\Display\{4d36e96e-e325-11ce-bfc1-08002be10318}";
+        internal const string IcmProfilesFolder = @"C:\Windows\System32\spool\drivers\color";
 
         const int DispChangeSuccessful = 0;
         const int DgpuOnlyRefreshRate = 300;

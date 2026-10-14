@@ -615,6 +615,27 @@
                                       SelectionChanged="cbRefreshRate_SelectionChanged"/>
                         </ui:CardControl>
 
+                        <!-- Display Color Calibration (hidden when only Default is available) -->
+                        <ui:CardControl x:Name="CardColorCalibration" Margin="0,0,0,8" Visibility="Collapsed">
+                            <ui:CardControl.Icon>
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE793;" FontSize="20" Margin="4,0,6,0"/>
+                            </ui:CardControl.Icon>
+                            <ui:CardControl.Header>
+                                <StackPanel>
+                                    <ui:TextBlock FontTypography="Body" Text="Color Calibration"/>
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                  FontTypography="Caption"
+                                                  Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                  Text="Associate a Windows ICC color profile with the display in use via the ICM profile-association registry"/>
+                                </StackPanel>
+                            </ui:CardControl.Header>
+                            <ComboBox x:Name="cbColorCalibration"
+                                      Width="180"
+                                      HorizontalAlignment="Right"
+                                      VerticalAlignment="Center"
+                                      SelectionChanged="cbColorCalibration_SelectionChanged"/>
+                        </ui:CardControl>
+
                         <!-- GPU Information CardExpander -->
                         <ui:CardExpander Margin="0,0,0,8"
 						                 IsExpanded="False">

@@ -37,6 +37,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool _isNvramAvailable;
         private bool _localDimmingToggling;
         private bool _refreshRateBusy;
+        private bool _colorCalBusy;
 
         // Delayed refresh timer created after each user change.
 
@@ -136,6 +137,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Show the refresh-rate card only when the panel offers more than one rate
             CardRefreshRate.Visibility = AvailableRefreshRates().Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+
+            // Show the color-calibration card when Windows offers more than just Default
+            CardColorCalibration.Visibility = OfferedColorProfileFiles().Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         /// <inheritdoc />
@@ -146,7 +150,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Keep the bottom-bar monitor status live: follows display switches
             // (internal panel <-> external monitor) and resolution changes.
             _statusTimer ??= new DispatcherTimer(TimeSpan.FromSeconds(5), DispatcherPriority.Normal,
-                (s, e) => tbRefreshRateTarget.Text = RefreshRateLabel(), Dispatcher);
+                (s, e) => tbRefreshRateTarget.Text = RefreshRateLabel() + ColorCalibrationSuffix(), Dispatcher);
             _statusTimer.Start();
         }
 
@@ -262,6 +266,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Sync the refresh-rate combo from the live Windows display mode
             UpdateRefreshRateCombo(GetRefreshRateSafe());
+
+            // Sync the color-calibration combo from the live ICM association
+            UpdateColorCalibrationCombo(GetColorProfileSafe());
 
             RefreshAll();
             _isLoaded = true;
@@ -574,7 +581,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             // Monitor status first — it must refresh even if the selection sync below fails.
-            tbRefreshRateTarget.Text = RefreshRateLabel();
+            tbRefreshRateTarget.Text = RefreshRateLabel() + ColorCalibrationSuffix();
 
             if (selectedIndex >= 0)
             {
@@ -631,6 +638,122 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     UpdateRefreshRateCombo(applied);
                     _refreshRateBusy = false;
+                });
+            });
+        }
+
+        #endregion
+
+        #region Display Color Calibration
+
+        private string? GetColorProfileSafe()
+        {
+            try
+            {
+                return Uniwill_Control_Utility.Scripts.Misc.Display.GetCurrentColorProfile(RefreshRateTarget());
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private List<string> OfferedColorProfileFiles()
+        {
+            try
+            {
+                return Uniwill_Control_Utility.Scripts.Misc.Display.GetOfferedColorProfileFiles();
+            }
+            catch
+            {
+                return new List<string>();
+            }
+        }
+
+        /// <summary>" · sRGB" suffix for the bottom bar ("" when uncalibrated).</summary>
+        private string ColorCalibrationSuffix()
+        {
+            var profile = GetColorProfileSafe();
+            if (profile is null)
+                return string.Empty;
+
+            return $" · {Uniwill_Control_Utility.Scripts.Misc.Display.ColorProfileLabel(profile)}";
+        }
+
+        /// <summary>
+        /// Rebuilds the combo with exactly the ICC profiles Windows offers, selected at the
+        /// profile currently associated with the display in use. The programmatic selection
+        /// detaches the handler so the sync does not re-apply the setting.
+        /// </summary>
+        private void UpdateColorCalibrationCombo(string? currentFile)
+        {
+            var files = OfferedColorProfileFiles();
+
+            cbColorCalibration.Items.Clear();
+            int selectedIndex = -1;
+            for (int i = 0; i < files.Count; i++)
+            {
+                string label = Uniwill_Control_Utility.Scripts.Misc.Display.ColorProfileLabel(files[i]);
+                cbColorCalibration.Items.Add(new ComboBoxItem { Content = label, Tag = files[i] });
+                if (files[i] == currentFile)
+                    selectedIndex = i;
+            }
+
+            if (selectedIndex >= 0)
+            {
+                cbColorCalibration.SelectionChanged -= cbColorCalibration_SelectionChanged;
+                try
+                {
+                    cbColorCalibration.SelectedIndex = selectedIndex;
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("[Display] Color calibration selection sync failed: {Message}", ex.Message);
+                }
+                finally
+                {
+                    cbColorCalibration.SelectionChanged += cbColorCalibration_SelectionChanged;
+                }
+            }
+        }
+
+        private void cbColorCalibration_SelectionChanged(object sender, RoutedEventArgs e)
+        {
+            if (!_isLoaded || _colorCalBusy)
+                return;
+
+            if (cbColorCalibration.SelectedItem is not ComboBoxItem item || item.Tag is not string file)
+                return;
+
+            // Ignore selection of the profile that is already active
+            if (file == GetColorProfileSafe())
+                return;
+
+            _colorCalBusy = true;
+
+            // The ICM association reload can take ~1s — keep it off the UI thread.
+            _ = Task.Run(() =>
+            {
+                var target = RefreshRateTarget();
+                try
+                {
+                    Uniwill_Control_Utility.Scripts.Misc.Display.ApplyColorProfile(target, file);
+                }
+                catch (Exception ex)
+                {
+                    Log.Information("[Display] [ERROR] Color calibration apply failed: {Message}", ex.Message);
+                }
+
+                // Verify via readback — the registry write reports failures only via return code.
+                string? applied = GetColorProfileSafe();
+                bool success = applied == file;
+                Log.Information("[Display] Color profile set to {Applied} (requested {File}, success: {Success})",
+                    applied, file, success);
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    UpdateColorCalibrationCombo(applied);
+                    _colorCalBusy = false;
                 });
             });
         }

@@ -131,6 +131,9 @@ namespace Uniwill_Control_Utility.Views.Windows
             {
                 RefreshRateSection.Visibility = policy.ShowRefreshRate ? Visibility.Visible : Visibility.Collapsed;
                 UpdateTrayRefreshRateButtons(snapshot.RefreshRateHz, snapshot.GpuModeDgpuOnly);
+
+                ColorCalSection.Visibility = snapshot.ColorCalAvailable ? Visibility.Visible : Visibility.Collapsed;
+                UpdateTrayColorCalButtons(snapshot.ColorProfileFile);
             }
             catch (Exception ex)
             {
@@ -205,8 +208,11 @@ namespace Uniwill_Control_Utility.Views.Windows
             ButtonsGrid.Visibility = _displayPage ? Visibility.Collapsed : Visibility.Visible;
             PageDisplay.Visibility = _displayPage ? Visibility.Visible : Visibility.Collapsed;
 
-            // Grow the page when the refresh-rate section is present (up to two rows) so it does not clip.
-            PageDisplay.Height = 298 + (RefreshRateSection.Visibility == Visibility.Visible ? 130 : 0);
+            // Grow the page when the refresh-rate / color-calibration sections are present
+            // (up to two rows each) so they do not clip.
+            PageDisplay.Height = 298
+                + (RefreshRateSection.Visibility == Visibility.Visible ? 130 : 0)
+                + (ColorCalSection.Visibility == Visibility.Visible ? 130 : 0);
         }
 
         /// <summary>
@@ -279,6 +285,56 @@ namespace Uniwill_Control_Utility.Views.Windows
                 var rates = Uniwill_Control_Utility.Scripts.Misc.Display.GetOfferedRefreshRates(
                     Uniwill_Control_Utility.Scripts.Misc.Display.CurrentDisplayName(), dGpuOnly);
                 return rates.Contains(hz);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Styles the active ICC profile and shows exactly the profiles Windows offers
+        /// (spool-folder presence), reflowing visible slots into the 2-column grid.
+        /// </summary>
+        private void UpdateTrayColorCalButtons(string? currentFile)
+        {
+            Style? inactiveStyle = (Style)Resources["TrayModeButtonStyle"];
+            Style? activeStyle = (Style)Resources["TrayModeButtonActiveStyle"];
+
+            System.Windows.Controls.StackPanel[] slots =
+                new System.Windows.Controls.StackPanel[] { SlotTrayColorDefault, SlotTrayColorSrgb, SlotTrayColorP3, SlotTrayColorAdobe };
+            System.Windows.Controls.Button[] buttons =
+                new System.Windows.Controls.Button[] { BtnTrayColorDefault, BtnTrayColorSrgb, BtnTrayColorP3, BtnTrayColorAdobe };
+            string[] files = new string[] { "Default.icm", "sRGB.icm", "DCIP3.icm", "AdobeRGB.icm" };
+
+            for (int i = 0; i < slots.Length; i++)
+            {
+                buttons[i].Style = currentFile == files[i] ? activeStyle : inactiveStyle;
+                slots[i].Visibility = TrayColorProfileAvailable(files[i]) ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            const int Columns = 2;
+            int slot = 0;
+            foreach (System.Windows.Controls.StackPanel panel in slots)
+            {
+                if (panel.Visibility != Visibility.Visible)
+                    continue;
+
+                System.Windows.Controls.Grid.SetRow(panel, slot / Columns);
+                System.Windows.Controls.Grid.SetColumn(panel, slot % Columns);
+                slot++;
+            }
+        }
+
+        private static bool TrayColorProfileAvailable(string file)
+        {
+            if (file == Uniwill_Control_Utility.Scripts.Misc.Display.DefaultColorProfileFile)
+                return true;
+
+            try
+            {
+                return System.IO.File.Exists(
+                    Uniwill_Control_Utility.Scripts.Misc.Display.IcmProfilesFolder + @"\" + file);
             }
             catch
             {
@@ -414,6 +470,21 @@ namespace Uniwill_Control_Utility.Views.Windows
                 // On failure the live rate is unchanged, so the snapshot re-fetch
                 // inside ApplyAsync restores the previous active style.
                 _ = await _quickControl.SetRefreshRateAsync(hz);
+            });
+        }
+
+        private async void BtnTrayColorCal_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loading || _applying || sender is not System.Windows.Controls.Button btn)
+                return;
+            if (btn.Tag is not string file)
+                return;
+
+            await ApplyAsync(async () =>
+            {
+                // On failure the live association is unchanged, so the snapshot re-fetch
+                // inside ApplyAsync restores the previous active style.
+                _ = await _quickControl.SetColorProfileAsync(file);
             });
         }
 

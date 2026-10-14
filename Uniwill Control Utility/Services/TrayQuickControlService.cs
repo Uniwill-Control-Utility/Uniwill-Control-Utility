@@ -26,7 +26,9 @@ namespace Uniwill_Control_Utility.Services
         bool GpuModeHybrid,
         bool GpuModeDgpuOnly,
         int GpuPowerSavingMode,
-        int RefreshRateHz);
+        int RefreshRateHz,
+        bool ColorCalAvailable,
+        string? ColorProfileFile);
 
     public sealed class TrayQuickControlService
     {
@@ -104,6 +106,19 @@ namespace Uniwill_Control_Utility.Services
                 Log.Warning("[Tray] Refresh rate read failed: {Message}", ex.Message);
             }
 
+            // Live ICM association for the display in use (primary).
+            string? colorProfileFile = null;
+            bool colorCalAvailable = false;
+            try
+            {
+                colorProfileFile = Display.GetCurrentColorProfile(Display.CurrentDisplayName());
+                colorCalAvailable = Display.GetOfferedColorProfileFiles().Count > 1;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Tray] Color calibration read failed: {Message}", ex.Message);
+            }
+
             var features = new FeatureNavigationPreferences(
                 Adaptive: Settings.Default.EnableAdaptiveNavigation,
                 HydroUi: Settings.Default.EnableHydroUiNavigation,
@@ -155,7 +170,9 @@ namespace Uniwill_Control_Utility.Services
                 GpuModeHybrid: gpuModeHybrid,
                 GpuModeDgpuOnly: gpuModeDgpuOnly,
                 GpuPowerSavingMode: Settings.Default.GpuPowerSavingMode,
-                RefreshRateHz: refreshRateHz);
+                RefreshRateHz: refreshRateHz,
+                ColorCalAvailable: colorCalAvailable,
+                ColorProfileFile: colorProfileFile);
         }
 
         #region Toggle Handlers
@@ -426,6 +443,31 @@ namespace Uniwill_Control_Utility.Services
             catch (Exception ex)
             {
                 Log.Warning("[Tray] Display refresh rate apply failed: {Message}", ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Associates an ICC profile with the display in use ("" removes the association).
+        /// Returns true when the readback confirms the requested profile.
+        /// </summary>
+        public async Task<bool> SetColorProfileAsync(string profileFile)
+        {
+            try
+            {
+                var target = Display.CurrentDisplayName();
+                Display.ApplyColorProfile(target, profileFile);
+
+                // Verify via readback — the registry write reports failures only via return code.
+                string? applied = Display.GetCurrentColorProfile(target);
+                bool success = applied == profileFile;
+                Log.Information("[Tray] Display color profile set to {Applied} (requested {File}, success: {Success})",
+                    applied, profileFile, success);
+                return success;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Tray] Display color profile apply failed: {Message}", ex.Message);
                 return false;
             }
         }
