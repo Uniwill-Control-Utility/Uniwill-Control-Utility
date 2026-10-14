@@ -455,7 +455,10 @@ namespace Uniwill_Control_Utility.Services
         {
             try
             {
-                var target = Display.CurrentDisplayName();
+                // Color calibration is laptop-panel-only — never the display in use.
+                var target = Display.InternalPanelName();
+                if (string.IsNullOrEmpty(target))
+                    return false;
                 Display.ApplyColorProfile(target, profileFile);
 
                 // Verify via readback — the registry write reports failures only via return code.

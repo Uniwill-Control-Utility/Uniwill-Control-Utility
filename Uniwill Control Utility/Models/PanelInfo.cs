@@ -79,6 +79,52 @@ namespace Uniwill_Control_Utility.Models
             return false;
         }
 
+        /// <summary>
+        /// The internal panel's model name (WmiMonitorID UserFriendlyName), e.g.
+        /// "NE160QDM-NM9". Prefers the active monitor that matches the known panel
+        /// database — that match IS the laptop panel, so externals are ignored —
+        /// falling back to the first active monitor with a friendly name.
+        /// Null when WMI is unavailable or no monitor reports a name.
+        /// </summary>
+        public static string? CurrentPanelModel()
+        {
+            try
+            {
+                using var searcher = new System.Management.ManagementObjectSearcher(
+                    "root\\wmi", "SELECT * FROM WmiMonitorID");
+
+                string? firstNamed = null;
+                foreach (System.Management.ManagementBaseObject monitor in searcher.Get())
+                {
+                    if (!(bool)monitor["Active"])
+                        continue;
+
+                    string? name = ExtractFriendlyName(monitor);
+                    string? hardwareId = ExtractHardwareId(monitor);
+
+                    PanelInfo? info = null;
+                    if (!string.IsNullOrEmpty(hardwareId))
+                        info = LookupByHardwareId(hardwareId);
+                    if (info == null && !string.IsNullOrEmpty(name))
+                        info = LookupByModel(name);
+
+                    // The database match IS the laptop panel; its Model is the friendly name
+                    // even when the monitor's WMI UserFriendlyName is empty (BOE panels omit it).
+                    if (info != null)
+                        return info.Value.Model;
+
+                    if (firstNamed is null && !string.IsNullOrEmpty(name))
+                        firstNamed = name;
+                }
+                return firstNamed;
+            }
+            catch
+            {
+                // WMI not available
+                return null;
+            }
+        }
+
         private static string? ExtractFriendlyName(System.Management.ManagementBaseObject monitor)
         {
             byte[]? friendlyNameBytes = monitor["UserFriendlyName"] as byte[];

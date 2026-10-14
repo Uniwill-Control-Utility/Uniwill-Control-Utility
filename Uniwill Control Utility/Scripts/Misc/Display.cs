@@ -311,6 +311,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 : string.Empty;
         }
 
+
         /// <summary>
         /// The laptop's internal panel (null when the device has none). Matches each
         /// GDI screen against the DirectX topology (Internal / DisplayportEmbedded),
@@ -417,33 +418,34 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         /// (attached + primary) display — GCUUtil.exe SetMonitorProfile's two-loop
         /// EnumDisplayDevices walk (dwFlags = EDD_GET_DEVICE_INTERFACE_NAME).
         /// </summary>
-        private static string WcsDeviceKey()
+        /// <summary>
+        /// The device identifier to pass to WcsSetDefaultColorProfile for a SPECIFIC display:
+        /// the DeviceKey of that display's (attached + multi-driver) sub-device, falling back to
+        /// its (attached) sub-device. Generalizes GCUUtil.exe SetMonitorProfile's walk (which
+        /// hardcodes the primary) to any GDI device name, so the WCS write lands on the same
+        /// association subkey IcmDeviceId(deviceName) reads.
+        /// </summary>
+        private static string WcsDeviceKeyFor(string? deviceName)
         {
+            if (string.IsNullOrEmpty(deviceName))
+                return string.Empty;
+
             DISPLAY_DEVICE dd = new DISPLAY_DEVICE();
             dd.cb = (uint)Marshal.SizeOf(dd);
 
-            string? primary = null;
+            string? attached = null;
             for (uint i = 0; ; i++)
             {
-                if (!EnumDisplayDevices(null, i, ref dd, 1))
+                if (!EnumDisplayDevices(deviceName, i, ref dd, 1))
                     break;
-                if ((dd.StateFlags & 1u) != 0 && (dd.StateFlags & 4u) != 0) // AttachedToDesktop | PrimaryDevice
-                {
-                    primary = dd.DeviceName;
-                    break;
-                }
-            }
-            if (primary is null)
-                return string.Empty;
-
-            for (uint i = 0; ; i++)
-            {
-                if (!EnumDisplayDevices(primary, i, ref dd, 1))
-                    break;
-                if ((dd.StateFlags & 1u) != 0 && (dd.StateFlags & 2u) != 0) // AttachedToDesktop | MultiDriver
+                if ((dd.StateFlags & 1u) == 0) // not AttachedToDesktop
+                    continue;
+                if ((dd.StateFlags & 2u) != 0) // MultiDriver — the WCS target
                     return dd.DeviceKey;
+                if (attached is null)
+                    attached = dd.DeviceKey;
             }
-            return string.Empty;
+            return attached ?? string.Empty;
         }
 
         /// <summary>
@@ -508,7 +510,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             if (!System.IO.File.Exists(fullPath))
                 return false;
 
-            string key = WcsDeviceKey();
+            string key = WcsDeviceKeyFor(deviceName);
             if (string.IsNullOrEmpty(key))
                 return false;
 
@@ -653,7 +655,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         }
 
         internal const string DefaultColorProfileFile = "Default.icm";
-        internal static readonly string[] ColorProfileLabels = new string[] { "Default", "sRGB", "P3", "AdobeRGB" };
+        internal static readonly string[] ColorProfileLabels = new string[] { "Default", "sRGB", "DCI-P3", "AdobeRGB" };
         internal static readonly string[] ColorProfileFiles = new string[] { DefaultColorProfileFile, "sRGB.icm", "DCIP3.icm", "AdobeRGB.icm" };
         internal const string IcmProfileValueName = "ICMProfile";
         internal const string IcmAssociationRoot = @"HKCU\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ICM\ProfileAssociations\Display\{4d36e96e-e325-11ce-bfc1-08002be10318}";

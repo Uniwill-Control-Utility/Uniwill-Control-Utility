@@ -147,10 +147,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             SyncFromEcAndRefresh();
 
-            // Keep the bottom-bar monitor status live: follows display switches
-            // (internal panel <-> external monitor) and resolution changes.
+            // Keep the bottom-bar panel-model status live (WMI UserFriendlyName via PanelDatabase).
             _statusTimer ??= new DispatcherTimer(TimeSpan.FromSeconds(5), DispatcherPriority.Normal,
-                (s, e) => tbRefreshRateTarget.Text = RefreshRateLabel() + ColorCalibrationSuffix(), Dispatcher);
+                (s, e) => tbRefreshRateTarget.Text = LaptopModelLabel(), Dispatcher);
             _statusTimer.Start();
         }
 
@@ -548,18 +547,15 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>
-        /// "Internal panel — 2560×1600" / "External monitor — 1920×1080" for the display in use.
+        /// "Panel model: NE160QDM-NM9" for the bottom bar — the WMI UserFriendlyName of the
+        /// laptop panel via PanelDatabase ("--" when WMI reports no name).
         /// </summary>
-        private string RefreshRateLabel()
+        private string LaptopModelLabel()
         {
-            var target = RefreshRateTarget();
-            if (target is null)
-                return "--";
-
-            bool isInternalPanel = Uniwill_Control_Utility.Scripts.Misc.Display.IsInternalDisplay(target);
-            var resolution = Uniwill_Control_Utility.Scripts.Misc.Display.GetDisplayResolution(target);
-            var size = resolution.Length > 0 ? $" — {resolution}" : string.Empty;
-            return (isInternalPanel ? "Internal panel" : "External monitor") + size;
+            var model = Uniwill_Control_Utility.Models.PanelDatabase.CurrentPanelModel();
+            if (model is null)
+                Log.Warning("[Display] Bottom-bar model label: WMI panel model unavailable");
+            return model is not null && model.Length > 0 ? $"Panel model: {model}" : "--";
         }
 
         /// <summary>
@@ -581,7 +577,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             // Monitor status first — it must refresh even if the selection sync below fails.
-            tbRefreshRateTarget.Text = RefreshRateLabel() + ColorCalibrationSuffix();
+            tbRefreshRateTarget.Text = LaptopModelLabel();
 
             if (selectedIndex >= 0)
             {
@@ -650,7 +646,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             try
             {
-                return Uniwill_Control_Utility.Scripts.Misc.Display.GetCurrentColorProfile(RefreshRateTarget());
+                // Color calibration is laptop-panel-only — never the display in use.
+                return Uniwill_Control_Utility.Scripts.Misc.Display.GetCurrentColorProfile(
+                    Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName());
             }
             catch
             {
@@ -670,19 +668,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        /// <summary>" · sRGB" suffix for the bottom bar ("" when uncalibrated).</summary>
-        private string ColorCalibrationSuffix()
-        {
-            var profile = GetColorProfileSafe();
-            if (profile is null)
-                return string.Empty;
-
-            return $" · {Uniwill_Control_Utility.Scripts.Misc.Display.ColorProfileLabel(profile)}";
-        }
-
         /// <summary>
         /// Rebuilds the combo with exactly the ICC profiles Windows offers, selected at the
-        /// profile currently associated with the display in use. The programmatic selection
+        /// profile currently associated with the laptop panel. The programmatic selection
         /// detaches the handler so the sync does not re-apply the setting.
         /// </summary>
         private void UpdateColorCalibrationCombo(string? currentFile)
@@ -734,10 +722,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             // The ICM association reload can take ~1s — keep it off the UI thread.
             _ = Task.Run(() =>
             {
-                var target = RefreshRateTarget();
+                var panel = Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName();
                 try
                 {
-                    Uniwill_Control_Utility.Scripts.Misc.Display.ApplyColorProfile(target, file);
+                    Uniwill_Control_Utility.Scripts.Misc.Display.ApplyColorProfile(panel, file);
                 }
                 catch (Exception ex)
                 {
