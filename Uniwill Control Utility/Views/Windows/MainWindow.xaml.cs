@@ -573,6 +573,80 @@ namespace Uniwill_Control_Utility.Views.Windows
         }
 
         /// <summary>
+        /// Auto-power lighting policy for the Keyboard and Light Bar pages: when a page's
+        /// "auto off when unplugged" option is enabled, the lights follow the AC plug
+        /// state — unplugged turns them off, plugged in restores the user's saved lighting
+        /// intent. The BetterRGB streamer (which owns the keyboard-zone handle) is
+        /// stopped/started instead of sending firmware reports.
+        /// </summary>
+        private static void ApplyLightingAutoPowerPolicy(bool acPlugged)
+        {
+            var kbdSettings = KeyboardSettingsService.Load();
+            bool kbdAuto = kbdSettings.AutoPowerOffOnBattery;
+            bool lbAuto = Settings.Default.LightBarAutoPowerOffOnBattery;
+            if (!kbdAuto && !lbAuto)
+                return;
+
+            if (kbdAuto && kbdSettings.Engine == KeyboardEngine.BetterRGB)
+            {
+                var streamer = App.GetService<BetterRgbStreamService>();
+                if (streamer != null)
+                {
+                    if (!acPlugged)
+                        streamer.StopEngine("auto-power-battery");
+                    else
+                    {
+                        streamer.SetParams(kbdSettings);
+                        streamer.StartEngine("auto-power-ac");
+                    }
+                }
+            }
+
+            // BetterRGB on battery also needs a one-shot firmware TurnOff: StopEngine
+            // only halts the frame loop and exits UserMode, leaving the last streamed
+            // frame lit (same pairing as RequestIdleOff's StopEngine + TurnOff).
+            bool kbdHidAuto = kbdAuto && (kbdSettings.Engine != KeyboardEngine.BetterRGB || !acPlugged);
+            if (!kbdHidAuto && !lbAuto)
+                return;
+
+            var hidService = new KeyboardHidService();
+            if (!hidService.Open())
+            {
+                hidService.Dispose();
+                return;
+            }
+
+            try
+            {
+                if (!acPlugged)
+                {
+                    if (kbdHidAuto)
+                    {
+                        hidService.TurnOff();
+                        Log.Information("[Lighting] Auto-power policy: keyboard OFF (unplugged)");
+                    }
+                    if (lbAuto && hidService.IsLightBarAvailable)
+                    {
+                        hidService.LightBarTurnOff();
+                        Log.Information("[Lighting] Auto-power policy: light bar OFF (unplugged)");
+                    }
+                }
+                else
+                {
+                    if (kbdHidAuto)
+                        ApplyKeyboardOnStartWithService(hidService);
+                    if (lbAuto)
+                        ApplyLightBarOnStartWithService(hidService);
+                    Log.Information("[Lighting] Auto-power policy: lighting restored (plugged in)");
+                }
+            }
+            finally
+            {
+                hidService.Dispose();
+            }
+        }
+
+        /// <summary>
         /// Applies keyboard RGB settings on startup with a delay and retries.
         /// The ITE HID controller may not be discoverable immediately on cold boot,
         /// and the app may start minimized to tray (before Dashboard navigation fires).
@@ -635,6 +709,22 @@ namespace Uniwill_Control_Utility.Views.Windows
             finally
             {
                 hidService?.Dispose();
+            }
+
+            // Auto-power lighting at startup: if the laptop is on battery and the
+            // option is enabled, the startup apply above turned the lights on —
+            // suppress them to honor the unplug-off policy.
+            try
+            {
+                GetBatteryStatus();
+                bool acPluggedAtStart = statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
+                    || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery;
+                if (!acPluggedAtStart)
+                    ApplyLightingAutoPowerPolicy(false);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[KBD] Startup auto-power policy failed: {ex.Message}");
             }
         }
 
@@ -1053,11 +1143,19 @@ namespace Uniwill_Control_Utility.Views.Windows
                     {
                         bool acPlugged = statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
                             || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery;
-                        App.GetService<BetterRgbStreamService>()?.ApplyAcPolicy(acPlugged);
+
+                        // Auto-power lighting policy (Keyboard/Light Bar pages): when a page's
+                        // "auto off when unplugged" option is enabled, battery turns the lights
+                        // OFF and plugged restores the saved lighting. It supersedes the BetterRGB
+                        // AC fallback (which would leave hardware effects ON on battery), so skip
+                        // that policy when the keyboard auto-power is enabled.
+                        if (!KeyboardSettingsService.Load().AutoPowerOffOnBattery)
+                            App.GetService<BetterRgbStreamService>()?.ApplyAcPolicy(acPlugged);
+                        ApplyLightingAutoPowerPolicy(acPlugged);
                     }
                     catch (Exception ex)
                     {
-                        Log.Information("[BetterRGB] AC policy apply failed: {Message}", ex.Message);
+                        Log.Information("[Lighting] AC policy apply failed: {Message}", ex.Message);
                     }
                 }
 
@@ -1146,6 +1244,22 @@ namespace Uniwill_Control_Utility.Views.Windows
                             catch (Exception ex)
                             {
                                 Debug.WriteLine($"[Resume] Light Bar re-apply failed: {ex.Message}");
+                            }
+
+                            // Auto-power lighting: the resume re-applies above turned the
+                            // lights back on per saved settings — if the auto-power option
+                            // is enabled and the laptop is on battery, suppress them again.
+                            try
+                            {
+                                GetBatteryStatus();
+                                bool acPluggedNow = statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
+                                    || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery;
+                                if (!acPluggedNow)
+                                    ApplyLightingAutoPowerPolicy(false);
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[Resume] Auto-power lighting suppression failed: {ex.Message}");
                             }
 
                             // Re-apply Battery charge limit

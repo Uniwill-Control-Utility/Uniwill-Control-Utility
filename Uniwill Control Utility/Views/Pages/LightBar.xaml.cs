@@ -139,8 +139,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             int brightness = Settings.Default.LightBarBrightness;
             int effectIndex = Settings.Default.LightBarEffectIndex;
             int speed = Settings.Default.LightBarSpeed;
+            bool autoPower = Settings.Default.LightBarAutoPowerOffOnBattery;
 
             tsLightBarPower.IsChecked = enabled;
+            tsAutoPowerUnplug.IsChecked = autoPower;
             ColorPicker.SelectedColor = Color.FromRgb(r, g, b);
             BrightnessSlider.Value = brightness;
             BrightnessValueText.Text = brightness.ToString();
@@ -153,8 +155,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Update UI visibility based on selected effect
             UpdateEffectUi();
 
-            // Apply saved settings to HID on first load
-            if (enabled && _hidService != null)
+            // Apply saved settings to HID on first load. Suppressed when the auto-power
+            // option is enabled and the laptop is currently unplugged — the lights must
+            // stay off on battery (MainWindow's auto-power policy owns the suppression).
+            bool unpluggedNow = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
+                == System.Windows.Forms.PowerLineStatus.Offline;
+            if (enabled && _hidService != null && !(autoPower && unpluggedNow))
             {
                 _ = Task.Run(() =>
                 {
@@ -224,6 +230,51 @@ namespace Uniwill_Control_Utility.Views.Pages
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"[LB] Power toggle failed: {ex.Message}");
+                }
+            });
+
+            SaveSettings();
+        }
+
+        /// <summary>
+        /// "Auto off when unplugged" toggle. Persists the option and immediately applies
+        /// the effective lighting state for the current plug state: battery + enabled →
+        /// lights off; disabled or plugged in → the user's saved power intent.
+        /// </summary>
+        private void TsAutoPowerUnplug_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isFirstLoad || _hidService == null)
+                return;
+
+            bool autoOn = tsAutoPowerUnplug.IsChecked == true;
+            bool pluggedIn = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
+                != System.Windows.Forms.PowerLineStatus.Offline;
+            bool effectiveOn = autoOn && !pluggedIn ? false : tsLightBarPower.IsChecked == true;
+
+            var color = ColorPicker.SelectedColor;
+            int brightness = (int)BrightnessSlider.Value;
+            byte effect = GetSelectedEffect();
+            byte hidSpeed = (byte)(11 - SpeedSlider.Value);
+
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    Thread.Sleep(50);
+                    if (effectiveOn)
+                    {
+                        _hidService?.LightBarTurnOn(color.R, color.G, color.B, brightness);
+                        _hidService?.LightBarSetEffect(effect, hidSpeed, brightness);
+                    }
+                    else
+                    {
+                        _hidService?.LightBarTurnOff();
+                    }
+                    Debug.WriteLine($"[LB] Auto-power toggled: autoOn={autoOn}, pluggedIn={pluggedIn}, effectiveOn={effectiveOn}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[LB] Auto-power toggle failed: {ex.Message}");
                 }
             });
 
@@ -322,6 +373,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void SaveSettings()
         {
             Settings.Default.LightBarEnabled = tsLightBarPower.IsChecked == true;
+            Settings.Default.LightBarAutoPowerOffOnBattery = tsAutoPowerUnplug.IsChecked == true;
             var color = ColorPicker.SelectedColor;
             Settings.Default.LightBarR = color.R;
             Settings.Default.LightBarG = color.G;

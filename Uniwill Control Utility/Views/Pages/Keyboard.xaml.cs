@@ -251,6 +251,29 @@ namespace Uniwill_Control_Utility.Views.Pages
                         // BetterRGB: start the streamer instead of firmware applies
                         // (idempotent — MainWindow's startup path may have started it).
                         var diskSettings = KeyboardSettingsService.Load();
+
+                        // Auto-power policy: on battery with the option enabled, the
+                        // lights must stay off — suppress the page-load apply instead
+                        // of turning them on (stop the streamer / firmware off path).
+                        bool autoSuppressed = diskSettings.AutoPowerOffOnBattery
+                            && System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
+                                == System.Windows.Forms.PowerLineStatus.Offline;
+                        if (autoSuppressed)
+                        {
+                            var autoStreamer = App.GetService<BetterRgbStreamService>();
+                            if (autoStreamer != null && diskSettings.Engine == KeyboardEngine.BetterRGB)
+                            {
+                                autoStreamer.StopEngine("auto-power-battery");
+                                // StopEngine alone leaves the last streamed frame lit —
+                                // pair it with a one-shot TurnOff (as RequestIdleOff does).
+                                _hidService?.TurnOff();
+                            }
+                            else
+                                _hidService?.TurnOff();
+                            Debug.WriteLine("[KBD] Page_Loaded apply suppressed: auto-power on battery");
+                            return;
+                        }
+
                         if (diskSettings.Engine == KeyboardEngine.BetterRGB)
                         {
                             var streamer = App.GetService<BetterRgbStreamService>();
@@ -1352,6 +1375,67 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
+        /// <summary>
+        /// "Auto off when unplugged" toggle. Persists the option and immediately applies
+        /// the effective lighting state for the current plug state: battery + enabled →
+        /// lights off; disabled or plugged in → the user's saved power intent. Routing
+        /// mirrors TsKeyboardPower_Toggled so per-key/effects/engine paths stay identical.
+        /// </summary>
+        private void TsAutoPowerUnplug_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isFirstLoad) return;
+
+            bool autoOn = tsAutoPowerUnplug.IsChecked == true;
+            bool pluggedIn = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
+                != System.Windows.Forms.PowerLineStatus.Offline;
+            bool effectiveOn = autoOn && !pluggedIn ? false : tsKeyboardPower.IsChecked == true;
+
+            if (ModeToggle.IsChecked == true)
+            {
+                // Per-key mode: turn on/off without switching to effects (same as power toggle).
+                if (_hidService?.IsAvailable == true)
+                {
+                    if (effectiveOn)
+                        ApplyPerKeyColorsToHid();
+                    else
+                    {
+                        var streamer = App.GetService<BetterRgbStreamService>();
+                        if (streamer != null && KeyboardSettingsService.Load().Engine == KeyboardEngine.BetterRGB)
+                        {
+                            streamer.StopEngine("auto-power-battery");
+                            // StopEngine alone leaves the last streamed frame lit — pair
+                            // it with a one-shot TurnOff (as RequestIdleOff does).
+                            _hidService?.TurnOff();
+                        }
+                        else
+                            _hidService.TurnOff();
+                    }
+                }
+            }
+            else
+            {
+                // Effects mode: debounce re-applies with power-on semantics; power-off
+                // goes straight to the streamer/firmware off path.
+                if (effectiveOn)
+                    _pendingApply = true;
+                else
+                {
+                    var streamer = App.GetService<BetterRgbStreamService>();
+                    if (streamer != null && KeyboardSettingsService.Load().Engine == KeyboardEngine.BetterRGB)
+                    {
+                        streamer.StopEngine("auto-power-battery");
+                        // StopEngine alone leaves the last streamed frame lit — pair
+                        // it with a one-shot TurnOff (as RequestIdleOff does).
+                        _hidService?.TurnOff();
+                    }
+                    else
+                        _hidService?.TurnOff();
+                }
+            }
+
+            SaveSettings();
+        }
+
         private void ColorPicker_ColorChangedDelayed(object sender, EventArgs e)
         {
             if (_isFirstLoad) return;
@@ -1886,6 +1970,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             tsIdleTimer.IsChecked = settings.IdleTimerEnabled;
             IdleTimerCard.IsExpanded = settings.IdleTimerEnabled;
             tsTouchReactive.IsChecked = settings.TouchReactive;
+            tsAutoPowerUnplug.IsChecked = settings.AutoPowerOffOnBattery;
 
             // BetterRGB engine + FPS sync from disk.
             tsBetterRgbEngine.IsChecked = settings.Engine == KeyboardEngine.BetterRGB;
@@ -2056,6 +2141,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Direction = _currentDirection,
                 MultiColors = SerializeColors(MultiColorPicker.GetColors()),
                 IdleTimerEnabled = tsIdleTimer.IsChecked == true,
+                AutoPowerOffOnBattery = tsAutoPowerUnplug.IsChecked == true,
                 IdleTimerMinutes = cmbIdleTimer.SelectedIndex >= 0
                     ? s_idleTimerOptions[cmbIdleTimer.SelectedIndex].Seconds / 60
                     : 10,

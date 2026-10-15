@@ -105,6 +105,30 @@
                                          Unchecked="TsLightBarPower_Toggled" />
                     </ui:CardControl>
 
+                    <!-- Auto power: light bar follows the AC plug state -->
+                    <ui:CardControl Margin="0,0,0,8">
+                        <ui:CardControl.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7E8;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardControl.Icon>
+                        <ui:CardControl.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Auto Off When Unplugged" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Automatically turn the light bar off when the laptop is unplugged, and back on when plugged in"
+                                               TextWrapping="Wrap" />
+                            </StackPanel>
+                        </ui:CardControl.Header>
+                        <ui:ToggleSwitch x:Name="tsAutoPowerUnplug"
+                                         LabelPosition="Left"
+                                         OnContent="On"
+                                         OffContent="Off"
+                                         IsChecked="False"
+                                         Checked="TsAutoPowerUnplug_Toggled"
+                                         Unchecked="TsAutoPowerUnplug_Toggled" />
+                    </ui:CardControl>
+
                     <!-- Color (single) -->
                     <ui:CardControl x:Name="ColorCard" Margin="0,0,0,8">
                         <ui:CardControl.Icon>

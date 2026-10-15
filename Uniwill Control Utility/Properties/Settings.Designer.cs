@@ -970,5 +970,13 @@ namespace Uniwill_Control_Utility.Properties {
             get { return ((bool)(this["EnableQKeyLedSync"])); }
             set { this["EnableQKeyLedSync"] = value; }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool LightBarAutoPowerOffOnBattery {
+            get { return ((bool)(this["LightBarAutoPowerOffOnBattery"])); }
+            set { this["LightBarAutoPowerOffOnBattery"] = value; }
+        }
     }
 }

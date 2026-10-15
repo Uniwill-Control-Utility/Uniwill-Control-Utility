@@ -240,6 +240,13 @@ namespace Uniwill_Control_Utility.Models
         public bool IdleTimerEnabled { get; set; } = false;
 
         /// <summary>
+        /// Auto-power policy: when true, the keyboard backlight is turned off while
+        /// the laptop is unplugged (on battery) and restored to the user's saved
+        /// PowerOn intent when plugged in. The PowerOn field stays the user's intent.
+        /// </summary>
+        public bool AutoPowerOffOnBattery { get; set; } = false;
+
+        /// <summary>
         /// Whether touch-reactive mode is enabled for effects that support it
         /// (Random, Ripple, Aurora, Spark). When true, the effect triggers on
         /// keypress instead of running automatically. Stored as byte[7]=0x01

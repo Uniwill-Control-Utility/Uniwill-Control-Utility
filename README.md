@@ -230,6 +230,7 @@ Per-key and global RGB keyboard backlight control via the ITE HID controller.
 - Multi-color palette picker (4 or 7 colors) for complex effects
 - Touch reactive toggle for Ripple, Aurora, Spark, and Random effects
 - Idle timer — Auto-turn-off backlight after configurable inactivity
+- Auto Off When Unplugged — opt-in toggle: backlight turns off while the laptop is unplugged (on battery) and restores the saved lighting when plugged in (works in both per-key and effects modes, including the BetterRGB streamer)
 - On/off toggle and brightness slider
 - **BetterRGB Streamer Engine** — opt-in software mode ported from the open-source [BetterRGB-ITE8291-Adaptive](https://github.com/ZavierChen/BetterRGB-ITE8291-Adaptive) engine: all 14 effects (breathing, wave, sparkle, reactive, wheel, lightning, flame, raindrop, matrix, static, ripple, rainbow, quicksand, current) rendered in software and streamed on the dedicated ITE 0xFF03 RGB interface with the reference's interleaved 512-byte framing, at 15/30/45/60 FPS (button-selected, default 30; the pacer self-degrades if the device lags). Its own Effects card carries the full reference control set per effect (speeds, smoothness, widths, densities, multi-color palettes capped per effect — up to 5 for Raindrop, 3 for Matrix/Quicksand/Current, random-color toggles, reactive duration, matrix styles, and Wave direction arrow buttons at 45° increments) — the firmware Effects card stays separate. 2–100 software brightness, keypress-driven reactive/ripple via the system key-state hook, AC auto-policy (plugged → streamer, on battery → firmware effects at 0% CPU), sleep/wake resume, a 3-attempt watchdog that falls back to Hardware MCU, and a live status line (running FPS + frame counter). On a normal UCU exit the engine hands the keyboard a static white firmware effect at the second-lowest brightness (in-memory only, never persisted) so the keyboard never goes black. Off by default — the hardware path is byte-identical
 - White-backlight-only mode for keyboards without RGB
@@ -242,6 +243,7 @@ Per-key and global RGB keyboard backlight control via the ITE HID controller.
 RGB light bar control with multiple effects and color options.
 
 - Power toggle, color picker, and brightness slider (0–100%)
+- Auto Off When Unplugged — opt-in toggle: light bar turns off while the laptop is unplugged (on battery) and restores the saved lighting when plugged in
 - Effects — Static, Breathing, Wave, Loading, Marquee, Meteor
 - Speed slider for animated effects
 - Fixed rainbow palette for Wave and Marquee effects
