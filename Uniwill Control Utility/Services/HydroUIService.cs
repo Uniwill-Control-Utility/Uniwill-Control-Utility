@@ -406,13 +406,35 @@ namespace Uniwill_Control_Utility.Services
             {
                 try
                 {
-                    _device = await BluetoothLEDevice.FromBluetoothAddressAsync(ulong.Parse(deviceAddress.Replace(":", "")));
-                    if (_device == null) return false;
+                    _device = await BluetoothLEDevice.FromBluetoothAddressAsync(
+                        ulong.Parse(deviceAddress.Replace(":", "")));
+                    if (_device == null)
+                    {
+                        Log.Warning("[WaterCooler] Connect attempt {Attempt}: FromBluetoothAddressAsync returned null for {Address}",
+                            attempt, deviceAddress);
+                        return false;
+                    }
 
                     Debug.WriteLine($"[WaterCooler] Device acquired, ConnectionStatus={_device.ConnectionStatus}");
 
                     // Create a GattSession for explicit connection lifecycle control.
                     _gattSession = await GattSession.FromDeviceIdAsync(BluetoothDeviceId.FromId(_device.DeviceId));
+
+                    // MaintainConnection=true is what asks Windows to hold — and INITIATE —
+                    // the BLE link. After hibernation resume the cooler advertises but is NOT
+                    // OS-connected (wake does not always re-establish the link), so without
+                    // this the GATT discovery below throws and reconnect fails forever until
+                    // the user power-cycles the cooler. DisconnectAsync flips it back to false
+                    // to tear the link down.
+                    try
+                    {
+                        if (_gattSession.CanMaintainConnection)
+                            _gattSession.MaintainConnection = true;
+                    }
+                    catch
+                    {
+                        // Some stacks report CanMaintainConnection=false; discovery proceeds.
+                    }
 
                     // Track when the OS-level session actually closes (not just our reference).
                     _sessionClosedTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -489,11 +511,15 @@ namespace Uniwill_Control_Utility.Services
                     }
 
                     // Clean up if we got here (device opened but no TX characteristic)
+                    Log.Warning("[WaterCooler] Connect attempt {Attempt}: device opened (ConnectionStatus={Status}) but no TX characteristic found",
+                        attempt, _device.ConnectionStatus);
                     await CleanupAfterFailedConnectAsync();
                     return false;
                 }
                 catch (Exception ex) when (attempt < maxRetries)
                 {
+                    Log.Warning("[WaterCooler] Connect attempt {Attempt}/{MaxRetries} failed: {Message}",
+                        attempt, maxRetries, ex.Message);
                     StatusChanged?.Invoke(this, $"Connection attempt {attempt} failed ({ex.Message}), retrying...");
 
                     // Clean up partial state before retry
@@ -1802,8 +1828,18 @@ namespace Uniwill_Control_Utility.Services
             if (advertising)
             {
                 // The device is actively advertising, so the attempt succeeds or
-                // fails quickly — no stall on a stale cache entry.
-                connected = await ConnectAsync(_settings.LastDeviceAddress);
+                // fails quickly — no stall on a stale cache entry. A THROW from the
+                // last attempt must not skip the watcher start below, so it is caught
+                // here and treated as a failed connect.
+                try
+                {
+                    connected = await ConnectAsync(_settings.LastDeviceAddress);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("[WaterCooler] Auto-connect scan found the device but ConnectAsync threw: {Message}", ex.Message);
+                    connected = false;
+                }
             }
 
             if (connected)

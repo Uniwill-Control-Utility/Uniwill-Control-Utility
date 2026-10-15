@@ -1270,14 +1270,16 @@ namespace Uniwill_Control_Utility.Views.Windows
                                     // zombie - force a disconnect before attempting reconnect.
                                     if (hydroUIService.IsConnected)
                                     {
-                                        Debug.WriteLine("[WaterCooler] Resuming from sleep - disconnecting zombie BLE link");
+                                        Log.Information("[WaterCooler] Resume: disconnecting zombie BLE link");
                                         await hydroUIService.DisconnectAsync();
                                         await Task.Delay(500);
                                     }
 
                                     bool connected = await hydroUIService.TryAutoConnectAsync();
                                     if (connected)
-                                        Debug.WriteLine("[WaterCooler] Auto-reconnected after system resume");
+                                        Log.Information("[WaterCooler] Auto-reconnected after system resume");
+                                    else
+                                        Log.Warning("[WaterCooler] Resume auto-connect failed; pending watcher will retry as the cooler advertises");
                                 }
                             }
 
