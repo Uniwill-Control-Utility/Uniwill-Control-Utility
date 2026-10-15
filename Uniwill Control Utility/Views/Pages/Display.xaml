@@ -443,9 +443,11 @@
                                 <!-- Divider -->
                                 <Border Height="1" Margin="0,12,0,0" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                                <!-- Power Saving Mode Selector — 3 buttons with cooldown overlay -->
+                                <!-- Power Saving Mode Selector — 3 buttons with the cooldown
+                                     Border inside the same Grid, spanning all three columns
+                                     (ZIndex paints it on top of the buttons). -->
                                 <Grid Margin="8,12,8,8">
-                                    <!-- Button row -->
+                                    <!-- Button row + cooldown overlay -->
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
@@ -530,21 +532,23 @@
 												           Margin="0,2,0,0"/>
                                             </StackPanel>
                                         </Button>
-                                    </Grid>
 
-                                    <!-- Cooldown overlay — blocks input during GPU driver transition -->
-                                    <Border x:Name="borderPowerSavingCooldown"
-                                            Visibility="Collapsed"
-                                            Background="{DynamicResource SmokeFillColorDefaultBrush}"
-                                            CornerRadius="4"
-                                            Panel.ZIndex="1">
-                                        <TextBlock x:Name="txtCooldownCountdown"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"
-                                                   FontSize="16"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
-                                    </Border>
+                                        <!-- Cooldown overlay — spans all three columns of the
+                                             button Grid so it covers the buttons (ZIndex on top) -->
+                                        <Border x:Name="borderPowerSavingCooldown"
+                                                Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3"
+                                                Visibility="Collapsed"
+                                                Background="{DynamicResource SmokeFillColorDefaultBrush}"
+                                                CornerRadius="4"
+                                                Panel.ZIndex="1">
+                                            <TextBlock x:Name="txtCooldownCountdown"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="16"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                        </Border>
+                                    </Grid>
                                 </Grid>
                             </StackPanel>
                         </ui:Card>

@@ -43,7 +43,7 @@
             <Setter Property="Width" Value="95" />
             <Setter Property="Height" Value="46" />
             <Setter Property="Padding" Value="8,4" />
-            <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+            <Setter Property="Background" Value="{DynamicResource AccentTextFillColorTertiaryBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
             <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
@@ -60,7 +60,7 @@
                                             <ObjectAnimationUsingKeyFrames Storyboard.TargetName="BackgroundBorder"
                                                                            Storyboard.TargetProperty="Background">
                                                 <DiscreteObjectKeyFrame KeyTime="0"
-                                                                        Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+                                                                        Value="{DynamicResource AccentTextFillColorTertiaryBrush}" />
                                             </ObjectAnimationUsingKeyFrames>
                                         </Storyboard>
                                     </VisualState>
@@ -261,11 +261,22 @@
                 </StackPanel>
                 <!-- Nvidia Optimus runtime switch (Hybrid display mode only) -->
                 <StackPanel x:Name="OptimusSection" Visibility="Collapsed" Margin="14,12,0,12">
-                    <ui:TextBlock FontSize="14"
-                                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                  Text="Nvidia Optimus"
-                                  FontWeight="SemiBold"
-                                  Margin="0,0,2,8" />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <ui:TextBlock FontSize="14"
+                                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                      Text="Nvidia Optimus"
+                                      FontWeight="SemiBold"
+                                      Margin="0,0,2,0" />
+                        <!-- Cooldown countdown — to the right of the caption while the
+                             GPU driver transition runs (the three buttons are disabled
+                             meanwhile; no dark overlay in the tray variant) -->
+                        <TextBlock x:Name="txtTrayCooldownCountdown"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                   Margin="10,0,0,0"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
                     <!-- Compensate PageDisplay's asymmetric -12/-22 horizontal margin
                          (vs the card's 20/20 padding) so the row centers on the card.
                          Width 320 = the ButtonsGrid width, so the three 95px buttons

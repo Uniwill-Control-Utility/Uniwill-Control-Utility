@@ -389,9 +389,11 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
             Log.Information("[GpuPowerSaving] Mode {Mode} applied successfully", mode);
 
-            // Repaint the open Display page (buttons + cooldown overlay) so the
-            // Automations engine's charger plug/unplug transitions follow suite live.
+            // Repaint the open Display page and the live tray page (buttons + cooldown
+            // countdown) so the Automations engine's charger plug/unplug transitions
+            // follow suite wherever the control is currently shown.
             Uniwill_Control_Utility.Views.Pages.Display.Instance?.NotifyPowerSavingApplied((int)mode);
+            Uniwill_Control_Utility.Views.Windows.Tray.TrayDisplayPage.Instance?.NotifyPowerSavingApplied((int)mode);
         }
 
         /// <summary>

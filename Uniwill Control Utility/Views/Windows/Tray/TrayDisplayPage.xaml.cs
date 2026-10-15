@@ -32,6 +32,14 @@ namespace Uniwill_Control_Utility.Views.Windows.Tray
         // do not re-apply the setting.
         private bool _syncingToggle;
 
+        // The power saving mode the tray buttons currently show (gates the live notify
+        // overlay — repeated StatusChange re-applies must not re-trigger the countdown).
+        private int _displayedPowerSavingMode = 2; // Auto
+
+        // Cooldown countdown after a power saving switch (mirrors the Display page's
+        // StartCooldownOverlay). Created on the tray window's thread inside the notify.
+        private DispatcherTimer? _cooldownTimer;
+
         /// <inheritdoc />
         public async Task OnNavigatedToAsync() { }
 
@@ -85,12 +93,80 @@ namespace Uniwill_Control_Utility.Views.Windows.Tray
         /// </summary>
         private void UpdateTrayPowerSavingButtons(int mode)
         {
+            _displayedPowerSavingMode = mode;
+
             Style? inactiveStyle = (Style)Resources["TrayModeButtonStyle"];
             Style? activeStyle = (Style)Resources["TrayModeButtonActiveStyle"];
 
             BtnTrayPowerSavingOn.Style = mode == 0 ? activeStyle : inactiveStyle;
             BtnTrayPowerSavingAuto.Style = mode == 2 ? activeStyle : inactiveStyle;
             BtnTrayPowerSavingOff.Style = mode == 1 ? activeStyle : inactiveStyle;
+        }
+
+        /// <summary>
+        /// Called by the GPU power saving engine after it applies a mode (including the
+        /// Automations engine on charger plug/unplug transitions). Repaints the power
+        /// saving buttons and starts the cooldown countdown while the tray page is alive.
+        /// May run from a foreign (power-event) thread — posted through the tray window's
+        /// Dispatcher; on the tray's own thread BeginInvoke runs it inline.
+        /// </summary>
+        public void NotifyPowerSavingApplied(int mode)
+        {
+            if (mode == _displayedPowerSavingMode)
+                return;
+
+            TrayWidgetWindow.Instance?.Dispatcher.BeginInvoke(() =>
+            {
+                UpdateTrayPowerSavingButtons(mode);
+                StartTrayCooldownOverlay();
+                Log.Information("[Tray] Power saving buttons live-updated to {Mode} with cooldown countdown", mode);
+            }, DispatcherPriority.Normal);
+        }
+
+        /// <summary>
+        /// Tray cooldown marker (the tray variant of the Display page's dark overlay):
+        /// disables the three power saving buttons and counts down to the right of the
+        /// "Nvidia Optimus" caption for the GPU driver transition window.
+        /// </summary>
+        private void StartTrayCooldownOverlay()
+        {
+            _cooldownTimer?.Stop();
+
+            int remainingSeconds = 15;
+            txtTrayCooldownCountdown.Text = remainingSeconds.ToString();
+            SetTrayPowerSavingButtonsEnabled(false);
+
+            _cooldownTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            _cooldownTimer.Tick += (s, e) =>
+            {
+                remainingSeconds--;
+                if (remainingSeconds <= 0)
+                {
+                    _cooldownTimer?.Stop();
+                    txtTrayCooldownCountdown.Text = string.Empty;
+                    SetTrayPowerSavingButtonsEnabled(true);
+                }
+                else
+                {
+                    txtTrayCooldownCountdown.Text = remainingSeconds.ToString();
+                }
+            };
+            _cooldownTimer.Start();
+        }
+
+        /// <summary>
+        /// Enables/disables the three power saving buttons. IsEnabled blocks clicks;
+        /// the dim carries the disabled look into the custom active style too.
+        /// </summary>
+        private void SetTrayPowerSavingButtonsEnabled(bool enabled)
+        {
+            BtnTrayPowerSavingOn.IsEnabled = enabled;
+            BtnTrayPowerSavingAuto.IsEnabled = enabled;
+            BtnTrayPowerSavingOff.IsEnabled = enabled;
+
+            BtnTrayPowerSavingOn.Opacity = enabled ? 1.0 : 0.35;
+            BtnTrayPowerSavingAuto.Opacity = enabled ? 1.0 : 0.35;
+            BtnTrayPowerSavingOff.Opacity = enabled ? 1.0 : 0.35;
         }
 
         /// <summary>
