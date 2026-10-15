@@ -187,14 +187,12 @@ namespace Uniwill_Control_Utility.Services
                     if (settings.Engine == KeyboardEngine.BetterRGB)
                     {
                         // Always leave the keyboard on a predictable, visible effect on
-                        // normal exit: Static white at the second-lowest firmware
-                        // brightness (level 2 of 1-7). In-memory only — the saved settings
+                        // normal exit: the firmware Rainbow effect at the lowest firmware
+                        // brightness (level 1 of 1-7). In-memory only — the saved settings
                         // (and Engine=BetterRGB) are untouched, so next startup still boots
                         // BetterRGB.
-                        settings.EffectMode = KeyboardEffect.Static;
-                        settings.ColorR = 255;
-                        settings.ColorG = 255;
-                        settings.ColorB = 255;
+                        settings.EffectMode = KeyboardEffect.Rainbow;
+                        settings.PerKeyMode = false;
                         settings.Brightness = 1;
 
                         try
