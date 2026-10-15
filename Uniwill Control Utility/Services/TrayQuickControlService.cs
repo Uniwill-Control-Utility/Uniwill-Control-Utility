@@ -92,50 +92,71 @@ namespace Uniwill_Control_Utility.Services
                 Log.Warning("[Tray] GPU mux mode read failed: {Message}", ex.Message);
             }
 
-            // Live Windows display mode refresh rate for the internal panel — the tray's
-            // refresh-rate control targets the laptop panel exclusively (never an
-            // external monitor). GetInternalRefreshRates falls back to the panel's known
-            // mode set when the panel is detached (external-only), so the controls stay
-            // offered; a selection made then is deferred until the panel reattaches.
+            // Live Windows display mode values for the internal panel — the tray's
+            // refresh-rate and color-calibration controls target the laptop panel
+            // exclusively (never an external monitor). When the panel is detached
+            // (external-only), GDI hides it: the last-known persisted values are
+            // reported instead (so the buttons keep a selection across the panel being
+            // switched off), and selections made then are deferred until reattach.
+            bool panelAttached = !string.IsNullOrEmpty(Display.InternalPanelName());
             int refreshRateHz = 0;
             bool refreshRateSwitchable = false;
-            try
-            {
-                // Consume a deferred selection from an external-only session first (this
-                // runs off-thread via Task.Run) so the snapshot reflects the reconciled
-                // state rather than the stale pre-switch mode.
-                int deferred = Settings.Default.DisplayRefreshRateDeferred;
-                if (deferred > 0)
-                {
-                    int applied = Display.ReconcileInternalRefreshRate(deferred);
-                    if (applied == deferred)
-                    {
-                        Settings.Default.DisplayRefreshRateDeferred = 0;
-                        Settings.Default.Save();
-                        Log.Information("[Tray] Deferred refresh rate {Hz} Hz applied on panel reattach", applied);
-                    }
-                }
-
-                refreshRateHz = Display.GetInternalRefreshRate();
-                refreshRateSwitchable = Display.GetInternalRefreshRates(gpuModeDgpuOnly).Count > 1;
-            }
-            catch (Exception ex)
-            {
-                Log.Warning("[Tray] Refresh rate read failed: {Message}", ex.Message);
-            }
-
-            // Live ICM association for the internal panel — SetColorProfileAsync
-            // applies laptop-panel-only, so the readback must read the same display.
             string? colorProfileFile = null;
             bool colorCalAvailable = false;
             try
             {
-                colorProfileFile = Display.GetInternalColorProfile();
+                if (panelAttached)
+                {
+                    // Consume deferred selections from an external-only session first (this
+                    // runs off-thread via Task.Run) so the snapshot reflects the reconciled
+                    // state rather than the stale pre-switch values.
+                    int deferred = Settings.Default.DisplayRefreshRateDeferred;
+                    if (deferred > 0)
+                    {
+                        int applied = Display.ReconcileInternalRefreshRate(deferred);
+                        if (applied == deferred)
+                        {
+                            Settings.Default.DisplayRefreshRateDeferred = 0;
+                            Settings.Default.DisplayRefreshRateLastKnown = applied;
+                            Settings.Default.Save();
+                            Log.Information("[Tray] Deferred refresh rate {Hz} Hz applied on panel reattach", applied);
+                        }
+                    }
+
+                    string deferredProfile = Settings.Default.DisplayColorProfileDeferred;
+                    if (deferredProfile.Length > 0)
+                    {
+                        string appliedProfile = Display.ReconcileInternalColorProfile(deferredProfile);
+                        if (appliedProfile == deferredProfile)
+                        {
+                            Settings.Default.DisplayColorProfileDeferred = string.Empty;
+                            Settings.Default.DisplayColorProfileLastKnown = appliedProfile;
+                            Settings.Default.Save();
+                            Log.Information("[Tray] Deferred color profile {Profile} applied on panel reattach", appliedProfile);
+                        }
+                    }
+
+                    refreshRateHz = Display.GetInternalRefreshRate();
+                    if (refreshRateHz > 0)
+                        Settings.Default.DisplayRefreshRateLastKnown = refreshRateHz;
+                    colorProfileFile = Display.GetInternalColorProfile();
+                    Settings.Default.DisplayColorProfileLastKnown = colorProfileFile ?? string.Empty;
+                }
+                else
+                {
+                    // Panel detached — report the last known values so the tray keeps a
+                    // selection while the panel is off.
+                    refreshRateHz = Settings.Default.DisplayRefreshRateLastKnown;
+                    string lastKnownProfile = Settings.Default.DisplayColorProfileLastKnown;
+                    colorProfileFile = lastKnownProfile.Length > 0 ? lastKnownProfile : null;
+                }
+
+                refreshRateSwitchable = Display.GetInternalRefreshRates(gpuModeDgpuOnly).Count > 1;
                 colorCalAvailable = Display.GetOfferedColorProfileFiles().Count > 1;
             }
             catch (Exception ex)
             {
-                Log.Warning("[Tray] Color calibration read failed: {Message}", ex.Message);
+                Log.Warning("[Tray] Panel display read failed: {Message}", ex.Message);
             }
 
             var features = new FeatureNavigationPreferences(
@@ -455,8 +476,10 @@ namespace Uniwill_Control_Utility.Services
                 {
                     // Panel detached (lid closed / internal display disconnected) — GDI
                     // hides a display that is off, so the write cannot land now. Persist
-                    // the selection; the next snapshot reconciles it on reattach.
+                    // the selection (deferred for reattach) and remember it as the panel's
+                    // value so the tray keeps a selection while the panel is off.
                     Settings.Default.DisplayRefreshRateDeferred = hz;
+                    Settings.Default.DisplayRefreshRateLastKnown = hz;
                     Settings.Default.Save();
                     Log.Information("[Tray] Refresh rate {Hz} Hz deferred — internal panel detached (external-only)", hz);
                     return true;
@@ -468,6 +491,11 @@ namespace Uniwill_Control_Utility.Services
 
                 // Verify via readback — the engine reports failures only to the console.
                 bool success = applied == hz;
+                if (success)
+                {
+                    Settings.Default.DisplayRefreshRateLastKnown = applied;
+                    Settings.Default.Save();
+                }
                 Log.Information("[Tray] Internal panel refresh rate set to {Applied} Hz (requested {Hz} Hz, success: {Success})",
                     applied, hz, success);
                 return success;
@@ -488,15 +516,32 @@ namespace Uniwill_Control_Utility.Services
             try
             {
                 // Color calibration is laptop-panel-only — never the display in use.
+                if (string.IsNullOrEmpty(Display.InternalPanelName()))
+                {
+                    // Panel detached (external-only) — persist the selection (deferred for
+                    // reattach) and remember it so the tray keeps a selection while the
+                    // panel is off.
+                    Settings.Default.DisplayColorProfileDeferred = profileFile;
+                    Settings.Default.DisplayColorProfileLastKnown = profileFile;
+                    Settings.Default.Save();
+                    Log.Information("[Tray] Color profile {File} deferred — internal panel detached (external-only)", profileFile);
+                    return true;
+                }
+
+                Settings.Default.DisplayColorProfileDeferred = string.Empty;
+                Settings.Default.Save();
                 var target = Display.InternalPanelName();
-                if (string.IsNullOrEmpty(target))
-                    return false;
                 Display.ApplyColorProfile(target, profileFile);
 
                 // Verify via readback — the registry write reports failures only via return code.
                 string? applied = Display.GetCurrentColorProfile(target);
                 bool success = applied == profileFile;
-                Log.Information("[Tray] Display color profile set to {Applied} (requested {File}, success: {Success})",
+                if (success)
+                {
+                    Settings.Default.DisplayColorProfileLastKnown = profileFile;
+                    Settings.Default.Save();
+                }
+                Log.Information("[Tray] Internal panel color profile set to {Applied} (requested {File}, success: {Success})",
                     applied, profileFile, success);
                 return success;
             }

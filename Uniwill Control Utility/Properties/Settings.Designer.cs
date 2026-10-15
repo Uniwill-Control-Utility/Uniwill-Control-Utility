@@ -933,6 +933,30 @@ namespace Uniwill_Control_Utility.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int DisplayRefreshRateLastKnown {
+            get { return ((int)(this["DisplayRefreshRateLastKnown"])); }
+            set { this["DisplayRefreshRateLastKnown"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string DisplayColorProfileDeferred {
+            get { return ((string)(this["DisplayColorProfileDeferred"])); }
+            set { this["DisplayColorProfileDeferred"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string DisplayColorProfileLastKnown {
+            get { return ((string)(this["DisplayColorProfileLastKnown"])); }
+            set { this["DisplayColorProfileLastKnown"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool EnableQKeyButtonIntercept {
             get { return ((bool)(this["EnableQKeyButtonIntercept"])); }

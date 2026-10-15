@@ -199,7 +199,7 @@
                     <!-- Same horizontal geometry as the Optimus row (Width 320, centered,
                          -5/+5 margins) so the row's right edge lands exactly on the
                          dGPU button's; four 72px buttons in star columns leave even gaps. -->
-                    <Grid Width="332" HorizontalAlignment="Center" Margin="0,4,8,0">
+                    <Grid Width="330" HorizontalAlignment="Center" Margin="-2,4,8,0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>

@@ -254,14 +254,31 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
             try
             {
-                var screens = Screen.AllScreens;
+                // Match by device name, not screen index: when the panel is disconnected
+                // (external-only), DCMI may still enumerate it while AllScreens omits it,
+                // so an index walk can misalign onto an external monitor.
                 var devices = GetAllDevices().ToArray();
-                for (int i = 0; i < devices.Length && i < screens.Length; i++)
+                foreach (var device in devices)
                 {
-                    if (screens[i].DeviceName == deviceName)
+                    if (device.monitorDevicePath == deviceName)
                     {
-                        return devices[i].outputTechnology == DisplayConfigOutputTechnology.Internal
-                            || devices[i].outputTechnology == DisplayConfigOutputTechnology.DisplayportEmbedded;
+                        return device.outputTechnology == DisplayConfigOutputTechnology.Internal
+                            || device.outputTechnology == DisplayConfigOutputTechnology.DisplayportEmbedded;
+                    }
+                }
+
+                // Index fallback when both arrays describe the same attached set — covers
+                // DCMI builds whose monitorDevicePath does not mirror the GDI name.
+                var screens = Screen.AllScreens;
+                if (devices.Length == screens.Length)
+                {
+                    for (int i = 0; i < screens.Length; i++)
+                    {
+                        if (screens[i].DeviceName == deviceName)
+                        {
+                            return devices[i].outputTechnology == DisplayConfigOutputTechnology.Internal
+                                || devices[i].outputTechnology == DisplayConfigOutputTechnology.DisplayportEmbedded;
+                        }
                     }
                 }
                 return false;
@@ -323,19 +340,43 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             {
                 var screens = Screen.AllScreens;
                 var devices = GetAllDevices().ToArray();
-                for (int i = 0; i < devices.Length && i < screens.Length; i++)
+
+                // Prefer name matching: robust when the panel is disconnected and the
+                // arrays desynchronize (DCMI enumerates active paths only, so a detached
+                // panel simply has no name match → null).
+                foreach (var screen in screens)
                 {
-                    if (devices[i].outputTechnology == DisplayConfigOutputTechnology.Internal
-                        || devices[i].outputTechnology == DisplayConfigOutputTechnology.DisplayportEmbedded)
+                    foreach (var device in devices)
                     {
-                        return screens[i].DeviceName;
+                        if (device.monitorDevicePath == screen.DeviceName
+                            && (device.outputTechnology == DisplayConfigOutputTechnology.Internal
+                                || device.outputTechnology == DisplayConfigOutputTechnology.DisplayportEmbedded))
+                        {
+                            return screen.DeviceName;
+                        }
+                    }
+                }
+
+                // Fall back to the index walk when both arrays describe the same set of
+                // attached displays (the historical alignment, proven while attached) —
+                // covers DCMI builds whose monitorDevicePath does not mirror the GDI
+                // device name.
+                if (devices.Length == screens.Length)
+                {
+                    for (int i = 0; i < devices.Length; i++)
+                    {
+                        if (devices[i].outputTechnology == DisplayConfigOutputTechnology.Internal
+                            || devices[i].outputTechnology == DisplayConfigOutputTechnology.DisplayportEmbedded)
+                        {
+                            return screens[i].DeviceName;
+                        }
                     }
                 }
                 return null;
             }
             catch
             {
-                return FindLaptopScreen();
+                return null;
             }
         }
 
@@ -419,6 +460,31 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
             ChangeDisplaySettings(panel, deferredHz);
             return GetCurrentRefreshRate(panel);
+        }
+
+        /// <summary>
+        /// Consumes a deferred internal-panel color-profile selection: when the user
+        /// picked a profile while the panel was detached (external-only), re-applies
+        /// it once the panel is attached again. Returns the applied profile verified
+        /// by readback (null when there is nothing to reconcile or the panel is still
+        /// detached).
+        /// </summary>
+        public static string? ReconcileInternalColorProfile(string deferredFile)
+        {
+            if (deferredFile is null || deferredFile.Length == 0)
+                return null;
+
+            var panel = InternalPanelName();
+            if (string.IsNullOrEmpty(panel))
+                return null;
+
+            if (GetCurrentColorProfile(panel) == deferredFile)
+                return deferredFile;
+
+            if (!ApplyColorProfile(panel, deferredFile))
+                return null;
+
+            return GetCurrentColorProfile(panel);
         }
 
         /// <summary>

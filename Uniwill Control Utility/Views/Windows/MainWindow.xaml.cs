@@ -1744,6 +1744,97 @@ namespace Uniwill_Control_Utility.Views.Windows
             _ = App.GetService<Views.Pages.FlydigiCooler>();
 
             Task.Run(Garbage.Garbage_Collect);
+
+            // Watch for the laptop panel being turned back on (external-only → attached)
+            // and auto-apply the UCU-declared refresh rate + color profile after a settle
+            // delay when the live panel differs.
+            StartPanelWatcher();
+        }
+
+        // Auto-reconcile the internal panel's display settings on the detached→attached
+        // transition: the watcher polls the panel's attach state; on re-enable it waits a
+        // settle delay (Windows is still finalizing the display mode) and then applies the
+        // declared values if the live panel differs. While the panel stays attached, no
+        // auto-apply happens — Windows-side changes are adopted by the normal syncs.
+        private const int PanelSettleDelayMs = 3000;
+        private bool _panelWasAttached = true;
+        private bool _panelReconcilePending;
+        private DispatcherTimer? _panelWatcherTimer;
+
+        private void StartPanelWatcher()
+        {
+            if (_panelWatcherTimer is not null)
+                return;
+
+            // Seed the baseline so a panel attached at startup never triggers a reconcile.
+            _panelWasAttached = !string.IsNullOrEmpty(
+                Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName());
+
+            _panelWatcherTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            _panelWatcherTimer.Tick += (s, e) => CheckPanelReattach();
+            _panelWatcherTimer.Start();
+        }
+
+        private void CheckPanelReattach()
+        {
+            bool attached = !string.IsNullOrEmpty(
+                Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName());
+
+            if (attached && !_panelWasAttached && !_panelReconcilePending)
+            {
+                _panelReconcilePending = true;
+                _ = Task.Run(async () =>
+                {
+                    // Let Windows finish settling the re-attached display before writing.
+                    await Task.Delay(PanelSettleDelayMs);
+                    AutoApplyPanelDisplaySettings();
+                    _panelReconcilePending = false;
+                });
+            }
+
+            _panelWasAttached = attached;
+        }
+
+        /// <summary>
+        /// Applies the UCU-declared internal-panel refresh rate (deferred selection wins
+        /// over last known) and color profile once the panel is attached and the live
+        /// values differ. Clears the deferred settings on readback match.
+        /// </summary>
+        private void AutoApplyPanelDisplaySettings()
+        {
+            int desired = Settings.Default.DisplayRefreshRateDeferred > 0
+                ? Settings.Default.DisplayRefreshRateDeferred
+                : Settings.Default.DisplayRefreshRateLastKnown;
+            if (desired > 0)
+            {
+                int applied = Uniwill_Control_Utility.Scripts.Misc.Display.ReconcileInternalRefreshRate(desired);
+                if (applied == desired)
+                {
+                    Settings.Default.DisplayRefreshRateDeferred = 0;
+                    Settings.Default.DisplayRefreshRateLastKnown = applied;
+                    Settings.Default.Save();
+                    Log.Information("[Panel] Auto-applied refresh rate {Hz} Hz after panel re-enable", applied);
+                }
+            }
+
+            string desiredProfile = Settings.Default.DisplayColorProfileDeferred.Length > 0
+                ? Settings.Default.DisplayColorProfileDeferred
+                : Settings.Default.DisplayColorProfileLastKnown;
+            if (desiredProfile.Length > 0)
+            {
+                string liveProfile = Uniwill_Control_Utility.Scripts.Misc.Display.GetInternalColorProfile() ?? string.Empty;
+                if (liveProfile != desiredProfile)
+                {
+                    string appliedProfile = Uniwill_Control_Utility.Scripts.Misc.Display.ReconcileInternalColorProfile(desiredProfile);
+                    if (appliedProfile == desiredProfile)
+                    {
+                        Settings.Default.DisplayColorProfileDeferred = string.Empty;
+                        Settings.Default.DisplayColorProfileLastKnown = appliedProfile;
+                        Settings.Default.Save();
+                        Log.Information("[Panel] Auto-applied color profile {Profile} after panel re-enable", appliedProfile);
+                    }
+                }
+            }
         }
 
         #region Tray Menu Handlers
