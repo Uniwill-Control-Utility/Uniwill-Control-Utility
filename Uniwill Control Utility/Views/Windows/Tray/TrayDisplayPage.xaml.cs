@@ -94,9 +94,9 @@ namespace Uniwill_Control_Utility.Views.Windows.Tray
         }
 
         /// <summary>
-        /// Shows exactly the rates the display in use offers (collapsed otherwise),
-        /// styles the active one, and reflows the visible buttons into the 5-column
-        /// grid — mirroring the Display page's UpdateRefreshRateButtons.
+        /// Shows exactly the internal panel's rates (collapsed otherwise), styles the
+        /// active one, and reflows the visible buttons into the 3-column single-row
+        /// grid — the panel offers only 60/240 (plus the hidden 300 while dGPU-only).
         /// </summary>
         private void UpdateTrayRefreshRateButtons(int currentHz, bool dGpuOnly)
         {
@@ -106,18 +106,14 @@ namespace Uniwill_Control_Utility.Views.Windows.Tray
             System.Windows.Controls.StackPanel[] slots =
                 new System.Windows.Controls.StackPanel[]
                 {
-                    SlotTrayRefreshRate60, SlotTrayRefreshRate75, SlotTrayRefreshRate90,
-                    SlotTrayRefreshRate100, SlotTrayRefreshRate120, SlotTrayRefreshRate144,
-                    SlotTrayRefreshRate165, SlotTrayRefreshRate240, SlotTrayRefreshRate300
+                    SlotTrayRefreshRate60, SlotTrayRefreshRate240, SlotTrayRefreshRate300
                 };
             System.Windows.Controls.Button[] buttons =
                 new System.Windows.Controls.Button[]
                 {
-                    BtnTrayRefreshRate60, BtnTrayRefreshRate75, BtnTrayRefreshRate90,
-                    BtnTrayRefreshRate100, BtnTrayRefreshRate120, BtnTrayRefreshRate144,
-                    BtnTrayRefreshRate165, BtnTrayRefreshRate240, BtnTrayRefreshRate300
+                    BtnTrayRefreshRate60, BtnTrayRefreshRate240, BtnTrayRefreshRate300
                 };
-            int[] hzValues = new int[] { 60, 75, 90, 100, 120, 144, 165, 240, 300 };
+            int[] hzValues = new int[] { 60, 240, 300 };
 
             for (int i = 0; i < slots.Length; i++)
             {
@@ -125,11 +121,11 @@ namespace Uniwill_Control_Utility.Views.Windows.Tray
                 slots[i].Visibility = TrayRefreshRateAvailable(hzValues[i], dGpuOnly) ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            // Reflow visible slots left-to-right, wrapping at 5 per row (the Grid's
-            // children are the StackPanel wrappers, not the buttons). Collapsed slots
-            // are left untouched — they render nothing, and -1 indices are rejected
-            // by this WPF's grid placement validation.
-            const int Columns = 5;
+            // Reflow visible slots left-to-right (the Grid's children are the StackPanel
+            // wrappers, not the buttons). Collapsed slots are left untouched — they
+            // render nothing, and -1 indices are rejected by this WPF's grid placement
+            // validation.
+            const int Columns = 3;
             int slot = 0;
             foreach (System.Windows.Controls.StackPanel panel in slots)
             {
@@ -146,8 +142,10 @@ namespace Uniwill_Control_Utility.Views.Windows.Tray
         {
             try
             {
-                var rates = Uniwill_Control_Utility.Scripts.Misc.Display.GetOfferedRefreshRates(
-                    Uniwill_Control_Utility.Scripts.Misc.Display.CurrentDisplayName(), dGpuOnly);
+                // Internal panel only — the tray offers the laptop panel's rates
+                // exclusively (never an external monitor's), falling back to the
+                // panel's known set when it is detached (external-only).
+                var rates = Uniwill_Control_Utility.Scripts.Misc.Display.GetInternalRefreshRates(dGpuOnly);
                 return rates.Contains(hz);
             }
             catch

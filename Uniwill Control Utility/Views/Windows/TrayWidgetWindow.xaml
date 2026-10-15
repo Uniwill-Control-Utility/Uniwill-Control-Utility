@@ -266,7 +266,8 @@
                            IsBackButtonVisible="Collapsed"
                            HeaderVisibility="Collapsed"
                            PaneDisplayMode="LeftFluent"
-                           HorizontalContentAlignment="Center">
+                           HorizontalContentAlignment="Center"
+                           Transition="None">
             <ui:NavigationView.Resources>
                 <!-- Forces the main frame content background to be transparent -->
                 <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />

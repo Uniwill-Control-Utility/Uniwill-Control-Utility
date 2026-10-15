@@ -8,11 +8,16 @@
      d:DesignWidth="400"
      SnapsToDevicePixels="True"
      UseLayoutRounding="True"
-      Margin="4,4,0,0">
+      Margin="4,4,0,0"
+     ScrollViewer.CanContentScroll="False">
 
     <!-- Tray display page: navigated to from the quick-settings page's Display
          button. The header row (back button + title) stays fixed; the sections
-         below scroll inside DisplayScroll. -->
+         below scroll inside DisplayScroll. ScrollViewer.CanContentScroll=False on
+         the root opts out of the NavigationView content presenter's own DynamicScrollViewer
+         (the outer, short-range scrollbar) — the presenter re-enables it on each
+         navigation from this attached property, so opting out leaves only the
+         page's DisplayScroll scrollbar. -->
 
     <Page.Resources>
         <ContextMenu x:Key="NavigateContextMenu"
@@ -132,26 +137,22 @@
         <ScrollViewer x:Name="DisplayScroll" Height="278">
             <StackPanel>
                 <!-- Display refresh rate (panels offering multiple rates only) -->
-                <StackPanel x:Name="RefreshRateSection" Visibility="Collapsed" Margin="0,16,0,0">
+                <StackPanel x:Name="RefreshRateSection" Visibility="Collapsed" Margin="0,0,0,0">
                     <ui:TextBlock FontSize="14"
                                   FontWeight="SemiBold"
                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                   Text="Refresh Rate"
                                   Margin="12,0,2,8" />
-                    <Grid Width="328" HorizontalAlignment="Center" Margin="-6,8,5,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
+                    <!-- The internal panel's rate set only: 60/240 via GDI, 300 as the
+                         hidden dGPU-only mode — one row, star columns spread evenly. -->
+                    <Grid Width="200" HorizontalAlignment="Left" Margin="7,4,0,0">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <StackPanel x:Name="SlotTrayRefreshRate60" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">
-                            <Button x:Name="BtnTrayRefreshRate60" Width="60" Height="36"
+                            <Button x:Name="BtnTrayRefreshRate60" Width="60" Height="42"
                                     Style="{StaticResource TrayModeButtonStyle}"
                                     Tag="60"
                                     Click="BtnTrayRefreshRate_Click">
@@ -162,79 +163,7 @@
                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                             </Button>
                         </StackPanel>
-                        <StackPanel x:Name="SlotTrayRefreshRate75" Grid.Row="0" Grid.Column="1" VerticalAlignment="Center">
-                            <Button x:Name="BtnTrayRefreshRate75" Width="60" Height="36"
-                                    Style="{StaticResource TrayModeButtonStyle}"
-                                    Tag="75"
-                                    Click="BtnTrayRefreshRate_Click">
-                                <ui:TextBlock FontSize="10"
-                                              HorizontalAlignment="Center"
-                                              Text="75 Hz"
-                                              FontWeight="SemiBold"
-                                              Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                            </Button>
-                        </StackPanel>
-                        <StackPanel x:Name="SlotTrayRefreshRate90" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center">
-                            <Button x:Name="BtnTrayRefreshRate90" Width="60" Height="36"
-                                    Style="{StaticResource TrayModeButtonStyle}"
-                                    Tag="90"
-                                    Click="BtnTrayRefreshRate_Click">
-                                <ui:TextBlock FontSize="10"
-                                              HorizontalAlignment="Center"
-                                              Text="90 Hz"
-                                              FontWeight="SemiBold"
-                                              Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                            </Button>
-                        </StackPanel>
-                        <StackPanel x:Name="SlotTrayRefreshRate100" Grid.Row="0" Grid.Column="3" VerticalAlignment="Center">
-                            <Button x:Name="BtnTrayRefreshRate100" Width="60" Height="36"
-                                    Style="{StaticResource TrayModeButtonStyle}"
-                                    Tag="100"
-                                    Click="BtnTrayRefreshRate_Click">
-                                <ui:TextBlock FontSize="10"
-                                              HorizontalAlignment="Center"
-                                              Text="100 Hz"
-                                              FontWeight="SemiBold"
-                                              Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                            </Button>
-                        </StackPanel>
-                        <StackPanel x:Name="SlotTrayRefreshRate120" Grid.Row="0" Grid.Column="4" VerticalAlignment="Center">
-                            <Button x:Name="BtnTrayRefreshRate120" Width="60" Height="36"
-                                    Style="{StaticResource TrayModeButtonStyle}"
-                                    Tag="120"
-                                    Click="BtnTrayRefreshRate_Click">
-                                <ui:TextBlock FontSize="10"
-                                              HorizontalAlignment="Center"
-                                              Text="120 Hz"
-                                              FontWeight="SemiBold"
-                                              Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                            </Button>
-                        </StackPanel>
-                        <StackPanel x:Name="SlotTrayRefreshRate144" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center">
-                            <Button x:Name="BtnTrayRefreshRate144" Width="60" Height="36"
-                                    Style="{StaticResource TrayModeButtonStyle}"
-                                    Tag="144"
-                                    Click="BtnTrayRefreshRate_Click">
-                                <ui:TextBlock FontSize="10"
-                                              HorizontalAlignment="Center"
-                                              Text="144 Hz"
-                                              FontWeight="SemiBold"
-                                              Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                            </Button>
-                        </StackPanel>
-                        <StackPanel x:Name="SlotTrayRefreshRate165" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center">
-                            <Button x:Name="BtnTrayRefreshRate165" Width="60" Height="36"
-                                    Style="{StaticResource TrayModeButtonStyle}"
-                                    Tag="165"
-                                    Click="BtnTrayRefreshRate_Click">
-                                <ui:TextBlock FontSize="10"
-                                              HorizontalAlignment="Center"
-                                              Text="165 Hz"
-                                              FontWeight="SemiBold"
-                                              Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                            </Button>
-                        </StackPanel>
-                        <StackPanel x:Name="SlotTrayRefreshRate240" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center">
+                        <StackPanel x:Name="SlotTrayRefreshRate240" Grid.Row="0" Grid.Column="1" VerticalAlignment="Center">
                             <Button x:Name="BtnTrayRefreshRate240" Width="60" Height="42"
                                     Style="{StaticResource TrayModeButtonStyle}"
                                     Tag="240"
@@ -246,7 +175,7 @@
                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                             </Button>
                         </StackPanel>
-                        <StackPanel x:Name="SlotTrayRefreshRate300" Grid.Row="1" Grid.Column="3" VerticalAlignment="Center">
+                        <StackPanel x:Name="SlotTrayRefreshRate300" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center">
                             <Button x:Name="BtnTrayRefreshRate300" Width="60" Height="42"
                                     Style="{StaticResource TrayModeButtonStyle}"
                                     Tag="300"
@@ -270,7 +199,7 @@
                     <!-- Same horizontal geometry as the Optimus row (Width 320, centered,
                          -5/+5 margins) so the row's right edge lands exactly on the
                          dGPU button's; four 72px buttons in star columns leave even gaps. -->
-                    <Grid Width="332" HorizontalAlignment="Center" Margin="0,8,8,0">
+                    <Grid Width="332" HorizontalAlignment="Center" Margin="0,4,8,0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
@@ -341,7 +270,7 @@
                          (vs the card's 20/20 padding) so the row centers on the card.
                          Width 320 = the ButtonsGrid width, so the three 95px buttons
                          get the same ~11.7px gaps as the QuickSettings grid. -->
-                    <Grid Width="340" HorizontalAlignment="Center" Margin="-20,8,5,0">
+                    <Grid Width="340" HorizontalAlignment="Center" Margin="-20,4,5,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />

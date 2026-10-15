@@ -393,6 +393,35 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         }
 
         /// <summary>
+        /// Consumes a deferred internal-panel refresh-rate selection: when the user
+        /// picked a rate while the panel was detached (lid closed / internal display
+        /// disconnected — GDI hides a display that is off, so the write could not
+        /// land), re-applies it once the panel is attached again. Returns the applied
+        /// rate verified by readback (0 when there is nothing to reconcile, the panel
+        /// is still detached, or the deferred rate is not currently takeable).
+        /// </summary>
+        public static int ReconcileInternalRefreshRate(int deferredHz)
+        {
+            if (deferredHz <= 0)
+                return 0;
+
+            var panel = InternalPanelName();
+            if (string.IsNullOrEmpty(panel))
+                return 0;
+
+            // Only reconcile rates the attached panel can actually take: the GDI set,
+            // plus the hidden 300 Hz dGPU-only mode (not enumerated but appliable).
+            if (deferredHz != DgpuOnlyRefreshRate && !GetAvailableRefreshRates(panel).Contains(deferredHz))
+                return 0;
+
+            if (GetCurrentRefreshRate(panel) == deferredHz)
+                return deferredHz;
+
+            ChangeDisplaySettings(panel, deferredHz);
+            return GetCurrentRefreshRate(panel);
+        }
+
+        /// <summary>
         /// The ICM display-profile association subkey for a GDI device name — the
         /// trailing component of EnumDisplayDevices(dwFlags=1) DeviceKey
         /// ("\Registry\Machine\...\Class\{4d36e96e-...}\0002" → "0002"). Same

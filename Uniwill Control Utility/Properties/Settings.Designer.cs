@@ -925,6 +925,14 @@ namespace Uniwill_Control_Utility.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int DisplayRefreshRateDeferred {
+            get { return ((int)(this["DisplayRefreshRateDeferred"])); }
+            set { this["DisplayRefreshRateDeferred"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool EnableQKeyButtonIntercept {
             get { return ((bool)(this["EnableQKeyButtonIntercept"])); }

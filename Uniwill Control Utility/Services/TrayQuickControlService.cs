@@ -92,14 +92,32 @@ namespace Uniwill_Control_Utility.Services
                 Log.Warning("[Tray] GPU mux mode read failed: {Message}", ex.Message);
             }
 
-            // Live Windows display mode refresh rate for the display in use (primary).
+            // Live Windows display mode refresh rate for the internal panel — the tray's
+            // refresh-rate control targets the laptop panel exclusively (never an
+            // external monitor). GetInternalRefreshRates falls back to the panel's known
+            // mode set when the panel is detached (external-only), so the controls stay
+            // offered; a selection made then is deferred until the panel reattaches.
             int refreshRateHz = 0;
             bool refreshRateSwitchable = false;
             try
             {
-                var refreshTarget = Display.CurrentDisplayName();
-                refreshRateHz = Display.GetCurrentRefreshRate(refreshTarget);
-                refreshRateSwitchable = Display.GetOfferedRefreshRates(refreshTarget, gpuModeDgpuOnly).Count > 1;
+                // Consume a deferred selection from an external-only session first (this
+                // runs off-thread via Task.Run) so the snapshot reflects the reconciled
+                // state rather than the stale pre-switch mode.
+                int deferred = Settings.Default.DisplayRefreshRateDeferred;
+                if (deferred > 0)
+                {
+                    int applied = Display.ReconcileInternalRefreshRate(deferred);
+                    if (applied == deferred)
+                    {
+                        Settings.Default.DisplayRefreshRateDeferred = 0;
+                        Settings.Default.Save();
+                        Log.Information("[Tray] Deferred refresh rate {Hz} Hz applied on panel reattach", applied);
+                    }
+                }
+
+                refreshRateHz = Display.GetInternalRefreshRate();
+                refreshRateSwitchable = Display.GetInternalRefreshRates(gpuModeDgpuOnly).Count > 1;
             }
             catch (Exception ex)
             {
@@ -424,20 +442,33 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// Switches the internal panel's refresh rate via the Windows display-mode
-        /// pathway (mirrors the Display page's btnRefreshRate_Click core). Returns
-        /// true when the readback confirms the requested rate.
+        /// pathway (mirrors the Display page's refresh-rate apply core). Returns
+        /// true when the readback confirms the requested rate, or when the selection
+        /// was deferred because the panel is detached (external-only) — it is applied
+        /// once the panel reattaches.
         /// </summary>
         public async Task<bool> SetRefreshRateAsync(int hz)
         {
             try
             {
-                var target = Display.CurrentDisplayName();
-                Display.ChangeDisplaySettings(target, hz);
+                if (string.IsNullOrEmpty(Display.InternalPanelName()))
+                {
+                    // Panel detached (lid closed / internal display disconnected) — GDI
+                    // hides a display that is off, so the write cannot land now. Persist
+                    // the selection; the next snapshot reconciles it on reattach.
+                    Settings.Default.DisplayRefreshRateDeferred = hz;
+                    Settings.Default.Save();
+                    Log.Information("[Tray] Refresh rate {Hz} Hz deferred — internal panel detached (external-only)", hz);
+                    return true;
+                }
+
+                Settings.Default.DisplayRefreshRateDeferred = 0;
+                Settings.Default.Save();
+                int applied = Display.ApplyInternalRefreshRate(hz);
 
                 // Verify via readback — the engine reports failures only to the console.
-                int applied = Display.GetCurrentRefreshRate(target);
                 bool success = applied == hz;
-                Log.Information("[Tray] Display refresh rate set to {Applied} Hz (requested {Hz} Hz, success: {Success})",
+                Log.Information("[Tray] Internal panel refresh rate set to {Applied} Hz (requested {Hz} Hz, success: {Success})",
                     applied, hz, success);
                 return success;
             }

@@ -491,15 +491,18 @@ namespace Uniwill_Control_Utility.Views.Pages
         #region Display Refresh Rate
 
         /// <summary>
-        /// The display in use — the primary (taskbar) display. Follows the user to an
-        /// external monitor when that monitor is primary, mirroring OpenRevo's
-        /// is_primary/is_internal monitor model.
+        /// The laptop's internal panel — always, never the display in use. The refresh-rate
+        /// control targets the panel exclusively: ChangeDisplaySettingsEx addresses it by
+        /// device name, so the write lands on the panel whether it is primary or secondary,
+        /// and Windows' per-display registry carries the mode across primary/secondary
+        /// switches. When the panel is detached (lid closed / external-only) GDI hides it
+        /// and a selection is deferred (DisplayRefreshRateDeferred) until it reattaches.
         /// </summary>
         private string? RefreshRateTarget()
         {
             try
             {
-                return Uniwill_Control_Utility.Scripts.Misc.Display.CurrentDisplayName();
+                return Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName();
             }
             catch
             {
@@ -511,7 +514,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             try
             {
-                return Uniwill_Control_Utility.Scripts.Misc.Display.GetCurrentRefreshRate(RefreshRateTarget());
+                return Uniwill_Control_Utility.Scripts.Misc.Display.GetInternalRefreshRate();
             }
             catch
             {
@@ -537,8 +540,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             try
             {
-                return Uniwill_Control_Utility.Scripts.Misc.Display.GetOfferedRefreshRates(
-                    RefreshRateTarget(), IsDgpuOnlyMode());
+                // Internal panel only — falls back to the panel's known mode set when the
+                // panel is detached (external-only), so the controls stay offered.
+                return Uniwill_Control_Utility.Scripts.Misc.Display.GetInternalRefreshRates(IsDgpuOnlyMode());
             }
             catch
             {
@@ -614,20 +618,35 @@ namespace Uniwill_Control_Utility.Views.Pages
             // The GDI mode switch can take ~1s — keep it off the UI thread.
             _ = Task.Run(() =>
             {
-                var target = RefreshRateTarget();
-                try
+                int applied;
+                if (string.IsNullOrEmpty(Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName()))
                 {
-                    Uniwill_Control_Utility.Scripts.Misc.Display.ChangeDisplaySettings(target, hz);
+                    // Panel detached (lid closed / internal display disconnected) — GDI
+                    // hides a display that is off, so the write cannot land now. Persist
+                    // the selection; RefreshAll reconciles it once the panel reattaches.
+                    Settings.Default.DisplayRefreshRateDeferred = hz;
+                    Settings.Default.Save();
+                    Log.Information("[Display] Refresh rate {Hz} Hz deferred — internal panel detached (external-only)", hz);
+                    applied = 0;
                 }
-                catch (Exception ex)
+                else
                 {
-                    Log.Information("[Display] [ERROR] Refresh rate apply failed: {Message}", ex.Message);
+                    Settings.Default.DisplayRefreshRateDeferred = 0;
+                    Settings.Default.Save();
+                    try
+                    {
+                        applied = Uniwill_Control_Utility.Scripts.Misc.Display.ApplyInternalRefreshRate(hz);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Information("[Display] [ERROR] Refresh rate apply failed: {Message}", ex.Message);
+                        applied = 0;
+                    }
                 }
 
-                // Verify via readback — ApplySettings reports failures only to the console.
-                int applied = GetRefreshRateSafe();
+                // Verify via readback — the engine reports failures only to the console.
                 bool success = applied == hz;
-                Log.Information("[Display] Refresh rate set to {Applied} Hz (requested {Hz} Hz, success: {Success})",
+                Log.Information("[Display] Internal panel refresh rate set to {Applied} Hz (requested {Hz} Hz, success: {Success})",
                     applied, hz, success);
 
                 Application.Current.Dispatcher.Invoke(() =>
@@ -798,10 +817,35 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
             }
 
+            // Consume a deferred refresh-rate selection from an external-only session
+            // (the panel was detached when the user picked a rate) before re-reading the
+            // live rate so the combo shows the reconciled value.
+            ReconcileDeferredRefreshRate();
+
             // The refresh-rate combo tracks the live Windows display mode
             UpdateRefreshRateCombo(GetRefreshRateSafe());
 
             RefreshGpuInfo();
+        }
+
+        /// <summary>
+        /// Applies a persisted deferred internal-panel refresh-rate selection once the
+        /// panel is attached again (the external-only case: GDI could not write while it
+        /// was detached). Clears the deferred setting when the readback confirms it.
+        /// </summary>
+        private void ReconcileDeferredRefreshRate()
+        {
+            int deferred = Settings.Default.DisplayRefreshRateDeferred;
+            if (deferred <= 0)
+                return;
+
+            int applied = Uniwill_Control_Utility.Scripts.Misc.Display.ReconcileInternalRefreshRate(deferred);
+            if (applied == deferred)
+            {
+                Settings.Default.DisplayRefreshRateDeferred = 0;
+                Settings.Default.Save();
+                Log.Information("[Display] Deferred refresh rate {Hz} Hz applied on panel reattach", applied);
+            }
         }
 
         private void RefreshGpuInfo()

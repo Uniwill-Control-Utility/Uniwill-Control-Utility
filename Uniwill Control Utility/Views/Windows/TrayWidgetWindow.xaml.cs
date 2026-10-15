@@ -13,6 +13,7 @@ using Uniwill_Control_Utility.Services;
 using Uniwill_Control_Utility.Views.Windows.Tray;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
+using Wpf.Ui.Animations;
 using Serilog;
 using Screen = System.Windows.Forms.Screen;
 
@@ -24,6 +25,10 @@ namespace Uniwill_Control_Utility.Views.Windows
         // NavigationView via reflection; they reach this window through this
         // static for the shared apply/snapshot orchestration.
         public static TrayWidgetWindow? Instance;
+
+        // Duration of the custom tray page transitions (directional fade+slide for the
+        // QuickSettings↔Display hops, fade+slide-up for the tray's own show).
+        private const int TrayTransitionMs = 300;
 
         private readonly TrayQuickControlService _quickControl;
         private readonly DispatcherTimer _refreshTimer;
@@ -69,8 +74,13 @@ namespace Uniwill_Control_Utility.Views.Windows
             Activate();
             _refreshTimer.Start();
 
-            // A re-shown tray always opens on the main QuickSettings page.
-            _ = NavigateTo(typeof(TrayQuickSettingsPage));
+            // A re-shown tray always opens on the main QuickSettings page — with the
+            // library-style fade + slide-up (the NavigationView's own transition is
+            // disabled in XAML, so we drive it here; the directional fade+slide is
+            // only for the QuickSettings↔Display page hops).
+            _ = TrayNavigation.Navigate(typeof(TrayQuickSettingsPage));
+            _ = TransitionAnimationProvider.ApplyTransition(
+                TrayQuickSettingsPage.Instance, Transition.FadeInWithSlide, TrayTransitionMs);
 
             try
             {
@@ -109,7 +119,35 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// instantiates the page by reflection (parameterless constructor) and
         /// animates the transition; navigating to the already-shown page is a no-op.
         /// </summary>
-        public bool NavigateTo(Type pageType) => TrayNavigation.Navigate(pageType);
+        /// <summary>
+        /// Navigates the tray's NavigationView to a page class and animates the shown
+        /// page with a custom fade+slide for the QuickSettings↔Display page hops:
+        /// entering the Display page slides in from the right, returning to the
+        /// quick-settings page slides in from the left — both layered with a fade
+        /// (the NavigationView's own transition is disabled in XAML, and its
+        /// TemplateBinding is one-time, so the library provider is applied here
+        /// instead). Navigate() is synchronous, so the page instance (and its static)
+        /// exists when it returns.
+        /// </summary>
+        public bool NavigateTo(Type pageType)
+        {
+            var toDisplay = pageType == typeof(TrayDisplayPage);
+            var navigated = TrayNavigation.Navigate(pageType);
+
+            Page? page = null;
+            if (toDisplay)
+                page = TrayDisplayPage.Instance;
+            else
+                page = TrayQuickSettingsPage.Instance;
+            if (page is not null)
+            {
+                var slide = toDisplay ? Transition.SlideRight : Transition.SlideLeft;
+                _ = TransitionAnimationProvider.ApplyTransition(page, slide, TrayTransitionMs);
+                _ = TransitionAnimationProvider.ApplyTransition(page, Transition.FadeIn, TrayTransitionMs);
+            }
+
+            return navigated;
+        }
 
         /// <summary>
         /// Re-fetches the live snapshot and re-applies it to both pages. Used after
