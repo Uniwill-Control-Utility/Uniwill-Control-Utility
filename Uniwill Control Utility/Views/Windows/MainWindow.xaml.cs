@@ -943,6 +943,15 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             try
             {
+                // Throw the blanket BEFORE the MCU's wake-time reset: while suspended the
+                // HID device is gone, and a running StreamLoop would fail sends and burn
+                // the reconnect ladder (handshake blinks) throughout the sleep/wake window.
+                // ResumeAfterWake (PowerModes.Resume below) settles and restarts the stream.
+                if (e.Mode == PowerModes.Suspend)
+                {
+                    App.GetService<BetterRgbStreamService>()?.SuspendForSleep();
+                }
+
                 if (e.Mode == PowerModes.StatusChange && Settings.Default.isAdaptiveModeRunning == false)
                 {
                     await Task.Run(() => GetBatteryStatus());
@@ -1779,6 +1788,14 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             bool attached = !string.IsNullOrEmpty(
                 Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName());
+
+            if (attached != _panelWasAttached)
+            {
+                // The ITE RGB MCU resets itself during a display (mux) switch; streaming
+                // frames into a resetting MCU repaints the keyboard key-by-key — the
+                // visible blink storm. Pause the stream and let the MCU settle first.
+                App.GetService<BetterRgbStreamService>()?.RestartAfterDisplaySwitch();
+            }
 
             if (attached && !_panelWasAttached && !_panelReconcilePending)
             {

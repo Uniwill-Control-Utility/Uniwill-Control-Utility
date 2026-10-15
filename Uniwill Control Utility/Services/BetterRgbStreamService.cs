@@ -46,6 +46,28 @@ namespace Uniwill_Control_Utility.Services
         private const int WatchdogAttempts = 3;
         private const int SendFailStreakLimit = 3;
         private const int WakeOpenRetries = 8;
+
+        // Settle after wake before re-handshaking: the ITE controller is not ready
+        // right after hibernation resume, and every EnterCustomModeC that lands on a
+        // half-ready device clears the plane — that is the visible "blink" storm.
+        private const int ResumeSettleMs = 6_000;
+
+        // Retry the first frame on the SAME handle before re-handshaking: re-entering
+        // UserMode (zone reset + clear + UserMode) is what repaints/blinks the keyboard,
+        // so a failed first frame must not trigger another handshake.
+        private const int FirstFrameRetries = 3;
+        private const int FirstFrameRetryDelayMs = 300;
+
+        // The ITE RGB MCU resets itself on a display (mux) switch and on wake; streaming
+        // frames into a resetting MCU repaints it key-by-key — the visible blink storm.
+        // Pause the stream and let the MCU settle before resuming. The watcher detects
+        // the transition after the switch already happened, so the MCU is settled by
+        // the time the settle starts: no fixed wait needed — StartAttempt's open retries
+        // and first-frame retries absorb any residual half-ready window.
+        private const int DisplaySwitchSettleMs = 0;
+        // Same mechanism on the reconnect ladder: settle before the first handshake so
+        // attempts stop landing on a half-ready device.
+        private const int ReconnectSettleMs = 3_000;
         private const int StaticKeepaliveFps = 10;
         private const int FpsFloor = 15;   // reference TARGET_FPS_MIN
         private const int FpsCeiling = 60; // reference TARGET_FPS_MAX
@@ -71,6 +93,8 @@ namespace Uniwill_Control_Utility.Services
 
         private volatile bool _running;
         private volatile bool _unsupported;
+        private volatile bool _starting; // a start-attempt task owns the handshake window exclusively
+        private volatile bool _suspendedForSleep; // blanket thrown on suspend; only ResumeAfterWake lifts it
         private volatile bool _suspendedForOverride;
         private volatile bool _idleOffRequested;
         private int _sendFailStreak;
@@ -130,7 +154,13 @@ namespace Uniwill_Control_Utility.Services
         {
             lock (_engineLock)
             {
-                if (_disposed || _running)
+                // _starting serializes the handshake window: without it, the resume hook,
+                // the AC-policy event and the startup apply each spawn their own StartAttempt
+                // task, and every concurrent watchdog attempt blinks the keyboard once more
+                // (EnterCustomModeC clears the plane on every try). _suspendedForSleep keeps
+                // the blanket thrown on suspend: the AC-policy event fires during sleep/wake
+                // and must not restart the stream against the resetting MCU.
+                if (_disposed || _running || _starting || _suspendedForSleep)
                     return;
 
                 // A user-initiated start clears the watchdog verdict and idle-off so
@@ -143,7 +173,18 @@ namespace Uniwill_Control_Utility.Services
                 if (!prm.PowerOn)
                     return;
 
-                _ = Task.Run(() => StartAttempt(prm, reason, OpenRetries, OpenRetryDelayMs));
+                _starting = true;
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        StartAttempt(prm, reason, OpenRetries, OpenRetryDelayMs);
+                    }
+                    finally
+                    {
+                        lock (_engineLock) { _starting = false; }
+                    }
+                });
             }
         }
 
@@ -212,13 +253,96 @@ namespace Uniwill_Control_Utility.Services
         /// discoverable right after wake), then restart the loop.
         /// OpenRevo: "resume_after_wake: BetterRGB Streamer successfully reconnected on attempt N".
         /// </summary>
+        /// <summary>
+        /// Suspend hook (MainWindow's PowerModes.Suspend branch): stop the loop and throw
+        /// the blanket BEFORE the MCU's wake-time reset. Without it the loop fights the
+        /// dead device all through sleep and burns the reconnect ladder (handshake blinks)
+        /// in the sleep/wake window. Only ResumeAfterWake lifts the blanket.
+        /// </summary>
+        public void SuspendForSleep()
+        {
+            _suspendedForSleep = true;
+            StopEngine("sleep");
+        }
+
         public void ResumeAfterWake()
         {
-            var prm = _params;
-            if (prm == null || _unsupported)
-                return;
+            lock (_engineLock)
+            {
+                if (_disposed || _starting || _unsupported)
+                    return;
 
-            _ = Task.Run(() => StartAttempt(prm, "resume_after_wake", WakeOpenRetries, OpenRetryDelayMs));
+                // Lift the sleep blanket: the system is waking, starts may proceed again
+                // (after the settle below).
+                _suspendedForSleep = false;
+
+                var prm = _params;
+                if (prm == null || !prm.PowerOn)
+                    return;
+
+                // The loop may still be "running" while its sends fail against the
+                // resetting MCU — stop it so the endpoint is released before settling.
+                if (_running)
+                    StopEngine("wake");
+
+                _starting = true;
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        // The ITE HID controller is not ready right after hibernation
+                        // resume: handshaking immediately clears the plane on a half-ready
+                        // device and every failed attempt blinks the keyboard. Let the
+                        // firmware settle first, then handshake once.
+                        Thread.Sleep(ResumeSettleMs);
+                        if (_running || _disposed)
+                            return;
+                        StartAttempt(prm, "resume_after_wake", WakeOpenRetries, OpenRetryDelayMs);
+                    }
+                    finally
+                    {
+                        lock (_engineLock) { _starting = false; }
+                    }
+                });
+            }
+        }
+
+        /// <summary>
+        /// Display (mux) switch hook, called by MainWindow's panel watcher on any panel
+        /// attach/detach transition: the ITE RGB MCU resets itself during the switch and
+        /// streaming frames into it repaints the keyboard key-by-key — the blink storm.
+        /// Release the endpoint, let the MCU settle, then resume with one handshake.
+        /// </summary>
+        public void RestartAfterDisplaySwitch()
+        {
+            lock (_engineLock)
+            {
+                if (_disposed || _starting)
+                    return;
+
+                var prm = _params;
+                if (prm == null || !prm.PowerOn)
+                    return;
+
+                if (_running)
+                    StopEngine("display-switch");
+
+                _starting = true;
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        Thread.Sleep(DisplaySwitchSettleMs);
+                        if (_running || _disposed)
+                            return;
+                        StartAttempt(prm, "display-switch", OpenRetries, OpenRetryDelayMs);
+                    }
+                    finally
+                    {
+                        lock (_engineLock) { _starting = false; }
+                    }
+                });
+            }
         }
 
         /// <summary>
@@ -422,6 +546,9 @@ namespace Uniwill_Control_Utility.Services
         {
             for (int attempt = 1; attempt <= WatchdogAttempts; attempt++)
             {
+                if (_running || _disposed)
+                    return false; // another start won the window; do not blink the keyboard again
+
                 KeyboardHidService? hid = null;
                 try
                 {
@@ -456,14 +583,28 @@ namespace Uniwill_Control_Utility.Services
                     if (!hid.EnterCustomModeC())
                         continue;
 
-                    // First frame must land before the engine counts as active.
+                    // First frame must land before the engine counts as active. Retry on
+                    // the SAME handle: re-entering UserMode (zone reset + clear + UserMode)
+                    // repaints the keyboard, so a failed first frame must not trigger
+                    // another handshake — that is the blink storm after wake/mux switches.
                     lock (_engineLock)
                     {
                         _frameState ??= new BetterRgbFrameState();
                     }
                     var frame = new byte[BetterRgbFrameRenderer.FrameSize];
-                    RenderFrame(prm, _frameState, 0L, 0.0, frame);
-                    if (!hid.SendStreamFrameInterleaved(frame))
+                    bool firstFrameOk = false;
+                    for (int fr = 0; fr < FirstFrameRetries; fr++)
+                    {
+                        if (fr > 0)
+                            Thread.Sleep(FirstFrameRetryDelayMs);
+                        RenderFrame(prm, _frameState, 0L, 0.0, frame);
+                        if (hid.SendStreamFrameInterleaved(frame))
+                        {
+                            firstFrameOk = true;
+                            break;
+                        }
+                    }
+                    if (!firstFrameOk)
                         continue;
 
                     lock (_engineLock)
@@ -716,6 +857,10 @@ namespace Uniwill_Control_Utility.Services
             var hid = _hid;
             _ = Task.Run(() => hid?.Dispose());
 
+            // Settle before the first handshake: a device that is mid-reset (wake, mux
+            // switch) accepts the handshake reports and every attempt blinks the keyboard.
+            Thread.Sleep(ReconnectSettleMs);
+
             for (int attempt = 0; attempt < ReconnectDelaysMs.Length; attempt++)
             {
                 Thread.Sleep(ReconnectDelaysMs[attempt]);
@@ -724,7 +869,8 @@ namespace Uniwill_Control_Utility.Services
                     return false;
 
                 var fresh = new KeyboardHidService();
-                if (fresh.Open() && fresh.HasRgbStreamInterface && fresh.EnterCustomModeC())
+                if (fresh.Open() && fresh.HasRgbStreamInterface && fresh.EnterCustomModeC()
+                    && ProbeStreamAlive(fresh))
                 {
                     lock (_engineLock)
                     {
@@ -737,6 +883,26 @@ namespace Uniwill_Control_Utility.Services
                 fresh.Dispose();
             }
             return false;
+        }
+
+        /// <summary>
+        /// Cheap liveness probe after a reconnect handshake: one all-black frame on the
+        /// fresh handle. Without it a half-ready device "succeeds" the reconnect, the loop
+        /// immediately fails sends again, and every extra cycle blinks the keyboard once
+        /// more (handshake clears the plane). The probe write itself is invisible — the
+        /// handshake already cleared the plane — so it adds no blink of its own.
+        /// </summary>
+        private static bool ProbeStreamAlive(KeyboardHidService hid)
+        {
+            var probe = new byte[BetterRgbFrameRenderer.FrameSize];
+            try
+            {
+                return hid.SendStreamFrameInterleaved(probe);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         /// <summary>
