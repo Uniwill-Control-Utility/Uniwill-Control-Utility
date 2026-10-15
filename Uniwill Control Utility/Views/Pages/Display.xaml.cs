@@ -61,6 +61,13 @@ namespace Uniwill_Control_Utility.Views.Pages
         // Shared across page instances (AddScoped creates a new page on each navigation).
         private static DateTime _lastUserApplyTime;
 
+        // The currently-alive page instance — the GPU power saving engine repaints it
+        // live when it applies a mode (e.g. the Automations engine on charger transitions).
+        public static Display? Instance;
+
+        // The power saving mode the buttons currently show (gates the live notify overlay).
+        private int _displayedPowerSavingMode = 2; // Auto
+
         // NVRAM P/Invoke
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern uint GetFirmwareEnvironmentVariable(
@@ -97,6 +104,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         public Display()
         {
             InitializeComponent();
+            Instance = this;
 
             _ecService = App.GetService<UniwillECService>();
             if (_ecService is not null)
@@ -159,6 +167,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             _delayTimer?.Stop();
             _delayTimer = null;
             _isLoaded = false;
+            if (Instance == this)
+                Instance = null;
         }
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
@@ -360,6 +370,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void UpdatePowerSavingButtons(int mode)
         {
+            _displayedPowerSavingMode = mode;
+
             Style? inactiveStyle = (Style)Resources["GpuModeButtonStyle"];
             Style? activeStyle = (Style)Resources["GpuModeButtonActiveStyle"];
 
@@ -382,6 +394,31 @@ namespace Uniwill_Control_Utility.Views.Pages
                     btnPowerSavingAuto.Style = activeStyle;
                     break;
             }
+        }
+
+        /// <summary>
+        /// Called by the GPU power saving engine after it applies a mode (including the
+        /// Automations engine on charger plug/unplug transitions). Repaints the power
+        /// saving buttons and shows the cooldown overlay while the page is open, so the
+        /// selection follows suite without navigating away. May run from a power-event
+        /// callback thread — the repaint is posted through the application Dispatcher.
+        /// </summary>
+        public void NotifyPowerSavingApplied(int mode)
+        {
+            if (!_isLoaded)
+                return;
+
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                // Only a visible transition repaints — repeated StatusChange events
+                // re-applying the same mode must not re-trigger the cooldown overlay.
+                if (mode == _displayedPowerSavingMode)
+                    return;
+
+                UpdatePowerSavingButtons(mode);
+                StartCooldownOverlay();
+                Log.Information("[Display] Power saving buttons live-updated to {Mode} with cooldown overlay", mode);
+            });
         }
 
         private async void btnPowerSaving_Click(object sender, RoutedEventArgs e)
@@ -871,6 +908,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                     Debug.WriteLine($"[Display] Failed to read MUX mode: {ex.Message}");
                 }
             }
+
+            // Re-sync the power saving buttons from the persisted selection — the
+            // Automations engine updates it when it applies a mode on power transitions.
+            UpdatePowerSavingButtons(Settings.Default.GpuPowerSavingMode);
 
             // Track the live panel values (so they survive the panel being switched off)
             // and consume deferred refresh-rate/color selections from an external-only

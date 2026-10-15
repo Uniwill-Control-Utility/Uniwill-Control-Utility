@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Win32;
 using Serilog;
+using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts.Misc;
 
 namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
@@ -347,6 +348,12 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         {
             Log.Information("[GpuPowerSaving] Applying mode: {Mode}", mode);
 
+            // Persist the applied mode as the current selection so the Display page's
+            // power saving buttons and the tray section follow suite — including when
+            // the Automations engine applies it on charger plug/unplug transitions.
+            Settings.Default.GpuPowerSavingMode = (int)mode;
+            Settings.Default.Save();
+
             // Step 1: Set Windows GPU preference registry for new processes
             SetWindowsGpuPreference(mode);
 
@@ -381,6 +388,10 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
             }
 
             Log.Information("[GpuPowerSaving] Mode {Mode} applied successfully", mode);
+
+            // Repaint the open Display page (buttons + cooldown overlay) so the
+            // Automations engine's charger plug/unplug transitions follow suite live.
+            Uniwill_Control_Utility.Views.Pages.Display.Instance?.NotifyPowerSavingApplied((int)mode);
         }
 
         /// <summary>
