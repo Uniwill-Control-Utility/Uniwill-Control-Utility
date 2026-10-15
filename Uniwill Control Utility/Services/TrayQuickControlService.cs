@@ -106,12 +106,13 @@ namespace Uniwill_Control_Utility.Services
                 Log.Warning("[Tray] Refresh rate read failed: {Message}", ex.Message);
             }
 
-            // Live ICM association for the display in use (primary).
+            // Live ICM association for the internal panel — SetColorProfileAsync
+            // applies laptop-panel-only, so the readback must read the same display.
             string? colorProfileFile = null;
             bool colorCalAvailable = false;
             try
             {
-                colorProfileFile = Display.GetCurrentColorProfile(Display.CurrentDisplayName());
+                colorProfileFile = Display.GetInternalColorProfile();
                 colorCalAvailable = Display.GetOfferedColorProfileFiles().Count > 1;
             }
             catch (Exception ex)

@@ -114,7 +114,7 @@ We do not mind features/code created with the assistance of AI, as long as it's 
 
 Simple metrics and toggles for quick changes.
 
-- **Display navigation page** — a Display button in the QuickSettings grid opens an in-tray page with the runtime Nvidia Optimus switch (iGPU / Auto / dGPU power saving, Hybrid mode only), the MiniLED local dimming toggle (MiniLED panels only), and the display refresh-rate row (panels offering multiple rates); a back button returns to the grid
+- **Page-container tray** — the QuickSettings grid is the default page of an in-tray NavigationView; a Display button navigates (with the page transition animation) to a Display page carrying the refresh-rate row, the laptop-panel color-calibration profile row, the runtime Nvidia Optimus switch (iGPU / Auto / dGPU power saving, Hybrid mode only) and the MiniLED local dimming toggle (MiniLED panels only), with the sections scrolling inside the page; a back button returns to the grid
 - **Title-bar hand-over button** — a button in the main window's title bar minimizes the main window and opens the mini-tray, mirroring a left-click on the tray icon
 
 ![Tray](screenshots/tray.png)

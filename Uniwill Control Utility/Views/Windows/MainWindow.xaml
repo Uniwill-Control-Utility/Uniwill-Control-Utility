@@ -83,6 +83,7 @@ VerticalAlignment="Center"/>
 
             <ui:TitleBar.TrailingContent>
                 <StackPanel Orientation="Horizontal">
+                    
 
                     <!-- Laptop name card -->
                     <ui:Card x:Name="LaptopNameCard"

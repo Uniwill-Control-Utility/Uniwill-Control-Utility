@@ -1,15 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
-using System.Windows.Media;
 using System.Windows.Threading;
 using Uniwill_Control_Utility.Services;
+using Uniwill_Control_Utility.Views.Windows.Tray;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
 using Serilog;
@@ -19,6 +20,11 @@ namespace Uniwill_Control_Utility.Views.Windows
 {
     public partial class TrayWidgetWindow : ITrayWidget
     {
+        // The tray pages (quick settings + display) are instantiated by the
+        // NavigationView via reflection; they reach this window through this
+        // static for the shared apply/snapshot orchestration.
+        public static TrayWidgetWindow? Instance;
+
         private readonly TrayQuickControlService _quickControl;
         private readonly DispatcherTimer _refreshTimer;
         private bool _loading;
@@ -27,14 +33,13 @@ namespace Uniwill_Control_Utility.Views.Windows
         // The show path produces one spurious Deactivated right after activation; swallow
         // exactly that one so a later real focus change can still hide the tray.
         private bool _ignoreNextDeactivation;
-        private bool _displayPage;
-        private bool _syncingToggle;
         private System.Drawing.Point _placementAnchor;
         private string? _placementScreenDeviceName;
 
         public TrayWidgetWindow(TrayQuickControlService quickControl)
         {
             _quickControl = quickControl;
+            Instance = this;
             InitializeComponent();
             SystemThemeWatcher.Watch(this, Wpf.Ui.Controls.WindowBackdropType.Mica, true);
 
@@ -64,9 +69,8 @@ namespace Uniwill_Control_Utility.Views.Windows
             Activate();
             _refreshTimer.Start();
 
-            // A re-shown tray always opens on the main QuickSettings grid.
-            _displayPage = false;
-            UpdateTrayPage();
+            // A re-shown tray always opens on the main QuickSettings page.
+            _ = NavigateTo(typeof(TrayQuickSettingsPage));
 
             try
             {
@@ -91,454 +95,34 @@ namespace Uniwill_Control_Utility.Views.Windows
             _showing = false;
         }
 
+        /// <summary>
+        /// Orchestration only: each page applies its own half of the snapshot.
+        /// </summary>
         private void ApplySnapshot(TrayQuickControlSnapshot snapshot)
         {
-            var policy = snapshot.Policy;
-
-            ApplyToggle(SlotAdaptiveMode, BtnAdaptiveMode, policy.ShowAdaptiveMode, snapshot.AdaptiveModeRunning, false);
-            ApplyToggle(SlotHydroSmartMode, BtnHydroSmartMode, policy.ShowHydroSmartMode, snapshot.HydroSmartMode, policy.DisableHydroSmartMode);
-            ApplyToggle(SlotHydroRgb, BtnHydroRgb, policy.ShowHydroRgb, snapshot.HydroRgbOn, policy.DisableHydroRgb);
-            ApplyToggle(SlotKeyboardBacklight, BtnKeyboardBacklight, policy.ShowKeyboardBacklight, snapshot.KeyboardRgbOn, policy.DisableKeyboardBacklight);
-            ApplyToggle(SlotLightBar, BtnLightBar, policy.ShowLightBar, snapshot.LightBarOn, policy.DisableLightBar);
-            ApplyToggle(SlotFanSmartMode, BtnFanSmartMode, policy.ShowFanSmartMode, snapshot.FanSmartMode, policy.DisableFanSmartMode);
-            ApplyToggle(SlotOverlay, BtnOverlay, policy.ShowOverlay, snapshot.OverlayOn, false);
-            ApplyToggle(SlotFlydigiRgb, BtnFlydigiRgb, policy.ShowFlydigiRgb, snapshot.FlydigiRgbOn, policy.DisableFlydigiRgb);
-
-            // Display navigation slot — always visible.
-            SlotDisplay.Visibility = Visibility.Visible;
-
-            // Recalculate UniformGrid rows based on visible children so collapsed
-            // items don't leave gaps and buttons flow left-to-right, top-to-bottom.
-            // Runs before the Display-page sync below: the slots carry no Grid.Row/
-            // Column in XAML, so the quicksettings grid must be placed even if a
-            // later sync fails.
-            UpdateButtonGridRows();
-
-            // In-tray Display page sections (harmless to sync while PageDisplay is collapsed).
-            OptimusSection.Visibility = snapshot.GpuModeHybrid ? Visibility.Visible : Visibility.Collapsed;
-            MiniLedSection.Visibility = policy.ShowLocalDimming ? Visibility.Visible : Visibility.Collapsed;
-
-            // Sync the local dimming switch state; the flag fences the Checked/Unchecked
-            // event handlers so this programmatic write does not re-apply the setting.
-            _syncingToggle = true;
-            TrayTsLocalDimming.IsChecked = snapshot.LocalDimmingOn;
-            _syncingToggle = false;
-
-            UpdateTrayPowerSavingButtons(snapshot.GpuPowerSavingMode);
-
-            // Fenced: a refresh-rate sync failure must never skip the grid placement above.
-            try
-            {
-                RefreshRateSection.Visibility = policy.ShowRefreshRate ? Visibility.Visible : Visibility.Collapsed;
-                UpdateTrayRefreshRateButtons(snapshot.RefreshRateHz, snapshot.GpuModeDgpuOnly);
-
-                ColorCalSection.Visibility = snapshot.ColorCalAvailable ? Visibility.Visible : Visibility.Collapsed;
-                UpdateTrayColorCalButtons(snapshot.ColorProfileFile);
-            }
-            catch (Exception ex)
-            {
-                Log.Warning("[Tray] Refresh rate sync failed: {Message}", ex.Message);
-            }
-        }
-
-        private static void ApplyToggle(
-            System.Windows.Controls.Panel panel,
-            System.Windows.Controls.Primitives.ToggleButton button,
-            bool visible,
-            bool isChecked,
-            bool isDisabled)
-        {
-            panel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-            button.IsChecked = isChecked;
-            button.IsEnabled = !isDisabled;
-        }
-
-        private void UpdateButtonGridRows()
-        {
-            const int Columns = 3;
-            const int RowGap = 24;
-
-            // Collect visible children in order.
-            var visible = new List<FrameworkElement>();
-            foreach (FrameworkElement child in ButtonsGrid.Children)
-            {
-                if (child.Visibility == Visibility.Visible)
-                    visible.Add(child);
-            }
-
-            int visibleCount = visible.Count;
-            int rowCount = visibleCount > 0 ? (visibleCount + Columns - 1) / Columns : 0;
-
-            // Build row definitions: one Auto row per content row, plus a spacer row between each.
-            ButtonsGrid.RowDefinitions.Clear();
-            for (int r = 0; r < rowCount; r++)
-            {
-                ButtonsGrid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = new GridLength(0, GridUnitType.Auto) });
-                if (r < rowCount - 1)
-                {
-                    ButtonsGrid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = new GridLength(RowGap) });
-                }
-            }
-
-            // Assign each visible slot to the correct Grid.Row and column, clear margins.
-            for (int i = 0; i < visibleCount; i++)
-            {
-                int col = i % Columns;
-                int contentRow = (i / Columns) * 2; // 0, 2, 4, ... (spacer rows are 1, 3, ...)
-                System.Windows.Controls.Grid.SetRow(visible[i], contentRow);
-                System.Windows.Controls.Grid.SetColumn(visible[i], col);
-                visible[i].Margin = new System.Windows.Thickness(0);
-            }
-
-            // Hide any collapsed children by clearing their row (they stay in Children but invisible).
-            foreach (FrameworkElement child in ButtonsGrid.Children)
-            {
-                if (child.Visibility != Visibility.Visible)
-                {
-                    System.Windows.Controls.Grid.SetRow(child, -1);
-                }
-            }
+            TrayQuickSettingsPage.Instance?.ApplySnapshot(snapshot);
+            TrayDisplayPage.Instance?.ApplySnapshot(snapshot);
         }
 
         /// <summary>
-        /// Sole owner of the QuickSettings page state — never touched by ApplySnapshot.
+        /// Navigates the tray's NavigationView to a page class. The NavigationView
+        /// instantiates the page by reflection (parameterless constructor) and
+        /// animates the transition; navigating to the already-shown page is a no-op.
         /// </summary>
-        private void UpdateTrayPage()
-        {
-            ButtonsGrid.Visibility = _displayPage ? Visibility.Collapsed : Visibility.Visible;
-            PageDisplay.Visibility = _displayPage ? Visibility.Visible : Visibility.Collapsed;
-
-            // Grow the page when the refresh-rate / color-calibration sections are present
-            // (up to two rows each) so they do not clip.
-            PageDisplay.Height = 298
-                + (RefreshRateSection.Visibility == Visibility.Visible ? 130 : 0)
-                + (ColorCalSection.Visibility == Visibility.Visible ? 130 : 0);
-        }
+        public bool NavigateTo(Type pageType) => TrayNavigation.Navigate(pageType);
 
         /// <summary>
-        /// Swaps the active/inactive styles of the tray's iGPU/Auto/dGPU power saving
-        /// buttons, mirroring the Display page's UpdatePowerSavingButtons.
+        /// Re-fetches the live snapshot and re-applies it to both pages. Used after
+        /// navigation, where the destination page is a fresh instance whose elements
+        /// still carry default state.
         /// </summary>
-        private void UpdateTrayPowerSavingButtons(int mode)
-        {
-            Style? inactiveStyle = (Style)Resources["TrayModeButtonStyle"];
-            Style? activeStyle = (Style)Resources["TrayModeButtonActiveStyle"];
+        public void RefreshSnapshot() => _ = ApplyAsync(async () => { });
 
-            BtnTrayPowerSavingOn.Style = mode == 0 ? activeStyle : inactiveStyle;
-            BtnTrayPowerSavingAuto.Style = mode == 2 ? activeStyle : inactiveStyle;
-            BtnTrayPowerSavingOff.Style = mode == 1 ? activeStyle : inactiveStyle;
-        }
+        public bool IsBusy => _loading || _applying;
 
-        /// <summary>
-        /// Shows exactly the rates the display in use offers (collapsed otherwise),
-        /// styles the active one, and reflows the visible buttons into the 5-column
-        /// grid — mirroring the Display page's UpdateRefreshRateButtons.
-        /// </summary>
-        private void UpdateTrayRefreshRateButtons(int currentHz, bool dGpuOnly)
-        {
-            Style? inactiveStyle = (Style)Resources["TrayModeButtonStyle"];
-            Style? activeStyle = (Style)Resources["TrayModeButtonActiveStyle"];
+        public TrayQuickControlService QuickControl => _quickControl;
 
-            System.Windows.Controls.StackPanel[] slots =
-                new System.Windows.Controls.StackPanel[]
-                {
-                    SlotTrayRefreshRate60, SlotTrayRefreshRate75, SlotTrayRefreshRate90,
-                    SlotTrayRefreshRate100, SlotTrayRefreshRate120, SlotTrayRefreshRate144,
-                    SlotTrayRefreshRate165, SlotTrayRefreshRate240, SlotTrayRefreshRate300
-                };
-            System.Windows.Controls.Button[] buttons =
-                new System.Windows.Controls.Button[]
-                {
-                    BtnTrayRefreshRate60, BtnTrayRefreshRate75, BtnTrayRefreshRate90,
-                    BtnTrayRefreshRate100, BtnTrayRefreshRate120, BtnTrayRefreshRate144,
-                    BtnTrayRefreshRate165, BtnTrayRefreshRate240, BtnTrayRefreshRate300
-                };
-            int[] hzValues = new int[] { 60, 75, 90, 100, 120, 144, 165, 240, 300 };
-
-            for (int i = 0; i < slots.Length; i++)
-            {
-                buttons[i].Style = currentHz == hzValues[i] ? activeStyle : inactiveStyle;
-                slots[i].Visibility = TrayRefreshRateAvailable(hzValues[i], dGpuOnly) ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            // Reflow visible slots left-to-right, wrapping at 5 per row (the Grid's
-            // children are the StackPanel wrappers, not the buttons). Collapsed slots
-            // are left untouched — they render nothing, and -1 indices are rejected
-            // by this WPF's grid placement validation.
-            const int Columns = 5;
-            int slot = 0;
-            foreach (System.Windows.Controls.StackPanel panel in slots)
-            {
-                if (panel.Visibility != Visibility.Visible)
-                    continue;
-
-                System.Windows.Controls.Grid.SetRow(panel, slot / Columns);
-                System.Windows.Controls.Grid.SetColumn(panel, slot % Columns);
-                slot++;
-            }
-        }
-
-        private static bool TrayRefreshRateAvailable(int hz, bool dGpuOnly)
-        {
-            try
-            {
-                var rates = Uniwill_Control_Utility.Scripts.Misc.Display.GetOfferedRefreshRates(
-                    Uniwill_Control_Utility.Scripts.Misc.Display.CurrentDisplayName(), dGpuOnly);
-                return rates.Contains(hz);
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Styles the active ICC profile and shows exactly the profiles Windows offers
-        /// (spool-folder presence), reflowing visible slots into the 2-column grid.
-        /// </summary>
-        private void UpdateTrayColorCalButtons(string? currentFile)
-        {
-            Style? inactiveStyle = (Style)Resources["TrayModeButtonStyle"];
-            Style? activeStyle = (Style)Resources["TrayModeButtonActiveStyle"];
-
-            System.Windows.Controls.StackPanel[] slots =
-                new System.Windows.Controls.StackPanel[] { SlotTrayColorDefault, SlotTrayColorSrgb, SlotTrayColorP3, SlotTrayColorAdobe };
-            System.Windows.Controls.Button[] buttons =
-                new System.Windows.Controls.Button[] { BtnTrayColorDefault, BtnTrayColorSrgb, BtnTrayColorP3, BtnTrayColorAdobe };
-            string[] files = new string[] { "Default.icm", "sRGB.icm", "DCIP3.icm", "AdobeRGB.icm" };
-
-            for (int i = 0; i < slots.Length; i++)
-            {
-                buttons[i].Style = currentFile == files[i] ? activeStyle : inactiveStyle;
-                slots[i].Visibility = TrayColorProfileAvailable(files[i]) ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            const int Columns = 2;
-            int slot = 0;
-            foreach (System.Windows.Controls.StackPanel panel in slots)
-            {
-                if (panel.Visibility != Visibility.Visible)
-                    continue;
-
-                System.Windows.Controls.Grid.SetRow(panel, slot / Columns);
-                System.Windows.Controls.Grid.SetColumn(panel, slot % Columns);
-                slot++;
-            }
-        }
-
-        private static bool TrayColorProfileAvailable(string file)
-        {
-            if (file == Uniwill_Control_Utility.Scripts.Misc.Display.DefaultColorProfileFile)
-                return true;
-
-            try
-            {
-                return System.IO.File.Exists(
-                    Uniwill_Control_Utility.Scripts.Misc.Display.IcmProfilesFolder + @"\" + file);
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        #region Toggle Handlers
-
-        private async void BtnAdaptiveMode_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
-
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                await _quickControl.SetAdaptiveModeAsync(enabled);
-            });
-        }
-
-        private async void BtnHydroSmartMode_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
-
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                await _quickControl.SetHydroSmartModeAsync(enabled);
-            });
-        }
-
-        private async void BtnHydroRgb_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
-
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                await _quickControl.SetHydroRgbAsync(enabled);
-            });
-        }
-
-        private async void BtnKeyboardBacklight_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
-
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                _quickControl.SetKeyboardBacklight(enabled);
-                await Task.CompletedTask;
-            });
-        }
-
-        private async void BtnLightBar_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
-
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                _quickControl.SetLightBar(enabled);
-                await Task.CompletedTask;
-            });
-        }
-
-        private async void BtnFanSmartMode_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
-
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                _quickControl.SetFanSmartMode(enabled);
-                await Task.CompletedTask;
-            });
-        }
-
-        private void BtnDisplay_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Button btn)
-                return;
-            if (btn != BtnDisplay || _displayPage)
-                return;
-
-            _displayPage = true;
-            UpdateTrayPage();
-            UpdateLayout();
-        }
-
-        private void BtnTrayBack_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Button btn)
-                return;
-            if (btn != BtnTrayBack || !_displayPage)
-                return;
-
-            _displayPage = false;
-            UpdateTrayPage();
-            UpdateLayout();
-        }
-
-        private async void BtnTrayPowerSaving_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Button btn)
-                return;
-            if (btn.Tag is not string tag || !int.TryParse(tag, out int mode))
-                return;
-
-            await ApplyAsync(async () =>
-            {
-                // On failure the persisted mode is untouched, so the snapshot re-fetch
-                // inside ApplyAsync restores the previous active style.
-                _ = await _quickControl.SetGpuPowerSavingAsync(mode);
-            });
-        }
-
-        private async void BtnTrayRefreshRate_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Button btn)
-                return;
-            if (btn.Tag is not string tag || !int.TryParse(tag, out int hz))
-                return;
-
-            await ApplyAsync(async () =>
-            {
-                // On failure the live rate is unchanged, so the snapshot re-fetch
-                // inside ApplyAsync restores the previous active style.
-                _ = await _quickControl.SetRefreshRateAsync(hz);
-            });
-        }
-
-        private async void BtnTrayColorCal_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Button btn)
-                return;
-            if (btn.Tag is not string file)
-                return;
-
-            await ApplyAsync(async () =>
-            {
-                // On failure the live association is unchanged, so the snapshot re-fetch
-                // inside ApplyAsync restores the previous active style.
-                _ = await _quickControl.SetColorProfileAsync(file);
-            });
-        }
-
-        private async void TrayTsLocalDimming_Toggled(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || _syncingToggle || sender is not Wpf.Ui.Controls.ToggleSwitch sw)
-                return;
-
-            bool enabled = sw.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                bool success = await _quickControl.SetLocalDimmingAsync(enabled);
-                if (!success)
-                {
-                    // Revert the toggle on failure. The revert re-fires this handler,
-                    // so fence it with _syncingToggle.
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        _syncingToggle = true;
-                        sw.IsChecked = !enabled;
-                        _syncingToggle = false;
-                    });
-                }
-            });
-        }
-
-        private async void BtnOverlay_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
-
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                _quickControl.SetOverlay(enabled);
-                await Task.CompletedTask;
-            });
-        }
-
-        private async void BtnFlydigiRgb_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
-
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                await _quickControl.SetFlydigiRgbAsync(enabled);
-            });
-        }
-
-        #endregion
-
-        private async Task ApplyAsync(Func<Task> action)
+        public async Task ApplyAsync(Func<Task> action)
         {
             _applying = true;
             try
@@ -734,6 +318,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         private void OpenUcuButton_Click(object sender, RoutedEventArgs e)
         {
             HideWidget();
+
             MainWindow? mainWindow = MainWindow.Instance;
             if (mainWindow is null)
                 return;
@@ -743,20 +328,11 @@ namespace Uniwill_Control_Utility.Views.Windows
             mainWindow.Activate();
         }
 
-        private void NavigateContextMenu_Opened(object sender, RoutedEventArgs e)
-        {
-            // Store the source button's Tag in the context menu so the click handler
-            // knows which page to navigate to.
-            if (sender is System.Windows.Controls.ContextMenu menu)
-            {
-                if (menu.PlacementTarget is System.Windows.Controls.Primitives.ToggleButton btn)
-                    menu.Tag = btn.Tag;
-                else if (menu.PlacementTarget is System.Windows.Controls.Button btn2)
-                    menu.Tag = btn2.Tag;
-            }
-        }
-
-        private void GoToUcuMenuItem_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Shared by both tray pages' context menus: hides the tray, opens UCU and
+        /// navigates to the page matching the source button's Tag.
+        /// </summary>
+        public void GoToUcuMenuItem_Click(object sender, RoutedEventArgs e)
         {
             HideWidget();
 
