@@ -33,7 +33,14 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         /// AUTO - Let NVIDIA Optimus / Windows decide per-application.
         /// Re-enables the dGPU and clears explicit GPU preferences.
         /// </summary>
-        Auto = 2
+        Auto = 2,
+
+        /// <summary>
+        /// NO CHANGE - per-power-state selection only (Automations page): leave the
+        /// GPU preference untouched on charger plug/unplug transitions. Never applied,
+        /// so it never becomes the last-applied GpuPowerSavingMode.
+        /// </summary>
+        NoChange = 3
     }
 
     /// <summary>
@@ -346,6 +353,14 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         /// <param name="mode">The power saving mode to apply.</param>
         public static async Task ApplyAsync(GpuPowerSavingMode mode)
         {
+            // "No change" is a per-power-state selection only — it never touches the GPU
+            // and never becomes the last-applied mode, so the Display/tray repaints stay put.
+            if (mode == GpuPowerSavingMode.NoChange)
+            {
+                Log.Information("[GpuPowerSaving] No change selected, skipping apply");
+                return;
+            }
+
             Log.Information("[GpuPowerSaving] Applying mode: {Mode}", mode);
 
             // Persist the applied mode as the current selection so the Display page's
@@ -406,6 +421,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 GpuPowerSavingMode.Enable => "On (Power Saving)",
                 GpuPowerSavingMode.Disable => "Off (Performance)",
                 GpuPowerSavingMode.Auto => "Auto",
+                GpuPowerSavingMode.NoChange => "No change",
                 _ => $"Unknown ({(int)mode})"
             };
         }

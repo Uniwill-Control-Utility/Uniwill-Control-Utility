@@ -893,7 +893,7 @@ namespace Uniwill_Control_Utility.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        [global::System.Configuration.DefaultSettingValueAttribute("3")]
         public int GpuPowerSavingBattery {
             get { return ((int)(this["GpuPowerSavingBattery"])); }
             set { this["GpuPowerSavingBattery"] = value; }
@@ -901,7 +901,7 @@ namespace Uniwill_Control_Utility.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("1")]
+        [global::System.Configuration.DefaultSettingValueAttribute("3")]
         public int GpuPowerSavingPluggedIn {
             get { return ((int)(this["GpuPowerSavingPluggedIn"])); }
             set { this["GpuPowerSavingPluggedIn"] = value; }

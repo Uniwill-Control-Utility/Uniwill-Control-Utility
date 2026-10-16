@@ -277,11 +277,37 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         #region GPU Power Saving
 
+        /// <summary>
+        /// Fills a ComboBox with the GPU preference options. The Tag carries the
+        /// GpuPowerSavingMode value so selection handlers never depend on item order —
+        /// "No change" leads as the default (the engine leaves the GPU untouched).
+        /// </summary>
         private static void PopulateGpuPowerSavingComboBox(ComboBox comboBox)
         {
-            comboBox.Items.Add("iGPU");
-            comboBox.Items.Add("dGPU");
-            comboBox.Items.Add("Auto");
+            comboBox.Items.Clear();
+            comboBox.Items.Add(new ComboBoxItem { Content = "No change", Tag = (int)GpuPowerSavingMode.NoChange });
+            comboBox.Items.Add(new ComboBoxItem { Content = "iGPU", Tag = (int)GpuPowerSavingMode.Enable });
+            comboBox.Items.Add(new ComboBoxItem { Content = "dGPU", Tag = (int)GpuPowerSavingMode.Disable });
+            comboBox.Items.Add(new ComboBoxItem { Content = "Auto", Tag = (int)GpuPowerSavingMode.Auto });
+        }
+
+        /// <summary>Reads the GpuPowerSavingMode value carried by the selected item's Tag.</summary>
+        private static int SelectedGpuPowerSavingMode(ComboBox comboBox)
+        {
+            return comboBox.SelectedItem is ComboBoxItem item && item.Tag is int mode
+                ? mode
+                : (int)GpuPowerSavingMode.NoChange;
+        }
+
+        /// <summary>Index of the item whose Tag carries the given mode, or -1 when absent.</summary>
+        private static int IndexOfGpuPowerSavingMode(ComboBox comboBox, int mode)
+        {
+            for (int i = 0; i < comboBox.Items.Count; i++)
+            {
+                if (comboBox.Items[i] is ComboBoxItem item && item.Tag is int tag && tag == mode)
+                    return i;
+            }
+            return -1;
         }
 
         private void PopulateGpuPowerSavingComboBoxes()
@@ -319,13 +345,14 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (!setup) return;
 
-            int mode = cbxGpuPowerSavingBattery.SelectedIndex;
+            int mode = SelectedGpuPowerSavingMode(cbxGpuPowerSavingBattery);
             Settings.Default.GpuPowerSavingBattery = mode;
             Settings.Default.Save();
 
-            // Apply immediately if currently on battery
+            // Apply immediately if currently on battery ("No change" never applies)
             var powerStatus = System.Windows.Forms.SystemInformation.PowerStatus;
-            if (powerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline)
+            if (mode != (int)GpuPowerSavingMode.NoChange
+                && powerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline)
             {
                 _ = GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
             }
@@ -335,13 +362,14 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (!setup) return;
 
-            int mode = cbxGpuPowerSavingPluggedIn.SelectedIndex;
+            int mode = SelectedGpuPowerSavingMode(cbxGpuPowerSavingPluggedIn);
             Settings.Default.GpuPowerSavingPluggedIn = mode;
             Settings.Default.Save();
 
-            // Apply immediately if currently plugged in
+            // Apply immediately if currently plugged in ("No change" never applies)
             var powerStatus = System.Windows.Forms.SystemInformation.PowerStatus;
-            if (powerStatus.PowerLineStatus != System.Windows.Forms.PowerLineStatus.Offline)
+            if (mode != (int)GpuPowerSavingMode.NoChange
+                && powerStatus.PowerLineStatus != System.Windows.Forms.PowerLineStatus.Offline)
             {
                 _ = GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
             }
@@ -349,26 +377,14 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void setGpuPowerSavingBattery(int mode)
         {
-            if (mode >= 0 && mode <= 2)
-            {
-                cbxGpuPowerSavingBattery.SelectedIndex = mode;
-            }
-            else
-            {
-                cbxGpuPowerSavingBattery.SelectedIndex = 2; // Default to Auto
-            }
+            int index = IndexOfGpuPowerSavingMode(cbxGpuPowerSavingBattery, mode);
+            cbxGpuPowerSavingBattery.SelectedIndex = index >= 0 ? index : 0; // Fall back to No change
         }
 
         private void setGpuPowerSavingPluggedIn(int mode)
         {
-            if (mode >= 0 && mode <= 2)
-            {
-                cbxGpuPowerSavingPluggedIn.SelectedIndex = mode;
-            }
-            else
-            {
-                cbxGpuPowerSavingPluggedIn.SelectedIndex = 2; // Default to Auto
-            }
+            int index = IndexOfGpuPowerSavingMode(cbxGpuPowerSavingPluggedIn, mode);
+            cbxGpuPowerSavingPluggedIn.SelectedIndex = index >= 0 ? index : 0; // Fall back to No change
         }
 
         #endregion
@@ -403,6 +419,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void PopulateRefreshRateComboBox(ComboBox comboBox)
         {
             comboBox.Items.Clear();
+            // "No change" (Tag 0) leads as the default — the engine treats hz <= 0 as "don't apply".
+            comboBox.Items.Add(new ComboBoxItem { Content = "No change", Tag = 0 });
             foreach (int hz in Uniwill_Control_Utility.Scripts.Misc.Display.GetInternalRefreshRates(IsDgpuOnlyMode()))
             {
                 comboBox.Items.Add(new ComboBoxItem { Content = $"{hz} Hz", Tag = hz });
@@ -434,12 +452,14 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void setRefreshRateBattery(int hz)
         {
-            cbxRefreshRateBattery.SelectedIndex = IndexOfRefreshRateHz(cbxRefreshRateBattery, hz);
+            int index = IndexOfRefreshRateHz(cbxRefreshRateBattery, hz);
+            cbxRefreshRateBattery.SelectedIndex = index >= 0 ? index : 0; // Fall back to No change
         }
 
         private void setRefreshRatePluggedIn(int hz)
         {
-            cbxRefreshRatePluggedIn.SelectedIndex = IndexOfRefreshRateHz(cbxRefreshRatePluggedIn, hz);
+            int index = IndexOfRefreshRateHz(cbxRefreshRatePluggedIn, hz);
+            cbxRefreshRatePluggedIn.SelectedIndex = index >= 0 ? index : 0; // Fall back to No change
         }
 
         private void cbxRefreshRateBattery_SelectionChanged(object sender, SelectionChangedEventArgs e)

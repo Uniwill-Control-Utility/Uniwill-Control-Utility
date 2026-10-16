@@ -384,17 +384,20 @@ namespace Uniwill_Control_Utility.Views.Windows
                     int mode = (powerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline)
                         ? Settings.Default.GpuPowerSavingBattery
                         : Settings.Default.GpuPowerSavingPluggedIn;
-                    await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
-                    Log.Information("[Startup] GPU Power Saving applied: {Mode}", (GpuPowerSavingMode)mode);
-
-                    // Reset LHM so it re-probes GPU availability after the PnP hotswap.
-                    // This ensures the dashboard shows the correct active GPU (iGPU fallback).
-                    try
+                    if (mode != (int)GpuPowerSavingMode.NoChange)
                     {
-                        var monitoring = App.GetService<IHardwareMonitoringService>();
-                        monitoring?.ResetComputer();
+                        await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
+                        Log.Information("[Startup] GPU Power Saving applied: {Mode}", (GpuPowerSavingMode)mode);
+
+                        // Reset LHM so it re-probes GPU availability after the PnP hotswap.
+                        // This ensures the dashboard shows the correct active GPU (iGPU fallback).
+                        try
+                        {
+                            var monitoring = App.GetService<IHardwareMonitoringService>();
+                            monitoring?.ResetComputer();
+                        }
+                        catch { /* non-critical */ }
                     }
-                    catch { /* non-critical */ }
                 }
                 catch (Exception ex)
                 {
@@ -1081,8 +1084,11 @@ namespace Uniwill_Control_Utility.Views.Windows
                         try
                         {
                             int mode = Settings.Default.GpuPowerSavingBattery;
-                            await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
-                            Log.Information("[Automations] GPU Power Saving applied for battery: {Mode}", (GpuPowerSavingMode)mode);
+                            if (mode != (int)GpuPowerSavingMode.NoChange)
+                            {
+                                await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
+                                Log.Information("[Automations] GPU Power Saving applied for battery: {Mode}", (GpuPowerSavingMode)mode);
+                            }
                         }
                         catch (Exception ex)
                         {
@@ -1112,8 +1118,11 @@ namespace Uniwill_Control_Utility.Views.Windows
                         try
                         {
                             int mode = Settings.Default.GpuPowerSavingPluggedIn;
-                            await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
-                            Log.Information("[Automations] GPU Power Saving applied for plugged in: {Mode}", (GpuPowerSavingMode)mode);
+                            if (mode != (int)GpuPowerSavingMode.NoChange)
+                            {
+                                await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
+                                Log.Information("[Automations] GPU Power Saving applied for plugged in: {Mode}", (GpuPowerSavingMode)mode);
+                            }
                         }
                         catch (Exception ex)
                         {
@@ -1289,8 +1298,11 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 int mode = (powerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline)
                                     ? Settings.Default.GpuPowerSavingBattery
                                     : Settings.Default.GpuPowerSavingPluggedIn;
-                                await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
-                                Log.Information("[Resume] GPU Power Saving re-applied: {Mode}", (GpuPowerSavingMode)mode);
+                                if (mode != (int)GpuPowerSavingMode.NoChange)
+                                {
+                                    await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
+                                    Log.Information("[Resume] GPU Power Saving re-applied: {Mode}", (GpuPowerSavingMode)mode);
+                                }
                             }
                             catch (Exception ex)
                             {

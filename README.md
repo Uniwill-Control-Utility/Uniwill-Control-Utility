@@ -199,10 +199,10 @@ Set-and-forget rules that apply presets automatically when system state changes.
 - **Preset on Battery Charge** — Apply a preset when the system switches to AC power
 - **Preset on Battery Discharge** — Apply a preset when running on battery
 - **Preset on System Resume** — Reapply settings after sleep or hibernation
-- **GPU Preference on Battery** — Set the GPU preference (iGPU / dGPU / Auto) when running on battery (Hybrid mode only)
-- **GPU Preference when Plugged In** — Set the GPU preference when connected to power (Hybrid mode only)
-- **Refresh Rate on Battery** — Set the internal panel's refresh rate when running on battery (internal panel only; 0 = off)
-- **Refresh Rate when Plugged In** — Set the internal panel's refresh rate when connected to power (internal panel only; 0 = off)
+- **GPU Preference on Battery** — Set the GPU preference (No change / iGPU / dGPU / Auto) when running on battery (Hybrid mode only; "No change" is the default)
+- **GPU Preference when Plugged In** — Set the GPU preference (No change / iGPU / dGPU / Auto) when connected to power (Hybrid mode only; "No change" is the default)
+- **Refresh Rate on Battery** — Set the internal panel's refresh rate when running on battery (internal panel only; "No change" is the default)
+- **Refresh Rate when Plugged In** — Set the internal panel's refresh rate when connected to power (internal panel only; "No change" is the default)
 
 ![Auto](screenshots/auto.png)
 
