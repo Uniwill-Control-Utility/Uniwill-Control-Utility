@@ -244,7 +244,7 @@ RGB light bar control with multiple effects and color options.
 
 - Power toggle, color picker, and brightness slider (0–100%)
 - Auto Off When Unplugged — opt-in toggle: light bar turns off while the laptop is unplugged (on battery) and restores the saved lighting when plugged in
-- BetterRGB Sync — opt-in toggle on the BetterRGB card: while the streamer engine runs, the strip mirrors the rendered frame's bottom row (the keys nearest the front edge), pushed as a single zone color at 10 Hz; the Light Bar page's own settings are saved but not applied while sync owns the strip, and are restored when the engine stops
+- BetterRGB Sync — opt-in toggle on the BetterRGB card: while the streamer engine runs, the strip mirrors the rendered frame's bottom row (the keys nearest the front edge), pushed as a single zone color at 10 Hz; while sync owns the strip the Light Bar page shows the same override overlay as Adaptive Mode (dark overlay, disabled controls, a "BetterRGB Light Bar Sync" snackbar), and its saved settings are restored when the engine stops
 - Effects — Static, Breathing, Wave, Loading, Marquee, Meteor
 - Speed slider for animated effects
 - Fixed rainbow palette for Wave and Marquee effects

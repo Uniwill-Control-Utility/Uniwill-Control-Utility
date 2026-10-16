@@ -93,35 +93,57 @@ namespace Uniwill_Control_Utility.Models
 
         // ---- Light bar sync sampling --------------------------------------------
         // The front strip is a single HID zone (zone 2) with no slots in the 512-byte
-        // RGB frame, so sync derives its color from the rendered keyboard frame: the
-        // average of the physical bottom row — KEYMAP Row >= 5 (modifier/space row
-        // plus the arrow cluster at row 6), the keys nearest the strip. Mirror
-        // semantics (strip coincident with the bottom row) beat an appended virtual
-        // row: most effects are per-key painters that would never paint an extra row,
-        // and the physical gap is far under one key pitch, so an appended row would
-        // exaggerate the reactive-effect lag.
-        public static bool SampleBottomRowAverage(byte[] frame512, out byte r, out byte g, out byte b)
+        // RGB frame, so sync derives its one color from the rendered keyboard frame's
+        // physical bottom row — KEYMAP Row >= 5 (modifier/space row plus the arrow
+        // cluster at row 6), the keys nearest the strip. Mirror semantics (strip
+        // coincident with the bottom row) beat an appended virtual row: most effects
+        // are per-key painters that would never paint an extra row, and the physical
+        // gap is far under one key pitch.
+        //
+        // A plain unweighted mean of the 13 sampled keys collapses a left→right hue
+        // gradient to its centroid (x≈9), which reads as "the middle is mirrored".
+        // A single zone can only ever be a summary of the row, so the honest smooth
+        // choice is a MEAN — as the Wave sweeps, the mean hue rotates continuously,
+        // so the strip cycles smoothly rather than snapping. (A brightest-key term
+        // was tried and rejected: it chases a discrete argmax, jarring even eased.)
+        // Width-weighting (Space ~5 pitches, Numpad0 ~2, else 1) makes the mean
+        // reflect real physical coverage instead of 13 equal votes.
+        public static bool SampleBottomRowColor(byte[] frame512, out byte r, out byte g, out byte b)
         {
-            int rs = 0, gs = 0, bs = 0, n = 0;
+            int rs = 0, gs = 0, bs = 0, wsum = 0;
+            int n = 0;
             for (int i = 0; i < KeyMap.Length; i++)
             {
                 if (KeyMap[i].Row < 5)
                     continue;
                 int off = KeyMap[i].Offset;
-                rs += frame512[off];
-                gs += frame512[off + 1];
-                bs += frame512[off + 2];
+                int w = SampleWidth(KeyMap[i].Name);
+                rs += frame512[off] * w;
+                gs += frame512[off + 1] * w;
+                bs += frame512[off + 2] * w;
+                wsum += w;
                 n++;
             }
-            if (n == 0)
+            if (n == 0 || wsum == 0)
             {
                 r = g = b = 0;
                 return false;
             }
-            r = (byte)(rs / n);
-            g = (byte)(gs / n);
-            b = (byte)(bs / n);
+            r = (byte)Math.Round((double)rs / wsum);
+            g = (byte)Math.Round((double)gs / wsum);
+            b = (byte)Math.Round((double)bs / wsum);
             return true;
+        }
+
+        // Approximate physical pitch width of a sampled bottom-row key (get_key_x
+        // geometry): Space spans ~5 columns, Numpad0 ~2, everything else ~1.
+        private static int SampleWidth(string name)
+        {
+            if (name == "Space")
+                return 5;
+            if (name == "Numpad0")
+                return 2;
+            return 1;
         }
 
         // ---- Precomputed geometry (get_key_x/get_y, effect_visual_row) ---------

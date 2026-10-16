@@ -82,18 +82,6 @@
                 <!-- Available content -->
                 <StackPanel x:Name="LightBarAvailable" Visibility="Visible">
 
-                    <!-- BetterRGB light bar sync caption: shown while the streamer
-                         owns the strip (bottom-row mirror). The controls below stay
-                         editable — their settings are saved but not applied while the
-                         engine streams; the streamer restores them when sync stops. -->
-                    <StackPanel x:Name="SyncCaptionBlock" Visibility="Collapsed" Margin="0,0,0,8">
-                        <ui:TextBlock FontTypography="Body" Text="BetterRGB sync active" />
-                        <ui:TextBlock Margin="0,2,0,0" FontTypography="Caption"
-                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                            Text="The strip mirrors the keyboard's bottom row while the engine streams"
-                            TextWrapping="Wrap" />
-                    </StackPanel>
-
                     <!-- Power toggle -->
                     <ui:CardControl Margin="0,0,0,8">
                         <ui:CardControl.Icon>

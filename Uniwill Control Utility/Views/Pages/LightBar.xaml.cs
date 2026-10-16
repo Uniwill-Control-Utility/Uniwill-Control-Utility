@@ -30,12 +30,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         };
         private bool _pendingApply;
 
-        // BetterRGB light bar sync: while the streamer runs with the sync flag on,
-        // it owns the strip (bottom-row mirror) and this page's applies are
-        // suppressed. The flag is cached from disk on Page_Loaded — changing it
-        // requires visiting the Keyboard page anyway; the running check is a cheap
-        // field read evaluated live.
-        private bool _syncFlagCached;
+        // BetterRGB light bar sync ownership is read live from the streamer
+        // (IsLightBarSyncActive — a cheap field read on the running loop + the
+        // live parameter snapshot), so the overlay tracks engine start/stop and
+        // a SetParams flag flip while this page is open, with no cached state.
 
         // Supported effects for the light bar (zone 2).
         // Each entry: (display name, effect byte, requires speed, color count)
@@ -52,21 +50,15 @@ namespace Uniwill_Control_Utility.Views.Pages
         };
 
         /// <summary>
-        /// Whether the BetterRGB streamer currently owns the strip (engine running
-        /// with the sync flag on). The streamer only runs while the BetterRGB engine
-        /// is active, so IsRunning alone implies the engine check.
+        /// Whether the BetterRGB streamer currently owns the strip: the loop is
+        /// running AND the live parameter snapshot carries the sync flag. The streamer
+        /// only runs while the BetterRGB engine is active, so this implies the engine
+        /// check; a SetParams flip or an engine stop changes it within one frame.
         /// </summary>
         private bool IsBetterRgbSyncActive()
         {
-            if (!_syncFlagCached)
-                return false;
             var streamer = App.GetService<BetterRgbStreamService>();
-            return streamer != null && streamer.IsRunning;
-        }
-
-        private void UpdateSyncCaption()
-        {
-            SyncCaptionBlock.Visibility = IsBetterRgbSyncActive() ? Visibility.Visible : Visibility.Collapsed;
+            return streamer != null && streamer.IsLightBarSyncActive;
         }
 
         public LightBar()
@@ -149,17 +141,14 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
-            // Re-apply override state on navigation. The override event may have fired
-            // before this page was in the visual tree, leaving stale UI state.
-            if (_deviceApplier != null && _deviceApplier.IsLightBarOverridden)
-            {
-                ApplyOverrideState(true);
-            }
-
-            // Cache the BetterRGB sync flag (changing it requires the Keyboard page,
-            // so a disk read here is enough) and reflect ownership in the caption.
-            _syncFlagCached = KeyboardSettingsService.Load().BetterRgbLightBarSync;
-            UpdateSyncCaption();
+            // Re-evaluate the override overlay on navigation from both owners (Adaptive
+            // Mode and BetterRGB sync). The override event may have fired before this
+            // page was in the visual tree, leaving stale UI state.
+            // Reset the snackbar transition flag: a navigation hands us a fresh
+            // presenter, so the override must re-show once (the debounce tick then
+            // won't re-show it again).
+            _overrideSnackbarShown = false;
+            RefreshOverrideState();
 
             // Load saved settings from disk
             bool enabled = Settings.Default.LightBarEnabled;
@@ -224,9 +213,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             _applyDebounce.Tick += (s, e) =>
             {
-                // Keep the sync caption live while the page is open (cheap: cached
-                // flag + the streamer's IsRunning field read, no disk I/O).
-                UpdateSyncCaption();
+                // Keep the override overlay live while the page is open: the streamer
+                // can start/stop and the sync flag can flip via SetParams without an
+                // event on this page — IsLightBarSyncActive is a cheap field read.
+                RefreshOverrideState();
                 if (_pendingApply)
                 {
                     _pendingApply = false;
@@ -431,22 +421,41 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.Save();
         }
 
+        // Snackbar transition tracking: the snackbar is shown only when the page
+        // TRANSITIONS into an overridden state (or the owning source changes), not
+        // on every RefreshOverrideState call — the debounce tick re-evaluates 6-7x/
+        // s, and re-showing a fresh Snackbar each tick is the visible seizure.
+        private bool _overrideSnackbarShown;
+        private bool _overrideSnackbarAdaptive;
+
         private void OnLightBarOverrideChanged(object? sender, bool isOverridden)
         {
-            ApplyOverrideState(isOverridden);
+            // Recompute from both owners rather than trusting the event flag alone:
+            // BetterRGB sync may own the strip when this (adaptive) event fires.
+            RefreshOverrideState();
         }
 
         /// <summary>
-        /// Applies or lifts the override UI state (overlay, snackbar, control enablement).
+        /// Re-evaluates the override overlay from both owners: Adaptive Mode
+        /// (DeviceApplier) and BetterRGB light bar sync (streamer running with the
+        /// sync flag). The two are mutually exclusive \u2014 an adaptive override
+        /// suspends the streamer \u2014 so at most one snackbar message applies.
         /// </summary>
-        private void ApplyOverrideState(bool isOverridden)
+        private void RefreshOverrideState()
         {
-            overlayAdaptiveWarning.Visibility = isOverridden ? Visibility.Visible : Visibility.Collapsed;
+            bool adaptive = _deviceApplier != null && _deviceApplier.IsLightBarOverridden;
+            bool sync = IsBetterRgbSyncActive();
+            bool overridden = adaptive || sync;
 
-            if (isOverridden)
+            overlayAdaptiveWarning.Visibility = overridden ? Visibility.Visible : Visibility.Collapsed;
+
+            if (overridden)
             {
                 LightBarAvailable.IsEnabled = false;
-                ShowAdaptiveSnackbar();
+                // Show only on a transition into override, or when the owning source
+                // changes (adaptive <-> sync) — not on every tick re-evaluation.
+                if (!_overrideSnackbarShown || _overrideSnackbarAdaptive != adaptive)
+                    ShowOverrideSnackbar(adaptive);
             }
             else
             {
@@ -455,15 +464,17 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private void ShowAdaptiveSnackbar()
+        private void ShowOverrideSnackbar(bool adaptive)
         {
             if (_adaptiveSnackbar != null)
                 SnackbarPresenter.HideCurrent();
 
             _adaptiveSnackbar = new Wpf.Ui.Controls.Snackbar(SnackbarPresenter)
             {
-                Title = "Adaptive Mode Override",
-                Content = "Adaptive Mode is currently controlling the light bar. Controls on this page are currently disabled.",
+                Title = adaptive ? "Adaptive Mode Override" : "BetterRGB Light Bar Sync",
+                Content = adaptive
+                    ? "Adaptive Mode is currently controlling the light bar. Controls on this page are currently disabled."
+                    : "BetterRGB is driving the light bar in sync with the keyboard. Controls on this page are disabled while the engine streams; your saved settings are restored when it stops.",
                 Appearance = Wpf.Ui.Controls.ControlAppearance.Info,
                 Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uF167", FontSize = 16, Margin = new Thickness(0, 0, 10, 0) },
                 IsCloseButtonEnabled = false,
@@ -474,12 +485,16 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _adaptiveSnackbar.Show(true);
             else
                 SnackbarPresenter.Loaded += (s, e) => _adaptiveSnackbar?.Show(true);
+
+            _overrideSnackbarShown = true;
+            _overrideSnackbarAdaptive = adaptive;
         }
 
         private void HideAdaptiveSnackbar()
         {
             SnackbarPresenter.HideCurrent();
             _adaptiveSnackbar = null;
+            _overrideSnackbarShown = false;
         }
     }
 }

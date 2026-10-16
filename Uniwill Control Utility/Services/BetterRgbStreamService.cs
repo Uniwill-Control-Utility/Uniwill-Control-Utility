@@ -114,6 +114,15 @@ namespace Uniwill_Control_Utility.Services
         private bool _syncPushActive;
         private long _lastSyncPushMs;
 
+        // Temporal easing of the pushed strip color: the sampler's target is a
+        // discrete argmax (brightest key), so a slow Wave jumps key-to-key. The
+        // eased color lerps toward the target each push, turning those jumps into
+        // gradual transitions. Reset on restore so a fresh sync starts on its own
+        // first target (no ghost from a previous session).
+        private bool _syncEaseInit;
+        private int _syncR, _syncG, _syncB;
+        private const double LightBarSyncEase = 0.3;
+
         public volatile int EffectiveFps;
 
         public BetterRgbStreamService()
@@ -146,6 +155,15 @@ namespace Uniwill_Control_Utility.Services
 
         public bool IsRunning { get => _running; }
         public bool IsUnsupported { get => _unsupported; }
+
+        /// <summary>
+        /// Light bar sync ownership: the strip is owned by the sync while the loop
+        /// runs AND the live parameter snapshot carries the sync flag — so a SetParams
+        /// toggle (or an engine stop) flips this within the same frame. The Light Bar
+        /// page reads it to drive its override overlay.
+        /// </summary>
+        public bool IsLightBarSyncActive
+            => _running && _params?.LightBarSync == true;
         public long TotalRenderedFrames { get => _totalFrames; }
 
         /// <summary>
@@ -965,21 +983,35 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
-        /// Light bar sync push: sample the rendered frame's physical bottom row
-        /// (KEYMAP Row >= 5 — the keys nearest the front strip) and push the average
-        /// as CMD_SET_COLOR on zone 2 via the streamer's own light-bar handle (usage-2
-        /// collection, separate from the keyboard endpoint — no one-live-consumer
-        /// conflict). Firmware brightness stays 100: the sampled color already carries
-        /// the engine's BrightnessPercent multiplier (ApplyBrightness ran before this).
+        /// Light bar sync push: summarize the rendered frame's physical bottom row
+        /// (KEYMAP Row >= 5 — width-weighted mean, see SampleBottomRowColor) and push
+        /// it, eased toward that target, as CMD_SET_COLOR on zone 2 via
+        /// the streamer's own light-bar handle (usage-2 collection, separate from the
+        /// keyboard endpoint — no one-live-consumer conflict). Firmware brightness stays
+        /// 100: the sampled color already carries the engine's BrightnessPercent
+        /// multiplier (ApplyBrightness ran before this).
         /// </summary>
         private void PushLightBarSync(byte[] frame512)
         {
             var hid = _hid;
             if (hid == null || !hid.IsLightBarAvailable)
                 return;
-            if (!BetterRgbFrameRenderer.SampleBottomRowAverage(frame512, out var r, out var g, out var b))
+            if (!BetterRgbFrameRenderer.SampleBottomRowColor(frame512, out var r, out var g, out var b))
                 return;
-            hid.LightBarSetColor(r, g, b, 100);
+            // Ease the pushed color toward the sampled target (see field comment):
+            // smooths the discrete brightest-key jumps into gradual transitions.
+            if (!_syncEaseInit)
+            {
+                _syncR = r; _syncG = g; _syncB = b;
+                _syncEaseInit = true;
+            }
+            else
+            {
+                _syncR = (int)Math.Round(_syncR + (r - _syncR) * LightBarSyncEase);
+                _syncG = (int)Math.Round(_syncG + (g - _syncG) * LightBarSyncEase);
+                _syncB = (int)Math.Round(_syncB + (b - _syncB) * LightBarSyncEase);
+            }
+            hid.LightBarSetColor((byte)_syncR, (byte)_syncG, (byte)_syncB, 100);
         }
 
         /// <summary>
@@ -990,6 +1022,9 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private void RestoreLightBar(string reason)
         {
+            // A fresh sync (after this restore) must start on its own first target,
+            // not ease from a previous session's color.
+            _syncEaseInit = false;
             var hid = new KeyboardHidService();
             try
             {
