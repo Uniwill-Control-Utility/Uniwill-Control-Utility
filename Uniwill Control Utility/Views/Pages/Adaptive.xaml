@@ -1686,8 +1686,8 @@
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Breath speed" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <TextBlock Name="tbKbBrBcSpeedValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="12" />
-                                        <Slider Name="sdKbBrBcSpeed" Width="140" Minimum="1" Maximum="40" Value="12" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrBcSpeed_ValueChanged" />
+                                        <TextBlock Name="tbKbBrBcSpeedValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
+                                        <Slider Name="sdKbBrBcSpeed" Width="140" Minimum="1" Maximum="5" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrBcSpeed_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <Border Name="sepKbBrBcSmooth" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
@@ -1728,7 +1728,7 @@
                                     <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Speed" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <TextBlock Name="tbKbBrWvSpeedValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="4" />
-                                        <Slider Name="sdKbBrWvSpeed" Width="140" Minimum="1" Maximum="20" Value="4" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrWvSpeed_ValueChanged" />
+                                        <Slider Name="sdKbBrWvSpeed" Width="140" Minimum="1" Maximum="5" Value="4" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrWvSpeed_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
 
@@ -1739,7 +1739,7 @@
                                     <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Spark rate" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <TextBlock Name="tbKbBrSpSpeedValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                        <Slider Name="sdKbBrSpSpeed" Width="140" Minimum="1" Maximum="10" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrSpSpeed_ValueChanged" />
+                                        <Slider Name="sdKbBrSpSpeed" Width="140" Minimum="1" Maximum="5" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrSpSpeed_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <Border Name="sepKbBrSpDensity" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
@@ -1783,7 +1783,7 @@
                                     <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Speed" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <TextBlock Name="tbKbBrWhSpeedValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="4" />
-                                        <Slider Name="sdKbBrWhSpeed" Width="140" Minimum="1" Maximum="20" Value="4" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrWhSpeed_ValueChanged" />
+                                        <Slider Name="sdKbBrWhSpeed" Width="140" Minimum="1" Maximum="5" Value="4" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrWhSpeed_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
 
@@ -1794,7 +1794,7 @@
                                     <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Strike speed" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <TextBlock Name="tbKbBrLtSpeedValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                        <Slider Name="sdKbBrLtSpeed" Width="140" Minimum="1" Maximum="10" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrLtSpeed_ValueChanged" />
+                                        <Slider Name="sdKbBrLtSpeed" Width="140" Minimum="1" Maximum="5" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrLtSpeed_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <Border Name="sepKbBrLtSmooth" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
@@ -1832,7 +1832,7 @@
                                     <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Flicker speed" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <TextBlock Name="tbKbBrFlSpeedValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                        <Slider Name="sdKbBrFlSpeed" Width="140" Minimum="1" Maximum="10" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrFlSpeed_ValueChanged" />
+                                        <Slider Name="sdKbBrFlSpeed" Width="140" Minimum="1" Maximum="5" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrFlSpeed_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <Border Name="sepKbBrFlSmooth" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
@@ -1852,7 +1852,7 @@
                                     <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Falling speed" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <TextBlock Name="tbKbBrRnSpeedValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                        <Slider Name="sdKbBrRnSpeed" Width="140" Minimum="1" Maximum="10" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrRnSpeed_ValueChanged" />
+                                        <Slider Name="sdKbBrRnSpeed" Width="140" Minimum="1" Maximum="5" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrRnSpeed_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <Border Name="sepKbBrRnDensity" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
@@ -1883,7 +1883,7 @@
                                     <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Speed" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <TextBlock Name="tbKbBrMtSpeedValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                        <Slider Name="sdKbBrMtSpeed" Width="140" Minimum="1" Maximum="10" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrMtSpeed_ValueChanged" />
+                                        <Slider Name="sdKbBrMtSpeed" Width="140" Minimum="1" Maximum="5" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrMtSpeed_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <Border Name="sepKbBrMtDensity" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
@@ -1929,7 +1929,7 @@
                                     <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Spread speed" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <TextBlock Name="tbKbBrRpSpeedValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                        <Slider Name="sdKbBrRpSpeed" Width="140" Minimum="1" Maximum="10" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrRpSpeed_ValueChanged" />
+                                        <Slider Name="sdKbBrRpSpeed" Width="140" Minimum="1" Maximum="5" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrRpSpeed_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <Border Name="sepKbBrRpWidth" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
@@ -1948,8 +1948,8 @@
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Color-change speed" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                        <TextBlock Name="tbKbBrRbSpeedValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="6" />
-                                        <Slider Name="sdKbBrRbSpeed" Width="140" Minimum="1" Maximum="20" Value="6" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrRbSpeed_ValueChanged" />
+                                        <TextBlock Name="tbKbBrRbSpeedValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
+                                        <Slider Name="sdKbBrRbSpeed" Width="140" Minimum="1" Maximum="5" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrRbSpeed_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
 
@@ -1960,7 +1960,7 @@
                                     <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Falling speed" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <TextBlock Name="tbKbBrQsSpeedValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                        <Slider Name="sdKbBrQsSpeed" Width="140" Minimum="1" Maximum="10" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrQsSpeed_ValueChanged" />
+                                        <Slider Name="sdKbBrQsSpeed" Width="140" Minimum="1" Maximum="5" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrQsSpeed_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <Border Name="sepKbBrQsScale" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />
@@ -1980,7 +1980,7 @@
                                     <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Flow speed" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <TextBlock Name="tbKbBrCuSpeedValue" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                        <Slider Name="sdKbBrCuSpeed" Width="140" Minimum="1" Maximum="10" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrCuSpeed_ValueChanged" />
+                                        <Slider Name="sdKbBrCuSpeed" Width="140" Minimum="1" Maximum="5" Value="5" IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False" ValueChanged="sdKbBrCuSpeed_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
                                 <Border Name="sepKbBrCuWidth" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" Visibility="Collapsed" />

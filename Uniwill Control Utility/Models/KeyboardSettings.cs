@@ -64,12 +64,12 @@ namespace Uniwill_Control_Utility.Models
 
         /// <summary>
         /// Streamer engine speed — the raw OpenRevo/BetterRGB C slider value for the
-        /// current effect (breathing 1-40, wave/rainbow/wheel 1-20, others 1-10),
-        /// higher = faster. The firmware Speed byte (1-10, 1=fastest) stays for the
-        /// hardware path. Serialized as an int, so JSON from older versions defaults
-        /// to 10.
+        /// current effect (reference ranges breathing 1-40, wave/rainbow/wheel 1-20,
+        /// others 1-10; the UI caps every BetterRGB speed slider at 5), higher =
+        /// faster. The firmware Speed byte (1-10, 1=fastest) stays for the hardware
+        /// path. Serialized as an int, so JSON from older versions defaults to 5.
         /// </summary>
-        public int BetterRgbSpeed { get; set; } = 10;
+        public int BetterRgbSpeed { get; set; } = 5;
 
         #region BetterRGB streamer parameters (reference: BetterRGB-ITE8291-Adaptive
         /// <summary>
@@ -91,8 +91,8 @@ namespace Uniwill_Control_Utility.Models
         /// </summary>
         public bool BetterRgbLightBarSync { get; set; } = false;
 
-        /// <summary>Breathing "Speed:" slider 1-40, default 12 (g_breathSpeed).</summary>
-        public int BetterRgbBreathSpeed { get; set; } = 12;
+        /// <summary>Breathing "Speed:" slider 1-5, default 6 (g_breathSpeed).</summary>
+        public int BetterRgbBreathSpeed { get; set; } = 5;
 
         /// <summary>Breathing "Smoothness:" slider 2-150, default 60 (g_breathSmooth levels).</summary>
         public int BetterRgbBreathSmooth { get; set; } = 60;
@@ -106,10 +106,10 @@ namespace Uniwill_Control_Utility.Models
         /// <summary>Wave "Angle:" slider 0-359 degrees, default 0 (g_waveAngle).</summary>
         public int BetterRgbWaveAngle { get; set; } = 0;
 
-        /// <summary>Wave "Speed:" slider 1-20, default 4 (g_waveSpeed).</summary>
+        /// <summary>Wave "Speed:" slider 1-5, default 4 (g_waveSpeed).</summary>
         public int BetterRgbWaveSpeed { get; set; } = 4;
 
-        /// <summary>Sparkle "Speed:" slider 1-10, default 5 (g_sparkleSpeed).</summary>
+        /// <summary>Sparkle "Speed:" slider 1-5, default 5 (g_sparkleSpeed).</summary>
         public int BetterRgbSparkleSpeed { get; set; } = 5;
 
         /// <summary>Sparkle "Density:" slider 3-20, default 8 (g_sparkleDensity).</summary>
@@ -124,13 +124,13 @@ namespace Uniwill_Control_Utility.Models
         /// <summary>Reactive "Duration:" radio Short/Medium/Long -> 10/20/45 frames, default 20 (g_reactiveDuration).</summary>
         public int BetterRgbReactiveDuration { get; set; } = 20;
 
-        /// <summary>Wheel "Speed:" slider 1-20, default 4 (g_wheelSpeed).</summary>
+        /// <summary>Wheel "Speed:" slider 1-5, default 4 (g_wheelSpeed).</summary>
         public int BetterRgbWheelSpeed { get; set; } = 4;
 
         /// <summary>Wheel "Reverse rotation" checkbox, default off (g_wheelReverse).</summary>
         public bool BetterRgbWheelReverse { get; set; } = false;
 
-        /// <summary>Lightning "Speed:" slider 1-10, default 5 (g_lightningSpeed).</summary>
+        /// <summary>Lightning "Speed:" slider 1-5, default 5 (g_lightningSpeed).</summary>
         public int BetterRgbLightningSpeed { get; set; } = 5;
 
         /// <summary>Lightning "Smoothness:" slider 1-20, default 10 (g_lightningSmooth).</summary>
@@ -142,13 +142,13 @@ namespace Uniwill_Control_Utility.Models
         /// <summary>Lightning "Concurrent count:" slider 1-4, default 1 (g_lightningConcurrent).</summary>
         public int BetterRgbLightningConcurrent { get; set; } = 1;
 
-        /// <summary>Flame "Flicker speed:" slider 1-10, default 5 (g_flameSpeed).</summary>
+        /// <summary>Flame "Flicker speed:" slider 1-5, default 5 (g_flameSpeed).</summary>
         public int BetterRgbFlameSpeed { get; set; } = 5;
 
         /// <summary>Flame "Smoothness:" slider 1-20, default 8 (g_flameSmooth).</summary>
         public int BetterRgbFlameSmooth { get; set; } = 8;
 
-        /// <summary>Raindrop "Falling speed:" slider 1-10, default 5 (g_rainSpeed).</summary>
+        /// <summary>Raindrop "Falling speed:" slider 1-5, default 5 (g_rainSpeed).</summary>
         public int BetterRgbRainSpeed { get; set; } = 5;
 
         /// <summary>Raindrop density buttons 1-5, default 3 (g_rainDensityTarget).</summary>
@@ -160,7 +160,7 @@ namespace Uniwill_Control_Utility.Models
         /// <summary>Raindrop 5 color buttons (g_rainColors defaults).</summary>
         public string BetterRgbRainColors { get; set; } = "#508CFF,#7850FF,#50DCFF,#FFFFFF,#50FFB4";
 
-        /// <summary>Matrix "Speed:" slider 1-10, default 5 (g_matrixSpeed).</summary>
+        /// <summary>Matrix "Speed:" slider 1-5, default 5 (g_matrixSpeed).</summary>
         public int BetterRgbMatrixSpeed { get; set; } = 5;
 
         /// <summary>Matrix "Style:" combo 0=Diagonal bands / 1=Number rain / 2=Laser scan / 3=Ripple, default 0 (g_matrixStyle).</summary>
@@ -178,14 +178,14 @@ namespace Uniwill_Control_Utility.Models
         /// <summary>Static "Layout:" 0=Horizontal zones / 1=Vertical zones (g_staticLayout).</summary>
         public int BetterRgbStaticLayout { get; set; } = 0;
 
-        /// <summary>Static "Number of zones:" slider 1-6 (horizontal) / 1-10 (vertical), default 1 (g_staticZoneCount).</summary>
+        /// <summary>Static "Number of zones:" slider 1-5 (horizontal) / 1-10 (vertical), default 1 (g_staticZoneCount).</summary>
         public int BetterRgbStaticZones { get; set; } = 1;
 
         /// <summary>Static 10 zone colors (g_staticColors defaults).</summary>
         public string BetterRgbStaticZoneColors { get; set; } =
             "#FFFFFF,#FF0000,#00FF00,#0000FF,#FFFF00,#FF00FF,#00FFFF,#FF8C00,#8C00FF,#008C8C";
 
-        /// <summary>Ripple "Spread speed:" slider 1-10, default 5 (g_rippleSpeed).</summary>
+        /// <summary>Ripple "Spread speed:" slider 1-5, default 5 (g_rippleSpeed).</summary>
         public int BetterRgbRippleSpeed { get; set; } = 5;
 
         /// <summary>Ripple "Wave width:" slider 1-4, default 2 (g_rippleWidth).</summary>
@@ -197,10 +197,10 @@ namespace Uniwill_Control_Utility.Models
         /// <summary>Ripple color, default RGB(0,180,255) (g_rippleColor).</summary>
         public string BetterRgbRippleColor { get; set; } = "#00B4FF";
 
-        /// <summary>Rainbow "Color-change speed:" slider 1-20, default 6 (g_rainbowSpeed).</summary>
-        public int BetterRgbRainbowSpeed { get; set; } = 6;
+        /// <summary>Rainbow "Color-change speed:" slider 1-5, default 6 (g_rainbowSpeed).</summary>
+        public int BetterRgbRainbowSpeed { get; set; } = 5;
 
-        /// <summary>Quicksand "Falling speed:" slider 1-10, default 5 (g_quicksandSpeed).</summary>
+        /// <summary>Quicksand "Falling speed:" slider 1-5, default 5 (g_quicksandSpeed).</summary>
         public int BetterRgbQuicksandSpeed { get; set; } = 5;
 
         /// <summary>Quicksand "Sand band width:" slider 1-10, default 5 (g_quicksandScale).</summary>
@@ -209,7 +209,7 @@ namespace Uniwill_Control_Utility.Models
         /// <summary>Quicksand 3 gradient colors, default red/green/blue (g_quicksandColors).</summary>
         public string BetterRgbQuicksandColors { get; set; } = "#FF0000,#00FF00,#0000FF";
 
-        /// <summary>Current "Flow speed:" slider 1-10, default 5 (g_currentSpeed).</summary>
+        /// <summary>Current "Flow speed:" slider 1-5, default 5 (g_currentSpeed).</summary>
         public int BetterRgbCurrentSpeed { get; set; } = 5;
 
         /// <summary>Current "Current length:" slider 2-8, default 4 (g_currentWidth).</summary>

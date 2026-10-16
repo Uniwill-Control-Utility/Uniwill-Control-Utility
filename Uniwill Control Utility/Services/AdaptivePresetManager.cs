@@ -141,17 +141,17 @@ namespace Uniwill_Control_Utility.Services
         public int BrightnessPercent { get; set; } = 100;     // software 2-100
 
         // Breathing
-        public int BreathSpeed { get; set; } = 12;            // 1-40
+        public int BreathSpeed { get; set; } = 5;            // 1-5
         public int BreathSmooth { get; set; } = 60;           // 2-150
         public bool BreathRandom { get; set; } = false;
         public string BreathColor { get; set; } = "#0078FF";
 
         // Wave
         public int WaveAngle { get; set; } = 0;               // 0-315, 45-degree steps
-        public int WaveSpeed { get; set; } = 4;               // 1-20 (renderer clamps to 1-10)
+        public int WaveSpeed { get; set; } = 4;               // 1-5 (renderer clamps to 1-10)
 
         // Sparkle
-        public int SparkleSpeed { get; set; } = 5;            // 1-10
+        public int SparkleSpeed { get; set; } = 5;            // 1-5
         public int SparkleDensity { get; set; } = 8;          // 3-20
 
         // Reactive
@@ -161,26 +161,26 @@ namespace Uniwill_Control_Utility.Services
 
         // Wheel
         public bool WheelReverse { get; set; } = false;
-        public int WheelSpeed { get; set; } = 4;              // 1-20 (renderer clamps to 1-10)
+        public int WheelSpeed { get; set; } = 4;              // 1-5 (renderer clamps to 1-10)
 
         // Lightning
-        public int LightningSpeed { get; set; } = 5;          // 1-10
+        public int LightningSpeed { get; set; } = 5;          // 1-5
         public int LightningSmooth { get; set; } = 10;        // 1-20
         public int LightningWidth { get; set; } = 2;          // 1-4
         public int LightningConcurrent { get; set; } = 1;     // 1-4
 
         // Flame
-        public int FlameSpeed { get; set; } = 5;              // 1-10
+        public int FlameSpeed { get; set; } = 5;              // 1-5
         public int FlameSmooth { get; set; } = 8;             // 1-20
 
         // Raindrop
-        public int RainSpeed { get; set; } = 5;               // 1-10
+        public int RainSpeed { get; set; } = 5;               // 1-5
         public int RainDensity { get; set; } = 3;             // 1-5
         public string RainColors { get; set; } = "";          // CSV, up to 5
 
         // Matrix
         public int MatrixStyle { get; set; } = 0;             // 0 Diagonal / 1 Columns / 2 Lasers / 3 Rings
-        public int MatrixSpeed { get; set; } = 5;             // 1-10
+        public int MatrixSpeed { get; set; } = 5;             // 1-5
         public int MatrixDensity { get; set; } = 2;           // 1-5
         public string MatrixColors { get; set; } = "";        // CSV, up to 3
 
@@ -191,20 +191,20 @@ namespace Uniwill_Control_Utility.Services
 
         // Ripple
         public bool RippleRandom { get; set; } = true;
-        public int RippleSpeed { get; set; } = 5;             // 1-10
+        public int RippleSpeed { get; set; } = 5;             // 1-5
         public int RippleWidth { get; set; } = 2;             // 1-4
         public string RippleColor { get; set; } = "#00B4FF";
 
         // Rainbow
-        public int RainbowSpeed { get; set; } = 6;            // 1-20
+        public int RainbowSpeed { get; set; } = 5;            // 1-5
 
         // Quicksand
-        public int QuicksandSpeed { get; set; } = 5;          // 1-10
+        public int QuicksandSpeed { get; set; } = 5;          // 1-5
         public int QuicksandScale { get; set; } = 5;          // 1-10
         public string QuicksandColors { get; set; } = "";     // CSV, up to 3
 
         // Current
-        public int CurrentSpeed { get; set; } = 5;            // 1-10
+        public int CurrentSpeed { get; set; } = 5;            // 1-5
         public int CurrentWidth { get; set; } = 4;            // 2-8
         public string CurrentColors { get; set; } = "";       // CSV, up to 3
 

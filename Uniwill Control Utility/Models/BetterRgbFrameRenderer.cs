@@ -38,6 +38,9 @@ namespace Uniwill_Control_Utility.Models
 
         // ---- KEYMAP (better_rgb.c:227-253) --------------------------------------
         // {name, offset, row, col}. row 0 = top (Esc), row 6 = bottom arrow cluster.
+        // Slot names follow the NEO A25 variant (matches KeyboardZone.cs): 333=PrtSc,
+        // 357=Ins, 289=CtrlR — the reference's FnLockCam/CopilotKey names are not
+        // present on this hardware.
         // Built via List (tuple types cannot appear in new-expressions).
         private static readonly (string Name, int Offset, int Row, int Col)[] KeyMap = BuildKeyMap();
 
@@ -56,7 +59,7 @@ namespace Uniwill_Control_Utility.Models
             list.Add(("F3",93,0,3)); list.Add(("F4",117,0,4)); list.Add(("F5",141,0,5));
             list.Add(("F6",165,0,6)); list.Add(("F7",189,0,7)); list.Add(("F8",213,0,8));
             list.Add(("F9",237,0,9)); list.Add(("F10",261,0,10)); list.Add(("F11",285,0,11));
-            list.Add(("F12",309,0,12)); list.Add(("FnLockCam",333,0,13)); list.Add(("PrtSc",357,0,14));
+            list.Add(("F12",309,0,12)); list.Add(("PrtSc",333,0,13)); list.Add(("Ins",357,0,14));
             list.Add(("Del",381,0,15)); list.Add(("Home",405,0,16)); list.Add(("PgUp",429,0,17));
             list.Add(("PgDn",453,0,18)); list.Add(("End",477,0,19));
             list.Add(("Grave",17,1,0)); list.Add(("1",41,1,1)); list.Add(("2",65,1,2));
@@ -85,7 +88,7 @@ namespace Uniwill_Control_Utility.Models
             list.Add(("Numpad3",413,4,15)); list.Add(("NumpadEnter",437,4,16));
             list.Add(("CtrlL",1,5,0)); list.Add(("Fn",49,5,1)); list.Add(("Windows",73,5,2));
             list.Add(("AltL",97,5,3)); list.Add(("Space",169,5,4)); list.Add(("AltGr",241,5,5));
-            list.Add(("CopilotKey",289,5,6)); list.Add(("ArrowUp",337,5,7)); list.Add(("Numpad0",385,5,8));
+            list.Add(("CtrlR",289,5,6)); list.Add(("ArrowUp",337,5,7)); list.Add(("Numpad0",385,5,8));
             list.Add(("NumpadDecimal",409,5,9));
             list.Add(("ArrowLeft",313,6,6)); list.Add(("ArrowDown",433,6,7)); list.Add(("ArrowRight",361,6,8));
             return list.ToArray();
@@ -160,7 +163,10 @@ namespace Uniwill_Control_Utility.Models
         private static readonly double[] CurrentSampleX = { -0.44, -0.31, -0.19, -0.06, 0.06, 0.19, 0.31, 0.44 };
 
         // ---- Keypress hook (GetAsyncKeyState, like the reference's effect threads)
-        [DllImport("kernel32.dll")]
+        // GetAsyncKeyState is exported by user32.dll, NOT kernel32.dll — a wrong DLL
+        // name makes the lazy DllImport binding throw on first call (only Reactive/
+        // Ripple call it), which trips the streamer watchdog and abandons BetterRGB.
+        [DllImport("user32.dll")]
         private static extern int GetAsyncKeyState(int virtualKey);
 
         // VK -> KEYMAP index (vk_to_keymap_index, better_rgb.c:2778-2805)
@@ -994,7 +1000,7 @@ namespace Uniwill_Control_Utility.Models
                     "AltL" => 3.25,
                     "Space" => 6.25,
                     "AltGr" => 9.5,
-                    "CopilotKey" => 10.75,
+                    "CtrlR" => 10.75,
                     "ArrowUp" or "ArrowDown" => 12.75,
                     "ArrowLeft" => 12.25,
                     "ArrowRight" => 13.25,
@@ -1111,6 +1117,7 @@ namespace Uniwill_Control_Utility.Models
             var list = new List<(int, string)>();
             list.Add((0x20, "Space")); list.Add((0x0D, "Enter")); list.Add((0x08, "Backspace")); list.Add((0x09, "Tab"));
             list.Add((0xA0, "ShiftL")); list.Add((0xA1, "ShiftR")); list.Add((0x14, "CapsLock")); list.Add((0xA2, "CtrlL"));
+            list.Add((0xA3, "CtrlR"));
             list.Add((0xA4, "AltL")); list.Add((0xA5, "AltGr")); list.Add((0x25, "ArrowLeft")); list.Add((0x27, "ArrowRight"));
             list.Add((0x26, "ArrowUp")); list.Add((0x28, "ArrowDown")); list.Add((0xE2, "ISO_Backslash")); list.Add((0x5B, "Windows"));
             list.Add((0xDB, "BracketL")); list.Add((0xDD, "BracketR")); list.Add((0xBA, "Semicolon")); list.Add((0xDE, "Quote"));
@@ -1119,7 +1126,7 @@ namespace Uniwill_Control_Utility.Models
             list.Add((0x1B, "Esc")); list.Add((0x70, "F1")); list.Add((0x71, "F2")); list.Add((0x72, "F3"));
             list.Add((0x73, "F4")); list.Add((0x74, "F5")); list.Add((0x75, "F6")); list.Add((0x76, "F7"));
             list.Add((0x77, "F8")); list.Add((0x78, "F9")); list.Add((0x79, "F10")); list.Add((0x7A, "F11")); list.Add((0x7B, "F12"));
-            list.Add((0x2C, "PrtSc")); list.Add((0x2E, "Del")); list.Add((0x24, "Home")); list.Add((0x21, "PgUp"));
+            list.Add((0x2C, "PrtSc")); list.Add((0x2D, "Ins")); list.Add((0x2E, "Del")); list.Add((0x24, "Home")); list.Add((0x21, "PgUp"));
             list.Add((0x22, "PgDn")); list.Add((0x23, "End"));
             list.Add((0x60, "Numpad0")); list.Add((0x61, "Numpad1")); list.Add((0x62, "Numpad2")); list.Add((0x63, "Numpad3"));
             list.Add((0x64, "Numpad4")); list.Add((0x65, "Numpad5")); list.Add((0x66, "Numpad6")); list.Add((0x67, "Numpad7"));

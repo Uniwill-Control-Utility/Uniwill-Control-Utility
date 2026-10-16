@@ -1033,14 +1033,15 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// <summary>
         /// OpenRevo/BetterRGB speed slider ranges are PER EFFECT (mk_slider in
         /// better_rgb.c): breathing 1-40, wave/rainbow/wheel 1-20, everything
-        /// else 1-10 — all higher = faster.
+        /// else 1-10 — all higher = faster. The UI caps every BetterRGB speed
+        /// slider at 5 (the reference maxima are far too fast on the strip).
         /// </summary>
-        private static int SpeedRangeMax(KeyboardEffect e) => e switch
+        private static int SpeedRangeMax(KeyboardEffect e) => Math.Min(e switch
         {
             KeyboardEffect.Breathing => 40,
             KeyboardEffect.Wave or KeyboardEffect.Rainbow or KeyboardEffect.Wheel => 20,
             _ => 10,
-        };
+        }, 5);
 
         /// <summary>
         /// While the streamer engine is on, the Speed slider adopts the current
@@ -1054,7 +1055,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             int max = engineOn ? SpeedRangeMax(effect) : 10;
             SpeedSlider.Minimum = 1;
             SpeedSlider.Maximum = max;
-            SpeedSlider.TickFrequency = max / 10.0;
+            SpeedSlider.TickFrequency = Math.Max(1.0, max / 10.0); // keep integer ticks when capped
             var v = Math.Clamp((int)SpeedSlider.Value, 1, max);
             SpeedSlider.Value = v;
             SpeedValueText.Text = v.ToString();
@@ -1996,45 +1997,45 @@ namespace Uniwill_Control_Utility.Views.Pages
             UpdateFpsButtons();
             if (tsBetterRgbLightBarSync != null)
                 tsBetterRgbLightBarSync.IsChecked = settings.BetterRgbLightBarSync;
-            BcSpeedSlider.Value = Math.Clamp(settings.BetterRgbBreathSpeed, 1, 40);
-            BcSpeedValueText.Text = Math.Clamp(settings.BetterRgbBreathSpeed, 1, 40).ToString();
+            BcSpeedSlider.Value = Math.Clamp(settings.BetterRgbBreathSpeed, 1, 5);
+            BcSpeedValueText.Text = Math.Clamp(settings.BetterRgbBreathSpeed, 1, 5).ToString();
             BcSmoothSlider.Value = Math.Clamp(settings.BetterRgbBreathSmooth, 2, 150);
             BcSmoothValueText.Text = Math.Clamp(settings.BetterRgbBreathSmooth, 2, 150).ToString();
             tsBcRandom.IsChecked = settings.BetterRgbBreathRandom;
             BcColorPicker.SelectedColor = ParseColorOr(settings.BetterRgbBreathColor, Color.FromRgb(0x00, 0x78, 0xFF));
             _brAngle = Math.Clamp(settings.BetterRgbWaveAngle, 0, 315);
             UpdateWaveAngleButtons();
-            WvSpeedSlider.Value = Math.Clamp(settings.BetterRgbWaveSpeed, 1, 10);
-            WvSpeedValueText.Text = Math.Clamp(settings.BetterRgbWaveSpeed, 1, 10).ToString();
-            SpSpeedSlider.Value = Math.Clamp(settings.BetterRgbSparkleSpeed, 1, 10);
-            SpSpeedValueText.Text = Math.Clamp(settings.BetterRgbSparkleSpeed, 1, 10).ToString();
+            WvSpeedSlider.Value = Math.Clamp(settings.BetterRgbWaveSpeed, 1, 5);
+            WvSpeedValueText.Text = Math.Clamp(settings.BetterRgbWaveSpeed, 1, 5).ToString();
+            SpSpeedSlider.Value = Math.Clamp(settings.BetterRgbSparkleSpeed, 1, 5);
+            SpSpeedValueText.Text = Math.Clamp(settings.BetterRgbSparkleSpeed, 1, 5).ToString();
             SpDensitySlider.Value = Math.Clamp(settings.BetterRgbSparkleDensity, 3, 20);
             SpDensityValueText.Text = Math.Clamp(settings.BetterRgbSparkleDensity, 3, 20).ToString();
             tsRcRandom.IsChecked = settings.BetterRgbReactiveRandom;
             RcColorPicker.SelectedColor = ParseColorOr(settings.BetterRgbReactiveColor, Color.FromRgb(0xFF, 0xFF, 0xFF));
             _brDuration = Math.Clamp(settings.BetterRgbReactiveDuration, 10, 45);
-            WhSpeedSlider.Value = Math.Clamp(settings.BetterRgbWheelSpeed, 1, 10);
-            WhSpeedValueText.Text = Math.Clamp(settings.BetterRgbWheelSpeed, 1, 10).ToString();
+            WhSpeedSlider.Value = Math.Clamp(settings.BetterRgbWheelSpeed, 1, 5);
+            WhSpeedValueText.Text = Math.Clamp(settings.BetterRgbWheelSpeed, 1, 5).ToString();
             tsWhReverse.IsChecked = settings.BetterRgbWheelReverse;
-            LtSpeedSlider.Value = Math.Clamp(settings.BetterRgbLightningSpeed, 1, 10);
-            LtSpeedValueText.Text = Math.Clamp(settings.BetterRgbLightningSpeed, 1, 10).ToString();
+            LtSpeedSlider.Value = Math.Clamp(settings.BetterRgbLightningSpeed, 1, 5);
+            LtSpeedValueText.Text = Math.Clamp(settings.BetterRgbLightningSpeed, 1, 5).ToString();
             LtSmoothSlider.Value = Math.Clamp(settings.BetterRgbLightningSmooth, 1, 20);
             LtSmoothValueText.Text = Math.Clamp(settings.BetterRgbLightningSmooth, 1, 20).ToString();
             LtWidthSlider.Value = Math.Clamp(settings.BetterRgbLightningWidth, 1, 4);
             LtWidthValueText.Text = Math.Clamp(settings.BetterRgbLightningWidth, 1, 4).ToString();
             LtConcurrentSlider.Value = Math.Clamp(settings.BetterRgbLightningConcurrent, 1, 4);
             LtConcurrentValueText.Text = Math.Clamp(settings.BetterRgbLightningConcurrent, 1, 4).ToString();
-            FlSpeedSlider.Value = Math.Clamp(settings.BetterRgbFlameSpeed, 1, 10);
-            FlSpeedValueText.Text = Math.Clamp(settings.BetterRgbFlameSpeed, 1, 10).ToString();
+            FlSpeedSlider.Value = Math.Clamp(settings.BetterRgbFlameSpeed, 1, 5);
+            FlSpeedValueText.Text = Math.Clamp(settings.BetterRgbFlameSpeed, 1, 5).ToString();
             FlSmoothSlider.Value = Math.Clamp(settings.BetterRgbFlameSmooth, 1, 20);
             FlSmoothValueText.Text = Math.Clamp(settings.BetterRgbFlameSmooth, 1, 20).ToString();
-            RnSpeedSlider.Value = Math.Clamp(settings.BetterRgbRainSpeed, 1, 10);
-            RnSpeedValueText.Text = Math.Clamp(settings.BetterRgbRainSpeed, 1, 10).ToString();
+            RnSpeedSlider.Value = Math.Clamp(settings.BetterRgbRainSpeed, 1, 5);
+            RnSpeedValueText.Text = Math.Clamp(settings.BetterRgbRainSpeed, 1, 5).ToString();
             RnDensitySlider.Value = Math.Clamp(settings.BetterRgbRainDensity, 1, 5);
             RnDensityValueText.Text = Math.Clamp(settings.BetterRgbRainDensity, 1, 5).ToString();
             RnPicker.SetColors(ParseColorString(settings.BetterRgbRainColors));
-            MtSpeedSlider.Value = Math.Clamp(settings.BetterRgbMatrixSpeed, 1, 10);
-            MtSpeedValueText.Text = Math.Clamp(settings.BetterRgbMatrixSpeed, 1, 10).ToString();
+            MtSpeedSlider.Value = Math.Clamp(settings.BetterRgbMatrixSpeed, 1, 5);
+            MtSpeedValueText.Text = Math.Clamp(settings.BetterRgbMatrixSpeed, 1, 5).ToString();
             _brStyle = Math.Clamp(settings.BetterRgbMatrixStyle, 0, 3);
             MtDensitySlider.Value = Math.Clamp(settings.BetterRgbMatrixDensity, 1, 5);
             MtDensityValueText.Text = Math.Clamp(settings.BetterRgbMatrixDensity, 1, 5).ToString();
@@ -2043,21 +2044,21 @@ namespace Uniwill_Control_Utility.Views.Pages
             StZonesSlider.Value = Math.Clamp(settings.BetterRgbStaticZones, 1, 7);
             StZonesValueText.Text = Math.Clamp(settings.BetterRgbStaticZones, 1, 7).ToString();
             StPicker.SetColors(ParseColorString(settings.BetterRgbStaticZoneColors), 7);
-            RpSpeedSlider.Value = Math.Clamp(settings.BetterRgbRippleSpeed, 1, 10);
-            RpSpeedValueText.Text = Math.Clamp(settings.BetterRgbRippleSpeed, 1, 10).ToString();
+            RpSpeedSlider.Value = Math.Clamp(settings.BetterRgbRippleSpeed, 1, 5);
+            RpSpeedValueText.Text = Math.Clamp(settings.BetterRgbRippleSpeed, 1, 5).ToString();
             RpWidthSlider.Value = Math.Clamp(settings.BetterRgbRippleWidth, 1, 4);
             RpWidthValueText.Text = Math.Clamp(settings.BetterRgbRippleWidth, 1, 4).ToString();
             tsRpRandom.IsChecked = settings.BetterRgbRippleRandom;
             RpColorPicker.SelectedColor = ParseColorOr(settings.BetterRgbRippleColor, Color.FromRgb(0x00, 0xB4, 0xFF));
-            RbSpeedSlider.Value = Math.Clamp(settings.BetterRgbRainbowSpeed, 1, 20);
-            RbSpeedValueText.Text = Math.Clamp(settings.BetterRgbRainbowSpeed, 1, 20).ToString();
-            QsSpeedSlider.Value = Math.Clamp(settings.BetterRgbQuicksandSpeed, 1, 10);
-            QsSpeedValueText.Text = Math.Clamp(settings.BetterRgbQuicksandSpeed, 1, 10).ToString();
+            RbSpeedSlider.Value = Math.Clamp(settings.BetterRgbRainbowSpeed, 1, 5);
+            RbSpeedValueText.Text = Math.Clamp(settings.BetterRgbRainbowSpeed, 1, 5).ToString();
+            QsSpeedSlider.Value = Math.Clamp(settings.BetterRgbQuicksandSpeed, 1, 5);
+            QsSpeedValueText.Text = Math.Clamp(settings.BetterRgbQuicksandSpeed, 1, 5).ToString();
             QsScaleSlider.Value = Math.Clamp(settings.BetterRgbQuicksandScale, 1, 10);
             QsScaleValueText.Text = Math.Clamp(settings.BetterRgbQuicksandScale, 1, 10).ToString();
             QsPicker.SetColors(ParseColorString(settings.BetterRgbQuicksandColors));
-            CuSpeedSlider.Value = Math.Clamp(settings.BetterRgbCurrentSpeed, 1, 10);
-            CuSpeedValueText.Text = Math.Clamp(settings.BetterRgbCurrentSpeed, 1, 10).ToString();
+            CuSpeedSlider.Value = Math.Clamp(settings.BetterRgbCurrentSpeed, 1, 5);
+            CuSpeedValueText.Text = Math.Clamp(settings.BetterRgbCurrentSpeed, 1, 5).ToString();
             CuWidthSlider.Value = Math.Clamp(settings.BetterRgbCurrentWidth, 2, 8);
             CuWidthValueText.Text = Math.Clamp(settings.BetterRgbCurrentWidth, 2, 8).ToString();
             CuPicker.SetColors(ParseColorString(settings.BetterRgbCurrentColors));
@@ -2174,30 +2175,30 @@ namespace Uniwill_Control_Utility.Views.Pages
                     ? brMode : BetterRgbEffect.Breathing,
                 BetterRgbFps = _brFps,
                 BetterRgbLightBarSync = tsBetterRgbLightBarSync?.IsChecked == true,
-                BetterRgbBreathSpeed = Math.Clamp((int)BcSpeedSlider.Value, 1, 40),
+                BetterRgbBreathSpeed = Math.Clamp((int)BcSpeedSlider.Value, 1, 5),
                 BetterRgbBreathSmooth = Math.Clamp((int)BcSmoothSlider.Value, 2, 150),
                 BetterRgbBreathRandom = tsBcRandom.IsChecked == true,
                 BetterRgbBreathColor = SerializeColor1(BcColorPicker.SelectedColor),
                 BetterRgbWaveAngle = _brAngle,
-                BetterRgbWaveSpeed = Math.Clamp((int)WvSpeedSlider.Value, 1, 10),
-                BetterRgbSparkleSpeed = Math.Clamp((int)SpSpeedSlider.Value, 1, 10),
+                BetterRgbWaveSpeed = Math.Clamp((int)WvSpeedSlider.Value, 1, 5),
+                BetterRgbSparkleSpeed = Math.Clamp((int)SpSpeedSlider.Value, 1, 5),
                 BetterRgbSparkleDensity = Math.Clamp((int)SpDensitySlider.Value, 3, 20),
                 BetterRgbReactiveRandom = tsRcRandom.IsChecked == true,
                 BetterRgbReactiveColor = SerializeColor1(RcColorPicker.SelectedColor),
                 BetterRgbReactiveDuration = _brDuration,
-                BetterRgbWheelSpeed = Math.Clamp((int)WhSpeedSlider.Value, 1, 10),
+                BetterRgbWheelSpeed = Math.Clamp((int)WhSpeedSlider.Value, 1, 5),
                 BetterRgbWheelReverse = tsWhReverse.IsChecked == true,
-                BetterRgbLightningSpeed = Math.Clamp((int)LtSpeedSlider.Value, 1, 10),
+                BetterRgbLightningSpeed = Math.Clamp((int)LtSpeedSlider.Value, 1, 5),
                 BetterRgbLightningSmooth = Math.Clamp((int)LtSmoothSlider.Value, 1, 20),
                 BetterRgbLightningWidth = Math.Clamp((int)LtWidthSlider.Value, 1, 4),
                 BetterRgbLightningConcurrent = Math.Clamp((int)LtConcurrentSlider.Value, 1, 4),
-                BetterRgbFlameSpeed = Math.Clamp((int)FlSpeedSlider.Value, 1, 10),
+                BetterRgbFlameSpeed = Math.Clamp((int)FlSpeedSlider.Value, 1, 5),
                 BetterRgbFlameSmooth = Math.Clamp((int)FlSmoothSlider.Value, 1, 20),
-                BetterRgbRainSpeed = Math.Clamp((int)RnSpeedSlider.Value, 1, 10),
+                BetterRgbRainSpeed = Math.Clamp((int)RnSpeedSlider.Value, 1, 5),
                 BetterRgbRainDensity = Math.Clamp((int)RnDensitySlider.Value, 1, 5),
                 BetterRgbRainColorCount = Math.Clamp(RnPicker.GetColors().Count, 1, 5),
                 BetterRgbRainColors = SerializeColors(RnPicker.GetColors()),
-                BetterRgbMatrixSpeed = Math.Clamp((int)MtSpeedSlider.Value, 1, 10),
+                BetterRgbMatrixSpeed = Math.Clamp((int)MtSpeedSlider.Value, 1, 5),
                 BetterRgbMatrixStyle = _brStyle,
                 BetterRgbMatrixDensity = Math.Clamp((int)MtDensitySlider.Value, 1, 5),
                 BetterRgbMatrixColorCount = Math.Clamp(MtPicker.GetColors().Count, 1, 3),
@@ -2205,15 +2206,15 @@ namespace Uniwill_Control_Utility.Views.Pages
                 BetterRgbStaticLayout = _brLayout,
                 BetterRgbStaticZones = Math.Clamp((int)StZonesSlider.Value, 1, 7),
                 BetterRgbStaticZoneColors = SerializeColors(StPicker.GetColors()),
-                BetterRgbRippleSpeed = Math.Clamp((int)RpSpeedSlider.Value, 1, 10),
+                BetterRgbRippleSpeed = Math.Clamp((int)RpSpeedSlider.Value, 1, 5),
                 BetterRgbRippleWidth = Math.Clamp((int)RpWidthSlider.Value, 1, 4),
                 BetterRgbRippleRandom = tsRpRandom.IsChecked == true,
                 BetterRgbRippleColor = SerializeColor1(RpColorPicker.SelectedColor),
-                BetterRgbRainbowSpeed = Math.Clamp((int)RbSpeedSlider.Value, 1, 20),
-                BetterRgbQuicksandSpeed = Math.Clamp((int)QsSpeedSlider.Value, 1, 10),
+                BetterRgbRainbowSpeed = Math.Clamp((int)RbSpeedSlider.Value, 1, 5),
+                BetterRgbQuicksandSpeed = Math.Clamp((int)QsSpeedSlider.Value, 1, 5),
                 BetterRgbQuicksandScale = Math.Clamp((int)QsScaleSlider.Value, 1, 10),
                 BetterRgbQuicksandColors = SerializeColors(QsPicker.GetColors()),
-                BetterRgbCurrentSpeed = Math.Clamp((int)CuSpeedSlider.Value, 1, 10),
+                BetterRgbCurrentSpeed = Math.Clamp((int)CuSpeedSlider.Value, 1, 5),
                 BetterRgbCurrentWidth = Math.Clamp((int)CuWidthSlider.Value, 2, 8),
                 BetterRgbCurrentColors = SerializeColors(CuPicker.GetColors()),
             };

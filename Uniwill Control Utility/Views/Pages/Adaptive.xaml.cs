@@ -845,29 +845,29 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tsKbBrRpRandom.IsChecked = brCfg.RippleRandom;
 
                 // Slider values (the ValueChanged handlers refresh the label texts).
-                SetKbBrSlider(sdKbBrBcSpeed, brCfg.BreathSpeed, 1, 40);
+                SetKbBrSlider(sdKbBrBcSpeed, brCfg.BreathSpeed, 1, 5);
                 SetKbBrSlider(sdKbBrBcSmooth, brCfg.BreathSmooth, 2, 150);
-                SetKbBrSlider(sdKbBrWvSpeed, brCfg.WaveSpeed, 1, 20);
-                SetKbBrSlider(sdKbBrSpSpeed, brCfg.SparkleSpeed, 1, 10);
+                SetKbBrSlider(sdKbBrWvSpeed, brCfg.WaveSpeed, 1, 5);
+                SetKbBrSlider(sdKbBrSpSpeed, brCfg.SparkleSpeed, 1, 5);
                 SetKbBrSlider(sdKbBrSpDensity, brCfg.SparkleDensity, 3, 20);
-                SetKbBrSlider(sdKbBrWhSpeed, brCfg.WheelSpeed, 1, 20);
-                SetKbBrSlider(sdKbBrLtSpeed, brCfg.LightningSpeed, 1, 10);
+                SetKbBrSlider(sdKbBrWhSpeed, brCfg.WheelSpeed, 1, 5);
+                SetKbBrSlider(sdKbBrLtSpeed, brCfg.LightningSpeed, 1, 5);
                 SetKbBrSlider(sdKbBrLtSmooth, brCfg.LightningSmooth, 1, 20);
                 SetKbBrSlider(sdKbBrLtWidth, brCfg.LightningWidth, 1, 4);
                 SetKbBrSlider(sdKbBrLtConcurrent, brCfg.LightningConcurrent, 1, 4);
-                SetKbBrSlider(sdKbBrFlSpeed, brCfg.FlameSpeed, 1, 10);
+                SetKbBrSlider(sdKbBrFlSpeed, brCfg.FlameSpeed, 1, 5);
                 SetKbBrSlider(sdKbBrFlSmooth, brCfg.FlameSmooth, 1, 20);
-                SetKbBrSlider(sdKbBrRnSpeed, brCfg.RainSpeed, 1, 10);
+                SetKbBrSlider(sdKbBrRnSpeed, brCfg.RainSpeed, 1, 5);
                 SetKbBrSlider(sdKbBrRnDensity, brCfg.RainDensity, 1, 5);
-                SetKbBrSlider(sdKbBrMtSpeed, brCfg.MatrixSpeed, 1, 10);
+                SetKbBrSlider(sdKbBrMtSpeed, brCfg.MatrixSpeed, 1, 5);
                 SetKbBrSlider(sdKbBrMtDensity, brCfg.MatrixDensity, 1, 5);
                 SetKbBrSlider(sdKbBrStZones, brCfg.StaticZones, 1, 7);
-                SetKbBrSlider(sdKbBrRpSpeed, brCfg.RippleSpeed, 1, 10);
+                SetKbBrSlider(sdKbBrRpSpeed, brCfg.RippleSpeed, 1, 5);
                 SetKbBrSlider(sdKbBrRpWidth, brCfg.RippleWidth, 1, 4);
-                SetKbBrSlider(sdKbBrRbSpeed, brCfg.RainbowSpeed, 1, 20);
-                SetKbBrSlider(sdKbBrQsSpeed, brCfg.QuicksandSpeed, 1, 10);
+                SetKbBrSlider(sdKbBrRbSpeed, brCfg.RainbowSpeed, 1, 5);
+                SetKbBrSlider(sdKbBrQsSpeed, brCfg.QuicksandSpeed, 1, 5);
                 SetKbBrSlider(sdKbBrQsScale, brCfg.QuicksandScale, 1, 10);
-                SetKbBrSlider(sdKbBrCuSpeed, brCfg.CurrentSpeed, 1, 10);
+                SetKbBrSlider(sdKbBrCuSpeed, brCfg.CurrentSpeed, 1, 5);
                 SetKbBrSlider(sdKbBrCuWidth, brCfg.CurrentWidth, 2, 8);
 
                 // Shared pickers: load the selected effect's own color fields.

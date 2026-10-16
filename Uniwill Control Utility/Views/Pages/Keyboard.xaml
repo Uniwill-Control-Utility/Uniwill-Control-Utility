@@ -625,7 +625,7 @@
                                         Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
                                         Visibility="Collapsed" />
 
-                                    <!-- Breathing: color, speed 1-40, smoothness 2-150, random -->
+                                    <!-- Breathing: color, speed 1-5, smoothness 2-150, random -->
                                     <Grid x:Name="BcColorRow" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -646,8 +646,8 @@
                                         </Grid.ColumnDefinitions>
                                         <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Breath speed" VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                            <TextBlock x:Name="BcSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="12" />
-                                            <Slider x:Name="BcSpeedSlider" Width="140" Minimum="1" Maximum="40" Value="12"
+                                            <TextBlock x:Name="BcSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
+                                            <Slider x:Name="BcSpeedSlider" Width="140" Minimum="1" Maximum="5" Value="5"
                                                 IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
                                                 ValueChanged="BcSpeedSlider_ValueChanged" />
                                         </StackPanel>
@@ -726,13 +726,13 @@
                                         <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Speed" VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                             <TextBlock x:Name="WvSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="4" />
-                                            <Slider x:Name="WvSpeedSlider" Width="140" Minimum="1" Maximum="20" Value="4"
+                                            <Slider x:Name="WvSpeedSlider" Width="140" Minimum="1" Maximum="5" Value="4"
                                                 IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
                                                 ValueChanged="WvSpeedSlider_ValueChanged" />
                                         </StackPanel>
                                     </Grid>
 
-                                    <!-- Sparkle: speed 1-10, density 3-20 -->
+                                    <!-- Sparkle: speed 1-5, density 3-20 -->
                                     <Grid x:Name="SpSpeedRow" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -741,7 +741,7 @@
                                         <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Spark rate" VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                             <TextBlock x:Name="SpSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                            <Slider x:Name="SpSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                            <Slider x:Name="SpSpeedSlider" Width="140" Minimum="1" Maximum="5" Value="5"
                                                 IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
                                                 ValueChanged="SpSpeedSlider_ValueChanged" />
                                         </StackPanel>
@@ -806,7 +806,7 @@
                                         </StackPanel>
                                     </Grid>
 
-                                    <!-- Wheel: reverse toggle, speed 1-20 -->
+                                    <!-- Wheel: reverse toggle, speed 1-5 -->
                                     <Grid x:Name="WhReverseRow" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -828,7 +828,7 @@
                                         <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Speed" VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                             <TextBlock x:Name="WhSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="4" />
-                                            <Slider x:Name="WhSpeedSlider" Width="140" Minimum="1" Maximum="20" Value="4"
+                                            <Slider x:Name="WhSpeedSlider" Width="140" Minimum="1" Maximum="5" Value="4"
                                                 IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
                                                 ValueChanged="WhSpeedSlider_ValueChanged" />
                                         </StackPanel>
@@ -840,7 +840,7 @@
                                         <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Strike speed" VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                             <TextBlock x:Name="LtSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                            <Slider x:Name="LtSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                            <Slider x:Name="LtSpeedSlider" Width="140" Minimum="1" Maximum="5" Value="5"
                                                 IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
                                                 ValueChanged="LtSpeedSlider_ValueChanged" />
                                         </StackPanel>
@@ -891,7 +891,7 @@
                                         <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Flicker speed" VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                             <TextBlock x:Name="FlSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                            <Slider x:Name="FlSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                            <Slider x:Name="FlSpeedSlider" Width="140" Minimum="1" Maximum="5" Value="5"
                                                 IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
                                                 ValueChanged="FlSpeedSlider_ValueChanged" />
                                         </StackPanel>
@@ -916,7 +916,7 @@
                                         <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Falling speed" VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                             <TextBlock x:Name="RnSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                            <Slider x:Name="RnSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                            <Slider x:Name="RnSpeedSlider" Width="140" Minimum="1" Maximum="5" Value="5"
                                                 IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
                                                 ValueChanged="RnSpeedSlider_ValueChanged" />
                                         </StackPanel>
@@ -980,7 +980,7 @@
                                         <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Speed" VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                             <TextBlock x:Name="MtSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                            <Slider x:Name="MtSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                            <Slider x:Name="MtSpeedSlider" Width="140" Minimum="1" Maximum="5" Value="5"
                                                 IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
                                                 ValueChanged="MtSpeedSlider_ValueChanged" />
                                         </StackPanel>
@@ -1088,7 +1088,7 @@
                                         <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Spread speed" VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                             <TextBlock x:Name="RpSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                            <Slider x:Name="RpSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                            <Slider x:Name="RpSpeedSlider" Width="140" Minimum="1" Maximum="5" Value="5"
                                                 IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
                                                 ValueChanged="RpSpeedSlider_ValueChanged" />
                                         </StackPanel>
@@ -1107,13 +1107,13 @@
                                         </StackPanel>
                                     </Grid>
 
-                                    <!-- Rainbow: color-change speed 1-20 -->
+                                    <!-- Rainbow: color-change speed 1-5 -->
                                     <Grid x:Name="RbSpeedRow" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                         <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Color-change speed" VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                            <TextBlock x:Name="RbSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="6" />
-                                            <Slider x:Name="RbSpeedSlider" Width="140" Minimum="1" Maximum="20" Value="6"
+                                            <TextBlock x:Name="RbSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
+                                            <Slider x:Name="RbSpeedSlider" Width="140" Minimum="1" Maximum="5" Value="5"
                                                 IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
                                                 ValueChanged="RbSpeedSlider_ValueChanged" />
                                         </StackPanel>
@@ -1138,7 +1138,7 @@
                                         <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Falling speed" VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                             <TextBlock x:Name="QsSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                            <Slider x:Name="QsSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                            <Slider x:Name="QsSpeedSlider" Width="140" Minimum="1" Maximum="5" Value="5"
                                                 IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
                                                 ValueChanged="QsSpeedSlider_ValueChanged" />
                                         </StackPanel>
@@ -1176,7 +1176,7 @@
                                         <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Flow speed" VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                             <TextBlock x:Name="CuSpeedValueText" Width="30" HorizontalAlignment="Center" VerticalAlignment="Center" Text="5" />
-                                            <Slider x:Name="CuSpeedSlider" Width="140" Minimum="1" Maximum="10" Value="5"
+                                            <Slider x:Name="CuSpeedSlider" Width="140" Minimum="1" Maximum="5" Value="5"
                                                 IsSnapToTickEnabled="True" TickFrequency="1" TickPlacement="Both" IsMoveToPointEnabled="False"
                                                 ValueChanged="CuSpeedSlider_ValueChanged" />
                                         </StackPanel>
