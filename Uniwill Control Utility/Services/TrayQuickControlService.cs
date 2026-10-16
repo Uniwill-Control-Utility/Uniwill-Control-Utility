@@ -41,6 +41,13 @@ namespace Uniwill_Control_Utility.Services
         private readonly OverlayManagerService _overlayManager;
         private readonly FlydigiCoolerHidService _flydigiCooler;
 
+        /// <summary>
+        /// Fired when the tray writes the Light Bar power state (Settings.Default.LightBarEnabled)
+        /// so the visible Light Bar page can re-sync without re-navigation — the Light Bar
+        /// analogue of KeyboardSettingsService.SettingsChanged.
+        /// </summary>
+        public event EventHandler? LightBarSettingsChanged;
+
         public TrayQuickControlService(
             UniwillECService ec,
             HydroUIService waterCooler,
@@ -183,6 +190,7 @@ namespace Uniwill_Control_Utility.Services
                 adaptiveWaterCoolerEnabled: adaptiveRunning && Settings.Default.AdaptiveWcEnabled,
                 adaptiveKeyboardEnabled: adaptiveRunning && Settings.Default.AdaptiveKeyboardEnabled,
                 adaptiveLightBarEnabled: adaptiveRunning && Settings.Default.AdaptiveLbEnabled,
+                lightBarSyncActive: App.GetService<BetterRgbStreamService>()?.IsLightBarSyncActive == true,
                 adaptiveFlydigiEnabled: adaptiveRunning && Settings.Default.AdaptiveBs2ProEnabled,
                 hasMiniLedPanel: hasMiniLed,
                 flydigiDeviceAvailable: flydigiAvailable,
@@ -302,6 +310,37 @@ namespace Uniwill_Control_Utility.Services
             settings.PowerOn = enabled;
             KeyboardSettingsService.Save(settings);
 
+            // BetterRGB engine owns the keyboard endpoint — route the tray toggle
+            // through the streamer. A firmware TurnOnWithEffect while the engine
+            // streams puts two consumers on the endpoint and seizes the lighting.
+            var streamer = App.GetService<BetterRgbStreamService>();
+            if (settings.Engine == KeyboardEngine.BetterRGB && streamer != null)
+            {
+                if (enabled)
+                {
+                    streamer.SetParams(settings);
+                    streamer.StartEngine("tray");
+                }
+                else
+                {
+                    streamer.StopEngine("tray");
+                    // StopEngine alone leaves the last streamed frame lit — pair with TurnOff.
+                    var offHid = new KeyboardHidService();
+                    if (offHid.Open())
+                    {
+                        try
+                        {
+                            offHid.TurnOff();
+                        }
+                        finally
+                        {
+                            offHid.Dispose();
+                        }
+                    }
+                }
+                return;
+            }
+
             // Apply to HID directly
             var hid = new KeyboardHidService();
             if (!hid.Open())
@@ -334,8 +373,15 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>Toggles Light Bar on/off.</summary>
         public void SetLightBar(bool enabled)
         {
+            // BetterRGB light bar sync owns the strip while it streams (the tray
+            // button is disabled then); ignore stray calls so a firmware write
+            // never fights the sync pushes.
+            if (App.GetService<BetterRgbStreamService>()?.IsLightBarSyncActive == true)
+                return;
+
             Settings.Default.LightBarEnabled = enabled;
             Settings.Default.Save();
+            LightBarSettingsChanged?.Invoke(this, EventArgs.Empty);
 
             var hid = new KeyboardHidService();
             if (!hid.Open())
