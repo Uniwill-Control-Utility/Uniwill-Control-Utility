@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media;
 using Uniwill_Control_Utility.Models;
+using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Services;
 using Uniwill_Control_Utility.Views.Pages;
 
@@ -76,6 +77,11 @@ namespace Uniwill_Control_Utility.Services
         private static readonly int[] ReconnectDelaysMs =
             { 100, 250, 500, 1000, 2000, 4000, 8000, 16000 };
 
+        // Light bar sync: the strip is one HID zone, so the bottom-row sample is
+        // pushed as a single CMD_SET_COLOR at a throttled rate — 10 Hz is plenty
+        // for one color and keeps the feature-report traffic small.
+        private const int LightBarSyncIntervalMs = 100;
+
         private readonly object _engineLock = new();
         private KeyboardHidService? _hid;
         private CancellationTokenSource? _loopCts;
@@ -101,6 +107,12 @@ namespace Uniwill_Control_Utility.Services
         private long _totalFrames;
         private bool _disposed;
         private bool _shutdownFallbackDone; // shutdown firmware-effect push runs at most once
+
+        // Light bar sync bookkeeping: whether the strip is currently owned by the
+        // sync (a sampled push happened since the last restore) and the last push
+        // time for the throttle.
+        private bool _syncPushActive;
+        private long _lastSyncPushMs;
 
         public volatile int EffectiveFps;
 
@@ -215,6 +227,21 @@ namespace Uniwill_Control_Utility.Services
 
                     _hid.Dispose();
                     _hid = null;
+                }
+
+                // Light bar sync: when the sync owns the strip and the engine stops for
+                // a reason that leaves the keyboard on its own state, hand the strip
+                // back to the user's saved LightBar settings. Skip the reasons where
+                // another owner takes over immediately: sleep/wake/display-switch (the
+                // MCU is resetting and MainWindow's resume apply re-applies after wake),
+                // adaptive-override (DeviceApplier owns the strip), auto-power-battery
+                // (MainWindow's auto-power policy owns the strip).
+                if (_syncPushActive && reason != "sleep" && reason != "wake"
+                    && reason != "display-switch" && reason != "adaptive-override"
+                    && reason != "auto-power-battery")
+                {
+                    _syncPushActive = false;
+                    _ = Task.Run(() => RestoreLightBar(reason));
                 }
 
                 // On app shutdown, push a firmware RGB effect once so the keyboard isn't
@@ -492,6 +519,7 @@ namespace Uniwill_Control_Utility.Services
                 BrightnessPercent = Math.Clamp(settings.BrightnessPercent, 0, 100),
                 Fps = fps,
                 PowerOn = settings.PowerOn,
+                LightBarSync = settings.BetterRgbLightBarSync,
                 Raw = settings,
             };
         }
@@ -813,6 +841,37 @@ namespace Uniwill_Control_Utility.Services
                         EffectiveFps = effectiveFps;
                     }
 
+                    // Light bar sync (mirror sampling): the strip is one HID zone with
+                    // no slots in the 512-byte frame, so push the bottom-row average of
+                    // the rendered frame as CMD_SET_COLOR on zone 2, throttled. Only
+                    // after a delivered frame — a dead device fails both pushes anyway.
+                    // When sync flips off mid-stream, hand the strip back once.
+                    if (ok)
+                    {
+                        if (p.LightBarSync && _hid != null && _hid.IsLightBarAvailable)
+                        {
+                            var syncNowMs = CurrentMonotonicMs();
+                            if (syncNowMs - _lastSyncPushMs >= LightBarSyncIntervalMs)
+                            {
+                                _lastSyncPushMs = syncNowMs;
+                                try
+                                {
+                                    PushLightBarSync(frame);
+                                    _syncPushActive = true;
+                                }
+                                catch (Exception ex)
+                                {
+                                    Log.Warning("[BetterRGB] Light bar sync push failed: {Message}", ex.Message);
+                                }
+                            }
+                        }
+                        else if (_syncPushActive)
+                        {
+                            _syncPushActive = false;
+                            RestoreLightBar("sync-off");
+                        }
+                    }
+
                     long now = CurrentMonotonicMs();
                     long periodMs = Math.Max(1, 1000 / fps);
                     // C pace_frame, exact: re-anchor if more than 2 intervals behind,
@@ -906,6 +965,83 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
+        /// Light bar sync push: sample the rendered frame's physical bottom row
+        /// (KEYMAP Row >= 5 — the keys nearest the front strip) and push the average
+        /// as CMD_SET_COLOR on zone 2 via the streamer's own light-bar handle (usage-2
+        /// collection, separate from the keyboard endpoint — no one-live-consumer
+        /// conflict). Firmware brightness stays 100: the sampled color already carries
+        /// the engine's BrightnessPercent multiplier (ApplyBrightness ran before this).
+        /// </summary>
+        private void PushLightBarSync(byte[] frame512)
+        {
+            var hid = _hid;
+            if (hid == null || !hid.IsLightBarAvailable)
+                return;
+            if (!BetterRgbFrameRenderer.SampleBottomRowAverage(frame512, out var r, out var g, out var b))
+                return;
+            hid.LightBarSetColor(r, g, b, 100);
+        }
+
+        /// <summary>
+        /// Hand the strip back when the sync stops: push the user's saved LightBar page
+        /// settings (or off, honoring the auto-power-on-battery policy and the idle-off
+        /// reason where the keyboard itself went dark). Mirrors MainWindow.ApplyLightBarOnResume's
+        /// effective-state logic on a temporary handle.
+        /// </summary>
+        private void RestoreLightBar(string reason)
+        {
+            var hid = new KeyboardHidService();
+            try
+            {
+                if (!hid.Open() || !hid.IsLightBarAvailable)
+                    return;
+
+                bool enabled = Settings.Default.LightBarEnabled;
+                bool autoPower = Settings.Default.LightBarAutoPowerOffOnBattery;
+                bool unplugged = System.Windows.Forms.SystemInformation.PowerStatus
+                    .PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline;
+
+                // idle-off: the keyboard went dark on the idle timer — the strip follows.
+                if (reason == "idle-off" || !enabled || (autoPower && unplugged))
+                {
+                    hid.LightBarTurnOff();
+                    Log.Information("[BetterRGB] Light bar sync off: strip restored to OFF ({Reason})", reason);
+                    return;
+                }
+
+                // Light bar effects mapping (same as the LightBar page's Effects array).
+                byte effect = Settings.Default.LightBarEffectIndex switch
+                {
+                    0 => 0x01, // Static
+                    1 => 0x02, // Breathing
+                    2 => 0x03, // Wave
+                    3 => 0x04, // Loading
+                    4 => 0x05, // Marquee
+                    5 => 0x06, // Meteor
+                    _ => 0x01
+                };
+                // Light bar speed is inverted: UI 0-11 (slow→fast), HID 0-11 (fast→slow).
+                byte hidSpeed = (byte)(11 - Math.Clamp(Settings.Default.LightBarSpeed, 0, 11));
+                int brightness = Settings.Default.LightBarBrightness;
+
+                Thread.Sleep(FirmwareSettleMs);
+                hid.LightBarTurnOn(Settings.Default.LightBarR, Settings.Default.LightBarG,
+                    Settings.Default.LightBarB, brightness);
+                hid.LightBarSetEffect(effect, hidSpeed, brightness);
+                Log.Information("[BetterRGB] Light bar sync off: strip restored to saved settings, effect=0x{Effect:X2} ({Reason})",
+                    effect, reason);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[BetterRGB] Light bar restore failed: {Message}", ex.Message);
+            }
+            finally
+            {
+                hid.Dispose();
+            }
+        }
+
+        /// <summary>
         /// One-shot firmware-effect apply at the current prm (watchdog fallback and
         /// AC-battery fallback). Mirrors DeviceApplier.ApplyKeyboardHid's sequence on a
         /// temporary handle. OpenRevo: "Hardware MCU effect applied: effect=, speed=, enabled=".
@@ -992,6 +1128,7 @@ namespace Uniwill_Control_Utility.Services
             internal int BrightnessPercent;           // software frame multiplier (0-100)
             internal int Fps;                         // 15-60, default 30 (reference range)
             internal bool PowerOn;
+            internal bool LightBarSync;               // strip follows the rendered frame
             internal KeyboardSettings? Raw;           // kept for the hardware-fallback apply
         }
     }

@@ -91,6 +91,39 @@ namespace Uniwill_Control_Utility.Models
             return list.ToArray();
         }
 
+        // ---- Light bar sync sampling --------------------------------------------
+        // The front strip is a single HID zone (zone 2) with no slots in the 512-byte
+        // RGB frame, so sync derives its color from the rendered keyboard frame: the
+        // average of the physical bottom row — KEYMAP Row >= 5 (modifier/space row
+        // plus the arrow cluster at row 6), the keys nearest the strip. Mirror
+        // semantics (strip coincident with the bottom row) beat an appended virtual
+        // row: most effects are per-key painters that would never paint an extra row,
+        // and the physical gap is far under one key pitch, so an appended row would
+        // exaggerate the reactive-effect lag.
+        public static bool SampleBottomRowAverage(byte[] frame512, out byte r, out byte g, out byte b)
+        {
+            int rs = 0, gs = 0, bs = 0, n = 0;
+            for (int i = 0; i < KeyMap.Length; i++)
+            {
+                if (KeyMap[i].Row < 5)
+                    continue;
+                int off = KeyMap[i].Offset;
+                rs += frame512[off];
+                gs += frame512[off + 1];
+                bs += frame512[off + 2];
+                n++;
+            }
+            if (n == 0)
+            {
+                r = g = b = 0;
+                return false;
+            }
+            r = (byte)(rs / n);
+            g = (byte)(gs / n);
+            b = (byte)(bs / n);
+            return true;
+        }
+
         // ---- Precomputed geometry (get_key_x/get_y, effect_visual_row) ---------
         private static readonly double[] KeyX = ComputeKeyX();
         private static readonly double[] KeyY = ComputeKeyY();

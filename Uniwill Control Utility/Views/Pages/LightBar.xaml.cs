@@ -30,6 +30,13 @@ namespace Uniwill_Control_Utility.Views.Pages
         };
         private bool _pendingApply;
 
+        // BetterRGB light bar sync: while the streamer runs with the sync flag on,
+        // it owns the strip (bottom-row mirror) and this page's applies are
+        // suppressed. The flag is cached from disk on Page_Loaded — changing it
+        // requires visiting the Keyboard page anyway; the running check is a cheap
+        // field read evaluated live.
+        private bool _syncFlagCached;
+
         // Supported effects for the light bar (zone 2).
         // Each entry: (display name, effect byte, requires speed, color count)
         // colorCount=0 means no color control (fixed palette, e.g. Wave)
@@ -43,6 +50,24 @@ namespace Uniwill_Control_Utility.Views.Pages
             ("Marquee",   0x05, true,  0),   // Fixed palette — no color control
             ("Meteor",    0x06, true,  1),
         };
+
+        /// <summary>
+        /// Whether the BetterRGB streamer currently owns the strip (engine running
+        /// with the sync flag on). The streamer only runs while the BetterRGB engine
+        /// is active, so IsRunning alone implies the engine check.
+        /// </summary>
+        private bool IsBetterRgbSyncActive()
+        {
+            if (!_syncFlagCached)
+                return false;
+            var streamer = App.GetService<BetterRgbStreamService>();
+            return streamer != null && streamer.IsRunning;
+        }
+
+        private void UpdateSyncCaption()
+        {
+            SyncCaptionBlock.Visibility = IsBetterRgbSyncActive() ? Visibility.Visible : Visibility.Collapsed;
+        }
 
         public LightBar()
         {
@@ -131,6 +156,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 ApplyOverrideState(true);
             }
 
+            // Cache the BetterRGB sync flag (changing it requires the Keyboard page,
+            // so a disk read here is enough) and reflect ownership in the caption.
+            _syncFlagCached = KeyboardSettingsService.Load().BetterRgbLightBarSync;
+            UpdateSyncCaption();
+
             // Load saved settings from disk
             bool enabled = Settings.Default.LightBarEnabled;
             byte r = Settings.Default.LightBarR;
@@ -157,10 +187,12 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Apply saved settings to HID on first load. Suppressed when the auto-power
             // option is enabled and the laptop is currently unplugged — the lights must
-            // stay off on battery (MainWindow's auto-power policy owns the suppression).
+            // stay off on battery (MainWindow's auto-power policy owns the suppression)
+            // — and while BetterRGB sync owns the strip (the streamer pushes the
+            // bottom-row mirror instead; it restores these settings when sync stops).
             bool unpluggedNow = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
                 == System.Windows.Forms.PowerLineStatus.Offline;
-            if (enabled && _hidService != null && !(autoPower && unpluggedNow))
+            if (enabled && _hidService != null && !(autoPower && unpluggedNow) && !IsBetterRgbSyncActive())
             {
                 _ = Task.Run(() =>
                 {
@@ -192,6 +224,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             _applyDebounce.Tick += (s, e) =>
             {
+                // Keep the sync caption live while the page is open (cheap: cached
+                // flag + the streamer's IsRunning field read, no disk I/O).
+                UpdateSyncCaption();
                 if (_pendingApply)
                 {
                     _pendingApply = false;
@@ -216,6 +251,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 try
                 {
                     Thread.Sleep(50);
+                    if (IsBetterRgbSyncActive())
+                    {
+                        Debug.WriteLine($"[LB] Power toggled (saved only): isOn={isOn}, sync owns strip");
+                        return;
+                    }
                     if (isOn)
                     {
                         _hidService?.LightBarTurnOn(color.R, color.G, color.B, brightness);
@@ -261,6 +301,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 try
                 {
                     Thread.Sleep(50);
+                    if (IsBetterRgbSyncActive())
+                    {
+                        Debug.WriteLine($"[LB] Auto-power toggled (saved only): effectiveOn={effectiveOn}, sync owns strip");
+                        return;
+                    }
                     if (effectiveOn)
                     {
                         _hidService?.LightBarTurnOn(color.R, color.G, color.B, brightness);
@@ -338,6 +383,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 try
                 {
                     Thread.Sleep(50);
+                    if (IsBetterRgbSyncActive())
+                        return; // sync owns the strip; the saved edit lands on disk only
                     if (isOn)
                     {
                         _hidService?.LightBarSetColor(color.R, color.G, color.B, brightness);

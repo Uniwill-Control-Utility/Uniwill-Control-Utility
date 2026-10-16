@@ -610,6 +610,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             BrightnessPercentRow.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
             FpsRow.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
             FpsSeparator.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            LightBarSyncRow.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            SyncSeparator.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
 
             BrightnessRow.Visibility = visible ? Visibility.Collapsed : Visibility.Visible;
             BrightnessSlider.IsEnabled = !visible;
@@ -830,6 +832,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             SetDirStyle(btnFps30, isActive(30));
             SetDirStyle(btnFps45, isActive(45));
             SetDirStyle(btnFps60, isActive(60));
+        }
+
+        /// <summary>Light bar sync toggle: routes through the debounce so the
+        /// streamer's parameter snapshot picks the flag up live (SetParams).</summary>
+        private void TsBetterRgbLightBarSync_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isFirstLoad) return;
+            MarkBetterRgbChanged();
         }
 
         private void BcSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1984,6 +1994,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             var savedFps = Math.Clamp(settings.BetterRgbFps, 15, 60);
             _brFps = Math.Clamp((int)Math.Round(savedFps / 15.0) * 15, 15, 60);
             UpdateFpsButtons();
+            if (tsBetterRgbLightBarSync != null)
+                tsBetterRgbLightBarSync.IsChecked = settings.BetterRgbLightBarSync;
             BcSpeedSlider.Value = Math.Clamp(settings.BetterRgbBreathSpeed, 1, 40);
             BcSpeedValueText.Text = Math.Clamp(settings.BetterRgbBreathSpeed, 1, 40).ToString();
             BcSmoothSlider.Value = Math.Clamp(settings.BetterRgbBreathSmooth, 2, 150);
@@ -2161,6 +2173,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 BetterRgbMode = cmbBetterRgbEffect.SelectedItem is BetterRgbEffect brMode
                     ? brMode : BetterRgbEffect.Breathing,
                 BetterRgbFps = _brFps,
+                BetterRgbLightBarSync = tsBetterRgbLightBarSync?.IsChecked == true,
                 BetterRgbBreathSpeed = Math.Clamp((int)BcSpeedSlider.Value, 1, 40),
                 BetterRgbBreathSmooth = Math.Clamp((int)BcSmoothSlider.Value, 2, 150),
                 BetterRgbBreathRandom = tsBcRandom.IsChecked == true,

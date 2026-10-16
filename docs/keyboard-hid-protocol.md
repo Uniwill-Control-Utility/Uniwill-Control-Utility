@@ -495,7 +495,16 @@ can push a replacement effect.
 
 ### One live consumer rule
 
-While streaming, `BetterRgbStreamService` owns the **only** keyboard-zone HID consumer. The Keyboard page and `DeviceApplier` never send keyboard-zone reports while `IsRunning` — concurrent traffic would corrupt the announce→`WriteFile` row pairing. Param changes route through `SetParams` (atomic snapshot swap). The light bar (usage page 2) is untouched.
+While streaming, `BetterRgbStreamService` owns the **only** keyboard-zone HID consumer. The Keyboard page and `DeviceApplier` never send keyboard-zone reports while `IsRunning` — concurrent traffic would corrupt the announce→`WriteFile` row pairing. Param changes route through `SetParams` (atomic snapshot swap). The light bar (usage page 2) is a separate HID collection, so it can be driven concurrently — see Light Bar Sync below.
+
+### Light bar sync (bottom-row mirror)
+
+The front strip is a **single HID zone** (zone 2, mask `0x22`) with no slots in the 512-byte RGB frame — the frame's KEYMAP covers only the 102 keyboard keys (the reference's "Touch Bar" paints `KEYMAP[0..19]`, the Esc/F-row, not the front strip). So sync cannot stream strip pixels; it **derives** the strip color from the rendered keyboard frame:
+
+- **Sample**: `BetterRgbFrameRenderer.SampleBottomRowAverage` averages the RGB triples of the KEYMAP entries with `Row >= 5` — the physical bottom row (modifier/space row 5 + the arrow cluster at row 6), the keys nearest the front edge. Mirror semantics (strip coincident with the bottom row) beat an appended virtual row: most effects are per-key painters that would never paint an extra row, and the physical gap is far under one key pitch, so an appended row would exaggerate the reactive-effect lag.
+- **Push**: `CMD_SET_COLOR` zone 2 via the streamer's own light-bar handle (usage-2 collection, opened in `KeyboardHidService.Open()`), throttled to 10 Hz (`LightBarSyncIntervalMs=100`). Firmware brightness stays 100 — the sampled color already carries the engine's `BrightnessPercent` multiplier (`ApplyBrightness` runs before the sample).
+- **Ownership**: the Light Bar page suppresses its own applies while `IsBetterRgbSyncActive()` (cached sync flag + streamer `IsRunning`); its settings stay saved-on-disk. When sync stops (engine stop, sync toggle off, watchdog/AC fallback), `RestoreLightBar` pushes the user's saved Light Bar settings (or off, honoring the auto-power-on-battery policy and the idle-off reason). Reasons where another owner takes over immediately (sleep/wake/display-switch, adaptive-override, auto-power-battery) skip the restore.
+- **Persisted** as `KeyboardSettings.BetterRgbLightBarSync` (default off), surfaced as the `LightBarSyncRow` toggle on the BetterRGB card; the flag rides the `BetterRgbParams` snapshot so `SetParams` flips it live.
 
 ### OpenRevo concept mapping
 

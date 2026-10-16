@@ -83,6 +83,14 @@ namespace Uniwill_Control_Utility.Models
         /// <summary>Streamer FPS target 15-60 (reference TARGET_FPS_DEFAULT 30).</summary>
         public int BetterRgbFps { get; set; } = 30;
 
+        /// <summary>
+        /// Light bar sync: while the BetterRGB engine streams, the front light bar
+        /// (single HID zone 2, no slots in the 512-byte RGB frame) mirrors the
+        /// rendered frame's bottom row — SampleBottomRowAverage per tick, pushed as
+        /// CMD_SET_COLOR. Default off.
+        /// </summary>
+        public bool BetterRgbLightBarSync { get; set; } = false;
+
         /// <summary>Breathing "Speed:" slider 1-40, default 12 (g_breathSpeed).</summary>
         public int BetterRgbBreathSpeed { get; set; } = 12;
 

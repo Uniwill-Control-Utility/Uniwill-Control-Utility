@@ -593,6 +593,32 @@
                                         </StackPanel>
                                     </Grid>
 
+                                    <!-- Global: light bar sync — the front strip (single
+                                         HID zone 2) mirrors the rendered frame's bottom
+                                         row while the engine streams (SampleBottomRowAverage
+                                         pushed as CMD_SET_COLOR at 10 Hz) -->
+                                    <Border x:Name="SyncSeparator" Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                        Visibility="Collapsed" />
+                                    <Grid x:Name="LightBarSyncRow"
+                                        Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <ui:TextBlock FontTypography="Body" Text="Light bar sync" />
+                                            <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Mirror the bottom row onto the front light bar while the engine streams"
+                                               TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ui:ToggleSwitch x:Name="tsBetterRgbLightBarSync" Grid.Column="1" LabelPosition="Left"
+                                            OnContent="On" OffContent="Off"
+                                            Checked="TsBetterRgbLightBarSync_Toggled" Unchecked="TsBetterRgbLightBarSync_Toggled" />
+                                    </Grid>
+
                                     <!-- Per-effect controls follow; only the selected
                                          effect's rows are shown (UpdateBetterRgbEffectUi) -->
                                     <Border x:Name="BetterRgbEffectSeparator" Height="1" Margin="-58,12,-46,12"
