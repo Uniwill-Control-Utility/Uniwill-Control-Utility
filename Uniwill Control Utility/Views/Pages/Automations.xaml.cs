@@ -122,6 +122,16 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         #endregion
 
+        /// <summary>
+        /// Prevents the CardExpander's ToggleButton from intercepting clicks on ComboBoxes
+        /// nested inside its content. Uses the bubbling MouseLeftButtonDown so the ComboBox
+        /// processes the click first, then we block it from reaching the ToggleButton above.
+        /// </summary>
+        private void ComboBoxInCardExpander_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+        }
+
         #region Selection Changed Handlers
 
         private void cbxCharge_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -337,8 +347,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             Visibility visibility = isHybrid ? Visibility.Visible : Visibility.Collapsed;
-            CardGpuPowerSavingBattery.Visibility = visibility;
-            CardGpuPowerSavingPluggedIn.Visibility = visibility;
+            SeparatorGpuBattery.Visibility = visibility;
+            RowGpuPowerSavingBattery.Visibility = visibility;
+            SeparatorGpuPluggedIn.Visibility = visibility;
+            RowGpuPowerSavingPluggedIn.Visibility = visibility;
         }
 
         private void cbxGpuPowerSavingBattery_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -431,8 +443,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         // which display is in use (an external monitor never affects them).
         private void UpdateRefreshRateVisibility()
         {
-            CardRefreshRateBattery.Visibility = Visibility.Visible;
-            CardRefreshRatePluggedIn.Visibility = Visibility.Visible;
+            SeparatorRefreshRateBattery.Visibility = Visibility.Visible;
+            RowRefreshRateBattery.Visibility = Visibility.Visible;
+            SeparatorRefreshRatePluggedIn.Visibility = Visibility.Visible;
+            RowRefreshRatePluggedIn.Visibility = Visibility.Visible;
         }
 
         private static int SelectedRefreshRateHz(ComboBox comboBox)

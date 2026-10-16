@@ -76,57 +76,33 @@
                 <!-- Row 1: Content cards -->
                 <StackPanel Grid.Row="1" Margin="12,0,16,16">
 
-                <!-- Preset on Battery Charge -->
-                <ui:CardControl Margin="0,0,0,8">
-                    <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEBB5;" FontSize="20" Margin="4,0,6,0" />
-                    </ui:CardControl.Icon>
-                    <ui:CardControl.Header>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
-                                <ui:TextBlock FontTypography="Body" Text="Preset on Battery Charge" />
-                                <ui:TextBlock Margin="0,2,0,0"
-                                           FontTypography="Caption"
-                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                           Text="Apply a preset whenever the battery begins charging"
-                                           TextWrapping="Wrap" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <ComboBox x:Name="cbxCharge"
-                                          MinWidth="150"
-                                          Height="37"
-                                          SelectedIndex="0"
-                                          SelectionChanged="cbxCharge_SelectionChanged" />
-                                <ui:Button x:Name="btnChargeLoad"
-                                           Width="44"
-                                           Height="37"
-                                           Margin="8,0,0,0"
-                                           ToolTip="Refresh the preset list"
-                                           Click="btnChargeLoad_Click">
-                                    <ui:SymbolIcon Symbol="ArrowSync20" FontSize="20" />
-                                </ui:Button>
-                            </StackPanel>
-                        </Grid>
-                    </ui:CardControl.Header>
-                </ui:CardControl>
-
-                <!-- Preset on Battery Discharge -->
-                <ui:CardControl Margin="0,0,0,8">
-                    <ui:CardControl.Icon>
+                <!-- When Charger Unplugged — every automation that fires as the laptop switches to battery power -->
+                <ui:CardExpander x:Name="ExpanderChargerUnplugged"
+                                 Margin="0,0,0,8"
+                                 IsExpanded="True">
+                    <ui:CardExpander.Icon>
                             <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xECBC;" FontSize="20" Margin="4,0,6,0" />
-                    </ui:CardControl.Icon>
-                    <ui:CardControl.Header>
+                    </ui:CardExpander.Icon>
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <ui:TextBlock FontTypography="Body" Text="When Charger Unplugged" />
+                            <ui:TextBlock Margin="0,2,0,0"
+                                       FontTypography="Caption"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       Text="Presets and settings applied when the system switches to battery power"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+
+                        <!-- Preset on Battery Discharge -->
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
-                                <ui:TextBlock FontTypography="Body" Text="Preset on Battery Discharge" />
+                            <StackPanel Grid.Column="0" Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="Preset" />
                                 <ui:TextBlock Margin="0,2,0,0"
                                            FontTypography="Caption"
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
@@ -138,7 +114,8 @@
                                           MinWidth="150"
                                           Height="37"
                                           SelectedIndex="0"
-                                          SelectionChanged="cbxDischarge_SelectionChanged" />
+                                          SelectionChanged="cbxDischarge_SelectionChanged"
+                                          MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown" />
                                 <ui:Button x:Name="btnDischargeLoad"
                                            Width="44"
                                            Height="37"
@@ -149,62 +126,19 @@
                                 </ui:Button>
                             </StackPanel>
                         </Grid>
-                    </ui:CardControl.Header>
-                </ui:CardControl>
 
-                <!-- Preset on System Resume -->
-                <ui:CardControl Margin="0,0,0,8">
-                    <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF83D;" FontSize="20" Margin="4,0,6,0" />
-                    </ui:CardControl.Icon>
-                    <ui:CardControl.Header>
-                        <Grid>
+                        <!-- Divider (hidden while the GPU row below is hidden) -->
+                        <Border x:Name="SeparatorGpuBattery" Height="1" Margin="-58,12,-46,12"
+                                Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                        <!-- GPU Preference on Battery — only visible in Hybrid mode -->
+                        <Grid x:Name="RowGpuPowerSavingBattery" Visibility="Collapsed">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
-                                <ui:TextBlock FontTypography="Body" Text="Preset on System Resume" />
-                                <ui:TextBlock Margin="0,2,0,0"
-                                           FontTypography="Caption"
-                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                           Text="Apply a preset after the system resumes from sleep or hibernation"
-                                           TextWrapping="Wrap" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <ComboBox x:Name="cbxResume"
-                                          MinWidth="150"
-                                          Height="37"
-                                          SelectedIndex="0"
-                                          SelectionChanged="cbxResume_SelectionChanged" />
-                                <ui:Button x:Name="btnResumeLoad"
-                                           Width="44"
-                                           Height="37"
-                                           Margin="8,0,0,0"
-                                           ToolTip="Refresh the preset list"
-                                           Click="btnResume_Click">
-                                    <ui:SymbolIcon Symbol="ArrowSync20" FontSize="20" />
-                                </ui:Button>
-                            </StackPanel>
-                        </Grid>
-                    </ui:CardControl.Header>
-                </ui:CardControl>
-
-                <!-- GPU Preference on Battery — only visible in Hybrid mode -->
-                <ui:CardControl x:Name="CardGpuPowerSavingBattery"
-                                Margin="0,0,0,8"
-                                Visibility="Collapsed">
-                    <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xECBF;" FontSize="20" Margin="4,0,6,0" />
-                    </ui:CardControl.Icon>
-                    <ui:CardControl.Header>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
-                                <ui:TextBlock FontTypography="Body" Text="GPU Preference on Battery" />
+                            <StackPanel Grid.Column="0" Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="GPU Preference" />
                                 <ui:TextBlock Margin="0,2,0,0"
                                            FontTypography="Caption"
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
@@ -216,26 +150,102 @@
                                       MinWidth="150"
                                       Height="37"
                                       SelectedIndex="0"
-                                      SelectionChanged="cbxGpuPowerSavingBattery_SelectionChanged" />
+                                      SelectionChanged="cbxGpuPowerSavingBattery_SelectionChanged"
+                                      MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown" />
                         </Grid>
-                    </ui:CardControl.Header>
-                </ui:CardControl>
 
-                <!-- GPU Preference when Plugged In — only visible in Hybrid mode -->
-                <ui:CardControl x:Name="CardGpuPowerSavingPluggedIn"
-                                Margin="0,0,0,8"
-                                Visibility="Collapsed">
-                    <ui:CardControl.Icon>
+                        <!-- Divider (hidden while the refresh-rate row below is hidden) -->
+                        <Border x:Name="SeparatorRefreshRateBattery" Height="1" Margin="-58,12,-46,12"
+                                Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                        <!-- Internal-panel refresh rate on battery (hidden when the panel offers one rate) -->
+                        <Grid x:Name="RowRefreshRateBattery">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="Refresh Rate" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Set the internal panel's refresh rate when running on battery power"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ComboBox x:Name="cbxRefreshRateBattery"
+                                      Grid.Column="1"
+                                      MinWidth="150"
+                                      Height="37"
+                                      SelectionChanged="cbxRefreshRateBattery_SelectionChanged"
+                                      MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown" />
+                        </Grid>
+
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- When Charger Gets Plugged Back In — every automation that fires as the charger is connected -->
+                <ui:CardExpander x:Name="ExpanderChargerPluggedIn"
+                                 Margin="0,0,0,8"
+                                 IsExpanded="True">
+                    <ui:CardExpander.Icon>
                             <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE95F;" FontSize="20" Margin="4,0,6,0" />
-                    </ui:CardControl.Icon>
-                    <ui:CardControl.Header>
+                    </ui:CardExpander.Icon>
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <ui:TextBlock FontTypography="Body" Text="When Charger Gets Plugged Back In" />
+                            <ui:TextBlock Margin="0,2,0,0"
+                                       FontTypography="Caption"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       Text="Presets and settings applied when the system connects to power"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+
+                        <!-- Preset on Battery Charge -->
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
-                                <ui:TextBlock FontTypography="Body" Text="GPU Preference when Plugged In" />
+                            <StackPanel Grid.Column="0" Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="Preset" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Apply a preset whenever the battery begins charging"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <ComboBox x:Name="cbxCharge"
+                                          MinWidth="150"
+                                          Height="37"
+                                          SelectedIndex="0"
+                                          SelectionChanged="cbxCharge_SelectionChanged"
+                                          MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown" />
+                                <ui:Button x:Name="btnChargeLoad"
+                                           Width="44"
+                                           Height="37"
+                                           Margin="8,0,0,0"
+                                           ToolTip="Refresh the preset list"
+                                           Click="btnChargeLoad_Click">
+                                    <ui:SymbolIcon Symbol="ArrowSync20" FontSize="20" />
+                                </ui:Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Divider (hidden while the GPU row below is hidden) -->
+                        <Border x:Name="SeparatorGpuPluggedIn" Height="1" Margin="-58,12,-46,12"
+                                Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                        <!-- GPU Preference when Plugged In — only visible in Hybrid mode -->
+                        <Grid x:Name="RowGpuPowerSavingPluggedIn" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="GPU Preference" />
                                 <ui:TextBlock Margin="0,2,0,0"
                                            FontTypography="Caption"
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
@@ -247,56 +257,22 @@
                                       MinWidth="150"
                                       Height="37"
                                       SelectedIndex="0"
-                                      SelectionChanged="cbxGpuPowerSavingPluggedIn_SelectionChanged" />
+                                      SelectionChanged="cbxGpuPowerSavingPluggedIn_SelectionChanged"
+                                      MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown" />
                         </Grid>
-                    </ui:CardControl.Header>
-                </ui:CardControl>
 
-                <!-- Internal-panel refresh rate on battery (hidden when the panel offers one rate) -->
-                <ui:CardControl x:Name="CardRefreshRateBattery"
-                                Margin="0,0,0,8"
-                                Visibility="Collapsed">
-                    <ui:CardControl.Icon>
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE717;" FontSize="20" Margin="4,0,6,0" />
-                    </ui:CardControl.Icon>
-                    <ui:CardControl.Header>
-                        <Grid>
+                        <!-- Divider (hidden while the refresh-rate row below is hidden) -->
+                        <Border x:Name="SeparatorRefreshRatePluggedIn" Height="1" Margin="-58,12,-46,12"
+                                Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                        <!-- Internal-panel refresh rate when plugged in -->
+                        <Grid x:Name="RowRefreshRatePluggedIn">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
-                                <ui:TextBlock FontTypography="Body" Text="Refresh Rate on Battery" />
-                                <ui:TextBlock Margin="0,2,0,0"
-                                           FontTypography="Caption"
-                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                           Text="Set the internal panel's refresh rate when running on battery power"
-                                           TextWrapping="Wrap" />
-                            </StackPanel>
-                            <ComboBox x:Name="cbxRefreshRateBattery"
-                                      Grid.Column="1"
-                                      MinWidth="150"
-                                      Height="37"
-                                      SelectionChanged="cbxRefreshRateBattery_SelectionChanged" />
-                        </Grid>
-                    </ui:CardControl.Header>
-                </ui:CardControl>
-
-                <!-- Internal-panel refresh rate when plugged in -->
-                <ui:CardControl x:Name="CardRefreshRatePluggedIn"
-                                Margin="0,0,0,8"
-                                Visibility="Collapsed">
-                    <ui:CardControl.Icon>
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE95F;" FontSize="20" Margin="4,0,6,0" />
-                    </ui:CardControl.Icon>
-                    <ui:CardControl.Header>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
-                                <ui:TextBlock FontTypography="Body" Text="Refresh Rate when Plugged In" />
+                            <StackPanel Grid.Column="0" Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="Refresh Rate" />
                                 <ui:TextBlock Margin="0,2,0,0"
                                            FontTypography="Caption"
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
@@ -307,10 +283,66 @@
                                       Grid.Column="1"
                                       MinWidth="150"
                                       Height="37"
-                                      SelectionChanged="cbxRefreshRatePluggedIn_SelectionChanged" />
+                                      SelectionChanged="cbxRefreshRatePluggedIn_SelectionChanged"
+                                      MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown" />
                         </Grid>
-                    </ui:CardControl.Header>
-                </ui:CardControl>
+
+                    </StackPanel>
+                </ui:CardExpander>
+
+                <!-- System Resume — every automation that fires as the system resumes from sleep/hibernation -->
+                <ui:CardExpander x:Name="ExpanderSystemResume"
+                                 Margin="0,0,0,8"
+                                 IsExpanded="True">
+                    <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xF83D;" FontSize="20" Margin="4,0,6,0" />
+                    </ui:CardExpander.Icon>
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <ui:TextBlock FontTypography="Body" Text="System Resume" />
+                            <ui:TextBlock Margin="0,2,0,0"
+                                       FontTypography="Caption"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       Text="Presets and settings applied after the system resumes from sleep or hibernation"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+
+                        <!-- Preset on System Resume -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="Preset" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Apply a preset after the system resumes from sleep or hibernation"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <ComboBox x:Name="cbxResume"
+                                          MinWidth="150"
+                                          Height="37"
+                                          SelectedIndex="0"
+                                          SelectionChanged="cbxResume_SelectionChanged"
+                                          MouseLeftButtonDown="ComboBoxInCardExpander_MouseLeftButtonDown" />
+                                <ui:Button x:Name="btnResumeLoad"
+                                           Width="44"
+                                           Height="37"
+                                           Margin="8,0,0,0"
+                                           ToolTip="Refresh the preset list"
+                                           Click="btnResume_Click">
+                                    <ui:SymbolIcon Symbol="ArrowSync20" FontSize="20" />
+                                </ui:Button>
+                            </StackPanel>
+                        </Grid>
+
+                    </StackPanel>
+                </ui:CardExpander>
 
                 </StackPanel>
             </Grid>
