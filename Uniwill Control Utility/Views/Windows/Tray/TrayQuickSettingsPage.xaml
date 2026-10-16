@@ -346,7 +346,7 @@
                           Width="95"
                           Height="46"
                           Style="{StaticResource QuickToggleStyle}"
-                          Tag="Watercooler"
+                          Tag="HydroUI"
                           ContextMenu="{StaticResource NavigateContextMenu}"
                           Click="BtnHydroSmartMode_Click">
                 <iconPacks:PackIconLucide
@@ -376,7 +376,7 @@
                           Width="95"
                           Height="46"
                           Style="{StaticResource QuickToggleStyle}"
-                          Tag="Watercooler"
+                          Tag="HydroUI"
                           ContextMenu="{StaticResource NavigateContextMenu}"
                           Click="BtnHydroRgb_Click">
                 <ui:FontIcon FontFamily="Segoe Fluent Icons"
