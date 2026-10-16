@@ -826,7 +826,8 @@ namespace Uniwill_Control_Utility.Services
                 settings.BetterRgbMode = ParseBetterRgbEffect(cfg.Mode);
                 settings.BetterRgbFps = Math.Clamp((int)Math.Round(Math.Clamp(cfg.Fps, 15, 60) / 15.0) * 15, 15, 60);
                 settings.TargetFps = settings.BetterRgbFps;
-                settings.BrightnessPercent = Math.Clamp(cfg.BrightnessPercent, 2, 100);
+                settings.BrightnessPercent = Math.Clamp(cfg.BrightnessPercent, 3, 100);
+                settings.BetterRgbLightBarSync = cfg.LightBarSync;
 
                 // Per-effect parameters — clamps mirror the Keyboard page's SaveSettings.
                 settings.BetterRgbBreathSpeed = Math.Clamp(cfg.BreathSpeed, 1, 5);

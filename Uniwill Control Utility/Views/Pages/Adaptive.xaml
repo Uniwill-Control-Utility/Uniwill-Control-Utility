@@ -1675,8 +1675,25 @@
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                         <TextBlock Name="tbKbBrBrightnessValue" Width="30" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,0,8,0" Text="100" />
-                                        <Slider Name="sdKbBrBrightness" Width="140" Maximum="100" Minimum="2" TickFrequency="25" TickPlacement="Both" IsSnapToTickEnabled="False" Value="100" IsMoveToPointEnabled="False" ValueChanged="sdKbBrBrightness_ValueChanged" />
+                                        <Slider Name="sdKbBrBrightness" Width="140" Maximum="100" Minimum="3" TickFrequency="25" TickPlacement="Both" IsSnapToTickEnabled="False" Value="100" IsMoveToPointEnabled="False" ValueChanged="sdKbBrBrightness_ValueChanged" />
                                     </StackPanel>
+                                </Grid>
+
+                                <!-- Divider before Light Bar Sync -->
+                                <Border Name="sepKbBrLbSync" Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                                <!-- Light Bar Sync: streamer mirrors the frame onto the front strip -->
+                                <Grid Name="BrLbSyncRow">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Light Bar Sync" />
+                                        <ui:TextBlock Margin="0,2,0,0" FontTypography="Caption"
+                                                      Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                      Text="Mirror the streamed keyboard frame onto the front light bar; the Light Bar card is hidden while on" />
+                                    </StackPanel>
+                                    <ui:ToggleSwitch Name="AdpTsKbBrLbSync" Grid.Column="1" LabelPosition="Left"
+                                                     OnContent="On" OffContent="Off"
+                                                     Checked="AdpTsKbBrLbSync_Toggled" Unchecked="AdpTsKbBrLbSync_Toggled" />
                                 </Grid>
 
                                 <!-- Per-effect controls: only the selected effect's rows show -->
@@ -2125,7 +2142,7 @@
                                                Text="100" />
                                     <Slider x:Name="AdpLbBrightnessSlider"
                                             Width="140"
-                                            Minimum="0"
+                                            Minimum="10"
                                             Maximum="100"
                                             Value="100"
                                             TickFrequency="10"

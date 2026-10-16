@@ -54,6 +54,7 @@ namespace Uniwill_Control_Utility.Services
             bool adaptiveWaterCoolerEnabled,
             bool adaptiveKeyboardEnabled,
             bool adaptiveLightBarEnabled,
+            bool lightBarSyncActive,
             bool adaptiveFlydigiEnabled,
             bool hasMiniLedPanel,
             bool flydigiDeviceAvailable,
@@ -85,7 +86,7 @@ namespace Uniwill_Control_Utility.Services
                 DisableHydroSmartMode: adaptiveWaterCoolerEnabled,
                 DisableHydroRgb: adaptiveWaterCoolerEnabled,
                 DisableKeyboardBacklight: adaptiveKeyboardEnabled,
-                DisableLightBar: adaptiveLightBarEnabled,
+                DisableLightBar: adaptiveLightBarEnabled || lightBarSyncActive,
                 DisableFlydigiRgb: adaptiveFlydigiEnabled);
         }
     }

@@ -18,6 +18,7 @@ public sealed class TrayQuickControlPolicyTests
             adaptiveWaterCoolerEnabled: false,
             adaptiveKeyboardEnabled: false,
             adaptiveLightBarEnabled: false,
+            lightBarSyncActive: false,
             adaptiveFlydigiEnabled: false,
             hasMiniLedPanel: false,
             flydigiDeviceAvailable: false,
@@ -46,6 +47,7 @@ public sealed class TrayQuickControlPolicyTests
             adaptiveWaterCoolerEnabled: true,
             adaptiveKeyboardEnabled: false,
             adaptiveLightBarEnabled: false,
+            lightBarSyncActive: false,
             adaptiveFlydigiEnabled: false,
             hasMiniLedPanel: false,
             flydigiDeviceAvailable: false,
@@ -61,5 +63,29 @@ public sealed class TrayQuickControlPolicyTests
         Assert.True(policy.TgpEnabled);
         Assert.True(policy.LocalDimmingEnabled);
         Assert.False(policy.HydroEnabled);
+    }
+
+    [Fact]
+    public void Create_DisablesLightBarWhileBetterRgbLightBarSyncOwnsTheStrip()
+    {
+        var policy = TrayQuickControlPolicy.Create(
+            hasNvidiaGpu: true,
+            hasSupportedWaterCooler: false,
+            waterCoolerConnected: false,
+            adaptiveCpuEnabled: false,
+            adaptiveGpuEnabled: false,
+            adaptiveFanEnabled: false,
+            adaptiveWaterCoolerEnabled: false,
+            adaptiveKeyboardEnabled: false,
+            adaptiveLightBarEnabled: false,
+            lightBarSyncActive: true,
+            adaptiveFlydigiEnabled: false,
+            hasMiniLedPanel: false,
+            flydigiDeviceAvailable: false,
+            flydigiEnabled: false,
+            refreshRateSwitchable: false,
+            features: new FeatureNavigationPreferences(false, false, false, false, false));
+
+        Assert.True(policy.DisableLightBar);
     }
 }

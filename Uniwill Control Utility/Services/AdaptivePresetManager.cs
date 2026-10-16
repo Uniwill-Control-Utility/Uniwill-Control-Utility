@@ -138,7 +138,8 @@ namespace Uniwill_Control_Utility.Services
         public bool Enabled { get; set; } = false;
         public string Mode { get; set; } = "Breathing";       // display name (Keyboard page list)
         public int Fps { get; set; } = 30;                    // 15-60
-        public int BrightnessPercent { get; set; } = 100;     // software 2-100
+        public int BrightnessPercent { get; set; } = 100;     // software 3-100
+        public bool LightBarSync { get; set; } = false;   // strip mirrors the streamed frame
 
         // Breathing
         public int BreathSpeed { get; set; } = 5;            // 1-5

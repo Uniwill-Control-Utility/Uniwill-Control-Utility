@@ -825,9 +825,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 UpdateKbBetterRgbUi();
                 _kbBrFps = Math.Clamp((int)Math.Round(Math.Clamp(brCfg.Fps, 15, 60) / 15.0) * 15, 15, 60);
                 UpdateKbBrFpsButtons();
-                var brBright = Math.Clamp(brCfg.BrightnessPercent, 2, 100);
+                var brBright = Math.Clamp(brCfg.BrightnessPercent, 3, 100);
                 sdKbBrBrightness.Value = brBright;
                 tbKbBrBrightnessValue.Text = brBright.ToString();
+                AdpTsKbBrLbSync.IsChecked = brCfg.LightBarSync;
+                ApplyLbSyncGate();
 
                 // Button-selected values restore their highlight state.
                 _kbBrAngle = Math.Clamp(brCfg.WaveAngle, 0, 315);
@@ -994,8 +996,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 AdpTsLightBarPower.IsChecked = preset.LbPower;
                 AdpLbColorPicker.SelectedColor = Color.FromRgb(preset.LbColorR, preset.LbColorG, preset.LbColorB);
-                AdpLbBrightnessSlider.Value = Math.Clamp(preset.LbBrightness, 0, 100);
-                AdpLbBrightnessValueText.Text = Math.Clamp(preset.LbBrightness, 0, 100).ToString();
+                AdpLbBrightnessSlider.Value = Math.Clamp(preset.LbBrightness, 10, 100);
+                AdpLbBrightnessValueText.Text = Math.Clamp(preset.LbBrightness, 10, 100).ToString();
                 AdpLbEffect.SelectedIndex = Math.Clamp(preset.LbEffect, 0, 5);
                 AdpLbSpeedSlider.Value = Math.Clamp(preset.LbSpeed, 0, 11);
                 AdpLbSpeedValueText.Text = Math.Clamp(preset.LbSpeed, 0, 11).ToString();
@@ -3400,6 +3402,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Mode = GetKbBrEffectFromIndex(cbxKbBrEffect.SelectedIndex),
                 Fps = _kbBrFps,
                 BrightnessPercent = (int)sdKbBrBrightness.Value,
+                LightBarSync = AdpTsKbBrLbSync.IsChecked == true,
                 BreathSpeed = (int)sdKbBrBcSpeed.Value,
                 BreathSmooth = (int)sdKbBrBcSmooth.Value,
                 BreathRandom = tsKbBrBcRandom.IsChecked == true,
@@ -4064,6 +4067,41 @@ namespace Uniwill_Control_Utility.Views.Pages
                 AdpLbBrightnessValueText.Text = ((int)AdpLbBrightnessSlider.Value).ToString();
 
             ApplyLbOverrideImmediate();
+        }
+
+        /// <summary>
+        /// Light Bar Sync ownership gate: while the BetterRGB keyboard override
+        /// streams with sync, the streamer owns the front strip, so the per-game
+        /// Light Bar card is hidden and disabled (its controls would fight the
+        /// sync pushes). The card is restored when sync turns off.
+        /// </summary>
+        private bool _lbHiddenBySync;
+        private void ApplyLbSyncGate()
+        {
+            bool sync = AdpTsKbBrLbSync.IsChecked == true;
+            if (sync)
+            {
+                if (sdLightBar.Visibility == Visibility.Visible)
+                {
+                    _lbHiddenBySync = true;
+                    sdLightBar.Visibility = Visibility.Collapsed;
+                    sdLightBar.IsEnabled = false;
+                    // Release any active light bar override — the streamer owns the strip.
+                    _deviceApplier?.DisableLightBarOverride();
+                }
+            }
+            else if (_lbHiddenBySync)
+            {
+                sdLightBar.IsEnabled = true;
+                if (Settings.Default.EnableLightBarNavigation)
+                    sdLightBar.Visibility = Visibility.Visible;
+                _lbHiddenBySync = false;
+            }
+        }
+
+        private void AdpTsKbBrLbSync_Toggled(object sender, RoutedEventArgs e)
+        {
+            ApplyLbSyncGate();
         }
 
         private void AdpLbEffect_SelectionChanged(object sender, SelectionChangedEventArgs e)
