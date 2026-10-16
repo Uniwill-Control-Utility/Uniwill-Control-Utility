@@ -201,7 +201,13 @@ namespace Uniwill_Control_Utility.Services
 
                 var prm = _params ?? BuildSnapshot(KeyboardSettingsService.Load());
                 if (!prm.PowerOn)
+                {
+                    // Silent bail made "BetterRGB not starting" undebuggable: the keyboard
+                    // is saved OFF (tray/page power-off persists PowerOn=false), so startup
+                    // legitimately skips the stream — say so instead of vanishing.
+                    Log.Information("[BetterRGB] Keyboard power is saved OFF — streamer not started ({Reason})", reason);
                     return;
+                }
 
                 _starting = true;
                 _ = Task.Run(() =>
@@ -534,7 +540,7 @@ namespace Uniwill_Control_Utility.Services
             return new BetterRgbParams
             {
                 Frame = frame,
-                BrightnessPercent = Math.Clamp(settings.BrightnessPercent, 0, 100),
+                BrightnessPercent = Math.Clamp(settings.BrightnessPercent, 3, 100),
                 Fps = fps,
                 PowerOn = settings.PowerOn,
                 LightBarSync = settings.BetterRgbLightBarSync,
@@ -611,7 +617,11 @@ namespace Uniwill_Control_Utility.Services
                     }
 
                     if (hid == null)
+                    {
+                        Log.Warning("[BetterRGB] Start attempt {Attempt}/{Total}: HID open ladder exhausted, no handle ({Reason})",
+                            attempt, WatchdogAttempts, reason);
                         continue;
+                    }
 
                     // Reference transport gate: the RGB runtime mode lives only on the
                     // UsagePage 0xFF03 / MI_01 interface. No interface → no announce
@@ -627,7 +637,12 @@ namespace Uniwill_Control_Utility.Services
                     Thread.Sleep(FirmwareSettleMs);
 
                     if (!hid.EnterCustomModeC())
+                    {
+                        Log.Warning("[BetterRGB] Start attempt {Attempt}/{Total}: RGB runtime mode handshake (0x33/0x32) rejected on the 0xFF03/MI_01 interface ({Reason})",
+                            attempt, WatchdogAttempts, reason);
+                        hid.Dispose();
                         continue;
+                    }
 
                     // First frame must land before the engine counts as active. Retry on
                     // the SAME handle: re-entering UserMode (zone reset + clear + UserMode)
@@ -651,7 +666,12 @@ namespace Uniwill_Control_Utility.Services
                         }
                     }
                     if (!firstFrameOk)
+                    {
+                        Log.Warning("[BetterRGB] Start attempt {Attempt}/{Total}: first stream frame rejected on the 0xFF03/MI_01 interface ({Reason})",
+                            attempt, WatchdogAttempts, reason);
+                        hid.Dispose();
                         continue;
+                    }
 
                     lock (_engineLock)
                     {
