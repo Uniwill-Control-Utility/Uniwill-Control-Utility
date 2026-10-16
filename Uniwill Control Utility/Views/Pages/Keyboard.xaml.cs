@@ -26,6 +26,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private KeyboardSettings? _settings;
         private bool _isFirstLoad = true;
         private bool _isInitialized; // true after ApplySettings has synced UI from disk
+        private bool _pageSavingSettings; // page's own Save — suppress the external re-sync
         private KeyboardDirection _currentDirection = KeyboardDirection.LeftRight;
 
         // Static flag to prevent re-applying HID settings on every page navigation.
@@ -89,6 +90,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             var deviceApplier = App.GetService<DeviceApplier>();
             if (deviceApplier != null)
                 deviceApplier.KeyboardOverrideChanged += OnKeyboardOverrideChanged;
+
+            // Re-sync the power row when settings change externally (mini-tray
+            // Keyboard RGB toggle, Adaptive apply) so the visible page never shows
+            // a stale ON/OFF without re-navigation.
+            KeyboardSettingsService.SettingsChanged += OnKeyboardSettingsChangedExternally;
  
             // Show unavailable state initially; HID opens in background
             KeyboardAvailable.Visibility = Visibility.Collapsed;
@@ -146,6 +152,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             UpdateDirectionButtons();
             UpdateBetterRgbStatus();
             _isFirstLoad = false;
+
+            // Re-sync the UI controls from disk on EVERY navigation: the page instance
+            // persists across navigation (the constructor's disk sync runs only once),
+            // so a tray/Adaptive change made while this page was hidden would otherwise
+            // show stale ON/OFF until the SettingsChanged event or a later navigation
+            // catches up. The override block below re-syncs from the preset when active.
+            SyncUiFromSettings();
 
             // Reconcile DeviceApplier override state with UI.
             // (Event subscription is in the constructor; Page_Loaded just syncs state.)
@@ -341,6 +354,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             var deviceApplier = App.GetService<DeviceApplier>();
             if (deviceApplier != null)
                 deviceApplier.KeyboardOverrideChanged -= OnKeyboardOverrideChanged;
+            KeyboardSettingsService.SettingsChanged -= OnKeyboardSettingsChangedExternally;
         }
 
         #region Idle Timer Chevron Hide
@@ -388,12 +402,8 @@ namespace Uniwill_Control_Utility.Views.Pages
        private void ModeToggle_Checked(object sender, RoutedEventArgs e)
         {
             bool isPerKey = ModeToggle.IsChecked == true;
-            EffectsContent.Visibility = isPerKey ? Visibility.Collapsed : Visibility.Visible;
-            PerKeyContent.Visibility = isPerKey ? Visibility.Visible : Visibility.Collapsed;
-
-            // The bottom bar is always visible; its content shifts with the mode.
-            PerKeyActionButtons.Visibility = isPerKey ? Visibility.Visible : Visibility.Collapsed;
-            PerKeyPickerPanel.Visibility = isPerKey ? Visibility.Visible : Visibility.Collapsed;
+            // Power + mode visibility (the power row is the single off switch).
+            ApplyPowerVisibility();
 
             // The BetterRGB engine is a global-effects feature: hidden while Per-Key
             // RGB owns the keyboard-zone consumer.
@@ -417,6 +427,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // handle while running — stop it before the per-key apply opens its
                 // own. The engine is also hidden/disabled in per-key mode.
                 App.GetService<BetterRgbStreamService>()?.StopEngine("mode-switch-per-key");
+                // Persist the mode switch FIRST: ApplyPerKeyColorsToHid routes on the
+                // SAVED engine, and until this save the disk still says BetterRGB —
+                // which sent the per-key apply back into the streamer instead of the
+                // firmware per-key path.
+                SaveSettings();
                 LoadPerKeyColors();
                 ApplyPerKeyColorsToHid();
             }
@@ -610,8 +625,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             BrightnessPercentRow.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
             FpsRow.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
             FpsSeparator.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-            LightBarSyncRow.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-            SyncSeparator.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            // Light Bar Sync is a dedicated top-level row now (below the engine toggle).
+            LightBarSyncCard.Visibility = visible && tsKeyboardPower.IsChecked == true
+                ? Visibility.Visible : Visibility.Collapsed;
 
             BrightnessRow.Visibility = visible ? Visibility.Collapsed : Visibility.Visible;
             BrightnessSlider.IsEnabled = !visible;
@@ -1068,7 +1084,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// Streamer brightness 0-100 — OpenRevo/BetterRGB's g_brightness slider
         /// range (continuous integers), not the firmware 1-7 levels.
         /// </summary>
-        private int CurrentBrightnessPercent() => Math.Clamp((int)BrightnessPercentSlider.Value, 0, 100);
+        private int CurrentBrightnessPercent() => Math.Clamp((int)BrightnessPercentSlider.Value, 3, 100);
 
         private void BrightnessPercentSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
@@ -1384,6 +1400,41 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 _pendingApply = true;
             }
+
+            ApplyPowerVisibility();
+        }
+
+        /// <summary>
+        /// Power-off collapses the whole page to just the power row: the mode/engine
+        /// cards, idle timer, auto-power row, effects content, per-key content and the
+        /// bottom bar are all hidden while the keyboard is off. Restoring re-lays out
+        /// by the current mode. The mini-tray Keyboard RGB button mirrors this same
+        /// PowerOn state (TrayQuickControlService writes/saves it on every toggle).
+        /// </summary>
+        private void ApplyPowerVisibility()
+        {
+            bool on = tsKeyboardPower.IsChecked == true;
+            bool isPerKey = ModeToggle.IsChecked == true;
+
+            ModeToggleCard.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            // The BetterRGB engine (and its Light Bar Sync row) are effects-mode only:
+            // per-key RGB owns the keyboard-zone consumer, so hide the whole card —
+            // hiding just the toggle left a card with no control on it.
+            EngineCard.Visibility = on && !isPerKey ? Visibility.Visible : Visibility.Collapsed;
+            IdleTimerCard.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            AutoPowerCard.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+
+            EffectsContent.Visibility = on && !isPerKey ? Visibility.Visible : Visibility.Collapsed;
+            PerKeyContent.Visibility = on && isPerKey ? Visibility.Visible : Visibility.Collapsed;
+            PerKeyActionButtons.Visibility = on && isPerKey ? Visibility.Visible : Visibility.Collapsed;
+            PerKeyPickerPanel.Visibility = on && isPerKey ? Visibility.Visible : Visibility.Collapsed;
+            // The bottom bar exists only for per-key RGB — no streamer-status strip
+            // in effects/BetterRGB modes.
+            PerKeyBottomBar.Visibility = on && isPerKey ? Visibility.Visible : Visibility.Collapsed;
+
+            // The Light Bar Sync row belongs to the BetterRGB engine only.
+            LightBarSyncCard.Visibility = on && !isPerKey && tsBetterRgbEngine.IsChecked == true
+                ? Visibility.Visible : Visibility.Collapsed;
         }
 
         /// <summary>
@@ -1696,7 +1747,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // send fails (e.g., controller disconnects mid-transfer).
                 _settings.SetPerKeyColors(colors);
                 _settings.PerKeyMode = true;
-                KeyboardSettingsService.Save(_settings);
+                _pageSavingSettings = true;
+                try { KeyboardSettingsService.Save(_settings); } finally { _pageSavingSettings = false; }
 
                 // Send all per-key colors in one batch (enters UserMode internally),
                 // or re-param the streamer when it owns the endpoint.
@@ -1761,7 +1813,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // per-key mode (ModeToggle_Checked saves a fresh KeyboardSettings
                 // but doesn't update the _settings field instance).
                 _settings.PerKeyMode = true;
-                KeyboardSettingsService.Save(_settings);
+                _pageSavingSettings = true;
+                try { KeyboardSettingsService.Save(_settings); } finally { _pageSavingSettings = false; }
                 Debug.WriteLine($"[KBD-PERKEY] Saved: PerKeyMode={_settings.PerKeyMode}, PerKeyColors length={_settings.PerKeyColors?.Length ?? 0}");
 
                 var streamer = GetRunningStreamer();
@@ -1985,7 +2038,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // BetterRGB engine + FPS sync from disk.
             tsBetterRgbEngine.IsChecked = settings.Engine == KeyboardEngine.BetterRGB;
-            var savedBrightness = Math.Clamp(settings.BrightnessPercent, 2, 100);
+            var savedBrightness = Math.Clamp(settings.BrightnessPercent, 3, 100);
             BrightnessPercentSlider.Value = savedBrightness;
             BrightnessPercentValueText.Text = savedBrightness.ToString();
 
@@ -2098,11 +2151,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
             }
 
-            // Sync content visibility to match the saved mode. ModeToggle_Checked
+            // Sync content visibility to match the saved mode + power state. ModeToggle_Checked
             // won't fire for programmatic IsChecked changes, so we must set the
             // visibility here otherwise the visualizer stays in a collapsed panel.
-            EffectsContent.Visibility = settings.PerKeyMode ? Visibility.Collapsed : Visibility.Visible;
-            PerKeyContent.Visibility = settings.PerKeyMode ? Visibility.Visible : Visibility.Collapsed;
+            ApplyPowerVisibility();
 
             // Load per-key colors into the visualizer now. This ensures the UI
             // reflects saved data even if Page_Loaded fires before this method
@@ -2218,7 +2270,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                 BetterRgbCurrentWidth = Math.Clamp((int)CuWidthSlider.Value, 2, 8),
                 BetterRgbCurrentColors = SerializeColors(CuPicker.GetColors()),
             };
-            KeyboardSettingsService.Save(settings);
+            _pageSavingSettings = true;
+            try { KeyboardSettingsService.Save(settings); } finally { _pageSavingSettings = false; }
             Debug.WriteLine($"[KBD] SaveSettings: PerKeyMode={settings.PerKeyMode}, PerKeyColors={(string.IsNullOrEmpty(savedPerKeyColors) ? "null" : "saved")}");
         }
 
@@ -2298,6 +2351,20 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>
+        /// KeyboardSettingsService.Save fired from elsewhere (mini-tray Keyboard RGB
+        /// toggle, Adaptive apply): full re-sync of the visible page so the power row
+        /// and every control reflect the new state without requiring re-navigation.
+        /// Guarded on _isInitialized so pre-init saves don't touch half-built controls;
+        /// Dispatcher-wrapped because the save may come from a non-render thread.
+        /// </summary>
+        private void OnKeyboardSettingsChangedExternally(object? sender, EventArgs e)
+        {
+            if (!_isInitialized || _pageSavingSettings)
+                return;
+            Application.Current.Dispatcher.Invoke((Action)(() => SyncUiFromSettings()));
+        }
+
+        /// <summary>
         /// Applies or lifts the override UI state (snackbar, control enablement).
         /// </summary>
         private void ApplyOverrideState(bool isOverridden)
@@ -2372,9 +2439,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Set mode toggle
             ModeToggle.IsChecked = e.PerKeyMode;
 
-            // Update effect UI visibility based on mode
-            EffectsContent.Visibility = e.PerKeyMode ? Visibility.Collapsed : Visibility.Visible;
-            PerKeyContent.Visibility = e.PerKeyMode ? Visibility.Visible : Visibility.Collapsed;
+            // Power + mode visibility (the power row is the single off switch).
+            tsKeyboardPower.IsChecked = KeyboardSettingsService.Load().PowerOn;
+            ApplyPowerVisibility();
 
             // Brightness
             BrightnessSlider.Value = Math.Clamp(e.Brightness, 1, 7);

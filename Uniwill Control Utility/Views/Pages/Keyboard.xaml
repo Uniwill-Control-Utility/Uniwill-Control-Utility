@@ -93,8 +93,34 @@
                     <!-- Available content -->
                     <StackPanel x:Name="KeyboardAvailable" Visibility="Visible">
 
+                        <!-- Keyboard power toggle (first row, like the Light Bar page):
+                             the single off switch for the keyboard. When off, every other
+                             control on the page is hidden; the mini-tray Keyboard RGB
+                             button mirrors this same PowerOn state. -->
+                        <ui:CardControl x:Name="PowerCard" Margin="0,0,0,8">
+                            <ui:CardControl.Icon>
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7E8;" FontSize="20" Margin="4,0,6,0" />
+                            </ui:CardControl.Icon>
+                            <ui:CardControl.Header>
+                                <StackPanel>
+                                    <ui:TextBlock FontTypography="Body" Text="Keyboard Backlight" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Turn the keyboard backlight on or off" />
+                                </StackPanel>
+                            </ui:CardControl.Header>
+                            <ui:ToggleSwitch x:Name="tsKeyboardPower"
+                                 LabelPosition="Left"
+                                 OnContent="On"
+                                 OffContent="Off"
+                                 IsChecked="True"
+                                 Checked="TsKeyboardPower_Toggled"
+                                 Unchecked="TsKeyboardPower_Toggled" />
+                        </ui:CardControl>
+
                         <!-- Mode toggle: Effects / Per-Key -->
-                        <ui:CardControl Margin="0,0,0,8">
+                        <ui:CardControl x:Name="ModeToggleCard" Margin="0,0,0,8">
                             <ui:CardControl.Icon>
                                 <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8D3;" FontSize="20" Margin="4,0,6,0" />
                             </ui:CardControl.Icon>
@@ -118,7 +144,7 @@
                         <!-- BetterRGB streamer engine (port of OpenRevo's BetterRGB):
                              software-rendered frames streamed at high FPS; on battery
                              the AC policy auto-falls back to hardware MCU effects. -->
-                        <ui:CardControl Margin="0,0,0,8">
+                        <ui:CardControl x:Name="EngineCard" Margin="0,0,0,8">
                             <ui:CardControl.Icon>
                                 <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
                             </ui:CardControl.Icon>
@@ -138,6 +164,33 @@
                                  OffContent="Off"
                                  Checked="EngineToggle_Toggled"
                                  Unchecked="EngineToggle_Toggled" />
+                        </ui:CardControl>
+
+                        <!-- Light bar sync — the front strip (single HID zone 2) mirrors
+                             the rendered frame's bottom row while the engine streams
+                             (SampleBottomRowAverage pushed as CMD_SET_COLOR at 10 Hz).
+                             Dedicated row below the engine toggle; hidden while the
+                             engine is off or the keyboard is powered off. -->
+                        <ui:CardControl x:Name="LightBarSyncCard" Margin="0,0,0,8">
+                            <ui:CardControl.Icon>
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEDAB;" FontSize="20" Margin="4,0,6,0" />
+                            </ui:CardControl.Icon>
+                            <ui:CardControl.Header>
+                                <StackPanel>
+                                    <ui:TextBlock FontTypography="Body" Text="Light Bar Sync" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Mirror the keyboard's bottom row onto the front light bar while the BetterRGB engine streams"
+                                           TextWrapping="Wrap" />
+                                </StackPanel>
+                            </ui:CardControl.Header>
+                            <ui:ToggleSwitch x:Name="tsBetterRgbLightBarSync"
+                                 LabelPosition="Left"
+                                 OnContent="On"
+                                 OffContent="Off"
+                                 Checked="TsBetterRgbLightBarSync_Toggled"
+                                 Unchecked="TsBetterRgbLightBarSync_Toggled" />
                         </ui:CardControl>
 
                         <!-- Idle Timer (common to both modes) -->
@@ -202,7 +255,7 @@
 
                         <!-- Auto power: backlight follows the AC plug state (common to
                              both per-key and effects modes) -->
-                        <ui:CardControl Margin="0,0,0,8">
+                        <ui:CardControl x:Name="AutoPowerCard" Margin="0,0,0,8">
                             <ui:CardControl.Icon>
                                 <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xED39;" FontSize="20" Margin="4,0,6,0" />
                             </ui:CardControl.Icon>
@@ -227,29 +280,6 @@
 
                         <!-- ===== EFFECTS MODE CONTENT ===== -->
                         <StackPanel x:Name="EffectsContent">
-                            <!-- Keyboard power toggle -->
-                            <ui:CardControl Margin="0,0,0,8">
-                                <ui:CardControl.Icon>
-                                    <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xED39;" FontSize="20" Margin="4,0,6,0" />
-                                </ui:CardControl.Icon>
-                                <ui:CardControl.Header>
-                                    <StackPanel>
-                                        <ui:TextBlock FontTypography="Body" Text="Keyboard Backlight" />
-                                        <ui:TextBlock Margin="0,2,0,0"
-                               FontTypography="Caption"
-                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                               Text="Turn the keyboard backlight on or off" />
-                                    </StackPanel>
-                                </ui:CardControl.Header>
-                                <ui:ToggleSwitch x:Name="tsKeyboardPower"
-                                     LabelPosition="Left"
-                                     OnContent="On"
-                                     OffContent="Off"
-                                     IsChecked="True"
-                                     Checked="TsKeyboardPower_Toggled"
-                                     Unchecked="TsKeyboardPower_Toggled" />
-                            </ui:CardControl>
-
                             <!-- Effect card with all controls -->
                             <ui:CardExpander x:Name="EffectsCardExpander"
                                  Margin="0,0,0,0"
@@ -548,7 +578,7 @@
                                                Text="100" />
                                             <Slider x:Name="BrightnessPercentSlider"
                                                 Width="140"
-                                                Minimum="2"
+                                                Minimum="3"
                                                 Maximum="100"
                                                 Value="100"
                                                 IsSnapToTickEnabled="False"
@@ -591,32 +621,6 @@
                                             <ui:Button x:Name="btnFps60" Width="52" Height="30" Margin="0,0,0,0" Appearance="Transparent"
                                                 Click="FpsButton_Click" Tag="60"><TextBlock Text="60" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
                                         </StackPanel>
-                                    </Grid>
-
-                                    <!-- Global: light bar sync — the front strip (single
-                                         HID zone 2) mirrors the rendered frame's bottom
-                                         row while the engine streams (SampleBottomRowAverage
-                                         pushed as CMD_SET_COLOR at 10 Hz) -->
-                                    <Border x:Name="SyncSeparator" Height="1" Margin="-58,12,-46,12"
-                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
-                                        Visibility="Collapsed" />
-                                    <Grid x:Name="LightBarSyncRow"
-                                        Visibility="Collapsed">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0">
-                                            <ui:TextBlock FontTypography="Body" Text="Light bar sync" />
-                                            <ui:TextBlock Margin="0,2,0,0"
-                                               FontTypography="Caption"
-                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Mirror the bottom row onto the front light bar while the engine streams"
-                                               TextWrapping="Wrap" />
-                                        </StackPanel>
-                                        <ui:ToggleSwitch x:Name="tsBetterRgbLightBarSync" Grid.Column="1" LabelPosition="Left"
-                                            OnContent="On" OffContent="Off"
-                                            Checked="TsBetterRgbLightBarSync_Toggled" Unchecked="TsBetterRgbLightBarSync_Toggled" />
                                     </Grid>
 
                                     <!-- Per-effect controls follow; only the selected
@@ -1245,10 +1249,9 @@
             </Grid>
         </ScrollViewer>
 
-        <!-- Row 1: Bottom bar for per-key mode action row (glued to bottom, content scrolls under) -->
-        <!-- Always visible; content shifts between per-key actions (per-key on) and
-             BetterRGB streamer status (per-key off). -->
-        <ui:Card x:Name="PerKeyBottomBar"
+        <!-- Row 1: Bottom bar — per-key RGB mode only (action buttons + picker).
+             Hidden in effects/BetterRGB modes; ApplyPowerVisibility owns the state. -->
+        <ui:Card x:Name="PerKeyBottomBar" Visibility="Collapsed"
               Grid.Row="1"
               MaxWidth="1052"
               HorizontalAlignment="Stretch"

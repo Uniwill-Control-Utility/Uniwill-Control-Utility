@@ -106,7 +106,7 @@
                     </ui:CardControl>
 
                     <!-- Auto power: light bar follows the AC plug state -->
-                    <ui:CardControl Margin="0,0,0,8">
+                    <ui:CardControl x:Name="AutoPowerCard" Margin="0,0,0,8">
                         <ui:CardControl.Icon>
                             <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7E8;" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>
@@ -151,7 +151,7 @@
                     </ui:CardControl>
 
                     <!-- Brightness -->
-                    <ui:CardControl Margin="0,0,0,8">
+                    <ui:CardControl x:Name="BrightnessCard" Margin="0,0,0,8">
                         <ui:CardControl.Icon>
                             <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE706;" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>
@@ -174,7 +174,7 @@
                                        Text="100" />
                             <Slider x:Name="BrightnessSlider"
                                     Width="140"
-                                    Minimum="0"
+                                    Minimum="10"
                                     Maximum="100"
                                     Value="100"
                                     TickFrequency="10"
@@ -186,7 +186,7 @@
                     </ui:CardControl>
 
                     <!-- Effect selector -->
-                    <ui:CardControl Margin="0,0,0,8">
+                    <ui:CardControl x:Name="EffectCard" Margin="0,0,0,8">
                         <ui:CardControl.Icon>
                             <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>

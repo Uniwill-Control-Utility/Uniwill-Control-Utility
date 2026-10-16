@@ -19,6 +19,7 @@ namespace Uniwill_Control_Utility.Views.Pages
     {
         private KeyboardHidService? _hidService;
         private DeviceApplier? _deviceApplier;
+        private TrayQuickControlService? _quickControl;
         private bool _isFirstLoad = true;
         private Wpf.Ui.Controls.Snackbar? _adaptiveSnackbar;
 
@@ -73,6 +74,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 _deviceApplier.LightBarOverrideChanged += OnLightBarOverrideChanged;
             }
+
+            // Re-sync the visible page when the mini-tray writes the Light Bar power
+            // state, so the power row never shows a stale ON/OFF without re-navigation.
+            _quickControl = App.GetService<TrayQuickControlService>();
+            if (_quickControl != null)
+                _quickControl.LightBarSettingsChanged += OnTrayLightBarSettingsChanged;
 
             // Show unavailable state initially; HID opens in background
             LightBarAvailable.Visibility = Visibility.Collapsed;
@@ -151,28 +158,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             RefreshOverrideState();
 
             // Load saved settings from disk
-            bool enabled = Settings.Default.LightBarEnabled;
-            byte r = Settings.Default.LightBarR;
-            byte g = Settings.Default.LightBarG;
-            byte b = Settings.Default.LightBarB;
-            int brightness = Settings.Default.LightBarBrightness;
-            int effectIndex = Settings.Default.LightBarEffectIndex;
-            int speed = Settings.Default.LightBarSpeed;
-            bool autoPower = Settings.Default.LightBarAutoPowerOffOnBattery;
-
-            tsLightBarPower.IsChecked = enabled;
-            tsAutoPowerUnplug.IsChecked = autoPower;
-            ColorPicker.SelectedColor = Color.FromRgb(r, g, b);
-            BrightnessSlider.Value = brightness;
-            BrightnessValueText.Text = brightness.ToString();
-            cbEffect.SelectedIndex = Math.Clamp(effectIndex, 0, Effects.Length - 1);
-            SpeedSlider.Value = Math.Clamp(speed, 0, 11);
-            SpeedValueText.Text = Math.Clamp(speed, 0, 11).ToString();
+            SyncControlsFromSettings();
 
             _isFirstLoad = false;
 
-            // Update UI visibility based on selected effect
-            UpdateEffectUi();
+            // Update UI visibility based on power state + selected effect
+            ApplyPowerVisibility();
 
             // Apply saved settings to HID on first load. Suppressed when the auto-power
             // option is enabled and the laptop is currently unplugged — the lights must
@@ -181,20 +172,26 @@ namespace Uniwill_Control_Utility.Views.Pages
             // bottom-row mirror instead; it restores these settings when sync stops).
             bool unpluggedNow = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus
                 == System.Windows.Forms.PowerLineStatus.Offline;
-            if (enabled && _hidService != null && !(autoPower && unpluggedNow) && !IsBetterRgbSyncActive())
+            if (Settings.Default.LightBarEnabled && _hidService != null
+                && !(Settings.Default.LightBarAutoPowerOffOnBattery && unpluggedNow)
+                && !IsBetterRgbSyncActive())
             {
                 _ = Task.Run(() =>
                 {
                     try
                     {
                         Thread.Sleep(200);
+                        byte r = Settings.Default.LightBarR;
+                        byte g = Settings.Default.LightBarG;
+                        byte b = Settings.Default.LightBarB;
+                        int brightness = Math.Clamp(Settings.Default.LightBarBrightness, 10, 100);
                         byte effect = GetSelectedEffect();
                         // UI speed is 0-11 (slow→fast), HID speed is 0-11 (fast→slow)
                         byte hidSpeed = (byte)(11 - SpeedSlider.Value);
 
                         _hidService?.LightBarTurnOn(r, g, b, brightness);
                         _hidService?.LightBarSetEffect(effect, hidSpeed, brightness);
-                        Debug.WriteLine($"[LB] Page_Loaded apply: enabled={enabled}, color=({r},{g},{b}), brightness={brightness}, effect=0x{effect:X2}, hidSpeed={hidSpeed}");
+                        Debug.WriteLine($"[LB] Page_Loaded apply: enabled=true, color=({r},{g},{b}), brightness={brightness}, effect=0x{effect:X2}, hidSpeed={hidSpeed}");
                     }
                     catch (Exception ex)
                     {
@@ -207,6 +204,52 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void Page_Unloaded(object sender, RoutedEventArgs e)
         {
             // Keep HID handle open across navigation
+            if (_quickControl != null)
+                _quickControl.LightBarSettingsChanged -= OnTrayLightBarSettingsChanged;
+        }
+
+        /// <summary>
+        /// Pulls the persisted Light Bar state (Fluent Settings) into the page controls.
+        /// Shared by Page_Loaded and the mini-tray re-sync so a tray toggle updates a
+        /// visible page without re-navigation.
+        /// </summary>
+        private void SyncControlsFromSettings()
+        {
+            bool enabled = Settings.Default.LightBarEnabled;
+            byte r = Settings.Default.LightBarR;
+            byte g = Settings.Default.LightBarG;
+            byte b = Settings.Default.LightBarB;
+            int brightness = Settings.Default.LightBarBrightness;
+            int effectIndex = Settings.Default.LightBarEffectIndex;
+            int speed = Settings.Default.LightBarSpeed;
+            bool autoPower = Settings.Default.LightBarAutoPowerOffOnBattery;
+
+            tsLightBarPower.IsChecked = enabled;
+            tsAutoPowerUnplug.IsChecked = autoPower;
+            ColorPicker.SelectedColor = Color.FromRgb(r, g, b);
+            // UI floor is 10 — a stale 0 from older versions would throw on the slider.
+            BrightnessSlider.Value = Math.Clamp(brightness, 10, 100);
+            BrightnessValueText.Text = Math.Clamp(brightness, 10, 100).ToString();
+            cbEffect.SelectedIndex = Math.Clamp(effectIndex, 0, Effects.Length - 1);
+            SpeedSlider.Value = Math.Clamp(speed, 0, 11);
+            SpeedValueText.Text = Math.Clamp(speed, 0, 11).ToString();
+        }
+
+        /// <summary>
+        /// The mini-tray wrote the Light Bar power state while this page is visible:
+        /// re-sync the controls (and the power-off hiding) so the page never shows a
+        /// stale ON/OFF. Dispatcher-wrapped: the tray save may come from a non-render
+        /// thread. Skipped before the first Page_Loaded so half-built controls stay untouched.
+        /// </summary>
+        private void OnTrayLightBarSettingsChanged(object? sender, EventArgs e)
+        {
+            if (_isFirstLoad)
+                return;
+            Application.Current.Dispatcher.Invoke((Action)(() =>
+            {
+                SyncControlsFromSettings();
+                ApplyPowerVisibility();
+            }));
         }
 
         private void InitializeDebounce()
@@ -264,6 +307,28 @@ namespace Uniwill_Control_Utility.Views.Pages
             });
 
             SaveSettings();
+            ApplyPowerVisibility();
+        }
+
+        /// <summary>
+        /// Power-off collapses the page to just the power row: auto-power, color,
+        /// brightness, effect and speed cards are hidden while the light bar is off.
+        /// Restoring re-runs UpdateEffectUi so the speed/color cards follow the
+        /// selected effect again.
+        /// </summary>
+        private void ApplyPowerVisibility()
+        {
+            bool on = tsLightBarPower.IsChecked == true;
+            AutoPowerCard.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            BrightnessCard.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            EffectCard.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            if (on)
+                UpdateEffectUi();
+            else
+            {
+                SpeedCard.Visibility = Visibility.Collapsed;
+                ColorCard.Visibility = Visibility.Collapsed;
+            }
         }
 
         /// <summary>
