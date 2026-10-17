@@ -316,6 +316,7 @@ Application preferences, diagnostics, updates, and embedded system information.
 - **Application behaviour** — Start on boot, start minimized, minimize-to-tray, reapply settings on start, auto-reapply interval, auto-start Adaptive Mode
 - **Preset backup** — Export and import custom and adaptive mode presets as JSON
 - **Feature Control** - enable/disable various pages (e.g. the Flydigi cooler page if you do not need it)
+- **Advanced features** — Power boost mode, Q-Key button preset switching, Q-Key LED sync, and the CPU Advanced Performance Menu unlock (writes the OemMagicVariable NVRAM switch — offsets 111 and 51 together, mirroring XMG Control Center — so BIOS setup exposes the Advanced Performance Menu on next boot; the row only appears when the firmware reports support, i.e. Intel NB02)
 - **Diagnostics** — Diagnostic logging level (Off, Error, Info, Debug)
 - **System Information** — Device, processor, memory, and battery specs with detailed RAM timings and SPD data
 

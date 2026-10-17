@@ -193,6 +193,18 @@ namespace Uniwill_Control_Utility.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool EnableCpuAdvancedPerformanceMenu {
+            get {
+                return ((bool)(this["EnableCpuAdvancedPerformanceMenu"]));
+            }
+            set {
+                this["EnableCpuAdvancedPerformanceMenu"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("0")]
         public double customCoCcd0 {
             get {

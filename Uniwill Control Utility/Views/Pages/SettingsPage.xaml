@@ -561,8 +561,12 @@
                                                  Checked="cbPowerBoostMode_Checked"
                                                  Unchecked="cbPowerBoostMode_Unchecked" />
                             </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
                             <!-- Row: Q-Key button preset switching -->
-                            <Grid Margin="0,8,0,0">
+                            <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -583,8 +587,12 @@
                                                  Checked="cbQKeyIntercept_Checked"
                                                  Unchecked="cbQKeyIntercept_Unchecked" />
                             </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
                             <!-- Row: Q-Key LED sync -->
-                            <Grid Margin="0,8,0,0">
+                            <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -604,6 +612,32 @@
                                                  OffContent="Off"
                                                  Checked="cbQKeyLedSync_Checked"
                                                  Unchecked="cbQKeyLedSync_Unchecked" />
+                            </Grid>
+
+                            <!-- Row: CPU Advanced Performance Menu (gated: Intel + firmware support) -->
+                            <Border x:Name="ApMenuDivider" Height="1" Margin="-58,12,-46,12"
+                                    Visibility="Collapsed"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <Grid x:Name="ApMenuRow" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="CPU Advanced Performance Menu" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Unlocks the Advanced Performance Menu (CPU and memory overclocking) in BIOS setup. Takes effect on the next boot."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbCpuAdvancedPerformanceMenu"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbCpuAdvancedPerformanceMenu_Checked"
+                                                 Unchecked="cbCpuAdvancedPerformanceMenu_Unchecked" />
                             </Grid>
                         </StackPanel>
                     </ui:CardExpander>

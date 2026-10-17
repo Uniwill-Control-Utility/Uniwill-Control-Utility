@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Management;
+using System.Runtime.InteropServices;
 using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
@@ -62,6 +63,135 @@ namespace Uniwill_Control_Utility.Views.Pages
         private Radio? _btRadio;
         private bool _radioListenersAttached;
 
+        #region CPU Advanced Performance Menu (OemMagicVariable NVRAM unlock)
+
+        // Same OemMagicVariable NVRAM entry the Display page uses for GPU mux mode.
+        // The checkbox drives two bytes in lockstep (tester-confirmed on Intel NB02):
+        // CPUPerformanceAndOverClockMenuSwitch at 111 and MemoryOverClockSwitch at 51.
+        // Support is firmware-reported at 110 (Intel NB02 = 1, AMD = 0).
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern uint GetFirmwareEnvironmentVariable(
+            string lpName, string lpGuid, [Out] byte[] lpBuffer, uint nSize);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetFirmwareEnvironmentVariable(
+            string lpName, string lpGuid, [In] byte[] lpValue, uint nSize);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool OpenProcessToken(IntPtr h, uint d, out IntPtr t);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool LookupPrivilegeValue(string? s, string n, ref LUID l);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool AdjustTokenPrivileges(IntPtr t, bool d, ref TP n, uint b, IntPtr p, IntPtr r);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool CloseHandle(IntPtr h);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct LUID { public uint Low; public int High; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct TP { public int Count; public LUID Luid; public uint Attr; }
+
+        private const uint TOKEN_ADJUST_PRIVILEGES = 0x0020;
+        private const uint SE_PRIVILEGE_ENABLED = 0x00000002;
+
+        private const string NvramGuidStr = "{9F33F85C-13CA-4FD1-9C4A-96217722C593}";
+        private const int OffsetMemOcSwitch = 51;
+        private const int OffsetCpuApMenuSupport = 110;
+        private const int OffsetCpuApMenuSwitch = 111;
+
+        private bool _isNvramAvailable;
+
+        /// <summary>
+        /// Enables SeSystemEnvironmentPrivilege on the current process token (required for NVRAM access).
+        /// </summary>
+        private static void EnableNvramPrivilege()
+        {
+            IntPtr token;
+            if (!OpenProcessToken(Process.GetCurrentProcess().Handle, TOKEN_ADJUST_PRIVILEGES, out token))
+            {
+                Debug.WriteLine($"[Settings] OpenProcessToken failed: {Marshal.GetLastWin32Error()}");
+                return;
+            }
+
+            try
+            {
+                var tp = new TP { Count = 1, Attr = SE_PRIVILEGE_ENABLED };
+                if (!LookupPrivilegeValue(null, "SeSystemEnvironmentPrivilege", ref tp.Luid))
+                {
+                    Debug.WriteLine($"[Settings] LookupPrivilegeValue failed: {Marshal.GetLastWin32Error()}");
+                    return;
+                }
+
+                if (!AdjustTokenPrivileges(token, false, ref tp, (uint)Marshal.SizeOf(tp), IntPtr.Zero, IntPtr.Zero))
+                {
+                    Debug.WriteLine($"[Settings] AdjustTokenPrivileges failed: {Marshal.GetLastWin32Error()}");
+                }
+            }
+            finally
+            {
+                CloseHandle(token);
+            }
+        }
+
+        /// <summary>
+        /// Reads the OemMagicVariable NVRAM buffer, or null when unavailable.
+        /// </summary>
+        private static byte[]? ReadNvramBuffer()
+        {
+            byte[] buf = new byte[4096];
+            uint len = GetFirmwareEnvironmentVariable("OemMagicVariable", NvramGuidStr, buf, (uint)buf.Length);
+            if (len == 0 || len > buf.Length)
+                return null;
+            var result = new byte[len];
+            Array.Copy(buf, result, len);
+            return result;
+        }
+
+        /// <summary>
+        /// Firmware-reported support byte for the CPU Advanced Performance Menu (offset 110).
+        /// Non-zero on Intel NB02, zero on AMD — gates the Settings row.
+        /// </summary>
+        private static bool CpuApMenuSupported()
+        {
+            var nvram = ReadNvramBuffer();
+            return nvram != null && nvram.Length > OffsetCpuApMenuSupport && nvram[OffsetCpuApMenuSupport] != 0;
+        }
+
+        /// <summary>
+        /// Writes the Advanced Performance Menu unlock: sets offsets 111 (CPU menu switch)
+        /// and 51 (memory OC switch) to the same boolean, whole-buffer rewrite.
+        /// </summary>
+        private static bool WriteCpuApMenuUnlock(bool enabled)
+        {
+            var nvram = ReadNvramBuffer();
+            if (nvram == null || nvram.Length <= OffsetCpuApMenuSwitch)
+            {
+                Debug.WriteLine($"[Settings] NVRAM OemMagicVariable unavailable for AP menu write");
+                return false;
+            }
+
+            var modified = (byte[])nvram.Clone();
+            modified[OffsetCpuApMenuSwitch] = (byte)(enabled ? 1 : 0);
+            modified[OffsetMemOcSwitch] = (byte)(enabled ? 1 : 0);
+
+            if (!SetFirmwareEnvironmentVariable("OemMagicVariable", NvramGuidStr, modified, (uint)modified.Length))
+            {
+                Debug.WriteLine($"[Settings] NVRAM AP menu write failed: {Marshal.GetLastWin32Error()}");
+                return false;
+            }
+
+            Debug.WriteLine($"[Settings] NVRAM AP menu switch set to {(enabled ? 1 : 0)} at offsets {OffsetCpuApMenuSwitch}/{OffsetMemOcSwitch}");
+            return true;
+        }
+
+        #endregion
+
         public ViewModels.SettingsViewModel ViewModel
         {
             get;
@@ -103,6 +233,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbShowAutoNavigation.IsChecked = Settings.Default.EnableAutoNavigation;
             cbQKeyIntercept.IsChecked = Settings.Default.EnableQKeyButtonIntercept;
             cbQKeyLedSync.IsChecked = Settings.Default.EnableQKeyLedSync;
+            cbCpuAdvancedPerformanceMenu.IsChecked = Settings.Default.EnableCpuAdvancedPerformanceMenu;
+            EnableNvramPrivilege();
+            bool apMenuSupported = Family.TYPE == Family.ProcessorType.Intel && CpuApMenuSupported();
+            _isNvramAvailable = apMenuSupported;
+            ApMenuDivider.Visibility = apMenuSupported ? Visibility.Visible : Visibility.Collapsed;
+            ApMenuRow.Visibility = apMenuSupported ? Visibility.Visible : Visibility.Collapsed;
             _featureNavigationControlsReady = true;
 
             cbxLogLevel.SelectedIndex = Settings.Default.DiagnosticLogLevel;
@@ -448,6 +584,22 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             Settings.Default.EnableQKeyLedSync = false;
             Settings.Default.Save();
+        }
+
+        private void cbCpuAdvancedPerformanceMenu_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.EnableCpuAdvancedPerformanceMenu = true;
+            Settings.Default.Save();
+            if (_isNvramAvailable && WriteCpuApMenuUnlock(true))
+                _logger.LogInformation("CPU Advanced Performance Menu unlocked (NVRAM offsets 111/51 set)");
+        }
+
+        private void cbCpuAdvancedPerformanceMenu_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.EnableCpuAdvancedPerformanceMenu = false;
+            Settings.Default.Save();
+            if (_isNvramAvailable && WriteCpuApMenuUnlock(false))
+                _logger.LogInformation("CPU Advanced Performance Menu lock restored (NVRAM offsets 111/51 cleared)");
         }
 
         #region Hardware Management (Device Manager-style toggles)

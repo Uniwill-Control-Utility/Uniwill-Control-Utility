@@ -59,6 +59,9 @@
     <Setting Name="customIntelVolt" Type="System.Double" Scope="User">
       <Value Profile="(Default)">0</Value>
     </Setting>
+    <Setting Name="EnableCpuAdvancedPerformanceMenu" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
     <Setting Name="customNvPower" Type="System.Double" Scope="User">
       <Value Profile="(Default)">150</Value>
     </Setting>
