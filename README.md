@@ -89,6 +89,7 @@ We do not mind features/code created with the assistance of AI, as long as it's 
  - GPU MUX switch control (Hybrid / dGPU Only / iGPU Only)
  - GPU Power Saving (On / Off / Auto)
  - Performance button preset switching (physical Performance/Q-key button)
+ - Device Manager hardware toggles (Wi-Fi / Bluetooth radios, webcam PnP enable/disable, touchpad Settings admin flow) on the Settings page
 
 ## Features replicated from Flydigi Space Center
  - Flydigi BS1, BS2, BS2 Pro, BS3 and BS3 Pro support

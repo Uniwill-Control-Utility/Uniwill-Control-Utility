@@ -608,6 +608,132 @@
                         </StackPanel>
                     </ui:CardExpander>
 
+                    <!-- Hardware management -->
+                    <ui:CardExpander x:Name="HardwareManagementCard"
+                                     Margin="0,0,0,8"
+                                     IsExpanded="False">
+                        <ui:CardExpander.Icon>
+                            <ui:SymbolIcon Symbol="Wrench20" FontSize="20" Margin="6,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Hardware management" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Enable or disable hardware features at the Windows level"
+                                               TextWrapping="Wrap" />
+                            </StackPanel>
+                        </ui:CardExpander.Header>
+
+                        <StackPanel>
+                            <!-- Row: Wi-Fi -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Wi-Fi" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Turn the Wi-Fi radio on or off, like the Settings quick toggle" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbWifiToggle"
+                                                 Grid.Column="1"
+                                                 IsChecked="True"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbWifiToggle_Checked"
+                                                 Unchecked="cbWifiToggle_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Bluetooth -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Bluetooth" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Turn the Bluetooth radio on or off, like the Settings quick toggle" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbBluetoothToggle"
+                                                 Grid.Column="1"
+                                                 IsChecked="True"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbBluetoothToggle_Checked"
+                                                 Unchecked="cbBluetoothToggle_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Webcam -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Webcam" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Enable or disable the camera device in Device Manager (PnP hotswap)" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbWebcamToggle"
+                                                 Grid.Column="1"
+                                                 IsChecked="True"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbWebcamToggle_Checked"
+                                                 Unchecked="cbWebcamToggle_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Touchpad -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Touchpad" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Enable or disable the touchpad via the Windows Settings admin flow" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbTouchpadToggle"
+                                                 Grid.Column="1"
+                                                 IsChecked="True"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbTouchpadToggle_Checked"
+                                                 Unchecked="cbTouchpadToggle_Unchecked" />
+                            </Grid>
+
+                        </StackPanel>
+                    </ui:CardExpander>
+
                     <!-- Preset backup -->
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="False">

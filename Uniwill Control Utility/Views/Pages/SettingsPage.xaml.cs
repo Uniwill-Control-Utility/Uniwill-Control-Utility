@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
+using Windows.Devices.Radios;
 using Microsoft.Extensions.Logging;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
@@ -55,6 +56,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         private string _ramProducer = "", _ramModel = "";
 
         private UniwillECService? _ecService;
+
+        // Hardware Management card state (Wi-Fi/Bluetooth radios + state-changed listeners)
+        private Radio? _wifiRadio;
+        private Radio? _btRadio;
+        private bool _radioListenersAttached;
 
         public ViewModels.SettingsViewModel ViewModel
         {
@@ -444,6 +450,123 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.Save();
         }
 
+        #region Hardware Management (Device Manager-style toggles)
+
+        private void cbWifiToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            _ = HardwareManagement.SetWifiAsync(true);
+        }
+
+        private void cbWifiToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            _ = HardwareManagement.SetWifiAsync(false);
+        }
+
+        private void cbBluetoothToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            _ = HardwareManagement.SetBluetoothAsync(true);
+        }
+
+        private void cbBluetoothToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            _ = HardwareManagement.SetBluetoothAsync(false);
+        }
+
+        private void cbWebcamToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            _ = HardwareManagement.SetWebcamAsync(true);
+        }
+
+        private void cbWebcamToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            _ = HardwareManagement.SetWebcamAsync(false);
+        }
+
+        private void cbTouchpadToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.TouchpadEnabled = true;
+            Settings.Default.Save();
+            _ = HardwareManagement.SetTouchpadAsync(true);
+        }
+
+        private void cbTouchpadToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.TouchpadEnabled = false;
+            Settings.Default.Save();
+            _ = HardwareManagement.SetTouchpadAsync(false);
+        }
+
+        /// <summary>
+        /// Pulls the live Wi-Fi/Bluetooth/webcam states (and the persisted touchpad state)
+        /// into the Hardware Management toggles, off the render thread, then attaches the
+        /// radio state-changed listeners so external toggles (Settings app, Fn keys) keep
+        /// the UI in sync — the same StateChanged subscription XMG CC's DeviceSwitchItem uses.
+        /// </summary>
+        private async System.Threading.Tasks.Task SyncHardwareManagementStates()
+        {
+            try
+            {
+                _wifiRadio = await HardwareManagement.GetWifiRadioAsync();
+                _btRadio = await HardwareManagement.GetBluetoothRadioAsync();
+                bool? wifiOn = _wifiRadio != null ? HardwareManagementRadioIsOn(_wifiRadio) : null;
+                bool? btOn = _btRadio != null ? HardwareManagementRadioIsOn(_btRadio) : null;
+                bool? camOn = await HardwareManagement.GetWebcamEnabledAsync();
+                bool touchpadOn = Settings.Default.TouchpadEnabled;
+
+                await this.Dispatcher.InvokeAsync(() =>
+                {
+                    if (wifiOn != null)
+                        cbWifiToggle.IsChecked = wifiOn;
+                    if (btOn != null)
+                        cbBluetoothToggle.IsChecked = btOn;
+                    if (camOn != null)
+                        cbWebcamToggle.IsChecked = camOn;
+                    cbTouchpadToggle.IsChecked = touchpadOn;
+
+                    AttachRadioStateListeners();
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to sync hardware management states");
+            }
+        }
+
+        private static bool HardwareManagementRadioIsOn(Radio radio)
+        {
+            return radio.State == RadioState.On;
+        }
+
+        private void AttachRadioStateListeners()
+        {
+            if (_radioListenersAttached)
+                return;
+            _radioListenersAttached = true;
+
+            if (_wifiRadio != null)
+                _wifiRadio.StateChanged += WifiRadioStateChanged;
+            if (_btRadio != null)
+                _btRadio.StateChanged += BluetoothRadioStateChanged;
+        }
+
+        private void WifiRadioStateChanged(Radio sender, object args)
+        {
+            _ = this.Dispatcher.InvokeAsync(() =>
+            {
+                cbWifiToggle.IsChecked = HardwareManagementRadioIsOn(sender);
+            });
+        }
+
+        private void BluetoothRadioStateChanged(Radio sender, object args)
+        {
+            _ = this.Dispatcher.InvokeAsync(() =>
+            {
+                cbBluetoothToggle.IsChecked = HardwareManagementRadioIsOn(sender);
+            });
+        }
+
+        #endregion
+
         private void cbHideFlydigi_Checked(object sender, RoutedEventArgs e)
         {
             Settings.Default.EnableFlydigi = true;
@@ -705,6 +828,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private async void UiPage_Loaded(object sender, RoutedEventArgs e)
         {
             await LoadSystemInfoAsync();
+            await SyncHardwareManagementStates();
         }
 
         private async System.Threading.Tasks.Task LoadSystemInfoAsync()

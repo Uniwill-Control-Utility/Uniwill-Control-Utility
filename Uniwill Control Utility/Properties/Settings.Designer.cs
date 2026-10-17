@@ -978,5 +978,14 @@ namespace Uniwill_Control_Utility.Properties {
             get { return ((bool)(this["LightBarAutoPowerOffOnBattery"])); }
             set { this["LightBarAutoPowerOffOnBattery"] = value; }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool TouchpadEnabled {
+            get { return ((bool)(this["TouchpadEnabled"])); }
+            set { this["TouchpadEnabled"] = value; }
+        }
+
     }
 }
