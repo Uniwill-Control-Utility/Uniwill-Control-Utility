@@ -110,9 +110,11 @@ namespace Uniwill_Control_Utility.Services
 
         // MUX mode values (Define.DGgpuDirectConnectionMode from GCUService.exe)
         // On AMD platforms: 0=Hybrid, 1=dGPU-only, 2=iGPU-only
+        // On Intel platforms: 4=Hybrid (Dynamic), 1=iGPU-only, 2=dGPU-only (no raw 0)
         public const byte MUX_MODE_HYBRID = 0x00;       // MS Hybrid (MUX open, both GPUs active)
         public const byte MUX_MODE_DGPU_ONLY = 0x01;    // dGPU only (MUX closed, discrete GPU)
         public const byte MUX_MODE_IGPU_ONLY = 0x02;    // iGPU only (MUX open, integrated GPU)
+        public const byte MUX_MODE_HYBRID_INTEL = 0x04; // MS Hybrid on Intel platforms (Dynamic)
 
         // --- PWM readback ---
         public const ushort REG_PWM_1 = 0x075B;
@@ -765,12 +767,12 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
-        /// On Intel platforms the EC/NVRAM encoding of the dGPU-only and iGPU-only
-        /// modes is swapped relative to AMD platforms (observed on Intel NB02 units):
-        /// the firmware reads raw 1 as iGPU-only and raw 2 as dGPU-only, the inverse
-        /// of the AMD mapping. Hybrid (0) is unaffected. These helpers translate between
-        /// the semantic <see cref="GpuMuxMode"/> used by the UI and the raw byte the
-        /// firmware expects on the current platform.
+        /// On Intel platforms the EC/NVRAM encoding differs from AMD (observed on Intel
+        /// NB02 units): the dGPU-only and iGPU-only modes are swapped (raw 1 = iGPU-only,
+        /// raw 2 = dGPU-only), and MS Hybrid is encoded as raw 4 (Dynamic) instead of 0 —
+        /// the Intel BIOS declares MSHybrid as 4, so raw 0 never appears there. These
+        /// helpers translate between the semantic <see cref="GpuMuxMode"/> used by the UI
+        /// and the raw byte the firmware expects on the current platform.
         /// </summary>
         private static bool IsIntelPlatform()
         {
@@ -781,16 +783,28 @@ namespace Uniwill_Control_Utility.Services
         public static byte ModeToRaw(GpuMuxMode mode)
         {
             byte raw = (byte)mode;
-            if (IsIntelPlatform() && (raw == MUX_MODE_DGPU_ONLY || raw == MUX_MODE_IGPU_ONLY))
-                return (byte)(MUX_MODE_DGPU_ONLY + MUX_MODE_IGPU_ONLY - raw); // swap 1 <-> 2
+            if (IsIntelPlatform())
+            {
+                // Intel BIOS encodes MS Hybrid as 4 (Dynamic), not 0.
+                if (raw == MUX_MODE_HYBRID)
+                    return MUX_MODE_HYBRID_INTEL;
+                if (raw == MUX_MODE_DGPU_ONLY || raw == MUX_MODE_IGPU_ONLY)
+                    return (byte)(MUX_MODE_DGPU_ONLY + MUX_MODE_IGPU_ONLY - raw); // swap 1 <-> 2
+            }
             return raw;
         }
 
         /// Raw EC/NVRAM byte -> semantic mode for the current platform.
         public static GpuMuxMode RawToMode(byte raw)
         {
-            if (IsIntelPlatform() && (raw == MUX_MODE_DGPU_ONLY || raw == MUX_MODE_IGPU_ONLY))
-                return (GpuMuxMode)(MUX_MODE_DGPU_ONLY + MUX_MODE_IGPU_ONLY - raw);
+            if (IsIntelPlatform())
+            {
+                // Intel BIOS declares MS Hybrid as raw 4 (Dynamic).
+                if (raw == MUX_MODE_HYBRID_INTEL)
+                    return GpuMuxMode.Hybrid;
+                if (raw == MUX_MODE_DGPU_ONLY || raw == MUX_MODE_IGPU_ONLY)
+                    return (GpuMuxMode)(MUX_MODE_DGPU_ONLY + MUX_MODE_IGPU_ONLY - raw);
+            }
             return (GpuMuxMode)raw;
         }
 
