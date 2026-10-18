@@ -640,148 +640,20 @@
                                       SelectionChanged="cbColorCalibration_SelectionChanged"/>
                         </ui:CardControl>
 
-                        <!-- GPU Information CardExpander -->
-                        <ui:CardExpander Margin="0,0,0,8"
-						                 IsExpanded="False">
-                            <ui:CardExpander.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="20" Margin="4,0,6,0"/>
-                            </ui:CardExpander.Icon>
-                            <ui:CardExpander.Header>
-                                <StackPanel>
-                                    <ui:TextBlock FontTypography="Body" Text="GPU Information"/>
-                                    <ui:TextBlock Margin="0,2,0,0"
-									              FontTypography="Caption"
-									              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-									              Text="GPU hardware state from the EC"/>
-                                </StackPanel>
-                            </ui:CardExpander.Header>
-                            <StackPanel>
-
-                                <!-- Current Mode -->
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body" Text="Current Mode"/>
-                                        <ui:TextBlock Margin="0,2,0,0"
-										              FontTypography="Caption"
-										              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-										              Text="Active GPU mode from the EC"/>
-                                    </StackPanel>
-                                    <TextBlock x:Name="tbCurrentMode"
-									           Grid.Column="1"
-									           VerticalAlignment="Center"
-									           FontSize="13"
-									           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-									           Text="--"/>
-                                </Grid>
-
-                                <!-- Divider -->
-                                <Border Height="1" Margin="-58,12,-46,12"
-								        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"/>
-
-                                <!-- GPU Module ID -->
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body" Text="GPU Module ID"/>
-                                        <ui:TextBlock Margin="0,2,0,0"
-										              FontTypography="Caption"
-										              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-										              Text="Hardware GPU module identifier"/>
-                                    </StackPanel>
-                                    <TextBlock x:Name="tbGpuModuleId"
-									           Grid.Column="1"
-									           VerticalAlignment="Center"
-									           FontSize="13"
-									           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-									           Text="--"/>
-                                </Grid>
-
-                                <!-- Divider -->
-                                <Border Height="1" Margin="-58,12,-46,12"
-								        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"/>
-
-                                <!-- MUX Hardware State -->
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body" Text="MUX Hardware State"/>
-                                        <ui:TextBlock Margin="0,2,0,0"
-										              FontTypography="Caption"
-										              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-										              Text="Physical MUX position from the EC"/>
-                                    </StackPanel>
-                                    <TextBlock x:Name="tbMuxHardwareState"
-									           Grid.Column="1"
-									           VerticalAlignment="Center"
-									           FontSize="13"
-									           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-									           Text="--"/>
-                                </Grid>
-
-                                <!-- Divider -->
-                                <Border Height="1" Margin="-58,12,-46,12"
-								        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"/>
-
-                                <!-- NVRAM Persistence -->
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <ui:TextBlock FontTypography="Body" Text="NVRAM Persistence"/>
-                                        <ui:TextBlock Margin="0,2,0,0"
-										              FontTypography="Caption"
-										              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-										              Text="UEFI NVRAM mode value (survives restart)"/>
-                                    </StackPanel>
-                                    <TextBlock x:Name="tbNvramMode"
-									           Grid.Column="1"
-									           VerticalAlignment="Center"
-									           FontSize="13"
-									           Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-									           Text="--"/>
-                                </Grid>
-                            </StackPanel>
-                        </ui:CardExpander>
                     </StackPanel>
                 </StackPanel>
             </Grid>
         </ScrollViewer>
 
-        <!-- Row 1: Bottom bar — Refresh button anchored right -->
+        <!-- Row 1: Bottom bar — live panel-model status -->
         <ui:Card x:Name="bottomBar" Grid.Row="1" MaxWidth="1052" HorizontalAlignment="Stretch" Margin="12,8,16,12" Padding="12,8" SnapsToDevicePixels="True">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <!-- Monitor info for the laptop panel, left side -->
-                <TextBlock Grid.Column="0"
-                           x:Name="tbRefreshRateTarget"
-                           VerticalAlignment="Center"
-                           FontSize="12"
-                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                           Text="--"/>
-                <ui:Button Grid.Column="1"
-				           x:Name="btnRefresh"
-				           Click="btnRefresh_Click">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" Margin="0,0,12,0"/>
-                        <TextBlock Text="Refresh" Margin="0,0,0,1"/>
-                    </StackPanel>
-                </ui:Button>
-            </Grid>
+            <!-- Monitor info for the laptop panel, left side -->
+            <TextBlock
+                       x:Name="tbRefreshRateTarget"
+                       VerticalAlignment="Center"
+                       FontSize="12"
+                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                       Text="--"/>
         </ui:Card>
     </Grid>
 </Page>

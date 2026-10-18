@@ -520,11 +520,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             _cooldownTimer.Start();
         }
 
-        private void btnRefresh_Click(object sender, RoutedEventArgs e)
-        {
-            RefreshAll();
-        }
-
         #region Display Refresh Rate
 
         /// <summary>
@@ -920,8 +915,6 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // The refresh-rate combo tracks the live Windows display mode
             UpdateRefreshRateCombo(GetRefreshRateSafe());
-
-            RefreshGpuInfo();
         }
 
         /// <summary>
@@ -977,90 +970,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             Settings.Default.Save();
-        }
-
-        private void RefreshGpuInfo()
-        {
-            if (_ecService is null) return;
-
-            try
-            {
-                var mode = _ecService.GetCurrentGpuMuxMode();
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    tbCurrentMode.Text = GetModeDisplayName(mode);
-                });
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[Display] Failed to read current mode: {ex.Message}");
-            }
-
-            try
-            {
-                var moduleId = _ecService.GetGpuModuleId();
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    tbGpuModuleId.Text = $"0x{moduleId:X2} ({moduleId})";
-                });
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[Display] Failed to read GPU module ID: {ex.Message}");
-            }
-
-            try
-            {
-                var muxState = _ecService.GetMuxHardwareState();
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    tbMuxHardwareState.Text = $"0x{muxState:X4}";
-                });
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[Display] Failed to read MUX hardware state: {ex.Message}");
-            }
-
-            // Read NVRAM mode from OemMagicVariable (offset 98)
-            try
-            {
-                byte? nvramMode = ReadNvramMode();
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    if (nvramMode.HasValue)
-                    {
-                        tbNvramMode.Text = $"{nvramMode.Value} ({GetModeDisplayName((UniwillECService.GpuMuxMode)nvramMode.Value)})";
-                    }
-                    else if (!_isNvramAvailable)
-                    {
-                        tbNvramMode.Text = "NVRAM unavailable";
-                    }
-                    else
-                    {
-                        tbNvramMode.Text = "Unable to read";
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[Display] NVRAM read failed: {ex.Message}");
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    tbNvramMode.Text = "Error";
-                });
-            }
-        }
-
-        private string GetModeDisplayName(UniwillECService.GpuMuxMode mode)
-        {
-            return mode switch
-            {
-                UniwillECService.GpuMuxMode.Hybrid => "Hybrid",
-                UniwillECService.GpuMuxMode.DgpuOnly => "dGPU Only",
-                UniwillECService.GpuMuxMode.IgpuOnly => "iGPU Only",
-                _ => $"Unknown ({(int)mode})"
-            };
         }
 
         #region NVRAM Access

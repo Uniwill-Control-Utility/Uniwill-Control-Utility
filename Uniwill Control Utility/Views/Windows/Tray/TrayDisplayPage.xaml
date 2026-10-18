@@ -216,7 +216,7 @@
                                     Click="BtnTrayColorCal_Click">
                                 <ui:TextBlock FontSize="10"
                                               HorizontalAlignment="Center"
-                                              Text="P3"
+                                              Text="DCI-P3"
                                               FontWeight="SemiBold"
                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                             </Button>
