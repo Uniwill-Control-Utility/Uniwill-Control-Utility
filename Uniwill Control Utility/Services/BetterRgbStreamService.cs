@@ -259,10 +259,13 @@ namespace Uniwill_Control_Utility.Services
                 // another owner takes over immediately: sleep/wake/display-switch (the
                 // MCU is resetting and MainWindow's resume apply re-applies after wake),
                 // adaptive-override (DeviceApplier owns the strip), auto-power-battery
-                // (MainWindow's auto-power policy owns the strip).
+                // (MainWindow's auto-power policy owns the strip), and shutdown — the
+                // shutdown fallback below hands the strip to Wave at the minimum
+                // brightness instead of the saved settings (the sync was overriding
+                // them, so restoring them would fight what the user last saw).
                 if (_syncPushActive && reason != "sleep" && reason != "wake"
                     && reason != "display-switch" && reason != "adaptive-override"
-                    && reason != "auto-power-battery")
+                    && reason != "auto-power-battery" && reason != "shutdown")
                 {
                     _syncPushActive = false;
                     _ = Task.Run(() => RestoreLightBar(reason));
@@ -290,6 +293,22 @@ namespace Uniwill_Control_Utility.Services
                         try
                         {
                             ApplyHardwareFallback(settings, "shutdown");
+                        }
+                        catch (Exception) { /* best-effort during teardown */ }
+                    }
+
+                    // Light bar sync shutdown: when the sync owned the strip, leave it
+                    // on a predictable, visible effect too — firmware Wave at the
+                    // lowest light bar brightness (10) — instead of the user's saved
+                    // settings. Synchronous: must complete before the process exits,
+                    // like the keyboard fallback above.
+                    if (_syncPushActive)
+                    {
+                        _syncPushActive = false;
+                        _syncEaseInit = false;
+                        try
+                        {
+                            ApplyLightBarShutdownFallback();
                         }
                         catch (Exception) { /* best-effort during teardown */ }
                     }
@@ -1090,6 +1109,43 @@ namespace Uniwill_Control_Utility.Services
             catch (Exception ex)
             {
                 Log.Warning("[BetterRGB] Light bar restore failed: {Message}", ex.Message);
+            }
+            finally
+            {
+                hid.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Shutdown hand-off when the sync owned the strip: leave the light bar on a
+        /// predictable, visible effect — firmware Wave at the lowest light bar
+        /// brightness (10) — mirroring the keyboard's Rainbow shutdown fallback.
+        /// Saved settings are untouched, so next startup still restores the user's
+        /// page state.
+        /// </summary>
+        private void ApplyLightBarShutdownFallback()
+        {
+            var hid = new KeyboardHidService();
+            try
+            {
+                if (!hid.Open() || !hid.IsLightBarAvailable)
+                    return;
+
+                // Lowest light bar brightness level — the same floor the Light Bar
+                // page slider uses.
+                const int minBrightness = 10;
+                byte hidSpeed = (byte)(11 - Math.Clamp(Settings.Default.LightBarSpeed, 0, 11));
+
+                Thread.Sleep(FirmwareSettleMs);
+                hid.LightBarTurnOn(Settings.Default.LightBarR, Settings.Default.LightBarG,
+                    Settings.Default.LightBarB, minBrightness);
+                hid.LightBarSetEffect(0x03, hidSpeed, minBrightness);
+                Log.Information("[BetterRGB] Light bar sync shutdown: strip set to Wave at min brightness ({Brightness})",
+                    minBrightness);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[BetterRGB] Light bar shutdown fallback failed: {Message}", ex.Message);
             }
             finally
             {
