@@ -1858,6 +1858,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                 this.Height = 907;
             }
 
+            // Keep the window inside the monitor's work area so the title bar
+            // never spills above the top screen edge. On the 2560x1600 internal
+            // panel at 150% scale, 1080 DIP = 1620 physical px — taller than the
+            // screen — so CenterScreen splits the overflow off the top.
+            App.FitWindowToWorkArea(this);
+
             _ = Task.Run(PremadePresets.SetPremadePresets);
 
             // Eagerly instantiate the Adaptive page so its constructor runs (starts the

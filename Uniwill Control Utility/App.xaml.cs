@@ -951,25 +951,16 @@ namespace Uniwill_Control_Utility
 
             window.UpdateLayout();
 
-            var screen = System.Windows.Forms.Screen.FromHandle(
-                new WindowInteropHelper(window).Handle);
-
-            var workingArea = screen.WorkingArea;
-
             double minWidth = window.MinWidth > 0 ? window.MinWidth : 980;
             double minHeight = window.MinHeight > 0 ? window.MinHeight : 420;
 
             window.Width = Math.Max(window.Width, minWidth);
             window.Height = Math.Max(window.Height, minHeight);
 
-            window.Width = Math.Min(window.Width, workingArea.Width);
-            window.Height = Math.Min(window.Height, workingArea.Height);
-
-            window.Left = workingArea.Left +
-                (workingArea.Width - window.Width) / 2;
-
-            window.Top = workingArea.Top +
-                (workingArea.Height - window.Height) / 2;
+            // Clamp + center in DIP space. The old code compared the physical-pixel
+            // WorkingArea directly against DIP window geometry, which mispositioned
+            // the window at display scales above 100%.
+            FitWindowToWorkArea(window);
 
             window.Activate();
 
@@ -979,6 +970,53 @@ namespace Uniwill_Control_Utility
             var handle = new WindowInteropHelper(window).Handle;
             if (handle != IntPtr.Zero)
                 SetForegroundWindow(handle);
+        }
+
+        /// <summary>
+        /// Clamps a window to its monitor's work area and re-centers it.
+        /// WPF window geometry (Left/Top/Width/Height) is in DIPs but
+        /// WorkingArea is in physical pixels, so the work area is converted
+        /// to DIPs using the window's DPI ratio before clamping. Without the
+        /// conversion, a window taller than the work area (e.g. 1080 DIP at
+        /// 150% scale on the 2560x1600 internal panel) spills its title bar
+        /// above the top screen edge.
+        /// </summary>
+        public static void FitWindowToWorkArea(Window window)
+        {
+            var hwnd = new WindowInteropHelper(window).Handle;
+            if (hwnd == 0)
+                return;
+
+            var workingArea = System.Windows.Forms.Screen
+                .FromHandle(hwnd).WorkingArea;
+
+            // Physical pixels per DIP for the monitor hosting the window,
+            // read from the DIP→device transform of the window's source.
+            double scaleX = 1.0;
+            double scaleY = 1.0;
+            var source = PresentationSource.FromVisual(window);
+            if (source?.CompositionTarget != null)
+            {
+                var toDevice = source.CompositionTarget.TransformToDevice;
+                if (toDevice.M11 > 0 && toDevice.M22 > 0)
+                {
+                    scaleX = toDevice.M11;
+                    scaleY = toDevice.M22;
+                }
+            }
+
+            double workLeft = workingArea.Left / scaleX;
+            double workTop = workingArea.Top / scaleY;
+            double workWidth = workingArea.Width / scaleX;
+            double workHeight = workingArea.Height / scaleY;
+
+            if (window.Width > workWidth)
+                window.Width = workWidth;
+            if (window.Height > workHeight)
+                window.Height = workHeight;
+
+            window.Left = workLeft + (workWidth - window.Width) / 2.0;
+            window.Top = workTop + (workHeight - window.Height) / 2.0;
         }
 
         [DllImport("user32.dll")]
