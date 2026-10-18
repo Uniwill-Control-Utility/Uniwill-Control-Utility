@@ -292,6 +292,34 @@
 
         <!-- ===== FOOTER ===== -->
         <Grid Grid.Row="4" Margin="12,3,12,0" >
+            <!-- Conditional "More <page> settings" hop: shown only when the tray is
+                 on a non-default page (e.g. the Display page), styled like the expand
+                 button (no background, no border). The tray window re-arms its label
+                 and visibility on every page navigation. -->
+            <Button x:Name="MoreSettingsButton"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Center"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Padding="8"
+                    Visibility="Collapsed"
+                    Click="MoreSettingsButton_Click">
+                <Button.Template>
+                    <!-- Bare template: no hover/pressed overlays, no border — the
+                         transparent Border keeps the whole padded area clickable. -->
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Button.Template>
+                <TextBlock x:Name="MoreSettingsText"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                           Text="More settings"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+            </Button>
             <Button HorizontalAlignment="Right"
                     Background="Transparent"
                     BorderThickness="0"

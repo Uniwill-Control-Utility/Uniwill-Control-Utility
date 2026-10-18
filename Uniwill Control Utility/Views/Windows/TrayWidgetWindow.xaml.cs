@@ -35,6 +35,9 @@ namespace Uniwill_Control_Utility.Views.Windows
         private bool _loading;
         private bool _applying;
         private bool _showing;
+        // The main-window page the footer's "More <page> settings" button opens for
+        // the currently shown tray page (null = button hidden on the default page).
+        private Type? _moreSettingsTargetPage;
         // The show path produces one spurious Deactivated right after activation; swallow
         // exactly that one so a later real focus change can still hide the tray.
         private bool _ignoreNextDeactivation;
@@ -79,6 +82,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             // disabled in XAML, so we drive it here; the directional fade+slide is
             // only for the QuickSettings↔Display page hops).
             _ = TrayNavigation.Navigate(typeof(TrayQuickSettingsPage));
+            UpdateMoreSettingsButton(typeof(TrayQuickSettingsPage));
             _ = TransitionAnimationProvider.ApplyTransition(
                 TrayQuickSettingsPage.Instance, Transition.FadeInWithSlide, TrayTransitionMs);
 
@@ -139,6 +143,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             var toDisplay = pageType == typeof(TrayDisplayPage);
             var navigated = TrayNavigation.Navigate(pageType);
+            UpdateMoreSettingsButton(pageType);
 
             Page? page = null;
             if (toDisplay)
@@ -373,6 +378,48 @@ namespace Uniwill_Control_Utility.Views.Windows
             mainWindow.Show();
             mainWindow.WindowState = WindowState.Normal;
             mainWindow.Activate();
+        }
+
+        /// <summary>
+        /// Re-arms the footer's conditional "More <page> settings" button for the
+        /// shown tray page: visible only on non-default pages (e.g. the Display
+        /// page), labeled with the page name in lower capitals, and remembering the
+        /// main-window page the click opens.
+        /// </summary>
+        private void UpdateMoreSettingsButton(Type pageType)
+        {
+            string label = string.Empty;
+            Type? mainPage = null;
+
+            if (pageType == typeof(TrayDisplayPage))
+            {
+                label = "More display settings";
+                mainPage = typeof(Views.Pages.Display);
+            }
+
+            MoreSettingsText.Text = label;
+            MoreSettingsButton.Visibility = label.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            _moreSettingsTargetPage = mainPage;
+        }
+
+        /// <summary>
+        /// Footer hop from a non-default tray page: hides the tray, opens UCU and
+        /// navigates it to the main-window page matching the shown tray page.
+        /// </summary>
+        private void MoreSettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            HideWidget();
+
+            MainWindow? mainWindow = MainWindow.Instance;
+            if (mainWindow is null)
+                return;
+
+            mainWindow.Show();
+            mainWindow.WindowState = WindowState.Normal;
+            mainWindow.Activate();
+
+            if (_moreSettingsTargetPage is not null)
+                mainWindow.Navigate(_moreSettingsTargetPage);
         }
 
         /// <summary>
