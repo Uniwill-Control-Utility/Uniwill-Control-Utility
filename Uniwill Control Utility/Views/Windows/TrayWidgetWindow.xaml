@@ -253,7 +253,10 @@
         <Border Grid.Row="1" Background="{DynamicResource SurfaceStrokeColorFlyoutBrush}" />
 
         <!-- ===== QUICK SETTINGS GRID (with card background) ===== -->
-        <Border Grid.Row="2" Margin="-10,0,0,0"
+        <!-- Height fits the full three-row button grid; the quick-settings page
+             shrinks the card (and the window, which sizes to its content) by the
+             exact space freed rows would occupy — see ResizeQuickSettingsCard. -->
+        <Border x:Name="QuickSettingsCard" Grid.Row="2" Margin="-10,0,0,0"
                 Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
                 BorderThickness="0"
                 Padding="0,0,0,22"

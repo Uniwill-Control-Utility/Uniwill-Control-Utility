@@ -43,6 +43,14 @@ namespace Uniwill_Control_Utility.Views.Windows
         private bool _ignoreNextDeactivation;
         private System.Drawing.Point _placementAnchor;
         private string? _placementScreenDeviceName;
+        // The tray page currently shown by the NavigationView — the quick-settings
+        // card resize only applies while that page is shown (the Display page is
+        // laid out for the full-height card).
+        private Type? _currentPage;
+        // The quick-settings card's XAML height, which fits the full three-row
+        // button grid; ResizeQuickSettingsCard shrinks it (and the window) below
+        // this when fewer rows are visible.
+        private const double QuickSettingsCardBaseHeight = 330;
 
         public TrayWidgetWindow(TrayQuickControlService quickControl)
         {
@@ -82,6 +90,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             // disabled in XAML, so we drive it here; the directional fade+slide is
             // only for the QuickSettings↔Display page hops).
             _ = TrayNavigation.Navigate(typeof(TrayQuickSettingsPage));
+            _currentPage = typeof(TrayQuickSettingsPage);
             UpdateMoreSettingsButton(typeof(TrayQuickSettingsPage));
             _ = TransitionAnimationProvider.ApplyTransition(
                 TrayQuickSettingsPage.Instance, Transition.FadeInWithSlide, TrayTransitionMs);
@@ -130,6 +139,34 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// animates the transition; navigating to the already-shown page is a no-op.
         /// </summary>
         /// <summary>
+        /// Resizes the quick-settings card to `base - freedHeight` and the window by
+        /// the same delta — the window sizes to its content, so the space freed by
+        /// hidden button rows must be taken from the HWND too, not just the card.
+        /// Idempotent: a no-op once the card already has the target height. Only
+        /// applies while the quick-settings page is shown; the Display page is laid
+        /// out for the full-height card and gets it back via the reset in NavigateTo.
+        /// </summary>
+        public void ResizeQuickSettingsCard(double freedHeight)
+        {
+            if (_currentPage != typeof(TrayQuickSettingsPage))
+                return;
+
+            ApplyQuickSettingsCardHeight(QuickSettingsCardBaseHeight - freedHeight);
+        }
+
+        private void ApplyQuickSettingsCardHeight(double cardHeight)
+        {
+            var delta = cardHeight - QuickSettingsCard.Height;
+            if (delta == 0)
+                return;
+
+            QuickSettingsCard.Height = cardHeight;
+            this.Height = this.Height + delta;
+            UpdateLayout();
+            PositionNearTray();
+        }
+
+        /// <summary>
         /// Navigates the tray's NavigationView to a page class and animates the shown
         /// page with a custom fade+slide for the QuickSettings↔Display page hops:
         /// entering the Display page slides in from the right, returning to the
@@ -144,6 +181,13 @@ namespace Uniwill_Control_Utility.Views.Windows
             var toDisplay = pageType == typeof(TrayDisplayPage);
             var navigated = TrayNavigation.Navigate(pageType);
             UpdateMoreSettingsButton(pageType);
+            _currentPage = pageType;
+
+            // Leaving the quick-settings page: restore the full-height card the
+            // Display page is laid out for (the quick-settings page re-shrinks it
+            // on the snapshot re-apply that follows its own navigation).
+            if (toDisplay)
+                ApplyQuickSettingsCardHeight(QuickSettingsCardBaseHeight);
 
             Page? page = null;
             if (toDisplay)

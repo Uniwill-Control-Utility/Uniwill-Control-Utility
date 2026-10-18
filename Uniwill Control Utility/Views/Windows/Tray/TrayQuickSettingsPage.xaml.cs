@@ -118,6 +118,20 @@ namespace Uniwill_Control_Utility.Views.Windows.Tray
             // which threw here and skipped the Display page's snapshot half — leaving its
             // Collapsed-by-default sections un-applied (an empty tray Display page) on
             // laptops with any collapsed quick-settings slot.
+
+            // The card (and the tray window) are sized for the full three-row grid;
+            // shrink both by exactly the space the hidden rows would occupy — each
+            // row is its content height (button + label margin + label) plus the
+            // spacer row that separated it. The slot is measured explicitly because
+            // on the first show the freshly instantiated page has not been through
+            // a layout pass yet, so its DesiredSize is still zero.
+            int designRows = (ButtonsGrid.Children.Count + Columns - 1) / Columns;
+            if (visibleCount > 0)
+            {
+                visible[0].Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                double freedHeight = (designRows - rowCount) * (visible[0].DesiredSize.Height + RowGap);
+                TrayWidgetWindow.Instance?.ResizeQuickSettingsCard(freedHeight);
+            }
         }
 
         #region Toggle Handlers
