@@ -151,10 +151,10 @@ One-click tuning profiles and granular hardware controls for CPU, GPU, and syste
 Interception of the laptop's physical Performance / Q-key button (Uniwill NB02 hardware), so the button cycles UCU's own presets instead of the firmware's.
 
 - **Preset cycling** — Each press advances to the next preset (Office → Gaming → Turbo → every saved Custom preset of the pool Power Boost Mode selects, wrapping) through the same apply path the Presets page uses, and the selection is persisted so the tray, Presets page, and resume handlers stay in sync
-- **Q-key LED** — The EC firmware drives the LED from its own internal mode state and the OEM button already cycles it (white → red → yellow), which stays aligned with the Office → Gaming → Turbo order; no LED color register is written by default
+- **Q-key LED** — The EC firmware drives the LED from its own internal mode state and the OEM button already cycles it (white → red → yellow), which stays aligned with the Office → Gaming → Turbo order; UCU writes no LED color register at all, the LED follows the preset apply on its own
 - **Detection** — The EC's ACPI WMI provider raises an `AcpiTest_EventULong` event whose `ULong` payload is `176` for every physical press, so the press is read from the EC itself rather than inferred from a register latch; UCU's own preset applies therefore cannot be mistaken for a press
 - **Manual-control gate** — The press echo only fires while the EC manual-control gate (`0x0741` bit0) is set, so UCU keeps it armed permanently: the button stays live while a Custom preset, custom fan curves, GPU power control or Smart Fan Mode holds manual control, and the EC — not the firmware — owns the mode state
-- **Settings** — "Q-Key button preset switching" (default ON) and "Q-Key LED sync (experimental)" (default OFF, mirrors the active preset into the EC mode index register for firmware that drives the LED from it)
+- **Settings** — "Q-Key button preset switching" (default ON; when OFF the button does nothing — UCU has already taken over the button engine, so the firmware's own cycle is not restored)
 
 ### **Adaptive Mode**
 
@@ -316,7 +316,7 @@ Application preferences, diagnostics, updates, and embedded system information.
 - **Application behaviour** — Start on boot, start minimized, minimize-to-tray, reapply settings on start, auto-reapply interval, auto-start Adaptive Mode
 - **Preset backup** — Export and import custom and adaptive mode presets as JSON
 - **Feature Control** - enable/disable various pages (e.g. the Flydigi cooler page if you do not need it)
-- **Advanced features** — Power boost mode, Q-Key button preset switching, Q-Key LED sync, and the CPU Advanced Performance Menu unlock (writes the OemMagicVariable NVRAM switch — offsets 111 and 51 together, mirroring XMG Control Center — so BIOS setup exposes the Advanced Performance Menu on next boot; the row only appears when the firmware reports support, i.e. Intel NB02)
+- **Advanced features** — Power boost mode, Q-Key button preset switching, and the CPU Advanced Performance Menu unlock (writes the OemMagicVariable NVRAM switch — offsets 111 and 51 together, mirroring XMG Control Center — so BIOS setup exposes the Advanced Performance Menu on next boot; the row only appears when the firmware reports support, i.e. Intel NB02)
 - **Diagnostics** — Diagnostic logging level (Off, Error, Info, Debug)
 - **System Information** — Device, processor, memory, and battery specs with detailed RAM timings and SPD data
 

@@ -40,10 +40,13 @@ namespace Uniwill_Control_Utility.Services
     ///
     /// Q-key LED: the EC firmware drives the LED from its own internal mode state,
     /// and the 0x0751 literal in UniwillECService.ApplyOemStockMode is what recolors
-    /// it (Office white / Gaming yellow / Turbo red). When <c>EnableQKeyLedSync</c>
-    /// is on, the service additionally mirrors the selected preset into the EC mode
-    /// index register (0x07AB) and pokes the trigger register (0x0767) for firmware
-    /// that honors the mode index instead.
+    /// it (Office white / Gaming yellow / Turbo red on this platform; other firmware
+    /// maps the same literals to its own colors). The corrected OpenRevo disassembly
+    /// (second linear sweep of its mode-apply function) shows Mechrevo/IDB firmware
+    /// recolors from the same 0x0751 literals and never writes a mode nibble to
+    /// 0x07AB, and UCU's ApplyOemStockMode already matches OpenRevo's 0x0751/0x07AB/
+    /// 0x0767/0x045B writes byte-for-byte — so no explicit LED sync is needed on any
+    /// family in the map, and the service never pokes those registers itself.
     /// </summary>
     public sealed class QKeyButtonService : IHostedService, IDisposable
     {
@@ -301,9 +304,6 @@ namespace Uniwill_Control_Utility.Services
                     },
                     DispatcherPriority.Normal);
 
-                if (Settings.Default.EnableQKeyLedSync)
-                    SyncQKeyLed(next);
-
                 ToastNotification.ShowToastNotification($"{displayName} Applied!",
                     $"{displayName} has been applied!");
 
@@ -319,36 +319,5 @@ namespace Uniwill_Control_Utility.Services
             }
         }
 
-        /// <summary>
-        /// Mirrors the applied preset into the EC mode index register and pokes
-        /// the trigger register so EC firmware that drives the Q-key LED from
-        /// the mode index (OpenRevo's sequence on Mechrevo units) updates the
-        /// LED. Read-modify-write on the trigger keeps any RGB effect bits
-        /// (logo / rainbow) set by the keyboard apply path intact.
-        /// Never uses the _Checked write variants: the EC on this platform
-        /// reports error code 1 for writes even on success.
-        /// </summary>
-        private void SyncQKeyLed(string profileName)
-        {
-            try
-            {
-                int modeIndex = PresetProfileApplier.OemModeIndexFor(profileName);
-
-                byte prevMode = _ec.ReadECRegister(UniwillECService.REG_MODE_INDEX);
-                _ec.WriteECRegister(UniwillECService.REG_MODE_INDEX,
-                    (byte)((prevMode & 0xE0) | modeIndex | UniwillECService.MODE_INDEX_ARM));
-                Thread.Sleep(10);
-
-                byte trigger = _ec.ReadECRegister(UniwillECService.REG_TRIGGER);
-                _ec.WriteECRegister(UniwillECService.REG_TRIGGER,
-                    (byte)(trigger | UniwillECService.TRIGGER_RGB_APPLY_COLOR));
-
-                Log.Information("[QKey] LED sync: mode index {Mode} written to 0x7AB", modeIndex);
-            }
-            catch (Exception ex)
-            {
-                Log.Warning("[QKey] LED sync failed: {Message}", ex.Message);
-            }
-        }
     }
 }

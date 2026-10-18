@@ -232,7 +232,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbShowOverlayNavigation.IsChecked = Settings.Default.EnableOverlayNavigation;
             cbShowAutoNavigation.IsChecked = Settings.Default.EnableAutoNavigation;
             cbQKeyIntercept.IsChecked = Settings.Default.EnableQKeyButtonIntercept;
-            cbQKeyLedSync.IsChecked = Settings.Default.EnableQKeyLedSync;
             cbCpuAdvancedPerformanceMenu.IsChecked = Settings.Default.EnableCpuAdvancedPerformanceMenu;
             EnableNvramPrivilege();
             bool apMenuSupported = Family.TYPE == Family.ProcessorType.Intel && CpuApMenuSupported();
@@ -571,18 +570,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void cbQKeyIntercept_Unchecked(object sender, RoutedEventArgs e)
         {
             Settings.Default.EnableQKeyButtonIntercept = false;
-            Settings.Default.Save();
-        }
-
-        private void cbQKeyLedSync_Checked(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.EnableQKeyLedSync = true;
-            Settings.Default.Save();
-        }
-
-        private void cbQKeyLedSync_Unchecked(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.EnableQKeyLedSync = false;
             Settings.Default.Save();
         }
 

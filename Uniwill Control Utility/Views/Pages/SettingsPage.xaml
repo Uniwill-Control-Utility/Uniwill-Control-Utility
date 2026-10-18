@@ -587,32 +587,6 @@
                                                  Checked="cbQKeyIntercept_Checked"
                                                  Unchecked="cbQKeyIntercept_Unchecked" />
                             </Grid>
-                            <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- Row: Q-Key LED sync -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Q-Key LED sync (experimental)" />
-                                    <ui:TextBlock Margin="0,2,0,2"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Writes the active preset to the EC mode index register so firmware that drives the Q-key LED from it changes color. Only needed when your preset order differs from the button's LED cycle."
-                                                   TextWrapping="Wrap" />
-                                </StackPanel>
-                                <ui:ToggleSwitch x:Name="cbQKeyLedSync"
-                                                 Grid.Column="1"
-                                                 LabelPosition="Left"
-                                                 OnContent="On"
-                                                 OffContent="Off"
-                                                 Checked="cbQKeyLedSync_Checked"
-                                                 Unchecked="cbQKeyLedSync_Unchecked" />
-                            </Grid>
 
                             <!-- Row: CPU Advanced Performance Menu (gated: Intel + firmware support) -->
                             <Border x:Name="ApMenuDivider" Height="1" Margin="-58,12,-46,12"
