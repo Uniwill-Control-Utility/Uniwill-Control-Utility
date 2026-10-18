@@ -764,8 +764,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             MtColorsSeparator.Visibility = MtColorsRow.Visibility;
 
             StLayoutRow.Visibility = sel(BetterRgbEffect.Static) ? Visibility.Visible : Visibility.Collapsed;
-            StZonesRow.Visibility = sel(BetterRgbEffect.Static) ? Visibility.Visible : Visibility.Collapsed;
-            StZonesSeparator.Visibility = StZonesRow.Visibility;
             StColorsRow.Visibility = sel(BetterRgbEffect.Static) ? Visibility.Visible : Visibility.Collapsed;
             StColorsSeparator.Visibility = StColorsRow.Visibility;
 
@@ -1033,12 +1031,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void MtDensitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             MtDensityValueText.Text = ((int)MtDensitySlider.Value).ToString();
-            MarkBetterRgbChanged();
-        }
-
-        private void StZonesSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            StZonesValueText.Text = ((int)StZonesSlider.Value).ToString();
             MarkBetterRgbChanged();
         }
 
@@ -2157,9 +2149,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             MtDensityValueText.Text = Math.Clamp(settings.BetterRgbMatrixDensity, 1, 5).ToString();
             MtPicker.SetColors(ParseColorString(settings.BetterRgbMatrixColors));
             _brLayout = Math.Clamp(settings.BetterRgbStaticLayout, 0, 1);
-            StZonesSlider.Value = Math.Clamp(settings.BetterRgbStaticZones, 1, 7);
-            StZonesValueText.Text = Math.Clamp(settings.BetterRgbStaticZones, 1, 7).ToString();
-            StPicker.SetColors(ParseColorString(settings.BetterRgbStaticZoneColors), 7);
+            // The picker's color count IS the zone count; trim the stored palette to it
+            StPicker.SetColors(ParseColorString(settings.BetterRgbStaticZoneColors)
+                .Take(Math.Clamp(settings.BetterRgbStaticZones, 1, 7)));
             RpSpeedSlider.Value = Math.Clamp(settings.BetterRgbRippleSpeed, 1, 5);
             RpSpeedValueText.Text = Math.Clamp(settings.BetterRgbRippleSpeed, 1, 5).ToString();
             RpWidthSlider.Value = Math.Clamp(settings.BetterRgbRippleWidth, 1, 4);
@@ -2319,7 +2311,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 BetterRgbMatrixColorCount = Math.Clamp(MtPicker.GetColors().Count, 1, 3),
                 BetterRgbMatrixColors = SerializeColors(MtPicker.GetColors()),
                 BetterRgbStaticLayout = _brLayout,
-                BetterRgbStaticZones = Math.Clamp((int)StZonesSlider.Value, 1, 7),
+                BetterRgbStaticZones = Math.Clamp(StPicker.GetColors().Count, 1, 7),
                 BetterRgbStaticZoneColors = SerializeColors(StPicker.GetColors()),
                 BetterRgbRippleSpeed = Math.Clamp((int)RpSpeedSlider.Value, 1, 5),
                 BetterRgbRippleWidth = Math.Clamp((int)RpWidthSlider.Value, 1, 4),
