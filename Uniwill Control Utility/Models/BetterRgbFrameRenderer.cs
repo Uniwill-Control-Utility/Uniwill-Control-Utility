@@ -103,34 +103,66 @@ namespace Uniwill_Control_Utility.Models
         // are per-key painters that would never paint an extra row, and the physical
         // gap is far under one key pitch.
         //
-        // A plain unweighted mean of the 13 sampled keys collapses a left→right hue
-        // gradient to its centroid (x≈9), which reads as "the middle is mirrored".
-        // A single zone can only ever be a summary of the row, so the honest smooth
-        // choice is a MEAN — as the Wave sweeps, the mean hue rotates continuously,
-        // so the strip cycles smoothly rather than snapping. (A brightest-key term
-        // was tried and rejected: it chases a discrete argmax, jarring even eased.)
-        // Width-weighting (Space ~5 pitches, Numpad0 ~2, else 1) makes the mean
-        // reflect real physical coverage instead of 13 equal votes.
+        // The sampled color is the width-weighted mean of the MIDDLE THIRD of the row
+        // (physical x-extent from get_key_x geometry; keys whose centre falls in the
+        // middle third — Space/AltGr/CtrlR on this layout), not the whole row: a
+        // whole-row mean lets every hue vote, so a multi-hue bottom row (blue+red+
+        // green+yellow+purple) collapses toward muddy near-white, while the middle
+        // third keeps the strip reading as the color under the strip's own physical
+        // midpoint — what a user means when they say "mirror the bottom row". Width-
+        // weighting (Space ~5 pitches, Numpad0 ~2, else 1) makes the mean reflect
+        // real physical coverage instead of equal votes; a mean of the middle third
+        // still rotates continuously as the Wave sweeps, so the strip cycles smoothly
+        // rather than snapping. (A brightest-key term was tried and rejected: it
+        // chases a discrete argmax, jarring even eased.)
         public static bool SampleBottomRowColor(byte[] frame512, out byte r, out byte g, out byte b)
         {
+            // Pass 1: physical extent of the sampled row (centre +/- half width).
+            double left = double.MaxValue, right = double.MinValue;
+            for (int i = 0; i < KeyMap.Length; i++)
+            {
+                if (KeyMap[i].Row < 5)
+                    continue;
+                double hw = SampleWidth(KeyMap[i].Name) / 2.0;
+                if (KeyX[i] - hw < left) left = KeyX[i] - hw;
+                if (KeyX[i] + hw > right) right = KeyX[i] + hw;
+            }
+            double t0 = left + (right - left) / 3.0;
+            double t1 = left + 2.0 * (right - left) / 3.0;
+
+            // Pass 2: width-weighted mean of the middle-third keys; the whole-row
+            // mean is kept alongside as a defensive fallback (the static geometry
+            // always yields at least Space, so it never fires in practice).
             int rs = 0, gs = 0, bs = 0, wsum = 0;
-            int n = 0;
+            int rsAll = 0, gsAll = 0, bsAll = 0, wsumAll = 0;
+            int n = 0, nAll = 0;
             for (int i = 0; i < KeyMap.Length; i++)
             {
                 if (KeyMap[i].Row < 5)
                     continue;
                 int off = KeyMap[i].Offset;
                 int w = SampleWidth(KeyMap[i].Name);
+                rsAll += frame512[off] * w;
+                gsAll += frame512[off + 1] * w;
+                bsAll += frame512[off + 2] * w;
+                wsumAll += w;
+                nAll++;
+                if (KeyX[i] < t0 || KeyX[i] > t1)
+                    continue;
                 rs += frame512[off] * w;
                 gs += frame512[off + 1] * w;
                 bs += frame512[off + 2] * w;
                 wsum += w;
                 n++;
             }
-            if (n == 0 || wsum == 0)
+            if (nAll == 0 || wsumAll == 0)
             {
                 r = g = b = 0;
                 return false;
+            }
+            if (n == 0)
+            {
+                rs = rsAll; gs = gsAll; bs = bsAll; wsum = wsumAll;
             }
             r = (byte)Math.Round((double)rs / wsum);
             g = (byte)Math.Round((double)gs / wsum);

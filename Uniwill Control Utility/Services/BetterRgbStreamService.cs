@@ -1004,7 +1004,8 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// Light bar sync push: summarize the rendered frame's physical bottom row
-        /// (KEYMAP Row >= 5 — width-weighted mean, see SampleBottomRowColor) and push
+        /// (KEYMAP Row >= 5 — width-weighted mean of the middle third by physical
+        /// x-extent, see SampleBottomRowColor) and push
         /// it, eased toward that target, as CMD_SET_COLOR on zone 2 via
         /// the streamer's own light-bar handle (usage-2 collection, separate from the
         /// keyboard endpoint — no one-live-consumer conflict). Firmware brightness stays
