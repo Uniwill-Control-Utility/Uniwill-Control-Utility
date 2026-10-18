@@ -689,6 +689,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             var m = cmbBetterRgbEffect.SelectedItem is BetterRgbEffect e ? e : BetterRgbEffect.Breathing;
             bool sel(BetterRgbEffect x) => m == x;
 
+            // Static and Rainbow render a constant frame: the engine caps their send
+            // rate at the 10 FPS keepalive (StaticKeepaliveFps), so the FPS target is
+            // inert — hide the row while they are selected (the persisted FPS still
+            // applies when switching to an animated effect).
+            bool staticSource = sel(BetterRgbEffect.Static) || sel(BetterRgbEffect.Rainbow);
+            FpsRow.Visibility = BetterRgbActive() && !staticSource ? Visibility.Visible : Visibility.Collapsed;
+            FpsSeparator.Visibility = FpsRow.Visibility;
+
             // Each divider sits above its row and shows only when that row does (the
             // first row of every effect has no divider - BetterRgbEffectSeparator
             // already separates the FPS row from the selected effect's block).

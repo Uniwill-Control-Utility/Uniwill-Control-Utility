@@ -3190,8 +3190,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             BrCuWidthRow.Visibility = cu ? Visibility.Visible : Visibility.Collapsed;
             sepKbBrCuWidth.Visibility = cu ? Visibility.Visible : Visibility.Collapsed;
 
-            grKbBrFps.Visibility = Visibility.Visible;
-            sepKbBrFps.Visibility = Visibility.Visible;
+            // Static and Rainbow render a constant frame (the engine caps them at the
+            // 10 FPS keepalive), so the FPS target is inert — hide it while selected.
+            bool staticSource = st || rb;
+            grKbBrFps.Visibility = staticSource ? Visibility.Collapsed : Visibility.Visible;
+            sepKbBrFps.Visibility = grKbBrFps.Visibility;
             grKbBrBright.Visibility = Visibility.Visible;
             sepKbBrBright.Visibility = Visibility.Visible;
         }
