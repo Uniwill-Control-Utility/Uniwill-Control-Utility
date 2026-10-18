@@ -76,7 +76,7 @@ namespace Uniwill_Control_Utility.Views.Windows.Tray
             try
             {
                 RefreshRateSection.Visibility = policy.ShowRefreshRate ? Visibility.Visible : Visibility.Collapsed;
-                UpdateTrayRefreshRateButtons(snapshot.RefreshRateHz, snapshot.GpuModeDgpuOnly);
+                UpdateTrayRefreshRateCombo(snapshot.RefreshRateHz, snapshot.GpuModeDgpuOnly);
 
                 ColorCalSection.Visibility = snapshot.ColorCalAvailable ? Visibility.Visible : Visibility.Collapsed;
                 UpdateTrayColorCalButtons(snapshot.ColorProfileFile);
@@ -170,63 +170,52 @@ namespace Uniwill_Control_Utility.Views.Windows.Tray
         }
 
         /// <summary>
-        /// Shows exactly the internal panel's rates (collapsed otherwise), styles the
-        /// active one, and reflows the visible buttons into the 3-column single-row
-        /// grid — the panel offers only 60/240 (plus the hidden 300 while dGPU-only).
+        /// Rebuilds the combo with exactly the rates the internal panel offers (GDI
+        /// enumeration — variant-dependent: the Intel NB02 chassis exposes 48/60/75/
+        /// 100/120/240 while AMD shows 60/240, plus the hidden 300 while dGPU-only;
+        /// Windows' own Settings under-reports this set) and selects the current one.
+        /// The programmatic selection detaches the handler so the sync does not
+        /// re-apply the setting.
         /// </summary>
-        private void UpdateTrayRefreshRateButtons(int currentHz, bool dGpuOnly)
+        private void UpdateTrayRefreshRateCombo(int currentHz, bool dGpuOnly)
         {
-            Style? inactiveStyle = (Style)Resources["TrayModeButtonStyle"];
-            Style? activeStyle = (Style)Resources["TrayModeButtonActiveStyle"];
-
-            System.Windows.Controls.StackPanel[] slots =
-                new System.Windows.Controls.StackPanel[]
-                {
-                    SlotTrayRefreshRate60, SlotTrayRefreshRate240, SlotTrayRefreshRate300
-                };
-            System.Windows.Controls.Button[] buttons =
-                new System.Windows.Controls.Button[]
-                {
-                    BtnTrayRefreshRate60, BtnTrayRefreshRate240, BtnTrayRefreshRate300
-                };
-            int[] hzValues = new int[] { 60, 240, 300 };
-
-            for (int i = 0; i < slots.Length; i++)
-            {
-                buttons[i].Style = currentHz == hzValues[i] ? activeStyle : inactiveStyle;
-                slots[i].Visibility = TrayRefreshRateAvailable(hzValues[i], dGpuOnly) ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            // Reflow visible slots left-to-right (the Grid's children are the StackPanel
-            // wrappers, not the buttons). Collapsed slots are left untouched — they
-            // render nothing, and -1 indices are rejected by this WPF's grid placement
-            // validation.
-            const int Columns = 3;
-            int slot = 0;
-            foreach (System.Windows.Controls.StackPanel panel in slots)
-            {
-                if (panel.Visibility != Visibility.Visible)
-                    continue;
-
-                System.Windows.Controls.Grid.SetRow(panel, slot / Columns);
-                System.Windows.Controls.Grid.SetColumn(panel, slot % Columns);
-                slot++;
-            }
-        }
-
-        private static bool TrayRefreshRateAvailable(int hz, bool dGpuOnly)
-        {
+            TrayCbRefreshRate.Items.Clear();
+            int selectedIndex = -1;
             try
             {
                 // Internal panel only — the tray offers the laptop panel's rates
                 // exclusively (never an external monitor's), falling back to the
                 // panel's known set when it is detached (external-only).
                 var rates = Uniwill_Control_Utility.Scripts.Misc.Display.GetInternalRefreshRates(dGpuOnly);
-                return rates.Contains(hz);
+                for (int i = 0; i < rates.Count; i++)
+                {
+                    TrayCbRefreshRate.Items.Add(
+                        new System.Windows.Controls.ComboBoxItem { Content = $"{rates[i]} Hz", Tag = rates[i] });
+                    if (rates[i] == currentHz)
+                        selectedIndex = i;
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                return false;
+                Log.Warning("[Tray] Refresh rate items rebuild failed: {Message}", ex.Message);
+                return;
+            }
+
+            if (selectedIndex >= 0)
+            {
+                TrayCbRefreshRate.SelectionChanged -= TrayCbRefreshRate_SelectionChanged;
+                try
+                {
+                    TrayCbRefreshRate.SelectedIndex = selectedIndex;
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("[Tray] Refresh rate selection sync failed: {Message}", ex.Message);
+                }
+                finally
+                {
+                    TrayCbRefreshRate.SelectionChanged += TrayCbRefreshRate_SelectionChanged;
+                }
             }
         }
 
@@ -323,17 +312,21 @@ namespace Uniwill_Control_Utility.Views.Windows.Tray
             });
         }
 
-        private async void BtnTrayRefreshRate_Click(object sender, RoutedEventArgs e)
+        private async void TrayCbRefreshRate_SelectionChanged(object sender, EventArgs e)
         {
-            if (IsBusy || sender is not System.Windows.Controls.Button btn)
+            if (IsBusy || sender is not System.Windows.Controls.ComboBox cb || cb != TrayCbRefreshRate)
                 return;
-            if (btn.Tag is not string tag || !int.TryParse(tag, out int hz))
+            if (cb.SelectedItem is not System.Windows.Controls.ComboBoxItem item || item.Tag is not int hz)
+                return;
+
+            // Ignore selection of the rate that is already active.
+            if (hz == Uniwill_Control_Utility.Scripts.Misc.Display.GetInternalRefreshRate())
                 return;
 
             await ApplyAsync(async () =>
             {
                 // On failure the live rate is unchanged, so the snapshot re-fetch
-                // inside ApplyAsync restores the previous active style.
+                // inside ApplyAsync restores the previous selection.
                 _ = await _quickControl.SetRefreshRateAsync(hz);
             });
         }

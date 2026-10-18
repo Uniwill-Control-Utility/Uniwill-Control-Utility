@@ -112,14 +112,12 @@ namespace Uniwill_Control_Utility.Views.Windows.Tray
                 visible[i].Margin = new System.Windows.Thickness(0);
             }
 
-            // Hide any collapsed children by clearing their row (they stay in Children but invisible).
-            foreach (FrameworkElement child in ButtonsGrid.Children)
-            {
-                if (child.Visibility != Visibility.Visible)
-                {
-                    System.Windows.Controls.Grid.SetRow(child, -1);
-                }
-            }
+            // Collapsed children are left untouched — they render nothing regardless of
+            // their stale row index (implicit tracks absorb out-of-range rows), and this
+            // WPF rejects -1 for Grid.Row ("'-1' is not a valid value for property 'Row'"),
+            // which threw here and skipped the Display page's snapshot half — leaving its
+            // Collapsed-by-default sections un-applied (an empty tray Display page) on
+            // laptops with any collapsed quick-settings slot.
         }
 
         #region Toggle Handlers

@@ -136,61 +136,37 @@
         <!-- Scrollable body: everything below the back button + title header -->
         <ScrollViewer x:Name="DisplayScroll" Height="278">
             <StackPanel>
-                <!-- Display refresh rate (panels offering multiple rates only) -->
-                <StackPanel x:Name="RefreshRateSection" Visibility="Collapsed" Margin="0,0,0,0">
-                    <ui:TextBlock FontSize="14"
-                                  FontWeight="SemiBold"
-                                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                  Text="Refresh Rate"
-                                  Margin="12,0,2,8" />
-                    <!-- The internal panel's rate set only: 60/240 via GDI, 300 as the
-                         hidden dGPU-only mode — one row, star columns spread evenly. -->
-                    <Grid Width="200" HorizontalAlignment="Left" Margin="7,4,0,0">
+                <!-- Display refresh rate (panels offering multiple rates only).
+                     A combo, not a button row: the offered rate set is dynamic and
+                     variant-dependent (GDI enumeration reveals more than Windows'
+                     own Settings shows — e.g. Intel NB02 exposes 48/60/75/100/120/240
+                     while AMD shows 60/240, plus the hidden 300 under dGPU-only mux),
+                     so the items are rebuilt from live state on every snapshot.
+                     Row layout mirrors the MiniLED row: icon + title + control. -->
+                <StackPanel x:Name="RefreshRateSection" Visibility="Collapsed" Margin="12,16,0,0">
+                    <Grid>
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel x:Name="SlotTrayRefreshRate60" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">
-                            <Button x:Name="BtnTrayRefreshRate60" Width="60" Height="42"
-                                    Style="{StaticResource TrayModeButtonStyle}"
-                                    Tag="60"
-                                    Click="BtnTrayRefreshRate_Click">
-                                <ui:TextBlock FontSize="10"
-                                              HorizontalAlignment="Center"
-                                              Text="60 Hz"
-                                              FontWeight="SemiBold"
-                                              Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                            </Button>
-                        </StackPanel>
-                        <StackPanel x:Name="SlotTrayRefreshRate240" Grid.Row="0" Grid.Column="1" VerticalAlignment="Center">
-                            <Button x:Name="BtnTrayRefreshRate240" Width="60" Height="42"
-                                    Style="{StaticResource TrayModeButtonStyle}"
-                                    Tag="240"
-                                    Click="BtnTrayRefreshRate_Click">
-                                <ui:TextBlock FontSize="10"
-                                              HorizontalAlignment="Center"
-                                              Text="240 Hz"
-                                              FontWeight="SemiBold"
-                                              Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                            </Button>
-                        </StackPanel>
-                        <StackPanel x:Name="SlotTrayRefreshRate300" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center">
-                            <Button x:Name="BtnTrayRefreshRate300" Width="60" Height="42"
-                                    Style="{StaticResource TrayModeButtonStyle}"
-                                    Tag="300"
-                                    Click="BtnTrayRefreshRate_Click">
-                                <ui:TextBlock FontSize="10"
-                                              HorizontalAlignment="Center"
-                                              Text="300 Hz"
-                                              FontWeight="SemiBold"
-                                              Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                            </Button>
-                        </StackPanel>
+
+                        <ui:TextBlock Grid.Column="1"
+                                      FontSize="14"
+                                      FontWeight="SemiBold"
+                                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                      Text="Refresh Rate"
+                                      VerticalAlignment="Center" />
+                        <ComboBox Grid.Column="2"
+                                  x:Name="TrayCbRefreshRate"
+                                  Width="120"
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,24,0"
+                                  SelectionChanged="TrayCbRefreshRate_SelectionChanged" />
                     </Grid>
                 </StackPanel>
                 <!-- Display color calibration (hidden when only Default is available) -->
-                <StackPanel x:Name="ColorCalSection" Visibility="Collapsed" Margin="0,16,0,0">
+                <StackPanel x:Name="ColorCalSection" Visibility="Collapsed" Margin="0,16,0,8">
                     <ui:TextBlock FontSize="14"
                                   FontWeight="SemiBold"
                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
@@ -260,7 +236,7 @@
                     </Grid>
                 </StackPanel>
                 <!-- Nvidia Optimus runtime switch (Hybrid display mode only) -->
-                <StackPanel x:Name="OptimusSection" Visibility="Collapsed" Margin="14,12,0,12">
+                <StackPanel x:Name="OptimusSection" Visibility="Collapsed" Margin="14,16,0,12">
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                         <ui:TextBlock FontSize="14"
                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"

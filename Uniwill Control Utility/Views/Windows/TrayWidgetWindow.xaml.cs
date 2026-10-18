@@ -90,9 +90,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                 UpdateLayout();
                 PositionNearTray();
             }
-            catch
+            catch (Exception ex)
             {
-                // Silently fail — no status text to show
+                // Silently fail — no status text to show, but keep the cause visible
+                // in the logs (a failed startup snapshot leaves the Display page's
+                // Collapsed-by-default sections un-applied = an empty page).
+                Log.Warning("[Tray] Startup snapshot failed: {Message}", ex.Message);
             }
             finally
             {
@@ -107,6 +110,9 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         /// <summary>
         /// Orchestration only: each page applies its own half of the snapshot.
+        /// A throw in either half leaves that page's Collapsed-by-default sections
+        /// un-applied, so the page renders empty — the catches in the callers log
+        /// the cause.
         /// </summary>
         private void ApplySnapshot(TrayQuickControlSnapshot snapshot)
         {
@@ -173,9 +179,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                     var snapshot = await Task.Run(_quickControl.GetSnapshot);
                     ApplySnapshot(snapshot);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignore — snapshot refresh is best-effort
+                    // Ignore — snapshot refresh is best-effort, but surface the cause:
+                    // a throw here leaves the Display page's Collapsed-by-default
+                    // sections un-applied (an empty page).
+                    Log.Warning("[Tray] Snapshot refresh failed: {Message}", ex.Message);
                 }
             }
             catch
