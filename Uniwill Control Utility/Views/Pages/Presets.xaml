@@ -508,8 +508,8 @@
                                         <Slider x:Name="sdIntelPl2" Width="140" Maximum="200" Minimum="10" Value="60" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" TouchDown="SizeSlider_TouchDown" ValueChanged="Slider_ValueChanged" />
                                     </StackPanel>
                                 </Grid>
-                                <!-- Intel Undervolt controls container (hidden when EnableCpuVoltageControl is OFF) -->
-                                <StackPanel x:Name="intelVoltControlsPanel">
+                                <!-- Intel Undervolt controls container — removed: voltage control is AMD-only -->
+                                <StackPanel x:Name="intelVoltControlsPanel" Visibility="Collapsed">
                                 <!-- Divider -->
                                 <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
                                 <!-- Intel Undervolt CPU -->

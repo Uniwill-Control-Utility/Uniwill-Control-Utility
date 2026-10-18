@@ -408,9 +408,8 @@ namespace Uniwill_Control_Utility.Services
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
+                // No voltage control on Intel — undervolt removed
                 parts.Add($"--intel-pl={preset.IntelPl1:F0},{preset.IntelPl2:F0}");
-                if (preset.IntelVolt < 0)
-                    parts.Add($"--intel-volt-cpu={preset.IntelVolt:F0}");
             }
 
             if (!skipGpuPower && !string.IsNullOrEmpty(NvTuning.GetGpuName()))
@@ -515,9 +514,8 @@ namespace Uniwill_Control_Utility.Services
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
+                // No voltage control on Intel — undervolt removed
                 parts.Add($"--intel-pl={Settings.Default.customIntelPl1:F0},{Settings.Default.customIntelPl2:F0}");
-                if (Settings.Default.customIntelVolt < 0)
-                    parts.Add($"--intel-volt-cpu={Settings.Default.customIntelVolt:F0}");
             }
 
             // NVIDIA GPU power — skip if V-F curve is active (power applied via SetPowerLimit instead)

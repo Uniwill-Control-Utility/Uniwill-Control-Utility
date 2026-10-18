@@ -138,7 +138,7 @@ One-click tuning profiles and granular hardware controls for CPU, GPU, and syste
 - **Custom profiles** — Save and load your own tuned configurations
 - **Status card** — Shows active values for CPU power limits, TjMax, Curve Optimizer, GPU TGP, and Dynamic Boost
 - **CPU Power Tuning** (AMD) — Sustained Power Limit (SPL), Fast Power Limit (FPL), TjMax, and Curve Optimizer
-- **Intel Tuning** — PL1, PL2 power limits and CPU undervolting via FIVR
+- **Intel Tuning** — PL1, PL2 power limits
 - **GPU Tuning** (NVIDIA) — GPU TGP, Dynamic Boost, Dynamic Boost Offset, Core/Memory Clock Offsets, and V-F Curve Editor (a fully working curve editor for undervolting)
 - **Custom presets** — Up to 5 custom presets can be set up (mirrored by another set when Power Boost Mode is ON)
 - **Preset backup & import** — Export and restore all custom presets and adaptive mode profiles
@@ -161,7 +161,7 @@ Interception of the laptop's physical Performance / Q-key button (Uniwill NB02 h
 Intelligent, game-aware performance optimization that automatically adjusts settings based on the active application.
 
 - Per-game profile support — each game gets its own tuned configuration
-- **CPU controls** — Power limits (SPL/FPL), TjMax, Curve Optimizer (AMD), PL1/PL2 and undervolt (Intel)
+- **CPU controls** — Power limits (SPL/FPL), TjMax, Curve Optimizer (AMD), PL1/PL2 (Intel)
 - **GPU controls** — TGP, Dynamic Boost, V-F Curve Editor, Core/Memory Clock Offsets
 - **Fan Control** — Custom EC fan curves per game
 - **Flydigi cooler** — Custom fan curves and RGB speed per game

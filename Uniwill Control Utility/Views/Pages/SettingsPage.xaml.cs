@@ -224,6 +224,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbPowerBoostMode.IsChecked = Settings.Default.EnablePowerBoostMode;
             cbHideFlydigi.IsChecked = Settings.Default.EnableFlydigi;
             cbDisableCpuVoltageControl.IsChecked = Settings.Default.EnableCpuVoltageControl;
+            // CPU voltage control (Curve Optimizer) is AMD-only — hide the row on Intel scenarios
+            bool cpuVoltageRowVisible = Family.TYPE != Family.ProcessorType.Intel;
+            CpuVoltageControlDivider.Visibility = cpuVoltageRowVisible ? Visibility.Visible : Visibility.Collapsed;
+            CpuVoltageControlRow.Visibility = cpuVoltageRowVisible ? Visibility.Visible : Visibility.Collapsed;
             cbDisableGpuClockControl.IsChecked = Settings.Default.EnableGpuClockControl;
             cbShowAdaptiveNavigation.IsChecked = Settings.Default.EnableAdaptiveNavigation;
             cbShowHydroUiNavigation.IsChecked = Settings.Default.EnableHydroUiNavigation;

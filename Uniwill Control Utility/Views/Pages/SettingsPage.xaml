@@ -368,11 +368,11 @@
                             </Grid>
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
+                            <Border x:Name="CpuVoltageControlDivider" Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                            <!-- Row: Disable CPU voltage control -->
-                            <Grid>
+                            <!-- Row: Disable CPU voltage control (hidden on Intel — voltage control is AMD-only) -->
+                            <Grid x:Name="CpuVoltageControlRow">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />

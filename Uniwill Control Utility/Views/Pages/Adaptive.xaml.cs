@@ -443,7 +443,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         // when getRunningGame already called it directly with resetTracking: false.
         private bool _isUpdatingPresetSelection;
 
-        // Voltage control is enabled when EnableCpuVoltageControl setting is True.
+        // Voltage control (Curve Optimizer) is AMD-only and gated by the EnableCpuVoltageControl setting.
         private bool AdpCpuVoltageEnabled => Settings.Default.EnableCpuVoltageControl;
 
         // Window classes that are NOT games (browsers, notifications, taskbar, etc.)
@@ -1075,7 +1075,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             lastCpuTjMax = 0;
             lastCpuPl1 = 0;
             lastCpuPl2 = 0;
-            lastCpuUndervolt = 0;
 
             // GPU tracking
             lastGpuTgp = 0;
@@ -1466,7 +1465,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         private int lastCpuCoCcd1 = 0;
         private int lastCpuPl1 = 0;
         private int lastCpuPl2 = 0;
-        private int lastCpuUndervolt = 0;
         // GPU diff-tracking
         private int lastGpuTgp = 0;
         private bool lastGpuDynamicBoost = false;
@@ -1944,16 +1942,13 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             int pl1 = (int)AdpSdIntelPl1.Value;
             int pl2 = (int)AdpSdIntelPl2.Value;
-            int uv = (int)AdpSdIntelUndervolt.Value;
 
-            if (pl1 != lastCpuPl1 || pl2 != lastCpuPl2 || uv != lastCpuUndervolt)
+            if (pl1 != lastCpuPl1 || pl2 != lastCpuPl2)
             {
                 try
                 {
                     var parts = new System.Collections.Generic.List<string>();
                     parts.Add($"--intel-pl={pl1:F0},{pl2:F0}");
-                    if (AdpCpuVoltageEnabled && uv < 0)
-                        parts.Add($"--intel-volt-cpu={uv:F0}");
 
                     string cmd = string.Join(" ", parts);
                     _ = RyzenAdj_To_UCU.TranslateAsync(cmd);
@@ -1965,7 +1960,6 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 lastCpuPl1 = pl1;
                 lastCpuPl2 = pl2;
-                lastCpuUndervolt = uv;
             }
         }
 
@@ -3800,9 +3794,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 AdpDividerAfterBoost.Visibility = Visibility.Collapsed;
                 AdpGridTjMax.Visibility = Visibility.Collapsed;
                 AdpCoControlsPanel.Visibility = Visibility.Collapsed;
-                // Intel undervolt visibility gated by voltage control setting
-                AdpGridIntelUndervolt.Visibility = voltageEnabled ? Visibility.Visible : Visibility.Collapsed;
-                AdpDividerAfterIntelPl2.Visibility = voltageEnabled ? Visibility.Visible : Visibility.Collapsed;
+                // Voltage control is AMD-only — Intel undervolt is not offered
+                AdpGridIntelUndervolt.Visibility = Visibility.Collapsed;
+                AdpDividerAfterIntelPl2.Visibility = Visibility.Collapsed;
             }
             else
             {
@@ -3895,7 +3889,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 lastCpuCoCcd1 = 0;
                 lastCpuPl1 = 0;
                 lastCpuPl2 = 0;
-                lastCpuUndervolt = 0;
             }
             else
             {
@@ -4319,7 +4312,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             lastCpuCoCcd1 = 0;
             lastCpuPl1 = 0;
             lastCpuPl2 = 0;
-            lastCpuUndervolt = 0;
             // Reset watercooler last values
             lastWcPump = PumpVoltage.Off;
             lastWcFan = FanSpeed.Off;

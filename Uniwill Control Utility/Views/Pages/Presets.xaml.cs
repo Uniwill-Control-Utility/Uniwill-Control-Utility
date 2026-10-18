@@ -86,9 +86,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         private double _profileIntelPl1 = 45;
         private double _profileIntelPl2 = 60;
 
-        // Voltage control is enabled when EnableCpuVoltageControl setting is True.
-        // When the setting is False, voltage controls (CO for AMD, undervolt for Intel)
-        // are hidden and the app skips voltage-related SMU/MSR commands.
+        // Voltage control (Curve Optimizer) is AMD-only and gated by the EnableCpuVoltageControl setting.
+        // Intel scenarios have no voltage control at all — the undervolt UI and MSR commands are removed.
         private bool CpuVoltageEnabled => Settings.Default.EnableCpuVoltageControl;
 
         public Presets(
@@ -463,7 +462,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tbPl2Label.Text = "PL2";
                 tbTjMaxLabel.Visibility = Visibility.Collapsed;
                 tbTjMax.Visibility = Visibility.Collapsed;
-                tbCoLabel.Text = "Voltage Offset";
             }
             // Hide Intel-specific controls on AMD
             else
@@ -471,12 +469,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                 sdIntelTuning.Visibility = Visibility.Collapsed;
             }
 
-            // Hide CO/voltage offset row in status card and slider controls when voltage control is disabled
-            bool voltageEnabled = CpuVoltageEnabled;
+            // Voltage control is AMD-only (Curve Optimizer): hide the CO row in the status card and the
+            // CO slider controls when EnableCpuVoltageControl is OFF. Intel has no voltage control at all.
+            bool voltageEnabled = CpuVoltageEnabled && Family.TYPE != Family.ProcessorType.Intel;
             tbCoLabel.Visibility = voltageEnabled ? Visibility.Visible : Visibility.Collapsed;
             tbCoOffset.Visibility = voltageEnabled ? Visibility.Visible : Visibility.Collapsed;
             coControlsPanel?.SetValue(VisibilityProperty, voltageEnabled ? Visibility.Visible : Visibility.Collapsed);
-            intelVoltControlsPanel?.SetValue(VisibilityProperty, voltageEnabled ? Visibility.Visible : Visibility.Collapsed);
 
             // NVIDIA visibility â€” check GPU inventory or fall back to NvTuning probe
             bool hasNvidia = false;
@@ -1179,8 +1177,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 tbPl1.Text = $"{_profileIntelPl1:F0} W";
                 tbPl2.Text = $"{_profileIntelPl2:F0} W";
-                if (CpuVoltageEnabled)
-                    tbCoOffset.Text = $"{sdIntelVolt.Value:+0;-0;0} mV";
                 tbGpuTgp.Text = $"{_profileGpuTgp:F0} W";
                 tbGpuDb.Text = _profileGpuDb ? $"+{_profileGpuDbOffset:F0} W" : "Off";
             }
@@ -1383,10 +1379,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             rbCoPerCcd.IsChecked = !coUnified;
             sdCoUnified.Value = Settings.Default.customCoUnifiedValue;
 
-            // Apply voltage control visibility from global setting
-            bool voltageEnabled = CpuVoltageEnabled;
+            // Apply voltage control visibility from global setting (AMD only — Intel has no voltage control)
+            bool voltageEnabled = CpuVoltageEnabled && Family.TYPE != Family.ProcessorType.Intel;
             coControlsPanel?.SetValue(VisibilityProperty, voltageEnabled ? Visibility.Visible : Visibility.Collapsed);
-            intelVoltControlsPanel?.SetValue(VisibilityProperty, voltageEnabled ? Visibility.Visible : Visibility.Collapsed);
 
             // Restore stored profile values for status card
             _profileSustained = sdSustained.Value;
@@ -1722,10 +1717,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
-                // Intel MSR commands
+                // Intel MSR commands (no voltage control on Intel — undervolt removed)
                 parts.Add($"--intel-pl={sdIntelPl1.Value:F0},{sdIntelPl2.Value:F0}");
-                if (CpuVoltageEnabled && sdIntelVolt.Value < 0)
-                    parts.Add($"--intel-volt-cpu={sdIntelVolt.Value:F0}");
             }
 
             // NVIDIA — GPU power control via EC Dynamic Boost registers (0x0743-0x0746).

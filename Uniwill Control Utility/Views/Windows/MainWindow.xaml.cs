@@ -2792,9 +2792,8 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
+                // No voltage control on Intel — undervolt removed
                 parts.Add($"--intel-pl={p.IntelPl1:F0},{p.IntelPl2:F0}");
-                if (p.IntelVolt < 0)
-                    parts.Add($"--intel-volt-cpu={p.IntelVolt:F0}");
             }
 
             // NVIDIA GPU clocks
