@@ -553,7 +553,7 @@
             <Style TargetType="{x:Type ui:CardExpander}"
                    BasedOn="{StaticResource DefaultUiCardExpanderStyle}">
                 <Setter Property="Padding" Value="14,16,16,16" />
-                <Setter Property="ContentPadding" Value="58,16,46,16" />
+                <Setter Property="ContentPadding" Value="60,16,46,16" />
                 <Setter Property="CornerRadius" Value="4"/>
             </Style>
         </ResourceDictionary>

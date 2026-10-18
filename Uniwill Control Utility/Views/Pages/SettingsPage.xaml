@@ -534,7 +534,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Unlocks hardware power limits"
+                                               Text="Manage extra useful features"
                                                TextWrapping="Wrap" />
                             </StackPanel>
                         </ui:CardExpander.Header>
@@ -550,7 +550,7 @@
                                     <ui:TextBlock Margin="0,2,0,2"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Removes CPU power limit caps and unlocks GPU power limit to 250W on supported GPUs. Disables Dynamic Boost control."
+                                                   Text="Sets TDP and TGP slider limits to 250W (but requires mods for it to truly apply and disables Dynamic Boost)"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="cbPowerBoostMode"
@@ -576,7 +576,7 @@
                                     <ui:TextBlock Margin="0,2,0,2"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Lets the physical Performance button cycle UCU power presets (Office to Gaming to Turbo to every saved Custom preset of the pool Power Boost Mode selects, wrapping). The press is read from the EC's own event channel, so the button stays usable while a Custom preset is active."
+                                                   Text="Enabling it lets the physical key (next to the power button) switch between power presets when pressed"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="cbQKeyIntercept"
@@ -621,7 +621,7 @@
                                      Margin="0,0,0,8"
                                      IsExpanded="False">
                         <ui:CardExpander.Icon>
-                            <ui:SymbolIcon Symbol="Wrench20" FontSize="20" Margin="6,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEC7A;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>
@@ -746,7 +746,7 @@
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="False">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7AA;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7AA;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>
@@ -816,7 +816,7 @@
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="False">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9D9;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9D9;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>
@@ -928,7 +928,7 @@
                                     Margin="0,12,0,8"
                                     Visibility="Collapsed">
                         <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEC7A;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE896;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardControl.Icon>
                         <ui:CardControl.Header>
                             <StackPanel>
@@ -950,7 +950,7 @@
                                      IsEnabled="True"
                                      IsExpanded="False">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7F8;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7F8;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>
