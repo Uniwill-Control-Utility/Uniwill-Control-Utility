@@ -147,7 +147,8 @@ namespace Uniwill_Control_Utility.Models
         /// <summary>Flame "Flicker speed:" slider 1-5, default 5 (g_flameSpeed).</summary>
         public int BetterRgbFlameSpeed { get; set; } = 5;
 
-        /// <summary>Flame "Smoothness:" slider 1-20, default 8 (g_flameSmooth).</summary>
+        /// <summary>Flame "Smoothness:" slider, reference range 1-20 (g_flameSmooth); UCU
+        /// caps it at 1-10 for a calmer flicker.</summary>
         public int BetterRgbFlameSmooth { get; set; } = 8;
 
         /// <summary>Raindrop "Falling speed:" slider 1-5, default 5 (g_rainSpeed).</summary>

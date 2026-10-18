@@ -502,7 +502,7 @@ namespace Uniwill_Control_Utility.Services
                 LightningWidth = Math.Clamp(settings.BetterRgbLightningWidth, 1, 4),
                 LightningConcurrent = Math.Clamp(settings.BetterRgbLightningConcurrent, 1, 4),
                 FlameSpeed = Math.Clamp(settings.BetterRgbFlameSpeed, 1, 5),
-                FlameSmooth = Math.Clamp(settings.BetterRgbFlameSmooth, 1, 20),
+                FlameSmooth = Math.Clamp(settings.BetterRgbFlameSmooth, 1, 10),
                 RainSpeed = Math.Clamp(settings.BetterRgbRainSpeed, 1, 5),
                 RainDensity = Math.Clamp(settings.BetterRgbRainDensity, 1, 5),
                 RainColorCount = Math.Clamp(settings.BetterRgbRainColorCount, 1, 5),

@@ -848,7 +848,7 @@ namespace Uniwill_Control_Utility.Services
                 settings.BetterRgbLightningWidth = Math.Clamp(cfg.LightningWidth, 1, 4);
                 settings.BetterRgbLightningConcurrent = Math.Clamp(cfg.LightningConcurrent, 1, 4);
                 settings.BetterRgbFlameSpeed = Math.Clamp(cfg.FlameSpeed, 1, 5);
-                settings.BetterRgbFlameSmooth = Math.Clamp(cfg.FlameSmooth, 1, 20);
+                settings.BetterRgbFlameSmooth = Math.Clamp(cfg.FlameSmooth, 1, 10);
                 settings.BetterRgbRainSpeed = Math.Clamp(cfg.RainSpeed, 1, 5);
                 settings.BetterRgbRainDensity = Math.Clamp(cfg.RainDensity, 1, 5);
                 settings.BetterRgbRainColors = cfg.RainColors;

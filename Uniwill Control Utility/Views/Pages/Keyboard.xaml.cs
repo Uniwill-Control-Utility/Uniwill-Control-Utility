@@ -2135,8 +2135,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             LtConcurrentValueText.Text = Math.Clamp(settings.BetterRgbLightningConcurrent, 1, 4).ToString();
             FlSpeedSlider.Value = Math.Clamp(settings.BetterRgbFlameSpeed, 1, 5);
             FlSpeedValueText.Text = Math.Clamp(settings.BetterRgbFlameSpeed, 1, 5).ToString();
-            FlSmoothSlider.Value = Math.Clamp(settings.BetterRgbFlameSmooth, 1, 20);
-            FlSmoothValueText.Text = Math.Clamp(settings.BetterRgbFlameSmooth, 1, 20).ToString();
+            FlSmoothSlider.Value = Math.Clamp(settings.BetterRgbFlameSmooth, 1, 10);
+            FlSmoothValueText.Text = Math.Clamp(settings.BetterRgbFlameSmooth, 1, 10).ToString();
             RnSpeedSlider.Value = Math.Clamp(settings.BetterRgbRainSpeed, 1, 5);
             RnSpeedValueText.Text = Math.Clamp(settings.BetterRgbRainSpeed, 1, 5).ToString();
             RnDensitySlider.Value = Math.Clamp(settings.BetterRgbRainDensity, 1, 5);
@@ -2300,7 +2300,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 BetterRgbLightningWidth = Math.Clamp((int)LtWidthSlider.Value, 1, 4),
                 BetterRgbLightningConcurrent = Math.Clamp((int)LtConcurrentSlider.Value, 1, 4),
                 BetterRgbFlameSpeed = Math.Clamp((int)FlSpeedSlider.Value, 1, 5),
-                BetterRgbFlameSmooth = Math.Clamp((int)FlSmoothSlider.Value, 1, 20),
+                BetterRgbFlameSmooth = Math.Clamp((int)FlSmoothSlider.Value, 1, 10),
                 BetterRgbRainSpeed = Math.Clamp((int)RnSpeedSlider.Value, 1, 5),
                 BetterRgbRainDensity = Math.Clamp((int)RnDensitySlider.Value, 1, 5),
                 BetterRgbRainColorCount = Math.Clamp(RnPicker.GetColors().Count, 1, 5),

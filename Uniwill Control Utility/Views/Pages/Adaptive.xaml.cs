@@ -858,7 +858,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 SetKbBrSlider(sdKbBrLtWidth, brCfg.LightningWidth, 1, 4);
                 SetKbBrSlider(sdKbBrLtConcurrent, brCfg.LightningConcurrent, 1, 4);
                 SetKbBrSlider(sdKbBrFlSpeed, brCfg.FlameSpeed, 1, 5);
-                SetKbBrSlider(sdKbBrFlSmooth, brCfg.FlameSmooth, 1, 20);
+                SetKbBrSlider(sdKbBrFlSmooth, brCfg.FlameSmooth, 1, 10);
                 SetKbBrSlider(sdKbBrRnSpeed, brCfg.RainSpeed, 1, 5);
                 SetKbBrSlider(sdKbBrRnDensity, brCfg.RainDensity, 1, 5);
                 SetKbBrSlider(sdKbBrMtSpeed, brCfg.MatrixSpeed, 1, 5);

@@ -172,7 +172,7 @@ namespace Uniwill_Control_Utility.Services
 
         // Flame
         public int FlameSpeed { get; set; } = 5;              // 1-5
-        public int FlameSmooth { get; set; } = 8;             // 1-20
+        public int FlameSmooth { get; set; } = 8;             // 1-10 (UCU cap; reference allows 1-20)
 
         // Raindrop
         public int RainSpeed { get; set; } = 5;               // 1-5
