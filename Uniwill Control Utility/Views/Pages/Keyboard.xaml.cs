@@ -150,6 +150,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             _visualizer.RefreshLayout();
             UpdateEffectUi();
             UpdateDirectionButtons();
+            // Re-assert the BetterRGB discrete-button highlights on every navigation: the
+            // constructor's async ApplySettings can race with the CardExpander content
+            // instantiation, so the startup pass may have skipped them (null-guarded).
+            UpdateFpsButtons();
+            UpdateWaveAngleButtons();
+            UpdateRcDurationButtons();
+            UpdateMtStyleButtons();
+            UpdateStLayoutButtons();
             UpdateBetterRgbStatus();
             _isFirstLoad = false;
 
@@ -650,7 +658,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private int _brDuration = 20;
         private int _brStyle;
         private int _brLayout;
-        private int _brAngle; // BetterRGB Wave angle, degrees (0-315, 45-degree steps)
+        private int _brAngle = 180; // BetterRGB Wave angle, degrees (0-315, 45-degree steps; default = left-to-right)
         private int _brFps = 30; // BetterRGB target stream rate (15/30/45/60)
 
         private void PopulateBetterRgbEffects()
@@ -803,6 +811,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     "Long" => 45,
                     _ => 20,
                 };
+            UpdateRcDurationButtons();
             MarkBetterRgbChanged();
         }
 
@@ -817,6 +826,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     "Rings" => 3,
                     _ => 0,
                 };
+            UpdateMtStyleButtons();
             MarkBetterRgbChanged();
         }
 
@@ -825,6 +835,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (_isFirstLoad) return;
             if (sender is System.Windows.Controls.Button btn && btn.Tag is string tag)
                 _brLayout = tag == "Vertical" ? 1 : 0;
+            UpdateStLayoutButtons();
             MarkBetterRgbChanged();
         }
 
@@ -839,9 +850,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             MarkBetterRgbChanged();
         }
 
-        /// <summary>Highlights the FPS button matching the current target rate.</summary>
+        /// <summary>Highlights the FPS button matching the current target rate.
+        /// Guarded: the BetterRGB card lives inside a CardExpander whose content is
+        /// instantiated lazily, so these buttons can still be null mid-instantiation.</summary>
         private void UpdateFpsButtons()
         {
+            if (btnFps15 == null)
+                return;
             bool isActive(int f) => _brFps == f;
 
             SetDirStyle(btnFps15, isActive(15));
@@ -882,6 +897,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// <summary>Highlights the direction button matching the current Wave angle.</summary>
         private void UpdateWaveAngleButtons()
         {
+            if (btnWvA0 == null)
+                return;
             bool isActive(int a) => _brAngle == a;
 
             SetDirStyle(btnWvA0, isActive(0));
@@ -892,6 +909,39 @@ namespace Uniwill_Control_Utility.Views.Pages
             SetDirStyle(btnWvA225, isActive(225));
             SetDirStyle(btnWvA270, isActive(270));
             SetDirStyle(btnWvA315, isActive(315));
+        }
+
+        /// <summary>Highlights the Reactive fade-duration button matching the current
+        /// duration (mirrors the Adaptive page's UpdateKbBrDurationButtons).</summary>
+        private void UpdateRcDurationButtons()
+        {
+            if (btnRcShort == null)
+                return;
+            SetDirStyle(btnRcShort, _brDuration == 10);
+            SetDirStyle(btnRcMedium, _brDuration == 20);
+            SetDirStyle(btnRcLong, _brDuration == 45);
+        }
+
+        /// <summary>Highlights the Matrix style button matching the current style
+        /// (mirrors the Adaptive page's UpdateKbBrStyleButtons).</summary>
+        private void UpdateMtStyleButtons()
+        {
+            if (btnMtDiagonal == null)
+                return;
+            SetDirStyle(btnMtDiagonal, _brStyle == 0);
+            SetDirStyle(btnMtColumns, _brStyle == 1);
+            SetDirStyle(btnMtLasers, _brStyle == 2);
+            SetDirStyle(btnMtRings, _brStyle == 3);
+        }
+
+        /// <summary>Highlights the Static layout button matching the current layout
+        /// (mirrors the Adaptive page's UpdateKbBrLayoutButtons).</summary>
+        private void UpdateStLayoutButtons()
+        {
+            if (btnStHorizontal == null)
+                return;
+            SetDirStyle(btnStHorizontal, _brLayout == 0);
+            SetDirStyle(btnStVertical, _brLayout == 1);
         }
 
         private void WvSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1357,6 +1407,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void UpdateDirectionButtons()
         {
+            if (btnDirLeftRight == null)
+                return;
             bool isActive(KeyboardDirection dir) => _currentDirection == dir;
             
             SetDirStyle(btnDirLeftRight, isActive(KeyboardDirection.LeftRight));
@@ -2058,6 +2110,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             BcColorPicker.SelectedColor = ParseColorOr(settings.BetterRgbBreathColor, Color.FromRgb(0x00, 0x78, 0xFF));
             _brAngle = Math.Clamp(settings.BetterRgbWaveAngle, 0, 315);
             UpdateWaveAngleButtons();
+            UpdateRcDurationButtons();
+            UpdateMtStyleButtons();
+            UpdateStLayoutButtons();
             WvSpeedSlider.Value = Math.Clamp(settings.BetterRgbWaveSpeed, 1, 5);
             WvSpeedValueText.Text = Math.Clamp(settings.BetterRgbWaveSpeed, 1, 5).ToString();
             SpSpeedSlider.Value = Math.Clamp(settings.BetterRgbSparkleSpeed, 1, 5);

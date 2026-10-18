@@ -614,7 +614,7 @@
                                             VerticalAlignment="Center">
                                             <ui:Button x:Name="btnFps15" Width="52" Height="30" Margin="0,0,4,0" Appearance="Transparent"
                                                 Click="FpsButton_Click" Tag="15"><TextBlock Text="15" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
-                                            <ui:Button x:Name="btnFps30" Width="52" Height="30" Margin="0,0,4,0" Appearance="Transparent"
+                                            <ui:Button x:Name="btnFps30" Width="52" Height="30" Margin="0,0,4,0" Appearance="Primary"
                                                 Click="FpsButton_Click" Tag="30"><TextBlock Text="30" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
                                             <ui:Button x:Name="btnFps45" Width="52" Height="30" Margin="0,0,4,0" Appearance="Transparent"
                                                 Click="FpsButton_Click" Tag="45"><TextBlock Text="45" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
@@ -709,7 +709,7 @@
                                                 Click="WvAngleButton_Click" Tag="90"><TextBlock Text="&#x2191;" FontSize="18" HorizontalAlignment="Center"/></ui:Button>
                                             <ui:Button x:Name="btnWvA135" Width="40" Height="36" Margin="0,0,4,0" Appearance="Transparent"
                                                 Click="WvAngleButton_Click" Tag="135"><TextBlock Text="&#x2197;" FontSize="18" HorizontalAlignment="Center"/></ui:Button>
-                                            <ui:Button x:Name="btnWvA180" Width="40" Height="36" Margin="0,0,4,0" Appearance="Transparent"
+                                            <ui:Button x:Name="btnWvA180" Width="40" Height="36" Margin="0,0,4,0" Appearance="Primary"
                                                 Click="WvAngleButton_Click" Tag="180"><TextBlock Text="&#x2192;" FontSize="18" HorizontalAlignment="Center"/></ui:Button>
                                             <ui:Button x:Name="btnWvA225" Width="40" Height="36" Margin="0,0,4,0" Appearance="Transparent"
                                                 Click="WvAngleButton_Click" Tag="225"><TextBlock Text="&#x2198;" FontSize="18" HorizontalAlignment="Center"/></ui:Button>
@@ -803,7 +803,7 @@
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                             <ui:Button x:Name="btnRcShort" Width="52" Height="30" Margin="0,0,4,0" Appearance="Transparent"
                                                 Click="RcDurationButton_Click" Tag="Short"><TextBlock Text="Short" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
-                                            <ui:Button x:Name="btnRcMedium" Width="60" Height="30" Margin="0,0,4,0" Appearance="Transparent"
+                                            <ui:Button x:Name="btnRcMedium" Width="60" Height="30" Margin="0,0,4,0" Appearance="Primary"
                                                 Click="RcDurationButton_Click" Tag="Medium"><TextBlock Text="Medium" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
                                             <ui:Button x:Name="btnRcLong" Width="52" Height="30" Margin="0,0,0,0" Appearance="Transparent"
                                                 Click="RcDurationButton_Click" Tag="Long"><TextBlock Text="Long" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
@@ -966,7 +966,7 @@
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                         <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Style" VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                            <ui:Button x:Name="btnMtDiagonal" Width="70" Height="30" Margin="0,0,4,0" Appearance="Transparent"
+                                            <ui:Button x:Name="btnMtDiagonal" Width="70" Height="30" Margin="0,0,4,0" Appearance="Primary"
                                                 Click="MtStyleButton_Click" Tag="Diagonal"><TextBlock Text="Diagonal" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
                                             <ui:Button x:Name="btnMtColumns" Width="70" Height="30" Margin="0,0,4,0" Appearance="Transparent"
                                                 Click="MtStyleButton_Click" Tag="Columns"><TextBlock Text="Columns" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
@@ -1027,7 +1027,7 @@
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                         <ui:TextBlock Grid.Column="0" FontTypography="Body" Text="Layout" VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                            <ui:Button x:Name="btnStHorizontal" Width="82" Height="30" Margin="0,0,4,0" Appearance="Transparent"
+                                            <ui:Button x:Name="btnStHorizontal" Width="82" Height="30" Margin="0,0,4,0" Appearance="Primary"
                                                 Click="StLayoutButton_Click" Tag="Horizontal"><TextBlock Text="Horizontal" FontSize="12" HorizontalAlignment="Center"/></ui:Button>
                                             <ui:Button x:Name="btnStVertical" Width="66" Height="30" Margin="0,0,0,0" Appearance="Transparent"
                                                 Click="StLayoutButton_Click" Tag="Vertical"><TextBlock Text="Vertical" FontSize="12" HorizontalAlignment="Center"/></ui:Button>

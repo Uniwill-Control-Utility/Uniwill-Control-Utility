@@ -148,7 +148,7 @@ namespace Uniwill_Control_Utility.Services
         public string BreathColor { get; set; } = "#0078FF";
 
         // Wave
-        public int WaveAngle { get; set; } = 0;               // 0-315, 45-degree steps
+        public int WaveAngle { get; set; } = 180;             // 0-315, 45-degree steps (left-to-right default)
         public int WaveSpeed { get; set; } = 4;               // 1-5 (renderer clamps to 1-10)
 
         // Sparkle

@@ -1441,7 +1441,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         // BetterRGB streamer override state (keyboard mode index 2). Button-selected
         // values (angle/duration/style/layout) live in fields; sliders read directly.
         private int _kbBrFps = 30;
-        private int _kbBrAngle = 0;      // Wave direction, 0-315 deg (45-degree steps)
+        private int _kbBrAngle = 180;    // Wave direction, 0-315 deg (45-degree steps; default = left-to-right)
         private int _kbBrDuration = 20;  // Reactive fade: 10 (Short) / 20 (Medium) / 45 (Long)
         private int _kbBrMtStyle = 0;    // Matrix: 0 Diagonal / 1 Columns / 2 Lasers / 3 Rings
         private int _kbBrStLayout = 0;   // Static: 0 Horizontal / 1 Vertical
@@ -3205,6 +3205,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void UpdateKbBrFpsButtons()
         {
+            if (btnKbBrFps15 == null)
+                return;
             void SetActive(Wpf.Ui.Controls.Button btn, int fps)
             {
                 btn.Appearance = _kbBrFps == fps ? Wpf.Ui.Controls.ControlAppearance.Primary : Wpf.Ui.Controls.ControlAppearance.Transparent;
@@ -3253,6 +3255,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void UpdateKbBrAngleButtons()
         {
+            if (btnKbBrWvA0 == null)
+                return;
             void SetActive(Wpf.Ui.Controls.Button btn, int angle)
             {
                 btn.Appearance = _kbBrAngle == angle ? Wpf.Ui.Controls.ControlAppearance.Primary : Wpf.Ui.Controls.ControlAppearance.Transparent;
@@ -3278,6 +3282,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void UpdateKbBrDurationButtons()
         {
+            if (btnKbBrRcShort == null)
+                return;
             void SetActive(Wpf.Ui.Controls.Button btn, int duration)
             {
                 btn.Appearance = _kbBrDuration == duration ? Wpf.Ui.Controls.ControlAppearance.Primary : Wpf.Ui.Controls.ControlAppearance.Transparent;
@@ -3298,6 +3304,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void UpdateKbBrStyleButtons()
         {
+            if (btnKbBrMtDiagonal == null)
+                return;
             void SetActive(Wpf.Ui.Controls.Button btn, int style)
             {
                 btn.Appearance = _kbBrMtStyle == style ? Wpf.Ui.Controls.ControlAppearance.Primary : Wpf.Ui.Controls.ControlAppearance.Transparent;
@@ -3319,6 +3327,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void UpdateKbBrLayoutButtons()
         {
+            if (btnKbBrStHorizontal == null)
+                return;
             void SetActive(Wpf.Ui.Controls.Button btn, int layout)
             {
                 btn.Appearance = _kbBrStLayout == layout ? Wpf.Ui.Controls.ControlAppearance.Primary : Wpf.Ui.Controls.ControlAppearance.Transparent;

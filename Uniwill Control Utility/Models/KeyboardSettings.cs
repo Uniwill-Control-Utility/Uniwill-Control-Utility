@@ -103,8 +103,10 @@ namespace Uniwill_Control_Utility.Models
         /// <summary>Breathing color, default RGB(0,120,255) (g_breathColor).</summary>
         public string BetterRgbBreathColor { get; set; } = "#0078FF";
 
-        /// <summary>Wave "Angle:" slider 0-359 degrees, default 0 (g_waveAngle).</summary>
-        public int BetterRgbWaveAngle { get; set; } = 0;
+        /// <summary>Wave "Angle:" slider 0-359 degrees. Reference default is 0 (g_waveAngle)
+        /// which sweeps right-to-left; UCU defaults to 180 (left-to-right) so the Wave
+        /// effect always has a direction selected out of the box.</summary>
+        public int BetterRgbWaveAngle { get; set; } = 180;
 
         /// <summary>Wave "Speed:" slider 1-5, default 4 (g_waveSpeed).</summary>
         public int BetterRgbWaveSpeed { get; set; } = 4;
