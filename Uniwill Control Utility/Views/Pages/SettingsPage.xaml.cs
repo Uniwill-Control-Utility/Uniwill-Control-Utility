@@ -36,7 +36,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         private const string ScheduledTaskName = "UCU";
         private const string InternetConnectivityHost = "8.8.8.8";
         private const string PresetExtension = ".UCUpresets";
-        private const string StressTestExeRelativePath = @"Assets\Stress-Test\AVX2 Stress Test.exe";
         private const string LegacyVersionPrefix = "3.";
         private const string MsiExecCommand = "msiexec";
         private const string MsiInstallFlag = "/i ";
@@ -1036,19 +1035,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             _ramSlots = CachedSystemInfo.RamSlots;
             _ramProducer = CachedSystemInfo.RamProducer;
             _ramModel = CachedSystemInfo.RamModel;
-        }
-
-        private void btnStressTest_Click(object sender, RoutedEventArgs e)
-        {
-            var stressTestPath = Settings.Default.Path + StressTestExeRelativePath;
-            if (File.Exists(stressTestPath))
-            {
-                Process process = new Process();
-                process.StartInfo.FileName = stressTestPath;
-                process.Start();
-
-                process.Dispose();
-            }
         }
 
         private void cbxLogLevel_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)

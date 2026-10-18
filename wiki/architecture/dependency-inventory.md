@@ -54,7 +54,6 @@ Thirty `.dll`, `.exe`, `.bin`, `.lib`, and `.exp` files are tracked, totalling a
 | `ACPIDriverDll.dll` | Loaded by `UniwillECService`; explicit copy-to-output rule. |
 | AMD PawnIO modules | Loaded by the AMD backend from `Assets/AMD/PawnIO`. |
 | Intel PawnIO modules | Loaded by the Intel backend from `Assets/Intel/PawnIO`. |
-| `Assets/Stress-Test/*` | Launched by Settings; explicit copy-to-output rules. |
 | RTSS shared-memory DLLs | Related to the overlay/RTSS integration and included in assets/root. |
 | `HidSharp.dll`, `LibreHardwareMonitorLib.dll` | Names overlap package-based dependencies and are present as tracked assemblies. |
 

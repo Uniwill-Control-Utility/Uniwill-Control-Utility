@@ -824,7 +824,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Logging level, stress testing, and troubleshooting tools"
+                                               Text="Logging level and troubleshooting tools"
                                                TextWrapping="Wrap" />
                             </StackPanel>
                         </ui:CardExpander.Header>
@@ -856,44 +856,6 @@
                                     <ComboBoxItem Content="Debug" />
                                 </ComboBox>
                             </Grid>
-
-                            <!-- Row: Stress test (hidden) -->
-                            <Grid Visibility="Collapsed">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Stress test" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Run a CPU stress test to validate cooling" />
-                                </StackPanel>
-                                <ui:Button x:Name="btnStressTest"
-                                           Grid.Column="1"
-                                           Width="190"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           Appearance="Caution"
-                                           Click="btnStressTest_Click">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="Fire20"
-                                                       FontSize="22"
-                                                       Margin="0,0,8,0" />
-                                        <TextBlock VerticalAlignment="Center"
-                                                   Text="Start Stress Test" />
-                                    </StackPanel>
-                                </ui:Button>
-                            </Grid>
-
-                            <ui:InfoBar Margin="0,10,0,0"
-                                        IsOpen="True"
-                                        IsClosable="False"
-                                        Severity="Warning"
-                                        Title="High CPU load"
-                                        Message="The stress test places extreme load on the CPU. Ensure cooling is adequate and proceed at your own risk"
-                                        Visibility="Collapsed" />
                         </StackPanel>
                     </ui:CardExpander>
 
