@@ -1,36 +1,41 @@
-using Gma.System.MouseKeyHook;
+﻿using Gma.System.MouseKeyHook;
 using Microsoft.Extensions.Hosting;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows;
+using System.Timers;
 using System.Windows.Forms;
 using Uniwill_Control_Utility.Models;
-using Uniwill_Control_Utility.ViewModels;
-using Uniwill_Control_Utility.Views.Overlay;
+using Uniwill_Control_Utility.Services.Performance;
 
 namespace Uniwill_Control_Utility.Services
 {
-    public sealed class OverlayManagerService :
+    public sealed partial class OverlayManagerService :
         IHostedService,
         IDisposable
     {
         private readonly OverlaySettingsStore _settingsStore;
         private readonly IHardwareMonitoringService _hardware;
         private readonly Performance.IFpsMonitoringService _fps;
+        private readonly EcTelemetryService? _ecTelemetry;
+        private readonly HydroUIService? _hydroUi;
+        private readonly FlydigiCoolerHidService? _flydigi;
 
         private readonly object _settingsSaveLock = new();
-
         private readonly object _hookLock = new();
 
         private IKeyboardMouseEvents? _hook;
-        private PerformanceOverlayWindow? _window;
-        private PerformanceOverlayViewModel? _viewModel;
 
         private DateTime _lastHotkeyUtc = DateTime.MinValue;
-        private bool _contentsVisible = true;
-        private bool _userShowIntent;
         private bool _disposed;
+
+        // RTSS OSD injection: timer-based update loop that writes metrics
+        // directly into RTSS shared memory for in-game rendering.
+        private System.Timers.Timer? _rtssOsdTimer;
+        private IDisposable? _rtssOsdHardwareLease;
+        private IDisposable? _rtssOsdFpsLease;
+        private bool _rtssOsdWasShowing; // tracks if OSD was last showing for focus-loss detection
+        private readonly object _rtssOsdLock = new(); // prevents concurrent ticks from System.Timers.Timer thread-pool dispatch
 
         public OverlayOptions CurrentOptions =>
             _settingsStore.Current;
@@ -38,7 +43,10 @@ namespace Uniwill_Control_Utility.Services
         public OverlayManagerService(
             OverlaySettingsStore settingsStore,
             IHardwareMonitoringService hardware,
-            Performance.IFpsMonitoringService fps)
+            Performance.IFpsMonitoringService fps,
+            EcTelemetryService? ecTelemetry = null,
+            HydroUIService? hydroUi = null,
+            FlydigiCoolerHidService? flydigi = null)
         {
             _settingsStore =
                 settingsStore ??
@@ -54,6 +62,10 @@ namespace Uniwill_Control_Utility.Services
                 fps ??
                 throw new ArgumentNullException(
                     nameof(fps));
+
+            _ecTelemetry = ecTelemetry;
+            _hydroUi = hydroUi;
+            _flydigi = flydigi;
         }
 
         public Task StartAsync(
@@ -80,13 +92,11 @@ namespace Uniwill_Control_Utility.Services
                  */
                 RunOnUiThread(EnsureHook);
 
-                // Re-apply current options (with defaults) so the ViewModel picks up new properties.
-                RunOnUiThread(() => _viewModel?.ApplyOptions(options));
+                // Start RTSS OSD timer.
+                StartRtssOsd(options);
             }
 
             if (options.Enabled && options.ShowOnStartup)
-                ShowOverlay();
-            else if (options.Enabled && options.VisibleOnLastShutdown)
                 ShowOverlay();
 
             return Task.CompletedTask;
@@ -97,23 +107,9 @@ namespace Uniwill_Control_Utility.Services
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            RunOnUiThread(() =>
-            {
-                RemoveHook();
-            });
+            StopRtssOsd();
 
-            RunOnUiThread(() =>
-            {
-                try
-                {
-                    SavePosition();
-                    SaveVisibilityState();
-                }
-                finally
-                {
-                    CloseOverlayWindow();
-                }
-            });
+            RunOnUiThread(RemoveHook);
 
             return Task.CompletedTask;
         }
@@ -134,180 +130,66 @@ namespace Uniwill_Control_Utility.Services
                 else
                     RemoveHook();
 
-                _viewModel?.ApplyOptions(normalisedOptions);
-
-                if (!normalisedOptions.Enabled)
-                {
-                    StopMonitoring();
-                    _window?.SetPendingShow(false);
-                    _window?.Hide();
-                    return;
-                }
-
-                if (_window?.IsVisible == true &&
-                    _contentsVisible)
-                {
-                    _viewModel?.StartMonitoring();
-                }
+                // Manage RTSS OSD timer based on enabled state.
+                if (normalisedOptions.Enabled)
+                    StartRtssOsd(normalisedOptions);
                 else
-                {
-                    _viewModel?.StopMonitoring();
-                }
+                    StopRtssOsd();
             });
         }
 
+        /// <summary>
+        /// Show the RTSS in-game OSD. Starts the shared-memory timer if not
+        /// already running. RTSS handles all rendering inside the game.
+        /// </summary>
         public void ShowOverlay()
         {
             ThrowIfDisposed();
 
-            RunOnUiThread(() =>
-            {
-                OverlayOptions options =
-                    _settingsStore.Current;
+            OverlayOptions options = _settingsStore.Current;
 
-                if (!options.Enabled)
-                    return;
+            if (!options.Enabled)
+                return;
 
-                EnsureWindow();
-
-                _contentsVisible = true;
-                _userShowIntent = true;
-
-                _viewModel!.SetContentVisible(true);
-                _viewModel.StartMonitoring();
-
-                if (_window!.IsVisible)
-                {
-                    _window.Activate();
-                    return;
-                }
-
-                // Defer the initial Show() until the first FPS sample confirms a game
-                // is active — this prevents the overlay from flashing briefly then
-                // disappearing when no game is currently in the foreground.
-                if (!_viewModel.GameActive)
-                {
-                    _window.SetPendingShow(true);
-                    return;
-                }
-
-                _window.SetUserWantsVisible(true);
-                _window.PositionRelativeToForegroundWindow();
-                _window.Show();
-            });
+            StartRtssOsd(options);
         }
 
+        /// <summary>
+        /// Hide the RTSS in-game OSD. Releases the OSD slot so RTSS stops
+        /// rendering UCU metrics.
+        /// </summary>
         public void HideOverlay()
         {
             if (_disposed)
                 return;
 
-            RunOnUiThread(() =>
-            {
-                _userShowIntent = false;
-                StopMonitoring();
-                _window?.ClearUserWantsVisible();
-                _window?.Hide();
-            });
+            StopRtssOsd();
         }
 
+        /// <summary>
+        /// Toggle the RTSS in-game OSD on/off.
+        /// </summary>
         public void ToggleOverlay()
         {
             ThrowIfDisposed();
 
-            RunOnUiThread(() =>
-            {
-                if (_window?.IsVisible == true)
-                    HideOverlay();
-                else
-                    ShowOverlay();
-            });
+            if (_rtssOsdTimer is not null)
+                HideOverlay();
+            else
+                ShowOverlay();
         }
 
+        /// <summary>
+        /// Alias for ToggleOverlay — kept for hotkey compatibility.
+        /// </summary>
         public void ToggleContents()
         {
-            ThrowIfDisposed();
-
-            RunOnUiThread(() =>
-            {
-                OverlayOptions options =
-                    _settingsStore.Current;
-
-                if (!options.Enabled)
-                    return;
-
-                EnsureWindow();
-
-                if (_window?.IsVisible != true)
-                {
-                    if (!_viewModel!.GameActive)
-                    {
-                        _window!.SetPendingShow(true);
-                        _window!.SetUserWantsVisible(true);
-                    }
-                    else
-                    {
-                        _window!.SetUserWantsVisible(true);
-                        _window!.PositionRelativeToForegroundWindow();
-                        _window!.Show();
-                    }
-                }
-
-                _contentsVisible = !_contentsVisible;
-
-                _viewModel!.SetContentVisible(
-                    _contentsVisible);
-
-                if (_contentsVisible)
-                    _viewModel.StartMonitoring();
-                else
-                    _viewModel.StopMonitoring();
-            });
+            ToggleOverlay();
         }
 
         public static bool IsValidHotkey(string? text)
         {
             return Hotkey.TryParse(text, out _);
-        }
-
-        private void EnsureWindow()
-        {
-            if (_window is not null)
-                return;
-
-            OverlayOptions options =
-                NormaliseForStorage(
-                    _settingsStore.Current);
-
-            _viewModel =
-                new PerformanceOverlayViewModel(
-                    _hardware,
-                    _fps);
-
-            _viewModel.ApplyOptions(options);
-
-            _window =
-                new PerformanceOverlayWindow(
-                    _viewModel);
-
-            _window.Closed += OnWindowClosed;
-
-            _window.Left = options.Left;
-            _window.Top = options.Top;
-        }
-
-        private void OnWindowClosed(
-            object? sender,
-            EventArgs e)
-        {
-            if (!ReferenceEquals(sender, _window))
-                return;
-
-            _viewModel?.StopMonitoring();
-            _viewModel?.Dispose();
-
-            _viewModel = null;
-            _window = null;
         }
 
         private void EnsureHook()
@@ -378,75 +260,25 @@ namespace Uniwill_Control_Utility.Services
         private OverlayOptions NormaliseForStorage(
             OverlayOptions options)
         {
-            return RunOnUiThread(() =>
+            int refreshInterval =
+                options.RefreshIntervalMs > 0
+                    ? options.RefreshIntervalMs
+                    : 250;
+
+            return options with
             {
-                Rect workArea = SystemParameters.WorkArea;
+                RefreshIntervalMs = refreshInterval,
 
-                double fallbackLeft =
-                    workArea.Left + 5;
+                ToggleOverlayHotkey =
+                    options.ToggleOverlayHotkey?
+                        .Trim() ??
+                    string.Empty,
 
-                double fallbackTop =
-                    workArea.Top + 5;
-
-                double left = options.Left;
-                double top = options.Top;
-
-                if (!IsFinite(left))
-                {
-                    left =
-                        _window is not null &&
-                        IsFinite(_window.Left)
-                            ? _window.Left
-                            : fallbackLeft;
-                }
-
-                if (!IsFinite(top))
-                {
-                    top =
-                        _window is not null &&
-                        IsFinite(_window.Top)
-                            ? _window.Top
-                            : fallbackTop;
-                }
-
-                double scale =
-                    IsFinite(options.Scale) &&
-                    options.Scale > 0
-                        ? options.Scale
-                        : 1.0;
-
-                double opacity =
-                    IsFinite(options.Opacity)
-                        ? Math.Clamp(
-                            options.Opacity,
-                            0.0,
-                            1.0)
-                        : 1.0;
-
-                int refreshInterval =
-                    options.RefreshIntervalMs > 0
-                        ? options.RefreshIntervalMs
-                        : 500;
-
-                return options with
-                {
-                    Left = left,
-                    Top = top,
-                    Scale = scale,
-                    Opacity = opacity,
-                    RefreshIntervalMs = refreshInterval,
-
-                    ToggleOverlayHotkey =
-                        options.ToggleOverlayHotkey?
-                            .Trim() ??
-                        string.Empty,
-
-                    ToggleContentsHotkey =
-                        options.ToggleContentsHotkey?
-                            .Trim() ??
-                        string.Empty
-                };
-            });
+                ToggleContentsHotkey =
+                    options.ToggleContentsHotkey?
+                        .Trim() ??
+                    string.Empty
+            };
         }
 
         private void SaveOptionsIfChanged(
@@ -462,70 +294,6 @@ namespace Uniwill_Control_Utility.Services
 
                 _settingsStore.Save(options);
             }
-        }
-
-        private void SavePosition()
-        {
-            if (_window is null)
-                return;
-
-            double left = _window.Left;
-            double top = _window.Top;
-
-            if (!IsFinite(left) ||
-                !IsFinite(top))
-            {
-                return;
-            }
-
-            OverlayOptions options =
-                NormaliseForStorage(
-                    _settingsStore.Current with
-                    {
-                        Left = left,
-                        Top = top
-                    });
-
-            SaveOptionsIfChanged(options);
-        }
-
-        private void SaveVisibilityState()
-        {
-            OverlayOptions current = _settingsStore.Current;
-
-            if (current.VisibleOnLastShutdown == _userShowIntent)
-                return;
-
-            OverlayOptions options = NormaliseForStorage(
-                current with { VisibleOnLastShutdown = _userShowIntent });
-
-            SaveOptionsIfChanged(options);
-        }
-
-        private void StopMonitoring()
-        {
-            _viewModel?.StopMonitoring();
-        }
-
-        private void CloseOverlayWindow()
-        {
-            PerformanceOverlayWindow? window =
-                _window;
-
-            PerformanceOverlayViewModel? viewModel =
-                _viewModel;
-
-            _window = null;
-            _viewModel = null;
-
-            if (window is not null)
-            {
-                window.Closed -= OnWindowClosed;
-                window.ClosePermanently();
-            }
-
-            viewModel?.StopMonitoring();
-            viewModel?.Dispose();
         }
 
         private static bool IsFinite(double value)
@@ -577,11 +345,204 @@ namespace Uniwill_Control_Utility.Services
 
             _disposed = true;
 
+            StopRtssOsd();
+
             RunOnUiThread(RemoveHook);
-            RunOnUiThread(CloseOverlayWindow);
 
             GC.SuppressFinalize(this);
         }
+
+        #region RTSS OSD
+
+        private void StartRtssOsd(OverlayOptions options)
+        {
+            if (_rtssOsdTimer is not null)
+            {
+                // Already running — just update the interval if it changed.
+                if (_rtssOsdTimer.Interval != options.RefreshIntervalMs)
+                    _rtssOsdTimer.Interval = options.RefreshIntervalMs;
+                return;
+            }
+
+            // Acquire hardware monitoring categories needed.
+            HardwareMonitoringCategory categories = HardwareMonitoringCategory.None;
+
+            if (options.ShowCpuRow)
+                categories |= HardwareMonitoringCategory.Cpu;
+
+            if (options.ShowRamRow)
+                categories |= HardwareMonitoringCategory.Memory;
+
+            if (options.ShowGpuRow || options.ShowVramRow)
+                categories |= HardwareMonitoringCategory.Gpu;
+
+            if (categories != HardwareMonitoringCategory.None)
+                _rtssOsdHardwareLease = _hardware.Acquire(categories);
+
+            // Always acquire FPS monitoring — we need fps.IsAvailable and
+            // fps.ProcessId for game focus detection even when no FPS rows
+            // are shown in the OSD. Store the lease so it isn't GC'd.
+            _rtssOsdFpsLease = _fps.Acquire();
+
+            _rtssOsdTimer = new System.Timers.Timer(options.RefreshIntervalMs > 0 ? options.RefreshIntervalMs : 250);
+            _rtssOsdTimer.AutoReset = true;
+            _rtssOsdTimer.Elapsed += OnRtssOsdTick;
+            _rtssOsdTimer.Start();
+        }
+
+        private void StopRtssOsd()
+        {
+            if (_rtssOsdTimer is not null)
+            {
+                _rtssOsdTimer.Stop();
+                _rtssOsdTimer.Elapsed -= OnRtssOsdTick;
+                _rtssOsdTimer.Dispose();
+                _rtssOsdTimer = null;
+            }
+
+            _rtssOsdHardwareLease?.Dispose();
+            _rtssOsdHardwareLease = null;
+
+            _rtssOsdFpsLease?.Dispose();
+            _rtssOsdFpsLease = null;
+
+            lock (_rtssOsdLock)
+            {
+                _rtssOsdWasShowing = false;
+                RtssOsdWriter.Release();
+            }
+        }
+
+        private void OnRtssOsdTick(object? sender, ElapsedEventArgs e)
+        {
+            lock (_rtssOsdLock)
+            {
+                try
+                {
+                    FpsMetricsSnapshot fps = _fps.Latest;
+                    OverlayOptions options = _settingsStore.Current;
+
+                // Determine whether the target game is currently in focus.
+                // The OSD should only render when the game window is foreground.
+                //
+                // fps.IsAvailable may be false even when a game is running, because
+                // IsRecognizedGame() in FpsMonitoringService blocks processes not in
+                // the installed game library (e.g. Wallpaper Engine). In that case
+                // fall back to a direct RTSS read for the foreground PID so the OSD
+                // still shows hardware metrics for hooked processes outside the
+                // game library.
+                bool gameInFocus = false;
+
+                if (fps.IsAvailable && fps.ProcessId > 0)
+                {
+                    int foregroundPid = GetForegroundProcessId();
+                    gameInFocus = foregroundPid == fps.ProcessId;
+                }
+                else
+                {
+                    // FpsMonitoringService rejected the process (IsRecognizedGame
+                    // returned false). Fall back to a direct RTSS read for the
+                    // foreground PID — but only accept an exact PID match.
+                    // TryRead has an internal fallback to any hooked process with
+                    // FPS > 0, which would make gameInFocus always true when any
+                    // game is running. We verify the returned PID matches the
+                    // foreground to avoid that.
+                    int foregroundPid = GetForegroundProcessId();
+                    if (foregroundPid > 0 && RtssReader.TryRead(foregroundPid, out RtssFpsData fallbackData) && fallbackData.Fps > 0
+                        && fallbackData.ProcessId == foregroundPid)
+                    {
+                        gameInFocus = true;
+                    }
+                }
+
+                // If the game is not in focus, write a single-space OSD to hide
+                // the metrics while keeping the slot claimed. RTSS renders this
+                // as a blank line, effectively hiding the overlay. The slot stays
+                // claimed so the next Update() can overwrite without re-claiming.
+                // After hiding, also call Release() to fully clear the slot.
+                if (!gameInFocus)
+                {
+                    // First write a space so RTSS renders a blank frame, then
+                    // release the slot. The two-step approach ensures RTSS sees
+                    // the buffer change before the slot goes unowned.
+                    RtssOsdWriter.Update(" ");
+                    RtssOsdWriter.Release();
+                    _rtssOsdWasShowing = false;
+                    return;
+                }
+
+                // Game is in focus — build and write the OSD.
+                HardwareMetricsSnapshot hardware = _hardware.ReadSnapshot();
+
+                // Enrich with EC fan duty data (cached, non-blocking read).
+                if (_ecTelemetry is not null)
+                {
+                    EcFanDutySnapshot ecFan = _ecTelemetry.ReadFanDuty();
+                    hardware = hardware with
+                    {
+                        CpuFanSpeed = ecFan.CpuFanPercent,
+                        GpuFanSpeed = ecFan.GpuFanPercent
+                    };
+                }
+
+                // Gather Hydro UI data (null when not connected or disabled in options).
+                HydroUiSnapshot? hydroUi = null;
+                if (options.ShowHydroUi && _hydroUi?.IsConnected == true)
+                {
+                    Models.PumpVoltage pump = _hydroUi.IsSmartModeActive
+                        ? _hydroUi.SmartModeCurrentPump
+                        : _hydroUi.GetSettings().GetPumpVoltage();
+                    Models.FanSpeed fan = _hydroUi.IsSmartModeActive
+                        ? _hydroUi.SmartModeCurrentFan
+                        : _hydroUi.GetSettings().GetFanSpeed();
+                    hydroUi = new HydroUiSnapshot(pump, fan);
+                }
+
+                // Gather Flydigi data (null when not connected or disabled in options).
+                FlydigiSnapshot? flydigi = null;
+                if (options.ShowFlydigi && _flydigi?.IsConnected == true && _flydigi.FanRpmData is { } fanData)
+                {
+                    string model = _flydigi.ConnectedDeviceInfo?.ModelName ?? "FLY";
+                    flydigi = new FlydigiSnapshot(fanData.CurrentRpm, model);
+                }
+
+                string? osdText = RtssOsdFormatter.Build(hardware, fps, options, hydroUi, flydigi);
+                if (osdText is not null)
+                {
+                    bool wrote = RtssOsdWriter.Update(osdText);
+                    if (wrote)
+                        _rtssOsdWasShowing = true;
+                }
+                else
+                {
+                    _rtssOsdWasShowing = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Transient read failure must not crash the timer loop.
+                try { Serilog.Log.Warning(ex, "[Overlay] RtssOsdTick failed"); } catch { }
+            }
+            }
+        }
+
+        private static int GetForegroundProcessId()
+        {
+            IntPtr window = GetForegroundWindow();
+            if (window == IntPtr.Zero)
+                return 0;
+
+            _ = GetWindowThreadProcessId(window, out uint processId);
+            return unchecked((int)processId);
+        }
+
+        [System.Runtime.InteropServices.LibraryImport("user32.dll")]
+        private static partial IntPtr GetForegroundWindow();
+
+        [System.Runtime.InteropServices.LibraryImport("user32.dll")]
+        private static partial uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+
+        #endregion
 
         private readonly record struct Hotkey(
             bool Control,
@@ -686,5 +647,13 @@ namespace Uniwill_Control_Utility.Services
                 return true;
             }
         }
+
+        /// <summary>Snapshot of Hydro UI pump and fan state for the RTSS OSD formatter.</summary>
+        internal readonly record struct HydroUiSnapshot(
+            Models.PumpVoltage EffectivePumpVoltage,
+            Models.FanSpeed EffectiveFanSpeed);
+
+        /// <summary>Snapshot of Flydigi cooler state for the RTSS OSD formatter.</summary>
+        internal readonly record struct FlydigiSnapshot(int FanRpm, string ModelName);
     }
 }

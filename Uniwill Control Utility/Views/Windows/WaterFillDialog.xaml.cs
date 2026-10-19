@@ -10,10 +10,10 @@ namespace Uniwill_Control_Utility.Views.Windows
 {
     public partial class WaterFillDialog : FluentWindow
     {
-        private readonly Services.WaterCoolerService _service;
+        private readonly Services.HydroUIService _service;
         private CancellationTokenSource? _primingCts;
 
-        public WaterFillDialog(Services.WaterCoolerService service)
+        public WaterFillDialog(Services.HydroUIService service)
         {
             InitializeComponent();
             _service = service;

@@ -12,7 +12,7 @@ namespace Uniwill_Control_Utility.Services
 {
     public class AdaptivePreset
     {
-        // Watercooler (Hydro UI) per-game settings
+        // HydroUI (Hydro UI) per-game settings
         public bool WcEnabled { get; set; } = false;
         public string WcPumpVoltage { get; set; } = "V7";
         public string WcFanSpeed { get; set; } = "Percent50";
@@ -59,6 +59,10 @@ namespace Uniwill_Control_Utility.Services
         public byte KbColorB { get; set; } = 255;
         public string KbMultiColors { get; set; } = "";
         public string? KbPerKeyColors { get; set; }
+
+        // BetterRGB streamer per-game settings - full mirror of the Keyboard page's
+        // BetterRGB card (nested so the preset carries every per-effect parameter)
+        public AdaptiveBetterRgbSettings KbBetterRgb { get; set; } = new();
 
         // CPU per-game settings (Presets-style)
         public bool CpuEnabled { get; set; } = false;
@@ -124,6 +128,89 @@ namespace Uniwill_Control_Utility.Services
         }
     }
 
+    /// <summary>
+    /// BetterRGB streamer settings for a single adaptive per-game profile - mirrors
+    /// every control on the Keyboard page's BetterRGB card so the override applies
+    /// the full per-effect parameter set, not just effect/colors/FPS/brightness.
+    /// </summary>
+    public class AdaptiveBetterRgbSettings
+    {
+        public bool Enabled { get; set; } = false;
+        public string Mode { get; set; } = "Breathing";       // display name (Keyboard page list)
+        public int Fps { get; set; } = 30;                    // 15-60
+        public int BrightnessPercent { get; set; } = 100;     // software 3-100
+        public bool LightBarSync { get; set; } = false;   // strip mirrors the streamed frame
+
+        // Breathing
+        public int BreathSpeed { get; set; } = 5;            // 1-5
+        public int BreathSmooth { get; set; } = 60;           // 2-150
+        public bool BreathRandom { get; set; } = false;
+        public string BreathColor { get; set; } = "#0078FF";
+
+        // Wave
+        public int WaveAngle { get; set; } = 180;             // 0-315, 45-degree steps (left-to-right default)
+        public int WaveSpeed { get; set; } = 4;               // 1-5 (renderer clamps to 1-10)
+
+        // Sparkle
+        public int SparkleSpeed { get; set; } = 5;            // 1-5
+        public int SparkleDensity { get; set; } = 8;          // 3-20
+
+        // Reactive
+        public bool ReactiveRandom { get; set; } = true;
+        public int ReactiveDuration { get; set; } = 20;       // 10 / 20 / 45
+        public string ReactiveColor { get; set; } = "#FFFFFF";
+
+        // Wheel
+        public bool WheelReverse { get; set; } = false;
+        public int WheelSpeed { get; set; } = 4;              // 1-5 (renderer clamps to 1-10)
+
+        // Lightning
+        public int LightningSpeed { get; set; } = 5;          // 1-5
+        public int LightningSmooth { get; set; } = 10;        // 1-20
+        public int LightningWidth { get; set; } = 2;          // 1-4
+        public int LightningConcurrent { get; set; } = 1;     // 1-4
+
+        // Flame
+        public int FlameSpeed { get; set; } = 5;              // 1-5
+        public int FlameSmooth { get; set; } = 8;             // 1-10 (UCU cap; reference allows 1-20)
+
+        // Raindrop
+        public int RainSpeed { get; set; } = 5;               // 1-5
+        public int RainDensity { get; set; } = 3;             // 1-5
+        public string RainColors { get; set; } = "";          // CSV, up to 5
+
+        // Matrix
+        public int MatrixStyle { get; set; } = 0;             // 0 Diagonal / 1 Columns / 2 Lasers / 3 Rings
+        public int MatrixSpeed { get; set; } = 5;             // 1-5
+        public int MatrixDensity { get; set; } = 2;           // 1-5
+        public string MatrixColors { get; set; } = "";        // CSV, up to 3
+
+        // Static
+        public int StaticLayout { get; set; } = 0;            // 0 Horizontal / 1 Vertical
+        public int StaticZones { get; set; } = 1;             // 1-7
+        public string StaticZoneColors { get; set; } = "";    // CSV, up to 7
+
+        // Ripple
+        public bool RippleRandom { get; set; } = true;
+        public int RippleSpeed { get; set; } = 5;             // 1-5
+        public int RippleWidth { get; set; } = 2;             // 1-4
+        public string RippleColor { get; set; } = "#00B4FF";
+
+        // Rainbow
+        public int RainbowSpeed { get; set; } = 5;            // 1-5
+
+        // Quicksand
+        public int QuicksandSpeed { get; set; } = 5;          // 1-5
+        public int QuicksandScale { get; set; } = 5;          // 1-10
+        public string QuicksandColors { get; set; } = "";     // CSV, up to 3
+
+        // Current
+        public int CurrentSpeed { get; set; } = 5;            // 1-5
+        public int CurrentWidth { get; set; } = 4;            // 2-8
+        public string CurrentColors { get; set; } = "";       // CSV, up to 3
+
+    }
+
     public class AdaptivePresetManager
     {
         private readonly string _filePath;
@@ -163,7 +250,7 @@ namespace Uniwill_Control_Utility.Services
             if (File.Exists(_filePath))
             {
                 string json = File.ReadAllText(_filePath, Encoding.UTF8);
-                string migrated = MigrateGpuFieldsToJson(json);
+                string migrated = MigrateBetterRgbFieldsToJson(MigrateGpuFieldsToJson(json));
                 _presets = JsonConvert.DeserializeObject<Dictionary<string, AdaptivePreset>>(migrated)
                     ?? new Dictionary<string, AdaptivePreset>();
 
@@ -175,6 +262,69 @@ namespace Uniwill_Control_Utility.Services
             {
                 _presets = new Dictionary<string, AdaptivePreset>();
             }
+        }
+
+        /// <summary>
+        /// Migrates old flat BetterRGB fields (KbBetterRgbEnabled, ...) to the nested
+        /// KbBetterRgb object in the raw JSON before deserialization.
+        /// </summary>
+        private static string MigrateBetterRgbFieldsToJson(string json)
+        {
+            // Quick check: if the JSON already has the nested object, it's already migrated
+            if (json.Contains("\"KbBetterRgb\":"))
+                return json;
+
+            // Check if there are any old-format BetterRGB fields to migrate
+            if (!json.Contains("\"KbBetterRgbEnabled\""))
+                return json;
+
+            var tokens = JsonConvert.DeserializeObject<Newtonsoft.Json.Linq.JObject>(json);
+            if (tokens == null)
+                return json;
+
+            bool changed = false;
+
+            foreach (var property in tokens.Properties())
+            {
+                var preset = property.Value as Newtonsoft.Json.Linq.JObject;
+                if (preset == null)
+                    continue;
+
+                if (preset["KbBetterRgbEnabled"] == null)
+                    continue;
+
+                // Carry the flat fields over; per-effect params start at defaults
+                var br = new Newtonsoft.Json.Linq.JObject
+                {
+                    ["Enabled"] = preset["KbBetterRgbEnabled"],
+                    ["Mode"] = preset["KbBetterRgbMode"] ?? "Breathing",
+                    ["Fps"] = preset["KbBetterRgbFps"] ?? 30,
+                    ["BrightnessPercent"] = preset["KbBetterRgbBrightness"] ?? 100,
+                    ["BreathColor"] = preset["KbBetterRgbColor"] ?? "#FFFFFF",
+                    ["ReactiveColor"] = preset["KbBetterRgbColor"] ?? "#FFFFFF",
+                    ["RippleColor"] = preset["KbBetterRgbColor"] ?? "#FFFFFF",
+                    ["RainColors"] = preset["KbBetterRgbMultiColors"] ?? "",
+                    ["MatrixColors"] = preset["KbBetterRgbMultiColors"] ?? "",
+                    ["StaticZoneColors"] = preset["KbBetterRgbMultiColors"] ?? "",
+                    ["QuicksandColors"] = preset["KbBetterRgbMultiColors"] ?? "",
+                    ["CurrentColors"] = preset["KbBetterRgbMultiColors"] ?? ""
+                };
+
+                preset.Remove("KbBetterRgbEnabled");
+                preset.Remove("KbBetterRgbMode");
+                preset.Remove("KbBetterRgbFps");
+                preset.Remove("KbBetterRgbBrightness");
+                preset.Remove("KbBetterRgbColor");
+                preset.Remove("KbBetterRgbMultiColors");
+
+                preset["KbBetterRgb"] = br;
+                changed = true;
+            }
+
+            if (!changed)
+                return json;
+
+            return JsonConvert.SerializeObject(tokens, Newtonsoft.Json.Formatting.Indented);
         }
 
         /// <summary>

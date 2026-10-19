@@ -22,6 +22,21 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         internal static extern int ChangeDisplaySettingsEx([MarshalAs(UnmanagedType.LPWStr)] string lpszDeviceName, ref DEVMODE lpDevMode, IntPtr hwnd, uint dwflags, IntPtr lParam);
+
+        // XMG Control Center's color engine (GCUUtil.exe, MonitorProfile class) drives the
+        // genuine ICC switch through mscms.dll. Mirrored verbatim from the decompiled
+        // declarations so the P/Invoke marshalling — and therefore the native call bytes —
+        // match what XMG CC ships. AssociateColorProfileWithDeviceA is imported by GCUUtil
+        // but never called; the apply path is Uninstall → Install → WcsSetDefaultColorProfile.
+        [DllImport("mscms.dll")]
+        internal static extern bool InstallColorProfile(IntPtr hdc, string path);
+
+        [DllImport("mscms.dll")]
+        internal static extern bool UninstallColorProfile(IntPtr hdc, string path, bool bDelete);
+
+        [DllImport("mscms.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        internal static extern bool WcsSetDefaultColorProfile(uint scope, string deviceName, uint profileType, uint subtype, uint profileID, string profileName);
+
 #pragma warning restore SYSLIB1054
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -216,7 +231,535 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 : 0;
         }
 
+        /// <summary>
+        /// The display currently in use — the primary (taskbar) display. Unlike
+        /// FindLaptopScreen (always the internal panel), this follows the user to an
+        /// external monitor when that monitor is primary, mirroring OpenRevo's
+        /// per-monitor is_primary/is_internal monitor model.
+        /// </summary>
+        public static string? CurrentDisplayName()
+        {
+            return Screen.PrimaryScreen?.DeviceName ?? DefaultDevice;
+        }
+
+        /// <summary>
+        /// True when the given GDI device name is the laptop's internal panel, per the
+        /// DirectX display-device topology (Internal / DisplayportEmbedded output
+        /// technology). More robust than OpenRevo's monitor-name/resolution table.
+        /// </summary>
+        public static bool IsInternalDisplay(string? deviceName)
+        {
+            if (deviceName is null)
+                return false;
+
+            try
+            {
+                // Match by device name, not screen index: when the panel is disconnected
+                // (external-only), DCMI may still enumerate it while AllScreens omits it,
+                // so an index walk can misalign onto an external monitor.
+                var devices = GetAllDevices().ToArray();
+                foreach (var device in devices)
+                {
+                    if (device.monitorDevicePath == deviceName)
+                    {
+                        return device.outputTechnology == DisplayConfigOutputTechnology.Internal
+                            || device.outputTechnology == DisplayConfigOutputTechnology.DisplayportEmbedded;
+                    }
+                }
+
+                // Index fallback when both arrays describe the same attached set — covers
+                // DCMI builds whose monitorDevicePath does not mirror the GDI name.
+                var screens = Screen.AllScreens;
+                if (devices.Length == screens.Length)
+                {
+                    for (int i = 0; i < screens.Length; i++)
+                    {
+                        if (screens[i].DeviceName == deviceName)
+                        {
+                            return devices[i].outputTechnology == DisplayConfigOutputTechnology.Internal
+                                || devices[i].outputTechnology == DisplayConfigOutputTechnology.DisplayportEmbedded;
+                        }
+                    }
+                }
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static int GetCurrentRefreshRate(string? targetDisplayName)
+        {
+            if (string.IsNullOrEmpty(targetDisplayName))
+                return 0;
+
+            DEVMODE devMode = new DEVMODE
+            {
+                dmSize = (short)Marshal.SizeOf<DEVMODE>()
+            };
+
+            return EnumDisplaySettings(targetDisplayName, EnumCurrentSettings, ref devMode)
+                ? devMode.dmDisplayFrequency
+                : 0;
+        }
+
+        public static List<int> GetAvailableRefreshRates(string? targetDisplayName)
+        {
+            return GetSupportedRefreshRates(targetDisplayName)
+                .Distinct()
+                .OrderByDescending(x => x)
+                .ToList();
+        }
+
+        /// <summary>Current mode resolution of the given display, e.g. "2560×1600".</summary>
+        public static string GetDisplayResolution(string? targetDisplayName)
+        {
+            if (string.IsNullOrEmpty(targetDisplayName))
+                return string.Empty;
+
+            DEVMODE devMode = new DEVMODE
+            {
+                dmSize = (short)Marshal.SizeOf<DEVMODE>()
+            };
+
+            return EnumDisplaySettings(targetDisplayName, EnumCurrentSettings, ref devMode)
+                ? $"{devMode.dmPelsWidth}×{devMode.dmPelsHeight}"
+                : string.Empty;
+        }
+
+
+        /// <summary>
+        /// The laptop's internal panel (null when the device has none). Matches each
+        /// GDI screen against the DirectX topology (Internal / DisplayportEmbedded),
+        /// so it never follows an external monitor when that one is primary.
+        /// </summary>
+        public static string? InternalPanelName()
+        {
+            try
+            {
+                var screens = Screen.AllScreens;
+                var devices = GetAllDevices().ToArray();
+
+                // Prefer name matching: robust when the panel is disconnected and the
+                // arrays desynchronize (DCMI enumerates active paths only, so a detached
+                // panel simply has no name match → null).
+                foreach (var screen in screens)
+                {
+                    foreach (var device in devices)
+                    {
+                        if (device.monitorDevicePath == screen.DeviceName
+                            && (device.outputTechnology == DisplayConfigOutputTechnology.Internal
+                                || device.outputTechnology == DisplayConfigOutputTechnology.DisplayportEmbedded))
+                        {
+                            return screen.DeviceName;
+                        }
+                    }
+                }
+
+                // Fall back to the index walk when both arrays describe the same set of
+                // attached displays (the historical alignment, proven while attached) —
+                // covers DCMI builds whose monitorDevicePath does not mirror the GDI
+                // device name.
+                if (devices.Length == screens.Length)
+                {
+                    for (int i = 0; i < devices.Length; i++)
+                    {
+                        if (devices[i].outputTechnology == DisplayConfigOutputTechnology.Internal
+                            || devices[i].outputTechnology == DisplayConfigOutputTechnology.DisplayportEmbedded)
+                        {
+                            return screens[i].DeviceName;
+                        }
+                    }
+                }
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Rates offered for a display: the GDI-enumerated set, plus the 300 Hz
+        /// internal-panel mode that Windows hides unless dGPU-only mux is active.
+        /// </summary>
+        public static List<int> GetOfferedRefreshRates(string? targetDisplayName, bool dGpuOnlyActive)
+        {
+            var rates = GetAvailableRefreshRates(targetDisplayName);
+            if (dGpuOnlyActive && IsInternalDisplay(targetDisplayName) && !rates.Contains(DgpuOnlyRefreshRate))
+                rates.Insert(0, DgpuOnlyRefreshRate);
+            return rates;
+        }
+
+        /// <summary>
+        /// Refresh rates offered for the internal panel (descending). When the panel
+        /// is not enumerable (lid closed / external-only — GDI hides a display that
+        /// is off), fall back to the panel's known mode set — the same offering XMG
+        /// Control Center shows. 300 Hz only while dGPU-only mux is active.
+        /// </summary>
+        public static List<int> GetInternalRefreshRates(bool dGpuOnlyActive)
+        {
+            var rates = GetOfferedRefreshRates(InternalPanelName(), dGpuOnlyActive);
+            if (rates.Count == 0)
+            {
+                rates = new List<int> { InternalPanelHighRefreshRate, InternalPanelBaseRefreshRate };
+                if (dGpuOnlyActive)
+                    rates.Insert(0, DgpuOnlyRefreshRate);
+            }
+            return rates;
+        }
+
+        /// <summary>Current refresh rate of the internal panel (0 when unavailable).</summary>
+        public static int GetInternalRefreshRate()
+        {
+            return GetCurrentRefreshRate(InternalPanelName());
+        }
+
+        /// <summary>
+        /// Applies a refresh rate to the internal panel only (0 = disabled, no-op).
+        /// Returns the applied rate verified by readback (0 when skipped).
+        /// </summary>
+        public static int ApplyInternalRefreshRate(int hz)
+        {
+            if (hz <= 0)
+                return 0;
+
+            var panel = InternalPanelName();
+            if (string.IsNullOrEmpty(panel))
+                return 0;
+
+            ChangeDisplaySettings(panel, hz);
+            return GetCurrentRefreshRate(panel);
+        }
+
+        /// <summary>
+        /// Consumes a deferred internal-panel refresh-rate selection: when the user
+        /// picked a rate while the panel was detached (lid closed / internal display
+        /// disconnected — GDI hides a display that is off, so the write could not
+        /// land), re-applies it once the panel is attached again. Returns the applied
+        /// rate verified by readback (0 when there is nothing to reconcile, the panel
+        /// is still detached, or the deferred rate is not currently takeable).
+        /// </summary>
+        public static int ReconcileInternalRefreshRate(int deferredHz)
+        {
+            if (deferredHz <= 0)
+                return 0;
+
+            var panel = InternalPanelName();
+            if (string.IsNullOrEmpty(panel))
+                return 0;
+
+            // Only reconcile rates the attached panel can actually take: the GDI set,
+            // plus the hidden 300 Hz dGPU-only mode (not enumerated but appliable).
+            if (deferredHz != DgpuOnlyRefreshRate && !GetAvailableRefreshRates(panel).Contains(deferredHz))
+                return 0;
+
+            if (GetCurrentRefreshRate(panel) == deferredHz)
+                return deferredHz;
+
+            ChangeDisplaySettings(panel, deferredHz);
+            return GetCurrentRefreshRate(panel);
+        }
+
+        /// <summary>
+        /// Consumes a deferred internal-panel color-profile selection: when the user
+        /// picked a profile while the panel was detached (external-only), re-applies
+        /// it once the panel is attached again. Returns the applied profile verified
+        /// by readback (null when there is nothing to reconcile or the panel is still
+        /// detached).
+        /// </summary>
+        public static string? ReconcileInternalColorProfile(string deferredFile)
+        {
+            if (deferredFile is null || deferredFile.Length == 0)
+                return null;
+
+            var panel = InternalPanelName();
+            if (string.IsNullOrEmpty(panel))
+                return null;
+
+            if (GetCurrentColorProfile(panel) == deferredFile)
+                return deferredFile;
+
+            if (!ApplyColorProfile(panel, deferredFile))
+                return null;
+
+            return GetCurrentColorProfile(panel);
+        }
+
+        /// <summary>
+        /// The ICM display-profile association subkey for a GDI device name — the
+        /// trailing component of EnumDisplayDevices(dwFlags=1) DeviceKey
+        /// ("\Registry\Machine\...\Class\{4d36e96e-...}\0002" → "0002"). Same
+        /// numbering Windows' own calibrator and OpenRevo use.
+        /// </summary>
+        private static string IcmDeviceId(string? deviceName)
+        {
+            if (string.IsNullOrEmpty(deviceName))
+                return string.Empty;
+
+            DISPLAY_DEVICE displayDevice = new DISPLAY_DEVICE();
+            displayDevice.cb = (uint)Marshal.SizeOf(displayDevice);
+            if (!EnumDisplayDevices(deviceName, 0, ref displayDevice, 1))
+                return string.Empty;
+
+            int sep = displayDevice.DeviceKey.LastIndexOf('\\');
+            return sep < 0 ? string.Empty : displayDevice.DeviceKey.Substring(sep + 1);
+        }
+
+        /// <summary>
+        /// The device identifier XMG Control Center passes to WcsSetDefaultColorProfile:
+        /// the DeviceKey of the (attached + multi-driver) sub-device found under the
+        /// (attached + primary) display — GCUUtil.exe SetMonitorProfile's two-loop
+        /// EnumDisplayDevices walk (dwFlags = EDD_GET_DEVICE_INTERFACE_NAME).
+        /// </summary>
+        /// <summary>
+        /// The device identifier to pass to WcsSetDefaultColorProfile for a SPECIFIC display:
+        /// the DeviceKey of that display's (attached + multi-driver) sub-device, falling back to
+        /// its (attached) sub-device. Generalizes GCUUtil.exe SetMonitorProfile's walk (which
+        /// hardcodes the primary) to any GDI device name, so the WCS write lands on the same
+        /// association subkey IcmDeviceId(deviceName) reads.
+        /// </summary>
+        private static string WcsDeviceKeyFor(string? deviceName)
+        {
+            if (string.IsNullOrEmpty(deviceName))
+                return string.Empty;
+
+            DISPLAY_DEVICE dd = new DISPLAY_DEVICE();
+            dd.cb = (uint)Marshal.SizeOf(dd);
+
+            string? attached = null;
+            for (uint i = 0; ; i++)
+            {
+                if (!EnumDisplayDevices(deviceName, i, ref dd, 1))
+                    break;
+                if ((dd.StateFlags & 1u) == 0) // not AttachedToDesktop
+                    continue;
+                if ((dd.StateFlags & 2u) != 0) // MultiDriver — the WCS target
+                    return dd.DeviceKey;
+                if (attached is null)
+                    attached = dd.DeviceKey;
+            }
+            return attached ?? string.Empty;
+        }
+
+        /// <summary>
+        /// The display's active ICC profile as stored in the ICM association
+        /// (HKCU\...\ICM\ProfileAssociations\Display\{GUID}\&lt;id&gt; value ICMProfile,
+        /// REG_MULTI_SZ single element, bare filename resolved against the spool
+        /// color folder — exactly what OpenRevo and XMG CC write). Null when no
+        /// association exists (uncalibrated).
+        /// </summary>
+        public static string? GetCurrentColorProfile(string? deviceName)
+        {
+            string id = IcmDeviceId(deviceName);
+            if (string.IsNullOrEmpty(id))
+                return null;
+
+            string? output = RunReg("query", IcmAssociationRoot + @"\" + id, "/v", IcmProfileValueName);
+            return output is null ? null : ParseActiveColorProfile(output);
+        }
+
+        /// <summary>Current ICC profile filename of the internal panel (null = uncalibrated).</summary>
+        public static string? GetInternalColorProfile()
+        {
+            return GetCurrentColorProfile(InternalPanelName());
+        }
+
+        /// <summary>
+        /// Associates an ICC profile with the internal panel ("" removes the
+        /// association = uncalibrated). Returns the applied profile verified by
+        /// readback (null when removed or failed).
+        /// </summary>
+        public static string? ApplyInternalColorProfile(string profileFileName)
+        {
+            var panel = InternalPanelName();
+            if (string.IsNullOrEmpty(panel))
+                return null;
+
+            if (!ApplyColorProfile(panel, profileFileName))
+                return null;
+
+            return GetCurrentColorProfile(panel);
+        }
+
+        /// <summary>
+        /// Associates an ICC profile with a display ("" removes the association).
+        /// Returns true when the write/readback succeeded.
+        /// </summary>
+        public static bool ApplyColorProfile(string? deviceName, string profileFileName)
+        {
+            // "" = uncalibrated: drop the association. XMG CC has no removal path (it only
+            // ever installs a profile); Windows treats "no association" as the uncalibrated
+            // state, so a plain delete is the faithful equivalent here.
+            if (string.IsNullOrEmpty(profileFileName))
+            {
+                string id = IcmDeviceId(deviceName);
+                if (string.IsNullOrEmpty(id))
+                    return false;
+                RunReg("delete", IcmAssociationRoot + @"\" + id, "/v", IcmProfileValueName, "/f");
+                return GetCurrentColorProfile(deviceName) is null;
+            }
+
+            string fullPath = IcmProfilesFolder + @"\" + profileFileName;
+            if (!System.IO.File.Exists(fullPath))
+                return false;
+
+            string key = WcsDeviceKeyFor(deviceName);
+            if (string.IsNullOrEmpty(key))
+                return false;
+
+            // XMG Control Center's exact apply sequence (GCUUtil.exe SetMonitorProfile):
+            // uninstall the target, install it fresh, then set it as the WCS default profile
+            // for the panel at SYSTEM_WIDE then CURRENT_USER scope. The WcsSetDefaultColorProfile
+            // pair is what forces Windows' color engine to reload and actually repaint the
+            // panel — a bare ProfileAssociations registry write only relabels the selection.
+            // Non-destructive. XMG CC's UninstallColorProfile(bDelete=true) DELETES the .icm
+            // from the spool — fine for their own bundled profiles, but pointed at Windows'
+            // spool files it wipes them one by one. We only need the profile registered, so
+            // install (no-op if already present) then set it as the WCS default at both scopes.
+            InstallColorProfile(IntPtr.Zero, fullPath);
+            WcsSetDefaultColorProfile(0u, key, 0u, 5u, 0u, fullPath); // SYSTEM_WIDE, CPT_ICC, CPST_RGB_WORKING_SPACE
+            bool currentUser = WcsSetDefaultColorProfile(1u, key, 0u, 5u, 0u, fullPath); // CURRENT_USER
+            return currentUser;
+        }
+
+        /// <summary>
+        /// Profile filenames offered for the color-calibration control, in display
+        /// order. Files are Windows' own (C:\Windows\System32\spool\drivers\color),
+        /// the same set OpenRevo and XMG Control Center offer.
+        /// </summary>
+        public static List<string> GetOfferedColorProfileFiles()
+        {
+            List<string> offered = new();
+            foreach (string file in ColorProfileFiles)
+            {
+                if (file == DefaultColorProfileFile || System.IO.File.Exists(IcmProfilesFolder + @"\" + file))
+                    offered.Add(file);
+            }
+            return offered;
+        }
+
+        /// <summary>Display label for a profile filename ("sRGB.icm" → "sRGB").</summary>
+        public static string ColorProfileLabel(string file)
+        {
+            for (int i = 0; i < ColorProfileFiles.Length; i++)
+            {
+                if (ColorProfileFiles[i] == file)
+                    return ColorProfileLabels[i];
+            }
+            return file;
+        }
+
+        /// <summary>
+        /// Runs reg.exe with the given arguments and returns its stdout decoded from
+        /// UTF-16LE (reg.exe emits UTF-16LE with a BOM when piped), or null on failure.
+        /// </summary>
+        private static string? RunReg(params string[] args)
+        {
+            try
+            {
+                var startInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = @"C:\Windows\System32\reg.exe",
+                    Arguments = string.Join(" ", args.Select(a => a.Contains(' ') ? "\"" + a + "\"" : a)),
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true
+                };
+                using var process = System.Diagnostics.Process.Start(startInfo);
+                if (process is null)
+                    return null;
+                string output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit();
+                return output is null ? null : output.Replace("\uFEFF", string.Empty).Replace("\0", string.Empty);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// First element of a reg.exe query line for the ICMProfile value (printed as
+        /// "ICMProfile    REG_MULTI_SZ    name\0rest"), null when the value is absent.
+        /// </summary>
+        private static string? ParseFirstMultiSz(string regQueryOutput)
+        {
+            foreach (string line in regQueryOutput.Split('\n'))
+            {
+                string trimmed = line.Trim();
+                if (!trimmed.StartsWith(IcmProfileValueName))
+                    continue;
+
+                int typePos = trimmed.IndexOf("REG_");
+                if (typePos < 0)
+                    continue;
+
+                int i = typePos;
+                while (i < trimmed.Length && (char.IsLetterOrDigit(trimmed[i]) || trimmed[i] == '_'))
+                    i++;
+                while (i < trimmed.Length && trimmed[i] == ' ')
+                    i++;
+
+                string value = trimmed.Substring(i);
+                int sep = value.IndexOf("\\0");
+                if (sep >= 0)
+                    value = value.Substring(0, sep);
+                return value.Length == 0 ? null : value;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// The active ICC profile from a reg.exe query of the ICM association: the LAST
+        /// element of the ICMProfile MULTI_SZ (XMG CC appends the requested profile last and
+        /// that is the one in effect), reduced to its bare filename so the value matches
+        /// ColorProfileFiles whether Windows stored a full path or a name.
+        /// </summary>
+        private static string? ParseActiveColorProfile(string regQueryOutput)
+        {
+            foreach (string line in regQueryOutput.Split('\n'))
+            {
+                string trimmed = line.Trim();
+                if (!trimmed.StartsWith(IcmProfileValueName))
+                    continue;
+
+                int typePos = trimmed.IndexOf("REG_");
+                if (typePos < 0)
+                    continue;
+
+                int i = typePos;
+                while (i < trimmed.Length && (char.IsLetterOrDigit(trimmed[i]) || trimmed[i] == '_'))
+                    i++;
+                while (i < trimmed.Length && trimmed[i] == ' ')
+                    i++;
+
+                string value = trimmed.Substring(i);
+                int lastSep = value.LastIndexOf("\\0");
+                if (lastSep >= 0)
+                    value = value.Substring(lastSep + 2);
+
+                int slash = value.LastIndexOf('\\');
+                if (slash >= 0)
+                    value = value.Substring(slash + 1);
+
+                return value.Length == 0 ? null : value;
+            }
+            return null;
+        }
+
+        internal const string DefaultColorProfileFile = "Default.icm";
+        internal static readonly string[] ColorProfileLabels = new string[] { "Default", "sRGB", "DCI-P3", "AdobeRGB" };
+        internal static readonly string[] ColorProfileFiles = new string[] { DefaultColorProfileFile, "sRGB.icm", "DCIP3.icm", "AdobeRGB.icm" };
+        internal const string IcmProfileValueName = "ICMProfile";
+        internal const string IcmAssociationRoot = @"HKCU\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ICM\ProfileAssociations\Display\{4d36e96e-e325-11ce-bfc1-08002be10318}";
+        internal const string IcmProfilesFolder = @"C:\Windows\System32\spool\drivers\color";
+
         const int DispChangeSuccessful = 0;
+        const int DgpuOnlyRefreshRate = 300;
+        const int InternalPanelBaseRefreshRate = 60;
+        const int InternalPanelHighRefreshRate = 240;
         internal const uint EnumCurrentSettings = 0xFFFFFFFF;
 
         [Flags]

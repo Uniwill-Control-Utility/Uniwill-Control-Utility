@@ -43,29 +43,28 @@
                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
         </Grid>
 
-        <!-- Graph area -->
-        <Border Grid.Row="0" Grid.Column="1" Height="200"
-                BorderBrush="{DynamicResource TextFillColorDisabledBrush}"
-                BorderThickness="1,0,0,1"/>
-
-        <!-- Canvas for curve line and fill -->
-        <Canvas x:Name="_canvas" Grid.Row="0" Grid.Column="1" Height="200"/>
-
-        <!-- Vertical sliders overlay -->
-        <Grid x:Name="_slidersGrid" Grid.Row="0" Grid.Column="1" Height="200">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+        <!-- Graph area — nested Grid so canvas and sliders share a proper parent -->
+        <Grid x:Name="GraphArea" Grid.Row="0" Grid.Column="1" Height="200" MouseLeave="GraphArea_MouseLeave">
+            <Border BorderBrush="{DynamicResource TextFillColorDisabledBrush}"
+                    BorderThickness="1,0,0,1"/>
+            <!-- Canvas for curve line and fill -->
+            <Canvas x:Name="_canvas"/>
+            <!-- Vertical sliders overlay (11 columns for temperature zones) -->
+            <Grid x:Name="_slidersGrid">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+            </Grid>
         </Grid>
 
         <!-- X-axis labels (Temperature °C) -->

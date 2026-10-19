@@ -30,6 +30,7 @@ using MenuItem = System.Windows.Controls.MenuItem;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
+using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Uniwill_Control_Utility.Scripts.Intel_Backend;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
@@ -55,6 +56,9 @@ namespace Uniwill_Control_Utility.Views.Windows
         private static INavigationService _navigationService;
         private bool _isTrayPresetApplying;
         private readonly TrayWidgetController _trayWidget;
+        // Debounce for the tray-icon left click — the shell can send the LBUTTONDOWN
+        // message twice per click (press + release).
+        private DateTime _lastTrayIconClick;
         public static bool IsPageSelected(Type pageType) =>
             _mainWindowNav?.SelectedItem is INavigationViewItem item && item.TargetPageType == pageType;
 
@@ -77,6 +81,11 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             SystemEvents.PowerModeChanged += HandlePowerModeChange;
 
+            // Subscribe to window messages for display change detection.
+            // We reset LHM Computer proactively when the display topology changes
+            // (monitor hotplug) to prevent ExecutionEngineException from stale NVML handles.
+            this.SourceInitialized += OnSourceInitialized;
+
             Instance = this;
 
             // Ensure tray icon is visible
@@ -87,10 +96,28 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// <summary>Toggles the compact quick-control widget when the tray icon is left-clicked.</summary>
         private void NotifyIcon_LeftClick(Wpf.Ui.Tray.Controls.NotifyIcon sender, RoutedEventArgs e)
         {
-            // If the main window is already visible and active, just hide the tray widget
+            // The shell can deliver the tray LBUTTONDOWN message twice (press and release);
+            // debounce so the second arrival doesn't re-show a tray we just hid.
+            var now = DateTime.Now;
+            if ((now - _lastTrayIconClick).TotalMilliseconds < 300)
+                return;
+            _lastTrayIconClick = now;
+
+            // If the main window is open on the desktop, just hide the tray widget
             // instead of toggling it open (main window takes priority).
-            if (this.IsActive && this.Visibility == Visibility.Visible)
+            // WindowState, not IsActive: a window minimized right after startup keeps a
+            // stale active flag (minimizing sends no WM_CLEARFOCUS), which used to swallow
+            // the first left-click until a right-click forced the focus change.
+            if (this.WindowState != WindowState.Minimized && this.IsVisible)
             {
+                // Open but not in focus (another window owns the desktop) — the click
+                // brings the main window back to the front instead of doing nothing.
+                if (!this.IsActive)
+                {
+                    this.Activate();
+                    _ = this.Focus();
+                }
+
                 _trayWidget.HideIfVisible();
                 return;
             }
@@ -102,6 +129,19 @@ namespace Uniwill_Control_Utility.Views.Windows
         private void MainWindow_Activated(object? sender, EventArgs e)
         {
             _trayWidget.HideIfVisible();
+        }
+
+        /// <summary>Title-bar hand-over: minimize the main window and open the mini-tray widget.</summary>
+        private void BtnMinimizeToTray_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Wpf.Ui.Controls.Button)
+                return;
+
+            // Minimize first so the tray-icon left-click guard sees a minimized window,
+            // then show the mini-tray near the tray icon — the cursor sits on the title
+            // bar here, so anchoring on it would drop the tray at the button's axis.
+            this.WindowState = WindowState.Minimized;
+            _ = _trayWidget.ToggleAsync();
         }
 
         private void TrayMenu_Opened(object sender, RoutedEventArgs e)
@@ -336,6 +376,51 @@ namespace Uniwill_Control_Utility.Views.Windows
 
                 // Keyboard RGB startup apply moved to mainWindow_Loaded (AsyncApplyKeyboardOnStart)
                 // so it fires regardless of whether the app starts minimized to tray.
+
+                // Apply GPU Power Saving based on current power state
+                try
+                {
+                    var powerStatus = System.Windows.Forms.SystemInformation.PowerStatus;
+                    int mode = (powerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline)
+                        ? Settings.Default.GpuPowerSavingBattery
+                        : Settings.Default.GpuPowerSavingPluggedIn;
+                    if (mode != (int)GpuPowerSavingMode.NoChange)
+                    {
+                        await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
+                        Log.Information("[Startup] GPU Power Saving applied: {Mode}", (GpuPowerSavingMode)mode);
+
+                        // Reset LHM so it re-probes GPU availability after the PnP hotswap.
+                        // This ensures the dashboard shows the correct active GPU (iGPU fallback).
+                        try
+                        {
+                            var monitoring = App.GetService<IHardwareMonitoringService>();
+                            monitoring?.ResetComputer();
+                        }
+                        catch { /* non-critical */ }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Information("[Startup] GPU Power Saving apply failed: {Message}", ex.Message);
+                }
+
+                // Apply internal-panel refresh rate for the current power state (0 = off)
+                try
+                {
+                    var powerStatus = System.Windows.Forms.SystemInformation.PowerStatus;
+                    int hz = (powerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline)
+                        ? Settings.Default.RefreshRateBattery
+                        : Settings.Default.RefreshRatePluggedIn;
+                    if (hz > 0)
+                    {
+                        int applied = await Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyInternalRefreshRate(hz));
+                        Log.Information("[Startup] Internal panel refresh rate applied: {Hz} Hz", applied);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("[Startup] Internal panel refresh rate apply failed: {Message}", ex.Message);
+                }
             }
             catch (Exception ex)
             {
@@ -348,14 +433,22 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             try
             {
+                var settings = KeyboardSettingsService.Load();
+
+                // BetterRGB: the streamer owns the keyboard handle — resume it instead
+                // of opening a fresh one and re-sending firmware reports.
+                if (settings.Engine == KeyboardEngine.BetterRGB)
+                {
+                    App.GetService<BetterRgbStreamService>()?.ResumeAfterWake();
+                    return;
+                }
+
                 var hidService = new KeyboardHidService();
                 if (!hidService.Open())
                 {
                     hidService.Dispose();
                     return;
                 }
-
-                var settings = KeyboardSettingsService.Load();
 
                 if (settings.PowerOn)
                 {
@@ -372,30 +465,39 @@ namespace Uniwill_Control_Utility.Views.Windows
                     {
                         int brightnessPercent = (settings.Brightness * 100) / 7;
                         byte speed = (byte)Math.Clamp((int)settings.Speed, 0, 11);
-                        if (settings.Direction != KeyboardDirection.LeftRight)
-                        {
-                            System.Threading.Thread.Sleep(500);
-                        }
-                        hidService.TurnOnWithEffect(settings.ColorR, settings.ColorG, settings.ColorB,
-                            brightnessPercent, settings.EffectMode, speed, settings.Direction);
 
-                        if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor7Effect(settings.EffectMode))
+                        if (settings.EffectMode == Uniwill_Control_Utility.Models.KeyboardEffect.Rainbow)
                         {
-                            var colors = ParseKeyboardColorString(settings.MultiColors, 7);
-                            if (colors.Count > 0)
+                            hidService.SendRainbowEffect(brightnessPercent);
+                            System.Diagnostics.Debug.WriteLine("[KBD] Resume apply: Rainbow (software gradient)");
+                        }
+                        else
+                        {
+                            if (settings.Direction != KeyboardDirection.LeftRight)
                             {
-                                if (settings.EffectMode == Uniwill_Control_Utility.Models.KeyboardEffect.Marquee)
-                                    colors = colors.AsEnumerable().Reverse().ToList();
-                                hidService.SetMultiColor(colors);
+                                System.Threading.Thread.Sleep(500);
                             }
+                            hidService.TurnOnWithEffect(settings.ColorR, settings.ColorG, settings.ColorB,
+                                brightnessPercent, settings.EffectMode, speed, settings.Direction);
+
+                            if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor7Effect(settings.EffectMode))
+                            {
+                                var colors = ParseKeyboardColorString(settings.MultiColors, 7);
+                                if (colors.Count > 0)
+                                {
+                                    if (settings.EffectMode == Uniwill_Control_Utility.Models.KeyboardEffect.Marquee)
+                                        colors = colors.AsEnumerable().Reverse().ToList();
+                                    hidService.SetMultiColor(colors);
+                                }
+                            }
+                            else if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor4Effect(settings.EffectMode))
+                            {
+                                var colors = ParseKeyboardColorString(settings.MultiColors, 4);
+                                if (colors.Count > 0)
+                                    hidService.SetMultiColor(colors);
+                            }
+                            System.Diagnostics.Debug.WriteLine($"[KBD] Resume apply: effect {settings.EffectMode}");
                         }
-                        else if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor4Effect(settings.EffectMode))
-                        {
-                            var colors = ParseKeyboardColorString(settings.MultiColors, 4);
-                            if (colors.Count > 0)
-                                hidService.SetMultiColor(colors);
-                        }
-                        System.Diagnostics.Debug.WriteLine($"[KBD] Resume apply: effect {settings.EffectMode}");
                     }
                 }
                 else
@@ -474,6 +576,80 @@ namespace Uniwill_Control_Utility.Views.Windows
         }
 
         /// <summary>
+        /// Auto-power lighting policy for the Keyboard and Light Bar pages: when a page's
+        /// "auto off when unplugged" option is enabled, the lights follow the AC plug
+        /// state — unplugged turns them off, plugged in restores the user's saved lighting
+        /// intent. The BetterRGB streamer (which owns the keyboard-zone handle) is
+        /// stopped/started instead of sending firmware reports.
+        /// </summary>
+        private static void ApplyLightingAutoPowerPolicy(bool acPlugged)
+        {
+            var kbdSettings = KeyboardSettingsService.Load();
+            bool kbdAuto = kbdSettings.AutoPowerOffOnBattery;
+            bool lbAuto = Settings.Default.LightBarAutoPowerOffOnBattery;
+            if (!kbdAuto && !lbAuto)
+                return;
+
+            if (kbdAuto && kbdSettings.Engine == KeyboardEngine.BetterRGB)
+            {
+                var streamer = App.GetService<BetterRgbStreamService>();
+                if (streamer != null)
+                {
+                    if (!acPlugged)
+                        streamer.StopEngine("auto-power-battery");
+                    else
+                    {
+                        streamer.SetParams(kbdSettings);
+                        streamer.StartEngine("auto-power-ac");
+                    }
+                }
+            }
+
+            // BetterRGB on battery also needs a one-shot firmware TurnOff: StopEngine
+            // only halts the frame loop and exits UserMode, leaving the last streamed
+            // frame lit (same pairing as RequestIdleOff's StopEngine + TurnOff).
+            bool kbdHidAuto = kbdAuto && (kbdSettings.Engine != KeyboardEngine.BetterRGB || !acPlugged);
+            if (!kbdHidAuto && !lbAuto)
+                return;
+
+            var hidService = new KeyboardHidService();
+            if (!hidService.Open())
+            {
+                hidService.Dispose();
+                return;
+            }
+
+            try
+            {
+                if (!acPlugged)
+                {
+                    if (kbdHidAuto)
+                    {
+                        hidService.TurnOff();
+                        Log.Information("[Lighting] Auto-power policy: keyboard OFF (unplugged)");
+                    }
+                    if (lbAuto && hidService.IsLightBarAvailable)
+                    {
+                        hidService.LightBarTurnOff();
+                        Log.Information("[Lighting] Auto-power policy: light bar OFF (unplugged)");
+                    }
+                }
+                else
+                {
+                    if (kbdHidAuto)
+                        ApplyKeyboardOnStartWithService(hidService);
+                    if (lbAuto)
+                        ApplyLightBarOnStartWithService(hidService);
+                    Log.Information("[Lighting] Auto-power policy: lighting restored (plugged in)");
+                }
+            }
+            finally
+            {
+                hidService.Dispose();
+            }
+        }
+
+        /// <summary>
         /// Applies keyboard RGB settings on startup with a delay and retries.
         /// The ITE HID controller may not be discoverable immediately on cold boot,
         /// and the app may start minimized to tray (before Dashboard navigation fires).
@@ -508,7 +684,26 @@ namespace Uniwill_Control_Utility.Views.Windows
                     return;
                 }
 
-                ApplyKeyboardOnStartWithService(hidService);
+                var settings = KeyboardSettingsService.Load();
+                if (settings.Engine == KeyboardEngine.BetterRGB)
+                {
+                    // BetterRGB: the streamer owns the keyboard-zone handle — skip the
+                    // firmware keyboard apply. The light bar rides the usage-2 device
+                    // and is unaffected by the engine choice.
+                    var streamer = App.GetService<BetterRgbStreamService>();
+                    if (streamer != null)
+                    {
+                        streamer.SetParams(settings);
+                        streamer.StartEngine("startup");
+                    }
+                    Log.Information("[BetterRGB] Startup lighting presets successfully restored to hardware & BetterRGB Streamer");
+                    ApplyLightBarOnStartWithService(hidService);
+                }
+                else
+                {
+                    ApplyKeyboardOnStartWithService(hidService);
+                    ApplyLightBarOnStartWithService(hidService);
+                }
             }
             catch (Exception ex)
             {
@@ -517,6 +712,22 @@ namespace Uniwill_Control_Utility.Views.Windows
             finally
             {
                 hidService?.Dispose();
+            }
+
+            // Auto-power lighting at startup: if the laptop is on battery and the
+            // option is enabled, the startup apply above turned the lights on —
+            // suppress them to honor the unplug-off policy.
+            try
+            {
+                GetBatteryStatus();
+                bool acPluggedAtStart = statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
+                    || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery;
+                if (!acPluggedAtStart)
+                    ApplyLightingAutoPowerPolicy(false);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[KBD] Startup auto-power policy failed: {ex.Message}");
             }
         }
 
@@ -531,7 +742,8 @@ namespace Uniwill_Control_Utility.Views.Windows
                 {
                     System.Threading.Thread.Sleep(200);
                     int brightnessPercent = (settings.Brightness * 100) / 7;
-                    hidService.SetPerKeyBrightness(brightnessPercent);
+                    hidService.TurnOn(settings.ColorR, settings.ColorG, settings.ColorB, brightnessPercent);
+                    hidService.SetEffect(Uniwill_Control_Utility.Models.KeyboardEffect.Static);
                     var colors = settings.GetPerKeyColors();
                     hidService.SendAllPerKeyColorsFromDict(colors);
                     System.Diagnostics.Debug.WriteLine("[KBD] Startup apply: per-key mode");
@@ -541,90 +753,27 @@ namespace Uniwill_Control_Utility.Views.Windows
                     int brightnessPercent = (settings.Brightness * 100) / 7;
                     byte speed = (byte)Math.Clamp((int)settings.Speed, 0, 11);
 
-                    if (settings.Direction != KeyboardDirection.LeftRight)
-                        System.Threading.Thread.Sleep(500);
-
-                    hidService.TurnOnWithEffect(settings.ColorR, settings.ColorG, settings.ColorB,
-                        brightnessPercent, settings.EffectMode, speed, settings.Direction, settings.TouchReactive);
-
-                    if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor7Effect(settings.EffectMode))
+                    if (settings.EffectMode == Uniwill_Control_Utility.Models.KeyboardEffect.Rainbow)
                     {
-                        var colors = ParseKeyboardColorString(settings.MultiColors, 7);
-                        if (colors.Count > 0)
-                        {
-                            if (settings.EffectMode == Uniwill_Control_Utility.Models.KeyboardEffect.Marquee)
-                                colors = colors.AsEnumerable().Reverse().ToList();
-                            hidService.SetMultiColor(colors);
-                        }
-                    }
-                    else if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor4Effect(settings.EffectMode))
-                    {
-                        var colors = ParseKeyboardColorString(settings.MultiColors, 4);
-                        if (colors.Count > 0)
-                            hidService.SetMultiColor(colors);
-                    }
-                    System.Diagnostics.Debug.WriteLine($"[KBD] Startup apply: effect {settings.EffectMode}");
-                }
-            }
-            else
-            {
-                hidService.TurnOff();
-                System.Diagnostics.Debug.WriteLine("[KBD] Startup apply: keyboard OFF");
-            }
-        }
-
-        /// <summary>Applies persisted keyboard RGB settings at app startup.</summary>
-        private void ApplyKeyboardOnStart()
-        {
-            try
-            {
-                var hidService = new KeyboardHidService();
-                if (!hidService.Open())
-                {
-                    hidService.Dispose();
-                    return;
-                }
-
-                var settings = KeyboardSettingsService.Load();
-
-                if (settings.PowerOn)
-                {
-                    if (settings.PerKeyMode)
-                    {
-                        // Per-key mode: apply saved per-key colors
-                        int brightnessPercent = (settings.Brightness * 100) / 7;
-                        hidService.TurnOn(settings.ColorR, settings.ColorG, settings.ColorB, brightnessPercent);
-                        hidService.SetEffect(Uniwill_Control_Utility.Models.KeyboardEffect.Static);
-
-                        var colors = settings.GetPerKeyColors();
-                        hidService.SendAllPerKeyColorsFromDict(colors);
-
-                        System.Diagnostics.Debug.WriteLine("[KBD] Startup apply: per-key mode");
+                        // Rainbow: use software-driven per-key gradient.
+                        // The ITE firmware's built-in Rainbow (0x05) leaves the
+                        // leftmost columns dark due to a hardcoded LED layout mismatch.
+                        hidService.SendRainbowEffect(brightnessPercent);
+                        System.Diagnostics.Debug.WriteLine("[KBD] Startup apply: Rainbow (software gradient)");
                     }
                     else
                     {
-                        // Effects mode: apply saved effect settings using TurnOnWithEffect
-                        // to combine power-on and effect into one sequence, avoiding a
-                        // visible flash of intermediate Static color.
-                        // The ITE firmware needs ~500ms to settle after the HID handle
-                        // is opened before it accepts direction bytes. Without this delay
-                        // the direction silently falls back to Left?Right.
-                        int brightnessPercent = (settings.Brightness * 100) / 7;
-                        byte speed = (byte)Math.Clamp((int)settings.Speed, 0, 11);
                         if (settings.Direction != KeyboardDirection.LeftRight)
-                        {
                             System.Threading.Thread.Sleep(500);
-                        }
-                        hidService.TurnOnWithEffect(settings.ColorR, settings.ColorG, settings.ColorB,
-                            brightnessPercent, settings.EffectMode, speed, settings.Direction);
 
-                        // Send multi-color palette for effects that need it
+                        hidService.TurnOnWithEffect(settings.ColorR, settings.ColorG, settings.ColorB,
+                            brightnessPercent, settings.EffectMode, speed, settings.Direction, settings.TouchReactive);
+
                         if (Uniwill_Control_Utility.Views.Pages.Keyboard.IsMultiColor7Effect(settings.EffectMode))
                         {
                             var colors = ParseKeyboardColorString(settings.MultiColors, 7);
                             if (colors.Count > 0)
                             {
-                                // Marquee displays colors in reverse order on the HID controller
                                 if (settings.EffectMode == Uniwill_Control_Utility.Models.KeyboardEffect.Marquee)
                                     colors = colors.AsEnumerable().Reverse().ToList();
                                 hidService.SetMultiColor(colors);
@@ -639,16 +788,50 @@ namespace Uniwill_Control_Utility.Views.Windows
                         System.Diagnostics.Debug.WriteLine($"[KBD] Startup apply: effect {settings.EffectMode}");
                     }
                 }
-                else
+            }
+            else
+            {
+                hidService.TurnOff();
+                System.Diagnostics.Debug.WriteLine("[KBD] Startup apply: keyboard OFF");
+            }
+        }
+
+        /// <summary>Applies persisted LightBar settings at app startup using a pre-opened HID service.</summary>
+        private static void ApplyLightBarOnStartWithService(KeyboardHidService hidService)
+        {
+            try
+            {
+                if (!Settings.Default.LightBarEnabled)
                 {
-                    hidService.TurnOff();
+                    System.Diagnostics.Debug.WriteLine("[LB] Startup apply: LightBar disabled, skipping");
+                    return;
                 }
 
-                hidService.Dispose();
+                if (!hidService.IsLightBarAvailable)
+                {
+                    System.Diagnostics.Debug.WriteLine("[LB] Startup apply: LightBar not available on this device");
+                    return;
+                }
+
+                byte r = Settings.Default.LightBarR;
+                byte g = Settings.Default.LightBarG;
+                byte b = Settings.Default.LightBarB;
+                int brightness = Settings.Default.LightBarBrightness;
+                int effectIndex = Math.Clamp(Settings.Default.LightBarEffectIndex, 0, 5);
+                int speed = Math.Clamp(Settings.Default.LightBarSpeed, 0, 11);
+
+                byte[] effectValues = new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 };
+                byte effect = effectValues[effectIndex];
+                byte hidSpeed = (byte)(11 - speed);
+
+                hidService.LightBarTurnOn(r, g, b, brightness);
+                hidService.LightBarSetEffect(effect, hidSpeed, brightness);
+
+                System.Diagnostics.Debug.WriteLine($"[LB] Startup apply: color=({r},{g},{b}), brightness={brightness}, effect=0x{effect:X2}, hidSpeed={hidSpeed}");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[KBD] Startup apply failed: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[LB] Startup apply failed: {ex.Message}");
             }
         }
 
@@ -853,6 +1036,15 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             try
             {
+                // Throw the blanket BEFORE the MCU's wake-time reset: while suspended the
+                // HID device is gone, and a running StreamLoop would fail sends and burn
+                // the reconnect ladder (handshake blinks) throughout the sleep/wake window.
+                // ResumeAfterWake (PowerModes.Resume below) settles and restarts the stream.
+                if (e.Mode == PowerModes.Suspend)
+                {
+                    App.GetService<BetterRgbStreamService>()?.SuspendForSleep();
+                }
+
                 if (e.Mode == PowerModes.StatusChange && Settings.Default.isAdaptiveModeRunning == false)
                 {
                     await Task.Run(() => GetBatteryStatus());
@@ -887,6 +1079,92 @@ namespace Uniwill_Control_Utility.Views.Windows
                             if (lastAppliedState != "dc") ToastNotification.ShowToastNotification("Discharge Preset Applied!", $"Your discharge preset settings have been applied!");
                             lastAppliedState = "dc";
                         }
+
+                        // Apply GPU Power Saving setting for battery
+                        try
+                        {
+                            int mode = Settings.Default.GpuPowerSavingBattery;
+                            if (mode != (int)GpuPowerSavingMode.NoChange)
+                            {
+                                await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
+                                Log.Information("[Automations] GPU Power Saving applied for battery: {Mode}", (GpuPowerSavingMode)mode);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Information("[Automations] GPU Power Saving battery apply failed: {Message}", ex.Message);
+                        }
+
+                        // Apply internal-panel refresh rate for battery (0 = off)
+                        try
+                        {
+                            int hz = Settings.Default.RefreshRateBattery;
+                            if (hz > 0)
+                            {
+                                int applied = await Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyInternalRefreshRate(hz));
+                                Log.Information("[Automations] Internal panel refresh rate applied for battery: {Hz} Hz", applied);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning("[Automations] Internal panel refresh rate battery apply failed: {Message}", ex.Message);
+                        }
+                    }
+
+                    // Apply GPU Power Saving setting for AC (plugged in)
+                    if (statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
+                        || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery)
+                    {
+                        try
+                        {
+                            int mode = Settings.Default.GpuPowerSavingPluggedIn;
+                            if (mode != (int)GpuPowerSavingMode.NoChange)
+                            {
+                                await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
+                                Log.Information("[Automations] GPU Power Saving applied for plugged in: {Mode}", (GpuPowerSavingMode)mode);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Information("[Automations] GPU Power Saving plugged-in apply failed: {Message}", ex.Message);
+                        }
+
+                        // Apply internal-panel refresh rate for plugged in (0 = off)
+                        try
+                        {
+                            int hz = Settings.Default.RefreshRatePluggedIn;
+                            if (hz > 0)
+                            {
+                                int applied = await Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyInternalRefreshRate(hz));
+                                Log.Information("[Automations] Internal panel refresh rate applied for plugged in: {Hz} Hz", applied);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning("[Automations] Internal panel refresh rate plugged-in apply failed: {Message}", ex.Message);
+                        }
+                    }
+
+                    // BetterRGB streamer AC policy (OpenRevo's auto-policy):
+                    // plugged in → restore the 60FPS streamer; battery → hardware
+                    // firmware effects at the same params (0% CPU).
+                    try
+                    {
+                        bool acPlugged = statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
+                            || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery;
+
+                        // Auto-power lighting policy (Keyboard/Light Bar pages): when a page's
+                        // "auto off when unplugged" option is enabled, battery turns the lights
+                        // OFF and plugged restores the saved lighting. It supersedes the BetterRGB
+                        // AC fallback (which would leave hardware effects ON on battery), so skip
+                        // that policy when the keyboard auto-power is enabled.
+                        if (!KeyboardSettingsService.Load().AutoPowerOffOnBattery)
+                            App.GetService<BetterRgbStreamService>()?.ApplyAcPolicy(acPlugged);
+                        ApplyLightingAutoPowerPolicy(acPlugged);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Information("[Lighting] AC policy apply failed: {Message}", ex.Message);
                     }
                 }
 
@@ -900,6 +1178,32 @@ namespace Uniwill_Control_Utility.Views.Windows
                         {
                             // Give the system a moment to reinitialize after resume
                             await Task.Delay(1500);
+
+                            // Reset LibreHardwareMonitor Computer to get fresh NVML/ADL handles.
+                            // GPU driver state is stale after hibernation/sleep resume, causing
+                            // ExecutionEngineException when LHM tries to use old handles.
+                            try
+                            {
+                                var monitoring = App.GetService<IHardwareMonitoringService>();
+                                monitoring?.ResetComputer();
+                                Debug.WriteLine("[Resume] LHM Computer reset with fresh handles");
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[Resume] LHM reset failed: {ex.Message}");
+                            }
+
+                            // Also reset the NvTuning NVML state — it uses a separate NVML
+                            // context from LHM and has its own stale handles after resume.
+                            try
+                            {
+                                Scripts.GPUs.NVIDIA.Nvml.Reset();
+                                Debug.WriteLine("[Resume] NVML reset for NvTuning");
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[Resume] NVML reset failed: {ex.Message}");
+                            }
 
                             // Invalidate Adaptive page diff-tracking so next timer tick
                             // force-applies everything (hardware reverted to BIOS defaults).
@@ -951,6 +1255,22 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 Debug.WriteLine($"[Resume] Light Bar re-apply failed: {ex.Message}");
                             }
 
+                            // Auto-power lighting: the resume re-applies above turned the
+                            // lights back on per saved settings — if the auto-power option
+                            // is enabled and the laptop is on battery, suppress them again.
+                            try
+                            {
+                                GetBatteryStatus();
+                                bool acPluggedNow = statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
+                                    || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery;
+                                if (!acPluggedNow)
+                                    ApplyLightingAutoPowerPolicy(false);
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[Resume] Auto-power lighting suppression failed: {ex.Message}");
+                            }
+
                             // Re-apply Battery charge limit
                             try
                             {
@@ -971,11 +1291,53 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 Debug.WriteLine($"[Resume] Battery re-apply failed: {ex.Message}");
                             }
 
-                            // Re-apply Fan Control EC duties or restart Smart Fan Mode
+                            // Re-apply GPU Power Saving based on current power state
+                            try
+                            {
+                                var powerStatus = System.Windows.Forms.SystemInformation.PowerStatus;
+                                int mode = (powerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline)
+                                    ? Settings.Default.GpuPowerSavingBattery
+                                    : Settings.Default.GpuPowerSavingPluggedIn;
+                                if (mode != (int)GpuPowerSavingMode.NoChange)
+                                {
+                                    await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
+                                    Log.Information("[Resume] GPU Power Saving re-applied: {Mode}", (GpuPowerSavingMode)mode);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[Resume] GPU Power Saving re-apply failed: {ex.Message}");
+                            }
+
+                            // Re-apply internal-panel refresh rate for the current power state (0 = off)
+                            try
+                            {
+                                var powerStatus = System.Windows.Forms.SystemInformation.PowerStatus;
+                                int hz = (powerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Offline)
+                                    ? Settings.Default.RefreshRateBattery
+                                    : Settings.Default.RefreshRatePluggedIn;
+                                if (hz > 0)
+                                {
+                                    int applied = await Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyInternalRefreshRate(hz));
+                                    Log.Information("[Resume] Internal panel refresh rate re-applied: {Hz} Hz", applied);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[Resume] Internal panel refresh rate re-apply failed: {ex.Message}");
+                            }
+
+                            // Re-apply Fan Control EC duties or restart Smart Fan Mode.
+                            // Stock presets own their fans in firmware, so re-writing a
+                            // custom EC curve after resume would undo the OEM mode engine.
                             try
                             {
                                 var ecService = App.GetService<UniwillECService>();
-                                if (ecService != null)
+                                if (ecService != null && !IsFanCustomizationAllowed())
+                                {
+                                    Debug.WriteLine("[Resume] Stock preset active — EC fan duties not re-applied");
+                                }
+                                else if (ecService != null)
                                 {
                                     var fanSettings = FanControlSettingsService.Load();
                                     EcFanCurve cpuCurve;
@@ -1027,21 +1389,23 @@ namespace Uniwill_Control_Utility.Views.Windows
                             // Auto-reconnect Hydro UI watercooler.
                             if (Properties.Settings.Default.EnableHydroUiNavigation)
                             {
-                                var waterCoolerService = App.GetService<WaterCoolerService>();
-                                if (waterCoolerService != null)
+                                var hydroUIService = App.GetService<HydroUIService>();
+                                if (hydroUIService != null)
                                 {
                                     // If the service still thinks it's connected, the BLE link is a
                                     // zombie - force a disconnect before attempting reconnect.
-                                    if (waterCoolerService.IsConnected)
+                                    if (hydroUIService.IsConnected)
                                     {
-                                        Debug.WriteLine("[WaterCooler] Resuming from sleep - disconnecting zombie BLE link");
-                                        await waterCoolerService.DisconnectAsync();
+                                        Log.Information("[WaterCooler] Resume: disconnecting zombie BLE link");
+                                        await hydroUIService.DisconnectAsync();
                                         await Task.Delay(500);
                                     }
 
-                                    bool connected = await waterCoolerService.TryAutoConnectAsync();
+                                    bool connected = await hydroUIService.TryAutoConnectAsync();
                                     if (connected)
-                                        Debug.WriteLine("[WaterCooler] Auto-reconnected after system resume");
+                                        Log.Information("[WaterCooler] Auto-reconnected after system resume");
+                                    else
+                                        Log.Warning("[WaterCooler] Resume auto-connect failed; pending watcher will retry as the cooler advertises");
                                 }
                             }
 
@@ -1110,6 +1474,93 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
         }
 
+        #region Display Change Detection
+
+        private HwndSourceHook? _hwndHook;
+
+        private void OnSourceInitialized(object? sender, EventArgs e)
+        {
+            SourceInitialized -= OnSourceInitialized;
+
+            var source = PresentationSource.FromVisual(this) as HwndSource;
+            if (source is null)
+                return;
+
+            _hwndHook = OnWindowMessage;
+            source.AddHook(_hwndHook);
+        }
+
+        /// <summary>
+        /// WM_DISPLAYCHANGE (0x007E) fires when the display topology changes
+        /// (monitor added/removed, resolution change, orientation change).
+        /// We use this to proactively reset LHM Computer before stale NVML handles cause crashes.
+        /// </summary>
+        private const int WM_DISPLAYCHANGE = 0x007E;
+
+        // SM_CMONITORS for GetSystemMetrics — tracks how many displays are active
+        // so we only reset GPU driver state on real topology changes, not fullscreen alt-tabs.
+        private const int SM_CMONITORS = 80;
+        private int _lastMonitorCount = -1;
+
+        [System.Runtime.InteropServices.LibraryImport("user32.dll")]
+        private static partial int GetSystemMetrics(int nIndex);
+
+        private IntPtr OnWindowMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WM_DISPLAYCHANGE)
+            {
+                int currentMonitorCount = GetSystemMetrics(SM_CMONITORS);
+                bool topologyChanged = _lastMonitorCount < 0 || currentMonitorCount != _lastMonitorCount;
+                _lastMonitorCount = currentMonitorCount;
+
+                // Don't mark as handled — other WPF code may need this message.
+                // Only reset GPU driver state when the monitor count actually changes.
+                // Fullscreen alt-tabs fire WM_DISPLAYCHANGE but don't change the
+                // monitor count — resetting on those causes a 15-second NVML
+                // blackout (GpuInteropGuard cooldown) and metrics show zeros.
+                if (topologyChanged)
+                {
+                    try
+                    {
+                        var monitoring = App.GetService<IHardwareMonitoringService>();
+                        monitoring?.ResetComputer();
+                        Debug.WriteLine($"[Display] LHM Computer reset after display topology change ({_lastMonitorCount} monitors)");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[Display] LHM reset failed: {ex.Message}");
+                    }
+
+                    // Also reset NvTuning's NVML context — separate from LHM.
+                    try
+                    {
+                        Scripts.GPUs.NVIDIA.Nvml.Reset();
+                        Debug.WriteLine("[Display] NVML reset for NvTuning");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[Display] NVML reset failed: {ex.Message}");
+                    }
+
+                    // Re-assert AppUserModelID to restore taskbar icon after display
+                    // topology change (dGPU disable/enable invalidates DWM composition).
+                    try
+                    {
+                        App.ReassertAppUserModelID();
+                        Debug.WriteLine("[Display] AppUserModelID re-asserted after display change");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[Display] AppUserModelID reassert failed: {ex.Message}");
+                    }
+                }
+            }
+
+            return IntPtr.Zero;
+        }
+
+        #endregion
+
         #region INavigationWindow Methods
 
         public INavigationView GetNavigation() => RootNavigation;
@@ -1140,6 +1591,12 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         protected override void OnClosed(EventArgs e)
         {
+            // Remove the window hook to avoid keeping the HwndSource alive
+            var source = PresentationSource.FromVisual(this) as HwndSource;
+            source?.RemoveHook(_hwndHook);
+
+            SystemEvents.PowerModeChanged -= HandlePowerModeChange;
+
             base.OnClosed(e);
             Application.Current.Shutdown();
         }
@@ -1401,6 +1858,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                 this.Height = 907;
             }
 
+            // Keep the window inside the monitor's work area so the title bar
+            // never spills above the top screen edge. On the 2560x1600 internal
+            // panel at 150% scale, 1080 DIP = 1620 physical px — taller than the
+            // screen — so CenterScreen splits the overflow off the top.
+            App.FitWindowToWorkArea(this);
+
             _ = Task.Run(PremadePresets.SetPremadePresets);
 
             // Eagerly instantiate the Adaptive page so its constructor runs (starts the
@@ -1420,10 +1883,109 @@ namespace Uniwill_Control_Utility.Views.Windows
             // delay on first navigation. These pages do heavy work in Loaded (service
             // resolution, event subscriptions, settings loading) which is noticeable
             // when the page is created lazily on first visit.
-            _ = App.GetService<Views.Pages.Watercooler>();
+            _ = App.GetService<Views.Pages.HydroUI>();
             _ = App.GetService<Views.Pages.FlydigiCooler>();
 
             Task.Run(Garbage.Garbage_Collect);
+
+            // Watch for the laptop panel being turned back on (external-only → attached)
+            // and auto-apply the UCU-declared refresh rate + color profile after a settle
+            // delay when the live panel differs.
+            StartPanelWatcher();
+        }
+
+        // Auto-reconcile the internal panel's display settings on the detached→attached
+        // transition: the watcher polls the panel's attach state; on re-enable it waits a
+        // settle delay (Windows is still finalizing the display mode) and then applies the
+        // declared values if the live panel differs. While the panel stays attached, no
+        // auto-apply happens — Windows-side changes are adopted by the normal syncs.
+        private const int PanelSettleDelayMs = 3000;
+        private bool _panelWasAttached = true;
+        private bool _panelReconcilePending;
+        private DispatcherTimer? _panelWatcherTimer;
+
+        private void StartPanelWatcher()
+        {
+            if (_panelWatcherTimer is not null)
+                return;
+
+            // Seed the baseline so a panel attached at startup never triggers a reconcile.
+            _panelWasAttached = !string.IsNullOrEmpty(
+                Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName());
+
+            _panelWatcherTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            _panelWatcherTimer.Tick += (s, e) => CheckPanelReattach();
+            _panelWatcherTimer.Start();
+        }
+
+        private void CheckPanelReattach()
+        {
+            bool attached = !string.IsNullOrEmpty(
+                Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName());
+
+            if (attached != _panelWasAttached)
+            {
+                // The ITE RGB MCU resets itself during a display (mux) switch; streaming
+                // frames into a resetting MCU repaints the keyboard key-by-key — the
+                // visible blink storm. Pause the stream and let the MCU settle first.
+                App.GetService<BetterRgbStreamService>()?.RestartAfterDisplaySwitch();
+            }
+
+            if (attached && !_panelWasAttached && !_panelReconcilePending)
+            {
+                _panelReconcilePending = true;
+                _ = Task.Run(async () =>
+                {
+                    // Let Windows finish settling the re-attached display before writing.
+                    await Task.Delay(PanelSettleDelayMs);
+                    AutoApplyPanelDisplaySettings();
+                    _panelReconcilePending = false;
+                });
+            }
+
+            _panelWasAttached = attached;
+        }
+
+        /// <summary>
+        /// Applies the UCU-declared internal-panel refresh rate (deferred selection wins
+        /// over last known) and color profile once the panel is attached and the live
+        /// values differ. Clears the deferred settings on readback match.
+        /// </summary>
+        private void AutoApplyPanelDisplaySettings()
+        {
+            int desired = Settings.Default.DisplayRefreshRateDeferred > 0
+                ? Settings.Default.DisplayRefreshRateDeferred
+                : Settings.Default.DisplayRefreshRateLastKnown;
+            if (desired > 0)
+            {
+                int applied = Uniwill_Control_Utility.Scripts.Misc.Display.ReconcileInternalRefreshRate(desired);
+                if (applied == desired)
+                {
+                    Settings.Default.DisplayRefreshRateDeferred = 0;
+                    Settings.Default.DisplayRefreshRateLastKnown = applied;
+                    Settings.Default.Save();
+                    Log.Information("[Panel] Auto-applied refresh rate {Hz} Hz after panel re-enable", applied);
+                }
+            }
+
+            string desiredProfile = Settings.Default.DisplayColorProfileDeferred.Length > 0
+                ? Settings.Default.DisplayColorProfileDeferred
+                : Settings.Default.DisplayColorProfileLastKnown;
+            if (desiredProfile.Length > 0)
+            {
+                string liveProfile = Uniwill_Control_Utility.Scripts.Misc.Display.GetInternalColorProfile() ?? string.Empty;
+                if (liveProfile != desiredProfile)
+                {
+                    string appliedProfile = Uniwill_Control_Utility.Scripts.Misc.Display.ReconcileInternalColorProfile(desiredProfile);
+                    if (appliedProfile == desiredProfile)
+                    {
+                        Settings.Default.DisplayColorProfileDeferred = string.Empty;
+                        Settings.Default.DisplayColorProfileLastKnown = appliedProfile;
+                        Settings.Default.Save();
+                        Log.Information("[Panel] Auto-applied color profile {Profile} after panel re-enable", appliedProfile);
+                    }
+                }
+            }
         }
 
         #region Tray Menu Handlers
@@ -1435,10 +1997,10 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
 
-            var wc = App.GetService<WaterCoolerService>();
+            var wc = App.GetService<HydroUIService>();
             if (wc == null || !wc.IsConnected)
             {
-                ToastNotification.ShowToastNotification("Hydro UI", "Watercooler not connected");
+                ToastNotification.ShowToastNotification("Hydro UI", "HydroUI not connected");
                 return;
             }
 
@@ -1464,10 +2026,10 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
 
-            var wc = App.GetService<WaterCoolerService>();
+            var wc = App.GetService<HydroUIService>();
             if (wc == null || !wc.IsConnected)
             {
-                ToastNotification.ShowToastNotification("Hydro UI", "Watercooler not connected");
+                ToastNotification.ShowToastNotification("Hydro UI", "HydroUI not connected");
                 return;
             }
 
@@ -1495,10 +2057,10 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (sender is not MenuItem item || item.Tag is not string tag)
                 return;
 
-            var wc = App.GetService<WaterCoolerService>();
+            var wc = App.GetService<HydroUIService>();
             if (wc == null || !wc.IsConnected)
             {
-                ToastNotification.ShowToastNotification("Hydro UI", "Watercooler not connected");
+                ToastNotification.ShowToastNotification("Hydro UI", "HydroUI not connected");
                 return;
             }
 
@@ -1528,7 +2090,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 return;
 
             bool enabled = item.IsChecked == true;
-            var wc = App.GetService<WaterCoolerService>();
+            var wc = App.GetService<HydroUIService>();
             if (wc == null)
                 return;
 
@@ -1745,7 +2307,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             // Apply the curve
             var ec = App.GetService<UniwillECService>();
-            if (ec != null)
+            if (ec != null && IsFanCustomizationAllowed())
             {
                 var curve = GetFanPresetCurve(settings.UnifiedPreset);
                 if (enabled)
@@ -1788,7 +2350,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             FanControlSettingsService.Save(settings);
 
             var ec = App.GetService<UniwillECService>();
-            if (ec != null)
+            if (ec != null && IsFanCustomizationAllowed())
             {
                 Models.EcFanCurve curve = presetName == "Custom"
                     ? GetFanCustomCurve(settings.UnifiedDuties)
@@ -1823,7 +2385,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             FanControlSettingsService.Save(settings);
 
             var ec = App.GetService<UniwillECService>();
-            if (ec != null)
+            if (ec != null && IsFanCustomizationAllowed())
             {
                 Models.EcFanCurve cpuCurve = presetName == "Custom"
                     ? GetFanCustomCurve(settings.CpuDuties)
@@ -1854,7 +2416,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             FanControlSettingsService.Save(settings);
 
             var ec = App.GetService<UniwillECService>();
-            if (ec != null)
+            if (ec != null && IsFanCustomizationAllowed())
             {
                 Models.EcFanCurve cpuCurve = settings.CpuPreset == "Custom"
                     ? GetFanCustomCurve(settings.CpuDuties)
@@ -1895,6 +2457,11 @@ namespace Uniwill_Control_Utility.Views.Windows
             return EcFanCurve.CreatePerformance();
         }
 
+        /// Fan Control customization (page, tray, resume) is Custom-preset-only:
+        /// stock presets leave fans to the firmware's per-mode table.
+        private static bool IsFanCustomizationAllowed() =>
+            !PresetProfileApplier.IsBuiltInProfile(Settings.Default.presetProfile);
+
         private void TrayFanSmartMode_Click(object? sender, RoutedEventArgs e)
         {
             if (sender is not MenuItem item)
@@ -1906,7 +2473,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             FanControlSettingsService.Save(settings);
 
             var ec = App.GetService<UniwillECService>();
-            if (ec == null)
+            if (ec == null || !IsFanCustomizationAllowed())
                 return;
 
             if (enabled)
@@ -1958,7 +2525,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             try
             {
-                var wc = App.GetService<WaterCoolerService>();
+                var wc = App.GetService<HydroUIService>();
                 if (wc == null) return;
 
                 var settings = wc.GetSettings();
@@ -2169,7 +2736,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 return;
             }
 
-            var wc = App.GetService<WaterCoolerService>();
+            var wc = App.GetService<HydroUIService>();
             miSectionHydro.Visibility = wc?.IsConnected == true
                 ? Visibility.Visible
                 : Visibility.Collapsed;
@@ -2178,6 +2745,8 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// <summary>
         /// Disables or enables tray controls based on Adaptive Mode override state.
         /// Only applies when Adaptive Mode is actually running (isAdaptiveModeRunning = true).
+        /// Fan Control is additionally disabled while a stock power preset is active,
+        /// since stock presets own their fan curves in firmware.
         /// </summary>
         private void UpdateTrayAdaptiveOverrideState()
         {
@@ -2187,7 +2756,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 // All controls enabled when Adaptive Mode is off
                 miSectionPresets.IsEnabled = true;
                 miSectionHydro.IsEnabled = true;
-                miSectionFanControl.IsEnabled = true;
+                miSectionFanControl.IsEnabled = IsFanCustomizationAllowed();
                 return;
             }
 
@@ -2204,7 +2773,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             // Fan Control: disable if EC fan override is active
             bool ecFanOverridden = deviceApplier != null && deviceApplier.IsEcFanOverridden;
-            miSectionFanControl.IsEnabled = !ecFanOverridden;
+            miSectionFanControl.IsEnabled = !ecFanOverridden && IsFanCustomizationAllowed();
         }
 
         #endregion
@@ -2229,9 +2798,8 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
+                // No voltage control on Intel — undervolt removed
                 parts.Add($"--intel-pl={p.IntelPl1:F0},{p.IntelPl2:F0}");
-                if (p.IntelVolt < 0)
-                    parts.Add($"--intel-volt-cpu={p.IntelVolt:F0}");
             }
 
             // NVIDIA GPU clocks
@@ -2240,7 +2808,18 @@ namespace Uniwill_Control_Utility.Views.Windows
             int tgp = (int)p.GpuTgp;
             int dbOffset = p.GpuDynamicBoost ? (int)p.GpuDbOffset : 0;
             int totalWatts = tgp + dbOffset;
-            parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
+
+            // When a V-F curve is active, ApplyCustomOnStart handles the power limit
+            // around the curve write. Emit only the clock tokens here to avoid a
+            // redundant SetPowerLimit call from the translator.
+            if (p.VfCurveOffsets.Count > 0)
+            {
+                parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}");
+            }
+            else
+            {
+                parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
+            }
 
             return string.Join(" ", parts) + " ";
         }

@@ -46,6 +46,19 @@ namespace Uniwill_Control_Utility.Services
         public string FlydigiModelName { get; init; } = string.Empty;
     }
 
+    /// <summary>
+    /// Which GPU type is currently providing sensor data.
+    /// Used to update the GPU metric card label when the active GPU changes
+    /// (e.g., dGPU disabled by MUX switch or iGPU Power Saving Mode).
+    /// </summary>
+    public enum ActiveGpuType
+    {
+        None = 0,
+        Nvidia = 1,
+        Amd = 2,
+        Intel = 3
+    }
+
     public sealed record HardwareMetricsSnapshot
     {
         public int CpuTemperature { get; init; }
@@ -60,6 +73,8 @@ namespace Uniwill_Control_Utility.Services
         public int GpuFanSpeed { get; init; }
         public double GpuMemoryUsedGb { get; init; }
         public double GpuMemoryTotalGb { get; init; }
+        /// <summary>Which GPU type is currently providing sensor data.</summary>
+        public ActiveGpuType ActiveGpuType { get; init; }
         public double SystemMemoryUsedGb { get; init; }
         public double SystemMemoryTotalGb { get; init; }
         public double SystemMemoryCommittedGb { get; init; }
@@ -113,6 +128,7 @@ namespace Uniwill_Control_Utility.Services
         void AcquirePersistent(HardwareMonitoringCategory categories);
         HardwareMetricsSnapshot ReadSnapshot();
         float ReadSensor(HardwareType hardwareType, SensorType sensorType, string sensorName);
+        void ResetComputer();
     }
 
     public sealed partial class HardwareMonitoringService : IHardwareMonitoringService, IDisposable
@@ -132,6 +148,12 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>When the last UpdateHardware failure occurred.</summary>
         private DateTime _lastUpdateFailureUtc = DateTime.MinValue;
+
+        /// <summary>When ResetComputer() was last called — used to enforce a cooldown before reopening.</summary>
+        private DateTime _lastResetUtc = DateTime.MinValue;
+
+        /// <summary>How long to wait after ResetComputer() before attempting to reopen (gives GPU driver time to settle).</summary>
+        private static readonly TimeSpan ResetCooldown = TimeSpan.FromSeconds(3);
 
         public HardwareMonitoringService()
         {
@@ -199,6 +221,39 @@ namespace Uniwill_Control_Utility.Services
 
         public float ReadSensor(HardwareType hardwareType, SensorType sensorType, string sensorName) =>
             _stateCache.Read().ReadSensor(hardwareType, sensorType, sensorName);
+
+        /// <summary>
+        /// Closes the LibreHardwareMonitor Computer to release stale GPU driver handles.
+        /// Call this proactively after events that invalidate GPU driver state:
+        /// monitor hotplug (display topology change), hibernation resume, etc.
+        ///
+        /// This method does NOT immediately reopen the Computer — it only closes it and
+        /// invalidates the cache. The next background refresh cycle will handle reopening
+        /// with fresh handles. This avoids calling computer.Open() on the calling thread,
+        /// which can trigger ExecutionEngineException if the GPU driver is in a corrupted state.
+        /// </summary>
+        public void ResetComputer()
+        {
+            lock (_sync)
+            {
+                ThrowIfDisposed();
+
+                try { Serilog.Log.Information("[LHM] ResetComputer called — releasing stale handles, reopening deferred to next refresh"); }
+                catch { /* Serilog may not be ready */ }
+
+                // Close releases NVML/ADL handles. Do this while holding the lock so
+                // no other thread is accessing the computer.
+                _computer?.Close();
+                _computer = null;
+                _lastUpdateUtc = DateTime.MinValue;
+                _updateFailureCount = 0;
+                _lastResetUtc = DateTime.UtcNow;
+
+                // Invalidate cache so the next ReadSnapshot() triggers a background
+                // refresh which will reopen the Computer with fresh handles.
+                _stateCache.Invalidate();
+            }
+        }
 
         private void Release(long id)
         {
@@ -282,7 +337,7 @@ namespace Uniwill_Control_Utility.Services
         private HardwareMetricsSnapshot BuildMetricsSnapshot()
         {
             IHardware? cpu = FindHardware(HardwareType.Cpu);
-            IHardware? gpu = FindPreferredGpu();
+            (IHardware? gpu, ActiveGpuType gpuType) = FindPreferredGpuWithFallback();
             IHardware? battery = FindHardware(HardwareType.Battery);
             GetSystemPowerStatus(out SystemPowerStatus powerStatus);
 
@@ -299,11 +354,12 @@ namespace Uniwill_Control_Utility.Services
                 CpuPowerWatts = Round(ReadFirstValue(cpu, SensorType.Power, "CPU Package", "Package")),
                 CpuClockMhz = Round(ReadAverage(cpu, SensorType.Clock, "Core")),
                 GpuTemperature = Round(ReadFirstValue(gpu, SensorType.Temperature, "GPU Core", "Core")),
-                GpuUsage = Round(ReadFirstValue(gpu, SensorType.Load, "GPU Core", "Core")),
+                GpuUsage = Round(ReadFirstValue(gpu, SensorType.Load, "GPU Core", "D3D 3D", "Core")),
                 GpuPowerWatts = Round(ReadFirstValue(gpu, SensorType.Power, "GPU Package", "GPU Power", "Core")),
                 GpuClockMhz = Round(ReadFirstValue(gpu, SensorType.Clock, "GPU Core", "Core")),
                 GpuMemoryUsedGb = gpuMemoryUsedMb / 1024d,
                 GpuMemoryTotalGb = gpuMemoryTotalMb / 1024d,
+                ActiveGpuType = gpuType,
                 SystemMemoryUsedGb = memoryUsed,
                 SystemMemoryTotalGb = memoryTotal,
                 SystemMemoryCommittedGb = memoryCommitted,
@@ -347,6 +403,82 @@ namespace Uniwill_Control_Utility.Services
 
         private void UpdateHardware()
         {
+            // If _computer is null but categories are active, attempt to reopen.
+            // This can happen after ResetComputer() releases stale handles, or after
+            // a previous failure cleared the computer. We only reopen if enough time
+            // has passed since the last failure to avoid tight loops on broken drivers.
+            if (_computer is null && _activeCategories != HardwareMonitoringCategory.None)
+            {
+                // Enforce cooldown after ResetComputer() — give the GPU driver time to
+                // settle after display topology changes before probing with fresh handles.
+                if (DateTime.UtcNow - _lastResetUtc < ResetCooldown)
+                {
+                    return;
+                }
+
+                // Rate-limit reopen attempts to avoid tight loops if the GPU driver is broken.
+                if (_updateFailureCount > 3 &&
+                    DateTime.UtcNow - _lastUpdateFailureUtc < TimeSpan.FromSeconds(10))
+                {
+                    return;
+                }
+
+                try
+                {
+                    var computer = new Computer
+                    {
+                        IsCpuEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Cpu),
+                        IsMemoryEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Memory),
+                        IsGpuEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Gpu),
+                        IsBatteryEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Battery),
+                        IsMotherboardEnabled = true,
+                        IsStorageEnabled = true,
+                        IsControllerEnabled = true
+                    };
+
+                    // Release lock during Open() — it probes drivers and can take 1-2 seconds.
+                    Monitor.Exit(_sync);
+                    try
+                    {
+                        computer.Open();
+                    }
+                    catch (Exception ex)
+                    {
+                        try { Serilog.Log.Warning(ex, "[LHM] UpdateHardware: failed to reopen Computer"); } catch { }
+                        computer.Close();
+                        _updateFailureCount++;
+                        _lastUpdateFailureUtc = DateTime.UtcNow;
+                        return;
+                    }
+                    finally
+                    {
+                        Monitor.Enter(_sync);
+                    }
+
+                    // Check that categories didn't change while we were opening.
+                    if (_activeCategories != HardwareMonitoringCategory.None && _computer is null)
+                    {
+                        _computer = computer;
+                    }
+                    else
+                    {
+                        computer.Close();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    /*
+                     * ExecutionEngineException from NVML can corrupt the process before
+                     * this catch block executes. However, when it doesn't, we log and
+                     * rate-limit retries so the app stays alive.
+                     */
+                    try { Serilog.Log.Warning(ex, "[LHM] UpdateHardware: exception during Computer reopen"); } catch { }
+                    _updateFailureCount++;
+                    _lastUpdateFailureUtc = DateTime.UtcNow;
+                    return;
+                }
+            }
+
             if (_computer is null || DateTime.UtcNow - _lastUpdateUtc < TimeSpan.FromMilliseconds(250))
                 return;
 
@@ -365,47 +497,17 @@ namespace Uniwill_Control_Utility.Services
                  * ADL/AMDL for AMD). When a display topology changes (e.g. monitor hotplug),
                  * the GPU driver can invalidate those handles, causing ExecutionEngineException
                  * or other fatal interop failures. Catch everything here to prevent the timer
-                 * thread from taking down the process, then reopen the Computer to get fresh
-                 * driver handles.
-                 *
-                 * We also rate-limit resets to avoid tight loops if the driver stays broken.
+                 * thread from taking down the process, then clear the computer so the next
+                 * call to UpdateHardware() will attempt a reopen with fresh handles.
                  */
                 _updateFailureCount++;
                 _lastUpdateFailureUtc = DateTime.UtcNow;
 
-                try { Serilog.Log.Warning(ex, "[LHM] UpdateHardware failed (failure #{Count}) — attempting Computer reset", _updateFailureCount); } catch { /* Serilog may not be ready */ }
+                try { Serilog.Log.Warning(ex, "[LHM] UpdateHardware failed (failure #{Count}) — clearing Computer for next refresh", _updateFailureCount); } catch { /* Serilog may not be ready */ }
 
-                // Only attempt a reset if at least 2 seconds have passed since the last failure
-                // to avoid tight loops during sustained driver issues.
-                if (DateTime.UtcNow - _lastUpdateFailureUtc > TimeSpan.FromSeconds(2) || _updateFailureCount <= 3)
-                {
-                    try
-                    {
-                        _computer?.Close();
-                        _computer = null;
-
-                        // Reopen with the currently active categories
-                        if (_activeCategories != HardwareMonitoringCategory.None)
-                        {
-                            _computer = new Computer
-                            {
-                                IsCpuEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Cpu),
-                                IsMemoryEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Memory),
-                                IsGpuEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Gpu),
-                                IsBatteryEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Battery),
-                                IsMotherboardEnabled = true,
-                                IsStorageEnabled = true,
-                                IsControllerEnabled = true
-                            };
-                            _computer.Open();
-                        }
-                    }
-                    catch
-                    {
-                        // If reopening also fails, give up and let the next tick retry later.
-                        _computer = null;
-                    }
-                }
+                // Close and clear — the next UpdateHardware() call will handle reopen.
+                _computer?.Close();
+                _computer = null;
             }
         }
 
@@ -419,14 +521,70 @@ namespace Uniwill_Control_Utility.Services
         private IHardware? FindHardware(HardwareType type) =>
             _computer?.Hardware.FirstOrDefault(hardware => hardware.HardwareType == type);
 
-        private IHardware? FindPreferredGpu()
+        /// <summary>
+        /// Finds the best GPU that has valid sensors.
+        /// Priority: NVIDIA → AMD → Intel. If a GPU is enumerated but returns
+        /// zero values (e.g., dGPU disabled by MUX switch or PnP hotswap),
+        /// falls through to the next candidate.
+        /// </summary>
+        private (IHardware? hardware, ActiveGpuType type) FindPreferredGpuWithFallback()
         {
             if (_computer is null)
-                return null;
+                return (null, ActiveGpuType.None);
 
-            return _computer.Hardware.FirstOrDefault(hardware => hardware.HardwareType == HardwareType.GpuNvidia)
-                ?? _computer.Hardware.FirstOrDefault(hardware => hardware.HardwareType == HardwareType.GpuAmd)
-                ?? _computer.Hardware.FirstOrDefault(hardware => hardware.HardwareType == HardwareType.GpuIntel);
+            // Try NVIDIA first
+            IHardware? nvidia = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.GpuNvidia);
+            if (nvidia is not null && HasValidSensors(nvidia))
+                return (nvidia, ActiveGpuType.Nvidia);
+
+            // Try AMD second (covers both dGPU Radeon RX and iGPU Radeon 610M)
+            IHardware? amd = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.GpuAmd);
+            if (amd is not null && HasValidSensors(amd))
+                return (amd, ActiveGpuType.Amd);
+
+            // Try Intel third
+            IHardware? intel = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.GpuIntel);
+            if (intel is not null && HasValidSensors(intel))
+                return (intel, ActiveGpuType.Intel);
+
+            // Fallback: return whatever GPU exists even without valid sensors,
+            // so the UI still shows the hardware name. Prefer by same priority.
+            if (nvidia is not null)
+                return (nvidia, ActiveGpuType.Nvidia);
+            if (amd is not null)
+                return (amd, ActiveGpuType.Amd);
+            if (intel is not null)
+                return (intel, ActiveGpuType.Intel);
+
+            return (null, ActiveGpuType.None);
+        }
+
+        /// <summary>
+        /// Returns true if the hardware has a valid temperature sensor AND a valid load sensor.
+        /// Used to detect GPUs that are enumerated but have no active driver.
+        /// A PnP-disabled dGPU still reports temperature (voltage regulation stays active)
+        /// but returns 0 for load/power/clock — so we require both to consider a GPU "active".
+        /// </summary>
+        private static bool HasValidSensors(IHardware hardware)
+        {
+            bool hasTemperature = false;
+            bool hasLoad = false;
+
+            foreach (ISensor sensor in EnumerateSensors(hardware))
+            {
+                if (sensor.Value.HasValue && sensor.Value.Value > 0)
+                {
+                    if (sensor.SensorType == SensorType.Temperature)
+                        hasTemperature = true;
+                    if (sensor.SensorType == SensorType.Load)
+                        hasLoad = true;
+                }
+
+                if (hasTemperature && hasLoad)
+                    return true;
+            }
+
+            return false;
         }
 
         private static double ReadFirstValue(IHardware? hardware, SensorType type, params string[] names)

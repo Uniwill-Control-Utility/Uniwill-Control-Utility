@@ -55,6 +55,29 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
+        /// Profile names the Performance-button cycle may visit: the built-ins plus the
+        /// saved Custom slots of the pool Power Boost Mode selects (Normal when off, Boost
+        /// when on). A Custom slot saved in the inactive pool is not a cycle member because
+        /// its power limits only take effect while that mode is enabled.
+        /// </summary>
+        public static string[] GetCycleProfileNames()
+        {
+            var list = new List<string>(BuiltInProfileNames);
+            Models.PresetMode mode = Settings.Default.EnablePowerBoostMode
+                ? Models.PresetMode.Boost
+                : Models.PresetMode.Normal;
+            var presets = CustomPresetStore.Load(mode);
+            for (int i = 0; i < presets.Length; i++)
+            {
+                if (presets[i].HasChanges)
+                {
+                    list.Add(CustomProfileKey(i, mode));
+                }
+            }
+            return list.ToArray();
+        }
+
+        /// <summary>
         /// Returns the profile key for a custom preset slot (0-based) in the given mode.
         /// e.g. slot 0, Normal → "Custom 1", slot 0, Boost → "Custom 1 (Boost)"
         /// </summary>
@@ -118,6 +141,23 @@ namespace Uniwill_Control_Utility.Services
             return profileName.Equals("Office", StringComparison.OrdinalIgnoreCase) ||
                    profileName.Equals("Gaming", StringComparison.OrdinalIgnoreCase) ||
                    profileName.Equals("Turbo", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Maps a stock preset to OpenRevo's mode-apply case selector (0=Office,
+        /// 1=Balance, 2=Beast). This is NOT the value written to 0x7AB: the per-mode
+        /// signal is the literal written to 0x751 plus the 0x45B flag and the 0x7AB
+        /// bit4 force, all derived inside UniwillECService.ApplyOemStockMode.
+        /// </summary>
+        public static int OemModeIndexFor(string profileName)
+        {
+            return profileName.ToLowerInvariant() switch
+            {
+                "office" => 0,
+                "gaming" => 1,
+                "turbo" => 2,
+                _ => 0
+            };
         }
 
         /// <summary>
@@ -188,6 +228,23 @@ namespace Uniwill_Control_Utility.Services
             // 1. RyzenAdj / SMU commands
             await RyzenAdj_To_UCU.TranslateAsync(command, appliedName: display, localizeAppliedName: false);
 
+            // 1b. Stock presets are applied the OpenRevo way: assert the OEM mode
+            // engine (mode index + trigger + the 0x045B flag) and clear the custom
+            // power/profile enable bits, which yields CPU limits, GPU TGP and fans
+            // to the firmware's own per-mode factory table. No cTGP/DB or EC PL
+            // writes happen for stock presets, so nothing can leave a stale GPU
+            // ceiling behind. 0x0741 bit0 stays armed everywhere: the EC only raises
+            // the AcpiTest_EventULong press echo while manual control is set, which is
+            // what keeps the Performance button live under a Custom preset.
+            if (IsBuiltInProfile(profileName))
+            {
+                var ecGate = RyzenAdj_To_UCU.EcService;
+                if (ecGate is not null)
+                {
+                    ecGate.ApplyOemStockMode(OemModeIndexFor(profileName));
+                }
+            }
+
             // 2. V-F curve (Custom profile only, if active)
             var (customSlot, customMode) = TryParseCustomSlotExtended(profileName);
             if (customSlot >= 0)
@@ -203,8 +260,9 @@ namespace Uniwill_Control_Utility.Services
                 ApplyVfCurve();
             }
 
-            // 3. EC CPU power limits (AMD APU only)
-            if (Family.TYPE == Family.ProcessorType.Amd_Apu)
+            // 3. EC CPU power limits (AMD APU only, Custom presets only — stock
+            // presets yield PL1/PL2/PL4 to the EC's native factory table)
+            if (Family.TYPE == Family.ProcessorType.Amd_Apu && !IsBuiltInProfile(profileName))
             {
                 var ec = RyzenAdj_To_UCU.EcService;
                 if (ec != null)
@@ -241,6 +299,16 @@ namespace Uniwill_Control_Utility.Services
                         }
                     }
                     ec.ApplyCpuPowerLimits(pl1, pl2);
+                }
+            }
+
+            // 4. Fan control settings (Custom presets only)
+            if (customSlot >= 0)
+            {
+                var presets = CustomPresetStore.Load(customMode);
+                if (customSlot < presets.Length && presets[customSlot].HasFanChanges)
+                {
+                    ApplyFanSettingsFromPreset(presets[customSlot]);
                 }
             }
         }
@@ -340,9 +408,8 @@ namespace Uniwill_Control_Utility.Services
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
+                // No voltage control on Intel — undervolt removed
                 parts.Add($"--intel-pl={preset.IntelPl1:F0},{preset.IntelPl2:F0}");
-                if (preset.IntelVolt < 0)
-                    parts.Add($"--intel-volt-cpu={preset.IntelVolt:F0}");
             }
 
             if (!skipGpuPower && !string.IsNullOrEmpty(NvTuning.GetGpuName()))
@@ -360,27 +427,23 @@ namespace Uniwill_Control_Utility.Services
         private static void BuildSkuProfileCommand(string profileName, List<string> parts)
         {
             var skuProfile = SkuResolver.GetProfile(profileName.ToLowerInvariant());
-            int cpuPl1, cpuPl2, gpuTgp;
-            bool gpuDb;
-            int gpuDbOffset;
+            int cpuPl1, cpuPl2;
 
             if (skuProfile != null)
             {
                 cpuPl1 = skuProfile.CpuPl1;
                 cpuPl2 = skuProfile.CpuPl2;
-                gpuTgp = skuProfile.GpuTgp;
-                gpuDb = skuProfile.DynamicBoost;
-                gpuDbOffset = skuProfile.DynamicBoostOffset;
             }
             else
             {
-                // Fallback defaults if SKU not resolved
-                (cpuPl1, cpuPl2, gpuTgp, gpuDb, gpuDbOffset) = profileName.ToLowerInvariant() switch
+                // Fallback defaults if SKU not resolved (GPU power is firmware-owned
+                // for stock presets, so only the CPU limits are carried here).
+                (cpuPl1, cpuPl2) = profileName.ToLowerInvariant() switch
                 {
-                    "office" => (45, 45, 95, false, 0),
-                    "gaming" => (75, 85, 150, false, 0),
-                    "turbo" => (135, 135, 150, true, 25),
-                    _ => (75, 85, 150, false, 0)
+                    "office" => (45, 45),
+                    "gaming" => (75, 85),
+                    "turbo" => (135, 135),
+                    _ => (75, 85)
                 };
             }
 
@@ -399,11 +462,12 @@ namespace Uniwill_Control_Utility.Services
                 parts.Add($"--intel-pl={cpuPl1},{cpuPl2}");
             }
 
-            // NVIDIA GPU power
+            // NVIDIA GPU power: stock presets yield GPU power to the firmware's
+            // per-mode factory table (OpenRevo's approach), so only the clock
+            // fields are emitted and no cTGP/DB write happens.
             if (!string.IsNullOrEmpty(NvTuning.GetGpuName()))
             {
-                int totalWatts = gpuTgp + (gpuDb ? gpuDbOffset : 0);
-                parts.Add($"--NVIDIA-Clocks=0-0-0-{totalWatts}-{(gpuDb ? gpuDbOffset : 0)}");
+                parts.Add("--NVIDIA-Clocks=0-0-0");
             }
         }
 
@@ -450,9 +514,8 @@ namespace Uniwill_Control_Utility.Services
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
+                // No voltage control on Intel — undervolt removed
                 parts.Add($"--intel-pl={Settings.Default.customIntelPl1:F0},{Settings.Default.customIntelPl2:F0}");
-                if (Settings.Default.customIntelVolt < 0)
-                    parts.Add($"--intel-volt-cpu={Settings.Default.customIntelVolt:F0}");
             }
 
             // NVIDIA GPU power — skip if V-F curve is active (power applied via SetPowerLimit instead)
@@ -507,5 +570,113 @@ namespace Uniwill_Control_Utility.Services
                 _ => profileName
             };
         }
+
+        #region Fan Control Settings from Custom Presets
+
+        /// <summary>
+        /// Applies the fan control settings stored in a CustomPreset.
+        /// Writes to FanControlSettingsService (triggers UI sync via SettingsChanged event)
+        /// and pushes the curve to the EC hardware.
+        /// </summary>
+        public static void ApplyFanSettingsFromPreset(CustomPreset preset)
+        {
+            if (!preset.HasFanChanges)
+                return;
+
+            // 1. Write to FanControlSettingsService so the Fan Control page UI syncs.
+            var settings = FanControlSettingsService.Load();
+            settings.UnifiedMode = preset.FanUnifiedMode;
+            settings.UnifiedPreset = preset.FanUnifiedPreset ?? settings.UnifiedPreset;
+            settings.UnifiedDuties = preset.FanUnifiedDuties;
+            settings.UnifiedTempThresholds = preset.FanUnifiedTempThresholds;
+            settings.CpuPreset = preset.FanCpuPreset ?? settings.CpuPreset;
+            settings.CpuDuties = preset.FanCpuDuties;
+            settings.CpuTempThresholds = preset.FanCpuTempThresholds;
+            settings.GpuPreset = preset.FanGpuPreset ?? settings.GpuPreset;
+            settings.GpuDuties = preset.FanGpuDuties;
+            settings.GpuTempThresholds = preset.FanGpuTempThresholds;
+            settings.EcSmartFanMode = preset.FanSmartFanMode;
+            settings.EcSmartFanTempSource = preset.FanSmartFanTempSource ?? settings.EcSmartFanTempSource;
+            FanControlSettingsService.Save(settings);
+
+            // 2. Push curve to EC hardware.
+            ApplyFanCurveToEc(preset);
+        }
+
+        private static void ApplyFanCurveToEc(CustomPreset preset)
+        {
+            var ec = RyzenAdj_To_UCU.EcService;
+            if (ec is null)
+                return;
+
+            EcFanCurve cpuCurve;
+            EcFanCurve gpuCurve;
+            int[] cpuTemps;
+            int[] gpuTemps;
+
+            if (preset.FanUnifiedMode)
+            {
+                cpuTemps = preset.FanUnifiedTempThresholds ?? EcFanCurve.CpuTemperatures;
+                gpuTemps = cpuTemps;
+
+                string unifiedPreset = preset.FanUnifiedPreset ?? "Balanced";
+                if (unifiedPreset == "Custom" && preset.FanUnifiedDuties?.Length == 11)
+                {
+                    cpuCurve = BuildCurveFromDuties(preset.FanUnifiedDuties, unifiedPreset);
+                }
+                else
+                {
+                    cpuCurve = GetPresetCurve(unifiedPreset);
+                }
+                gpuCurve = cpuCurve;
+            }
+            else
+            {
+                cpuTemps = preset.FanCpuTempThresholds ?? EcFanCurve.CpuTemperatures;
+                gpuTemps = preset.FanGpuTempThresholds ?? EcFanCurve.GpuTemperatures;
+
+                string cpuPreset = preset.FanCpuPreset ?? "Balanced";
+                string gpuPreset = preset.FanGpuPreset ?? "Balanced";
+
+                cpuCurve = preset.FanCpuDuties?.Length == 11
+                    ? BuildCurveFromDuties(preset.FanCpuDuties, cpuPreset)
+                    : GetPresetCurve(cpuPreset);
+
+                gpuCurve = preset.FanGpuDuties?.Length == 11
+                    ? BuildCurveFromDuties(preset.FanGpuDuties, gpuPreset)
+                    : GetPresetCurve(gpuPreset);
+            }
+
+            try
+            {
+                ec.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                Debug.WriteLine($"[PresetProfileApplier] Fan curve applied from preset: unified={preset.FanUnifiedMode}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[PresetProfileApplier] Fan curve apply failed: {ex.Message}");
+            }
+        }
+
+        private static EcFanCurve BuildCurveFromDuties(int[] duties, string name)
+        {
+            var curve = new EcFanCurve { Name = name };
+            curve.Duties.Clear();
+            foreach (var d in duties)
+                curve.Duties.Add(Math.Clamp(d, 0, 100));
+            return curve;
+        }
+
+        private static EcFanCurve GetPresetCurve(string? name) => name switch
+        {
+            "Silent" => EcFanCurve.CreateSilent(),
+            "Balanced" => EcFanCurve.CreateBalanced(),
+            "Performance" => EcFanCurve.CreatePerformance(),
+            "Full Speed" => EcFanCurve.CreateFullSpeed(),
+            "Off" => EcFanCurve.CreateOff(),
+            _ => EcFanCurve.CreateBalanced()
+        };
+
+        #endregion
     }
 }

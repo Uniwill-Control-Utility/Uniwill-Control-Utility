@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Serilog;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
@@ -21,12 +22,18 @@ namespace Uniwill_Control_Utility.Services
         bool FanSmartMode,
         bool LocalDimmingOn,
         bool OverlayOn,
-        bool FlydigiRgbOn);
+        bool FlydigiRgbOn,
+        bool GpuModeHybrid,
+        bool GpuModeDgpuOnly,
+        int GpuPowerSavingMode,
+        int RefreshRateHz,
+        bool ColorCalAvailable,
+        string? ColorProfileFile);
 
     public sealed class TrayQuickControlService
     {
         private readonly UniwillECService _ec;
-        private readonly WaterCoolerService _waterCooler;
+        private readonly HydroUIService _waterCooler;
         private readonly DeviceApplier _deviceApplier;
         private readonly IHardwareMonitoringService _hardwareMonitoring;
         private readonly EcTelemetryService _ecTelemetry;
@@ -34,9 +41,16 @@ namespace Uniwill_Control_Utility.Services
         private readonly OverlayManagerService _overlayManager;
         private readonly FlydigiCoolerHidService _flydigiCooler;
 
+        /// <summary>
+        /// Fired when the tray writes the Light Bar power state (Settings.Default.LightBarEnabled)
+        /// so the visible Light Bar page can re-sync without re-navigation — the Light Bar
+        /// analogue of KeyboardSettingsService.SettingsChanged.
+        /// </summary>
+        public event EventHandler? LightBarSettingsChanged;
+
         public TrayQuickControlService(
             UniwillECService ec,
-            WaterCoolerService waterCooler,
+            HydroUIService waterCooler,
             DeviceApplier deviceApplier,
             IHardwareMonitoringService hardwareMonitoring,
             EcTelemetryService ecTelemetry,
@@ -68,6 +82,90 @@ namespace Uniwill_Control_Utility.Services
             bool flydigiAvailable = FlydigiCoolerHidService.IsDeviceAvailable();
             bool flydigiEnabled = Properties.Settings.Default.EnableFlydigi;
 
+            // Runtime GPU mux mode — the tray's Display page shows the Nvidia Optimus
+            // (power saving) row only while the runtime mode is Hybrid. The EC runtime
+            // read is the right condition here (not the persisted NVRAM value): power
+            // saving is a runtime feature and NVRAM access is admin-gated.
+            bool gpuModeHybrid = true;
+            bool gpuModeDgpuOnly = false;
+            try
+            {
+                var muxMode = _ec.GetCurrentGpuMuxMode();
+                gpuModeHybrid = muxMode == UniwillECService.GpuMuxMode.Hybrid;
+                gpuModeDgpuOnly = muxMode == UniwillECService.GpuMuxMode.DgpuOnly;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Tray] GPU mux mode read failed: {Message}", ex.Message);
+            }
+
+            // Live Windows display mode values for the internal panel — the tray's
+            // refresh-rate and color-calibration controls target the laptop panel
+            // exclusively (never an external monitor). When the panel is detached
+            // (external-only), GDI hides it: the last-known persisted values are
+            // reported instead (so the buttons keep a selection across the panel being
+            // switched off), and selections made then are deferred until reattach.
+            bool panelAttached = !string.IsNullOrEmpty(Display.InternalPanelName());
+            int refreshRateHz = 0;
+            bool refreshRateSwitchable = false;
+            string? colorProfileFile = null;
+            bool colorCalAvailable = false;
+            try
+            {
+                if (panelAttached)
+                {
+                    // Consume deferred selections from an external-only session first (this
+                    // runs off-thread via Task.Run) so the snapshot reflects the reconciled
+                    // state rather than the stale pre-switch values.
+                    int deferred = Settings.Default.DisplayRefreshRateDeferred;
+                    if (deferred > 0)
+                    {
+                        int applied = Display.ReconcileInternalRefreshRate(deferred);
+                        if (applied == deferred)
+                        {
+                            Settings.Default.DisplayRefreshRateDeferred = 0;
+                            Settings.Default.DisplayRefreshRateLastKnown = applied;
+                            Settings.Default.Save();
+                            Log.Information("[Tray] Deferred refresh rate {Hz} Hz applied on panel reattach", applied);
+                        }
+                    }
+
+                    string deferredProfile = Settings.Default.DisplayColorProfileDeferred;
+                    if (deferredProfile.Length > 0)
+                    {
+                        string appliedProfile = Display.ReconcileInternalColorProfile(deferredProfile);
+                        if (appliedProfile == deferredProfile)
+                        {
+                            Settings.Default.DisplayColorProfileDeferred = string.Empty;
+                            Settings.Default.DisplayColorProfileLastKnown = appliedProfile;
+                            Settings.Default.Save();
+                            Log.Information("[Tray] Deferred color profile {Profile} applied on panel reattach", appliedProfile);
+                        }
+                    }
+
+                    refreshRateHz = Display.GetInternalRefreshRate();
+                    if (refreshRateHz > 0)
+                        Settings.Default.DisplayRefreshRateLastKnown = refreshRateHz;
+                    colorProfileFile = Display.GetInternalColorProfile();
+                    Settings.Default.DisplayColorProfileLastKnown = colorProfileFile ?? string.Empty;
+                }
+                else
+                {
+                    // Panel detached — report the last known values so the tray keeps a
+                    // selection while the panel is off.
+                    refreshRateHz = Settings.Default.DisplayRefreshRateLastKnown;
+                    string lastKnownProfile = Settings.Default.DisplayColorProfileLastKnown;
+                    colorProfileFile = lastKnownProfile.Length > 0 ? lastKnownProfile : null;
+                }
+
+                refreshRateSwitchable = Display.GetInternalRefreshRates(gpuModeDgpuOnly).Count > 1;
+                colorCalAvailable = Display.GetOfferedColorProfileFiles().Count > 1;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Tray] Panel display read failed: {Message}", ex.Message);
+            }
+
             var features = new FeatureNavigationPreferences(
                 Adaptive: Settings.Default.EnableAdaptiveNavigation,
                 HydroUi: Settings.Default.EnableHydroUiNavigation,
@@ -92,10 +190,12 @@ namespace Uniwill_Control_Utility.Services
                 adaptiveWaterCoolerEnabled: adaptiveRunning && Settings.Default.AdaptiveWcEnabled,
                 adaptiveKeyboardEnabled: adaptiveRunning && Settings.Default.AdaptiveKeyboardEnabled,
                 adaptiveLightBarEnabled: adaptiveRunning && Settings.Default.AdaptiveLbEnabled,
+                lightBarSyncActive: App.GetService<BetterRgbStreamService>()?.IsLightBarSyncActive == true,
                 adaptiveFlydigiEnabled: adaptiveRunning && Settings.Default.AdaptiveBs2ProEnabled,
                 hasMiniLedPanel: hasMiniLed,
                 flydigiDeviceAvailable: flydigiAvailable,
                 flydigiEnabled: flydigiEnabled,
+                refreshRateSwitchable: refreshRateSwitchable,
                 features: features);
 
             var waterSettings = _waterCooler.GetSettings();
@@ -114,7 +214,13 @@ namespace Uniwill_Control_Utility.Services
                 FanSmartMode: fanSettings.EcSmartFanMode,
                 LocalDimmingOn: Settings.Default.DisplayLocalDimming,
                 OverlayOn: overlayOptions.Enabled,
-                FlydigiRgbOn: flydigiSettings.RgbMode != "Off");
+                FlydigiRgbOn: flydigiSettings.RgbMode != "Off",
+                GpuModeHybrid: gpuModeHybrid,
+                GpuModeDgpuOnly: gpuModeDgpuOnly,
+                GpuPowerSavingMode: Settings.Default.GpuPowerSavingMode,
+                RefreshRateHz: refreshRateHz,
+                ColorCalAvailable: colorCalAvailable,
+                ColorProfileFile: colorProfileFile);
         }
 
         #region Toggle Handlers
@@ -204,6 +310,37 @@ namespace Uniwill_Control_Utility.Services
             settings.PowerOn = enabled;
             KeyboardSettingsService.Save(settings);
 
+            // BetterRGB engine owns the keyboard endpoint — route the tray toggle
+            // through the streamer. A firmware TurnOnWithEffect while the engine
+            // streams puts two consumers on the endpoint and seizes the lighting.
+            var streamer = App.GetService<BetterRgbStreamService>();
+            if (settings.Engine == KeyboardEngine.BetterRGB && streamer != null)
+            {
+                if (enabled)
+                {
+                    streamer.SetParams(settings);
+                    streamer.StartEngine("tray");
+                }
+                else
+                {
+                    streamer.StopEngine("tray");
+                    // StopEngine alone leaves the last streamed frame lit — pair with TurnOff.
+                    var offHid = new KeyboardHidService();
+                    if (offHid.Open())
+                    {
+                        try
+                        {
+                            offHid.TurnOff();
+                        }
+                        finally
+                        {
+                            offHid.Dispose();
+                        }
+                    }
+                }
+                return;
+            }
+
             // Apply to HID directly
             var hid = new KeyboardHidService();
             if (!hid.Open())
@@ -236,8 +373,15 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>Toggles Light Bar on/off.</summary>
         public void SetLightBar(bool enabled)
         {
+            // BetterRGB light bar sync owns the strip while it streams (the tray
+            // button is disabled then); ignore stray calls so a firmware write
+            // never fights the sync pushes.
+            if (App.GetService<BetterRgbStreamService>()?.IsLightBarSyncActive == true)
+                return;
+
             Settings.Default.LightBarEnabled = enabled;
             Settings.Default.Save();
+            LightBarSettingsChanged?.Invoke(this, EventArgs.Empty);
 
             var hid = new KeyboardHidService();
             if (!hid.Open())
@@ -322,6 +466,136 @@ namespace Uniwill_Control_Utility.Services
                     return false;
                 }
             });
+        }
+
+        /// <summary>
+        /// Switches the runtime iGPU Power Saving mode (Hybrid/Nvidia Optimus only).
+        /// Mirrors the Display page's btnPowerSaving_Click core: persist, PnP hotswap,
+        /// LHM reset. Returns true if the switch was applied.
+        /// </summary>
+        public async Task<bool> SetGpuPowerSavingAsync(int mode)
+        {
+            // Block during GPU driver transition cooldown (same guard as the Display page).
+            if (GpuInteropGuard.IsBlocked)
+                return false;
+
+            try
+            {
+                Settings.Default.GpuPowerSavingMode = mode;
+                Settings.Default.Save();
+
+                await GpuPowerSaving.ApplyAsync((GpuPowerSavingMode)mode);
+
+                // Reset LHM Computer so metrics re-probe with fresh driver handles.
+                try
+                {
+                    App.GetService<IHardwareMonitoringService>()?.ResetComputer();
+                }
+                catch
+                {
+                    // Best-effort — metrics refresh on their own schedule.
+                }
+
+                Log.Information("[Tray] GPU power saving mode set to {Mode} ({Name})",
+                    mode, GpuPowerSaving.GetModeDisplayName((GpuPowerSavingMode)mode));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Tray] GPU power saving switch failed: {Message}", ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Switches the internal panel's refresh rate via the Windows display-mode
+        /// pathway (mirrors the Display page's refresh-rate apply core). Returns
+        /// true when the readback confirms the requested rate, or when the selection
+        /// was deferred because the panel is detached (external-only) — it is applied
+        /// once the panel reattaches.
+        /// </summary>
+        public async Task<bool> SetRefreshRateAsync(int hz)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(Display.InternalPanelName()))
+                {
+                    // Panel detached (lid closed / internal display disconnected) — GDI
+                    // hides a display that is off, so the write cannot land now. Persist
+                    // the selection (deferred for reattach) and remember it as the panel's
+                    // value so the tray keeps a selection while the panel is off.
+                    Settings.Default.DisplayRefreshRateDeferred = hz;
+                    Settings.Default.DisplayRefreshRateLastKnown = hz;
+                    Settings.Default.Save();
+                    Log.Information("[Tray] Refresh rate {Hz} Hz deferred — internal panel detached (external-only)", hz);
+                    return true;
+                }
+
+                Settings.Default.DisplayRefreshRateDeferred = 0;
+                Settings.Default.Save();
+                int applied = Display.ApplyInternalRefreshRate(hz);
+
+                // Verify via readback — the engine reports failures only to the console.
+                bool success = applied == hz;
+                if (success)
+                {
+                    Settings.Default.DisplayRefreshRateLastKnown = applied;
+                    Settings.Default.Save();
+                }
+                Log.Information("[Tray] Internal panel refresh rate set to {Applied} Hz (requested {Hz} Hz, success: {Success})",
+                    applied, hz, success);
+                return success;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Tray] Display refresh rate apply failed: {Message}", ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Associates an ICC profile with the display in use ("" removes the association).
+        /// Returns true when the readback confirms the requested profile.
+        /// </summary>
+        public async Task<bool> SetColorProfileAsync(string profileFile)
+        {
+            try
+            {
+                // Color calibration is laptop-panel-only — never the display in use.
+                if (string.IsNullOrEmpty(Display.InternalPanelName()))
+                {
+                    // Panel detached (external-only) — persist the selection (deferred for
+                    // reattach) and remember it so the tray keeps a selection while the
+                    // panel is off.
+                    Settings.Default.DisplayColorProfileDeferred = profileFile;
+                    Settings.Default.DisplayColorProfileLastKnown = profileFile;
+                    Settings.Default.Save();
+                    Log.Information("[Tray] Color profile {File} deferred — internal panel detached (external-only)", profileFile);
+                    return true;
+                }
+
+                Settings.Default.DisplayColorProfileDeferred = string.Empty;
+                Settings.Default.Save();
+                var target = Display.InternalPanelName();
+                Display.ApplyColorProfile(target, profileFile);
+
+                // Verify via readback — the registry write reports failures only via return code.
+                string? applied = Display.GetCurrentColorProfile(target);
+                bool success = applied == profileFile;
+                if (success)
+                {
+                    Settings.Default.DisplayColorProfileLastKnown = profileFile;
+                    Settings.Default.Save();
+                }
+                Log.Information("[Tray] Internal panel color profile set to {Applied} (requested {File}, success: {Success})",
+                    applied, profileFile, success);
+                return success;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Tray] Display color profile apply failed: {Message}", ex.Message);
+                return false;
+            }
         }
 
         /// <remarks>

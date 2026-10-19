@@ -57,7 +57,7 @@ namespace Uniwill_Control_Utility.Services
         private const int ConnectRetryDelayMs = 1000;
         private const string ModeRealtime = "Realtime";
         private const string ModeGear = "Gear";
-        private const int AutoConnectMaxAttempts = 3;
+        private const int AutoConnectMaxAttempts = 2;
         private const int ConnectMaxRetries = 2;
         private const int ConnectTimeoutSeconds = 5;
         private const int GattSessionTimeoutSeconds = 5;

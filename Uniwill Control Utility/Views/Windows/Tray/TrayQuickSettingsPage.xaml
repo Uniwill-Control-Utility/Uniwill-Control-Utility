@@ -1,0 +1,426 @@
+<Page x:Class="Uniwill_Control_Utility.Views.Windows.Tray.TrayQuickSettingsPage"
+     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+     xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+     mc:Ignorable="d"
+     d:DesignHeight="330"
+     d:DesignWidth="354"
+     SnapsToDevicePixels="True"
+     UseLayoutRounding="True"
+      Margin="0,12,0,0">
+
+    <!-- Tray quick-settings page: the default page of the mini-tray's NavigationView.
+         The Display button navigates to TrayDisplayPage; the tray window owns the
+         NavigationView and the shared apply/snapshot orchestration. -->
+
+    <Page.Resources>
+        <ContextMenu x:Key="NavigateContextMenu"
+                     Opened="NavigateContextMenu_Opened">
+            <MenuItem Header="Go to UCU" Click="GoToUcuMenuItem_Click" />
+        </ContextMenu>
+
+        <!-- Regular (non-toggle) quick button: same look as QuickToggleStyle minus checked state -->
+        <Style x:Key="QuickButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid IsHitTestVisible="{TemplateBinding IsEnabled}">
+                            <!-- Base background -->
+                            <Border x:Name="BaseBackground"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="4">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="Black"
+                                                      Opacity="0.08"
+                                                      BlurRadius="3"
+                                                      ShadowDepth="1"
+                                                      Direction="270" />
+                                </Border.Effect>
+                            </Border>
+                            <!-- Hover overlay -->
+                            <Border x:Name="HoverOverlay"
+                                    Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                    CornerRadius="4"
+                                    Visibility="Collapsed" />
+                            <!-- Content -->
+                            <ContentPresenter x:Name="ContentPresenter"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="HoverOverlay" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <!-- Disabled state: dim background, off-state foreground -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Background" Value="{DynamicResource ControlFillColorDisabledBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorDisabledBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="QuickToggleStyle"
+               TargetType="ToggleButton"
+               BasedOn="{StaticResource {x:Type ToggleButton}}">
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Grid IsHitTestVisible="{TemplateBinding IsEnabled}">
+                            <!-- Base background -->
+                            <Border x:Name="BaseBackground"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="4">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="Black"
+                                                      Opacity="0.08"
+                                                      BlurRadius="3"
+                                                      ShadowDepth="1"
+                                                      Direction="270" />
+                                </Border.Effect>
+                            </Border>
+                            <!-- Hover overlay for off-state -->
+                            <Border x:Name="HoverOffOverlay"
+                                    Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                    CornerRadius="4"
+                                    Visibility="Collapsed" />
+                            <!-- Hover overlay for on-state -->
+                            <Border x:Name="HoverOnOverlay"
+                                    Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                    CornerRadius="4"
+                                    Visibility="Collapsed" />
+                            <!-- Content -->
+                            <ContentPresenter x:Name="ContentPresenter"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource AccentTextFillColorTertiaryBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True" />
+                                    <Condition Property="IsChecked" Value="False" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="HoverOffOverlay" Property="Visibility" Value="Visible" />
+                            </MultiTrigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True" />
+                                    <Condition Property="IsChecked" Value="True" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="HoverOnOverlay" Property="Visibility" Value="Visible" />
+                            </MultiTrigger>
+                            <!-- Disabled state: dim background, off-state foreground -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Background" Value="{DynamicResource ControlFillColorDisabledBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorDisabledBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
+    <!-- Quick settings grid. Width fixed at 320 (the card's inner width) so the
+         button gaps match the Display page's Optimus row regardless of the
+         NavigationView content box. -->
+    <Grid x:Name="ButtonsGrid"
+          Width="320"
+          HorizontalAlignment="Center"
+          VerticalAlignment="Center">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Adaptive Mode -->
+        <StackPanel x:Name="SlotAdaptiveMode"
+                    Orientation="Vertical"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+            <ToggleButton x:Name="BtnAdaptiveMode"
+                          Width="95"
+                          Height="46"
+                          Style="{StaticResource QuickToggleStyle}"
+                          Tag="Adaptive"
+                          ContextMenu="{StaticResource NavigateContextMenu}"
+                          Click="BtnAdaptiveMode_Click">
+                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                             Glyph="&#xEB44;"
+                             FontSize="16">
+                    <ui:FontIcon.Foreground>
+                        <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                 Path="Foreground" />
+                    </ui:FontIcon.Foreground>
+                </ui:FontIcon>
+            </ToggleButton>
+            <ui:TextBlock FontSize="11"
+                          Margin="0,12,0,0"
+                          HorizontalAlignment="Center"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="Adaptive Mode" />
+        </StackPanel>
+
+        <!-- Keyboard RGB -->
+        <StackPanel x:Name="SlotKeyboardBacklight"
+                    Orientation="Vertical"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+            <ToggleButton x:Name="BtnKeyboardBacklight"
+                          Width="95"
+                          Height="46"
+                          Style="{StaticResource QuickToggleStyle}"
+                          Tag="Keyboard"
+                          ContextMenu="{StaticResource NavigateContextMenu}"
+                          Click="BtnKeyboardBacklight_Click">
+                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                             Glyph="&#xE92E;"
+                             FontSize="16">
+                    <ui:FontIcon.Foreground>
+                        <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                 Path="Foreground" />
+                    </ui:FontIcon.Foreground>
+                </ui:FontIcon>
+            </ToggleButton>
+            <ui:TextBlock FontSize="11"
+                          Margin="0,12,0,0"
+                          HorizontalAlignment="Center"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="Keyboard RGB" />
+        </StackPanel>
+
+        <!-- Light Bar -->
+        <StackPanel x:Name="SlotLightBar"
+                    Orientation="Vertical"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+            <ToggleButton x:Name="BtnLightBar"
+                          Width="95"
+                          Height="46"
+                          Style="{StaticResource QuickToggleStyle}"
+                          Tag="LightBar"
+                          ContextMenu="{StaticResource NavigateContextMenu}"
+                          Click="BtnLightBar_Click">
+                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                             Glyph="&#xED39;"
+                             FontSize="18">
+                    <ui:FontIcon.Foreground>
+                        <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                 Path="Foreground" />
+                    </ui:FontIcon.Foreground>
+                </ui:FontIcon>
+            </ToggleButton>
+            <ui:TextBlock FontSize="11"
+                          Margin="0,12,0,0"
+                          HorizontalAlignment="Center"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="Light Bar" />
+        </StackPanel>
+
+        <!-- Smart Fan Mode -->
+        <StackPanel x:Name="SlotFanSmartMode"
+                    Orientation="Vertical"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+            <ToggleButton x:Name="BtnFanSmartMode"
+                          Width="95"
+                          Height="46"
+                          Style="{StaticResource QuickToggleStyle}"
+                          Tag="FanControl"
+                          ContextMenu="{StaticResource NavigateContextMenu}"
+                          Click="BtnFanSmartMode_Click">
+                <iconPacks:PackIconLucide
+                    Kind="Fan"
+                    Width="16"
+                    Height="16"
+                    VerticalAlignment="Center">
+                    <iconPacks:PackIconLucide.Foreground>
+                        <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                 Path="Foreground" />
+                    </iconPacks:PackIconLucide.Foreground>
+                </iconPacks:PackIconLucide>
+            </ToggleButton>
+            <ui:TextBlock FontSize="11"
+                          Margin="0,12,0,0"
+                          HorizontalAlignment="Center"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="Smart Fan Mode" />
+        </StackPanel>
+
+        <!-- Overlay -->
+        <StackPanel x:Name="SlotOverlay"
+                    Orientation="Vertical"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+            <ToggleButton x:Name="BtnOverlay"
+                          Width="95"
+                          Height="46"
+                          Style="{StaticResource QuickToggleStyle}"
+                          Tag="OverlaySettingsPage"
+                          ContextMenu="{StaticResource NavigateContextMenu}"
+                          Click="BtnOverlay_Click">
+                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                             Glyph="&#xE81E;"
+                             FontSize="16">
+                    <ui:FontIcon.Foreground>
+                        <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                 Path="Foreground" />
+                    </ui:FontIcon.Foreground>
+                </ui:FontIcon>
+            </ToggleButton>
+            <ui:TextBlock FontSize="11"
+                          Margin="0,12,0,0"
+                          HorizontalAlignment="Center"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="Overlay" />
+        </StackPanel>
+
+        <!-- Display (navigation page — regular button, not a toggle) -->
+        <StackPanel x:Name="SlotDisplay"
+                    Orientation="Vertical"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+            <Button x:Name="BtnDisplay"
+                    Width="95"
+                    Height="46"
+                    Style="{StaticResource QuickButtonStyle}"
+                    Tag="Display"
+                    ContextMenu="{StaticResource NavigateContextMenu}"
+                    Click="BtnDisplay_Click">
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                 Glyph="&#xE7F4;"
+                                 FontSize="16">
+                        <ui:FontIcon.Foreground>
+                            <Binding RelativeSource="{RelativeSource AncestorType=Button}"
+                                     Path="Foreground" />
+                        </ui:FontIcon.Foreground>
+                    </ui:FontIcon>
+                    <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                 Glyph="&#xE974;"
+                                 FontSize="12"
+                                 Margin="4,0,0,0">
+                        <ui:FontIcon.Foreground>
+                            <Binding RelativeSource="{RelativeSource AncestorType=Button}"
+                                     Path="Foreground" />
+                        </ui:FontIcon.Foreground>
+                    </ui:FontIcon>
+                </StackPanel>
+            </Button>
+            <ui:TextBlock FontSize="11"
+                          Margin="0,12,0,0"
+                          HorizontalAlignment="Center"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="Display" />
+        </StackPanel>
+
+        <!-- Smart Hydro (dynamic circumstance) -->
+        <StackPanel x:Name="SlotHydroSmartMode"
+                    Orientation="Vertical"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+            <ToggleButton x:Name="BtnHydroSmartMode"
+                          Width="95"
+                          Height="46"
+                          Style="{StaticResource QuickToggleStyle}"
+                          Tag="HydroUI"
+                          ContextMenu="{StaticResource NavigateContextMenu}"
+                          Click="BtnHydroSmartMode_Click">
+                <iconPacks:PackIconLucide
+                    Kind="BrainCircuit"
+                    Width="16"
+                    Height="16"
+                    VerticalAlignment="Center">
+                    <iconPacks:PackIconLucide.Foreground>
+                        <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                 Path="Foreground" />
+                    </iconPacks:PackIconLucide.Foreground>
+                </iconPacks:PackIconLucide>
+            </ToggleButton>
+            <ui:TextBlock FontSize="11"
+                          Margin="0,12,0,0"
+                          HorizontalAlignment="Center"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="Smart Hydro" />
+        </StackPanel>
+
+        <!-- Hydro RGB (dynamic circumstance) -->
+        <StackPanel x:Name="SlotHydroRgb"
+                    Orientation="Vertical"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+            <ToggleButton x:Name="BtnHydroRgb"
+                          Width="95"
+                          Height="46"
+                          Style="{StaticResource QuickToggleStyle}"
+                          Tag="HydroUI"
+                          ContextMenu="{StaticResource NavigateContextMenu}"
+                          Click="BtnHydroRgb_Click">
+                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                             Glyph="&#xE790;"
+                             FontSize="16">
+                    <ui:FontIcon.Foreground>
+                        <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                 Path="Foreground" />
+                    </ui:FontIcon.Foreground>
+                </ui:FontIcon>
+            </ToggleButton>
+            <ui:TextBlock FontSize="11"
+                          Margin="0,12,0,0"
+                          HorizontalAlignment="Center"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="Hydro RGB" />
+        </StackPanel>
+
+        <!-- Flydigi RGB (dynamic circumstance) -->
+        <StackPanel x:Name="SlotFlydigiRgb"
+                    Orientation="Vertical"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+            <ToggleButton x:Name="BtnFlydigiRgb"
+                          Width="95"
+                          Height="46"
+                          Style="{StaticResource QuickToggleStyle}"
+                          Tag="FlydigiCooler"
+                          ContextMenu="{StaticResource NavigateContextMenu}"
+                          Click="BtnFlydigiRgb_Click">
+                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                             Glyph="&#xE790;"
+                             FontSize="16">
+                    <ui:FontIcon.Foreground>
+                        <Binding RelativeSource="{RelativeSource AncestorType=ToggleButton}"
+                                 Path="Foreground" />
+                    </ui:FontIcon.Foreground>
+                </ui:FontIcon>
+            </ToggleButton>
+            <ui:TextBlock FontSize="11"
+                          Margin="0,12,0,0"
+                          HorizontalAlignment="Center"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="Flydigi RGB" />
+        </StackPanel>
+    </Grid>
+</Page>

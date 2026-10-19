@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -23,7 +24,7 @@ namespace Uniwill_Control_Utility.Views.Pages
     {
         private readonly ILogger<Presets> _logger;
         private readonly GpuInventoryService? _gpuInventory;
-        private readonly WaterCoolerService? _waterCooler;
+        private readonly HydroUIService? _waterCooler;
         private readonly DeviceApplier? _deviceApplier;
         private readonly PresetsNavigationRequest _navigationRequest;
         private string _currentProfile = "Gaming";
@@ -64,10 +65,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         // Custom profile fan curve persistence
         private FanControlSettings? _savedCustomFanSettings;
 
-        // Diagnostic logging (visible in Visual Studio Output / debug console)
+        // Diagnostic logging (visible in Serilog log file)
         private static void DebugLog(string message)
         {
-            Debug.WriteLine($"[Presets] {message}");
+            try { Log.Information("[Presets] {Message}", message); } catch { }
         }
 
         // Adaptive Mode override snackbar
@@ -85,23 +86,25 @@ namespace Uniwill_Control_Utility.Views.Pages
         private double _profileIntelPl1 = 45;
         private double _profileIntelPl2 = 60;
 
-        // Voltage control is enabled when EnableCpuVoltageControl setting is True.
-        // When the setting is False, voltage controls (CO for AMD, undervolt for Intel)
-        // are hidden and the app skips voltage-related SMU/MSR commands.
+        // Voltage control (Curve Optimizer) is AMD-only and gated by the EnableCpuVoltageControl setting.
+        // Intel scenarios have no voltage control at all — the undervolt UI and MSR commands are removed.
         private bool CpuVoltageEnabled => Settings.Default.EnableCpuVoltageControl;
 
         public Presets(
             ILogger<Presets> logger,
             PresetsNavigationRequest navigationRequest,
             GpuInventoryService? gpuInventory = null,
-            WaterCoolerService? waterCooler = null,
-            DeviceApplier? deviceApplier = null)
+            HydroUIService? waterCooler = null,
+            DeviceApplier? deviceApplier = null,
+            QKeyButtonService? qKeyButton = null)
         {
             _logger = logger;
             _navigationRequest = navigationRequest;
             _gpuInventory = gpuInventory;
             _waterCooler = waterCooler;
             _deviceApplier = deviceApplier;
+            // Lets a preset applied by the physical button drive this page's selection state.
+            qKeyButton?.RegisterPresetsPage(this);
             InitializeComponent();
             _ = Tablet.TabletDevices;
         }
@@ -128,14 +131,34 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     var presets = Models.CustomPresetStore.Load(ActivePresetMode);
                     int slot = _customPresetSlot;
+                    DebugLog($"OnNavigatedToAsync Custom: _customPresetSlot={slot}, presets[{slot}].HasChanges={slot < presets.Length && presets[slot].HasChanges}");
                     if (slot < 0 || slot >= presets.Length || !presets[slot].HasChanges)
                     {
                         // Slot empty — fall back to Settings.Default values saved by last Apply.
+                        DebugLog($"OnNavigatedToAsync Custom: Falling back to LoadCustomValues()");
                         LoadCustomValues();
                     }
                     updateStatus();
                     updateAllLabels();
+
+                    // Force a visual refresh on cached pages. WPF doesn't re-render
+                    // TextBlock elements when .Text is set programmatically on a
+                    // page that was previously displayed with different values.
+                    // Defer a second pass to the next dispatcher cycle so the visual
+                    // tree has processed the initial changes.
+                    _ = this.Dispatcher.InvokeAsync(() =>
+                    {
+                        updateStatus();
+                        updateAllLabels();
+                        this.UpdateLayout();
+                    }, DispatcherPriority.Background);
                 }
+
+                // After ALL slider value assignments (profile load + Custom fallback),
+                // clamp to current limits so Power Boost mode changes are respected.
+                // Must run after the Custom block above because LoadCustomValues()
+                // can overwrite slider values that were already clamped.
+                clampSlidersToLimits();
 
                 // Refresh preset mode label and bottom bar stroke on every navigation
                 // (handles settings changes from the Settings page).
@@ -280,6 +303,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             // even when the custom panel is collapsed (pre-made profiles).
             updateAllLabels();
 
+            // Clamp slider values to current limits after Page_Loaded overwrites them.
+            // (OnNavigatedToAsync clamps too, but Page_Loaded fires after and resets values.)
+            clampSlidersToLimits();
+            updateAllLabels();
+
             // Update overlay based on Adaptive Mode override state
             UpdateAdaptiveOverlay();
         }
@@ -417,7 +445,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             lblNvDbOffset.Text = $"{sdNvDbOffset.Value:F0} W";
             // Show "Curve" only if curve is active AND user hasn't touched the slider.
             // If the user manually changes the slider, the curve is ignored for Apply.
-            lblNvCore.Text = (VfCurveActive && !_userTouchedCoreSlider) ? "Curve" : $"{sdNvCore.Value:F0} MHz";
+            bool stockPreset = Services.PresetProfileApplier.IsBuiltInProfile(_currentProfile);
+            lblNvCore.Text = (!stockPreset && VfCurveActive && !_userTouchedCoreSlider) ? "Curve" : $"{sdNvCore.Value:F0} MHz";
             lblNvMem.Text = $"{sdNvMem.Value:F0} MHz";
         }
 
@@ -433,7 +462,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tbPl2Label.Text = "PL2";
                 tbTjMaxLabel.Visibility = Visibility.Collapsed;
                 tbTjMax.Visibility = Visibility.Collapsed;
-                tbCoLabel.Text = "Voltage Offset";
             }
             // Hide Intel-specific controls on AMD
             else
@@ -441,12 +469,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                 sdIntelTuning.Visibility = Visibility.Collapsed;
             }
 
-            // Hide CO/voltage offset row in status card and slider controls when voltage control is disabled
-            bool voltageEnabled = CpuVoltageEnabled;
+            // Voltage control is AMD-only (Curve Optimizer): hide the CO row in the status card and the
+            // CO slider controls when EnableCpuVoltageControl is OFF. Intel has no voltage control at all.
+            bool voltageEnabled = CpuVoltageEnabled && Family.TYPE != Family.ProcessorType.Intel;
             tbCoLabel.Visibility = voltageEnabled ? Visibility.Visible : Visibility.Collapsed;
             tbCoOffset.Visibility = voltageEnabled ? Visibility.Visible : Visibility.Collapsed;
             coControlsPanel?.SetValue(VisibilityProperty, voltageEnabled ? Visibility.Visible : Visibility.Collapsed);
-            intelVoltControlsPanel?.SetValue(VisibilityProperty, voltageEnabled ? Visibility.Visible : Visibility.Collapsed);
 
             // NVIDIA visibility â€” check GPU inventory or fall back to NvTuning probe
             bool hasNvidia = false;
@@ -523,6 +551,28 @@ namespace Uniwill_Control_Utility.Views.Pages
             return null;
         }
 
+        /// <summary>
+        /// Updates a slider Maximum and adjusts the value if the range changed.
+        /// If the max shrinks and the value exceeds it, clamps down.
+        /// If the max grows and the value was at the old max, bumps to the new max.
+        /// </summary>
+        private static void applySliderMaxChange(Slider slider, double newMax)
+        {
+            double oldMax = slider.Maximum;
+            double value = slider.Value;
+
+            slider.Maximum = newMax;
+
+            if (value > newMax)
+            {
+                slider.Value = newMax;
+            }
+            else if (newMax > oldMax && value >= oldMax)
+            {
+                slider.Value = newMax;
+            }
+        }
+
         private void applyPowerLimits()
         {
             var limits = GetPowerLimits();
@@ -540,20 +590,65 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             if (Family.TYPE == Family.ProcessorType.Amd_Apu)
             {
-                sdSustained.Maximum = powerBoostMode ? boostPl1 : pl.CpuPl1Sustained;
-                sdBoost.Maximum = powerBoostMode ? boostPl2 : pl.CpuPl2Boost;
+                applySliderMaxChange(sdSustained, powerBoostMode ? boostPl1 : pl.CpuPl1Sustained);
+                applySliderMaxChange(sdBoost, powerBoostMode ? boostPl2 : pl.CpuPl2Boost);
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
-                sdIntelPl1.Maximum = powerBoostMode ? boostPl1 : pl.CpuPl1Sustained;
-                sdIntelPl2.Maximum = powerBoostMode ? boostPl2 : pl.CpuPl2Boost;
+                applySliderMaxChange(sdIntelPl1, powerBoostMode ? boostPl1 : pl.CpuPl1Sustained);
+                applySliderMaxChange(sdIntelPl2, powerBoostMode ? boostPl2 : pl.CpuPl2Boost);
             }
 
-            // GPU TGP slider — set per-GPU min/max range
             SetGpuSliderLimits(pl.GpuTgpBaseline);
 
             // Dynamic Boost offset — max is the DB max from SKU config
             sdNvDbOffset.Maximum = pl.DynamicBoostMax;
+        }
+
+        /// <summary>
+        /// Clamps slider values to current limits after profile loading.
+        /// If the slider max grew (Power Boost enabled) and the value was at the old max,
+        /// bumps it to the new max so the label and thumb stay in sync.
+        /// </summary>
+        private void clampSlidersToLimits()
+        {
+            var limits = GetPowerLimits();
+            if (limits == null)
+                return;
+
+            var pl = limits;
+            bool powerBoostMode = Settings.Default.EnablePowerBoostMode;
+
+            // CPU sliders
+            int boostPl1 = Family.TYPE == Family.ProcessorType.Amd_Apu ? 160 : 255;
+            int boostPl2 = Family.TYPE == Family.ProcessorType.Amd_Apu ? 160 : 255;
+
+            if (Family.TYPE == Family.ProcessorType.Amd_Apu)
+            {
+                int effectiveMax = powerBoostMode ? boostPl1 : pl.CpuPl1Sustained;
+                if (sdSustained.Value > effectiveMax) sdSustained.Value = effectiveMax;
+                if (powerBoostMode && sdSustained.Value == pl.CpuPl1Sustained) sdSustained.Value = boostPl1;
+
+                effectiveMax = powerBoostMode ? boostPl2 : pl.CpuPl2Boost;
+                if (sdBoost.Value > effectiveMax) sdBoost.Value = effectiveMax;
+                if (powerBoostMode && sdBoost.Value == pl.CpuPl2Boost) sdBoost.Value = boostPl2;
+            }
+            else if (Family.TYPE == Family.ProcessorType.Intel)
+            {
+                int effectiveMax = powerBoostMode ? boostPl1 : pl.CpuPl1Sustained;
+                if (sdIntelPl1.Value > effectiveMax) sdIntelPl1.Value = effectiveMax;
+                if (powerBoostMode && sdIntelPl1.Value == pl.CpuPl1Sustained) sdIntelPl1.Value = boostPl1;
+
+                effectiveMax = powerBoostMode ? boostPl2 : pl.CpuPl2Boost;
+                if (sdIntelPl2.Value > effectiveMax) sdIntelPl2.Value = effectiveMax;
+                if (powerBoostMode && sdIntelPl2.Value == pl.CpuPl2Boost) sdIntelPl2.Value = boostPl2;
+            }
+
+            // GPU TGP slider — clamp to current max.
+            if (sdNvPower.Value > sdNvPower.Maximum)
+            {
+                sdNvPower.Value = sdNvPower.Maximum;
+            }
         }
 
         private void SetGpuSliderLimits(int fallbackMax)
@@ -567,12 +662,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                 var n when n.Contains("rtx 5070") => (60, boostEnabled ? 250 : 115),
                 _ => (50, fallbackMax)
             };
+
             sdNvPower.Minimum = min;
             sdNvPower.Maximum = max;
 
-            // Clamp current value to new range only if out of bounds.
-            // This handles the case where Power boost mode setting changes
-            // (e.g., user disables boost, reducing the max from 250 to 150).
+            // Clamp current value to new range if above max.
+            // The upward bump (max grows, value was at old max) is handled
+            // separately in clampSlidersToLimits() which runs after profile loading.
             if (sdNvPower.Value > max) sdNvPower.Value = max;
             if (sdNvPower.Value < min) sdNvPower.Value = min;
 
@@ -714,7 +810,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             return $"{profile}\n\n{cpuSection}\n{cpuValues}\n\n{gpuSection}\n{gpuValues}";
         }
 
-        private void loadSavedProfile()
+        public void loadSavedProfile()
         {
             // Restore last selected profile.
             // Try the new string property first; fall back to the legacy int property.
@@ -736,14 +832,19 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Handle custom preset names saved by the tray widget (e.g. "Custom 2", "Custom 3 (Boost)")
             if (Services.TrayPresetOptions.IsCustomPreset(saved))
             {
+                DebugLog($"loadSavedProfile: saved='{saved}', ActivePresetSlot={ActivePresetSlot}, customPresetSlot={Settings.Default.customPresetSlot}, customPresetSlotBoost={Settings.Default.customPresetSlotBoost}");
+
                 // Parse slot from "Custom N" or "Custom N (Boost)"
-                int slot = 0;
                 var parts = saved.Replace("(Boost)", "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length >= 2 && int.TryParse(parts[1], out int parsed))
-                    slot = Math.Clamp(parsed - 1, 0, Models.CustomPreset.MaxSlots - 1);
+                {
+                    int slot = Math.Clamp(parsed - 1, 0, Models.CustomPreset.MaxSlots - 1);
+                    // Only overwrite ActivePresetSlot when the saved name contains an explicit slot number.
+                    // When saved is just "Custom", the slot is already persisted in customPresetSlot/customPresetSlotBoost.
+                    ActivePresetSlot = slot;
+                    DebugLog($"loadSavedProfile: Parsed slot {slot} from '{saved}'");
+                }
 
-                // Ensure ActivePresetSlot is synced so selectProfile picks up the correct slot
-                ActivePresetSlot = slot;
                 selectProfile("Custom", apply: false);
             }
             else
@@ -892,13 +993,27 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (_customPresetSlot < 0 || _customPresetSlot >= Models.CustomPreset.MaxSlots)
                     _customPresetSlot = 0;
 
+                DebugLog($"selectProfile Custom: _customPresetSlot={_customPresetSlot}, ActivePresetSlot={ActivePresetSlot}, customPresetSlot={Settings.Default.customPresetSlot}");
+
                 LoadCustomPreset(_customPresetSlot);
                 updateAllLabels();
+
+                // Page_Loaded only fires once, so a profile switch — including one
+                // driven by the Performance button — has to move the checked slot too.
+                var slotButtons = new RadioButton[] { rbProfile1, rbProfile2, rbProfile3, rbProfile4, rbProfile5 };
+                for (int i = 0; i < slotButtons.Length; i++)
+                    slotButtons[i].IsChecked = i == _customPresetSlot;
+
                 updateRadioButtonStyles();
             }
 
             // Update status display
             updateStatus();
+
+            // Clamp slider values to current limits after profile values are set.
+            // Handles Power Boost mode changes: if boost is ON and a profile value
+            // equals the non-boost max, bump to the boost max.
+            clampSlidersToLimits();
 
             // Save selection
             Settings.Default.presetProfile = profile;
@@ -918,11 +1033,23 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     if (profile == "Custom")
                     {
-                        if (_savedCustomFanSettings is not null)
+                        // Check if the active custom preset slot has fan settings stored.
+                        var customPresets = Models.CustomPresetStore.Load(ActivePresetMode);
+                        bool presetHasFanSettings = _customPresetSlot >= 0 &&
+                            _customPresetSlot < customPresets.Length &&
+                            customPresets[_customPresetSlot].HasFanChanges;
+
+                        if (presetHasFanSettings)
                         {
-                            // Restore Custom fan settings and apply to EC
+                            // Apply fan settings from the custom preset slot
+                            PresetProfileApplier.ApplyFanSettingsFromPreset(customPresets[_customPresetSlot]);
+                            DebugLog($"selectProfile: Applied fan settings from Custom preset slot {_customPresetSlot + 1}");
+                        }
+                        else if (_savedCustomFanSettings is not null)
+                        {
+                            // Fallback: restore saved Custom fan settings and apply to EC
                             FanControlSettingsService.Save(_savedCustomFanSettings);
-                            DebugLog($"selectProfile: Restored and applying Custom fan settings");
+                            DebugLog($"selectProfile: Restored and applying saved Custom fan settings");
                             ApplyCustomFanCurveFromSettings(_savedCustomFanSettings);
                         }
                         else
@@ -941,15 +1068,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                             DebugLog($"selectProfile: Saved Custom fan settings before switching to {profile}");
                         }
 
-                        // Apply mapped fan curve for default profiles
-                        string fanPreset = profile switch
-                        {
-                            "Office" => "Silent",
-                            "Gaming" => "Balanced",
-                            "Turbo" => "Performance",
-                            _ => "Balanced"
-                        };
-                        ApplyFanCurveFromPreset(fanPreset);
+                        // Stock presets leave fans to the firmware's per-mode table:
+                        // ApplyOemStockMode clears 0x727 bit6, which makes the EC ignore
+                        // custom fan tables and hands the OEM mode engine back. Writing a
+                        // mapped curve here would re-arm manual fan control instead.
+                        DebugLog($"selectProfile: {profile} is a stock preset — fan curves left to the firmware");
                     }
                 }
 
@@ -982,12 +1105,18 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Curve Optimizer
             sdCoCcd0.Value = coCcd0;
             sdCoCcd1.Value = coCcd1;
+            sdCoUnified.Value = 0;
 
             // GPU
             sdNvPower.Value = gpuTgp;
             togDynamicBoost.IsChecked = gpuDb;
             sdNvDbOffset.Value = Math.Max(0, gpuDbOffset);
             spNvDbOffset.Visibility = gpuDb ? Visibility.Visible : Visibility.Collapsed;
+
+            // Stock presets own no GPU clock offsets: clearing here keeps the Custom
+            // preset's core/mem offsets from leaking into a stock apply.
+            sdNvCore.Value = 0;
+            sdNvMem.Value = 0;
 
             // Reset the flag when loading profile values — start fresh.
             _userTouchedCoreSlider = false;
@@ -1006,7 +1135,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (sdNvidia.Visibility == Visibility.Visible && Settings.Default.EnableGpuClockControl)
             {
                 string coreText;
-                if (VfCurveActive && !_userTouchedCoreSlider)
+                if (!Services.PresetProfileApplier.IsBuiltInProfile(_currentProfile)
+                    && VfCurveActive && !_userTouchedCoreSlider)
                 {
                     coreText = "Curve";
                 }
@@ -1047,8 +1177,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 tbPl1.Text = $"{_profileIntelPl1:F0} W";
                 tbPl2.Text = $"{_profileIntelPl2:F0} W";
-                if (CpuVoltageEnabled)
-                    tbCoOffset.Text = $"{sdIntelVolt.Value:+0;-0;0} mV";
                 tbGpuTgp.Text = $"{_profileGpuTgp:F0} W";
                 tbGpuDb.Text = _profileGpuDb ? $"+{_profileGpuDbOffset:F0} W" : "Off";
             }
@@ -1078,6 +1206,23 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // complete first and the SMU overwrites the ceiling after.
                 await RyzenAdj_To_UCU.TranslateAsync(command, appliedName: _currentProfile + " Profile", localizeAppliedName: false);
                 DebugLog($"  TranslateAsync completed");
+
+                // Stock presets are applied the OpenRevo way: assert the OEM mode
+                // engine (mode index + trigger + the 0x045B flag) and clear the
+                // custom power/profile enable bits, which yields CPU limits, GPU
+                // TGP and fans to the firmware's own per-mode factory table. Runs
+                // before anything else EC-side so no stale GPU ceiling can be left
+                // behind. 0x0741 bit0 stays armed: the EC only raises the
+                // AcpiTest_EventULong press echo while manual control is set, which
+                // is what keeps the Performance button live under a Custom preset.
+                if (PresetProfileApplier.IsBuiltInProfile(_currentProfile))
+                {
+                    var ecGate = RyzenAdj_To_UCU.EcService;
+                    if (ecGate != null)
+                    {
+                        ecGate.ApplyOemStockMode(PresetProfileApplier.OemModeIndexFor(_currentProfile));
+                    }
+                }
 
                 // Apply V-F curve offsets only on Custom profile.
                 // Stock profiles (Office/Gaming/Turbo) always use the slider values (0 MHz),
@@ -1126,10 +1271,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                     }
                 }
 
-                // Apply EC CPU power limits AFTER SMU commands. The EC enforces a hardware
-                // ceiling that clamps SMU settings from above. Without these
-                // EC writes, the CPU is capped at ~130W regardless of SMU power limit values.
-                if (Family.TYPE == Family.ProcessorType.Amd_Apu)
+                // Apply EC CPU power limits AFTER SMU commands, for Custom presets
+                // only — stock presets yield PL1/PL2/PL4 to the EC's native factory
+                // table (OpenRevo's approach).
+                if (Family.TYPE == Family.ProcessorType.Amd_Apu && !PresetProfileApplier.IsBuiltInProfile(_currentProfile))
                 {
                     var ec = RyzenAdj_To_UCU.EcService;
                     if (ec != null)
@@ -1159,6 +1304,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 // For Custom profile, update stored values from sliders so the status
                 // card reflects what was just applied (not whatever was loaded on startup).
+                // Also apply fan control settings stored in the custom preset.
                 if (_currentProfile == "Custom")
                 {
                     _profileSustained = sdSustained.Value;
@@ -1171,6 +1317,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                      _profileGpuTgp = sdNvPower.Value;
                     _profileGpuDb = togDynamicBoost.IsChecked == true;
                     _profileGpuDbOffset = sdNvDbOffset.Value;
+
+                    // Apply fan control settings from the saved custom preset slot.
+                    var customPresets = Models.CustomPresetStore.Load(ActivePresetMode);
+                    if (_customPresetSlot >= 0 && _customPresetSlot < customPresets.Length)
+                    {
+                        PresetProfileApplier.ApplyFanSettingsFromPreset(customPresets[_customPresetSlot]);
+                    }
                 }
 
                 // Update status after apply
@@ -1226,10 +1379,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             rbCoPerCcd.IsChecked = !coUnified;
             sdCoUnified.Value = Settings.Default.customCoUnifiedValue;
 
-            // Apply voltage control visibility from global setting
-            bool voltageEnabled = CpuVoltageEnabled;
+            // Apply voltage control visibility from global setting (AMD only — Intel has no voltage control)
+            bool voltageEnabled = CpuVoltageEnabled && Family.TYPE != Family.ProcessorType.Intel;
             coControlsPanel?.SetValue(VisibilityProperty, voltageEnabled ? Visibility.Visible : Visibility.Collapsed);
-            intelVoltControlsPanel?.SetValue(VisibilityProperty, voltageEnabled ? Visibility.Visible : Visibility.Collapsed);
 
             // Restore stored profile values for status card
             _profileSustained = sdSustained.Value;
@@ -1287,6 +1439,29 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
             }
 
+            // Capture current Fan Control page settings from the global FanControlSettings.
+            // This lets each custom preset store its own copy of fan curves, unified/split
+            // mode, temp thresholds, and Smart Fan Mode state — but only for slots that
+            // carry tuning changes: stamping the global fan state into a slot the user
+            // just cleared would make it look saved again right after Clear.
+            var p = presets[slotIndex];
+            if (p.HasTuningChanges)
+            {
+                var fanSettings = FanControlSettingsService.Load();
+                p.FanUnifiedMode = fanSettings.UnifiedMode;
+                p.FanUnifiedPreset = fanSettings.UnifiedPreset;
+                p.FanUnifiedDuties = fanSettings.UnifiedDuties?.Clone() as int[];
+                p.FanUnifiedTempThresholds = fanSettings.UnifiedTempThresholds?.Clone() as int[];
+                p.FanCpuPreset = fanSettings.CpuPreset;
+                p.FanCpuDuties = fanSettings.CpuDuties?.Clone() as int[];
+                p.FanCpuTempThresholds = fanSettings.CpuTempThresholds?.Clone() as int[];
+                p.FanGpuPreset = fanSettings.GpuPreset;
+                p.FanGpuDuties = fanSettings.GpuDuties?.Clone() as int[];
+                p.FanGpuTempThresholds = fanSettings.GpuTempThresholds?.Clone() as int[];
+                p.FanSmartFanMode = fanSettings.EcSmartFanMode;
+                p.FanSmartFanTempSource = fanSettings.EcSmartFanTempSource;
+            }
+
             Models.CustomPresetStore.Save(presets, ActivePresetMode);
             DebugLog($"SaveCustomPreset: slot {slotIndex + 1} saved (mode={ActivePresetMode})");
             updateRadioButtonStyles();
@@ -1328,6 +1503,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 updateCoVisibility();
 
                 // Restore stored profile values for status card
+                DebugLog($"LoadCustomPreset slot {slotIndex + 1}: setting sliders Sustained={preset.CpuSustained}, Boost={preset.CpuBoost}, TjMax={preset.CpuTjMax}");
                 _profileSustained = preset.CpuSustained;
                 _profileBoost = preset.CpuBoost;
                 _profileTjMax = (int)preset.CpuTjMax;
@@ -1381,6 +1557,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             var buttons = new RadioButton[] { rbProfile1, rbProfile2, rbProfile3, rbProfile4, rbProfile5 };
             int newSlot = Array.IndexOf(buttons, sender as RadioButton);
+            DebugLog($"rbProfile_Click: newSlot={newSlot}, _customPresetSlot={_customPresetSlot}, customPresetSlot={Settings.Default.customPresetSlot}");
             if (newSlot < 0 || newSlot == _customPresetSlot) return;
 
             // Save current slot before switching (in case user made unsaved changes)
@@ -1388,13 +1565,26 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             _customPresetSlot = newSlot;
             ActivePresetSlot = newSlot;
+
+            // The Performance-button cycle keys off presetProfile, so the slot switch
+            // has to move that key too or the walk resumes from the old slot.
+            Settings.Default.presetProfile = Services.PresetProfileApplier.CustomProfileKey(newSlot, ActivePresetMode);
             Settings.Default.Save();
+            DebugLog($"rbProfile_Click: Saved _customPresetSlot={_customPresetSlot}, customPresetSlot={Settings.Default.customPresetSlot}");
 
             // Load the new slot's preset if it has data
             LoadCustomPreset(newSlot);
             updateAllLabels();
             updateStatus();
             updateRadioButtonStyles();
+
+            // Apply fan settings from the new preset slot if it has any stored.
+            var customPresets = Models.CustomPresetStore.Load(ActivePresetMode);
+            if (newSlot < customPresets.Length && customPresets[newSlot].HasFanChanges)
+            {
+                PresetProfileApplier.ApplyFanSettingsFromPreset(customPresets[newSlot]);
+                DebugLog($"rbProfile_Click: Applied fan settings from slot {newSlot + 1}");
+            }
         }
 
         private void btnSave_Click(object sender, RoutedEventArgs e)
@@ -1527,10 +1717,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
-                // Intel MSR commands
+                // Intel MSR commands (no voltage control on Intel — undervolt removed)
                 parts.Add($"--intel-pl={sdIntelPl1.Value:F0},{sdIntelPl2.Value:F0}");
-                if (CpuVoltageEnabled && sdIntelVolt.Value < 0)
-                    parts.Add($"--intel-volt-cpu={sdIntelVolt.Value:F0}");
             }
 
             // NVIDIA — GPU power control via EC Dynamic Boost registers (0x0743-0x0746).
@@ -1548,14 +1736,23 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 else
                 {
-                    int core = Settings.Default.EnableGpuClockControl ? (int)sdNvCore.Value : 0;
-                    int mem = Settings.Default.EnableGpuClockControl ? (int)sdNvMem.Value : 0;
-                    int tgp = (int)sdNvPower.Value;
-                    bool boostEnabled = Settings.Default.EnablePowerBoostMode;
-                    bool dbEnabled = !boostEnabled && togDynamicBoost.IsChecked == true;
-                    int dbOffset = dbEnabled ? (int)sdNvDbOffset.Value : 0;
-                    int totalWatts = tgp + dbOffset;
-                    parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
+                    if (PresetProfileApplier.IsBuiltInProfile(_currentProfile))
+                    {
+                        // Stock presets yield GPU power to the firmware's per-mode
+                        // table (OpenRevo's approach) and own no clock offsets.
+                        parts.Add("--NVIDIA-Clocks=0-0-0");
+                    }
+                    else
+                    {
+                        int core = Settings.Default.EnableGpuClockControl ? (int)sdNvCore.Value : 0;
+                        int mem = Settings.Default.EnableGpuClockControl ? (int)sdNvMem.Value : 0;
+                        int tgp = (int)sdNvPower.Value;
+                        bool boostEnabled = Settings.Default.EnablePowerBoostMode;
+                        bool dbEnabled = !boostEnabled && togDynamicBoost.IsChecked == true;
+                        int dbOffset = dbEnabled ? (int)sdNvDbOffset.Value : 0;
+                        int totalWatts = tgp + dbOffset;
+                        parts.Add($"--NVIDIA-Clocks=0-{core}-{mem}-{totalWatts}-{dbOffset}");
+                    }
                 }
             }
 
@@ -1601,14 +1798,28 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _customPresetSlot = 0;
 
             var presets = Models.CustomPresetStore.Load(ActivePresetMode);
-            for (int i = 0; i < presets.Length; i++)
+
+            // Check the active slot first — if it has a V-F curve, activate it and stop.
+            if (_customPresetSlot < presets.Length && presets[_customPresetSlot].VfCurveOffsets.Count > 0)
             {
-                if (presets[i].VfCurveOffsets.Count > 0)
+                _vfActivePreset = 0;
+                DebugLog($"V-F curve active on current slot {_customPresetSlot + 1} (mode={ActivePresetMode})");
+                return;
+            }
+
+            // Only auto-switch to another slot if the current slot is empty (no HasChanges).
+            // This avoids stealing the slot away from a preset that has fan/VF settings but no V-F curve.
+            if (!presets[_customPresetSlot].HasChanges)
+            {
+                for (int i = 0; i < presets.Length; i++)
                 {
-                    _vfActivePreset = 0;
-                    _customPresetSlot = i;
-                    DebugLog($"V-F curve auto-detected on Custom preset slot {i + 1} (mode={ActivePresetMode})");
-                    return;
+                    if (presets[i].VfCurveOffsets.Count > 0)
+                    {
+                        _vfActivePreset = 0;
+                        _customPresetSlot = i;
+                        DebugLog($"V-F curve auto-detected on Custom preset slot {i + 1} (mode={ActivePresetMode})");
+                        return;
+                    }
                 }
             }
         }

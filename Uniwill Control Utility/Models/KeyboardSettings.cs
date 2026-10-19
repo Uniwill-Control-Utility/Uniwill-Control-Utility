@@ -41,6 +41,189 @@ namespace Uniwill_Control_Utility.Models
         public KeyboardEffect EffectMode { get; set; } = KeyboardEffect.Static;
 
         /// <summary>
+        /// Which lighting engine drives the effects. Hardware (default) uses the ITE
+        /// controller's built-in firmware MCU effects; BetterRGB renders the same effect
+        /// list in software and streams per-key frames to the controller at TargetFps.
+        /// Serialized as an int, so JSON written by older versions defaults to Hardware.
+        /// </summary>
+        public KeyboardEngine Engine { get; set; } = KeyboardEngine.Hardware;
+
+        /// <summary>
+        /// Streamer engine frame rate target (1-60). Only used when Engine is BetterRGB.
+        /// OpenRevo's BetterRGB advertises 60 FPS; lower values trade smoothness for
+        /// less HID traffic (each frame is 6 row announces + 6 output reports).
+        /// </summary>
+        public int TargetFps { get; set; } = 60;
+
+        /// <summary>
+        /// Streamer engine brightness 0-100 — OpenRevo/BetterRGB's g_brightness
+        /// slider range (0-100 continuous), applied to the whole rendered frame.
+        /// The firmware Brightness field (1-7 levels) stays for the hardware path.
+        /// </summary>
+        public int BrightnessPercent { get; set; } = 100;
+
+        /// <summary>
+        /// Streamer engine speed — the raw OpenRevo/BetterRGB C slider value for the
+        /// current effect (reference ranges breathing 1-40, wave/rainbow/wheel 1-20,
+        /// others 1-10; the UI caps every BetterRGB speed slider at 5), higher =
+        /// faster. The firmware Speed byte (1-10, 1=fastest) stays for the hardware
+        /// path. Serialized as an int, so JSON from older versions defaults to 5.
+        /// </summary>
+        public int BetterRgbSpeed { get; set; } = 5;
+
+        #region BetterRGB streamer parameters (reference: BetterRGB-ITE8291-Adaptive
+        /// <summary>
+        /// The BetterRGB card's effect — the reference's 16 software modes (better_rgb.c
+        /// MODE_* 0-15). Independent of the firmware KeyboardEffect enum: the two engines
+        /// no longer share controls. Newtonsoft serializes as int; old JSON defaults to
+        /// Breathing.
+        /// </summary>
+        public BetterRgbEffect BetterRgbMode { get; set; } = BetterRgbEffect.Breathing;
+
+        /// <summary>Streamer FPS target 15-60 (reference TARGET_FPS_DEFAULT 30).</summary>
+        public int BetterRgbFps { get; set; } = 30;
+
+        /// <summary>
+        /// Light bar sync: while the BetterRGB engine streams, the front light bar
+        /// (single HID zone 2, no slots in the 512-byte RGB frame) mirrors the
+        /// rendered frame's bottom row — SampleBottomRowAverage per tick, pushed as
+        /// CMD_SET_COLOR. Default off.
+        /// </summary>
+        public bool BetterRgbLightBarSync { get; set; } = false;
+
+        /// <summary>Breathing "Speed:" slider 1-5, default 6 (g_breathSpeed).</summary>
+        public int BetterRgbBreathSpeed { get; set; } = 5;
+
+        /// <summary>Breathing "Smoothness:" slider 2-150, default 60 (g_breathSmooth levels).</summary>
+        public int BetterRgbBreathSmooth { get; set; } = 60;
+
+        /// <summary>Breathing "Random multi-color" checkbox, default off (g_breathRandomMode).</summary>
+        public bool BetterRgbBreathRandom { get; set; } = false;
+
+        /// <summary>Breathing color, default RGB(0,120,255) (g_breathColor).</summary>
+        public string BetterRgbBreathColor { get; set; } = "#0078FF";
+
+        /// <summary>Wave "Angle:" slider 0-359 degrees. Reference default is 0 (g_waveAngle)
+        /// which sweeps right-to-left; UCU defaults to 180 (left-to-right) so the Wave
+        /// effect always has a direction selected out of the box.</summary>
+        public int BetterRgbWaveAngle { get; set; } = 180;
+
+        /// <summary>Wave "Speed:" slider 1-5, default 4 (g_waveSpeed).</summary>
+        public int BetterRgbWaveSpeed { get; set; } = 4;
+
+        /// <summary>Sparkle "Speed:" slider 1-5, default 5 (g_sparkleSpeed).</summary>
+        public int BetterRgbSparkleSpeed { get; set; } = 5;
+
+        /// <summary>Sparkle "Density:" slider 3-20, default 8 (g_sparkleDensity).</summary>
+        public int BetterRgbSparkleDensity { get; set; } = 8;
+
+        /// <summary>Reactive "Random" checkbox, default ON (g_reactiveRandomMode).</summary>
+        public bool BetterRgbReactiveRandom { get; set; } = true;
+
+        /// <summary>Reactive response color, default white (g_reactiveColor).</summary>
+        public string BetterRgbReactiveColor { get; set; } = "#FFFFFF";
+
+        /// <summary>Reactive "Duration:" radio Short/Medium/Long -> 10/20/45 frames, default 20 (g_reactiveDuration).</summary>
+        public int BetterRgbReactiveDuration { get; set; } = 20;
+
+        /// <summary>Wheel "Speed:" slider 1-5, default 4 (g_wheelSpeed).</summary>
+        public int BetterRgbWheelSpeed { get; set; } = 4;
+
+        /// <summary>Wheel "Reverse rotation" checkbox, default off (g_wheelReverse).</summary>
+        public bool BetterRgbWheelReverse { get; set; } = false;
+
+        /// <summary>Lightning "Speed:" slider 1-5, default 5 (g_lightningSpeed).</summary>
+        public int BetterRgbLightningSpeed { get; set; } = 5;
+
+        /// <summary>Lightning "Smoothness:" slider 1-20, default 10 (g_lightningSmooth).</summary>
+        public int BetterRgbLightningSmooth { get; set; } = 10;
+
+        /// <summary>Lightning "Lightning width:" slider 1-4, default 2 (g_lightningWidth).</summary>
+        public int BetterRgbLightningWidth { get; set; } = 2;
+
+        /// <summary>Lightning "Concurrent count:" slider 1-4, default 1 (g_lightningConcurrent).</summary>
+        public int BetterRgbLightningConcurrent { get; set; } = 1;
+
+        /// <summary>Flame "Flicker speed:" slider 1-5, default 5 (g_flameSpeed).</summary>
+        public int BetterRgbFlameSpeed { get; set; } = 5;
+
+        /// <summary>Flame "Smoothness:" slider, reference range 1-20 (g_flameSmooth); UCU
+        /// caps it at 1-10 for a calmer flicker.</summary>
+        public int BetterRgbFlameSmooth { get; set; } = 8;
+
+        /// <summary>Raindrop "Falling speed:" slider 1-5, default 5 (g_rainSpeed).</summary>
+        public int BetterRgbRainSpeed { get; set; } = 5;
+
+        /// <summary>Raindrop density buttons 1-5, default 3 (g_rainDensityTarget).</summary>
+        public int BetterRgbRainDensity { get; set; } = 3;
+
+        /// <summary>Raindrop "Number of colors:" buttons 1-5, default 1 (g_rainColorCount).</summary>
+        public int BetterRgbRainColorCount { get; set; } = 1;
+
+        /// <summary>Raindrop 5 color buttons (g_rainColors defaults).</summary>
+        public string BetterRgbRainColors { get; set; } = "#508CFF,#7850FF,#50DCFF,#FFFFFF,#50FFB4";
+
+        /// <summary>Matrix "Speed:" slider 1-5, default 5 (g_matrixSpeed).</summary>
+        public int BetterRgbMatrixSpeed { get; set; } = 5;
+
+        /// <summary>Matrix "Style:" combo 0=Diagonal bands / 1=Number rain / 2=Laser scan / 3=Ripple, default 0 (g_matrixStyle).</summary>
+        public int BetterRgbMatrixStyle { get; set; } = 0;
+
+        /// <summary>Matrix density buttons 1-5, default 2 (g_matrixDensityTarget).</summary>
+        public int BetterRgbMatrixDensity { get; set; } = 2;
+
+        /// <summary>Matrix "Number of colors:" buttons 1-3, default 1 (g_matrixColorCount).</summary>
+        public int BetterRgbMatrixColorCount { get; set; } = 1;
+
+        /// <summary>Matrix 3 color buttons (g_matrixColors defaults).</summary>
+        public string BetterRgbMatrixColors { get; set; } = "#00FF3C,#00B4FF,#FF0078";
+
+        /// <summary>Static "Layout:" 0=Horizontal zones / 1=Vertical zones (g_staticLayout).</summary>
+        public int BetterRgbStaticLayout { get; set; } = 0;
+
+        /// <summary>Static "Number of zones:" slider 1-5 (horizontal) / 1-10 (vertical), default 1 (g_staticZoneCount).</summary>
+        public int BetterRgbStaticZones { get; set; } = 1;
+
+        /// <summary>Static 10 zone colors (g_staticColors defaults).</summary>
+        public string BetterRgbStaticZoneColors { get; set; } =
+            "#FFFFFF,#FF0000,#00FF00,#0000FF,#FFFF00,#FF00FF,#00FFFF,#FF8C00,#8C00FF,#008C8C";
+
+        /// <summary>Ripple "Spread speed:" slider 1-5, default 5 (g_rippleSpeed).</summary>
+        public int BetterRgbRippleSpeed { get; set; } = 5;
+
+        /// <summary>Ripple "Wave width:" slider 1-4, default 2 (g_rippleWidth).</summary>
+        public int BetterRgbRippleWidth { get; set; } = 2;
+
+        /// <summary>Ripple "Random" checkbox, default ON (g_rippleRandomMode).</summary>
+        public bool BetterRgbRippleRandom { get; set; } = true;
+
+        /// <summary>Ripple color, default RGB(0,180,255) (g_rippleColor).</summary>
+        public string BetterRgbRippleColor { get; set; } = "#00B4FF";
+
+        /// <summary>Rainbow "Color-change speed:" slider 1-5, default 6 (g_rainbowSpeed).</summary>
+        public int BetterRgbRainbowSpeed { get; set; } = 5;
+
+        /// <summary>Quicksand "Falling speed:" slider 1-5, default 5 (g_quicksandSpeed).</summary>
+        public int BetterRgbQuicksandSpeed { get; set; } = 5;
+
+        /// <summary>Quicksand "Sand band width:" slider 1-10, default 5 (g_quicksandScale).</summary>
+        public int BetterRgbQuicksandScale { get; set; } = 5;
+
+        /// <summary>Quicksand 3 gradient colors, default red/green/blue (g_quicksandColors).</summary>
+        public string BetterRgbQuicksandColors { get; set; } = "#FF0000,#00FF00,#0000FF";
+
+        /// <summary>Current "Flow speed:" slider 1-5, default 5 (g_currentSpeed).</summary>
+        public int BetterRgbCurrentSpeed { get; set; } = 5;
+
+        /// <summary>Current "Current length:" slider 2-8, default 4 (g_currentWidth).</summary>
+        public int BetterRgbCurrentWidth { get; set; } = 4;
+
+        /// <summary>Current 3 gradient colors, default red/green/blue (g_currentColors).</summary>
+        public string BetterRgbCurrentColors { get; set; } = "#FF0000,#00FF00,#0000FF";
+
+        #endregion
+
+        /// <summary>
         /// Animation speed 0-11 (0x00-0x0B). Default 5.
         /// 0x00 = fastest, 0x0B = frozen (effect active but no movement).
         /// Higher value = slower animation (inverted scale).
@@ -66,6 +249,13 @@ namespace Uniwill_Control_Utility.Models
         /// automatically turns off after a period of keyboard/mouse inactivity.
         /// </summary>
         public bool IdleTimerEnabled { get; set; } = false;
+
+        /// <summary>
+        /// Auto-power policy: when true, the keyboard backlight is turned off while
+        /// the laptop is unplugged (on battery) and restored to the user's saved
+        /// PowerOn intent when plugged in. The PowerOn field stays the user's intent.
+        /// </summary>
+        public bool AutoPowerOffOnBattery { get; set; } = false;
 
         /// <summary>
         /// Whether touch-reactive mode is enabled for effects that support it
@@ -200,6 +390,87 @@ namespace Uniwill_Control_Utility.Models
 
         /// <summary>Only WASD and arrow keys lit, rest dark (XCC: "Gaming Mode").</summary>
         GamingMode = 0x15,
+
+        // --- Software-only effects (BetterRGB streamer engine; the ITE firmware
+        // MCU has no equivalent byte). Offered in the ComboBox only while the
+        // engine is on; persisted as Hardware if saved while per-key/hardware. ---
+
+        /// <summary>Digital-matrix falling code columns (BetterRGB "Digital Matrix").</summary>
+        Matrix = 0x20,
+
+        /// <summary>Lightning strikes sweeping down the keyboard (BetterRGB "Lightning").</summary>
+        Lightning = 0x21,
+
+        /// <summary>Rolling flames with per-key heat noise (BetterRGB "Rolling Flames").</summary>
+        Flame = 0x22,
+
+        /// <summary>Color wheel rotating around the keyboard center (BetterRGB "Wheel").</summary>
+        Wheel = 0x23,
+    }
+
+    /// <summary>
+    /// Lighting engines for the keyboard. Hardware sends the effect byte to the ITE
+    /// controller's firmware MCU (the original path); BetterRGB is the software
+    /// streamer engine (port of OpenRevo's BetterRGB): frames are rendered per key
+    /// in software and streamed through UserMode (0x33) at <c>TargetFps</c>.
+    /// </summary>
+    public enum KeyboardEngine : byte
+    {
+        /// <summary>ITE firmware MCU effects via CMD_MODE_BRIGHTNESS reports (default).</summary>
+        Hardware = 0,
+
+        /// <summary>Software-rendered frames streamed to the controller at up to 60 FPS.</summary>
+        BetterRGB = 1,
+    }
+
+    /// <summary>
+    /// The BetterRGB streamer card's effect list — the reference's 16 software modes
+    /// in MODE_* order (better_rgb.c:99-115). Completely separate from the firmware
+    /// KeyboardEffect enum: the two engines no longer share controls or effect lists.
+    /// </summary>
+    public enum BetterRgbEffect : byte
+    {
+        /// <summary>Sine breathing with smooth-level quantization (MODE_BREATH).</summary>
+        Breathing = 0,
+
+        /// <summary>HSV wave traveling along an adjustable angle (MODE_WAVE).</summary>
+        Wave = 1,
+
+        /// <summary>Random keys sparkle with sin^2 envelopes (MODE_SPARKLE).</summary>
+        Sparkle = 2,
+
+        /// <summary>Keys light while held, fade on release (MODE_REACTIVE).</summary>
+        Reactive = 3,
+
+        /// <summary>HSV color wheel around the keybed centroid (MODE_WHEEL).</summary>
+        Wheel = 4,
+
+        /// <summary>Vertical lightning strikes with phosphor decay (MODE_LIGHTNING).</summary>
+        Lightning = 5,
+
+        /// <summary>Rolling flames with per-key heat EMA (MODE_FLAME).</summary>
+        Flame = 6,
+
+        /// <summary>Falling gaussian rain drops (MODE_RAIN).</summary>
+        Raindrop = 7,
+
+        /// <summary>Digital matrix: 4 styles (bands/rain/lasers/rings) (MODE_MATRIX).</summary>
+        Matrix = 8,
+
+        /// <summary>Static color zones (horizontal rows / vertical ranks) (MODE_STATIC).</summary>
+        Static = 9,
+
+        /// <summary>Keypress ripple rings (MODE_RIPPLE).</summary>
+        Ripple = 10,
+
+        /// <summary>Full-color gradient rotating at 4+2*speed deg/s (MODE_RAINBOW).</summary>
+        Rainbow = 11,
+
+        /// <summary>Flowing quicksand curtain, 3-color palette (MODE_QUICKSAND).</summary>
+        Quicksand = 12,
+
+        /// <summary>Per-row comet currents with exponential tails (MODE_CURRENT).</summary>
+        Current = 13,
     }
 
     /// <summary>

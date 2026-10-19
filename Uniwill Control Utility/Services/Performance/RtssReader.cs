@@ -86,13 +86,99 @@ namespace Uniwill_Control_Utility.Services.Performance
         // Win32 file mapping access flags
         private const uint FileMapRead = 0x0004;
 
-        // Ring buffer for frame-time percentile calculation.
+        // Cached shared memory mapping to avoid OpenFileMapping/MapViewOfFile on every read.
+        // These are kernel transitions; caching them eliminates 4 P/Invoke calls per sample.
+        // We validate the signature on each read to detect RTSS restart/crash.
+        private static IntPtr _cachedMappingHandle;
+        private static IntPtr _cachedViewPtr;
+
+        private static bool AcquireMapping(out IntPtr viewPtr)
+        {
+            // Try cached handle first.
+            if (_cachedViewPtr != IntPtr.Zero)
+            {
+                // Validate the signature is still correct (RTSS may have restarted).
+                try
+                {
+                    RtssHeader header = Marshal.PtrToStructure<RtssHeader>(_cachedViewPtr);
+                    if (header.Signature == ValidSignature)
+                    {
+                        viewPtr = _cachedViewPtr;
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // Cache corrupted, fall through to recreate.
+                }
+
+                // Dispose cached handles.
+                ReleaseCachedMapping();
+            }
+
+            // Open fresh mapping.
+            IntPtr mappingHandle = OpenFileMapping(FileMapRead, false, SharedMemoryName);
+            if (mappingHandle == IntPtr.Zero)
+            {
+                viewPtr = IntPtr.Zero;
+                return false;
+            }
+
+            viewPtr = MapViewOfFile(mappingHandle, FileMapRead, 0, 0, 0);
+            if (viewPtr == IntPtr.Zero)
+            {
+                CloseHandle(mappingHandle);
+                viewPtr = IntPtr.Zero;
+                return false;
+            }
+
+            // Cache for next call.
+            _cachedMappingHandle = mappingHandle;
+            _cachedViewPtr = viewPtr;
+            return true;
+        }
+
+        private static void ReleaseCachedMapping()
+        {
+            if (_cachedViewPtr != IntPtr.Zero)
+            {
+                UnmapViewOfFile(_cachedViewPtr);
+                _cachedViewPtr = IntPtr.Zero;
+            }
+            if (_cachedMappingHandle != IntPtr.Zero)
+            {
+                CloseHandle(_cachedMappingHandle);
+                _cachedMappingHandle = IntPtr.Zero;
+            }
+        }
+
+        // Per-process ring buffers for frame-time percentile calculation.
         // RTSS shared memory only exposes the latest per-frame time (dwFrameTime).
         // We accumulate samples across TryRead calls and compute real 1% / 0.1% lows.
+        // Each process gets its own buffer to avoid cross-process pollution on
+        // multi-monitor setups where desktop compositing noise corrupts percentiles.
         private const int FrameTimeBufferSize = 8192;
-        private static readonly double[] _frameTimeRingBuffer = new double[FrameTimeBufferSize];
-        private static int _ringNext;
-        private static int _ringCount;
+        private static readonly object _perProcessLock = new();
+        private static readonly Dictionary<int, PerProcessBuffer> _perProcessBuffers = new();
+
+        private sealed class PerProcessBuffer
+        {
+            public double[] Timestamps = new double[FrameTimeBufferSize];
+            public int Next;
+            public int Count;
+            public DateTime LastSeen = DateTime.UtcNow;
+        }
+
+        // Remove buffers for processes not seen in the last 30 seconds.
+        private static void EvictStaleBuffers()
+        {
+            var now = DateTime.UtcNow;
+            foreach (var kvp in _perProcessBuffers.ToList())
+            {
+                if (now - kvp.Value.LastSeen > TimeSpan.FromSeconds(30))
+                    _perProcessBuffers.Remove(kvp.Key);
+            }
+        }
 
         [LibraryImport("kernel32.dll", EntryPoint = "OpenFileMappingW", StringMarshalling = StringMarshalling.Utf16)]
         private static partial IntPtr OpenFileMapping(uint dwDesiredAccess, [MarshalAs(UnmanagedType.Bool)] bool bInheritHandle, string lpName);
@@ -196,100 +282,65 @@ namespace Uniwill_Control_Utility.Services.Performance
         {
             data = default;
 
-            IntPtr mappingHandle = IntPtr.Zero;
-            IntPtr viewPtr = IntPtr.Zero;
-
-            try
+            if (!AcquireMapping(out IntPtr viewPtr))
             {
-                mappingHandle = OpenFileMapping(FileMapRead, false, SharedMemoryName);
-                if (mappingHandle == IntPtr.Zero)
-                {
-                    LogOnce("OpenFileMapping returned null — RTSS not running or mapping inaccessible");
-                    return false;
-                }
-
-                // Map the entire view (0 size = full mapping)
-                viewPtr = MapViewOfFile(mappingHandle, FileMapRead, 0, 0, 0);
-                if (viewPtr == IntPtr.Zero)
-                {
-                    LogOnce("MapViewOfFile returned null");
-                    return false;
-                }
-
-                // Read header
-                RtssHeader header = Marshal.PtrToStructure<RtssHeader>(viewPtr);
-
-                if (header.Signature != ValidSignature)
-                {
-                    LogOnce($"Signature mismatch: 0x{header.Signature:X8} (expected 0x{ValidSignature:X8})");
-                    return false;
-                }
-
-                // Validate offsets
-                if (header.AppArrOffset == 0 || header.AppEntrySize == 0 || header.AppArrSize == 0)
-                {
-                    LogOnce($"Invalid header offsets: offset={header.AppArrOffset}, entrySize={header.AppEntrySize}, arrSize={header.AppArrSize}");
-                    return false;
-                }
-
-                // Scan app array — collect all apps, look for exact PID match and best fallback.
-                RtssFpsData? bestFallback = null;
-                List<(int Pid, string Name, int FrameTime, int ApiFlag)> allApps = new();
-
-                for (uint i = 0; i < header.AppArrSize; i++)
-                {
-                    IntPtr entryPtr = IntPtr.Add(viewPtr, (int)(header.AppArrOffset + i * header.AppEntrySize));
-                    int pid = Marshal.ReadInt32(entryPtr);
-                    if (pid == 0)
-                        continue; // Empty slot
-
-                    string name = ReadAnsiString(entryPtr, 4, MaxPath);
-                    int flags = Marshal.ReadInt32(entryPtr, 4 + MaxPath);
-                    int dwFrameTime = Marshal.ReadInt32(entryPtr, 268 + 12); // offset 280
-
-                    allApps.Add((pid, name, dwFrameTime, flags & RtssFlags.ApiUsageMask));
-
-                    if (pid == processId)
-                    {
-                        data = ParseAppEntry(entryPtr, (int)header.AppEntrySize, processId);
-                        if (data.Fps > 0)
-                            return true;
-                    }
-
-                    // Collect fallback: best game-like app with FPS > 0.
-                    if (IsGameProcess(name) && dwFrameTime > 0)
-                    {
-                        RtssFpsData candidate = ParseAppEntry(entryPtr, (int)header.AppEntrySize, pid);
-                        if (candidate.Fps > 0 && (bestFallback == null || candidate.Fps > bestFallback.Value.Fps))
-                            bestFallback = candidate;
-                    }
-                }
-
-                // If exact PID wasn't found but we have a game entry with FPS, use it.
-                if (bestFallback != null && bestFallback.Value.Fps > 0)
-                {
-                    data = bestFallback.Value;
-                    LogOnce($"PID {processId} not in RTSS, using fallback [{data.ProcessId}] {System.IO.Path.GetFileName(data.ProcessName)} FPS={data.Fps:F0}");
-                    return true;
-                }
-
-                // Log all apps once for diagnostics (debounced by LogOnce).
-                string appList = string.Join(", ", allApps.Take(5).Select(a => $"[{a.Pid}] {System.IO.Path.GetFileName(a.Name)} ft={a.FrameTime} api=0x{a.ApiFlag:X}"));
-                LogOnce($"RTSS apps ({allApps.Count}): {appList}{(allApps.Count > 5 ? " ..." : "")}");
-
+                LogOnce("Could not acquire RTSS mapping — RTSS not running or mapping inaccessible");
                 return false;
             }
-            catch (Exception ex)
+
+            // Read header (signature already validated by AcquireMapping, but read fields).
+            RtssHeader header = Marshal.PtrToStructure<RtssHeader>(viewPtr);
+
+            if (header.AppArrOffset == 0 || header.AppEntrySize == 0 || header.AppArrSize == 0)
             {
-                LogOnce($"RTSS read failed: {ex.GetType().Name} - {ex.Message}");
+                LogOnce($"Invalid header offsets: offset={header.AppArrOffset}, entrySize={header.AppEntrySize}, arrSize={header.AppArrSize}");
+                return false;
             }
-            finally
+
+            // Scan app array — collect all apps, look for exact PID match and best fallback.
+            RtssFpsData? bestFallback = null;
+            List<(int Pid, string Name, int FrameTime, int ApiFlag)> allApps = new();
+
+            for (uint i = 0; i < header.AppArrSize; i++)
             {
-                if (viewPtr != IntPtr.Zero)
-                    UnmapViewOfFile(viewPtr);
-                if (mappingHandle != IntPtr.Zero)
-                    CloseHandle(mappingHandle);
+                IntPtr entryPtr = IntPtr.Add(viewPtr, (int)(header.AppArrOffset + i * header.AppEntrySize));
+                int pid = Marshal.ReadInt32(entryPtr);
+                if (pid == 0)
+                    continue; // Empty slot
+
+                string name = ReadAnsiString(entryPtr, 4, MaxPath);
+                int flags = Marshal.ReadInt32(entryPtr, 4 + MaxPath);
+                int dwFrameTime = Marshal.ReadInt32(entryPtr, 268 + 12); // offset 280
+
+                allApps.Add((pid, name, dwFrameTime, flags & RtssFlags.ApiUsageMask));
+
+                if (pid == processId)
+                {
+                    data = ParseAppEntry(entryPtr, (int)header.AppEntrySize, processId);
+                    if (data.Fps > 0)
+                        return true;
+                }
+
+                // Collect fallback: best game-like app with FPS > 0.
+                if (IsGameProcess(name) && dwFrameTime > 0)
+                {
+                    RtssFpsData candidate = ParseAppEntry(entryPtr, (int)header.AppEntrySize, pid);
+                    if (candidate.Fps > 0 && (bestFallback == null || candidate.Fps > bestFallback.Value.Fps))
+                        bestFallback = candidate;
+                }
             }
+
+            // If exact PID wasn't found but we have a game entry with FPS, use it.
+            if (bestFallback != null && bestFallback.Value.Fps > 0)
+            {
+                data = bestFallback.Value;
+                LogOnce($"PID {processId} not in RTSS, using fallback [{data.ProcessId}] {System.IO.Path.GetFileName(data.ProcessName)} FPS={data.Fps:F0}");
+                return true;
+            }
+
+            // Log all apps once for diagnostics (debounced by LogOnce).
+            string appList = string.Join(", ", allApps.Take(5).Select(a => $"[{a.Pid}] {System.IO.Path.GetFileName(a.Name)} ft={a.FrameTime} api=0x{a.ApiFlag:X}"));
+            LogOnce($"RTSS apps ({allApps.Count}): {appList}{(allApps.Count > 5 ? " ..." : "")}");
 
             return false;
         }
@@ -364,48 +415,64 @@ namespace Uniwill_Control_Utility.Services.Performance
             double fps = dwFrameTime > 0 ? 1_000_000.0 / dwFrameTime : 0;
             double frameTimeMs = dwFrameTime / 1000.0;
 
-            // Feed valid frame time into the ring buffer for percentile calculation.
-            if (dwFrameTime > 0)
+            // Get or create the per-process ring buffer.
+            PerProcessBuffer? buffer = null;
+            lock (_perProcessLock)
             {
-                _frameTimeRingBuffer[_ringNext] = frameTimeMs;
-                _ringNext = (_ringNext + 1) % FrameTimeBufferSize;
-                if (_ringCount < FrameTimeBufferSize)
-                    _ringCount++;
+                if (!_perProcessBuffers.TryGetValue(expectedPid, out buffer))
+                {
+                    buffer = new PerProcessBuffer();
+                    _perProcessBuffers[expectedPid] = buffer;
+                }
+                buffer.LastSeen = DateTime.UtcNow;
+
+                // Feed valid frame time into this process's ring buffer.
+                if (dwFrameTime > 0)
+                {
+                    buffer.Timestamps[buffer.Next] = frameTimeMs;
+                    buffer.Next = (buffer.Next + 1) % FrameTimeBufferSize;
+                    if (buffer.Count < FrameTimeBufferSize)
+                        buffer.Count++;
+                }
+
+                // Periodically evict stale process buffers.
+                if (_perProcessBuffers.Count > 16)
+                    EvictStaleBuffers();
             }
 
-            // Calculate real 1% and 0.1% lows from the ring buffer.
+            // Calculate real 1% and 0.1% lows from this process's ring buffer.
             double onePercentLowFps = fps;
             double onePercentFrameTimeMs = frameTimeMs;
             double pointOnePercentLowFps = fps;
             double pointOnePercentFrameTimeMs = frameTimeMs;
 
-            if (_ringCount >= 2)
+            if (buffer != null && buffer.Count >= 2)
             {
                 try
                 {
-                    double[] rented = ArrayPool<double>.Shared.Rent(_ringCount);
+                    double[] rented = ArrayPool<double>.Shared.Rent(buffer.Count);
                     try
                     {
                         // Copy ring buffer to linear array.
-                        int oldest = _ringCount == FrameTimeBufferSize ? _ringNext : 0;
-                        for (int i = 0; i < _ringCount; i++)
-                            rented[i] = _frameTimeRingBuffer[(oldest + i) % FrameTimeBufferSize];
+                        int oldest = buffer.Count == FrameTimeBufferSize ? buffer.Next : 0;
+                        for (int i = 0; i < buffer.Count; i++)
+                            rented[i] = buffer.Timestamps[(oldest + i) % FrameTimeBufferSize];
 
                         // Sort ascending — slowest (worst) frames are at the end.
-                        Array.Sort(rented, 0, _ringCount);
+                        Array.Sort(rented, 0, buffer.Count);
 
                         // 1% low: average of the worst 1% of frames (highest frame times).
-                        int count1Percent = Math.Max(1, (int)Math.Ceiling(_ringCount * 0.01));
+                        int count1Percent = Math.Max(1, (int)Math.Ceiling(buffer.Count * 0.01));
                         double sum1Percent = 0;
-                        for (int i = _ringCount - count1Percent; i < _ringCount; i++)
+                        for (int i = buffer.Count - count1Percent; i < buffer.Count; i++)
                             sum1Percent += rented[i];
                         onePercentFrameTimeMs = sum1Percent / count1Percent;
                         onePercentLowFps = 1000.0 / onePercentFrameTimeMs;
 
                         // 0.1% low: average of the worst 0.1% of frames.
-                        int count01Percent = Math.Max(1, (int)Math.Ceiling(_ringCount * 0.001));
+                        int count01Percent = Math.Max(1, (int)Math.Ceiling(buffer.Count * 0.001));
                         double sum01Percent = 0;
-                        for (int i = _ringCount - count01Percent; i < _ringCount; i++)
+                        for (int i = buffer.Count - count01Percent; i < buffer.Count; i++)
                             sum01Percent += rented[i];
                         pointOnePercentFrameTimeMs = sum01Percent / count01Percent;
                         pointOnePercentLowFps = 1000.0 / pointOnePercentFrameTimeMs;

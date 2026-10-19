@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Serilog;
 using System.Management;
+using Uniwill_Control_Utility.Properties;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -66,6 +67,10 @@ namespace Uniwill_Control_Utility.Services
         public const ushort REG_TCC_OFFSET = 0x0786;
         public const ushort REG_PL5_SETTING = 0x0788;  // appears to be the authoritative sustained power cap on AM5/FireRange
         public const ushort REG_MODE_INDEX = 0x07AB;
+        public const byte MODE_INDEX_ARM = 0x10;       // bit 4: forced only for Beast/Custom, cleared for Office/Balance
+        public const ushort REG_POWER_MGMT_726 = 0x0726;
+        public const byte POWER_MGMT_726_ENABLE = 0x80; // bit 7: custom power-management gate
+        public const ushort REG_OEM_MODE_FLAG_45B = 0x045B; // OpenRevo writes 1 for Office, 0 for other stock modes
 
         // --- Keyboard backlight ---
         public const ushort REG_RGB_RED = 0x0769;
@@ -79,6 +84,8 @@ namespace Uniwill_Control_Utility.Services
 
         // --- AP_OEM flags ---
         public const ushort REG_AP_OEM = 0x0741;
+        public const byte MANUAL_MODE_ENABLE = 0x01; // bit0: EC honors custom fan tables + cTGP/DB; SETTING it disarms the OEM Performance-button engine on NB02
+        public const byte AP_OEM_FIRMWARE_BOOT_BIT = 0x04; // bit2: the firmware's boot value. The EC drops it when manual control engages; it is NOT the button's freeze switch (bit0 is)
 
         // --- NVIDIA GPU power control (cTGP / Dynamic Boost) ---
         public const ushort REG_CUSTOM_PROFILE = 0x0727;
@@ -92,6 +99,22 @@ namespace Uniwill_Control_Utility.Services
         public const byte CTGP_DB_ENABLE_GENERAL = 0x01;
         public const byte CTGP_DB_ENABLE_DB = 0x02;
         public const byte CTGP_DB_ENABLE_CTGP = 0x04;
+
+        // --- GPU MUX / Direct Connect (from XMG CC GCUService.exe decompilation) ---
+        public const ushort REG_GPU_STATUS = 0x072A;     // MUX mode control: 0=Hybrid, 1=dGPU-only, 2=iGPU-only
+        public const ushort REG_MODULE_ID_GPU = 0x07D2;  // GPU module ID (read-only, 0x1B for RTX 5090)
+        public const ushort REG_MUX_STATE_LO = 0x0402;   // MUX hardware state low byte (read-only)
+        public const ushort REG_MUX_STATE_HI = 0x0403;   // MUX hardware state high byte (read-only)
+        public const ushort REG_DISPLAY_VARIANT_LO = 0x0408; // Display variant low byte (read-only)
+        public const ushort REG_DISPLAY_VARIANT_HI = 0x0409; // Display variant high byte (read-only)
+
+        // MUX mode values (Define.DGgpuDirectConnectionMode from GCUService.exe)
+        // On AMD platforms: 0=Hybrid, 1=dGPU-only, 2=iGPU-only
+        // On Intel platforms: 4=Hybrid (Dynamic), 1=iGPU-only, 2=dGPU-only (no raw 0)
+        public const byte MUX_MODE_HYBRID = 0x00;       // MS Hybrid (MUX open, both GPUs active)
+        public const byte MUX_MODE_DGPU_ONLY = 0x01;    // dGPU only (MUX closed, discrete GPU)
+        public const byte MUX_MODE_IGPU_ONLY = 0x02;    // iGPU only (MUX open, integrated GPU)
+        public const byte MUX_MODE_HYBRID_INTEL = 0x04; // MS Hybrid on Intel platforms (Dynamic)
 
         // --- PWM readback ---
         public const ushort REG_PWM_1 = 0x075B;
@@ -108,6 +131,16 @@ namespace Uniwill_Control_Utility.Services
         public const byte FAN_MODE_BOOST = 0x40;   // bit 6
         public const byte FAN_MODE_USER = 0x80;    // bit 7
         public const byte FAN_LEVEL_MASK = 0x07;   // bits 0-2
+
+        // OpenRevo writes 0x0751 as a literal per stock mode — its (bl<<6)|imm form
+        // with the config flag bl resolved to 0. This is the per-mode performance
+        // profile that recolors the Q-key LED; 0x07AB carries no mode index.
+        public const byte FAN_PROFILE_OFFICE = 0xA0;   // USER|HIGH
+        public const byte FAN_PROFILE_BALANCE = 0x00;  // profile bits cleared
+        public const byte FAN_PROFILE_BEAST = 0x10;    // TURBO
+
+        // Last write in every OpenRevo stock body, never present in Custom (0x83 = 0x80|3).
+        public const byte OEM_MODE_COMMIT = 0x83;
 
         // --- UNIVERSAL_FAN_CTRL bits ---
         public const byte SPLIT_TABLES = 0x80;     // bit 7
@@ -345,12 +378,14 @@ namespace Uniwill_Control_Utility.Services
                 Thread.Sleep(50);
                 DebugLog("[DIAG] UniwillEC: Step 1 — Handshake complete");
 
-                // Step 2: Activation — write 0x01 to 0x0741 (manual mode).
-                // The Linux driver (tuxedo_io) writes 0x01 here. Previously we used 0x05
-                // which may have had a side effect of enforcing the BIOS power ceiling.
-                WriteECRaw(0x0741, 0x01);
-                Thread.Sleep(50);
-                DebugLog("[DIAG] UniwillEC: Step 2 — Manual mode enabled (0x741=0x01)");
+                // Step 2: 0x0741 is not written here. bit0 (manual control) is ORed in
+                // on demand by UnlockManualMode / ApplyOemStockMode, which keeps the
+                // firmware's bit2 (boot value 0x04). What froze the Performance button
+                // in the 2026-10-11 bisect was a LITERAL write that cleared bit2, not
+                // bit0 itself — OpenRevo keeps bit0 set in every mode and the button
+                // still cycles.
+                byte reg741 = ReadECRaw(0x0741);
+                DebugLog($"[DIAG] UniwillEC: Step 2 — 0x741 left at firmware value (0x{reg741:X2}); bit0 is ORed in only where manual control is needed");
 
                 // Step 3: Feature enable — write 0x81 to 0x748
                 WriteECRaw(0x0748, 0x81);
@@ -601,9 +636,10 @@ namespace Uniwill_Control_Utility.Services
                 WriteECInternal(REG_CUSTOM_PROFILE, customProfile);
                 Thread.Sleep(EcDelayMs);
 
-                // Step 0: Set GPU power management enable flag (0x0741).
-                WriteECInternal(0x0741, 0x01);
-                Thread.Sleep(EcDelayMs);
+                // Step 0: the cTGP/DB offsets below are only honored while 0x741 bit0
+                // is set (measured 2026-10-11: with bit0 clear the EC echoes the offsets
+                // but the NVIDIA driver keeps its previous limit).
+                UnlockManualMode();
 
                 // Step 0.5: Enable CTGP/DB feature in EC (0x0743).
                 // tuxedo-drivers writes this register to enable GPU power control.
@@ -620,8 +656,11 @@ namespace Uniwill_Control_Utility.Services
                 WriteECInternal(REG_CTGP_DB_CTGP_OFFSET, (byte)ctgpOffset);
                 Thread.Sleep(EcDelayMs);
 
-                // Step 2: TPP offset = 255 (max total power pool)
-                WriteECInternal(REG_CTGP_DB_TPP_OFFSET, 255);
+                // Step 2: total power pool (0x745). MechControl writes 255 only on the
+                // Dynamic-Boost-enabled path and 0 otherwise; leaving the pool wide open
+                // on a DB-disabled preset lets the GPU draw past its base TGP.
+                byte tppOffset = (byte)(dbClamped > 0 ? 255 : 0);
+                WriteECInternal(REG_CTGP_DB_TPP_OFFSET, tppOffset);
                 Thread.Sleep(EcDelayMs);
 
                 // Step 3: Dynamic Boost offset (watts the GPU can borrow from CPU)
@@ -634,7 +673,7 @@ namespace Uniwill_Control_Utility.Services
                 byte r2 = ReadECInternal(REG_CTGP_DB_CTGP_OFFSET);
                 byte r3 = ReadECInternal(REG_CTGP_DB_TPP_OFFSET);
                 byte r4 = ReadECInternal(REG_CTGP_DB_DB_OFFSET);
-                DebugLog($"ActivateGpuPowerControl readback: 0x0727=0x{r0:X2} 0x0743=0x{r1:X2} 0x0744=0x{r2:X2} (wanted 0x{ctgpOffset:X2}) 0x0745=0x{r3:X2} 0x0746=0x{r4:X2} (wanted db=0x{dbClamped:X2})");
+                DebugLog($"ActivateGpuPowerControl readback: 0x0727=0x{r0:X2} 0x0743=0x{r1:X2} 0x0744=0x{r2:X2} (wanted 0x{ctgpOffset:X2}) 0x0745=0x{r3:X2} (wanted tpp=0x{tppOffset:X2}) 0x0746=0x{r4:X2} (wanted db=0x{dbClamped:X2})");
             }
         }
 
@@ -659,6 +698,41 @@ namespace Uniwill_Control_Utility.Services
             }
         }
 
+        /// Sets 0x0741 bit0 (manual mode): the gate the EC requires before it honors
+        /// custom fan tables and cTGP/DB power offsets. Must stay read-modify-write:
+        /// a literal write clears the firmware's bit2 (boot value 0x04), which also
+        /// freezes the Performance button. UCU keeps bit0 armed permanently — the EC
+        /// raises its AcpiTest_EventULong press echo only while bit0 is set, so the
+        /// Performance-button intercept depends on the gate instead of fighting it.
+        public void UnlockManualMode()
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                byte before = ReadECInternal(REG_AP_OEM);
+                if ((before & MANUAL_MODE_ENABLE) != 0)
+                    return;
+                byte after = (byte)(before | MANUAL_MODE_ENABLE);
+                WriteECInternal(REG_AP_OEM, after);
+                if ((after & AP_OEM_FIRMWARE_BOOT_BIT) == 0)
+                    DebugLog($"[WARN] UniwillEC: 0x741 bit2 clear after unlocking manual mode (0x{after:X2}) — the EC dropped the firmware boot bit");
+                DebugLog($"[DIAG] UniwillEC: Manual mode UNLOCKED (0x741: 0x{before:X2} -> 0x{after:X2}) — EC honors custom fan tables and cTGP/DB offsets");
+            }
+        }
+
+        /// True when the EC's custom-profile enable bit (0x0727 bit6) is set, i.e. a
+        /// Custom preset owns the fan tables and power values. Stock presets clear it
+        /// and let the firmware's per-mode factory table apply — this is the
+        /// discriminator OpenRevo uses, since 0x0741 bit0 is set in both states.
+        public bool IsCustomProfileActive()
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                return (ReadECInternal(REG_CUSTOM_PROFILE) & CUSTOM_PROFILE_ENABLE) != 0;
+            }
+        }
+
         /// <summary>
         /// Gets the current TCC (Thermal Comfort Control) offset from the EC.
         /// Returns the value of register 0x0786 (CPU TCC offset).
@@ -675,6 +749,145 @@ namespace Uniwill_Control_Utility.Services
         public void SetTccOffset(int value)
         {
             WriteECRegister(REG_TCC_OFFSET, (byte)Math.Clamp(value, 0, 255));
+        }
+
+        #endregion
+
+        #region GPU MUX / Direct Connect
+
+        /// <summary>
+        /// GPU MUX mode. On AMD platforms: 0=Hybrid, 1=dGPU-only, 2=iGPU-only.
+        /// (From Define.DGgpuDirectConnectionMode in GCUService.exe)
+        /// </summary>
+        public enum GpuMuxMode
+        {
+            Hybrid = 0x00,      // MS Hybrid (MUX open, both GPUs active)
+            DgpuOnly = 0x01,   // dGPU only (MUX closed, discrete GPU)
+            IgpuOnly = 0x02,   // iGPU only (MUX open, integrated GPU)
+        }
+
+        /// <summary>
+        /// On Intel platforms the EC/NVRAM encoding differs from AMD (observed on Intel
+        /// NB02 units): the dGPU-only and iGPU-only modes are swapped (raw 1 = iGPU-only,
+        /// raw 2 = dGPU-only), and MS Hybrid is encoded as raw 4 (Dynamic) instead of 0 —
+        /// the Intel BIOS declares MSHybrid as 4, so raw 0 never appears there. These
+        /// helpers translate between the semantic <see cref="GpuMuxMode"/> used by the UI
+        /// and the raw byte the firmware expects on the current platform.
+        /// </summary>
+        private static bool IsIntelPlatform()
+        {
+            return Uniwill_Control_Utility.Scripts.Family.TYPE == Uniwill_Control_Utility.Scripts.Family.ProcessorType.Intel;
+        }
+
+        /// Semantic mode -> raw EC/NVRAM byte for the current platform.
+        public static byte ModeToRaw(GpuMuxMode mode)
+        {
+            byte raw = (byte)mode;
+            if (IsIntelPlatform())
+            {
+                // Intel BIOS encodes MS Hybrid as 4 (Dynamic), not 0.
+                if (raw == MUX_MODE_HYBRID)
+                    return MUX_MODE_HYBRID_INTEL;
+                if (raw == MUX_MODE_DGPU_ONLY || raw == MUX_MODE_IGPU_ONLY)
+                    return (byte)(MUX_MODE_DGPU_ONLY + MUX_MODE_IGPU_ONLY - raw); // swap 1 <-> 2
+            }
+            return raw;
+        }
+
+        /// Raw EC/NVRAM byte -> semantic mode for the current platform.
+        public static GpuMuxMode RawToMode(byte raw)
+        {
+            if (IsIntelPlatform())
+            {
+                // Intel BIOS declares MS Hybrid as raw 4 (Dynamic).
+                if (raw == MUX_MODE_HYBRID_INTEL)
+                    return GpuMuxMode.Hybrid;
+                if (raw == MUX_MODE_DGPU_ONLY || raw == MUX_MODE_IGPU_ONLY)
+                    return (GpuMuxMode)(MUX_MODE_DGPU_ONLY + MUX_MODE_IGPU_ONLY - raw);
+            }
+            return (GpuMuxMode)raw;
+        }
+
+        /// <summary>
+        /// Reads the current GPU MUX mode from the EC.
+        /// </summary>
+        public GpuMuxMode GetCurrentGpuMuxMode()
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                byte status = ReadECInternal(REG_GPU_STATUS);
+                return RawToMode(status);
+            }
+        }
+
+        /// <summary>
+        /// Sets the GPU MUX mode on the EC.
+        /// WARNING: This write persists in EC but the physical MUX switch
+        /// only takes effect after a system restart (BIOS configures hardware during POST).
+        /// 
+        /// To apply the change fully:
+        /// 1. Call SetGpuMuxMode() to write the EC register
+        /// 2. Optionally perform GPU hotswap (Enable-PnpDevice/Disable-PnpDevice) for runtime effect
+        /// 3. Restart the system for the physical MUX to switch
+        /// </summary>
+        /// <param name="mode">Target MUX mode</param>
+        public void SetGpuMuxMode(GpuMuxMode mode)
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                byte target = ModeToRaw(mode);
+                byte current = ReadECInternal(REG_GPU_STATUS);
+                DebugLog($"SetGpuMuxMode: current=0x{current:X2} ({RawToMode(current)}), target=0x{target:X2} ({mode})");
+
+                if (current == target)
+                {
+                    DebugLog("SetGpuMuxMode: already at target mode, skipping write");
+                    return;
+                }
+
+                WriteECInternal(REG_GPU_STATUS, target);
+                Thread.Sleep(EcDelayMs);
+
+                // Verify write
+                byte verify = ReadECInternal(REG_GPU_STATUS);
+                DebugLog($"SetGpuMuxMode: wrote 0x{target:X2}, verified 0x{verify:X2}");
+
+                if (verify != target)
+                {
+                    DebugLog($"[WARN] SetGpuMuxMode: write verification failed. Expected 0x{target:X2}, got 0x{verify:X2}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Reads the GPU module ID from the EC (read-only hardware identifier).
+        /// Returns 0x1B (27) for RTX 5090 Laptop GPU on NB02 platform.
+        /// </summary>
+        public byte GetGpuModuleId()
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                return ReadECInternal(REG_MODULE_ID_GPU);
+            }
+        }
+
+        /// <summary>
+        /// Reads the MUX hardware state from the EC (read-only, reflects physical MUX position).
+        /// Returns a 16-bit value where byte1 is at 0x0402 and byte2 is at 0x0403.
+        /// Typically 0x1900 on NB02 platform regardless of MUX mode.
+        /// </summary>
+        public ushort GetMuxHardwareState()
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                byte lo = ReadECInternal(REG_MUX_STATE_LO);
+                byte hi = ReadECInternal(REG_MUX_STATE_HI);
+                return (ushort)((hi << 8) | lo);
+            }
         }
 
         #endregion
@@ -1128,6 +1341,9 @@ namespace Uniwill_Control_Utility.Services
         {
             InitializeEc();
 
+            // Custom tables are only honored while 0x741 bit0 is set.
+            UnlockManualMode();
+
             byte[] cpuDuty = cpuCurve.ToEcDutyTable();
             byte[] gpuDuty = gpuCurve.ToEcDutyTable();
 
@@ -1311,6 +1527,9 @@ namespace Uniwill_Control_Utility.Services
             // Ensure the EC activation handshake is complete before writing tables.
             // InitializeEc() is idempotent — it only runs once per service lifetime.
             InitializeEc();
+
+            // Custom tables are only honored while 0x741 bit0 is set.
+            UnlockManualMode();
 
             // Step 1: Ensure SPLIT is set (same as ApplyFanCurve)
             byte ufCtrl = ReadECRegister(REG_UNIVERSAL_FAN_CTRL);
@@ -1531,12 +1750,89 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// Sets the performance mode (0=quiet, 1=balanced, 2=performance, 3=battery_saver).
+        /// Read-modify-write: the low nibble is the mode index and bit 4 (0x10) is the
+        /// engine's arm bit, so writing a bare mode value disarms the OEM button engine.
         /// </summary>
         public void SetPerformanceMode(int mode)
         {
             mode = Math.Clamp(mode, 0, 3);
-            WriteECRegister(REG_MODE_INDEX, (byte)mode);
-            DebugLog($"UniwillEC: Set performance mode to {mode}");
+            byte prev = ReadECRegister(REG_MODE_INDEX);
+            byte value = (byte)((prev & 0xE0) | mode | MODE_INDEX_ARM);
+            WriteECRegister(REG_MODE_INDEX, value);
+            DebugLog($"UniwillEC: Set performance mode to {mode} (0x07AB: 0x{prev:X2} -> 0x{value:X2})");
+        }
+
+        /// <summary>
+        /// Applies a stock preset the way OpenRevo's mode-apply function does
+        /// (FUN_14036E030 jump-table cases 1-3, verified by linear disassembly 2026-10-11).
+        /// The per-mode signal is NOT a mode index in 0x7AB — it is the literal written
+        /// to 0x751 plus the 0x45B flag and the 0x7AB bit4 force. Ordered exactly as
+        /// OpenRevo executes it:
+        ///
+        ///   1. 0x0726 bit7 and 0x0727 bit6 (custom-profile enable) CLEARED for stock.
+        ///      This is the discriminator OpenRevo uses: stock presets own no custom
+        ///      profile, so the firmware's per-mode factory table applies.
+        ///   2. 0x0751 written LITERAL per mode: Office 0xA0, Balance 0x00, Beast 0x10.
+        ///      OpenRevo computes these as (bl<<6)|imm with bl from an unresolved config
+        ///      flag; bl=0 is the observed baseline, and this write is what recolors the
+        ///      Q-key LED.
+        ///   3. 0x07AB = (old & 0xE0) | (old & 1), plus bit4 forced for Beast only.
+        ///   4. 0x0767 = (old & 0x10) | 0x28 for Office, | 0x20 for the others.
+        ///   5. 0x045B = 1 for Office, 0 for Balance/Beast.
+        ///   6. 0x0787 = 0x83, the last write in every stock body and absent in Custom.
+        ///
+        /// 0x0741 bit0 is left untouched: UCU keeps manual control armed permanently so
+        /// the EC keeps raising the AcpiTest_EventULong press echo the Performance-button
+        /// intercept listens for (verified 2026-10-12 by docs\acpi\WmiProbe — with bit0
+        /// clear the firmware consumes the press itself, runs its own 0x751 cycle of
+        /// 0xA0 / 0x20 / 0x30, and emits no event).
+        ///
+        /// OpenRevo writes no PL, TCC, cTGP or Dynamic Boost register in this function
+        /// (0x783-0x786 and 0x743/0x744/0x746 appear only as reads), which is why stock
+        /// presets yield all power values to the firmware's factory table.
+        /// </summary>
+        public void ApplyOemStockMode(int modeCase)
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                byte v726 = ReadECInternal(REG_POWER_MGMT_726);
+                WriteECInternal(REG_POWER_MGMT_726, (byte)(v726 & ~POWER_MGMT_726_ENABLE));
+
+                byte v727 = ReadECInternal(REG_CUSTOM_PROFILE);
+                WriteECInternal(REG_CUSTOM_PROFILE, (byte)(v727 & ~CUSTOM_PROFILE_ENABLE));
+
+                byte fanProfile = modeCase switch
+                {
+                    0 => FAN_PROFILE_OFFICE,
+                    1 => FAN_PROFILE_BALANCE,
+                    _ => FAN_PROFILE_BEAST,
+                };
+                WriteECInternal(REG_MANUAL_FAN_CTRL, fanProfile);
+
+                byte prevMode = ReadECInternal(REG_MODE_INDEX);
+                byte modeValue = (byte)((prevMode & 0xE0) | (prevMode & 1));
+                if (modeCase >= 2)
+                {
+                    modeValue |= FAN_MODE_TURBO;
+                }
+                WriteECInternal(REG_MODE_INDEX, modeValue);
+
+                byte prevTrigger = ReadECInternal(REG_TRIGGER);
+                byte triggerValue = (byte)((prevTrigger & 0x10) | TRIGGER_RGB_APPLY_COLOR | (modeCase == 0 ? 0x08 : 0x00));
+                WriteECInternal(REG_TRIGGER, triggerValue);
+
+                byte modeFlag = (byte)(modeCase == 0 ? 1 : 0);
+                WriteECInternal(REG_OEM_MODE_FLAG_45B, modeFlag);
+
+                WriteECInternal(REG_FAN_SWITCH_SPEED, OEM_MODE_COMMIT);
+
+                byte r741 = ReadECInternal(REG_AP_OEM);
+                if ((r741 & AP_OEM_FIRMWARE_BOOT_BIT) == 0)
+                    DebugLog($"[WARN] UniwillEC: 0x0741 bit2 clear (readback 0x{r741:X2}) — the EC dropped its boot bit");
+
+                DebugLog($"UniwillEC: OEM stock mode {modeCase} asserted (0x0726: 0x{v726:X2} -> 0x{v726 & ~POWER_MGMT_726_ENABLE:X2}, 0x0727: 0x{v727:X2} -> 0x{v727 & ~CUSTOM_PROFILE_ENABLE:X2}, 0x0751 -> 0x{fanProfile:X2}, 0x07AB: 0x{prevMode:X2} -> 0x{modeValue:X2}, 0x0767: 0x{prevTrigger:X2} -> 0x{triggerValue:X2}, 0x045B -> 0x{modeFlag:X2}, 0x0787 -> 0x{OEM_MODE_COMMIT:X2}) — power values yielded to the firmware factory table");
+            }
         }
 
         /// <summary>
@@ -1674,9 +1970,9 @@ namespace Uniwill_Control_Utility.Services
                 Thread.Sleep(50);
                 DebugLog($"[DIAG] UniwillEC: Custom profile toggle 0x727: 0x{cur727:X2} -> 0x{clear727:X2} -> 0x{set727:X2}");
 
-                // Step 4: Ensure manual mode (0x0741 = 0x01).
-                // Linux driver writes this after custom profile toggle.
-                WriteECRaw(0x0741, 0x01);
+                // Step 4: 0x0741 is left untouched here — this is the Custom path, which
+                // needs bit0 set (UnlockManualMode did that). Clearing bit0 would disarm
+                // the OEM Performance-button engine; ApplyOemStockMode does the hand-back.
                 Thread.Sleep(50);
 
                 // Step 5: Overboost performance profile (0x0751 = 0x10).
@@ -1763,16 +2059,24 @@ namespace Uniwill_Control_Utility.Services
             // Step 2: Custom profile mode toggle on 0x0727 bit 6.
             // From tuxedo_keyboard::uniwill_set_custom_profile_mode(true):
             //   read 0x0727, clear bit 6, write back, msleep(50), set bit 6, write back
+            // The clear half is what makes the firmware leave its custom-profile state,
+            // and that state is what holds the Q-key LED green: toggling unconditionally
+            // flashes the LED to the stock color of 0x751 for 50ms on every Custom apply.
+            // Only toggle when the bit is clear (right after a stock preset asserted it).
             byte cur727 = ReadECRaw(REG_CUSTOM_PROFILE);
-            byte clear727 = (byte)(cur727 & ~(1 << 6));
-            WriteECRaw(REG_CUSTOM_PROFILE, clear727);
-            Thread.Sleep(50);
-            byte set727 = (byte)(clear727 | (1 << 6));
-            WriteECRaw(REG_CUSTOM_PROFILE, set727);
-            Thread.Sleep(50);
+            if ((cur727 & CUSTOM_PROFILE_ENABLE) == 0)
+            {
+                byte clear727 = (byte)(cur727 & ~CUSTOM_PROFILE_ENABLE);
+                WriteECRaw(REG_CUSTOM_PROFILE, clear727);
+                Thread.Sleep(50);
+                byte set727 = (byte)(clear727 | CUSTOM_PROFILE_ENABLE);
+                WriteECRaw(REG_CUSTOM_PROFILE, set727);
+                Thread.Sleep(50);
+            }
 
-            // Step 3: Ensure manual mode (0x0741 = 0x01)
-            WriteECRaw(0x0741, 0x01);
+            // Step 3: 0x0741 is left untouched here — this is the Custom path, which
+            // needs bit0 set (UnlockManualMode did that). Clearing bit0 would disarm
+            // the OEM Performance-button engine; ApplyOemStockMode does the hand-back.
             Thread.Sleep(50);
 
             // Step 4: Overboost performance profile on 0x0751 using read-modify-write.

@@ -193,6 +193,18 @@ namespace Uniwill_Control_Utility.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool EnableCpuAdvancedPerformanceMenu {
+            get {
+                return ((bool)(this["EnableCpuAdvancedPerformanceMenu"]));
+            }
+            set {
+                this["EnableCpuAdvancedPerformanceMenu"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("0")]
         public double customCoCcd0 {
             get {
@@ -882,5 +894,102 @@ namespace Uniwill_Control_Utility.Properties {
             get { return ((bool)(this["ShowStartupProgressOverlay"])); }
             set { this["ShowStartupProgressOverlay"] = value; }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("2")]
+        public int GpuPowerSavingMode {
+            get { return ((int)(this["GpuPowerSavingMode"])); }
+            set { this["GpuPowerSavingMode"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("3")]
+        public int GpuPowerSavingBattery {
+            get { return ((int)(this["GpuPowerSavingBattery"])); }
+            set { this["GpuPowerSavingBattery"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("3")]
+        public int GpuPowerSavingPluggedIn {
+            get { return ((int)(this["GpuPowerSavingPluggedIn"])); }
+            set { this["GpuPowerSavingPluggedIn"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int RefreshRateBattery {
+            get { return ((int)(this["RefreshRateBattery"])); }
+            set { this["RefreshRateBattery"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int RefreshRatePluggedIn {
+            get { return ((int)(this["RefreshRatePluggedIn"])); }
+            set { this["RefreshRatePluggedIn"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int DisplayRefreshRateDeferred {
+            get { return ((int)(this["DisplayRefreshRateDeferred"])); }
+            set { this["DisplayRefreshRateDeferred"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int DisplayRefreshRateLastKnown {
+            get { return ((int)(this["DisplayRefreshRateLastKnown"])); }
+            set { this["DisplayRefreshRateLastKnown"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string DisplayColorProfileDeferred {
+            get { return ((string)(this["DisplayColorProfileDeferred"])); }
+            set { this["DisplayColorProfileDeferred"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string DisplayColorProfileLastKnown {
+            get { return ((string)(this["DisplayColorProfileLastKnown"])); }
+            set { this["DisplayColorProfileLastKnown"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool EnableQKeyButtonIntercept {
+            get { return ((bool)(this["EnableQKeyButtonIntercept"])); }
+            set { this["EnableQKeyButtonIntercept"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool LightBarAutoPowerOffOnBattery {
+            get { return ((bool)(this["LightBarAutoPowerOffOnBattery"])); }
+            set { this["LightBarAutoPowerOffOnBattery"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool TouchpadEnabled {
+            get { return ((bool)(this["TouchpadEnabled"])); }
+            set { this["TouchpadEnabled"] = value; }
+        }
+
     }
 }

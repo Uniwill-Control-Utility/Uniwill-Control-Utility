@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -7,7 +7,10 @@ using RyzenSmu;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 using System;
+using System.Collections.Generic;
 using System.Configuration;
+using System.Linq;
+using System.Text;
 using System.Diagnostics;
 using System.IO;
 using System.Management;
@@ -56,7 +59,7 @@ namespace Uniwill_Control_Utility
             return _host?.Services.GetService(typeof(T)) as T;
         }
 
-        internal static readonly string version = "0.9.4.5";
+        internal static readonly string version = "0.9.5.0";
         private Mutex? mutex;
         private const string MutexName = "UniwillControlUtility";
 
@@ -91,6 +94,16 @@ namespace Uniwill_Control_Utility
 
             try
             {
+                // Set a stable AppUserModelID so the taskbar button stays pinned
+                // to this app even after GPU driver resets (PnP hotswap).
+                // Without this, Windows loses the taskbar association and shows
+                // a generic icon after dGPU disable/enable.
+                SetAppUserModelID("UniwillControlUtility.UCU");
+
+                // Register code page provider so Encoding.GetEncoding(1252) works
+                // (required for RTSS OSD degree symbol rendering).
+                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
                 Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
                 PrepareUserSettings();
@@ -216,7 +229,14 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<GpuInventoryService>();
                         services.AddSingleton<IFpsMonitoringService, FpsMonitoringService>();
                         services.AddSingleton<OverlaySettingsStore>();
-                        services.AddSingleton<OverlayManagerService>();
+                        services.AddSingleton<OverlayManagerService>(provider =>
+                            new OverlayManagerService(
+                                provider.GetRequiredService<OverlaySettingsStore>(),
+                                provider.GetRequiredService<IHardwareMonitoringService>(),
+                                provider.GetRequiredService<IFpsMonitoringService>(),
+                                provider.GetService<EcTelemetryService>(),
+                                provider.GetService<HydroUIService>(),
+                                provider.GetService<FlydigiCoolerHidService>()));
                         services.AddHostedService(provider => provider.GetRequiredService<OverlayManagerService>());
 
                         // Main window with navigation
@@ -233,14 +253,19 @@ namespace Uniwill_Control_Utility
                         services.AddScoped<Views.Pages.Keyboard>();
                         services.AddScoped<Views.Pages.LightBar>();
                         services.AddScoped<Views.Pages.Battery>();
+                        services.AddScoped<Views.Pages.Display>();
                         services.AddScoped<Views.Pages.SettingsPage>();
                         services.AddScoped<ViewModels.SettingsViewModel>();
-                        services.AddScoped<Views.Pages.OverlaySettingsPage>();
+                        services.AddScoped<Views.Pages.OverlaySettingsPage>(provider =>
+                            new Views.Pages.OverlaySettingsPage(
+                                provider.GetRequiredService<OverlayManagerService>(),
+                                provider.GetService<HydroUIService>(),
+                                provider.GetService<FlydigiCoolerHidService>()));
                         services.AddScoped<Views.Pages.AboutPage>();
 
-                        // Watercooler service (singleton for auto-connect)
-                        services.AddScoped<Views.Pages.Watercooler>();
-                        services.AddSingleton<WaterCoolerService>();
+                        // HydroUI service (singleton for auto-connect)
+                        services.AddScoped<Views.Pages.HydroUI>();
+                        services.AddSingleton<HydroUIService>();
 
                         // Flydigi BS2 Pro cooling pad page and service
                         // Singleton so the host disposes it on shutdown (stops background timers).
@@ -256,6 +281,17 @@ namespace Uniwill_Control_Utility
                             return new UniwillECService();
                         });
                         services.AddSingleton<EcTelemetryService>();
+
+                        // Hardware Performance / Q-key button intercept: polls the EC
+                        // TCC offset register for button presses and cycles UCU presets.
+                        services.AddSingleton<QKeyButtonService>();
+                        services.AddHostedService(provider => provider.GetRequiredService<QKeyButtonService>());
+
+                        // BetterRGB streamer engine: software-rendered keyboard RGB
+                        // streamed to the ITE controller at up to 60 FPS (port of
+                        // OpenRevo's BetterRGB). Hosted so shutdown stops the loop.
+                        services.AddSingleton<BetterRgbStreamService>();
+                        services.AddHostedService(provider => provider.GetRequiredService<BetterRgbStreamService>());
 
                         // Centralized device applier (singleton)
                         services.AddSingleton<DeviceApplier>();
@@ -313,15 +349,135 @@ namespace Uniwill_Control_Utility
                 if (File.Exists("C:\\Uniwill.Control.Utility.msi"))
                     File.Delete("C:\\Uniwill.Control.Utility.msi");
 
-                // Run hardware detection and LHM init before building the UI.
-                // Both run in parallel on background threads so the total wait
-                // is max(WMI, LHM) — the window only shows when all data is ready.
-                await startupProgressReporter.ReportAsync(StartupStage.DetectingHardware);
-                await startupProgressReporter.ReportAsync(StartupStage.InitializingSensors);
-                await DetectHardwareAsync(_host.Services.GetRequiredService<IHardwareMonitoringService>());
+                // --- Phase 1: independent startup tasks (all run in parallel) ---
+                // Hardware detection + sensor init, device connections, startup settings
+                // apply, and game library sync are all independent and can run concurrently.
+                // The total wait is the slowest individual task, not the sum.
 
-                await startupProgressReporter.ReportAsync(StartupStage.ApplyingStartupSettings);
+                var monitoring = _host.Services.GetRequiredService<IHardwareMonitoringService>();
 
+                // Wire the EC service to the static field before startup preset apply.
+                // The MainWindowViewModel constructor also sets this field (idempotent —
+                // same singleton instance), but ApplyOnStart() runs here in the pre-loader
+                // phase _before_ _host.StartAsync() creates the MainWindow.
+                // Without this, RyzenAdj_To_UCU.EcService is null during startup preset
+                // apply and GPU power limit writes fail silently.
+                var ecService = _host.Services.GetService<UniwillECService>();
+                if (ecService != null)
+                {
+                    Scripts.RyzenAdj_To_UCU.EcService = ecService;
+                }
+
+                var phase1TasksList = new[]
+                {
+                    ("Detecting hardware", true),
+                    ("Initializing sensors", true),
+                    ("Connecting devices", Settings.Default.EnableHydroUiNavigation || Settings.Default.EnableFlydigi),
+                    ("Applying startup settings", true),
+                    ("Loading game library", true),
+                };
+
+                // Wait for any queued pre-Phase-1 animations to finish so the tracker
+                // doesn't fight with the playback loop over StatusTitle.
+                // The window is null when the startup progress overlay is disabled.
+                if (startupWindow is not null)
+                    await startupWindow.WaitForProgressPlaybackAsync();
+
+                // The tracker keeps the detail row hidden ("Initializing" only)
+                // and surfaces "Connecting devices…" in it if that task is still
+                // running 3 seconds after the phase starts.
+                // Null when the startup progress overlay is disabled — nothing to drive.
+                ParallelPhaseTracker? tracker = startupWindow is null
+                    ? null
+                    : new ParallelPhaseTracker(
+                    "Initializing",
+                    phase1TasksList,
+                    50,
+                    92,
+                    (title, detail) => startupWindow.SetStatusLabel(title, detail),
+                    startupWindow.SetProgressValue,
+                    action => startupWindow.Dispatcher.InvokeAsync(action),
+                    slowTaskLabelKey: "Connecting devices");
+
+                var phase1Tasks = new List<Task>();
+
+                // Hardware detection + sensor initialization (WMI + LHM).
+                phase1Tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        await DetectHardwareAsync(monitoring);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Failed to detect hardware");
+                    }
+                    finally
+                    {
+                        _ = startupWindow?.Dispatcher.InvokeAsync(() =>
+                        {
+                            tracker?.TaskCompleted(0); // Detecting hardware
+                            tracker?.TaskCompleted(1); // Initializing sensors (runs inside DetectHardwareAsync)
+                        });
+                    }
+                }));
+
+                // Auto-connect devices (Hydro UI, Flydigi cooler) so the dashboard
+                // shows connected state on open.
+                phase1Tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        await AutoConnectDevicesAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Failed during device auto-connect");
+                    }
+                    finally
+                    {
+                        _ = startupWindow?.Dispatcher.InvokeAsync(() => tracker?.TaskCompleted(2));
+                    }
+                }));
+
+                // Apply startup settings (presets, keyboard RGB, EC fan curve,
+                // battery charge limit) so the main window appears instantly
+                // without waiting for hardware writes.
+                phase1Tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        await ApplyStartupSettingsAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Failed to apply startup settings");
+                    }
+                    finally
+                    {
+                        _ = startupWindow?.Dispatcher.InvokeAsync(() => tracker?.TaskCompleted(3));
+                    }
+                }));
+
+                // Load game library so the FPS overlay and Adaptive Mode have the
+                // installed games list ready immediately.
+                phase1Tasks.Add(Task.Run(() =>
+                {
+                    try
+                    {
+                        Game_Manager.installedGames = Game_Manager.syncGame_Library();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Logger.Error(ex, "Failed to sync game library during startup");
+                    }
+                    finally
+                    {
+                        _ = startupWindow?.Dispatcher.InvokeAsync(() => tracker?.TaskCompleted(4));
+                    }
+                }));
+
+                // Save install path on first boot (runs inline, near-instant).
                 string? entryLocation = System.Reflection.Assembly.GetEntryAssembly()?.Location;
                 string path = System.IO.Path.GetDirectoryName(entryLocation)!;
 
@@ -341,27 +497,16 @@ namespace Uniwill_Control_Utility
                     }
                 }
 
-                // Auto-connect devices (Hydro UI, Flydigi cooler) during the
-                // pre-loading phase so the dashboard shows connected state on open.
-                // Only show the progress step if at least one device feature is enabled.
-                if (Settings.Default.EnableHydroUiNavigation || Settings.Default.EnableFlydigi)
-                {
-                    await startupProgressReporter.ReportAsync(StartupStage.ConnectingDevices);
-                }
-                await AutoConnectDevicesAsync();
+                // Wait for all independent Phase 1 tasks to complete.
+                await Task.WhenAll(phase1Tasks);
+                startupWindow?.SetProgressValue(92);
 
-                // Restore Adaptive Mode override state from previous session.
-                // Only show the progress step if adaptive mode was actually running.
+                // --- Phase 2: restore Adaptive Mode (depends on devices being connected) ---
                 if (Settings.Default.isAdaptiveModeRunning)
                 {
                     await startupProgressReporter.ReportAsync(StartupStage.RestoringAdaptiveMode);
                 }
                 await RestoreAdaptiveModeAsync();
-
-                // Apply startup settings (presets, keyboard RGB, EC fan curve,
-                // battery charge limit) during the pre-loading phase so the main
-                // window appears instantly without waiting for hardware writes.
-                await ApplyStartupSettingsAsync();
 
                 await _host.StartAsync(CancellationToken.None);
 
@@ -484,6 +629,19 @@ namespace Uniwill_Control_Utility
 
                 await Task.WhenAll(wmiTask, lhmTask);
 
+                // Check GPU availability after LHM warms up. If the dGPU is offline
+                // (MUX=iGPU-only or PnP-disabled by iGPU Power Saving Mode), log the
+                // active GPU type so downstream code can adapt.
+                try
+                {
+                    var snapshot = monitoring.ReadSnapshot();
+                    if (snapshot.ActiveGpuType != Services.ActiveGpuType.Nvidia)
+                    {
+                        Log.Information("[Startup] Active GPU is {GpuType} (NVIDIA dGPU unavailable — MUX switch or iGPU Power Saving Mode)", snapshot.ActiveGpuType);
+                    }
+                }
+                catch { /* non-critical — LHM may not be ready yet */ }
+
                 // Notify subscribers that hardware detection is done.
                 HardwareDetectionCompleted?.Invoke();
             }
@@ -583,53 +741,74 @@ namespace Uniwill_Control_Utility
 
         private static async Task AutoConnectDevicesAsync()
         {
+            // Auto-connect devices in parallel during the pre-loading phase.
+            // Each TryAutoConnectAsync has internal guards (AutoConnect flag,
+            // LastDeviceAddress, _userDisconnected) and is wrapped in try/catch
+            // so one failure does not block the others.
+            var tasks = new List<Task>();
+
             // Auto-connect watercooler on startup if enabled.
-            // Runs during the pre-loading phase so the dashboard shows connected
-            // state on open. Each TryAutoConnectAsync has internal guards:
-            // checks AutoConnect flag, LastDeviceAddress, and _userDisconnected.
-            try
+            if (Settings.Default.EnableHydroUiNavigation)
             {
-                if (Settings.Default.EnableHydroUiNavigation)
+                var hydroUIService = _host?.Services.GetService<HydroUIService>();
+                if (hydroUIService != null && WaterCoolerHardwareDetector.IsSupportedHardware())
                 {
-                    var waterCoolerService = _host?.Services.GetService<WaterCoolerService>();
-                    if (waterCoolerService != null && WaterCoolerHardwareDetector.IsSupportedHardware())
-                        await waterCoolerService.TryAutoConnectAsync();
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await hydroUIService.TryAutoConnectAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogError(ex, "Failed to auto-connect watercooler");
+                        }
+                    }));
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to auto-connect watercooler");
             }
 
-            // Auto-connect Flydigi BS2 Pro cooling pad on startup if enabled.
-            try
+            // Auto-connect Flydigi BS2 Pro/BS3 Pro cooling pad on startup if enabled.
+            if (Settings.Default.EnableFlydigi)
             {
-                if (Settings.Default.EnableFlydigi)
+                var flydigiCoolerService = _host?.Services.GetService<FlydigiCoolerHidService>();
+                if (flydigiCoolerService != null && FlydigiCoolerHidService.IsDeviceAvailable())
                 {
-                    var flydigiCoolerService = _host?.Services.GetService<FlydigiCoolerHidService>();
-                    if (flydigiCoolerService != null && FlydigiCoolerHidService.IsDeviceAvailable())
-                        await flydigiCoolerService.TryAutoConnectAsync();
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await flydigiCoolerService.TryAutoConnectAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogError(ex, "Failed to auto-connect Flydigi cooler");
+                        }
+                    }));
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to auto-connect Flydigi cooler");
             }
 
             // Auto-connect Flydigi BS1 (BLE) cooling pad on startup if enabled.
-            try
+            if (Settings.Default.EnableFlydigi)
             {
-                if (Settings.Default.EnableFlydigi)
+                var bs1Service = _host?.Services.GetService<FlydigiCoolerBleService>();
+                if (bs1Service != null)
                 {
-                    var bs1Service = _host?.Services.GetService<FlydigiCoolerBleService>();
-                    if (bs1Service != null)
-                        await bs1Service.TryAutoConnectAsync();
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await bs1Service.TryAutoConnectAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogError(ex, "Failed to auto-connect Flydigi BS1");
+                        }
+                    }));
                 }
             }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to auto-connect Flydigi BS1");
-            }
+
+            if (tasks.Count > 0)
+                await Task.WhenAll(tasks);
         }
 
         private static async Task RestoreAdaptiveModeAsync()
@@ -699,15 +878,6 @@ namespace Uniwill_Control_Utility
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed during deferred update and PawnIO checks");
-            }
-
-            try
-            {
-                Game_Manager.installedGames = await Task.Run(() => Game_Manager.syncGame_Library());
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to sync game library");
             }
 
             // Show the prerequisite checklist on first startup.
@@ -781,25 +951,16 @@ namespace Uniwill_Control_Utility
 
             window.UpdateLayout();
 
-            var screen = System.Windows.Forms.Screen.FromHandle(
-                new WindowInteropHelper(window).Handle);
-
-            var workingArea = screen.WorkingArea;
-
             double minWidth = window.MinWidth > 0 ? window.MinWidth : 980;
             double minHeight = window.MinHeight > 0 ? window.MinHeight : 420;
 
             window.Width = Math.Max(window.Width, minWidth);
             window.Height = Math.Max(window.Height, minHeight);
 
-            window.Width = Math.Min(window.Width, workingArea.Width);
-            window.Height = Math.Min(window.Height, workingArea.Height);
-
-            window.Left = workingArea.Left +
-                (workingArea.Width - window.Width) / 2;
-
-            window.Top = workingArea.Top +
-                (workingArea.Height - window.Height) / 2;
+            // Clamp + center in DIP space. The old code compared the physical-pixel
+            // WorkingArea directly against DIP window geometry, which mispositioned
+            // the window at display scales above 100%.
+            FitWindowToWorkArea(window);
 
             window.Activate();
 
@@ -811,8 +972,58 @@ namespace Uniwill_Control_Utility
                 SetForegroundWindow(handle);
         }
 
+        /// <summary>
+        /// Clamps a window to its monitor's work area and re-centers it.
+        /// WPF window geometry (Left/Top/Width/Height) is in DIPs but
+        /// WorkingArea is in physical pixels, so the work area is converted
+        /// to DIPs using the window's DPI ratio before clamping. Without the
+        /// conversion, a window taller than the work area (e.g. 1080 DIP at
+        /// 150% scale on the 2560x1600 internal panel) spills its title bar
+        /// above the top screen edge.
+        /// </summary>
+        public static void FitWindowToWorkArea(Window window)
+        {
+            var hwnd = new WindowInteropHelper(window).Handle;
+            if (hwnd == 0)
+                return;
+
+            var workingArea = System.Windows.Forms.Screen
+                .FromHandle(hwnd).WorkingArea;
+
+            // Physical pixels per DIP for the monitor hosting the window,
+            // read from the DIP→device transform of the window's source.
+            double scaleX = 1.0;
+            double scaleY = 1.0;
+            var source = PresentationSource.FromVisual(window);
+            if (source?.CompositionTarget != null)
+            {
+                var toDevice = source.CompositionTarget.TransformToDevice;
+                if (toDevice.M11 > 0 && toDevice.M22 > 0)
+                {
+                    scaleX = toDevice.M11;
+                    scaleY = toDevice.M22;
+                }
+            }
+
+            double workLeft = workingArea.Left / scaleX;
+            double workTop = workingArea.Top / scaleY;
+            double workWidth = workingArea.Width / scaleX;
+            double workHeight = workingArea.Height / scaleY;
+
+            if (window.Width > workWidth)
+                window.Width = workWidth;
+            if (window.Height > workHeight)
+                window.Height = workHeight;
+
+            window.Left = workLeft + (workWidth - window.Width) / 2.0;
+            window.Top = workTop + (workHeight - window.Height) / 2.0;
+        }
+
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("shell32.dll")]
+        private static extern int SetCurrentProcessExplicitAppUserModelID(string appId);
 
         public static async Task CheckForUpdate()
         {
@@ -906,6 +1117,17 @@ namespace Uniwill_Control_Utility
                 bs1Service?.Dispose();
             }
             catch { /* Non-critical: dispose during teardown is best-effort */ }
+
+            // Stop the BetterRGB stream synchronously (not fire-and-forget) so its
+            // shutdown firmware fallback — which pushes a regular RGB effect so the
+            // keyboard isn't left black or stuck on the last BetterRGB frame — runs
+            // to completion before the process exits. StopEngine touches only HID and
+            // logging (no Dispatcher.Invoke), so this cannot deadlock the UI thread.
+            try
+            {
+                App._host?.Services.GetService<BetterRgbStreamService>()?.StopEngine("shutdown");
+            }
+            catch { /* best-effort during teardown */ }
 
             // Stop the host on a background thread to avoid deadlock with Dispatcher.Invoke
             // calls from hosted services' StopAsync. The host's cancellation token ensures
@@ -1006,5 +1228,94 @@ namespace Uniwill_Control_Utility
                 }
             }
         }
+
+        /// <summary>
+        /// Sets a stable AppUserModelID so the taskbar button stays pinned to this app
+        /// even after GPU driver resets (PnP hotswap). Must be called before any windows
+        /// are shown.
+        /// </summary>
+        private static void SetAppUserModelID(string appId)
+        {
+            try
+            {
+                SetCurrentProcessExplicitAppUserModelID(appId);
+            }
+            catch { /* non-critical — falls back to default taskbar behavior */ }
+        }
+
+        /// <summary>
+        /// Re-asserts the AppUserModelID after a GPU driver reset.
+        /// Call this from the UI thread after PnP hotswap to restore the taskbar icon.
+        /// When the dGPU is PnP-disabled, WPF's D3D device is lost and DWM can no
+        /// longer render the taskbar thumbnail. This method forces DWM to re-query
+        /// the window by re-sending WM_SETICON and invalidating the composition.
+        /// </summary>
+        public static void ReassertAppUserModelID()
+        {
+            SetAppUserModelID("UniwillControlUtility.UCU");
+
+            var window = System.Windows.Application.Current.MainWindow;
+            if (window is not null)
+            {
+                try
+                {
+                    var hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+                    if (hwnd != IntPtr.Zero)
+                    {
+                        // Re-send WM_SETICON so DWM picks up the icon handles again
+                        // after the GPU driver reinitialization invalidated them.
+                        // Get the current class icons, then re-apply them to force
+                        // DWM to re-render the taskbar button.
+                        IntPtr bigIcon = GetClassLong(hwnd, GCL_HICON);
+                        IntPtr smallIcon = GetClassLong(hwnd, GCL_HICONSM);
+                        if (bigIcon != IntPtr.Zero)
+                        {
+                            SendMessage(hwnd, WM_SETICON, ICON_BIG, bigIcon);
+                        }
+                        if (smallIcon != IntPtr.Zero)
+                        {
+                            SendMessage(hwnd, WM_SETICON, ICON_SMALL, smallIcon);
+                        }
+
+                        // Force DWM to flush pending composition and re-render
+                        DwmFlush();
+
+                        // Force a full redraw without moving or resizing
+                        // SWP_NOMOVE | SWP_NOSIZE | NOACTIVATE | NOSENDCHANGING | SWP_FRAMECHANGED
+                        SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, 0x0037);
+
+                        // Force the window to repaint immediately
+                        RedrawWindow(hwnd, IntPtr.Zero, IntPtr.Zero, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+                    }
+                }
+                catch { /* non-critical */ }
+            }
+        }
+
+        private const int WM_SETICON = 0x0080;
+        private const int ICON_BIG = 0;
+        private const int ICON_SMALL = 1;
+
+        private const int GCL_HICON = -14;
+        private const int GCL_HICONSM = -34;
+
+        private const uint RDW_INVALIDATE = 0x0001;
+        private const uint RDW_UPDATENOW = 0x0100;
+        private const uint RDW_ALLCHILDREN = 0x0080;
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr GetClassLong(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, int wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool RedrawWindow(IntPtr hwnd, IntPtr lprc, IntPtr hrgn, uint flags);
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmFlush();
+
+        [DllImport("user32.dll")]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
     }
 }

@@ -16,12 +16,12 @@ using Uniwill_Control_Utility.Services;
 namespace Uniwill_Control_Utility.Views.Pages
 {
     /// <summary>
-    /// Interaction logic for Watercooler page.
+    /// Interaction logic for HydroUI page.
     /// Provides pump voltage, fan speed, and RGB lighting controls for LCT water coolers.
     /// </summary>
-    public partial class Watercooler : Page
+    public partial class HydroUI : Page
     {
-        private WaterCoolerService? _waterCoolerService;
+        private HydroUIService? _hydroUIService;
         private DeviceApplier? _deviceApplier;
         private string? _selectedDeviceAddress;
         private bool _isInitialized;
@@ -44,7 +44,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// <summary>True while syncing UI from external settings change (tray menu). Suppresses SelectionChanged saves.</summary>
         private bool _isSyncingFromExternal;
 
-        public Watercooler()
+        public HydroUI()
         {
             InitializeComponent();
             InitializePage();
@@ -59,11 +59,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             try
             {
-                _waterCoolerService = App.GetService<WaterCoolerService>();
-                if (_waterCoolerService == null)
+                _hydroUIService = App.GetService<HydroUIService>();
+                if (_hydroUIService == null)
                 {
                     MessageBox.Show(
-                        "Watercooler service is not available.\nPlease restart the application.",
+                        "HydroUI service is not available.\nPlease restart the application.",
                         "Service Error",
                         MessageBoxButton.OK,
                         MessageBoxImage.Error);
@@ -72,11 +72,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 // Subscribe to service events so the page responds to connection changes
                 // even before it's navigated to (e.g., auto-connect at startup).
-                _waterCoolerService.ConnectionStateChanged += OnConnectionStateChanged;
-                _waterCoolerService.StatusChanged += OnStatusChanged;
-                _waterCoolerService.FlowStatusChanged += OnFlowStatusChanged;
-                _waterCoolerService.FirmwareVersionReceived += OnFirmwareVersionReceived;
-                _waterCoolerService.SettingsChanged += OnWaterCoolerSettingsChanged;
+                _hydroUIService.ConnectionStateChanged += OnConnectionStateChanged;
+                _hydroUIService.StatusChanged += OnStatusChanged;
+                _hydroUIService.FlowStatusChanged += OnFlowStatusChanged;
+                _hydroUIService.FirmwareVersionReceived += OnFirmwareVersionReceived;
+                _hydroUIService.SettingsChanged += OnWaterCoolerSettingsChanged;
 
                 // Get DeviceApplier for centralized device commands and override management
                 _deviceApplier = App.GetService<DeviceApplier>();
@@ -103,7 +103,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void Watercooler_Loaded(object sender, RoutedEventArgs e)
         {
-            if (_waterCoolerService == null) return;
+            if (_hydroUIService == null) return;
 
             // Service event subscriptions are in InitializePage() (constructor) so they're
             // active even before the first navigation. No need to subscribe here.
@@ -121,9 +121,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             // Reflect current connection state if already connected
-            if (_waterCoolerService.IsConnected)
+            if (_hydroUIService.IsConnected)
             {
-                OnConnectionStateChanged(null, WaterCoolerService.WatercoolerConnectionState.Connected);
+                OnConnectionStateChanged(null, HydroUIService.WatercoolerConnectionState.Connected);
             }
         }
 
@@ -134,26 +134,26 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void Watercooler_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
-            if (!this.IsVisible || _waterCoolerService == null) return;
+            if (!this.IsVisible || _hydroUIService == null) return;
 
             // Re-sync connection state in case it changed while this page was hidden.
             // The event-driven OnConnectionStateChanged handles live changes, but if
             // a state transition occurred and completed while we were away, we need
             // to reflect the current state on return.
-            if (_waterCoolerService.IsConnected)
+            if (_hydroUIService.IsConnected)
             {
-                OnConnectionStateChanged(null, WaterCoolerService.WatercoolerConnectionState.Connected);
+                OnConnectionStateChanged(null, HydroUIService.WatercoolerConnectionState.Connected);
                 // Also re-sync the current flow status in case it changed while away.
-                UpdateFlowStatusUi(_waterCoolerService.FlowStatus);
+                UpdateFlowStatusUi(_hydroUIService.FlowStatus);
 
                 // Re-sync firmware version — the query may have completed before this
                 // page was first navigated to, so the event was missed.
-                if (_waterCoolerService.FirmwareVersion is string version)
+                if (_hydroUIService.FirmwareVersion is string version)
                     OnFirmwareVersionReceived(null, version);
             }
             else
             {
-                OnConnectionStateChanged(null, WaterCoolerService.WatercoolerConnectionState.Disconnected);
+                OnConnectionStateChanged(null, HydroUIService.WatercoolerConnectionState.Disconnected);
             }
 
             // Re-apply override state (Adaptive Mode may have been toggled while away)
@@ -168,9 +168,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void LoadSettings()
         {
-            if (_waterCoolerService == null) return;
+            if (_hydroUIService == null) return;
 
-            var settings = _waterCoolerService.GetSettings();
+            var settings = _hydroUIService.GetSettings();
 
             // Restore pump voltage selection
             var pumpVoltage = settings.GetPumpVoltage();
@@ -199,10 +199,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             tsAutoConnect.IsChecked = settings.AutoConnect;
 
             // Check if the service is already connected (e.g., via auto-connect on startup)
-            if (_waterCoolerService.IsConnected)
+            if (_hydroUIService.IsConnected)
             {
                 _selectedDeviceAddress = settings.LastDeviceAddress;
-                OnConnectionStateChanged(null, WaterCoolerService.WatercoolerConnectionState.Connected);
+                OnConnectionStateChanged(null, HydroUIService.WatercoolerConnectionState.Connected);
             }
             else
             {
@@ -314,14 +314,14 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async void btnScan_Click(object sender, RoutedEventArgs e)
         {
-            if (_waterCoolerService == null) return;
+            if (_hydroUIService == null) return;
 
             btnScan.IsEnabled = false;
             cbxDevices.Items.Clear();
 
             try
             {
-                var devices = await _waterCoolerService.DiscoverDevicesAsync(10000);
+                var devices = await _hydroUIService.DiscoverDevicesAsync(10000);
 
                 foreach (var device in devices)
                     cbxDevices.Items.Add(device);
@@ -344,18 +344,18 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (cbxDevices.SelectedItem is WaterCoolerDeviceInfo device)
             {
                 _selectedDeviceAddress = device.Address;
-                btnConnect.IsEnabled = _waterCoolerService == null || !_waterCoolerService.IsConnected;
+                btnConnect.IsEnabled = _hydroUIService == null || !_hydroUIService.IsConnected;
             }
         }
 
         private async void btnConnect_Click(object sender, RoutedEventArgs e)
         {
-            if (_waterCoolerService == null || _selectedDeviceAddress == null) return;
+            if (_hydroUIService == null || _selectedDeviceAddress == null) return;
 
             btnConnect.IsEnabled = false;
             btnConnect.Content = "Connecting...";
 
-            var connected = await _waterCoolerService.ConnectAsync(_selectedDeviceAddress);
+            var connected = await _hydroUIService.ConnectAsync(_selectedDeviceAddress);
 
             if (connected)
             {
@@ -368,18 +368,25 @@ namespace Uniwill_Control_Utility.Views.Pages
                     // WriteWithResponse ensures reliable delivery — no artificial delays needed.
                     try
                     {
+                        var savedSettings = _hydroUIService.GetSettings();
                         var pumpVoltage = GetSelectedPumpVoltage();
                         if (pumpVoltage != PumpVoltage.Off)
-                            await _waterCoolerService.WritePumpModeAsync(pumpVoltage);
+                            await _hydroUIService.WritePumpModeAsync(pumpVoltage);
 
                         var fanSpeed = GetSelectedFanSpeed();
                         if (fanSpeed != FanSpeed.Off)
-                            await _waterCoolerService.WriteFanModeAsync(fanSpeed);
+                            await _hydroUIService.WriteFanModeAsync(fanSpeed);
 
-                        var rgbMode = GetSelectedRgbMode();
-                        var rgbColor = GetSelectedRgbColor();
-                        if (rgbMode != RgbState.Off)
-                            await _waterCoolerService.WriteRgbModeAsync(rgbMode, rgbColor);
+                        if (savedSettings.RgbEnabled)
+                        {
+                            var rgbMode = GetSelectedRgbMode();
+                            var rgbColor = GetSelectedRgbColor();
+                            await _hydroUIService.WriteRgbModeAsync(rgbMode, rgbColor);
+                        }
+                        else
+                        {
+                            await _hydroUIService.WriteRgbModeAsync(RgbState.Off, RgbColor.Red);
+                        }
                     }
                     catch { /* non-critical during connect */ }
                 }
@@ -393,10 +400,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async void btnDisconnect_Click(object sender, RoutedEventArgs e)
         {
-            if (_waterCoolerService == null) return;
+            if (_hydroUIService == null) return;
 
-            _waterCoolerService.SetUserDisconnected();
-            await _waterCoolerService.DisconnectAsync();
+            _hydroUIService.SetUserDisconnected();
+            await _hydroUIService.DisconnectAsync();
             SetControlsEnabled(false);
         }
 
@@ -407,21 +414,21 @@ namespace Uniwill_Control_Utility.Views.Pages
         private async void cbxPumpVoltage_SelectionChanged(object sender, EventArgs e)
         {
             if (_isSyncingFromPreset || _isSyncingFromExternal) return;
-            if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
+            if (_hydroUIService == null || !_hydroUIService.IsConnected) return;
 
             var voltage = GetSelectedPumpVoltage();
-            await _waterCoolerService.WritePumpModeAsync(voltage);
-            _waterCoolerService.UpdatePumpVoltage(voltage);
+            await _hydroUIService.WritePumpModeAsync(voltage);
+            _hydroUIService.UpdatePumpVoltage(voltage);
         }
 
         private async void cbxFanSpeed_SelectionChanged(object sender, EventArgs e)
         {
             if (_isSyncingFromPreset || _isSyncingFromExternal) return;
-            if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
+            if (_hydroUIService == null || !_hydroUIService.IsConnected) return;
 
             var speed = GetSelectedFanSpeed();
-            await _waterCoolerService.WriteFanModeAsync(speed);
-            _waterCoolerService.UpdateFanSpeed(speed);
+            await _hydroUIService.WriteFanModeAsync(speed);
+            _hydroUIService.UpdateFanSpeed(speed);
         }
 
         private async void cbxRgbMode_SelectionChanged(object sender, EventArgs e)
@@ -429,12 +436,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             UpdateRgbColorVisibility();
 
             if (_isSyncingFromPreset || _isSyncingFromExternal) return;
-            if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
+            if (_hydroUIService == null || !_hydroUIService.IsConnected) return;
+            if (tsRgbEnabled.IsChecked != true) return;
 
             var mode = GetSelectedRgbMode();
             var color = GetSelectedRgbColor();
-            await _waterCoolerService.WriteRgbModeAsync(mode, color);
-            _waterCoolerService.UpdateRgbMode(mode);
+            await _hydroUIService.WriteRgbModeAsync(mode, color);
+            _hydroUIService.UpdateRgbMode(mode);
         }
 
         /// <summary>Show the color row (and divider) only for modes that accept a custom color (Static, Breathe).</summary>
@@ -449,60 +457,61 @@ namespace Uniwill_Control_Utility.Views.Pages
         private async void cbxRgbColor_SelectionChanged(object sender, EventArgs e)
         {
             if (_isSyncingFromPreset || _isSyncingFromExternal) return;
-            if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
+            if (_hydroUIService == null || !_hydroUIService.IsConnected) return;
+            if (tsRgbEnabled.IsChecked != true) return;
 
             var mode = GetSelectedRgbMode();
             var color = GetSelectedRgbColor();
-            await _waterCoolerService.WriteRgbModeAsync(mode, color);
-            _waterCoolerService.UpdateRgbColor(color);
+            await _hydroUIService.WriteRgbModeAsync(mode, color);
+            _hydroUIService.UpdateRgbColor(color);
         }
 
        private void tsRgbEnabled_Checked(object sender, RoutedEventArgs e)
         {
             if (_isSyncingFromPreset || _isSyncingFromExternal) return;
-            if (_waterCoolerService == null) return;
-            var settings = _waterCoolerService.GetSettings();
+            if (_hydroUIService == null) return;
+            var settings = _hydroUIService.GetSettings();
             settings.RgbEnabled = true;
-            _waterCoolerService.SaveSettings();
+            _hydroUIService.SaveSettings();
 
             RgbCardExpander.IsExpanded = true;
 
             // Apply current effect/color to device
-            if (_waterCoolerService.IsConnected)
+            if (_hydroUIService.IsConnected)
             {
                 var mode = GetSelectedRgbMode();
                 var color = GetSelectedRgbColor();
-                _ = _waterCoolerService.WriteRgbModeAsync(mode, color);
+                _ = _hydroUIService.WriteRgbModeAsync(mode, color);
             }
         }
 
         private async void tsRgbEnabled_Unchecked(object sender, RoutedEventArgs e)
         {
             if (_isSyncingFromPreset || _isSyncingFromExternal) return;
-            if (_waterCoolerService == null) return;
-            var settings = _waterCoolerService.GetSettings();
+            if (_hydroUIService == null) return;
+            var settings = _hydroUIService.GetSettings();
             settings.RgbEnabled = false;
-            _waterCoolerService.SaveSettings();
+            _hydroUIService.SaveSettings();
 
             RgbCardExpander.IsExpanded = false;
 
             // Turn off RGB on device
-            if (_waterCoolerService.IsConnected)
+            if (_hydroUIService.IsConnected)
             {
-                await _waterCoolerService.WriteRgbModeAsync(RgbState.Off, RgbColor.Red);
+                await _hydroUIService.WriteRgbModeAsync(RgbState.Off, RgbColor.Red);
             }
         }
 
         private void tsAutoConnect_Checked(object sender, RoutedEventArgs e)
         {
-            if (_waterCoolerService != null)
-                _waterCoolerService.UpdateAutoConnect(true);
+            if (_hydroUIService != null)
+                _hydroUIService.UpdateAutoConnect(true);
         }
 
         private void tsAutoConnect_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (_waterCoolerService != null)
-                _waterCoolerService.UpdateAutoConnect(false);
+            if (_hydroUIService != null)
+                _hydroUIService.UpdateAutoConnect(false);
         }
 
         #region Smart Mode Handlers
@@ -510,13 +519,13 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void tsSmartMode_Checked(object sender, RoutedEventArgs e)
         {
             if (_isSyncingFromPreset || _isSyncingFromExternal) return;
-            if (_waterCoolerService == null) return;
+            if (_hydroUIService == null) return;
 
-            var settings = _waterCoolerService.GetSettings();
+            var settings = _hydroUIService.GetSettings();
             settings.SmartModeEnabled = true;
             SaveSmartModeSettings();
 
-            _waterCoolerService.StartSmartMode();
+            _hydroUIService.StartSmartMode();
             // Hide manual pump and fan control while smart mode is active
             PumpVoltageCard.Visibility = Visibility.Collapsed;
             FanSpeedCard.Visibility = Visibility.Collapsed;
@@ -525,28 +534,28 @@ namespace Uniwill_Control_Utility.Views.Pages
         private async void tsSmartMode_Unchecked(object sender, RoutedEventArgs e)
         {
             if (_isSyncingFromPreset || _isSyncingFromExternal) return;
-            if (_waterCoolerService == null) return;
+            if (_hydroUIService == null) return;
 
-            var settings = _waterCoolerService.GetSettings();
+            var settings = _hydroUIService.GetSettings();
             settings.SmartModeEnabled = false;
-            _waterCoolerService.SaveSettings();
+            _hydroUIService.SaveSettings();
 
-            _waterCoolerService.StopSmartMode();
+            _hydroUIService.StopSmartMode();
             PumpVoltageCard.Visibility = Visibility.Visible;
             FanSpeedCard.Visibility = Visibility.Visible;
 
             // Re-apply the current combobox values so pump/fan don't stay at the
             // last smart-mode speed after disabling.
-            if (_waterCoolerService.IsConnected)
+            if (_hydroUIService.IsConnected)
             {
                 var voltage = GetSelectedPumpVoltage();
                 var fan = GetSelectedFanSpeed();
                 try
                 {
                     if (voltage != PumpVoltage.Off)
-                        await _waterCoolerService.WritePumpModeAsync(voltage);
+                        await _hydroUIService.WritePumpModeAsync(voltage);
                     if (fan != FanSpeed.Off)
-                        await _waterCoolerService.WriteFanModeAsync(fan);
+                        await _hydroUIService.WriteFanModeAsync(fan);
                 }
                 catch { /* non-critical — device may have disconnected */ }
             }
@@ -567,6 +576,40 @@ namespace Uniwill_Control_Utility.Views.Pages
             SaveSmartModeSettings();
         }
 
+        private void tsSmartModeTemperatureRgb_Checked(object sender, RoutedEventArgs e)
+        {
+            SaveSmartModeSettings();
+            // Hide and disable manual RGB controls — Smart Mode takes over
+            RgbCardExpander.IsEnabled = false;
+            RgbCardExpander.Visibility = Visibility.Collapsed;
+            // Restart Smart Mode so it immediately applies temperature-based RGB
+            if (_hydroUIService?.IsSmartModeActive == true)
+                _hydroUIService.StartSmartMode();
+        }
+
+        private async void tsSmartModeTemperatureRgb_Unchecked(object sender, RoutedEventArgs e)
+        {
+            SaveSmartModeSettings();
+            // Restore manual RGB controls
+            RgbCardExpander.IsEnabled = true;
+            RgbCardExpander.Visibility = Visibility.Visible;
+            // Re-apply the saved manual RGB state
+            if (_hydroUIService?.IsConnected == true)
+            {
+                var settings = _hydroUIService.GetSettings();
+                if (settings.RgbEnabled)
+                {
+                    await _hydroUIService.WriteRgbModeAsync(settings.GetRgbMode(), settings.GetRgbColor());
+                }
+                else
+                {
+                    await _hydroUIService.WriteRgbModeAsync(RgbState.Off, RgbColor.Red);
+                }
+            }
+            if (_hydroUIService?.IsSmartModeActive == true)
+                _hydroUIService.StartSmartMode(); // restart to pick up new setting
+        }
+
         private void TextBox_NumericOnly(object sender, TextCompositionEventArgs e)
         {
             e.Handled = !Regex.IsMatch(e.Text, @"^\d+$");
@@ -574,10 +617,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void SaveSmartModeSettings()
         {
-            if (_waterCoolerService == null) return;
+            if (_hydroUIService == null) return;
             // Skip save if controls are being populated from loaded settings (prevents circular save).
             if (_isSyncingSmartMode) return;
-            var settings = _waterCoolerService.GetSettings();
+            var settings = _hydroUIService.GetSettings();
 
             // Temperature source: 0=max, 1=cpu, 2=gpu
             settings.SmartModeTempSource = cbxSmartModeTempSource.SelectedIndex switch
@@ -640,13 +683,15 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _ => "Percent100"
             };
 
-            _waterCoolerService.SaveSettings();
+            settings.SmartModeTemperatureRgb = tsSmartModeTemperatureRgb.IsChecked == true;
+
+            _hydroUIService.SaveSettings();
         }
 
         private void LoadSmartModeSettings()
         {
-            if (_waterCoolerService == null) return;
-            var settings = _waterCoolerService.GetSettings();
+            if (_hydroUIService == null) return;
+            var settings = _hydroUIService.GetSettings();
 
             // Prevent SelectionChanged handlers from saving back to disk while we populate controls.
             _isSyncingSmartMode = true;
@@ -705,10 +750,20 @@ namespace Uniwill_Control_Utility.Views.Pages
                     _ => 6
                 };
 
-                // Apply smart mode enabled state
-                if (settings.SmartModeEnabled && _waterCoolerService.IsConnected)
+                // Temperature-based RGB toggle
+                tsSmartModeTemperatureRgb.IsChecked = settings.SmartModeTemperatureRgb;
+
+                // Hide manual RGB controls if temperature-based RGB is active
+                if (settings.SmartModeTemperatureRgb)
                 {
-                    _waterCoolerService.StartSmartMode();
+                    RgbCardExpander.IsEnabled = false;
+                    RgbCardExpander.Visibility = Visibility.Collapsed;
+                }
+
+                // Apply smart mode enabled state
+                if (settings.SmartModeEnabled && _hydroUIService.IsConnected)
+                {
+                    _hydroUIService.StartSmartMode();
                     PumpVoltageCard.Visibility = Visibility.Collapsed;
                     FanSpeedCard.Visibility = Visibility.Collapsed;
                 }
@@ -725,13 +780,13 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         #region Event Handlers
 
-        private void OnConnectionStateChanged(object? sender, WaterCoolerService.WatercoolerConnectionState state)
+        private void OnConnectionStateChanged(object? sender, HydroUIService.WatercoolerConnectionState state)
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
                 switch (state)
                 {
-                    case WaterCoolerService.WatercoolerConnectionState.Connected:
+                    case HydroUIService.WatercoolerConnectionState.Connected:
                         spConnectedState.Visibility = Visibility.Visible;
                         spDisconnectedState.Visibility = Visibility.Collapsed;
                         SetControlsEnabled(true);
@@ -761,17 +816,17 @@ namespace Uniwill_Control_Utility.Views.Pages
                         }, null, TimeSpan.Zero, TimeSpan.FromSeconds(2));
 
                         // Update page title with detected device name
-                        if (_waterCoolerService?.ConnectedDeviceName != null
-                            && !string.IsNullOrEmpty(_waterCoolerService.ConnectedDeviceName))
+                        if (_hydroUIService?.ConnectedDeviceName != null
+                            && !string.IsNullOrEmpty(_hydroUIService.ConnectedDeviceName))
                         {
-                            tbPageTitle.Text = $"{_waterCoolerService.ConnectedDeviceName} Control";
+                            tbPageTitle.Text = $"{_hydroUIService.ConnectedDeviceName} Control";
                         }
 
                         // Restart Smart Mode if it was enabled
-                        var settings = _waterCoolerService?.GetSettings();
+                        var settings = _hydroUIService?.GetSettings();
                         if (settings?.SmartModeEnabled == true)
                         {
-                            _waterCoolerService.StartSmartMode();
+                            _hydroUIService.StartSmartMode();
                             PumpVoltageCard.Visibility = Visibility.Collapsed;
                             FanSpeedCard.Visibility = Visibility.Collapsed;
                             tsSmartMode.IsChecked = true;
@@ -785,10 +840,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                         // Re-sync flow status from service — it may already be in a
                         // non-Off state if Smart Mode restarted and turned the pump on.
-                        UpdateFlowStatusUi(_waterCoolerService.FlowStatus);
+                        UpdateFlowStatusUi(_hydroUIService.FlowStatus);
                         break;
 
-                    case WaterCoolerService.WatercoolerConnectionState.Disconnected:
+                    case HydroUIService.WatercoolerConnectionState.Disconnected:
                         // Reset flow status UI to Off on disconnect so the card doesn't
                         // show stale state from the previous connection.
                         UpdateFlowStatusUi(FlowStatus.Off);
@@ -823,7 +878,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         bottomBar.Visibility = Visibility.Collapsed;
                         break;
 
-                    case WaterCoolerService.WatercoolerConnectionState.Scanning:
+                    case HydroUIService.WatercoolerConnectionState.Scanning:
                         break;
                 }
             });
@@ -840,14 +895,14 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void OnWaterCoolerSettingsChanged(object? sender, EventArgs e)
         {
-            if (_waterCoolerService == null) return;
+            if (_hydroUIService == null) return;
 
             this.Dispatcher.Invoke(() =>
             {
                 _isSyncingFromExternal = true;
                 try
                 {
-                    var settings = _waterCoolerService.GetSettings();
+                    var settings = _hydroUIService.GetSettings();
 
                     // Pump voltage
                     var pumpVoltage = settings.GetPumpVoltage();
@@ -901,9 +956,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             string imageFile = "mk2.png"; // Default fallback
 
-            if (_waterCoolerService?.ConnectedDeviceName != null)
+            if (_hydroUIService?.ConnectedDeviceName != null)
             {
-                string name = _waterCoolerService.ConnectedDeviceName;
+                string name = _hydroUIService.ConnectedDeviceName;
                 if (name.Contains("LCT22001", StringComparison.OrdinalIgnoreCase) || name.Contains("LCT22002", StringComparison.OrdinalIgnoreCase) ||
                     name.Contains("Mk2", StringComparison.OrdinalIgnoreCase))
                 {
@@ -970,7 +1025,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Override lifted — hide snackbar and overlay regardless of connection state.
                 HideAdaptiveSnackbar();
 
-                if (_waterCoolerService?.IsConnected == true)
+                if (_hydroUIService?.IsConnected == true)
                 {
                     // DeviceApplier already re-applied settings to the device in DisableWatercoolerOverrideAsync.
                     // We just need to sync the UI to reflect the restored settings.
@@ -981,29 +1036,31 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>
-        /// Re-applies the Watercooler page's saved settings to the device after override is lifted.
+        /// Re-applies the HydroUI page's saved settings to the device after override is lifted.
         /// </summary>
         private void ReapplyUserSettingsToDevice()
         {
-            if (_waterCoolerService == null || !_waterCoolerService.IsConnected)
+            if (_hydroUIService == null || !_hydroUIService.IsConnected)
                 return;
 
             try
             {
-                var settings = _waterCoolerService.GetSettings();
+                var settings = _hydroUIService.GetSettings();
                 var pumpVoltage = settings.GetPumpVoltage();
                 var fanSpeed = settings.GetFanSpeed();
                 var rgbMode = settings.GetRgbMode();
                 var rgbColor = settings.GetRgbColor();
 
                 if (pumpVoltage != PumpVoltage.Off)
-                    _ = _waterCoolerService.WritePumpModeAsync(pumpVoltage);
+                    _ = _hydroUIService.WritePumpModeAsync(pumpVoltage);
 
                 if (fanSpeed != FanSpeed.Off)
-                    _ = _waterCoolerService.WriteFanModeAsync(fanSpeed);
+                    _ = _hydroUIService.WriteFanModeAsync(fanSpeed);
 
-                if (rgbMode != RgbState.Off)
-                    _ = _waterCoolerService.WriteRgbModeAsync(rgbMode, rgbColor);
+                if (settings.RgbEnabled)
+                    _ = _hydroUIService.WriteRgbModeAsync(rgbMode, rgbColor);
+                else
+                    _ = _hydroUIService.WriteRgbModeAsync(RgbState.Off, RgbColor.Red);
             }
             catch { /* non-critical on override-lift */ }
         }
@@ -1013,8 +1070,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void SyncUiFromSettings()
         {
-            if (_waterCoolerService == null) return;
-            var settings = _waterCoolerService.GetSettings();
+            if (_hydroUIService == null) return;
+            var settings = _hydroUIService.GetSettings();
 
             _isSyncingFromPreset = true;
             try
@@ -1067,7 +1124,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         /// <summary>
         /// Event handler for <see cref="DeviceApplier.WatercoolerPresetApplied"/>.
-        /// Syncs the Watercooler page's UI controls to reflect the profile's values.
+        /// Syncs the HydroUI page's UI controls to reflect the profile's values.
         /// </summary>
         private void OnWatercoolerPresetApplied(object? sender, WatercoolerPresetAppliedEventArgs e)
         {
@@ -1179,18 +1236,18 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async void btnStandby_Click(object sender, RoutedEventArgs e)
         {
-            if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
+            if (_hydroUIService == null || !_hydroUIService.IsConnected) return;
 
-            if (_waterCoolerService.IsStandby)
+            if (_hydroUIService.IsStandby)
             {
                 // Resume
-                await _waterCoolerService.ExitStandbyAsync();
+                await _hydroUIService.ExitStandbyAsync();
                 UpdateStandbyButton(false);
             }
             else
             {
                 // Enter standby
-                await _waterCoolerService.EnterStandbyAsync();
+                await _hydroUIService.EnterStandbyAsync();
                 UpdateStandbyButton(true);
             }
         }
@@ -1217,9 +1274,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void btnWaterFill_Click(object sender, RoutedEventArgs e)
         {
-            if (_waterCoolerService == null || !_waterCoolerService.IsConnected) return;
+            if (_hydroUIService == null || !_hydroUIService.IsConnected) return;
 
-            var dialog = new Views.Windows.WaterFillDialog(_waterCoolerService);
+            var dialog = new Views.Windows.WaterFillDialog(_hydroUIService);
             dialog.ShowDialog();
         }
 

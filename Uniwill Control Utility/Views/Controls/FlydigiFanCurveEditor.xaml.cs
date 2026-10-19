@@ -21,7 +21,7 @@ namespace Uniwill_Control_Utility.Views.Controls
     {
         private readonly List<Slider> _sliders = new();
         private readonly InfoTooltip _customToolTip = new();
-        private DispatcherOperation? _pendingGraphRedraw;
+        private DispatcherOperation? _pendingFallbackRedraw;
 
         // Fixed temperature points: 0, 10, 20, ..., 100 °C (11 points)
         private static readonly int[] Temperatures = { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
@@ -32,8 +32,22 @@ namespace Uniwill_Control_Utility.Views.Controls
         public FlydigiFanCurveEditor()
         {
             InitializeComponent();
+            InitializeSliders();
+        }
 
-            MouseLeave += (s, e) => _customToolTip.IsOpen = false;
+        private void InitializeSliders()
+        {
+            for (int i = 0; i < Temperatures.Length; i++)
+            {
+                var slider = GenerateSlider(i);
+                _sliders.Add(slider);
+                _slidersGrid.Children.Add(slider);
+            }
+        }
+
+        private void GraphArea_MouseLeave(object sender, MouseEventArgs e)
+        {
+            _customToolTip.IsOpen = false;
         }
 
         protected override Size ArrangeOverride(Size arrangeBounds)
@@ -45,37 +59,34 @@ namespace Uniwill_Control_Utility.Views.Controls
 
         /// <summary>
         /// Populates the editor with RPM values from a fan curve profile.
+        /// Sliders use a 0-100 percentage range for smooth dragging; RPM is derived on read.
         /// </summary>
         public void SetCurve(FlydigiFanCurveProfile profile)
         {
-            _sliders.Clear();
-            _slidersGrid.Children.Clear();
-
             ushort minRpm = FlydigiFanCurveProfile.MinRpm;
             ushort maxRpm = FlydigiFanCurveProfile.MaxRpm;
-            int steps = Steps(minRpm, maxRpm);
 
-            for (int i = 0; i < Temperatures.Length; i++)
+            for (int i = 0; i < _sliders.Count && i < Temperatures.Length; i++)
             {
-                // Interpolate the RPM at this temperature from the profile's sparse points
                 var rpm = profile.GetRpmForTemperature(Temperatures[i]);
-                // Round to nearest 100 RPM step
-                var rounded = RoundToStep(rpm, minRpm, maxRpm);
-                // Convert to step index for the slider
-                var stepIndex = StepIndex(rounded, minRpm, maxRpm);
-
-                var slider = GenerateSlider(i, 0, steps);
-                slider.Value = stepIndex;
-                _sliders.Add(slider);
-                _slidersGrid.Children.Add(slider);
+                var percent = RpmToPercent(rpm, minRpm, maxRpm);
+                _sliders[i].Value = percent;
             }
 
-            RequestGraphRedraw();
+            // Clear the old curve line immediately so it doesn't persist while
+            // slider thumbs animate to their new positions. Then defer the redraw
+            // to Background priority so the layout system has fully processed all
+            // value changes and thumbs are at their final positions before DrawGraph
+            // samples them. Using InvalidateArrange directly would fire ArrangeOverride
+            // before the thumbs reposition, drawing a line at the stale curve shape.
+            _canvas.Children.Clear();
+
+            Dispatcher.InvokeAsync(() => InvalidateArrange(), DispatcherPriority.Background);
         }
 
         /// <summary>
         /// Returns the edited curve as a FlydigiFanCurveProfile.
-        /// Only temperatures whose RPM differs from their neighbor are kept as points.
+        /// Slider percentage values are mapped back to RPM, rounded to the nearest 100 RPM.
         /// </summary>
         public FlydigiFanCurveProfile GetCurve()
         {
@@ -86,8 +97,8 @@ namespace Uniwill_Control_Utility.Views.Controls
 
             for (int i = 0; i < _sliders.Count; i++)
             {
-                var step = (int)_sliders[i].Value;
-                var rpm = RpmFromStep(step, minRpm, maxRpm);
+                var percent = _sliders[i].Value;
+                var rpm = PercentToRpm(percent, minRpm, maxRpm);
                 points.Add(new FanCurvePoint
                 {
                     Temperature = Temperatures[i],
@@ -103,25 +114,35 @@ namespace Uniwill_Control_Utility.Views.Controls
             };
         }
 
-        private Slider GenerateSlider(int index, int minimum, int maximum)
+        private Slider GenerateSlider(int index)
         {
+            // Use a 0-100 percentage range so each 1% step is ~2px of travel,
+            // matching EcFanCurveEditor and giving smooth drag feel.
+            // The percentage is mapped to RPM in GetCurve() / SetCurve().
             var slider = new Slider
             {
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Orientation = Orientation.Vertical,
                 IsSnapToTickEnabled = true,
                 TickFrequency = 1,
-                Maximum = maximum,
-                Minimum = minimum,
+                Maximum = 100,
+                Minimum = 0,
                 Tag = index,
             };
 
+            slider.PreviewMouseDown += Slider_PreviewMouseDown;
             slider.MouseMove += Slider_MouseMove;
             slider.ValueChanged += Slider_OnValueChanged;
 
             Grid.SetColumn(slider, index);
 
             return slider;
+        }
+
+        private void Slider_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            // No-op: ensures the slider receives the mouse event before the template
+            // processes it. Unlike EcFanCurveEditor, this editor is always editable.
         }
 
         private void Slider_MouseMove(object sender, MouseEventArgs e)
@@ -140,7 +161,7 @@ namespace Uniwill_Control_Utility.Views.Controls
 
             var index = (int)slider.Tag;
             var temp = Temperatures[index];
-            var rpm = RpmFromStep((int)slider.Value, FlydigiFanCurveProfile.MinRpm, FlydigiFanCurveProfile.MaxRpm);
+            var rpm = PercentToRpm(slider.Value, FlydigiFanCurveProfile.MinRpm, FlydigiFanCurveProfile.MaxRpm);
 
             _customToolTip.Update(temp, rpm);
 
@@ -176,20 +197,20 @@ namespace Uniwill_Control_Utility.Views.Controls
                 return;
 
             VerifyMonotonicity(currentSlider);
-            RequestGraphRedraw();
+            InvalidateArrange();
             CurveChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        private void RequestGraphRedraw()
+        /// <summary>Schedules a Background-priority redraw as a safety net when layout hasn't settled.</summary>
+        private void ScheduleFallbackRedraw()
         {
-            if (_pendingGraphRedraw is { Status: DispatcherOperationStatus.Pending })
+            if (_pendingFallbackRedraw is { Status: DispatcherOperationStatus.Pending })
                 return;
-
-            _pendingGraphRedraw = Dispatcher.InvokeAsync(() =>
+            _pendingFallbackRedraw = Dispatcher.InvokeAsync(() =>
             {
-                _pendingGraphRedraw = null;
-                DrawGraph();
-            }, DispatcherPriority.Loaded);
+                _pendingFallbackRedraw = null;
+                InvalidateArrange();
+            }, DispatcherPriority.Background);
         }
 
         /// <summary>
@@ -228,6 +249,15 @@ namespace Uniwill_Control_Utility.Views.Controls
                 ?? new SolidColorBrush(Colors.Gray);
             if (color == null)
                 return;
+
+            // Check if sliders are actually measured yet. If not, skip drawing to
+            // avoid clearing the canvas with (0,0) points during early layout passes.
+            bool allMeasured = _sliders.Count > 0 && _sliders.All(s => s.ActualWidth > 0 && s.ActualHeight > 0);
+            if (!allMeasured)
+            {
+                ScheduleFallbackRedraw();
+                return;
+            }
 
             _canvas.Children.Clear();
 
@@ -292,34 +322,24 @@ namespace Uniwill_Control_Utility.Views.Controls
             return slider.TranslatePoint(new(x, y), _canvas);
         }
 
-        /// <summary>Number of 100-RPM steps in the range [minRpm, maxRpm]. E.g. 1300-4000 → 27 steps.</summary>
-        private static int Steps(ushort minRpm, ushort maxRpm)
+        /// <summary>Converts an RPM value to a 0-100 percentage for the slider.</summary>
+        private static double RpmToPercent(ushort rpm, ushort minRpm, ushort maxRpm)
         {
-            return (maxRpm - minRpm) / 100;
+            var range = maxRpm - minRpm;
+            if (range == 0) return 0;
+            var percent = (rpm - minRpm) * 100.0 / range;
+            return Math.Clamp(percent, 0, 100);
         }
 
-        /// <summary>Rounds an RPM value to the nearest 100-RPM step boundary.</summary>
-        private static ushort RoundToStep(ushort rpm, ushort minRpm, ushort maxRpm)
+        /// <summary>Converts a 0-100 percentage back to an RPM value, rounded to the nearest 100 RPM.</summary>
+        private static ushort PercentToRpm(double percent, ushort minRpm, ushort maxRpm)
         {
-            var offset = rpm - minRpm;
-            var step = (int)Math.Round(offset / 100.0);
-            step = Math.Clamp(step, 0, Steps(minRpm, maxRpm));
-            return (ushort)(minRpm + step * 100);
-        }
-
-        /// <summary>Converts a step index (0..Steps) back to an RPM value.</summary>
-        private static ushort RpmFromStep(int step, ushort minRpm, ushort maxRpm)
-        {
-            step = Math.Clamp(step, 0, Steps(minRpm, maxRpm));
-            return (ushort)(minRpm + step * 100);
-        }
-
-        /// <summary>Converts an RPM value to a step index (0..Steps).</summary>
-        private static int StepIndex(ushort rpm, ushort minRpm, ushort maxRpm)
-        {
-            var offset = rpm - minRpm;
-            var step = (int)Math.Round(offset / 100.0);
-            return Math.Clamp(step, 0, Steps(minRpm, maxRpm));
+            percent = Math.Clamp(percent, 0, 100);
+            var range = maxRpm - minRpm;
+            var rpm = minRpm + (int)Math.Round(percent * range / 100.0);
+            // Round to nearest 100 RPM step.
+            rpm = (int)Math.Round(rpm / 100.0) * 100;
+            return (ushort)Math.Clamp(rpm, minRpm, maxRpm);
         }
 
         /* ------------------------------------------------------------------ */

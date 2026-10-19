@@ -5,11 +5,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Management;
+using System.Runtime.InteropServices;
 using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
+using Windows.Devices.Radios;
 using Microsoft.Extensions.Logging;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
@@ -34,7 +36,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         private const string ScheduledTaskName = "UCU";
         private const string InternetConnectivityHost = "8.8.8.8";
         private const string PresetExtension = ".UCUpresets";
-        private const string StressTestExeRelativePath = @"Assets\Stress-Test\AVX2 Stress Test.exe";
         private const string LegacyVersionPrefix = "3.";
         private const string MsiExecCommand = "msiexec";
         private const string MsiInstallFlag = "/i ";
@@ -54,21 +55,141 @@ namespace Uniwill_Control_Utility.Views.Pages
         private int _ramSpeed = 0, _ramType = 0, _ramWidth = 0, _ramSlots = 0;
         private string _ramProducer = "", _ramModel = "";
 
-        // MiniLED Local Dimming
-        private const string WmiClassName = "AcpiTest_MULong";
-        private const string DefaultInstanceName = @"ACPI\PNP0C14\1_1";
-        private const ulong CmdEnableStep1 = 0x50000000002;
-        private const ulong CmdEnableStep2 = 0x5000000000E;
-        private const ulong CmdDisableStep1 = 0x50000000001;
-        private const ulong CmdDisableStep2 = 0x5000000000D;
-        private const byte ExpectedEnableStep1 = 0xBB;
-        private const byte ExpectedEnableStep2 = 0x0E;
-        private const byte ExpectedDisableStep1 = 0xAA;
-        private const byte ExpectedDisableStep2 = 0x0D;
-        private const ushort EcLocalDimmingRegister = 0x072B;
-        private const byte EcLocalDimmingBit = 0x02;
-        private bool _localDimmingToggling;
         private UniwillECService? _ecService;
+
+        // Hardware Management card state (Wi-Fi/Bluetooth radios + state-changed listeners)
+        private Radio? _wifiRadio;
+        private Radio? _btRadio;
+        private bool _radioListenersAttached;
+
+        #region CPU Advanced Performance Menu (OemMagicVariable NVRAM unlock)
+
+        // Same OemMagicVariable NVRAM entry the Display page uses for GPU mux mode.
+        // The checkbox drives two bytes in lockstep (tester-confirmed on Intel NB02):
+        // CPUPerformanceAndOverClockMenuSwitch at 111 and MemoryOverClockSwitch at 51.
+        // Support is firmware-reported at 110 (Intel NB02 = 1, AMD = 0).
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern uint GetFirmwareEnvironmentVariable(
+            string lpName, string lpGuid, [Out] byte[] lpBuffer, uint nSize);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetFirmwareEnvironmentVariable(
+            string lpName, string lpGuid, [In] byte[] lpValue, uint nSize);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool OpenProcessToken(IntPtr h, uint d, out IntPtr t);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool LookupPrivilegeValue(string? s, string n, ref LUID l);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool AdjustTokenPrivileges(IntPtr t, bool d, ref TP n, uint b, IntPtr p, IntPtr r);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool CloseHandle(IntPtr h);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct LUID { public uint Low; public int High; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct TP { public int Count; public LUID Luid; public uint Attr; }
+
+        private const uint TOKEN_ADJUST_PRIVILEGES = 0x0020;
+        private const uint SE_PRIVILEGE_ENABLED = 0x00000002;
+
+        private const string NvramGuidStr = "{9F33F85C-13CA-4FD1-9C4A-96217722C593}";
+        private const int OffsetMemOcSwitch = 51;
+        private const int OffsetCpuApMenuSupport = 110;
+        private const int OffsetCpuApMenuSwitch = 111;
+
+        private bool _isNvramAvailable;
+
+        /// <summary>
+        /// Enables SeSystemEnvironmentPrivilege on the current process token (required for NVRAM access).
+        /// </summary>
+        private static void EnableNvramPrivilege()
+        {
+            IntPtr token;
+            if (!OpenProcessToken(Process.GetCurrentProcess().Handle, TOKEN_ADJUST_PRIVILEGES, out token))
+            {
+                Debug.WriteLine($"[Settings] OpenProcessToken failed: {Marshal.GetLastWin32Error()}");
+                return;
+            }
+
+            try
+            {
+                var tp = new TP { Count = 1, Attr = SE_PRIVILEGE_ENABLED };
+                if (!LookupPrivilegeValue(null, "SeSystemEnvironmentPrivilege", ref tp.Luid))
+                {
+                    Debug.WriteLine($"[Settings] LookupPrivilegeValue failed: {Marshal.GetLastWin32Error()}");
+                    return;
+                }
+
+                if (!AdjustTokenPrivileges(token, false, ref tp, (uint)Marshal.SizeOf(tp), IntPtr.Zero, IntPtr.Zero))
+                {
+                    Debug.WriteLine($"[Settings] AdjustTokenPrivileges failed: {Marshal.GetLastWin32Error()}");
+                }
+            }
+            finally
+            {
+                CloseHandle(token);
+            }
+        }
+
+        /// <summary>
+        /// Reads the OemMagicVariable NVRAM buffer, or null when unavailable.
+        /// </summary>
+        private static byte[]? ReadNvramBuffer()
+        {
+            byte[] buf = new byte[4096];
+            uint len = GetFirmwareEnvironmentVariable("OemMagicVariable", NvramGuidStr, buf, (uint)buf.Length);
+            if (len == 0 || len > buf.Length)
+                return null;
+            var result = new byte[len];
+            Array.Copy(buf, result, len);
+            return result;
+        }
+
+        /// <summary>
+        /// Firmware-reported support byte for the CPU Advanced Performance Menu (offset 110).
+        /// Non-zero on Intel NB02, zero on AMD — gates the Settings row.
+        /// </summary>
+        private static bool CpuApMenuSupported()
+        {
+            var nvram = ReadNvramBuffer();
+            return nvram != null && nvram.Length > OffsetCpuApMenuSupport && nvram[OffsetCpuApMenuSupport] != 0;
+        }
+
+        /// <summary>
+        /// Writes the Advanced Performance Menu unlock: sets offsets 111 (CPU menu switch)
+        /// and 51 (memory OC switch) to the same boolean, whole-buffer rewrite.
+        /// </summary>
+        private static bool WriteCpuApMenuUnlock(bool enabled)
+        {
+            var nvram = ReadNvramBuffer();
+            if (nvram == null || nvram.Length <= OffsetCpuApMenuSwitch)
+            {
+                Debug.WriteLine($"[Settings] NVRAM OemMagicVariable unavailable for AP menu write");
+                return false;
+            }
+
+            var modified = (byte[])nvram.Clone();
+            modified[OffsetCpuApMenuSwitch] = (byte)(enabled ? 1 : 0);
+            modified[OffsetMemOcSwitch] = (byte)(enabled ? 1 : 0);
+
+            if (!SetFirmwareEnvironmentVariable("OemMagicVariable", NvramGuidStr, modified, (uint)modified.Length))
+            {
+                Debug.WriteLine($"[Settings] NVRAM AP menu write failed: {Marshal.GetLastWin32Error()}");
+                return false;
+            }
+
+            Debug.WriteLine($"[Settings] NVRAM AP menu switch set to {(enabled ? 1 : 0)} at offsets {OffsetCpuApMenuSwitch}/{OffsetMemOcSwitch}");
+            return true;
+        }
+
+        #endregion
 
         public ViewModels.SettingsViewModel ViewModel
         {
@@ -85,12 +206,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             _logger = logger;
 
             InitializeComponent();
-
-            // Get EC service for Local Dimming readback verification.
-            _ecService = App.GetService<UniwillECService>();
-
-            // Show/hide Local Dimming card based on panel type (detected at startup).
-            CardLocalDimming.Visibility = App.HasMiniLEDPanel ? Visibility.Visible : Visibility.Collapsed;
 
             cbxLanguage.ItemsSource = LocalizationService.SupportedLanguages;
             cbxLanguage.SelectedItem = LocalizationService.SupportedLanguages.First(language => language.CultureName == LocalizationService.CurrentCultureName);
@@ -109,12 +224,23 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbPowerBoostMode.IsChecked = Settings.Default.EnablePowerBoostMode;
             cbHideFlydigi.IsChecked = Settings.Default.EnableFlydigi;
             cbDisableCpuVoltageControl.IsChecked = Settings.Default.EnableCpuVoltageControl;
+            // CPU voltage control (Curve Optimizer) is AMD-only — hide the row on Intel scenarios
+            bool cpuVoltageRowVisible = Family.TYPE != Family.ProcessorType.Intel;
+            CpuVoltageControlDivider.Visibility = cpuVoltageRowVisible ? Visibility.Visible : Visibility.Collapsed;
+            CpuVoltageControlRow.Visibility = cpuVoltageRowVisible ? Visibility.Visible : Visibility.Collapsed;
             cbDisableGpuClockControl.IsChecked = Settings.Default.EnableGpuClockControl;
             cbShowAdaptiveNavigation.IsChecked = Settings.Default.EnableAdaptiveNavigation;
             cbShowHydroUiNavigation.IsChecked = Settings.Default.EnableHydroUiNavigation;
             cbShowLightBarNavigation.IsChecked = Settings.Default.EnableLightBarNavigation;
             cbShowOverlayNavigation.IsChecked = Settings.Default.EnableOverlayNavigation;
             cbShowAutoNavigation.IsChecked = Settings.Default.EnableAutoNavigation;
+            cbQKeyIntercept.IsChecked = Settings.Default.EnableQKeyButtonIntercept;
+            cbCpuAdvancedPerformanceMenu.IsChecked = Settings.Default.EnableCpuAdvancedPerformanceMenu;
+            EnableNvramPrivilege();
+            bool apMenuSupported = Family.TYPE == Family.ProcessorType.Intel && CpuApMenuSupported();
+            _isNvramAvailable = apMenuSupported;
+            ApMenuDivider.Visibility = apMenuSupported ? Visibility.Visible : Visibility.Collapsed;
+            ApMenuRow.Visibility = apMenuSupported ? Visibility.Visible : Visibility.Collapsed;
             _featureNavigationControlsReady = true;
 
             cbxLogLevel.SelectedIndex = Settings.Default.DiagnosticLogLevel;
@@ -418,17 +544,170 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.Save();
         }
 
-       private void cbPowerBoostMode_Checked(object sender, RoutedEventArgs e)
+      private void cbPowerBoostMode_Checked(object sender, RoutedEventArgs e)
         {
             Settings.Default.EnablePowerBoostMode = true;
             Settings.Default.Save();
+
+            // Invalidate cached Presets/Adaptive page instances so the next
+            // navigation creates fresh instances with the new slider ranges.
+            var pageService = App.GetService<Wpf.Ui.Abstractions.INavigationViewPageProvider>() as PageService;
+            pageService?.InvalidateBoostDependentPages();
         }
 
         private void cbPowerBoostMode_Unchecked(object sender, RoutedEventArgs e)
         {
             Settings.Default.EnablePowerBoostMode = false;
             Settings.Default.Save();
+
+            var pageService = App.GetService<Wpf.Ui.Abstractions.INavigationViewPageProvider>() as PageService;
+            pageService?.InvalidateBoostDependentPages();
         }
+
+        private void cbQKeyIntercept_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.EnableQKeyButtonIntercept = true;
+            Settings.Default.Save();
+        }
+
+        private void cbQKeyIntercept_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.EnableQKeyButtonIntercept = false;
+            Settings.Default.Save();
+        }
+
+        private void cbCpuAdvancedPerformanceMenu_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.EnableCpuAdvancedPerformanceMenu = true;
+            Settings.Default.Save();
+            if (_isNvramAvailable && WriteCpuApMenuUnlock(true))
+                _logger.LogInformation("CPU Advanced Performance Menu unlocked (NVRAM offsets 111/51 set)");
+        }
+
+        private void cbCpuAdvancedPerformanceMenu_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.EnableCpuAdvancedPerformanceMenu = false;
+            Settings.Default.Save();
+            if (_isNvramAvailable && WriteCpuApMenuUnlock(false))
+                _logger.LogInformation("CPU Advanced Performance Menu lock restored (NVRAM offsets 111/51 cleared)");
+        }
+
+        #region Hardware Management (Device Manager-style toggles)
+
+        private void cbWifiToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            _ = HardwareManagement.SetWifiAsync(true);
+        }
+
+        private void cbWifiToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            _ = HardwareManagement.SetWifiAsync(false);
+        }
+
+        private void cbBluetoothToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            _ = HardwareManagement.SetBluetoothAsync(true);
+        }
+
+        private void cbBluetoothToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            _ = HardwareManagement.SetBluetoothAsync(false);
+        }
+
+        private void cbWebcamToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            _ = HardwareManagement.SetWebcamAsync(true);
+        }
+
+        private void cbWebcamToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            _ = HardwareManagement.SetWebcamAsync(false);
+        }
+
+        private void cbTouchpadToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.TouchpadEnabled = true;
+            Settings.Default.Save();
+            _ = HardwareManagement.SetTouchpadAsync(true);
+        }
+
+        private void cbTouchpadToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.TouchpadEnabled = false;
+            Settings.Default.Save();
+            _ = HardwareManagement.SetTouchpadAsync(false);
+        }
+
+        /// <summary>
+        /// Pulls the live Wi-Fi/Bluetooth/webcam states (and the persisted touchpad state)
+        /// into the Hardware Management toggles, off the render thread, then attaches the
+        /// radio state-changed listeners so external toggles (Settings app, Fn keys) keep
+        /// the UI in sync — the same StateChanged subscription XMG CC's DeviceSwitchItem uses.
+        /// </summary>
+        private async System.Threading.Tasks.Task SyncHardwareManagementStates()
+        {
+            try
+            {
+                _wifiRadio = await HardwareManagement.GetWifiRadioAsync();
+                _btRadio = await HardwareManagement.GetBluetoothRadioAsync();
+                bool? wifiOn = _wifiRadio != null ? HardwareManagementRadioIsOn(_wifiRadio) : null;
+                bool? btOn = _btRadio != null ? HardwareManagementRadioIsOn(_btRadio) : null;
+                bool? camOn = await HardwareManagement.GetWebcamEnabledAsync();
+                bool touchpadOn = Settings.Default.TouchpadEnabled;
+
+                await this.Dispatcher.InvokeAsync(() =>
+                {
+                    if (wifiOn != null)
+                        cbWifiToggle.IsChecked = wifiOn;
+                    if (btOn != null)
+                        cbBluetoothToggle.IsChecked = btOn;
+                    if (camOn != null)
+                        cbWebcamToggle.IsChecked = camOn;
+                    cbTouchpadToggle.IsChecked = touchpadOn;
+
+                    AttachRadioStateListeners();
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to sync hardware management states");
+            }
+        }
+
+        private static bool HardwareManagementRadioIsOn(Radio radio)
+        {
+            return radio.State == RadioState.On;
+        }
+
+        private void AttachRadioStateListeners()
+        {
+            if (_radioListenersAttached)
+                return;
+            _radioListenersAttached = true;
+
+            if (_wifiRadio != null)
+                _wifiRadio.StateChanged += WifiRadioStateChanged;
+            if (_btRadio != null)
+                _btRadio.StateChanged += BluetoothRadioStateChanged;
+        }
+
+        private void WifiRadioStateChanged(Radio sender, object args)
+        {
+            _ = this.Dispatcher.InvokeAsync(() =>
+            {
+                cbWifiToggle.IsChecked = HardwareManagementRadioIsOn(sender);
+            });
+        }
+
+        private void BluetoothRadioStateChanged(Radio sender, object args)
+        {
+            _ = this.Dispatcher.InvokeAsync(() =>
+            {
+                cbBluetoothToggle.IsChecked = HardwareManagementRadioIsOn(sender);
+            });
+        }
+
+        #endregion
 
         private void cbHideFlydigi_Checked(object sender, RoutedEventArgs e)
         {
@@ -575,8 +854,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             if (isVisible)
             {
-                // Restore service-level state (e.g. reinstall keyboard hooks).
-                _mainWindowViewModel.EnableFeature(feature);
+                // Restore service-level state (e.g. reinstall keyboard hooks,
+                // reconnect Hydro UI watercooler). Fire-and-forget to avoid
+                // blocking the Settings UI while BLE connects.
+                _ = _mainWindowViewModel.EnableFeatureAsync(feature);
             }
             else
             {
@@ -688,10 +969,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private async void UiPage_Loaded(object sender, RoutedEventArgs e)
         {
-            // Load Local Dimming state from settings.
-            tsLocalDimming.IsChecked = Settings.Default.DisplayLocalDimming;
-
             await LoadSystemInfoAsync();
+            await SyncHardwareManagementStates();
         }
 
         private async System.Threading.Tasks.Task LoadSystemInfoAsync()
@@ -760,19 +1039,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             _ramSlots = CachedSystemInfo.RamSlots;
             _ramProducer = CachedSystemInfo.RamProducer;
             _ramModel = CachedSystemInfo.RamModel;
-        }
-
-        private void btnStressTest_Click(object sender, RoutedEventArgs e)
-        {
-            var stressTestPath = Settings.Default.Path + StressTestExeRelativePath;
-            if (File.Exists(stressTestPath))
-            {
-                Process process = new Process();
-                process.StartInfo.FileName = stressTestPath;
-                process.Start();
-
-                process.Dispose();
-            }
         }
 
         private void cbxLogLevel_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -903,158 +1169,5 @@ namespace Uniwill_Control_Utility.Views.Pages
             PresetBackupStatus.IsOpen = true;
         }
 
-        #region MiniLED Local Dimming
-
-        /// <summary>
-        /// Calls GetSetULong via WMI using the correct GetMethodParameters pattern.
-        /// This matches the pattern used by MechControl (Heavyfail fork) on Uniwill IDY/Tongfang X6 laptops.
-        /// </summary>
-        private static byte WmiCall(ManagementObject mo, ulong data)
-        {
-            using var input = mo.GetMethodParameters("GetSetULong");
-            input["Data"] = data;
-
-            using var output = (ManagementBaseObject)mo.InvokeMethod("GetSetULong", input, null);
-            return (byte)(uint)output["Return"];
-        }
-
-        private void TsLocalDimming_Toggled(object sender, RoutedEventArgs e)
-        {
-            if (_localDimmingToggling)
-                return;
-
-            bool isOn = tsLocalDimming.IsChecked == true;
-
-            _localDimmingToggling = true;
-            tsLocalDimming.IsEnabled = false;
-
-            // WMI ManagementObject has apartment threading affinity — must be called on a dedicated thread.
-            _ = System.Threading.Tasks.Task.Run(() =>
-            {
-                try
-                {
-                    bool success = SetLocalDimming(isOn);
-                    _logger.LogInformation("[Display] Local Dimming {State}: {Result}",
-                        isOn ? "enabled" : "disabled", success ? "success" : "failed");
-
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        if (!success)
-                        {
-                            tsLocalDimming.IsChecked = !isOn;
-                        }
-                        tsLocalDimming.IsEnabled = true;
-                        _localDimmingToggling = false;
-
-                        Settings.Default.DisplayLocalDimming = tsLocalDimming.IsChecked == true;
-                        Settings.Default.Save();
-                    });
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "[Display] Local Dimming toggle failed");
-
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        tsLocalDimming.IsChecked = !isOn;
-                        tsLocalDimming.IsEnabled = true;
-                        _localDimmingToggling = false;
-
-                        Settings.Default.DisplayLocalDimming = tsLocalDimming.IsChecked == true;
-                        Settings.Default.Save();
-                    });
-                }
-            });
-        }
-
-        private bool SetLocalDimming(bool enable)
-        {
-            try
-            {
-                var instancePath = $@"{WmiClassName}.InstanceName='{DefaultInstanceName}'";
-                using var mo = new ManagementObject(@"root\WMI", instancePath, null);
-
-                if (enable)
-                {
-                    _logger.LogDebug("[Display] Sending enable step 1: 0x{Cmd:X}", CmdEnableStep1);
-                    byte result1 = WmiCall(mo, CmdEnableStep1);
-                    _logger.LogDebug("[Display] Enable step 1 returned 0x{Result:X2}", result1);
-
-                    if (result1 != ExpectedEnableStep1)
-                    {
-                        _logger.LogWarning("[Display] Enable step 1 returned 0x{Result:X2} (expected 0x{Expected:X2})",
-                            result1, ExpectedEnableStep1);
-                        return false;
-                    }
-
-                    _logger.LogDebug("[Display] Sending enable step 2: 0x{Cmd:X}", CmdEnableStep2);
-                    byte result2 = WmiCall(mo, CmdEnableStep2);
-                    _logger.LogDebug("[Display] Enable step 2 returned 0x{Result:X2}", result2);
-
-                    if (result2 != ExpectedEnableStep2)
-                    {
-                        _logger.LogWarning("[Display] Enable step 2 returned 0x{Result:X2} (expected 0x{Expected:X2})",
-                            result2, ExpectedEnableStep2);
-                        return false;
-                    }
-                }
-                else
-                {
-                    _logger.LogDebug("[Display] Sending disable step 1: 0x{Cmd:X}", CmdDisableStep1);
-                    byte result1 = WmiCall(mo, CmdDisableStep1);
-                    _logger.LogDebug("[Display] Disable step 1 returned 0x{Result:X2}", result1);
-
-                    if (result1 != ExpectedDisableStep1)
-                    {
-                        _logger.LogWarning("[Display] Disable step 1 returned 0x{Result:X2} (expected 0x{Expected:X2})",
-                            result1, ExpectedDisableStep1);
-                        return false;
-                    }
-
-                    _logger.LogDebug("[Display] Sending disable step 2: 0x{Cmd:X}", CmdDisableStep2);
-                    byte result2 = WmiCall(mo, CmdDisableStep2);
-                    _logger.LogDebug("[Display] Disable step 2 returned 0x{Result:X2}", result2);
-
-                    if (result2 != ExpectedDisableStep2)
-                    {
-                        _logger.LogWarning("[Display] Disable step 2 returned 0x{Result:X2} (expected 0x{Expected:X2})",
-                            result2, ExpectedDisableStep2);
-                        return false;
-                    }
-                }
-
-                Thread.Sleep(100);
-
-                // Verify via EC readback.
-                if (_ecService != null && _ecService.Initialize())
-                {
-                    byte ecValue = _ecService.ReadECRegister(EcLocalDimmingRegister);
-                    bool actualState = (ecValue & EcLocalDimmingBit) != 0;
-
-                    if (actualState != enable)
-                    {
-                        _logger.LogWarning("[Display] EC 0x72B readback 0x{EcValue:X2} shows {Actual}, expected {Expected} — mismatch",
-                            ecValue, actualState ? "ON" : "OFF", enable ? "ON" : "OFF");
-                        return false;
-                    }
-
-                    _logger.LogInformation("[Display] EC 0x72B readback 0x{EcValue:X2} confirms Local Dimming {State}",
-                        ecValue, enable ? "ON" : "OFF");
-                }
-                else
-                {
-                    _logger.LogInformation("[Display] EC service unavailable — skipping readback verification");
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "[Display] WMI/ACPI call failed");
-                return false;
-            }
-        }
-
-        #endregion
-    }
+     }
 }

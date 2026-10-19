@@ -144,6 +144,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 string displayGpuName = FilterGpuName(gpuName);
                 _header.LaptopGPUName = displayGpuName;
                 _gpu.HardwareName = displayGpuName;
+
+                // Seed the last active GPU type so the first metrics update
+                // doesn't trigger a redundant name change.
+                _lastActiveGpuType = ActiveGpuType.Nvidia;
             }
 
             _memory.UpdateModuleInfo(
@@ -274,23 +278,111 @@ namespace Uniwill_Control_Utility.Views.Pages
             return string.Join(" / ", filtered);
         }
 
+        private ActiveGpuType _lastActiveGpuType;
+
         private void OnMetricsUpdated(object? sender, HardwareMetricsSnapshot snapshot)
         {
+            // Update GPU card hardware name when the active GPU type changes
+            // (e.g., user switches to iGPU-only MUX or enables iGPU Power Saving).
+            if (snapshot.ActiveGpuType != _lastActiveGpuType)
+            {
+                _lastActiveGpuType = snapshot.ActiveGpuType;
+                UpdateGpuCardName(snapshot.ActiveGpuType);
+            }
+
             _cpu.UpdateMetrics(snapshot);
             _gpu.UpdateMetrics(snapshot);
             _memory.UpdateMetrics(snapshot);
             _battery.UpdateMetrics(snapshot);
         }
 
+        private void UpdateGpuCardName(ActiveGpuType activeType)
+        {
+            string gpuName = Family.GPUName;
+            if (string.IsNullOrEmpty(gpuName))
+                return;
+
+            string displayName = activeType switch
+            {
+                ActiveGpuType.Nvidia => FilterGpuName(gpuName),
+                ActiveGpuType.Amd => ExtractIntegratedGpuName(gpuName, isIntel: false),
+                ActiveGpuType.Intel => ExtractIntegratedGpuName(gpuName, isIntel: true),
+                _ => FilterGpuName(gpuName)
+            };
+
+            if (!string.IsNullOrEmpty(displayName))
+            {
+                _gpu.HardwareName = displayName;
+            }
+        }
+
+        /// <summary>
+        /// Extracts the integrated GPU name from the combined Family.GPUName string.
+        /// </summary>
+        private static string ExtractIntegratedGpuName(string gpuName, bool isIntel)
+        {
+            string[] separator = { " / " };
+            var parts = gpuName.Split(separator, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var part in parts)
+            {
+                string trimmed = part.Trim();
+                if (string.IsNullOrEmpty(trimmed))
+                    continue;
+
+                if (isIntel && IsIntelGpu(trimmed))
+                    return CleanGpuName(trimmed);
+                if (!isIntel && IsAmdIntegratedGpu(trimmed))
+                    return CleanGpuName(trimmed);
+            }
+
+            // Fallback: return the last GPU in the list (usually the iGPU)
+            for (int i = parts.Length - 1; i >= 0; i--)
+            {
+                string trimmed = parts[i].Trim();
+                if (!string.IsNullOrEmpty(trimmed) && IsIntegratedGpu(trimmed))
+                    return CleanGpuName(trimmed);
+            }
+
+            return string.Empty;
+        }
+
+        private static bool IsIntelGpu(string gpuName)
+        {
+            string upper = gpuName.ToUpperInvariant();
+            return upper.Contains("INTEL") ||
+                   upper.Contains("UHD GRAPHICS") ||
+                   upper.Contains("IRIS") ||
+                   upper.Contains("INTEL HD");
+        }
+
+        private static bool IsAmdIntegratedGpu(string gpuName)
+        {
+            // AMD iGPU: contains "Radeon" but NOT "RX " or "Pro " (those are discrete)
+            string upper = gpuName.ToUpperInvariant();
+            return upper.Contains("RADEON") &&
+                   !upper.Contains("RX ") &&
+                   !upper.Contains("PRO ");
+        }
+
         private void OnDeviceMetricsUpdated(object? sender, DeviceMetricsSnapshot snapshot)
         {
-            // Only update Hydro UI metrics if the feature toggle is enabled.
-            if (Settings.Default.EnableHydroUiNavigation)
-                _hydroUi.UpdateMetrics(snapshot);
+            // Gate Hydro UI by hardware support and feature toggle.
+            // If either condition changes (e.g. user disables the feature in
+            // Settings while the Dashboard is open), collapse the card immediately.
+            bool hydroEnabled = WaterCoolerHardwareDetector.IsSupportedHardware()
+                && Settings.Default.EnableHydroUiNavigation;
 
-            // Only update Flydigi metrics if the feature toggle is enabled.
+            if (hydroEnabled)
+                _hydroUi.UpdateMetrics(snapshot);
+            else if (_hydroUi.Visibility == Visibility.Visible)
+                _hydroUi.Visibility = Visibility.Collapsed;
+
+            // Gate Flydigi by feature toggle — collapse if disabled at runtime.
             if (Settings.Default.EnableFlydigi)
                 _flydigi.UpdateMetrics(snapshot);
+            else if (_flydigi.Visibility == Visibility.Visible)
+                _flydigi.Visibility = Visibility.Collapsed;
 
             // Adjust layout based on which cards are visible.
             bool hydroVisible = _hydroUi.Visibility == Visibility.Visible;

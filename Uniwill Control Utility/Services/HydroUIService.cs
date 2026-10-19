@@ -6,7 +6,9 @@ using System.Management;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using Newtonsoft.Json;
+using Serilog;
 using Uniwill_Control_Utility.Models;
 using System.Diagnostics;
 using Windows.Devices.Bluetooth;
@@ -19,7 +21,7 @@ namespace Uniwill_Control_Utility.Services
     /// BLE communication layer for LCT laptop water coolers (LCT21001/LCT22002).
     /// Uses Nordic nRF52 UART GATT profile.
     /// </summary>
-    public sealed class WaterCoolerService : IDisposable
+    public sealed class HydroUIService : IDisposable
     {
         private BluetoothLEDevice? _device;
         private GattSession? _gattSession;
@@ -58,6 +60,19 @@ namespace Uniwill_Control_Utility.Services
         private int _isDisconnectingInt; // 0 = not disconnecting, 1 = in progress (for Interlocked.Exchange)
         private bool _isConnecting; // True while ConnectAsync is in flight — prevents GATT callback from triggering cleanup
 
+        /* ------------------------------------------------------------------ */
+        /*  Pending device watcher (auto-connect when the cooler powers on)     */
+        /* ------------------------------------------------------------------ */
+
+        private BluetoothLEAdvertisementWatcher? _pendingWatcher;
+        private CancellationTokenSource? _pendingWatcherCts;
+        private readonly object _pendingWatcherLock = new();
+        private long _lastPendingWatcherAttemptTick; // Environment.TickCount64 of the last watcher-triggered connect
+        private int _pendingWatcherConnectInProgress; // 0/1 — de-duplicates rapid advertisement events
+
+        private static readonly long PendingWatcherAttemptCooldownMs = 30_000;
+        private static readonly int PendingWatcherRearmDelayMs = 10_000;
+
         public event EventHandler<WatercoolerConnectionState>? ConnectionStateChanged;
         public event EventHandler<string>? StatusChanged;
         public event EventHandler<bool>? SmartModeStateChanged;
@@ -73,7 +88,7 @@ namespace Uniwill_Control_Utility.Services
         public event EventHandler<FlowStatus>? FlowStatusChanged;
 
         /// <summary>
-        /// Raised whenever settings are saved. Used by the Watercooler page to
+        /// Raised whenever settings are saved. Used by the HydroUI page to
         /// sync its UI when changes come from external callers (e.g., tray menu).
         /// </summary>
         public event EventHandler? SettingsChanged;
@@ -110,7 +125,7 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public string ConnectedDeviceName { get; private set; } = string.Empty;
 
-        public WaterCoolerService()
+        public HydroUIService()
         {
             LoadSettings();
         }
@@ -193,12 +208,17 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// Discovers LCT watercooler devices via BLE advertising.
+        /// When <paramref name="targetAddress"/> is provided the scan keeps
+        /// running (recording other LCT devices) until that specific device
+        /// advertises or the timeout elapses. Without a target, the scan stops
+        /// as soon as any LCT device is found.
         /// </summary>
-        public async Task<List<WaterCoolerDeviceInfo>> DiscoverDevicesAsync(int timeoutMs = 10000)
+        public async Task<List<WaterCoolerDeviceInfo>> DiscoverDevicesAsync(int timeoutMs = 10000, string? targetAddress = null)
         {
             var devices = new List<WaterCoolerDeviceInfo>();
             var foundAddresses = new HashSet<string>();
             var completed = new TaskCompletionSource<bool>();
+            var target = NormalizeAddress(targetAddress);
 
             var watcher = new BluetoothLEAdvertisementWatcher();
             watcher.Received += (s, e) =>
@@ -223,9 +243,16 @@ namespace Uniwill_Control_Utility.Services
                                 Rssi = e.RawSignalStrengthInDBm,
                                 Model = DetectModelFromBleName(name)
                             });
+                        }
 
-                            // Stop scanning once we found at least one device.
-                            // The caller can re-scan if they need more results.
+                        // Without a target, stop on the first LCT device (the
+                        // caller can re-scan for more results). With a target,
+                        // only that device ends the scan early — a different
+                        // cooler advertising first must not mask the target.
+                        bool isTarget = target != null &&
+                            string.Equals(NormalizeAddress(address), target, StringComparison.OrdinalIgnoreCase);
+                        if (target == null || isTarget)
+                        {
                             watcher.Stop();
                             completed.TrySetResult(true);
                         }
@@ -250,6 +277,13 @@ namespace Uniwill_Control_Utility.Services
         #region Device Identification
 
         /// <summary>
+        /// Normalizes a BLE address for comparison (strips colons; the Windows
+        /// BLE stack reports "aabbccddeeff" while saved addresses may use "AA:BB:..").
+        /// </summary>
+        private static string? NormalizeAddress(string? address) =>
+            string.IsNullOrEmpty(address) ? null : address.Replace(":", "");
+
+        /// <summary>
         /// Detects the LCT hardware model from a BLE advertising name.
         /// Returns "LCT22002", "LCT21001", or null if unknown.
         /// </summary>
@@ -271,7 +305,7 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// Resolves a human-readable cooler brand name from the laptop chassis WMI data.
-        /// Returns "XMG Oasis", "TUXEDO Aquaris", "PC Specialist", "Eluktronics", or "LCT Watercooler".
+        /// Returns "XMG Oasis", "TUXEDO Aquaris", "PC Specialist", "Eluktronics", or "LCT HydroUI".
         /// </summary>
         private static string DetectChassisBrand()
         {
@@ -305,12 +339,12 @@ namespace Uniwill_Control_Utility.Services
                 // WMI not available
             }
 
-            return "LCT Watercooler";
+            return "LCT HydroUI";
         }
 
         /// <summary>
         /// Builds a human-readable device name from the BLE name and chassis brand.
-        /// Examples: "XMG Oasis Mk2", "TUXEDO Aquaris Mk1", "LCT Watercooler"
+        /// Examples: "XMG Oasis Mk2", "TUXEDO Aquaris Mk1", "LCT HydroUI"
         /// </summary>
         private static string ResolveDeviceName(string bleName)
         {
@@ -353,7 +387,9 @@ namespace Uniwill_Control_Utility.Services
         private async Task<bool> ConnectAsyncCore(string deviceAddress)
         {
             ClearUserDisconnected();
-            const int maxRetries = 3;
+            // Limited attempts for pre-loading auto-connect. Background reconnect
+            // loops handle retries later if the device appears after startup.
+            const int maxRetries = 2;
 
             // If somehow still connected, disconnect first to avoid stacking connections.
             // Windows BLE creates a NEW connection handle per FromBluetoothAddressAsync call —
@@ -370,13 +406,35 @@ namespace Uniwill_Control_Utility.Services
             {
                 try
                 {
-                    _device = await BluetoothLEDevice.FromBluetoothAddressAsync(ulong.Parse(deviceAddress.Replace(":", "")));
-                    if (_device == null) return false;
+                    _device = await BluetoothLEDevice.FromBluetoothAddressAsync(
+                        ulong.Parse(deviceAddress.Replace(":", "")));
+                    if (_device == null)
+                    {
+                        Log.Warning("[WaterCooler] Connect attempt {Attempt}: FromBluetoothAddressAsync returned null for {Address}",
+                            attempt, deviceAddress);
+                        return false;
+                    }
 
                     Debug.WriteLine($"[WaterCooler] Device acquired, ConnectionStatus={_device.ConnectionStatus}");
 
                     // Create a GattSession for explicit connection lifecycle control.
                     _gattSession = await GattSession.FromDeviceIdAsync(BluetoothDeviceId.FromId(_device.DeviceId));
+
+                    // MaintainConnection=true is what asks Windows to hold — and INITIATE —
+                    // the BLE link. After hibernation resume the cooler advertises but is NOT
+                    // OS-connected (wake does not always re-establish the link), so without
+                    // this the GATT discovery below throws and reconnect fails forever until
+                    // the user power-cycles the cooler. DisconnectAsync flips it back to false
+                    // to tear the link down.
+                    try
+                    {
+                        if (_gattSession.CanMaintainConnection)
+                            _gattSession.MaintainConnection = true;
+                    }
+                    catch
+                    {
+                        // Some stacks report CanMaintainConnection=false; discovery proceeds.
+                    }
 
                     // Track when the OS-level session actually closes (not just our reference).
                     _sessionClosedTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -431,8 +489,9 @@ namespace Uniwill_Control_Utility.Services
                         _settings.LastDeviceAddress = deviceAddress;
                         SaveSettings();
 
-                        // Stop any background reconnection loop — we're connected now.
+                        // Stop any background reconnection mechanisms — we're connected now.
                         StopReconnectLoop();
+                        StopPendingDeviceWatcher();
 
                         // Query firmware version (raw "sw" bytes, no framing)
                         _ = Task.Run(async () =>
@@ -452,11 +511,15 @@ namespace Uniwill_Control_Utility.Services
                     }
 
                     // Clean up if we got here (device opened but no TX characteristic)
+                    Log.Warning("[WaterCooler] Connect attempt {Attempt}: device opened (ConnectionStatus={Status}) but no TX characteristic found",
+                        attempt, _device.ConnectionStatus);
                     await CleanupAfterFailedConnectAsync();
                     return false;
                 }
                 catch (Exception ex) when (attempt < maxRetries)
                 {
+                    Log.Warning("[WaterCooler] Connect attempt {Attempt}/{MaxRetries} failed: {Message}",
+                        attempt, maxRetries, ex.Message);
                     StatusChanged?.Invoke(this, $"Connection attempt {attempt} failed ({ex.Message}), retrying...");
 
                     // Clean up partial state before retry
@@ -620,11 +683,15 @@ namespace Uniwill_Control_Utility.Services
 
             // Start background reconnection loop if this wasn't a user-initiated disconnect.
             // This handles cases where the BLE link drops unexpectedly (e.g., Bluetooth
-            // off→on, device goes out of range then returns).
+            // off→on, device goes out of range then returns). The pending-device
+            // watcher complements the bounded reconnect loop: it keeps listening
+            // indefinitely, so a cooler that is powered on much later still
+            // auto-connects.
             if (!_userDisconnected && _settings.AutoConnect)
             {
                 _connectGeneration++; // Invalidate any in-flight connection attempt
                 StartReconnectLoop();
+                StartPendingDeviceWatcher();
             }
 
             // Stop Smart Mode on disconnect — it can't operate without a live link.
@@ -643,6 +710,7 @@ namespace Uniwill_Control_Utility.Services
             _connectGeneration++; // Invalidate any in-flight reconnect
             _userDisconnected = true;
             StopReconnectLoop();
+            StopPendingDeviceWatcher();
         }
 
         /// <summary>
@@ -797,6 +865,252 @@ namespace Uniwill_Control_Utility.Services
 
         #endregion
 
+        #region Pending Device Watcher
+
+        /// <summary>
+        /// Starts a persistent, passive BLE advertisement watcher that
+        /// auto-connects the last known watercooler as soon as it advertises
+        /// (e.g. the user powers it on after a failed startup connect). The
+        /// watcher receives advertisements pushed by the OS BLE radio — no
+        /// polling, no outbound probes. No-op when auto-connect is disabled,
+        /// no device is known, or the user disconnected manually.
+        /// </summary>
+        public void StartPendingDeviceWatcher()
+        {
+            lock (_pendingWatcherLock)
+            {
+                if (_pendingWatcherCts != null)
+                    return; // Supervisor already running
+
+                if (!IsPendingWatcherEligible())
+                    return;
+
+                var cts = new CancellationTokenSource();
+                _pendingWatcherCts = cts;
+                _ = RunPendingWatcherSupervisorAsync(cts);
+            }
+        }
+
+        /// <summary>
+        /// Stops the pending-device watcher and its supervisor (no re-arm).
+        /// </summary>
+        public void StopPendingDeviceWatcher()
+        {
+            CancellationTokenSource? cts;
+            lock (_pendingWatcherLock)
+            {
+                cts = _pendingWatcherCts;
+                _pendingWatcherCts = null;
+
+                var watcher = _pendingWatcher;
+                _pendingWatcher = null;
+                if (watcher != null)
+                {
+                    try { watcher.Stop(); }
+                    catch
+                    {
+                        // Non-critical: watcher stop failed during teardown
+                    }
+                }
+            }
+
+            if (cts != null)
+            {
+                try
+                {
+                    cts.Cancel();
+                    cts.Dispose();
+                }
+                catch
+                {
+                    // Already disposed by the supervisor's exit path
+                }
+            }
+        }
+
+        private bool IsPendingWatcherEligible() =>
+            _settings.AutoConnect &&
+            !string.IsNullOrEmpty(_settings.LastDeviceAddress) &&
+            !_userDisconnected &&
+            !IsConnected;
+
+        /// <summary>
+        /// Keeps a pending-device watcher alive: starts it, re-arms it when the
+        /// OS stops it (e.g. Bluetooth radio off), and exits when the target
+        /// handled a connect or conditions are no longer met.
+        /// </summary>
+        private async Task RunPendingWatcherSupervisorAsync(CancellationTokenSource cts)
+        {
+            var token = cts.Token;
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    if (!IsPendingWatcherEligible())
+                        return;
+
+                    var endedTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    var targetHandled = new[] { false };
+
+                    var watcher = new BluetoothLEAdvertisementWatcher();
+                    watcher.Received += (s, e) =>
+                    {
+                        if (!TryHandlePendingWatcherReceived(e.BluetoothAddress.ToString()))
+                            return;
+
+                        // The target advertised and the connect flow took over —
+                        // end this watcher without re-arming.
+                        targetHandled[0] = true;
+                        try { watcher.Stop(); }
+                        catch
+                        {
+                            // Non-critical: the connect flow also stops the watcher explicitly
+                        }
+                    };
+                    // Radio loss (e.g. Bluetooth off) surfaces as Stopped in
+                    // this WinRT projection — the supervisor re-arms on it.
+                    watcher.Stopped += (s, e) => endedTcs.TrySetResult(targetHandled[0]);
+
+                    // Cancellation (app exit / feature disable) must unblock the
+                    // await on endedTcs even if Stop() was never delivered.
+                    using var cancellationStop = token.Register(() =>
+                    {
+                        try { watcher.Stop(); }
+                        catch
+                        {
+                            // Non-critical: watcher already gone
+                        }
+                    });
+
+                    try
+                    {
+                        watcher.Start();
+                    }
+                    catch (Exception ex)
+                    {
+                        // Radio off/unavailable — retry after a delay.
+                        Log.Information("[WaterCooler] Pending device watcher unavailable ({Error}), retrying", ex.Message);
+                        await Task.Delay(PendingWatcherRearmDelayMs, token);
+                        continue;
+                    }
+
+                    lock (_pendingWatcherLock)
+                    {
+                        if (token.IsCancellationRequested)
+                        {
+                            try { watcher.Stop(); }
+                            catch
+                            {
+                                // Non-critical
+                            }
+                            return;
+                        }
+                        _pendingWatcher = watcher;
+                    }
+                    Log.Information("[WaterCooler] Pending device watcher active for {Address}", _settings.LastDeviceAddress);
+
+                    await endedTcs.Task;
+
+                    lock (_pendingWatcherLock)
+                    {
+                        if (ReferenceEquals(_pendingWatcher, watcher))
+                            _pendingWatcher = null;
+                    }
+
+                    if (targetHandled[0] || token.IsCancellationRequested)
+                        return;
+
+                    // The watcher stopped on its own (e.g. radio off) — re-arm.
+                    await Task.Delay(PendingWatcherRearmDelayMs, token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Shutdown requested — nothing to clean up here
+            }
+            finally
+            {
+                lock (_pendingWatcherLock)
+                {
+                    if (ReferenceEquals(_pendingWatcherCts, cts))
+                    {
+                        _pendingWatcherCts = null;
+                        try { cts.Dispose(); }
+                        catch
+                        {
+                            // Already disposed by StopPendingDeviceWatcher
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Handles an advertisement received by the pending-device watcher.
+        /// Returns true when the target matched and the connect flow was
+        /// launched (the watcher should then stop without re-arming).
+        /// </summary>
+        private bool TryHandlePendingWatcherReceived(string address)
+        {
+            var target = NormalizeAddress(_settings.LastDeviceAddress);
+            if (target == null ||
+                !string.Equals(NormalizeAddress(address), target, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (IsConnected || _userDisconnected || _isConnecting)
+                return false;
+
+            // Cooldown after a failed attempt — the device keeps advertising,
+            // so without this we would hammer ConnectAsync on every
+            // advertisement (~1/s) while it stays unreachable.
+            if (Environment.TickCount64 - _lastPendingWatcherAttemptTick < PendingWatcherAttemptCooldownMs)
+                return false;
+
+            if (Interlocked.Exchange(ref _pendingWatcherConnectInProgress, 1) == 1)
+                return false;
+
+            _lastPendingWatcherAttemptTick = Environment.TickCount64;
+            Log.Information("[WaterCooler] Watercooler {Address} advertising — connecting", target);
+            _ = ConnectPendingDeviceAsync();
+            return true;
+        }
+
+        /// <summary>
+        /// Connects to the last known watercooler after the pending-device
+        /// watcher saw it advertise. The scan gate is satisfied by the
+        /// advertisement itself, so no discovery scan is needed.
+        /// </summary>
+        private async Task ConnectPendingDeviceAsync()
+        {
+            try
+            {
+                StopPendingDeviceWatcher();
+
+                StatusChanged?.Invoke(this, "Watercooler detected — connecting...");
+                if (await ConnectAsync(_settings.LastDeviceAddress))
+                {
+                    await RestoreSettingsAfterConnectAsync();
+                    StatusChanged?.Invoke(this, "Auto-connected successfully");
+                }
+                else
+                {
+                    StatusChanged?.Invoke(this, "Watercooler detected — connection failed");
+                    StartPendingDeviceWatcher();
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Information("[WaterCooler] Pending device connect failed: {Error}", ex.Message);
+                StartPendingDeviceWatcher();
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _pendingWatcherConnectInProgress, 0);
+            }
+        }
+
+        #endregion
+
         /* ------------------------------------------------------------------ */
         /*  Smart Mode — temperature-linked pump and fan speed                   */
         /* ------------------------------------------------------------------ */
@@ -806,6 +1120,8 @@ namespace Uniwill_Control_Utility.Services
         private FanSpeed _smartModeCurrentFan;
         private double _smartModeFilteredTemp;
         private bool _smartModeLastWasBoost; // For hysteresis direction tracking
+        private RgbState _smartModeCurrentRgbMode;
+        private RgbColor _smartModeCurrentRgbColor;
 
         /// <summary>
         /// Starts the Smart Mode control loop.
@@ -815,7 +1131,7 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public void StartSmartMode()
         {
-            // Already running — don't restart. The Watercooler page calls this on every
+            // Already running — don't restart. The HydroUI page calls this on every
             // navigation (IsVisibleChanged → OnConnectionStateChanged), which would reset
             // hysteresis state and the EWMA filter, causing unwanted pump/fan speed changes.
             if (_smartModeTimer != null)
@@ -842,6 +1158,8 @@ namespace Uniwill_Control_Utility.Services
             // what the device's actual pump/fan speed is.
             _smartModeCurrentPump = settings.GetSmartModeIdlePump();
             _smartModeCurrentFan = settings.GetSmartModeIdleFan();
+            _smartModeCurrentRgbMode = default;
+            _smartModeCurrentRgbColor = default;
 
             _ = Task.Run(async () =>
             {
@@ -856,6 +1174,19 @@ namespace Uniwill_Control_Utility.Services
 
                         if (_smartModeCurrentFan != FanSpeed.Off)
                             await WriteFanModeAsync(_smartModeCurrentFan);
+
+                        // Apply initial temperature-based RGB if enabled
+                        if (settings.SmartModeTemperatureRgb)
+                        {
+                            var rgbColor = _smartModeFilteredTemp < settings.SmartModeLowThreshold
+                                ? RgbColor.Green
+                                : _smartModeFilteredTemp > settings.SmartModeHighThreshold
+                                    ? RgbColor.Red
+                                    : RgbColor.White;
+                            _smartModeCurrentRgbMode = RgbState.Static;
+                            _smartModeCurrentRgbColor = rgbColor;
+                            await WriteRgbModeAsync(RgbState.Static, rgbColor);
+                        }
 
                         Debug.WriteLine($"[WaterCooler] Smart mode initial: pump {_smartModeCurrentPump}, fan {_smartModeCurrentFan}");
                     }
@@ -890,6 +1221,8 @@ namespace Uniwill_Control_Utility.Services
             var timer = _smartModeTimer;
             _smartModeTimer = null;
             timer?.Dispose();
+            _smartModeCurrentRgbMode = default;
+            _smartModeCurrentRgbColor = default;
             Debug.WriteLine("[WaterCooler] Smart Mode stopped");
             SmartModeStateChanged?.Invoke(this, false);
         }
@@ -984,6 +1317,40 @@ namespace Uniwill_Control_Utility.Services
             {
                 _smartModeCurrentFan = targetFan;
                 await WriteFanModeAsync(targetFan);
+            }
+
+            // Temperature-based RGB (only when SmartModeTemperatureRgb is enabled)
+            if (settings.SmartModeTemperatureRgb)
+            {
+                RgbState rgbMode;
+                RgbColor rgbColor;
+
+                if (filtered < lowThreshold)
+                {
+                    rgbMode = RgbState.Static;
+                    rgbColor = RgbColor.Green; // Idle - cool
+                }
+                else if (filtered > highThreshold)
+                {
+                    rgbMode = RgbState.Static;
+                    rgbColor = RgbColor.Red; // Boost - hot
+                }
+                else
+                {
+                    rgbMode = RgbState.Static;
+                    rgbColor = RgbColor.White; // Transition - between thresholds
+                }
+
+                // Write RGB if it differs from current
+                if (_smartModeCurrentRgbMode != rgbMode || _smartModeCurrentRgbColor != rgbColor)
+                {
+                    _smartModeCurrentRgbMode = rgbMode;
+                    _smartModeCurrentRgbColor = rgbColor;
+                    Application.Current.Dispatcher.InvokeAsync(async () =>
+                    {
+                        await WriteRgbModeAsync(rgbMode, rgbColor);
+                    });
+                }
             }
 
             if (pumpChanged || fanChanged)
@@ -1341,8 +1708,10 @@ namespace Uniwill_Control_Utility.Services
                 // Re-apply RGB
                 var rgbMode = settings.GetRgbMode();
                 var rgbColor = settings.GetRgbColor();
-                if (settings.RgbEnabled && rgbMode != RgbState.Off)
+                if (settings.RgbEnabled)
                     await WriteRgbModeAsync(rgbMode, rgbColor);
+                else
+                    await WriteRgbModeAsync(RgbState.Off, RgbColor.Red);
 
                 Debug.WriteLine("[WaterCooler] Standby mode exited — settings restored");
             }
@@ -1424,10 +1793,13 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// Attempts to auto-connect to the last known device on startup.
-        /// Runs a BLE scan before each connection attempt so the device is in the
-        /// Windows BLE cache (FromBluetoothAddressAsync can fail on cold boot
-        /// without a prior scan). Retries up to 3 times with a delay between attempts
-        /// to allow the cooler's BLE radio time to power on after cold boot.
+        /// The connect is gated on BLE advertising: a powered-off cooler that is
+        /// still in the Windows BLE cache would make FromBluetoothAddressAsync
+        /// stall for a long time before failing, which used to hang startup.
+        /// If the device does not advertise within the scan window (its radio
+        /// may still be powering on after cold boot), one more scan is given
+        /// before giving up. Background reconnect handles the device turning
+        /// on later.
         /// </summary>
         public async Task<bool> TryAutoConnectAsync()
         {
@@ -1439,58 +1811,199 @@ namespace Uniwill_Control_Utility.Services
 
             StatusChanged?.Invoke(this, "Attempting auto-connect...");
 
-            bool autoConnected = false;
-            const int maxAttempts = 3;
-            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            // LCT coolers advertise on a short interval, so a 5s scan reliably
+            // catches a powered-on device.
+            bool advertising = await ScanForTargetAsync(5000, _settings.LastDeviceAddress);
+
+            if (!advertising)
             {
-                // Scan for BLE devices before connecting. On cold boot, FromBluetoothAddressAsync
-                // fails if the Windows BLE stack hasn't discovered the device yet. A short scan
-                // populates the device cache so the connection attempt can succeed.
+                // The cooler's BLE radio may still be starting up after cold boot.
+                // Give it one more chance before giving up.
+                await Task.Delay(3000);
+                StatusChanged?.Invoke(this, "Auto-connect: cooler not advertising yet, trying again...");
+                advertising = await ScanForTargetAsync(5000, _settings.LastDeviceAddress);
+            }
+
+            bool connected = false;
+            if (advertising)
+            {
+                // The device is actively advertising, so the attempt succeeds or
+                // fails quickly — no stall on a stale cache entry. A THROW from the
+                // last attempt must not skip the watcher start below, so it is caught
+                // here and treated as a failed connect.
                 try
                 {
-                    await DiscoverDevicesAsync(5000);
+                    connected = await ConnectAsync(_settings.LastDeviceAddress);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Non-critical: scan failed, proceed with direct connection anyway.
-                }
-
-                if (await ConnectAsync(_settings.LastDeviceAddress))
-                {
-                    autoConnected = true;
-                    break;
-                }
-
-                // If connection failed and retries remain, wait before trying again.
-                // The cooler's BLE radio may need time to start advertising after cold boot.
-                if (attempt < maxAttempts)
-                {
-                    StatusChanged?.Invoke(this, $"Auto-connect attempt {attempt} failed, retrying...");
-                    await Task.Delay(3000);
+                    Log.Warning("[WaterCooler] Auto-connect scan found the device but ConnectAsync threw: {Message}", ex.Message);
+                    connected = false;
                 }
             }
 
-            var connected = autoConnected;
+            if (connected)
+            {
+                await RestoreSettingsAfterConnectAsync();
+                StatusChanged?.Invoke(this, "Auto-connected successfully");
+            }
+            else
+            {
+                StatusChanged?.Invoke(this, advertising
+                    ? "Auto-connect failed (connection error)"
+                    : "Auto-connect failed (device not found)");
+
+                // Nothing connected — keep a passive advertisement watcher
+                // running so the cooler connects automatically when it is
+                // powered on later.
+                StartPendingDeviceWatcher();
+            }
+
+            return connected;
+        }
+
+        /// <summary>
+        /// Pauses briefly for the nRF52 BLE stack to stabilize after connecting,
+        /// then restores saved pump/fan/RGB settings to the device.
+        /// WriteWithResponse ensures each command is acknowledged before the
+        /// next fires, so no artificial inter-command delays are needed
+        /// (matches Python reference). Smart Mode is intentionally not started
+        /// here — temperature sources may not be ready yet; it starts later in
+        /// DashboardViewModel.OnNavigatedToAsync() once temperature data is
+        /// confirmed. If Smart Mode is enabled, pump/fan writes are skipped
+        /// entirely (Smart Mode applies the correct speeds once it starts).
+        /// </summary>
+        private async Task RestoreSettingsAfterConnectAsync()
+        {
+            // Pause after connection for device BLE stack to stabilize.
+            // The nRF52 needs time to transition from advertising to connected state
+            // before it can reliably accept GATT write commands.
+            await Task.Delay(500);
+
+            try
+            {
+                if (!_settings.SmartModeEnabled)
+                {
+                    var pumpVoltage = _settings.GetPumpVoltage();
+                    if (pumpVoltage != PumpVoltage.Off)
+                        await WritePumpModeAsync(pumpVoltage);
+
+                    var fanSpeed = _settings.GetFanSpeed();
+                    if (fanSpeed != FanSpeed.Off)
+                        await WriteFanModeAsync(fanSpeed);
+                }
+
+                var rgbMode = _settings.GetRgbMode();
+                var rgbColor = _settings.GetRgbColor();
+                if (_settings.RgbEnabled)
+                    await WriteRgbModeAsync(rgbMode, rgbColor);
+                else
+                    await WriteRgbModeAsync(RgbState.Off, RgbColor.Red);
+            }
+            catch
+            {
+                // Non-critical: failed to restore settings after connect
+            }
+        }
+
+        /// <summary>
+        /// Scans for a specific device's advertisement. Returns false when the
+        /// scan times out or fails — a blind FromBluetoothAddressAsync to a
+        /// stale cache entry would stall startup, so callers must gate any
+        /// connect on this result.
+        /// </summary>
+        private async Task<bool> ScanForTargetAsync(int timeoutMs, string targetAddress)
+        {
+            try
+            {
+                var target = NormalizeAddress(targetAddress);
+                var devices = await DiscoverDevicesAsync(timeoutMs, targetAddress);
+                return devices.Any(d =>
+                    string.Equals(NormalizeAddress(d.Address), target, StringComparison.OrdinalIgnoreCase));
+            }
+            catch
+            {
+                // Non-critical: scan failed (e.g. Bluetooth radio off).
+                // Treat as not advertising rather than attempting a blind connect.
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to reconnect when the Hydro UI feature is re-enabled in Settings.
+        /// Unlike <see cref="TryAutoConnectAsync"/> this does not require the per-device
+        /// AutoConnect flag — it always tries. Strategy:
+        ///  1. If already connected, return true immediately.
+        ///  2. Scan for the last known device (or any LCT cooler) — the scan
+        ///     gates the connect so a powered-off cooler fails fast instead of
+        ///     stalling on a stale Windows BLE cache entry.
+        ///  3. On success, restore saved pump/fan/RGB settings.
+        /// </summary>
+        public async Task<bool> TryReconnectOnFeatureEnableAsync()
+        {
+            if (IsConnected)
+                return true;
+
+            // Re-enabling the feature is explicit intent to connect — lift the
+            // user-disconnected flag set when the feature was disabled, so the
+            // pending-device watcher (started below on failure) can still fire.
+            ClearUserDisconnected();
+
+            StatusChanged?.Invoke(this, "Re-enabling Hydro UI — attempting connection...");
+
+            bool connected = false;
+            string? connectAddress = null;
+            string? connectName = null;
+
+            // Scan first: a powered-on cooler advertises within the window and
+            // connecting is quick. A blind cache lookup (FromBluetoothAddressAsync)
+            // can stall for a long time when the cooler is powered off but still
+            // in the Windows BLE cache.
+            StatusChanged?.Invoke(this, "Scanning for LCT coolers...");
+            try
+            {
+                var devices = await DiscoverDevicesAsync(10000, _settings.LastDeviceAddress);
+                var target = NormalizeAddress(_settings.LastDeviceAddress);
+
+                bool lastKnownAdvertising = target != null && devices.Any(d =>
+                    string.Equals(NormalizeAddress(d.Address), target, StringComparison.OrdinalIgnoreCase));
+
+                if (lastKnownAdvertising)
+                {
+                    // The last known device is advertising — connect to the saved address.
+                    var match = devices.First(d =>
+                        string.Equals(NormalizeAddress(d.Address), target, StringComparison.OrdinalIgnoreCase));
+                    connectAddress = _settings.LastDeviceAddress;
+                    connectName = match.Name;
+                }
+                else if (devices.Count > 0)
+                {
+                    // A different/unknown cooler is advertising — connect to the first found.
+                    connectAddress = devices[0].Address;
+                    connectName = devices[0].Name;
+                }
+            }
+            catch
+            {
+                // Scan failed — nothing to connect to.
+            }
+
+            if (connectAddress != null)
+            {
+                StatusChanged?.Invoke(this, $"Found {connectName} — connecting...");
+                connected = await ConnectAsync(connectAddress);
+            }
 
             if (connected)
             {
-                // Pause after connection for device BLE stack to stabilize.
-                // The nRF52 needs time to transition from advertising to connected state
-                // before it can reliably accept GATT write commands.
+                // Ensure the per-device AutoConnect flag is set so that future
+                // startup reconnects (via TryAutoConnectAsync) also work.
+                _settings.AutoConnect = true;
+                SaveSettings();
+
                 await Task.Delay(500);
 
-                // Restore saved settings to device.
-                // WriteWithResponse ensures each command is acknowledged before the next fires,
-                // so no artificial inter-command delays are needed (matches Python reference).
-                //
-                // During pre-loading auto-connect, we intentionally skip Smart Mode
-                // activation here — LibreHardwareMonitor may not have valid temperature
-                // readings yet, causing Smart Mode to apply idle speeds to a hot CPU.
-                // Smart Mode is started later in DashboardViewModel.OnNavigatedToAsync()
-                // after temperature data is confirmed available.
-                //
-                // If Smart Mode is enabled, skip pump/fan entirely (not just restore) —
-                // Smart Mode will apply the correct speeds once it starts.
+                // Restore saved pump/fan/RGB settings.
                 try
                 {
                     if (!_settings.SmartModeEnabled)
@@ -1506,19 +2019,25 @@ namespace Uniwill_Control_Utility.Services
 
                     var rgbMode = _settings.GetRgbMode();
                     var rgbColor = _settings.GetRgbColor();
-                    if (_settings.RgbEnabled && rgbMode != RgbState.Off)
+                    if (_settings.RgbEnabled)
                         await WriteRgbModeAsync(rgbMode, rgbColor);
+                    else
+                        await WriteRgbModeAsync(RgbState.Off, RgbColor.Red);
                 }
                 catch
                 {
-                    // Non-critical: failed to restore settings during auto-connect
+                    // Non-critical: failed to restore settings after reconnect.
                 }
 
-                StatusChanged?.Invoke(this, "Auto-connected successfully");
+                StatusChanged?.Invoke(this, "Hydro UI re-enabled — connected successfully");
             }
             else
             {
-                StatusChanged?.Invoke(this, "Auto-connect failed (device not found)");
+                StatusChanged?.Invoke(this, "Hydro UI re-enabled — no cooler found");
+
+                // No cooler found — keep a passive advertisement watcher
+                // running so it connects automatically when powered on later.
+                StartPendingDeviceWatcher();
             }
 
             return connected;
@@ -1742,6 +2261,7 @@ namespace Uniwill_Control_Utility.Services
         {
             StopSmartMode();
             StopReconnectLoop();
+            StopPendingDeviceWatcher();
 
             // Fire-and-forget disconnect to avoid deadlock on UI thread
             _ = DisconnectAsync().ContinueWith(t =>

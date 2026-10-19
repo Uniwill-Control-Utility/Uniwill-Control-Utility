@@ -12,6 +12,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Uniwill_Control_Utility.Models;
+using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
 
@@ -31,6 +32,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private IDisposable? _monitoringLease;
         private System.Timers.Timer? _applyDebounceTimer;
         private Wpf.Ui.Controls.Snackbar? _adaptiveSnackbar;
+        private Wpf.Ui.Controls.Snackbar? _stockPresetSnackbar;
 
         // Smart Fan Mode (cross-sensor polling loop)
         private EcSmartFanControl? _smartFanControl;
@@ -65,6 +67,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Subscribe to DeviceApplier override events
             _deviceApplier.EcFanOverrideChanged += OnEcFanOverrideChanged;
             _deviceApplier.EcFanPresetApplied += OnEcFanPresetApplied;
+            _deviceApplier.ManualControlLockChanged += OnManualControlLockChanged;
 
             // Subscribe to settings changes from external callers (e.g., tray menu)
             // so the page UI stays in sync when the user changes settings from niTray.
@@ -187,6 +190,17 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void OnEcFanOverrideChanged(object? sender, bool isOverridden)
         {
             ApplyOverrideState(isOverridden);
+
+            // Adaptive Mode owns the overlay while it is active. When it lifts, the EC
+            // manual-control gate may still be locked by a stock preset, which needs the
+            // same overlay back with its own snackbar.
+            if (!isOverridden && _deviceApplier.IsManualControlLocked)
+                ApplyStockPresetState(true);
+        }
+
+        private void OnManualControlLockChanged(object? sender, bool isLocked)
+        {
+            ApplyStockPresetState(isLocked);
         }
 
         /// <summary>
@@ -208,6 +222,19 @@ namespace Uniwill_Control_Utility.Views.Pages
                 try
                 {
                     var settings = FanControlSettingsService.Load();
+
+                    // Sync unified/split mode if it changed (e.g., from a custom preset apply)
+                    bool unifiedWasChecked = tsUnifiedCurve.IsChecked == true;
+                    if (unifiedWasChecked != settings.UnifiedMode)
+                    {
+                        // Full reload needed — apply all settings including curve editors
+                        _loadingSettings = true;
+                        ApplySettings(settings);
+                        InitializeTempThresholdInputs();
+                        _loadingSettings = false;
+                        UpdateBanner();
+                        return;
+                    }
 
                     // Sync Smart Fan Mode toggle
                     _loadingSettings = true;
@@ -249,6 +276,23 @@ namespace Uniwill_Control_Utility.Views.Pages
                             // No need to ApplyCurveNow() — the tray handler already
                             // applied the normal fan curve when it stopped Smart Fan.
                         }
+                    }
+
+                    // Sync preset combo boxes if they changed (e.g., from a custom preset apply)
+                    string unifiedPreset = GetSelectedPresetName(cbPreset);
+                    string cpuPreset = GetSelectedPresetName(cbCpuPreset);
+                    string gpuPreset = GetSelectedPresetName(cbGpuPreset);
+
+                    bool presetChanged =
+                        (settings.UnifiedMode && unifiedPreset != settings.UnifiedPreset) ||
+                        (!settings.UnifiedMode && (cpuPreset != settings.CpuPreset || gpuPreset != settings.GpuPreset));
+
+                    if (presetChanged)
+                    {
+                        // Reload curve editors with the new preset selections
+                        ApplySettings(settings);
+                        InitializeTempThresholdInputs();
+                        UpdateBanner();
                     }
 
                     // Sync temp source dropdown
@@ -407,6 +451,59 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             SnackbarPresenter.HideCurrent();
             _adaptiveSnackbar = null;
+        }
+
+        /// <summary>
+        /// Applies the "EC manual control unavailable" state. The firmware makes manual
+        /// EC control and the OEM Performance-button engine mutually exclusive, so while
+        /// a stock preset is active the fan curves it accepts are the firmware's own.
+        /// Adaptive Mode override owns the same overlay and wins when both would apply.
+        /// </summary>
+        private void ApplyStockPresetState(bool isLocked)
+        {
+            if (_deviceApplier.IsEcFanOverridden)
+                return;
+
+            if (isLocked)
+            {
+                overlayAdaptiveWarning.Visibility = Visibility.Visible;
+                SetControlsEnabled(false);
+                ShowStockPresetSnackbar();
+            }
+            else
+            {
+                overlayAdaptiveWarning.Visibility = Visibility.Collapsed;
+                SetControlsEnabled(true);
+                HideStockPresetSnackbar();
+            }
+        }
+
+        private void ShowStockPresetSnackbar()
+        {
+            if (_stockPresetSnackbar != null)
+                SnackbarPresenter.HideCurrent();
+
+            string preset = PresetProfileApplier.DisplayName(Settings.Default.presetProfile);
+            _stockPresetSnackbar = new Wpf.Ui.Controls.Snackbar(SnackbarPresenter)
+            {
+                Title = "Stock Preset Active",
+                Content = $"{preset} preset applied — fan control customization is only possible with a Custom preset.",
+                Appearance = Wpf.Ui.Controls.ControlAppearance.Info,
+                Icon = new Wpf.Ui.Controls.FontIcon { FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons"), Glyph = "\uF167", FontSize = 16, Margin = new System.Windows.Thickness(0, 0, 10, 0) },
+                IsCloseButtonEnabled = false,
+                Timeout = TimeSpan.FromHours(1),
+            };
+
+            if (SnackbarPresenter.IsLoaded)
+                _stockPresetSnackbar.Show(true);
+            else
+                SnackbarPresenter.Loaded += (s, e) => _stockPresetSnackbar?.Show(true);
+        }
+
+        private void HideStockPresetSnackbar()
+        {
+            SnackbarPresenter.HideCurrent();
+            _stockPresetSnackbar = null;
         }
 
         private void SetControlsEnabled(bool enabled)
@@ -1753,6 +1850,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             bool isOverridden = _deviceApplier.IsEcFanOverridden;
             ApplyOverrideState(isOverridden);
 
+            // Re-read the EC manual-control gate on navigation too — a preset may have
+            // been applied while this page was hidden, and the event only fires on change.
+            _deviceApplier.SyncManualControlLock();
+            ApplyStockPresetState(_deviceApplier.IsManualControlLocked);
+
             // NOTE: Fan curve auto-apply is handled in DashboardViewModel.OnNavigatedToAsync
             // (the app always launches on Dashboard). This page does not auto-apply on
             // navigation — the user explicitly applies via the 5s debounce timer.
@@ -1823,6 +1925,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Hide adaptive snackbar
             HideAdaptiveSnackbar();
+            HideStockPresetSnackbar();
 
             // Stop Smart Fan Mode polling loop (EC tables remain as safety net)
             _smartFanControl?.Stop();

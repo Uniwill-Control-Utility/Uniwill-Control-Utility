@@ -22,6 +22,14 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private static readonly string SavedSettingsFile = Path.Combine(SettingsFolder, "keyboard_saved_settings.json");
 
+        /// <summary>
+        /// Fired after every Save so open pages (Keyboard) can re-sync their controls
+        /// when the state changes externally — e.g. the mini-tray Keyboard RGB toggle
+        /// writes PowerOn while the Keyboard page is visible. Mirrors the
+        /// FanControlSettingsService.SettingsChanged pattern.
+        /// </summary>
+        public static event EventHandler? SettingsChanged;
+
         public static KeyboardSettings Load()
         {
             try
@@ -46,6 +54,7 @@ namespace Uniwill_Control_Utility.Services
                 Directory.CreateDirectory(SettingsFolder);
                 var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
                 File.WriteAllText(SettingsFile, json);
+                SettingsChanged?.Invoke(null, EventArgs.Empty);
             }
             catch (Exception ex)
             {

@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         Title="Uniwill Control Utility"
-        Width="280"
-        Height="270"
+        Width="320"
+        Height="290"
         WindowStyle="None"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
@@ -41,6 +41,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -105,20 +106,32 @@
             </Image>
         </Grid>
 
-        <TextBlock x:Name="StatusText"
+        <!-- Title row (bold, larger) — e.g. "Initializing" -->
+        <TextBlock x:Name="StatusTitle"
                    Grid.Row="2"
-                   Height="26"
                    HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                    FontFamily="Segoe UI Variable Text, Segoe UI"
                    FontSize="13"
+                   FontWeight="SemiBold"
                    TextAlignment="Center"
-                   TextTrimming="CharacterEllipsis"
                    Text="Initializing application" />
 
+        <!-- Detail row (caption weight, smaller) — hidden unless a task is slow, e.g. "Connecting devices…" -->
+        <TextBlock x:Name="StatusDetail"
+                   Grid.Row="3"
+                   Margin="0,4,0,0"
+                   HorizontalAlignment="Center"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                   FontSize="11"
+                   FontWeight="Normal"
+                   TextAlignment="Center"
+                   TextWrapping="Wrap"
+                   MaxWidth="272" />
+
         <ProgressBar x:Name="StartupProgressBar"
-                     Grid.Row="3"
+                     Grid.Row="4"
                      Margin="0,8,0,0"
                      Minimum="0"
                      Maximum="100"
@@ -126,7 +139,7 @@
                      Style="{StaticResource StartupProgressBarStyle}" />
 
         <TextBlock x:Name="PercentageText"
-                   Grid.Row="4"
+                   Grid.Row="5"
                    Margin="0,12,0,0"
                    HorizontalAlignment="Center"
                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"

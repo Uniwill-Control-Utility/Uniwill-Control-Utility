@@ -79,6 +79,10 @@ namespace Uniwill_Control_Utility.Models
         [JsonProperty("smartModeBoostFan", NullValueHandling = NullValueHandling.Ignore)]
         public string SmartModeBoostFan { get; set; } = "Percent100";
 
+        /// <summary>When true, Smart Mode controls RGB based on temperature: green (idle), white (transition), red (boost).</summary>
+        [JsonProperty("smartModeTemperatureRgb", NullValueHandling = NullValueHandling.Ignore)]
+        public bool SmartModeTemperatureRgb { get; set; }
+
         /* -- Obsolete legacy properties (Smart Pump Mode) -- */
         // These are deserialized from old settings files so we can migrate them.
         // They are NOT written back to disk (Ignore = True on serialize).

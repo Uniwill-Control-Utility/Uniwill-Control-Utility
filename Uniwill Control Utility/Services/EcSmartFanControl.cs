@@ -236,7 +236,7 @@ namespace Uniwill_Control_Utility.Services
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            Stop();
+            StopLoop();
 
             _curveTablesInitialized = false;
             IsActive = true;
@@ -244,10 +244,21 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
-        /// Stops the control loop and disposes the timer.
-        /// Also clears the app-scoped singleton so callers know it's stopped.
+        /// Stops the control loop and disposes the timer, and clears the app-scoped
+        /// singleton so callers know it's stopped. Smart Fan Mode keeps 0x0741 bit0
+        /// armed for its whole duration (that gate is what makes the EC honor the
+        /// duty tables it rewrites every tick), and the Performance-button intercept
+        /// listens for the EC's press echo through that same gate, so stopping leaves
+        /// manual control alone.
         /// </summary>
         public void Stop()
+        {
+            StopLoop();
+        }
+
+        /// Tears the loop down; Start() restarts the timer through this so a restart
+        /// never tears down twice.
+        private void StopLoop()
         {
             IsActive = false;
             _timer?.Dispose();

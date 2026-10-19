@@ -14,6 +14,34 @@ using static NvAPIWrapper.Native.GPU.Structures.PerformanceStates20InfoV1;
 
 namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 {
+    /// <summary>
+    /// Global guard that blocks ALL native GPU interop calls (NVML and NvAPI)
+    /// for a cooldown period after a reset. This prevents ExecutionEngineException
+    /// when the GPU driver is in a transitional state after display hotplug,
+    /// hibernation resume, or KVM switch (which may also disconnect USB devices,
+    /// extending the transitional state).
+    /// </summary>
+    internal static class GpuInteropGuard
+    {
+        private static DateTime _lastResetUtc = DateTime.MinValue;
+
+        /// <summary>
+        /// Cooldown after reset. Extended to 15 seconds because KVM switches
+        /// that also handle USB disconnection can keep the GPU driver in a
+        /// transitional state longer than display-only hotplug events.
+        /// </summary>
+        private static readonly TimeSpan Cooldown = TimeSpan.FromSeconds(15);
+
+        /// <summary>Call this proactively after display change, resume, or any event that may invalidate GPU driver state.</summary>
+        public static void Reset()
+        {
+            _lastResetUtc = DateTime.UtcNow;
+        }
+
+        /// <summary>Returns true if a native GPU call should be blocked right now.</summary>
+        public static bool IsBlocked => DateTime.UtcNow - _lastResetUtc < Cooldown;
+    }
+
     internal class NvTuning
     {
         public const int MinCoreOffset = -900;
@@ -98,6 +126,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
             if (core < MinCoreOffset || core > MaxCoreOffset ||
                 memory < MinMemoryOffset || memory > MaxMemoryOffset)
                 return 0;
+
+            if (GpuInteropGuard.IsBlocked) return 0;
 
             try
             {
@@ -428,6 +458,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         public static int GetMaxGPUCLock()
         {
+            if (GpuInteropGuard.IsBlocked) return 0;
+
             try
             {
                 PhysicalGPU? internalGpu = PhysicalGPU.GetPhysicalGPUs().FirstOrDefault();
@@ -448,6 +480,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         public static bool TryGetVfCurve(out List<VfPoint> points)
         {
             points = new List<VfPoint>();
+
+            if (GpuInteropGuard.IsBlocked) return false;
 
             try
             {
@@ -506,6 +540,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         public static int ResetVfCurveOffsets()
         {
+            if (GpuInteropGuard.IsBlocked) return 0;
+
             DiagnosticLogger.LogInfo("ResetVfCurveOffsets: reset GPU clock offsets to zero");
             try
             {
@@ -561,6 +597,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         {
             if (requestedMaxVoltageMv < MinUndervoltVoltageMv || requestedMaxVoltageMv > MaxUndervoltVoltageMv) return 0;
             if (requestedMaxClockMhz < MinUndervoltClockMhz || requestedMaxClockMhz > MaxUndervoltClockMhz) return 0;
+
+            if (GpuInteropGuard.IsBlocked) return 0;
 
             try
             {
@@ -764,6 +802,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         /// </summary>
         public static int ApplyVfCurveOffsets(Dictionary<int, int> offsetsMHz)
         {
+            if (GpuInteropGuard.IsBlocked) return 0;
+
             DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets: {offsetsMHz.Count} points received");
             int ok = 0;
             int skip = 0;
@@ -825,6 +865,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         /// </summary>
         public static int ApplyVfCurveOffsets_ClockBoostTable(Dictionary<int, int> offsetsMHz)
         {
+            if (GpuInteropGuard.IsBlocked) return 0;
+
             DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostTable: {offsetsMHz.Count} points");
             try
             {
@@ -901,6 +943,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         /// </summary>
         public static int ApplyVfCurveOffsets_ClockBoostLock(Dictionary<int, int> offsetsMHz)
         {
+            if (GpuInteropGuard.IsBlocked) return 0;
+
             DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_ClockBoostLock: {offsetsMHz.Count} points");
             try
             {
@@ -974,6 +1018,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         /// </summary>
         public static int ApplyVfCurveOffsets_SetClocks(Dictionary<int, int> offsetsMHz)
         {
+            if (GpuInteropGuard.IsBlocked) return 0;
+
             DiagnosticLogger.LogInfo($"ApplyVfCurveOffsets_SetClocks: {offsetsMHz.Count} points");
             try
             {
@@ -1049,7 +1095,18 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
             if (!Nvml.EnsureInitialised()) return false;
 
-            return Nvml.nvmlDeviceGetHandleByIndex_v2(0, out gpu) == Nvml.NVML_SUCCESS;
+            try
+            {
+                return Nvml.nvmlDeviceGetHandleByIndex_v2(0, out gpu) == Nvml.NVML_SUCCESS;
+            }
+            catch
+            {
+                // NVML P/Invoke may throw SEHException/AccessViolationException when the
+                // GPU driver is in a bad state (e.g., after display hotplug). Reset NVML
+                // so the next call reinitializes with fresh handles.
+                Nvml.Reset();
+                return false;
+            }
         }
     }
 
@@ -1072,12 +1129,33 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         public static bool EnsureInitialised()
         {
+            // Block all NVML calls during the global GPU interop cooldown.
+            // This prevents the Adaptive page timer (5s) or other callers from
+            // hitting NVML before the GPU driver has settled after display changes.
+            if (GpuInteropGuard.IsBlocked)
+                return false;
+
             if (_initAttempted) return _initialised;
 
             _initAttempted = true;
             _initialised = nvmlInit_v2() == NVML_SUCCESS;
 
             return _initialised;
+        }
+
+        /// <summary>
+        /// Shuts down NVML and resets the initialization flags so the next EnsureInitialised()
+        /// will reinitialize. Also signals the global GPU interop guard so NvAPI calls
+        /// are also blocked during cooldown. Call this proactively after events that invalidate
+        /// GPU driver state (display hotplug, hibernation resume) to prevent
+        /// ExecutionEngineException from stale handles.
+        /// </summary>
+        public static void Reset()
+        {
+            try { nvmlShutdown(); } catch { /* NVML may be in a bad state */ }
+            _initAttempted = false;
+            _initialised = false;
+            GpuInteropGuard.Reset();
         }
 
         [DllImport(Dll)] public static extern int nvmlInit_v2();
@@ -1123,6 +1201,8 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         public static bool TryGetFirstGpuHandle(out IntPtr gpu)
         {
             gpu = IntPtr.Zero;
+
+            if (GpuInteropGuard.IsBlocked) return false;
 
             IntPtr initPtr = QueryInterface(0x0150E828);
             IntPtr enumPtr = QueryInterface(0xE5AC921F);

@@ -58,6 +58,12 @@ namespace Uniwill_Control_Utility.Scripts
                             {
                                 if (!game.Name.Contains("Steamworks") && !game.Name.Contains("SteamVR") && !game.Name.Contains("Google Earth") && !game.Name.Contains("Wallpaper Engine") && !game.Name.Contains("tModLoader") && !game.Name.Contains("- Original Soundtrack") && game.Id != "228980")
                                 {
+                                    // Skip games with no executables — nothing to launch
+                                    if (!game.Executables.Any())
+                                    {
+                                        continue;
+                                    }
+
                                     GameLauncherItem launcherItem = new GameLauncherItem();
                                     launcherItem.gameName = game.Name;
                                     launcherItem.gameID = game.Id;

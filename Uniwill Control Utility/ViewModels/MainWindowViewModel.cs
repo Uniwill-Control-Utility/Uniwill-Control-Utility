@@ -64,7 +64,7 @@ namespace Uniwill_Control_Utility.ViewModels
         /// Call this from SettingsPage when a feature toggle is switched ON so that
         /// internal service state (e.g. keyboard hooks) is re-enabled.
         /// </summary>
-        internal void EnableFeature(OptionalNavigationFeature feature)
+        internal async Task EnableFeatureAsync(OptionalNavigationFeature feature)
         {
             switch (feature)
             {
@@ -78,8 +78,16 @@ namespace Uniwill_Control_Utility.ViewModels
                     }
                     break;
 
-                case OptionalNavigationFeature.Adaptive:
                 case OptionalNavigationFeature.HydroUi:
+                    // Attempt to reconnect the watercooler when the feature is re-enabled.
+                    var hydroUIService = App.GetService<HydroUIService>();
+                    if (hydroUIService != null)
+                    {
+                        _ = hydroUIService.TryReconnectOnFeatureEnableAsync();
+                    }
+                    break;
+
+                case OptionalNavigationFeature.Adaptive:
                 case OptionalNavigationFeature.LightBar:
                 case OptionalNavigationFeature.Auto:
                     // No re-enable action needed — these features don't hold
@@ -119,12 +127,15 @@ namespace Uniwill_Control_Utility.ViewModels
                     break;
 
                 case OptionalNavigationFeature.HydroUi:
-                    // Disconnect the watercooler if connected.
-                    var waterCoolerService = App.GetService<WaterCoolerService>();
-                    if (waterCoolerService?.IsConnected == true)
+                    // Stop all auto-connect logic (reconnect loop and pending
+                    // device watcher) even when not connected, then disconnect
+                    // the watercooler if it is.
+                    var hydroUIService = App.GetService<HydroUIService>();
+                    if (hydroUIService != null)
                     {
-                        waterCoolerService.SetUserDisconnected();
-                        await waterCoolerService.DisconnectAsync();
+                        hydroUIService.SetUserDisconnected();
+                        if (hydroUIService.IsConnected)
+                            await hydroUIService.DisconnectAsync();
                     }
                     break;
 
@@ -170,7 +181,7 @@ namespace Uniwill_Control_Utility.ViewModels
 
             if (FeatureNavigationPolicy.IsVisible(OptionalNavigationFeature.HydroUi, preferences, hydroUiAvailable, lightBarAvailable))
             {
-                createNavItem("Hydro UI", "watercooler", "\uEB42", typeof(Views.Pages.Watercooler), false);
+                createNavItem("Hydro UI", "watercooler", "\uEB42", typeof(Views.Pages.HydroUI), false);
             }
 
             // Flydigi cooler in footer (hidden if user has disabled it in Settings)
@@ -193,7 +204,8 @@ namespace Uniwill_Control_Utility.ViewModels
                     createNavItem("Light Bar", "lightbar", "\uED39", typeof(Views.Pages.LightBar), false);
                 }
 
-                createNavItem("Battery", "battery", "\uEBC0", typeof(Views.Pages.Battery), false);
+                createNavItem("Battery", "battery", "\uEBAA", typeof(Views.Pages.Battery), false);
+                createNavItem("Display", "display", "\uE7F8", typeof(Views.Pages.Display), false);
             }
 
             if (FeatureNavigationPolicy.IsVisible(OptionalNavigationFeature.Overlay, preferences, hydroUiAvailable, lightBarAvailable))

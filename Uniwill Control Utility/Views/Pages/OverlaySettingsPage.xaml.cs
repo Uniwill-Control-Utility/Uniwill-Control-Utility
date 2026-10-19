@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using Uniwill_Control_Utility.Models;
+using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Services;
 using Uniwill_Control_Utility.Services.Performance;
 
@@ -13,12 +15,23 @@ namespace Uniwill_Control_Utility.Views.Pages
     public partial class OverlaySettingsPage : Page
     {
         private readonly OverlayManagerService _overlay;
+        private readonly HydroUIService? _hydroUi;
+        private readonly FlydigiCoolerHidService? _flydigi;
         private readonly DispatcherTimer _rtssTimer;
         private bool _saveInProgress;
 
-        public OverlaySettingsPage(OverlayManagerService overlay)
+        // References to peripheral checkboxes so they can be shown/hidden reactively.
+        private CheckBox? _hydroUiCheckBox;
+        private CheckBox? _flydigiCheckBox;
+
+        public OverlaySettingsPage(
+            OverlayManagerService overlay,
+            HydroUIService? hydroUi = null,
+            FlydigiCoolerHidService? flydigi = null)
         {
             _overlay = overlay ?? throw new ArgumentNullException(nameof(overlay));
+            _hydroUi = hydroUi;
+            _flydigi = flydigi;
 
             InitializeComponent();
 
@@ -34,47 +47,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             // Wire up UI update handlers and auto-save after initial load is complete.
-            ScaleSlider.ValueChanged += (_, __) =>
-            {
-                ScaleValueText.Text = ScaleSlider.Value.ToString("P0");
-                SaveOptions();
-            };
-
-            BackgroundOpacitySlider.ValueChanged += (_, __) =>
-            {
-                BackgroundOpacityValueText.Text = BackgroundOpacitySlider.Value.ToString("P0");
-                SaveOptions();
-            };
-
-            ContentOpacitySlider.ValueChanged += (_, __) =>
-            {
-                ContentOpacityValueText.Text = ContentOpacitySlider.Value.ToString("P0");
-                SaveOptions();
-            };
-
-            ScaleValueText.Text = ScaleSlider.Value.ToString("P0");
-            BackgroundOpacityValueText.Text = BackgroundOpacitySlider.Value.ToString("P0");
-            ContentOpacityValueText.Text = ContentOpacitySlider.Value.ToString("P0");
-
             EnabledCheckBox.Checked += (_, __) => SaveOptions();
             EnabledCheckBox.Unchecked += (_, __) => SaveOptions();
             StartupCheckBox.Checked += (_, __) => SaveOptions();
             StartupCheckBox.Unchecked += (_, __) => SaveOptions();
-            ShowFpsCheckBox.Checked += (_, __) => SaveOptions();
-            ShowFpsCheckBox.Unchecked += (_, __) => SaveOptions();
-            ShowFrameTimesCheckBox.Checked += (_, __) => SaveOptions();
-            ShowFrameTimesCheckBox.Unchecked += (_, __) => SaveOptions();
-            ShowGpuCheckBox.Checked += (_, __) => SaveOptions();
-            ShowGpuCheckBox.Unchecked += (_, __) => SaveOptions();
-            ShowCpuCheckBox.Checked += (_, __) => SaveOptions();
-            ShowCpuCheckBox.Unchecked += (_, __) => SaveOptions();
-            ShowMemoryCheckBox.Checked += (_, __) => SaveOptions();
-            ShowMemoryCheckBox.Unchecked += (_, __) => SaveOptions();
-            ShowBatteryCheckBox.Checked += (_, __) => SaveOptions();
-            ShowBatteryCheckBox.Unchecked += (_, __) => SaveOptions();
-            ShowGraphsCheckBox.Checked += (_, __) => SaveOptions();
-            ShowGraphsCheckBox.Unchecked += (_, __) => SaveOptions();
-    
+
             RefreshIntervalNumberBox.ValueChanged += (_, __) => SaveOptions();
 
             // Poll RTSS status every 2 seconds.
@@ -83,8 +60,21 @@ namespace Uniwill_Control_Utility.Views.Pages
             _rtssTimer.Start();
             UpdateRtssStatus();
 
-            Loaded += (_, __) => _rtssTimer.Start();
-            Unloaded += (_, __) => _rtssTimer.Stop();
+            Loaded += (_, __) =>
+            {
+                _rtssTimer.Start();
+                WirePeripheralConnectionEvents();
+
+                // Feature settings may have changed while this page was in the
+                // background (e.g. user toggled Hydro UI or Flydigi in Settings).
+                // Rebuild the metrics list so newly-enabled checkboxes appear.
+                RefreshPeripheralCheckboxes();
+            };
+            Unloaded += (_, __) =>
+            {
+                _rtssTimer.Stop();
+                UnwirePeripheralConnectionEvents();
+            };
         }
 
         private void UpdateRtssStatus()
@@ -105,6 +95,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
+        #region Options Load / Save
+
         private void LoadOptions(OverlayOptions options)
         {
             EnabledCheckBox.IsChecked = options.Enabled;
@@ -114,66 +106,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             RefreshIntervalNumberBox.Value = options.RefreshIntervalMs > 0
                 ? options.RefreshIntervalMs
                 : 500;
-            ScaleSlider.Value = IsFinitePositive(options.Scale)
-                ? options.Scale
-                : 1.0;
-            BackgroundOpacitySlider.Value = IsFinite(options.BackgroundOpacity)
-                ? Math.Clamp(options.BackgroundOpacity, 0.0, 1.0)
-                : 0.95;
-            ContentOpacitySlider.Value = IsFinite(options.ContentOpacity)
-                ? Math.Clamp(options.ContentOpacity, 0.0, 1.0)
-                : 1.0;
-            ShowFpsCheckBox.IsChecked = options.ShowFps;
-            ShowFrameTimesCheckBox.IsChecked = options.ShowFrameTimes;
-            ShowGpuCheckBox.IsChecked = options.ShowGpu;
-            ShowCpuCheckBox.IsChecked = options.ShowCpu;
-            ShowMemoryCheckBox.IsChecked = options.ShowMemory;
-           ShowBatteryCheckBox.IsChecked = options.ShowBattery;
-            ShowGraphsCheckBox.IsChecked = options.ShowGraphs;
-        }
 
-        private void HotkeyTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            e.Handled = true;
-
-            if (sender is not TextBox textBox)
-                return;
-
-            Key key = e.Key == Key.System
-                ? e.SystemKey
-                : e.Key;
-
-            if (key is
-                Key.LeftCtrl or
-                Key.RightCtrl or
-                Key.LeftAlt or
-                Key.RightAlt or
-                Key.LeftShift or
-                Key.RightShift or
-                Key.LWin or
-                Key.RWin)
-            {
-                return;
-            }
-
-            ModifierKeys modifiers = System.Windows.Input.Keyboard.Modifiers;
-            var value = new StringBuilder();
-
-            if (modifiers.HasFlag(ModifierKeys.Control))
-                value.Append("Ctrl+");
-
-            if (modifiers.HasFlag(ModifierKeys.Alt))
-                value.Append("Alt+");
-
-            if (modifiers.HasFlag(ModifierKeys.Shift))
-                value.Append("Shift+");
-
-            value.Append(key);
-
-            textBox.Text = value.ToString();
-            textBox.CaretIndex = textBox.Text.Length;
-
-            SaveOptions();
+            BuildMetricsList(options);
         }
 
         private OverlayOptions ReadOptions()
@@ -181,26 +115,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             OverlayOptions current = _overlay.CurrentOptions;
 
             int refreshInterval = (int)Math.Round(
-                RefreshIntervalNumberBox.Value ?? 500);
+                RefreshIntervalNumberBox.Value ?? 250);
 
             if (refreshInterval <= 0)
-                refreshInterval = 500;
+                refreshInterval = 250;
 
-            double scale = ScaleSlider.Value;
-
-            if (!IsFinitePositive(scale))
-                scale = 1.0;
-
-            double backgroundOpacity = BackgroundOpacitySlider.Value;
-            double contentOpacity = ContentOpacitySlider.Value;
-
-            if (!IsFinite(backgroundOpacity))
-                backgroundOpacity = 0.95;
-            if (!IsFinite(contentOpacity))
-                contentOpacity = 1.0;
-
-            backgroundOpacity = Math.Clamp(backgroundOpacity, 0.0, 1.0);
-            contentOpacity = Math.Clamp(contentOpacity, 0.0, 1.0);
+            // Read tree state into per-row toggles.
+            var toggles = ReadTreeToggles();
 
             return current with
             {
@@ -209,16 +130,19 @@ namespace Uniwill_Control_Utility.Views.Pages
                 ToggleOverlayHotkey = ToggleOverlayHotkeyTextBox.Text.Trim(),
                 ToggleContentsHotkey = ToggleContentsHotkeyTextBox.Text.Trim(),
                 RefreshIntervalMs = refreshInterval,
-                Scale = scale,
-                BackgroundOpacity = backgroundOpacity,
-                ContentOpacity = contentOpacity,
-                ShowFps = ShowFpsCheckBox.IsChecked == true,
-                ShowFrameTimes = ShowFrameTimesCheckBox.IsChecked == true,
-                ShowGpu = ShowGpuCheckBox.IsChecked == true,
-                ShowCpu = ShowCpuCheckBox.IsChecked == true,
-                ShowMemory = ShowMemoryCheckBox.IsChecked == true,
-                ShowBattery = ShowBatteryCheckBox.IsChecked == true,
-                ShowGraphs = ShowGraphsCheckBox.IsChecked == true
+
+                // Row toggles
+                ShowCpuRow = toggles["ShowCpuRow"],
+                ShowRamRow = toggles["ShowRamRow"],
+                ShowGpuRow = toggles["ShowGpuRow"],
+                ShowVramRow = toggles["ShowVramRow"],
+                ShowFpsCurrent = toggles["ShowFpsCurrent"],
+                ShowFpsOnePercentLow = toggles["ShowFpsOnePercentLow"],
+                ShowFpsPointOnePercentLow = toggles["ShowFpsPointOnePercentLow"],
+
+                // Peripherals
+                ShowHydroUi = toggles["ShowHydroUi"],
+                ShowFlydigi = toggles["ShowFlydigi"]
             };
         }
 
@@ -314,6 +238,209 @@ namespace Uniwill_Control_Utility.Views.Pages
             return false;
         }
 
+        #endregion
+
+        #region Hotkey
+
+        private void HotkeyTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            e.Handled = true;
+
+            if (sender is not TextBox textBox)
+                return;
+
+            Key key = e.Key == Key.System
+                ? e.SystemKey
+                : e.Key;
+
+            if (key is
+                Key.LeftCtrl or
+                Key.RightCtrl or
+                Key.LeftAlt or
+                Key.RightAlt or
+                Key.LeftShift or
+                Key.RightShift or
+                Key.LWin or
+                Key.RWin)
+            {
+                return;
+            }
+
+            ModifierKeys modifiers = System.Windows.Input.Keyboard.Modifiers;
+            var value = new StringBuilder();
+
+            if (modifiers.HasFlag(ModifierKeys.Control))
+                value.Append("Ctrl+");
+
+            if (modifiers.HasFlag(ModifierKeys.Alt))
+                value.Append("Alt+");
+
+            if (modifiers.HasFlag(ModifierKeys.Shift))
+                value.Append("Shift+");
+
+            value.Append(key);
+
+            textBox.Text = value.ToString();
+            textBox.CaretIndex = textBox.Text.Length;
+
+            SaveOptions();
+        }
+
+        #endregion
+
+        #region Metrics CheckBox List
+
+        private void BuildMetricsList(OverlayOptions options)
+        {
+            MetricsCheckPanel.Children.Clear();
+            _hydroUiCheckBox = null;
+            _flydigiCheckBox = null;
+
+            AddMetricCheckBox("CPU row", "ShowCpuRow", options.ShowCpuRow);
+            AddMetricCheckBox("RAM row", "ShowRamRow", options.ShowRamRow);
+            AddMetricCheckBox("GPU row", "ShowGpuRow", options.ShowGpuRow);
+            AddMetricCheckBox("VRAM row", "ShowVramRow", options.ShowVramRow);
+            AddMetricCheckBox("Current FPS", "ShowFpsCurrent", options.ShowFpsCurrent);
+            AddMetricCheckBox("1% Low FPS", "ShowFpsOnePercentLow", options.ShowFpsOnePercentLow);
+            AddMetricCheckBox("0.1% Low FPS", "ShowFpsPointOnePercentLow", options.ShowFpsPointOnePercentLow);
+
+            // Hydro UI checkbox — hidden if feature disabled in Settings or device not connected.
+            bool hydroUiFeatureEnabled = Settings.Default.EnableHydroUiNavigation;
+            if (hydroUiFeatureEnabled)
+            {
+                _hydroUiCheckBox = AddMetricCheckBox("Hydro UI pump & fan", "ShowHydroUi", options.ShowHydroUi);
+                UpdateHydroUiCheckBoxVisibility();
+            }
+
+            // Flydigi checkbox — hidden if feature disabled in Settings or device not connected.
+            bool flydigiFeatureEnabled = Settings.Default.EnableFlydigi;
+            if (flydigiFeatureEnabled)
+            {
+                _flydigiCheckBox = AddMetricCheckBox("Flydigi cooler RPM", "ShowFlydigi", options.ShowFlydigi);
+                UpdateFlydigiCheckBoxVisibility();
+            }
+        }
+
+        private CheckBox AddMetricCheckBox(string label, string optionKey, bool isChecked)
+        {
+            var cb = new CheckBox
+            {
+                IsChecked = isChecked,
+                Content = label,
+                Margin = new Thickness(0, 4, 0, 4),
+                VerticalAlignment = VerticalAlignment.Center,
+                Tag = optionKey
+            };
+            cb.Checked += (_, __) => SaveOptions();
+            cb.Unchecked += (_, __) => SaveOptions();
+            MetricsCheckPanel.Children.Add(cb);
+            return cb;
+        }
+
+        private Dictionary<string, bool> ReadTreeToggles()
+        {
+            var result = new Dictionary<string, bool>();
+
+            foreach (var child in MetricsCheckPanel.Children)
+            {
+                if (child is CheckBox cb && cb.Tag is string key)
+                {
+                    result[key] = cb.IsChecked == true;
+                }
+            }
+
+            return result;
+        }
+
+        #endregion
+
+        #region Peripheral Connection Events
+
+        private void WirePeripheralConnectionEvents()
+        {
+            if (_hydroUi is not null)
+                _hydroUi.ConnectionStateChanged += HydroUi_ConnectionStateChanged;
+
+            if (_flydigi is not null)
+                _flydigi.ConnectionStateChanged += Flydigi_ConnectionStateChanged;
+        }
+
+        private void UnwirePeripheralConnectionEvents()
+        {
+            if (_hydroUi is not null)
+                _hydroUi.ConnectionStateChanged -= HydroUi_ConnectionStateChanged;
+
+            if (_flydigi is not null)
+                _flydigi.ConnectionStateChanged -= Flydigi_ConnectionStateChanged;
+        }
+
+        private void HydroUi_ConnectionStateChanged(object? sender, HydroUIService.WatercoolerConnectionState e)
+        {
+            // Dispatcher.Invoke not needed — ConnectionStateChanged fires on the UI thread.
+            UpdateHydroUiCheckBoxVisibility();
+        }
+
+        private void Flydigi_ConnectionStateChanged(object? sender, bool e)
+        {
+            UpdateFlydigiCheckBoxVisibility();
+        }
+
+        private void UpdateHydroUiCheckBoxVisibility()
+        {
+            if (_hydroUiCheckBox is null)
+                return;
+
+            bool connected = _hydroUi?.IsConnected == true;
+            _hydroUiCheckBox.Visibility = connected ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void UpdateFlydigiCheckBoxVisibility()
+        {
+            if (_flydigiCheckBox is null)
+                return;
+
+            bool connected = _flydigi?.IsConnected == true;
+            _flydigiCheckBox.Visibility = connected ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Ensures peripheral checkboxes exist when their feature is enabled in
+        /// Settings, and hides them when the device is disconnected. Called on
+        /// every Loaded so that toggles made in Settings while this page was in
+        /// the background take effect without restarting the app.
+        /// </summary>
+        private void RefreshPeripheralCheckboxes()
+        {
+            OverlayOptions options = _overlay.CurrentOptions;
+
+            // Hydro UI — create checkbox if feature enabled but checkbox missing.
+            if (Settings.Default.EnableHydroUiNavigation && _hydroUiCheckBox is null)
+            {
+                _saveInProgress = true;
+                try { BuildMetricsList(options); }
+                finally { _saveInProgress = false; }
+                return; // BuildMetricsList creates both, no need to check Flydigi separately.
+            }
+
+            // Flydigi — same logic.
+            if (Settings.Default.EnableFlydigi && _flydigiCheckBox is null)
+            {
+                _saveInProgress = true;
+                try { BuildMetricsList(options); }
+                finally { _saveInProgress = false; }
+                return;
+            }
+
+            // Both checkboxes already exist (or both features disabled) — just
+            // update visibility based on connection state.
+            UpdateHydroUiCheckBoxVisibility();
+            UpdateFlydigiCheckBoxVisibility();
+        }
+
+        #endregion
+
+        #region Button Handlers
+
         private void VisibilityButton_Click(object sender, RoutedEventArgs e)
         {
             if (SaveOptionsWithValidation())
@@ -331,21 +458,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             _overlay.HideOverlay();
         }
 
-        private void ContentsVisibilityButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (SaveOptionsWithValidation())
-                _overlay.ToggleContents();
-        }
-
-        private static bool IsFinite(double value)
-        {
-            return !double.IsNaN(value) &&
-                   !double.IsInfinity(value);
-        }
-
-        private static bool IsFinitePositive(double value)
-        {
-            return IsFinite(value) && value > 0;
-        }
+        #endregion
     }
 }

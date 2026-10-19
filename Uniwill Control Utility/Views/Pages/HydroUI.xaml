@@ -1,4 +1,4 @@
-<Page x:Class="Uniwill_Control_Utility.Views.Pages.Watercooler"
+<Page x:Class="Uniwill_Control_Utility.Views.Pages.HydroUI"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -7,7 +7,7 @@
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
       mc:Ignorable="d"
-      d:DataContext="{d:DesignInstance local:Watercooler, IsDesignTimeCreatable=False}"
+      d:DataContext="{d:DesignInstance local:HydroUI, IsDesignTimeCreatable=False}"
       d:Background="{DynamicResource ApplicationBackgroundBrush}"
       d:DesignHeight="650" d:DesignWidth="900"
       Title="Watercooler Control"
@@ -388,6 +388,32 @@
                                         </ComboBox>
                                     </StackPanel>
                                 </Grid>
+                                <!-- Divider -->
+                                <Border Height="1" Margin="-58,12,-46,12" Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                                <!-- Temperature-based RGB -->
+                                <Grid Margin="0,4,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Temperature-Based RGB" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                               FontTypography="Caption"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                               Text="RGB changes with temperature: green (idle), white (transition), red (boost)" />
+                                    </StackPanel>
+                                    <ui:ToggleSwitch x:Name="tsSmartModeTemperatureRgb"
+                              Grid.Column="1"
+                              Margin="4,0,0,0"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Center"
+                              LabelPosition="Left"
+                              OnContent="On"
+                              OffContent="Off"
+                              Checked="tsSmartModeTemperatureRgb_Checked"
+                              Unchecked="tsSmartModeTemperatureRgb_Unchecked" />
+                                </Grid>
                             </StackPanel>
                         </ui:CardExpander>
 
@@ -480,7 +506,7 @@
                                   Unchecked="tsRgbEnabled_Unchecked" />
                             </Grid>
                         </ui:CardExpander.Header>
-                        <StackPanel>
+                        <StackPanel x:Name="RgbContentPanel">
                             <!-- Effect mode -->
                             <Grid Margin="0,0,0,2">
                                 <Grid.ColumnDefinitions>

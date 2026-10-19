@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Serilog;
 using System.Windows.Media;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Scripts.Misc;
@@ -17,17 +18,24 @@ namespace Uniwill_Control_Utility.Services
     {
         private readonly FlydigiCoolerHidService _flydigiService;
         private readonly FlydigiCoolerBleService? _bs1Service;
-        private readonly WaterCoolerService _waterCoolerService;
+        private readonly HydroUIService _hydroUIService;
         private readonly UniwillECService? _uniwillEc;
 
         /// <summary>Whether Adaptive Mode is currently overriding Flydigi device control.</summary>
         public bool IsFlydigiOverridden { get; private set; }
 
-        /// <summary>Whether Adaptive Mode is currently overriding Watercooler device control.</summary>
+        /// <summary>Whether Adaptive Mode is currently overriding HydroUI device control.</summary>
         public bool IsWatercoolerOverridden { get; private set; }
 
         /// <summary>Whether Adaptive Mode is currently overriding EC Fan Control.</summary>
         public bool IsEcFanOverridden { get; private set; }
+
+        /// <summary>
+        /// Whether EC manual control is unavailable: the firmware's 0x0741 bit0 is clear,
+        /// so a stock preset (Office/Gaming/Turbo) is active and the OEM Performance-button
+        /// engine is armed. Manual control and the button engine are mutually exclusive.
+        /// </summary>
+        public bool IsManualControlLocked { get; private set; }
 
         /// <summary>Whether Adaptive Mode is currently overriding Keyboard RGB.</summary>
         public bool IsKeyboardOverridden { get; private set; }
@@ -38,7 +46,7 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>The last Flydigi preset applied from Adaptive Mode (null when nothing has been applied yet).</summary>
         public FlydigiPresetAppliedEventArgs? LastAppliedFlydigiPreset { get; private set; }
 
-        /// <summary>The last Watercooler preset applied from Adaptive Mode (null when nothing has been applied yet).</summary>
+        /// <summary>The last HydroUI preset applied from Adaptive Mode (null when nothing has been applied yet).</summary>
         public WatercoolerPresetAppliedEventArgs? LastAppliedWatercoolerPreset { get; private set; }
 
         /// <summary>The last EC Fan curve applied from Adaptive Mode (null when nothing has been applied yet).</summary>
@@ -54,7 +62,7 @@ namespace Uniwill_Control_Utility.Services
         public event EventHandler<bool>? FlydigiOverrideChanged;
 
         /// <summary>
-        /// Raised when the Watercooler override state changes.
+        /// Raised when the HydroUI override state changes.
         /// Args: (isOverridden)
         /// </summary>
         public event EventHandler<bool>? WatercoolerOverrideChanged;
@@ -66,7 +74,7 @@ namespace Uniwill_Control_Utility.Services
         public event EventHandler<FlydigiPresetAppliedEventArgs>? FlydigiPresetApplied;
 
         /// <summary>
-        /// Raised when profile-specific Watercooler settings have been applied and the page
+        /// Raised when profile-specific HydroUI settings have been applied and the page
         /// should update its UI controls to reflect the profile's values.
         /// </summary>
         public event EventHandler<WatercoolerPresetAppliedEventArgs>? WatercoolerPresetApplied;
@@ -76,6 +84,12 @@ namespace Uniwill_Control_Utility.Services
         /// Args: (isOverridden)
         /// </summary>
         public event EventHandler<bool>? EcFanOverrideChanged;
+
+        /// <summary>
+        /// Raised when the EC manual-control lock state changes.
+        /// Args: (isLocked)
+        /// </summary>
+        public event EventHandler<bool>? ManualControlLockChanged;
 
         /// <summary>
         /// Raised when profile-specific EC Fan settings have been applied and the Fan Control
@@ -108,7 +122,7 @@ namespace Uniwill_Control_Utility.Services
         private Bs2ProSettings? _savedFlydigiSettings;
 
         /// <summary>
-        /// Saved user Watercooler settings, captured when override is enabled.
+        /// Saved user HydroUI settings, captured when override is enabled.
         /// Restored when override is lifted.
         /// </summary>
         private WaterCoolerSettings? _savedWatercoolerSettings;
@@ -131,11 +145,11 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private (byte R, byte G, byte B, int Brightness, int EffectIndex, int Speed, bool Enabled)? _savedLightBarSettings;
 
-        public DeviceApplier(FlydigiCoolerHidService flydigiService, FlydigiCoolerBleService? bs1Service, WaterCoolerService waterCoolerService, UniwillECService? uniwillEc = null)
+        public DeviceApplier(FlydigiCoolerHidService flydigiService, FlydigiCoolerBleService? bs1Service, HydroUIService hydroUIService, UniwillECService? uniwillEc = null)
         {
             _flydigiService = flydigiService;
             _bs1Service = bs1Service;
-            _waterCoolerService = waterCoolerService;
+            _hydroUIService = hydroUIService;
             _uniwillEc = uniwillEc;
         }
 
@@ -207,7 +221,7 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
-        /// Enables Adaptive Mode override for the Watercooler device.
+        /// Enables Adaptive Mode override for the HydroUI device.
         /// Captures the current user settings so they can be restored later.
         /// </summary>
         public void EnableWatercoolerOverride()
@@ -222,7 +236,7 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
-        /// Disables Adaptive Mode override for the Watercooler device.
+        /// Disables Adaptive Mode override for the HydroUI device.
         /// Restores the previously saved user settings to the service's settings object
         /// and re-applies them to the device immediately (regardless of page visibility).
         /// </summary>
@@ -237,15 +251,15 @@ namespace Uniwill_Control_Utility.Services
             WaterCoolerSettings? saved = _savedWatercoolerSettings;
             if (saved != null)
             {
-                var currentSettings = _waterCoolerService.GetSettings();
+                var currentSettings = _hydroUIService.GetSettings();
                 CopyWatercoolerSettings(saved, currentSettings);
-                _waterCoolerService.SaveSettings();
+                _hydroUIService.SaveSettings();
                 _savedWatercoolerSettings = null;
 
                 // Re-apply restored settings to the device immediately.
                 // When Smart Mode is configured, skip pump and fan writes — Smart Mode
                 // controls them and would fight with a one-shot restore.
-                if (_waterCoolerService.IsConnected)
+                if (_hydroUIService.IsConnected)
                 {
                     try
                     {
@@ -256,7 +270,7 @@ namespace Uniwill_Control_Utility.Services
                     }
                     catch (Exception ex)
                     {
-                        DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to re-apply user Watercooler settings on override-lift");
+                        DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to re-apply user HydroUI settings on override-lift");
                     }
                 }
             }
@@ -322,6 +336,56 @@ namespace Uniwill_Control_Utility.Services
             }
 
             EcFanOverrideChanged?.Invoke(this, false);
+        }
+
+        /// <summary>
+        /// Marks EC manual control as unavailable — a stock preset is active and the OEM
+        /// Performance-button engine is armed instead.
+        /// </summary>
+        public void EnableManualControlLock()
+        {
+            if (IsManualControlLocked)
+                return;
+
+            IsManualControlLocked = true;
+            ManualControlLockChanged?.Invoke(this, true);
+        }
+
+        /// <summary>
+        /// Marks EC manual control as available — a custom preset has unlocked 0x0741 bit0,
+        /// which disarms the OEM Performance-button engine.
+        /// </summary>
+        public void DisableManualControlLock()
+        {
+            if (!IsManualControlLocked)
+                return;
+
+            IsManualControlLocked = false;
+            ManualControlLockChanged?.Invoke(this, false);
+        }
+
+        /// <summary>
+        /// Re-reads the EC manual-mode gate and raises ManualControlLockChanged when the
+        /// firmware disagrees with our cached view. Called from the preset-apply flow
+        /// (page navigation) rather than on a timer — only a preset apply or the OEM
+        /// button ever flips the gate.
+        /// </summary>
+        public void SyncManualControlLock()
+        {
+            if (_uniwillEc is null)
+                return;
+
+            try
+            {
+                if (_uniwillEc.IsCustomProfileActive())
+                    DisableManualControlLock();
+                else
+                    EnableManualControlLock();
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to read EC manual-mode lock state");
+            }
         }
 
         /// <summary>
@@ -433,6 +497,11 @@ namespace Uniwill_Control_Utility.Services
             }
 
             IsKeyboardOverridden = true;
+
+            // Pause the streamer while Adaptive Mode owns the keyboard; the preset
+            // apply below either re-params it (BetterRGB) or uses a temporary handle.
+            App.GetService<BetterRgbStreamService>()?.SuspendForOverride();
+
             KeyboardOverrideChanged?.Invoke(this, true);
         }
 
@@ -470,10 +539,32 @@ namespace Uniwill_Control_Utility.Services
             if (saved != null)
             {
                 var s = saved;
+                var streamer = App.GetService<BetterRgbStreamService>();
                 _ = Task.Run(() =>
                 {
-                    ApplyKeyboardHid(s.PerKeyMode, s.Brightness, s.EffectMode, s.Speed,
-                        s.Direction, s.ColorR, s.ColorG, s.ColorB, s.MultiColors, s.PerKeyColors);
+                    if (streamer != null && s.Engine == KeyboardEngine.BetterRGB)
+                    {
+                        // Restore the user's BetterRGB engine instead of a firmware
+                        // apply (the streamer owns the handle).
+                        streamer.SetParams(s);
+                        streamer.ResumeFromOverride();
+                    }
+                    else
+                    {
+                        // A BetterRGB preset may have left the streamer running even
+                        // though the restored user engine is firmware — release the
+                        // endpoint before the firmware apply, and clear the suspend
+                        // flag so the AC policy can manage the engine afterwards.
+                        if (streamer != null)
+                        {
+                            if (streamer.IsRunning)
+                                streamer.StopEngine("override-lift");
+                            streamer.ResumeFromOverride();
+                        }
+
+                        ApplyKeyboardHid(s.PerKeyMode, s.Brightness, s.EffectMode, s.Speed,
+                            s.Direction, s.ColorR, s.ColorG, s.ColorB, s.MultiColors, s.PerKeyColors);
+                    }
                 });
             }
         }
@@ -663,6 +754,11 @@ namespace Uniwill_Control_Utility.Services
                 // to Effects mode — we don't want to wipe saved per-key data.
                 var settings = KeyboardSettingsService.Load();
                 settings.PowerOn = true;
+                // A firmware preset means firmware lighting for the duration of the
+                // override: force the hardware engine so the HID apply below is
+                // visible. BetterRGB presets route through ApplyBetterRgbFromPreset
+                // instead, and the user's engine is restored on override lift.
+                settings.Engine = KeyboardEngine.Hardware;
                 settings.PerKeyMode = perKeyMode;
                 settings.Brightness = brightness;
                 settings.IdleTimerEnabled = idleTimerEnabled;
@@ -688,6 +784,13 @@ namespace Uniwill_Control_Utility.Services
                 LastAppliedKeyboardPreset = args;
                 KeyboardPresetApplied?.Invoke(this, args);
 
+                // Stop the streamer if it somehow still runs — the firmware apply
+                // below opens a temporary handle and must not fight the stream
+                // endpoint (EnableKeyboardOverride already suspended it).
+                var streamer = App.GetService<BetterRgbStreamService>();
+                if (streamer != null && streamer.IsRunning)
+                    streamer.StopEngine("adaptive-override");
+
                 // Send HID commands directly so the keyboard updates immediately even when
                 // the Keyboard page is not visible. The Keyboard page's debounce timer will
                 // also fire if it's visible, but that's harmless (idempotent HID writes).
@@ -704,6 +807,136 @@ namespace Uniwill_Control_Utility.Services
                 DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to apply Keyboard preset from profile");
             }
         }
+
+        /// <summary>
+        /// Applies a BetterRGB streamer preset from an Adaptive profile: forces the
+        /// BetterRGB engine for the override duration, maps the profile's full
+        /// per-effect parameter set (AdaptiveBetterRgbSettings) into the matching
+        /// BetterRgb* settings fields, and re-params (or starts) the streamer.
+        /// Clamps mirror the Keyboard page's SaveSettings so the Adaptive override
+        /// and the Keyboard card produce identical renderer parameters.
+        /// </summary>
+        public void ApplyBetterRgbFromPreset(AdaptiveBetterRgbSettings cfg)
+        {
+            try
+            {
+                var settings = KeyboardSettingsService.Load();
+                settings.Engine = KeyboardEngine.BetterRGB;
+                settings.PowerOn = true;
+                settings.BetterRgbMode = ParseBetterRgbEffect(cfg.Mode);
+                settings.BetterRgbFps = Math.Clamp((int)Math.Round(Math.Clamp(cfg.Fps, 15, 60) / 15.0) * 15, 15, 60);
+                settings.TargetFps = settings.BetterRgbFps;
+                settings.BrightnessPercent = Math.Clamp(cfg.BrightnessPercent, 3, 100);
+                settings.BetterRgbLightBarSync = cfg.LightBarSync;
+
+                // Per-effect parameters — clamps mirror the Keyboard page's SaveSettings.
+                settings.BetterRgbBreathSpeed = Math.Clamp(cfg.BreathSpeed, 1, 5);
+                settings.BetterRgbBreathSmooth = Math.Clamp(cfg.BreathSmooth, 2, 150);
+                settings.BetterRgbBreathRandom = cfg.BreathRandom;
+                settings.BetterRgbBreathColor = cfg.BreathColor;
+                settings.BetterRgbWaveAngle = Math.Clamp(cfg.WaveAngle, 0, 315);
+                settings.BetterRgbWaveSpeed = Math.Clamp(cfg.WaveSpeed, 1, 5);
+                settings.BetterRgbSparkleSpeed = Math.Clamp(cfg.SparkleSpeed, 1, 5);
+                settings.BetterRgbSparkleDensity = Math.Clamp(cfg.SparkleDensity, 3, 20);
+                settings.BetterRgbReactiveRandom = cfg.ReactiveRandom;
+                settings.BetterRgbReactiveColor = cfg.ReactiveColor;
+                settings.BetterRgbReactiveDuration = Math.Clamp(cfg.ReactiveDuration, 10, 45);
+                settings.BetterRgbWheelReverse = cfg.WheelReverse;
+                settings.BetterRgbWheelSpeed = Math.Clamp(cfg.WheelSpeed, 1, 5);
+                settings.BetterRgbLightningSpeed = Math.Clamp(cfg.LightningSpeed, 1, 5);
+                settings.BetterRgbLightningSmooth = Math.Clamp(cfg.LightningSmooth, 1, 20);
+                settings.BetterRgbLightningWidth = Math.Clamp(cfg.LightningWidth, 1, 4);
+                settings.BetterRgbLightningConcurrent = Math.Clamp(cfg.LightningConcurrent, 1, 4);
+                settings.BetterRgbFlameSpeed = Math.Clamp(cfg.FlameSpeed, 1, 5);
+                settings.BetterRgbFlameSmooth = Math.Clamp(cfg.FlameSmooth, 1, 10);
+                settings.BetterRgbRainSpeed = Math.Clamp(cfg.RainSpeed, 1, 5);
+                settings.BetterRgbRainDensity = Math.Clamp(cfg.RainDensity, 1, 5);
+                settings.BetterRgbRainColors = cfg.RainColors;
+                settings.BetterRgbRainColorCount = CountColors(cfg.RainColors);
+                settings.BetterRgbMatrixStyle = Math.Clamp(cfg.MatrixStyle, 0, 3);
+                settings.BetterRgbMatrixSpeed = Math.Clamp(cfg.MatrixSpeed, 1, 5);
+                settings.BetterRgbMatrixDensity = Math.Clamp(cfg.MatrixDensity, 1, 5);
+                settings.BetterRgbMatrixColors = cfg.MatrixColors;
+                settings.BetterRgbMatrixColorCount = CountColors(cfg.MatrixColors);
+                settings.BetterRgbStaticLayout = Math.Clamp(cfg.StaticLayout, 0, 1);
+                settings.BetterRgbStaticZones = Math.Clamp(cfg.StaticZones, 1, 7);
+                settings.BetterRgbStaticZoneColors = cfg.StaticZoneColors;
+                settings.BetterRgbRippleRandom = cfg.RippleRandom;
+                settings.BetterRgbRippleSpeed = Math.Clamp(cfg.RippleSpeed, 1, 5);
+                settings.BetterRgbRippleWidth = Math.Clamp(cfg.RippleWidth, 1, 4);
+                settings.BetterRgbRippleColor = cfg.RippleColor;
+                settings.BetterRgbRainbowSpeed = Math.Clamp(cfg.RainbowSpeed, 1, 5);
+                settings.BetterRgbQuicksandSpeed = Math.Clamp(cfg.QuicksandSpeed, 1, 5);
+                settings.BetterRgbQuicksandScale = Math.Clamp(cfg.QuicksandScale, 1, 10);
+                settings.BetterRgbQuicksandColors = cfg.QuicksandColors;
+                settings.BetterRgbCurrentSpeed = Math.Clamp(cfg.CurrentSpeed, 1, 5);
+                settings.BetterRgbCurrentWidth = Math.Clamp(cfg.CurrentWidth, 2, 8);
+                settings.BetterRgbCurrentColors = cfg.CurrentColors;
+                KeyboardSettingsService.Save(settings);
+
+                // The Keyboard page's preset-sync event carries the selected effect's
+                // colors so its pickers land on the profile's values.
+                string color = settings.BetterRgbMode switch
+                {
+                    BetterRgbEffect.Breathing => settings.BetterRgbBreathColor,
+                    BetterRgbEffect.Reactive => settings.BetterRgbReactiveColor,
+                    BetterRgbEffect.Ripple => settings.BetterRgbRippleColor,
+                    _ => "",
+                };
+                string multiColors = settings.BetterRgbMode switch
+                {
+                    BetterRgbEffect.Raindrop => settings.BetterRgbRainColors,
+                    BetterRgbEffect.Matrix => settings.BetterRgbMatrixColors,
+                    BetterRgbEffect.Static => settings.BetterRgbStaticZoneColors,
+                    BetterRgbEffect.Quicksand => settings.BetterRgbQuicksandColors,
+                    BetterRgbEffect.Current => settings.BetterRgbCurrentColors,
+                    _ => "",
+                };
+
+                var args = new KeyboardPresetAppliedEventArgs(
+                    false, 5, false, 0, "", 10, KeyboardDirection.LeftRight,
+                    0, 0, 0, "", null,
+                    true, settings.BetterRgbMode, settings.BetterRgbFps,
+                    settings.BrightnessPercent, color, multiColors);
+                LastAppliedKeyboardPreset = args;
+                KeyboardPresetApplied?.Invoke(this, args);
+
+                var streamer = App.GetService<BetterRgbStreamService>();
+                if (streamer == null)
+                    return;
+
+                streamer.SetParams(settings);
+                if (!streamer.IsRunning)
+                    streamer.StartEngine("adaptive-better-rgb");
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to apply BetterRGB preset from profile");
+            }
+        }
+
+        /// <summary>Counts the colors in a "#RRGGBB,#RRGGBB,..." CSV (min 1).</summary>
+        private static int CountColors(string csv) =>
+            string.IsNullOrEmpty(csv) ? 1 : csv.Split(',').Length;
+
+        /// <summary>Parses a BetterRGB effect display name to the enum.</summary>
+        private static BetterRgbEffect ParseBetterRgbEffect(string name) => name switch
+        {
+            "Wave" => BetterRgbEffect.Wave,
+            "Sparkle" => BetterRgbEffect.Sparkle,
+            "Reactive" => BetterRgbEffect.Reactive,
+            "Wheel" => BetterRgbEffect.Wheel,
+            "Lightning" => BetterRgbEffect.Lightning,
+            "Flame" => BetterRgbEffect.Flame,
+            "Raindrop" => BetterRgbEffect.Raindrop,
+            "Matrix" => BetterRgbEffect.Matrix,
+            "Static" => BetterRgbEffect.Static,
+            "Ripple" => BetterRgbEffect.Ripple,
+            "Rainbow" => BetterRgbEffect.Rainbow,
+            "Quicksand" => BetterRgbEffect.Quicksand,
+            "Current" => BetterRgbEffect.Current,
+            _ => BetterRgbEffect.Breathing,
+        };
 
         // Effects that need 7 multi-color slots
         private static readonly HashSet<KeyboardEffect> s_multiColor7Effects = new()
@@ -752,7 +985,17 @@ namespace Uniwill_Control_Utility.Services
                     // Effects mode: use TurnOnWithEffect to combine power-on and
                     // effect into one sequence, avoiding a visible flash of
                     // intermediate Static color.
-                    hid.TurnOnWithEffect(r, g, b, brightnessPercent, effect, effectSpeed, direction, touchReactive);
+                    // Rainbow effect has a firmware bug that leaves the leftmost
+                    // columns dark, so we bypass the firmware effect and send a
+                    // software-driven per-key gradient instead.
+                    if (effect == KeyboardEffect.Rainbow)
+                    {
+                        hid.SendRainbowEffect(brightnessPercent);
+                    }
+                    else
+                    {
+                        hid.TurnOnWithEffect(r, g, b, brightnessPercent, effect, effectSpeed, direction, touchReactive);
+                    }
 
                     // Multi-color effects need additional color reports after effect is set.
                     if (!string.IsNullOrEmpty(multiColors))
@@ -1005,7 +1248,7 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /* ------------------------------------------------------------------ */
-        /*  Watercooler Device Commands                                        */
+        /*  HydroUI Device Commands                                        */
         /* ------------------------------------------------------------------ */
 
         /// <summary>
@@ -1017,29 +1260,29 @@ namespace Uniwill_Control_Utility.Services
             RgbState? rgbMode = null,
             RgbColor? rgbColor = null)
         {
-            if (!_waterCoolerService.IsConnected)
+            if (!_hydroUIService.IsConnected)
                 return;
 
             try
             {
                 if (pumpVoltage.HasValue)
-                    await _waterCoolerService.WritePumpModeAsync(pumpVoltage.Value);
+                    await _hydroUIService.WritePumpModeAsync(pumpVoltage.Value);
 
                 if (fanSpeed.HasValue)
-                    await _waterCoolerService.WriteFanModeAsync(fanSpeed.Value);
+                    await _hydroUIService.WriteFanModeAsync(fanSpeed.Value);
 
                 if (rgbMode.HasValue && rgbColor.HasValue)
-                    await _waterCoolerService.WriteRgbModeAsync(rgbMode.Value, rgbColor.Value);
+                    await _hydroUIService.WriteRgbModeAsync(rgbMode.Value, rgbColor.Value);
             }
             catch (Exception ex)
             {
-                DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to apply Watercooler settings");
+                DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to apply HydroUI settings");
             }
         }
 
         /// <summary>
-        /// Applies a complete Watercooler preset from Adaptive Mode.
-        /// Fires <see cref="WatercoolerPresetApplied"/> so the Watercooler page can sync its UI.
+        /// Applies a complete HydroUI preset from Adaptive Mode.
+        /// Fires <see cref="WatercoolerPresetApplied"/> so the HydroUI page can sync its UI.
         /// </summary>
         public async Task ApplyWatercoolerFromPresetAsync(
             PumpVoltage pumpVoltage,
@@ -1049,7 +1292,7 @@ namespace Uniwill_Control_Utility.Services
         {
             await ApplyWatercoolerAsync(pumpVoltage, fanSpeed, rgbMode, rgbColor);
 
-            // Notify subscribers so the Watercooler page can update its UI controls
+            // Notify subscribers so the HydroUI page can update its UI controls
             var args = new WatercoolerPresetAppliedEventArgs(pumpVoltage, fanSpeed, rgbMode, rgbColor);
             LastAppliedWatercoolerPreset = args;
             WatercoolerPresetApplied?.Invoke(this, args);
@@ -1116,7 +1359,7 @@ namespace Uniwill_Control_Utility.Services
 
         private WaterCoolerSettings CaptureWatercoolerSettings()
         {
-            var source = _waterCoolerService.GetSettings();
+            var source = _hydroUIService.GetSettings();
             return new WaterCoolerSettings
             {
                 PumpVoltage = source.PumpVoltage,
@@ -1176,8 +1419,8 @@ namespace Uniwill_Control_Utility.Services
     }
 
     /// <summary>
-    /// Raised when profile-specific Watercooler settings have been applied to the device.
-    /// The Watercooler page should sync its UI controls to reflect these values.
+    /// Raised when profile-specific HydroUI settings have been applied to the device.
+    /// The HydroUI page should sync its UI controls to reflect these values.
     /// </summary>
     public class WatercoolerPresetAppliedEventArgs : EventArgs
     {
@@ -1215,11 +1458,22 @@ namespace Uniwill_Control_Utility.Services
         public string MultiColors { get; }
         public string? PerKeyColors { get; }
 
+        /// <summary>Set when the applied preset is a BetterRGB streamer preset.</summary>
+        public bool BetterRgbMode { get; }
+        public BetterRgbEffect BetterRgbEffectMode { get; }
+        public int BetterRgbFps { get; }
+        public int BetterRgbBrightness { get; }
+        public string BetterRgbColor { get; }
+        public string BetterRgbMultiColors { get; }
+
         public KeyboardPresetAppliedEventArgs(
             bool perKeyMode, int brightness, bool idleTimerEnabled, int idleTimerMinutes,
             string effectMode, byte effectSpeed, KeyboardDirection direction,
             byte colorR, byte colorG, byte colorB,
-            string multiColors, string? perKeyColors)
+            string multiColors, string? perKeyColors,
+            bool betterRgbMode = false, BetterRgbEffect betterRgbEffect = BetterRgbEffect.Breathing,
+            int betterRgbFps = 30, int betterRgbBrightness = 100,
+            string betterRgbColor = "", string betterRgbMultiColors = "")
         {
             PerKeyMode = perKeyMode;
             Brightness = brightness;
@@ -1233,6 +1487,12 @@ namespace Uniwill_Control_Utility.Services
             ColorB = colorB;
             MultiColors = multiColors;
             PerKeyColors = perKeyColors;
+            BetterRgbMode = betterRgbMode;
+            BetterRgbEffectMode = betterRgbEffect;
+            BetterRgbFps = betterRgbFps;
+            BetterRgbBrightness = betterRgbBrightness;
+            BetterRgbColor = betterRgbColor;
+            BetterRgbMultiColors = betterRgbMultiColors;
         }
     }
 

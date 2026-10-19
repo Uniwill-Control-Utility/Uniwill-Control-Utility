@@ -59,6 +59,9 @@
     <Setting Name="customIntelVolt" Type="System.Double" Scope="User">
       <Value Profile="(Default)">0</Value>
     </Setting>
+    <Setting Name="EnableCpuAdvancedPerformanceMenu" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
     <Setting Name="customNvPower" Type="System.Double" Scope="User">
       <Value Profile="(Default)">150</Value>
     </Setting>
@@ -210,6 +213,36 @@
       <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="ShowStartupProgressOverlay" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="GpuPowerSavingMode" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">2</Value>
+    </Setting>
+    <Setting Name="GpuPowerSavingBattery" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="GpuPowerSavingPluggedIn" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">1</Value>
+    </Setting>
+    <Setting Name="RefreshRateBattery" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="RefreshRatePluggedIn" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="DisplayRefreshRateDeferred" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="DisplayRefreshRateLastKnown" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="DisplayColorProfileDeferred" Type="System.String" Scope="User">
+      <Value Profile="(Default)"></Value>
+    </Setting>
+    <Setting Name="DisplayColorProfileLastKnown" Type="System.String" Scope="User">
+      <Value Profile="(Default)"></Value>
+    </Setting>
+    <Setting Name="EnableQKeyButtonIntercept" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
    </Settings>

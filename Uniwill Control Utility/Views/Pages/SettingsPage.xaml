@@ -71,28 +71,6 @@
                 <!-- Content cards -->
                 <StackPanel Grid.Row="1" Margin="12,16,16,18">
 
-                    <!-- MiniLED Local Dimming (hidden for non-MiniLED panels) -->
-                    <ui:CardControl x:Name="CardLocalDimming" Margin="0,0,0,8" Visibility="Collapsed">
-                        <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE706;" FontSize="20" Margin="4,0,6,0" />
-                        </ui:CardControl.Icon>
-                        <ui:CardControl.Header>
-                            <StackPanel>
-                                <ui:TextBlock FontTypography="Body" Text="MiniLED local dimming" />
-                                <ui:TextBlock Margin="0,2,0,0"
-                                               FontTypography="Caption"
-                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Enable or disable MiniLED local dimming on the display" />
-                            </StackPanel>
-                        </ui:CardControl.Header>
-                        <ui:ToggleSwitch x:Name="tsLocalDimming"
-                                         LabelPosition="Left"
-                                         OnContent="On"
-                                         OffContent="Off"
-                                         Checked="TsLocalDimming_Toggled"
-                                         Unchecked="TsLocalDimming_Toggled" />
-                    </ui:CardControl>
-
                     <!-- Application behaviour -->
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="True">
@@ -390,11 +368,11 @@
                             </Grid>
 
                             <!-- Divider -->
-                            <Border Height="1" Margin="-58,12,-46,12"
+                            <Border x:Name="CpuVoltageControlDivider" Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                            <!-- Row: Disable CPU voltage control -->
-                            <Grid>
+                            <!-- Row: Disable CPU voltage control (hidden on Intel — voltage control is AMD-only) -->
+                            <Grid x:Name="CpuVoltageControlRow">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -556,7 +534,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Unlocks hardware power limits"
+                                               Text="Manage extra useful features"
                                                TextWrapping="Wrap" />
                             </StackPanel>
                         </ui:CardExpander.Header>
@@ -572,7 +550,7 @@
                                     <ui:TextBlock Margin="0,2,0,2"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Removes CPU power limit caps and unlocks GPU power limit to 250W on supported GPUs. Disables Dynamic Boost control."
+                                                   Text="Sets TDP and TGP slider limits to 250W (but requires mods for it to truly apply and disables Dynamic Boost)"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="cbPowerBoostMode"
@@ -583,6 +561,184 @@
                                                  Checked="cbPowerBoostMode_Checked"
                                                  Unchecked="cbPowerBoostMode_Unchecked" />
                             </Grid>
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Q-Key button preset switching -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Q-Key button preset switching" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Enabling it lets the physical key (next to the power button) switch between power presets when pressed"
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbQKeyIntercept"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbQKeyIntercept_Checked"
+                                                 Unchecked="cbQKeyIntercept_Unchecked" />
+                            </Grid>
+
+                            <!-- Row: CPU Advanced Performance Menu (gated: Intel + firmware support) -->
+                            <Border x:Name="ApMenuDivider" Height="1" Margin="-58,12,-46,12"
+                                    Visibility="Collapsed"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+                            <Grid x:Name="ApMenuRow" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="CPU Advanced Performance Menu" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Unlocks the Advanced Performance Menu (CPU and memory overclocking) in BIOS setup. Takes effect on the next boot."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbCpuAdvancedPerformanceMenu"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbCpuAdvancedPerformanceMenu_Checked"
+                                                 Unchecked="cbCpuAdvancedPerformanceMenu_Unchecked" />
+                            </Grid>
+                        </StackPanel>
+                    </ui:CardExpander>
+
+                    <!-- Hardware management -->
+                    <ui:CardExpander x:Name="HardwareManagementCard"
+                                     Margin="0,0,0,8"
+                                     IsExpanded="False">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEC7A;" FontSize="20" Margin="6,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Hardware management" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Enable or disable hardware features at the Windows level"
+                                               TextWrapping="Wrap" />
+                            </StackPanel>
+                        </ui:CardExpander.Header>
+
+                        <StackPanel>
+                            <!-- Row: Wi-Fi -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Wi-Fi" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Turn the Wi-Fi radio on or off, like the Settings quick toggle" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbWifiToggle"
+                                                 Grid.Column="1"
+                                                 IsChecked="True"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbWifiToggle_Checked"
+                                                 Unchecked="cbWifiToggle_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Bluetooth -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Bluetooth" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Turn the Bluetooth radio on or off, like the Settings quick toggle" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbBluetoothToggle"
+                                                 Grid.Column="1"
+                                                 IsChecked="True"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbBluetoothToggle_Checked"
+                                                 Unchecked="cbBluetoothToggle_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Webcam -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Webcam" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Enable or disable the camera device in Device Manager (PnP hotswap)" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbWebcamToggle"
+                                                 Grid.Column="1"
+                                                 IsChecked="True"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbWebcamToggle_Checked"
+                                                 Unchecked="cbWebcamToggle_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Touchpad -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Touchpad" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Enable or disable the touchpad via the Windows Settings admin flow" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbTouchpadToggle"
+                                                 Grid.Column="1"
+                                                 IsChecked="True"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbTouchpadToggle_Checked"
+                                                 Unchecked="cbTouchpadToggle_Unchecked" />
+                            </Grid>
+
                         </StackPanel>
                     </ui:CardExpander>
 
@@ -590,7 +746,7 @@
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="False">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7AA;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7AA;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>
@@ -660,7 +816,7 @@
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="False">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9D9;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9D9;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>
@@ -668,7 +824,7 @@
                                 <ui:TextBlock Margin="0,2,0,0"
                                                FontTypography="Caption"
                                                Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                               Text="Logging level, stress testing, and troubleshooting tools"
+                                               Text="Logging level and troubleshooting tools"
                                                TextWrapping="Wrap" />
                             </StackPanel>
                         </ui:CardExpander.Header>
@@ -700,44 +856,6 @@
                                     <ComboBoxItem Content="Debug" />
                                 </ComboBox>
                             </Grid>
-
-                            <!-- Row: Stress test (hidden) -->
-                            <Grid Visibility="Collapsed">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Stress test" />
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Run a CPU stress test to validate cooling" />
-                                </StackPanel>
-                                <ui:Button x:Name="btnStressTest"
-                                           Grid.Column="1"
-                                           Width="190"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           Appearance="Caution"
-                                           Click="btnStressTest_Click">
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="Fire20"
-                                                       FontSize="22"
-                                                       Margin="0,0,8,0" />
-                                        <TextBlock VerticalAlignment="Center"
-                                                   Text="Start Stress Test" />
-                                    </StackPanel>
-                                </ui:Button>
-                            </Grid>
-
-                            <ui:InfoBar Margin="0,10,0,0"
-                                        IsOpen="True"
-                                        IsClosable="False"
-                                        Severity="Warning"
-                                        Title="High CPU load"
-                                        Message="The stress test places extreme load on the CPU. Ensure cooling is adequate and proceed at your own risk"
-                                        Visibility="Collapsed" />
                         </StackPanel>
                     </ui:CardExpander>
 
@@ -810,7 +928,7 @@
                                     Margin="0,12,0,8"
                                     Visibility="Collapsed">
                         <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEC7A;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE896;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardControl.Icon>
                         <ui:CardControl.Header>
                             <StackPanel>
@@ -832,7 +950,7 @@
                                      IsEnabled="True"
                                      IsExpanded="False">
                         <ui:CardExpander.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7F8;" FontSize="20" Margin="4,0,6,0" />
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7F8;" FontSize="20" Margin="6,0,6,0" />
                         </ui:CardExpander.Icon>
                         <ui:CardExpander.Header>
                             <StackPanel>

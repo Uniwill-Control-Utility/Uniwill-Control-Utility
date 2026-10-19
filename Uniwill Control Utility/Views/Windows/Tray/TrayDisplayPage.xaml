@@ -1,0 +1,374 @@
+<Page x:Class="Uniwill_Control_Utility.Views.Windows.Tray.TrayDisplayPage"
+     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+     mc:Ignorable="d"
+     d:DesignWidth="400"
+     SnapsToDevicePixels="True"
+     UseLayoutRounding="True"
+      Margin="4,4,0,0"
+     ScrollViewer.CanContentScroll="False">
+
+    <!-- Tray display page: navigated to from the quick-settings page's Display
+         button. The header row (back button + title) stays fixed; the sections
+         below scroll inside DisplayScroll. ScrollViewer.CanContentScroll=False on
+         the root opts out of the NavigationView content presenter's own DynamicScrollViewer
+         (the outer, short-range scrollbar) — the presenter re-enables it on each
+         navigation from this attached property, so opting out leaves only the
+         page's DisplayScroll scrollbar. -->
+
+    <Page.Resources>
+        <ContextMenu x:Key="NavigateContextMenu"
+                     Opened="NavigateContextMenu_Opened">
+            <MenuItem Header="Go to UCU" Click="GoToUcuMenuItem_Click" />
+        </ContextMenu>
+
+        <!-- Inactive mode-selector button (tray-sized clone of the Display page's GpuModeButtonStyle) -->
+        <Style x:Key="TrayModeButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Width" Value="95" />
+            <Setter Property="Height" Value="46" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <!-- Active (selected) mode-selector button with hover/press states -->
+        <Style x:Key="TrayModeButtonActiveStyle" TargetType="Button">
+            <Setter Property="Width" Value="95" />
+            <Setter Property="Height" Value="46" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Background" Value="{DynamicResource AccentTextFillColorTertiaryBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="CommonStates">
+                                    <VisualState x:Name="Normal" />
+                                    <VisualState x:Name="MouseOver">
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="BackgroundBorder"
+                                                                           Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0"
+                                                                        Value="{DynamicResource AccentTextFillColorTertiaryBrush}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </VisualState>
+                                    <VisualState x:Name="Pressed">
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="BackgroundBorder"
+                                                                           Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0"
+                                                                        Value="{DynamicResource AccentFillColorTertiaryBrush}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </VisualState>
+                                    <VisualState x:Name="Disabled">
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="ContentPresenter"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="0.5" Duration="0" />
+                                        </Storyboard>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <Border x:Name="BackgroundBorder"
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="4">
+                                <ContentPresenter x:Name="ContentPresenter"
+                                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                  RecognizesAccessKey="True"
+                                                  TextElement.Foreground="{TemplateBinding Foreground}" />
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
+    <StackPanel x:Name="PageDisplay">
+
+        <!-- Row 1: back button + page title -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Button x:Name="BtnTrayBack"
+                    Grid.Column="0"
+                    Width="40"
+                    Height="40"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Padding="8"
+                    Margin="2,0,4,8"
+                    Click="BtnTrayBack_Click">
+                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                             Glyph="&#xE72B;"
+                             FontSize="12">
+                    <ui:FontIcon.Foreground>
+                        <Binding RelativeSource="{RelativeSource AncestorType=Button}"
+                                 Path="Foreground" />
+                    </ui:FontIcon.Foreground>
+                </ui:FontIcon>
+            </Button>
+            <ui:TextBlock Grid.Column="1"
+                          FontSize="16"
+                          FontWeight="Regular"
+                          Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                          Text="Display"
+                          VerticalAlignment="Center"
+                          Margin="0,4,0,12" />
+        </Grid>
+
+        <!-- Scrollable body: everything below the back button + title header -->
+        <ScrollViewer x:Name="DisplayScroll" Height="278">
+            <StackPanel>
+                <!-- Display refresh rate (panels offering multiple rates only).
+                     A combo, not a button row: the offered rate set is dynamic and
+                     variant-dependent (GDI enumeration reveals more than Windows'
+                     own Settings shows — e.g. Intel NB02 exposes 48/60/75/100/120/240
+                     while AMD shows 60/240, plus the hidden 300 under dGPU-only mux),
+                     so the items are rebuilt from live state on every snapshot.
+                     Row layout mirrors the MiniLED row: icon + title + control. -->
+                <StackPanel x:Name="RefreshRateSection" Visibility="Collapsed" Margin="12,16,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <ui:TextBlock Grid.Column="1"
+                                      FontSize="14"
+                                      FontWeight="SemiBold"
+                                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                      Text="Refresh Rate"
+                                      VerticalAlignment="Center" />
+                        <ComboBox Grid.Column="2"
+                                  x:Name="TrayCbRefreshRate"
+                                  Width="120"
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,24,0"
+                                  SelectionChanged="TrayCbRefreshRate_SelectionChanged" />
+                    </Grid>
+                </StackPanel>
+                <!-- Display color calibration (hidden when only Default is available) -->
+                <StackPanel x:Name="ColorCalSection" Visibility="Collapsed" Margin="0,16,0,8">
+                    <ui:TextBlock FontSize="14"
+                                  FontWeight="SemiBold"
+                                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                  Text="Color Calibration"
+                                  Margin="12,0,2,8" />
+                    <!-- Same horizontal geometry as the Optimus row (Width 320, centered,
+                         -5/+5 margins) so the row's right edge lands exactly on the
+                         dGPU button's; four 72px buttons in star columns leave even gaps. -->
+                    <Grid Width="330" HorizontalAlignment="Center" Margin="-2,4,8,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel x:Name="SlotTrayColorDefault" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">
+                            <Button x:Name="BtnTrayColorDefault" Width="74" Height="36"
+                                    Style="{StaticResource TrayModeButtonStyle}"
+                                    Tag="Default.icm"
+                                    Click="BtnTrayColorCal_Click">
+                                <ui:TextBlock FontSize="10"
+                                              HorizontalAlignment="Center"
+                                              Text="Default"
+                                              FontWeight="SemiBold"
+                                              Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                            </Button>
+                        </StackPanel>
+                        <StackPanel x:Name="SlotTrayColorSrgb" Grid.Row="0" Grid.Column="1" VerticalAlignment="Center">
+                            <Button x:Name="BtnTrayColorSrgb" Width="74" Height="36"
+                                    Style="{StaticResource TrayModeButtonStyle}"
+                                    Tag="sRGB.icm"
+                                    Click="BtnTrayColorCal_Click">
+                                <ui:TextBlock FontSize="10"
+                                              HorizontalAlignment="Center"
+                                              Text="sRGB"
+                                              FontWeight="SemiBold"
+                                              Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                            </Button>
+                        </StackPanel>
+                        <StackPanel x:Name="SlotTrayColorP3" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center">
+                            <Button x:Name="BtnTrayColorP3" Width="74" Height="36"
+                                    Style="{StaticResource TrayModeButtonStyle}"
+                                    Tag="DCIP3.icm"
+                                    Click="BtnTrayColorCal_Click">
+                                <ui:TextBlock FontSize="10"
+                                              HorizontalAlignment="Center"
+                                              Text="DCI-P3"
+                                              FontWeight="SemiBold"
+                                              Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                            </Button>
+                        </StackPanel>
+                        <StackPanel x:Name="SlotTrayColorAdobe" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center">
+                            <Button x:Name="BtnTrayColorAdobe" Width="74" Height="36"
+                                    Style="{StaticResource TrayModeButtonStyle}"
+                                    Tag="AdobeRGB.icm"
+                                    Click="BtnTrayColorCal_Click">
+                                <ui:TextBlock FontSize="10"
+                                              HorizontalAlignment="Center"
+                                              Text="Adobe RGB"
+                                              FontWeight="SemiBold"
+                                              Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+                <!-- Nvidia Optimus runtime switch (Hybrid display mode only) -->
+                <StackPanel x:Name="OptimusSection" Visibility="Collapsed" Margin="14,16,0,12">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <ui:TextBlock FontSize="14"
+                                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                      Text="Nvidia Optimus"
+                                      FontWeight="SemiBold"
+                                      Margin="0,0,2,0" />
+                        <!-- Cooldown countdown — to the right of the caption while the
+                             GPU driver transition runs (the three buttons are disabled
+                             meanwhile; no dark overlay in the tray variant) -->
+                        <TextBlock x:Name="txtTrayCooldownCountdown"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                   Margin="10,0,0,0"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <!-- Compensate PageDisplay's asymmetric -12/-22 horizontal margin
+                         (vs the card's 20/20 padding) so the row centers on the card.
+                         Width 320 = the ButtonsGrid width, so the three 95px buttons
+                         get the same ~11.7px gaps as the QuickSettings grid. -->
+                    <Grid Width="340" HorizontalAlignment="Center" Margin="-20,4,5,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <Button x:Name="BtnTrayPowerSavingOn"
+                                    Style="{StaticResource TrayModeButtonStyle}"
+                                    Tag="0"
+                                    Click="BtnTrayPowerSaving_Click">
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                             Glyph="&#xEC0A;"
+                                             FontSize="16">
+                                    <ui:FontIcon.Foreground>
+                                        <Binding RelativeSource="{RelativeSource AncestorType=Button}"
+                                                 Path="Foreground" />
+                                    </ui:FontIcon.Foreground>
+                                </ui:FontIcon>
+                            </Button>
+                            <ui:TextBlock FontSize="11"
+                                          Margin="0,8,0,0"
+                                          HorizontalAlignment="Center"
+                                          FontWeight="SemiBold"
+                                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                          Text="iGPU" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <Button x:Name="BtnTrayPowerSavingAuto"
+                                    Style="{StaticResource TrayModeButtonStyle}"
+                                    Tag="2"
+                                    Click="BtnTrayPowerSaving_Click">
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                             Glyph="&#xE8AB;"
+                                             FontSize="16">
+                                    <ui:FontIcon.Foreground>
+                                        <Binding RelativeSource="{RelativeSource AncestorType=Button}"
+                                                 Path="Foreground" />
+                                    </ui:FontIcon.Foreground>
+                                </ui:FontIcon>
+                            </Button>
+                            <ui:TextBlock FontSize="11"
+                                          Margin="0,8,0,0"
+                                          HorizontalAlignment="Center"
+                                          FontWeight="SemiBold"
+                                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                          Text="Auto" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                            <Button x:Name="BtnTrayPowerSavingOff"
+                                    Style="{StaticResource TrayModeButtonStyle}"
+                                    Tag="1"
+                                    Click="BtnTrayPowerSaving_Click">
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons"
+                                             Glyph="&#xEC4A;"
+                                             FontSize="16">
+                                    <ui:FontIcon.Foreground>
+                                        <Binding RelativeSource="{RelativeSource AncestorType=Button}"
+                                                 Path="Foreground" />
+                                    </ui:FontIcon.Foreground>
+                                </ui:FontIcon>
+                            </Button>
+                            <ui:TextBlock FontSize="11"
+                                          Margin="0,8,0,0"
+                                          HorizontalAlignment="Center"
+                                          FontWeight="SemiBold"
+                                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                          Text="dGPU" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+
+                <!-- MiniLED local dimming (MiniLED panels only) -->
+                <!-- "MiniLED" caption above the control row, mirroring how the
+                     Optimus section captions its button row -->
+                <StackPanel x:Name="MiniLedSection" Visibility="Collapsed" Margin="14,10,-4,24">
+                    <ui:TextBlock FontSize="14"
+                                  FontWeight="SemiBold"
+                                  Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                  Text="MiniLED"
+                                  Margin="0,0,0,8" />
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ui:FontIcon Grid.Column="0"
+                                     FontFamily="Segoe Fluent Icons"
+                                     Glyph="&#xE706;"
+                                     FontSize="14"
+                                     VerticalAlignment="Center"
+                                     Margin="0,0,16,0" 
+                                     Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                        <ui:TextBlock Grid.Column="1"
+                                      FontSize="14"
+                                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                      Text="Local Dimming"
+                                      VerticalAlignment="Center" />
+                        <ui:ToggleSwitch Grid.Column="2"
+                                         x:Name="TrayTsLocalDimming"
+                                         LabelPosition="Left"
+                                         OnContent="On"
+                                         OffContent="Off"
+                                         VerticalAlignment="Center"
+                                         Checked="TrayTsLocalDimming_Toggled"
+                                         Unchecked="TrayTsLocalDimming_Toggled"
+                                         Margin="0,0,30,0" />
+                    </Grid>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+    </StackPanel>
+</Page>

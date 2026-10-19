@@ -105,6 +105,30 @@
                                          Unchecked="TsLightBarPower_Toggled" />
                     </ui:CardControl>
 
+                    <!-- Auto power: light bar follows the AC plug state -->
+                    <ui:CardControl x:Name="AutoPowerCard" Margin="0,0,0,8">
+                        <ui:CardControl.Icon>
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE95F;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardControl.Icon>
+                        <ui:CardControl.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="Auto Off When Unplugged" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Automatically turn the light bar off when the laptop is unplugged, and back on when plugged in"
+                                               TextWrapping="Wrap" />
+                            </StackPanel>
+                        </ui:CardControl.Header>
+                        <ui:ToggleSwitch x:Name="tsAutoPowerUnplug"
+                                         LabelPosition="Left"
+                                         OnContent="On"
+                                         OffContent="Off"
+                                         IsChecked="False"
+                                         Checked="TsAutoPowerUnplug_Toggled"
+                                         Unchecked="TsAutoPowerUnplug_Toggled" />
+                    </ui:CardControl>
+
                     <!-- Color (single) -->
                     <ui:CardControl x:Name="ColorCard" Margin="0,0,0,8">
                         <ui:CardControl.Icon>
@@ -127,7 +151,7 @@
                     </ui:CardControl>
 
                     <!-- Brightness -->
-                    <ui:CardControl Margin="0,0,0,8">
+                    <ui:CardControl x:Name="BrightnessCard" Margin="0,0,0,8">
                         <ui:CardControl.Icon>
                             <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE706;" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>
@@ -150,7 +174,7 @@
                                        Text="100" />
                             <Slider x:Name="BrightnessSlider"
                                     Width="140"
-                                    Minimum="0"
+                                    Minimum="10"
                                     Maximum="100"
                                     Value="100"
                                     TickFrequency="10"
@@ -162,7 +186,7 @@
                     </ui:CardControl>
 
                     <!-- Effect selector -->
-                    <ui:CardControl Margin="0,0,0,8">
+                    <ui:CardControl x:Name="EffectCard" Margin="0,0,0,8">
                         <ui:CardControl.Icon>
                             <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE794;" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>

@@ -18,13 +18,16 @@ public sealed class TrayQuickControlPolicyTests
             adaptiveWaterCoolerEnabled: false,
             adaptiveKeyboardEnabled: false,
             adaptiveLightBarEnabled: false,
+            lightBarSyncActive: false,
             adaptiveFlydigiEnabled: false,
             hasMiniLedPanel: false,
             flydigiDeviceAvailable: false,
             flydigiEnabled: false,
+            refreshRateSwitchable: false,
             features: new FeatureNavigationPreferences(false, false, false, false, false));
 
         Assert.False(policy.ShowTgp);
+        Assert.False(policy.ShowRefreshRate);
         Assert.False(policy.ShowHydro);
         Assert.True(policy.PresetEnabled);
         Assert.True(policy.TdpEnabled);
@@ -44,18 +47,45 @@ public sealed class TrayQuickControlPolicyTests
             adaptiveWaterCoolerEnabled: true,
             adaptiveKeyboardEnabled: false,
             adaptiveLightBarEnabled: false,
+            lightBarSyncActive: false,
             adaptiveFlydigiEnabled: false,
             hasMiniLedPanel: false,
             flydigiDeviceAvailable: false,
             flydigiEnabled: false,
+            refreshRateSwitchable: true,
             features: new FeatureNavigationPreferences(false, false, false, false, false));
 
         Assert.True(policy.ShowTgp);
+        Assert.True(policy.ShowRefreshRate);
         Assert.True(policy.ShowHydro);
         Assert.False(policy.PresetEnabled);
         Assert.False(policy.TdpEnabled);
         Assert.True(policy.TgpEnabled);
         Assert.True(policy.LocalDimmingEnabled);
         Assert.False(policy.HydroEnabled);
+    }
+
+    [Fact]
+    public void Create_DisablesLightBarWhileBetterRgbLightBarSyncOwnsTheStrip()
+    {
+        var policy = TrayQuickControlPolicy.Create(
+            hasNvidiaGpu: true,
+            hasSupportedWaterCooler: false,
+            waterCoolerConnected: false,
+            adaptiveCpuEnabled: false,
+            adaptiveGpuEnabled: false,
+            adaptiveFanEnabled: false,
+            adaptiveWaterCoolerEnabled: false,
+            adaptiveKeyboardEnabled: false,
+            adaptiveLightBarEnabled: false,
+            lightBarSyncActive: true,
+            adaptiveFlydigiEnabled: false,
+            hasMiniLedPanel: false,
+            flydigiDeviceAvailable: false,
+            flydigiEnabled: false,
+            refreshRateSwitchable: false,
+            features: new FeatureNavigationPreferences(false, false, false, false, false));
+
+        Assert.True(policy.DisableLightBar);
     }
 }

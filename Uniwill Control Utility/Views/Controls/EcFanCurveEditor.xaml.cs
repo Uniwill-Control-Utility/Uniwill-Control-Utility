@@ -24,7 +24,7 @@ namespace Uniwill_Control_Utility.Views.Controls
         private readonly List<Slider> _sliders = new();
         private int[] _temperatures = EcFanCurve.CpuTemperatures;
         private bool _isReadOnly;
-        private DispatcherOperation? _pendingGraphRedraw;
+        private DispatcherOperation? _pendingFallbackRedraw;
 
         /// <summary>
         /// Sets the temperature labels displayed on the X-axis and in tooltips.
@@ -37,7 +37,7 @@ namespace Uniwill_Control_Utility.Views.Controls
             {
                 _temperatures = value;
                 UpdateTemperatureLabels();
-                RequestGraphRedraw();
+                InvalidateArrange();
             }
         }
 
@@ -113,7 +113,7 @@ namespace Uniwill_Control_Utility.Views.Controls
                 _slidersGrid.Children.Add(slider);
             }
 
-            RequestGraphRedraw();
+            InvalidateArrange();
         }
 
         private void UpdateTemperatureLabels()
@@ -152,7 +152,16 @@ namespace Uniwill_Control_Utility.Views.Controls
             {
                 _sliders[i].Value = curve.Duties[i];
             }
-            RequestGraphRedraw();
+
+            // Clear the old curve line immediately so it doesn't persist while
+            // slider thumbs animate to their new positions. Then defer the redraw
+            // to Background priority so the layout system has fully processed all
+            // value changes and thumbs are at their final positions before DrawGraph
+            // samples them. Using InvalidateArrange directly would fire ArrangeOverride
+            // before the thumbs reposition, drawing a line at the stale curve shape.
+            _canvas.Children.Clear();
+
+            Dispatcher.InvokeAsync(() => InvalidateArrange(), DispatcherPriority.Background);
         }
 
         /// <summary>Read the current slider values into an EcFanCurve.</summary>
@@ -227,20 +236,8 @@ namespace Uniwill_Control_Utility.Views.Controls
                 return;
 
             VerifyMonotonicity(currentSlider);
-            RequestGraphRedraw();
+            InvalidateArrange();
             CurveChanged?.Invoke(this, EventArgs.Empty);
-        }
-
-        private void RequestGraphRedraw()
-        {
-            if (_pendingGraphRedraw is { Status: DispatcherOperationStatus.Pending })
-                return;
-
-            _pendingGraphRedraw = Dispatcher.InvokeAsync(() =>
-            {
-                _pendingGraphRedraw = null;
-                DrawGraph();
-            }, DispatcherPriority.Loaded);
         }
 
         private void VerifyMonotonicity(Slider currentSlider)
@@ -256,10 +253,30 @@ namespace Uniwill_Control_Utility.Views.Controls
                 if (s.Value < currentValue) s.Value = currentValue;
         }
 
+        /// <summary>Schedules a Background-priority redraw as a safety net when layout hasn't settled.</summary>
+        private void ScheduleFallbackRedraw()
+        {
+            if (_pendingFallbackRedraw is { Status: DispatcherOperationStatus.Pending })
+                return;
+            _pendingFallbackRedraw = Dispatcher.InvokeAsync(() =>
+            {
+                _pendingFallbackRedraw = null;
+                InvalidateArrange();
+            }, DispatcherPriority.Background);
+        }
+
         private void DrawGraph()
         {
             var color = Application.Current.Resources["ControlFillColorDefaultBrush"] as SolidColorBrush;
             if (color == null) return;
+
+            // Skip if sliders aren't measured yet — avoid clearing the canvas
+            // with (0,0) points during early layout passes.
+            if (!(_sliders.Count > 0 && _sliders.All(s => s.ActualWidth > 0 && s.ActualHeight > 0)))
+            {
+                ScheduleFallbackRedraw();
+                return;
+            }
 
             _canvas.Children.Clear();
 

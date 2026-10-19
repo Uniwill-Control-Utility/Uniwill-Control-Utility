@@ -1,33 +1,61 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
-using System.Windows.Media;
 using System.Windows.Threading;
 using Uniwill_Control_Utility.Services;
+using Uniwill_Control_Utility.Views.Windows.Tray;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
+using Wpf.Ui.Animations;
+using Serilog;
 using Screen = System.Windows.Forms.Screen;
 
 namespace Uniwill_Control_Utility.Views.Windows
 {
     public partial class TrayWidgetWindow : ITrayWidget
     {
+        // The tray pages (quick settings + display) are instantiated by the
+        // NavigationView via reflection; they reach this window through this
+        // static for the shared apply/snapshot orchestration.
+        public static TrayWidgetWindow? Instance;
+
+        // Duration of the custom tray page transitions (directional fade+slide for the
+        // QuickSettings↔Display hops, fade+slide-up for the tray's own show).
+        private const int TrayTransitionMs = 300;
+
         private readonly TrayQuickControlService _quickControl;
         private readonly DispatcherTimer _refreshTimer;
         private bool _loading;
         private bool _applying;
         private bool _showing;
+        // The main-window page the footer's "More <page> settings" button opens for
+        // the currently shown tray page (null = button hidden on the default page).
+        private Type? _moreSettingsTargetPage;
+        // The show path produces one spurious Deactivated right after activation; swallow
+        // exactly that one so a later real focus change can still hide the tray.
+        private bool _ignoreNextDeactivation;
         private System.Drawing.Point _placementAnchor;
         private string? _placementScreenDeviceName;
+        // The tray page currently shown by the NavigationView — the quick-settings
+        // card resize only applies while that page is shown (the Display page is
+        // laid out for the full-height card).
+        private Type? _currentPage;
+        // The quick-settings card's XAML height, which fits the full three-row
+        // button grid; ResizeQuickSettingsCard shrinks it (and the window) below
+        // this when fewer rows are visible.
+        private const double QuickSettingsCardBaseHeight = 330;
 
         public TrayWidgetWindow(TrayQuickControlService quickControl)
         {
             _quickControl = quickControl;
+            Instance = this;
             InitializeComponent();
             SystemThemeWatcher.Watch(this, Wpf.Ui.Controls.WindowBackdropType.Mica, true);
 
@@ -49,12 +77,23 @@ namespace Uniwill_Control_Utility.Views.Windows
             CapturePlacementAnchor();
             _loading = true;
             _showing = true;
+            _ignoreNextDeactivation = true;
 
             Show();
             UpdateLayout();
             PositionNearTray();
             Activate();
             _refreshTimer.Start();
+
+            // A re-shown tray always opens on the main QuickSettings page — with the
+            // library-style fade + slide-up (the NavigationView's own transition is
+            // disabled in XAML, so we drive it here; the directional fade+slide is
+            // only for the QuickSettings↔Display page hops).
+            _ = TrayNavigation.Navigate(typeof(TrayQuickSettingsPage));
+            _currentPage = typeof(TrayQuickSettingsPage);
+            UpdateMoreSettingsButton(typeof(TrayQuickSettingsPage));
+            _ = TransitionAnimationProvider.ApplyTransition(
+                TrayQuickSettingsPage.Instance, Transition.FadeInWithSlide, TrayTransitionMs);
 
             try
             {
@@ -64,9 +103,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                 UpdateLayout();
                 PositionNearTray();
             }
-            catch
+            catch (Exception ex)
             {
-                // Silently fail — no status text to show
+                // Silently fail — no status text to show, but keep the cause visible
+                // in the logs (a failed startup snapshot leaves the Display page's
+                // Collapsed-by-default sections un-applied = an empty page).
+                Log.Warning("[Tray] Startup snapshot failed: {Message}", ex.Message);
             }
             finally
             {
@@ -79,206 +121,101 @@ namespace Uniwill_Control_Utility.Views.Windows
             _showing = false;
         }
 
+        /// <summary>
+        /// Orchestration only: each page applies its own half of the snapshot.
+        /// A throw in either half leaves that page's Collapsed-by-default sections
+        /// un-applied, so the page renders empty — the catches in the callers log
+        /// the cause.
+        /// </summary>
         private void ApplySnapshot(TrayQuickControlSnapshot snapshot)
         {
-            var policy = snapshot.Policy;
-
-            ApplyToggle(SlotAdaptiveMode, BtnAdaptiveMode, policy.ShowAdaptiveMode, snapshot.AdaptiveModeRunning, false);
-            ApplyToggle(SlotHydroSmartMode, BtnHydroSmartMode, policy.ShowHydroSmartMode, snapshot.HydroSmartMode, policy.DisableHydroSmartMode);
-            ApplyToggle(SlotHydroRgb, BtnHydroRgb, policy.ShowHydroRgb, snapshot.HydroRgbOn, policy.DisableHydroRgb);
-            ApplyToggle(SlotKeyboardBacklight, BtnKeyboardBacklight, policy.ShowKeyboardBacklight, snapshot.KeyboardRgbOn, policy.DisableKeyboardBacklight);
-            ApplyToggle(SlotLightBar, BtnLightBar, policy.ShowLightBar, snapshot.LightBarOn, policy.DisableLightBar);
-            ApplyToggle(SlotFanSmartMode, BtnFanSmartMode, policy.ShowFanSmartMode, snapshot.FanSmartMode, policy.DisableFanSmartMode);
-            ApplyToggle(SlotLocalDimming, BtnLocalDimming, policy.ShowLocalDimming, snapshot.LocalDimmingOn, false);
-            ApplyToggle(SlotOverlay, BtnOverlay, policy.ShowOverlay, snapshot.OverlayOn, false);
-            ApplyToggle(SlotFlydigiRgb, BtnFlydigiRgb, policy.ShowFlydigiRgb, snapshot.FlydigiRgbOn, policy.DisableFlydigiRgb);
-
-            // Recalculate UniformGrid rows based on visible children so collapsed
-            // items don't leave gaps and buttons flow left-to-right, top-to-bottom.
-            UpdateButtonGridRows();
+            TrayQuickSettingsPage.Instance?.ApplySnapshot(snapshot);
+            TrayDisplayPage.Instance?.ApplySnapshot(snapshot);
         }
 
-        private static void ApplyToggle(
-            System.Windows.Controls.Panel panel,
-            System.Windows.Controls.Primitives.ToggleButton button,
-            bool visible,
-            bool isChecked,
-            bool isDisabled)
+        /// <summary>
+        /// Navigates the tray's NavigationView to a page class. The NavigationView
+        /// instantiates the page by reflection (parameterless constructor) and
+        /// animates the transition; navigating to the already-shown page is a no-op.
+        /// </summary>
+        /// <summary>
+        /// Resizes the quick-settings card to `base - freedHeight` and the window by
+        /// the same delta — the window sizes to its content, so the space freed by
+        /// hidden button rows must be taken from the HWND too, not just the card.
+        /// Idempotent: a no-op once the card already has the target height. Only
+        /// applies while the quick-settings page is shown; the Display page is laid
+        /// out for the full-height card and gets it back via the reset in NavigateTo.
+        /// </summary>
+        public void ResizeQuickSettingsCard(double freedHeight)
         {
-            panel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-            button.IsChecked = isChecked;
-            button.IsEnabled = !isDisabled;
+            if (_currentPage != typeof(TrayQuickSettingsPage))
+                return;
+
+            ApplyQuickSettingsCardHeight(QuickSettingsCardBaseHeight - freedHeight);
         }
 
-        private void UpdateButtonGridRows()
+        private void ApplyQuickSettingsCardHeight(double cardHeight)
         {
-            const int Columns = 3;
-            const int RowGap = 24;
+            var delta = cardHeight - QuickSettingsCard.Height;
+            if (delta == 0)
+                return;
 
-            // Collect visible children in order.
-            var visible = new List<FrameworkElement>();
-            foreach (FrameworkElement child in ButtonsGrid.Children)
+            QuickSettingsCard.Height = cardHeight;
+            this.Height = this.Height + delta;
+            UpdateLayout();
+            PositionNearTray();
+        }
+
+        /// <summary>
+        /// Navigates the tray's NavigationView to a page class and animates the shown
+        /// page with a custom fade+slide for the QuickSettings↔Display page hops:
+        /// entering the Display page slides in from the right, returning to the
+        /// quick-settings page slides in from the left — both layered with a fade
+        /// (the NavigationView's own transition is disabled in XAML, and its
+        /// TemplateBinding is one-time, so the library provider is applied here
+        /// instead). Navigate() is synchronous, so the page instance (and its static)
+        /// exists when it returns.
+        /// </summary>
+        public bool NavigateTo(Type pageType)
+        {
+            var toDisplay = pageType == typeof(TrayDisplayPage);
+            var navigated = TrayNavigation.Navigate(pageType);
+            UpdateMoreSettingsButton(pageType);
+            _currentPage = pageType;
+
+            // Leaving the quick-settings page: restore the full-height card the
+            // Display page is laid out for (the quick-settings page re-shrinks it
+            // on the snapshot re-apply that follows its own navigation).
+            if (toDisplay)
+                ApplyQuickSettingsCardHeight(QuickSettingsCardBaseHeight);
+
+            Page? page = null;
+            if (toDisplay)
+                page = TrayDisplayPage.Instance;
+            else
+                page = TrayQuickSettingsPage.Instance;
+            if (page is not null)
             {
-                if (child.Visibility == Visibility.Visible)
-                    visible.Add(child);
+                var slide = toDisplay ? Transition.SlideRight : Transition.SlideLeft;
+                _ = TransitionAnimationProvider.ApplyTransition(page, slide, TrayTransitionMs);
+                _ = TransitionAnimationProvider.ApplyTransition(page, Transition.FadeIn, TrayTransitionMs);
             }
 
-            int visibleCount = visible.Count;
-            int rowCount = visibleCount > 0 ? (visibleCount + Columns - 1) / Columns : 0;
-
-            // Build row definitions: one Auto row per content row, plus a spacer row between each.
-            ButtonsGrid.RowDefinitions.Clear();
-            for (int r = 0; r < rowCount; r++)
-            {
-                ButtonsGrid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = new GridLength(0, GridUnitType.Auto) });
-                if (r < rowCount - 1)
-                {
-                    ButtonsGrid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = new GridLength(RowGap) });
-                }
-            }
-
-            // Assign each visible slot to the correct Grid.Row and column, clear margins.
-            for (int i = 0; i < visibleCount; i++)
-            {
-                int col = i % Columns;
-                int contentRow = (i / Columns) * 2; // 0, 2, 4, ... (spacer rows are 1, 3, ...)
-                System.Windows.Controls.Grid.SetRow(visible[i], contentRow);
-                System.Windows.Controls.Grid.SetColumn(visible[i], col);
-                visible[i].Margin = new System.Windows.Thickness(0);
-            }
-
-            // Hide any collapsed children by clearing their row (they stay in Children but invisible).
-            foreach (FrameworkElement child in ButtonsGrid.Children)
-            {
-                if (child.Visibility != Visibility.Visible)
-                {
-                    System.Windows.Controls.Grid.SetRow(child, -1);
-                }
-            }
+            return navigated;
         }
 
-        #region Toggle Handlers
+        /// <summary>
+        /// Re-fetches the live snapshot and re-applies it to both pages. Used after
+        /// navigation, where the destination page is a fresh instance whose elements
+        /// still carry default state.
+        /// </summary>
+        public void RefreshSnapshot() => _ = ApplyAsync(async () => { });
 
-        private async void BtnAdaptiveMode_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
+        public bool IsBusy => _loading || _applying;
 
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                await _quickControl.SetAdaptiveModeAsync(enabled);
-            });
-        }
+        public TrayQuickControlService QuickControl => _quickControl;
 
-        private async void BtnHydroSmartMode_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
-
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                await _quickControl.SetHydroSmartModeAsync(enabled);
-            });
-        }
-
-        private async void BtnHydroRgb_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
-
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                await _quickControl.SetHydroRgbAsync(enabled);
-            });
-        }
-
-        private async void BtnKeyboardBacklight_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
-
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                _quickControl.SetKeyboardBacklight(enabled);
-                await Task.CompletedTask;
-            });
-        }
-
-        private async void BtnLightBar_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
-
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                _quickControl.SetLightBar(enabled);
-                await Task.CompletedTask;
-            });
-        }
-
-        private async void BtnFanSmartMode_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
-
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                _quickControl.SetFanSmartMode(enabled);
-                await Task.CompletedTask;
-            });
-        }
-
-        private async void BtnLocalDimming_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
-
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                bool success = await _quickControl.SetLocalDimmingAsync(enabled);
-                if (!success)
-                {
-                    // Revert toggle on failure
-                    Application.Current.Dispatcher.Invoke(() => btn.IsChecked = !enabled);
-                }
-            });
-        }
-
-        private async void BtnOverlay_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
-
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                _quickControl.SetOverlay(enabled);
-                await Task.CompletedTask;
-            });
-        }
-
-        private async void BtnFlydigiRgb_Click(object sender, RoutedEventArgs e)
-        {
-            if (_loading || _applying || sender is not System.Windows.Controls.Primitives.ToggleButton btn)
-                return;
-
-            bool enabled = btn.IsChecked == true;
-            await ApplyAsync(async () =>
-            {
-                await _quickControl.SetFlydigiRgbAsync(enabled);
-            });
-        }
-
-        #endregion
-
-        private async Task ApplyAsync(Func<Task> action)
+        public async Task ApplyAsync(Func<Task> action)
         {
             _applying = true;
             try
@@ -291,9 +228,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                     var snapshot = await Task.Run(_quickControl.GetSnapshot);
                     ApplySnapshot(snapshot);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignore — snapshot refresh is best-effort
+                    // Ignore — snapshot refresh is best-effort, but surface the cause:
+                    // a throw here leaves the Display page's Collapsed-by-default
+                    // sections un-applied (an empty page).
+                    Log.Warning("[Tray] Snapshot refresh failed: {Message}", ex.Message);
                 }
             }
             catch
@@ -363,7 +303,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                     StringComparison.OrdinalIgnoreCase)) ?? Screen.FromHandle(handle);
 
             var tbBounds = FindTaskbarBounds(screen.Bounds);
-            TrayWidgetPlacementResult placement = TrayWidgetPlacement.Calculate(
+            System.Drawing.Point location = TrayWidgetPlacement.CalculateCorner(
                 screen.Bounds,
                 screen.WorkingArea,
                 _placementAnchor,
@@ -374,8 +314,8 @@ namespace Uniwill_Control_Utility.Views.Windows
             SetWindowPos(
                 handle,
                 IntPtr.Zero,
-                placement.Location.X,
-                placement.Location.Y,
+                location.X,
+                location.Y,
                 0,
                 0,
                 SetWindowPosFlags.NoSize |
@@ -457,6 +397,12 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void Window_Deactivated(object sender, EventArgs e)
         {
+            if (_ignoreNextDeactivation)
+            {
+                _ignoreNextDeactivation = false;
+                return;
+            }
+
             if (_showing || _applying)
                 return;
 
@@ -468,6 +414,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         private void OpenUcuButton_Click(object sender, RoutedEventArgs e)
         {
             HideWidget();
+
             MainWindow? mainWindow = MainWindow.Instance;
             if (mainWindow is null)
                 return;
@@ -477,15 +424,53 @@ namespace Uniwill_Control_Utility.Views.Windows
             mainWindow.Activate();
         }
 
-        private void NavigateContextMenu_Opened(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Re-arms the footer's conditional "More <page> settings" button for the
+        /// shown tray page: visible only on non-default pages (e.g. the Display
+        /// page), labeled with the page name in lower capitals, and remembering the
+        /// main-window page the click opens.
+        /// </summary>
+        private void UpdateMoreSettingsButton(Type pageType)
         {
-            // Store the source button's Tag in the context menu so the click handler
-            // knows which page to navigate to.
-            if (sender is System.Windows.Controls.ContextMenu menu && menu.PlacementTarget is System.Windows.Controls.Primitives.ToggleButton btn)
-                menu.Tag = btn.Tag;
+            string label = string.Empty;
+            Type? mainPage = null;
+
+            if (pageType == typeof(TrayDisplayPage))
+            {
+                label = "More display settings";
+                mainPage = typeof(Views.Pages.Display);
+            }
+
+            MoreSettingsText.Text = label;
+            MoreSettingsButton.Visibility = label.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            _moreSettingsTargetPage = mainPage;
         }
 
-        private void GoToUcuMenuItem_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Footer hop from a non-default tray page: hides the tray, opens UCU and
+        /// navigates it to the main-window page matching the shown tray page.
+        /// </summary>
+        private void MoreSettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            HideWidget();
+
+            MainWindow? mainWindow = MainWindow.Instance;
+            if (mainWindow is null)
+                return;
+
+            mainWindow.Show();
+            mainWindow.WindowState = WindowState.Normal;
+            mainWindow.Activate();
+
+            if (_moreSettingsTargetPage is not null)
+                mainWindow.Navigate(_moreSettingsTargetPage);
+        }
+
+        /// <summary>
+        /// Shared by both tray pages' context menus: hides the tray, opens UCU and
+        /// navigates to the page matching the source button's Tag.
+        /// </summary>
+        public void GoToUcuMenuItem_Click(object sender, RoutedEventArgs e)
         {
             HideWidget();
 
@@ -506,12 +491,13 @@ namespace Uniwill_Control_Utility.Views.Windows
             Type? pageType = tagName switch
             {
                 "Adaptive" => typeof(Views.Pages.Adaptive),
-                "Watercooler" => typeof(Views.Pages.Watercooler),
+                "HydroUI" => typeof(Views.Pages.HydroUI),
                 "Keyboard" => typeof(Views.Pages.Keyboard),
                 "LightBar" => typeof(Views.Pages.LightBar),
                 "FanControl" => typeof(Views.Pages.FanControl),
                 "SettingsPage" => typeof(Views.Pages.SettingsPage),
                 "OverlaySettingsPage" => typeof(Views.Pages.OverlaySettingsPage),
+                "Display" => typeof(Views.Pages.Display),
                 "FlydigiCooler" => typeof(Views.Pages.FlydigiCooler),
                 _ => null
             };

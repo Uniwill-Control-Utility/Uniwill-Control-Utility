@@ -36,8 +36,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         private readonly System.Windows.Threading.DispatcherTimer sensors = new System.Windows.Threading.DispatcherTimer();
         private readonly GpuInventoryService gpuInventory;
 
-        // Watercooler connection tracking
-        private WaterCoolerService? _waterCoolerService;
+        // HydroUI connection tracking
+        private HydroUIService? _hydroUIService;
         private bool _hydroConnected;
 
         public Adaptive(GpuInventoryService gpuInventory)
@@ -84,17 +84,17 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (!WaterCoolerHardwareDetector.IsSupportedHardware())
                     return;
 
-                var waterCooler = App.GetService<WaterCoolerService>();
+                var waterCooler = App.GetService<HydroUIService>();
                 bool connected = waterCooler?.IsConnected == true;
 
                 Dispatcher.Invoke(() =>
                 {
-                    _waterCoolerService = waterCooler;
+                    _hydroUIService = waterCooler;
                     _hydroConnected = connected;
 
                     sdHydroUI.Visibility = Visibility.Visible;
-                    _waterCoolerService!.ConnectionStateChanged += OnWaterCoolerConnectionStateChanged;
-                    _waterCoolerService.SmartModeStateChanged += OnSmartModeStateChanged;
+                    _hydroUIService!.ConnectionStateChanged += OnWaterCoolerConnectionStateChanged;
+                    _hydroUIService.SmartModeStateChanged += OnSmartModeStateChanged;
 
                     ApplyFeatureVisibilityGates();
                 });
@@ -256,6 +256,25 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
+        /// <summary>
+        /// Disables the EC fan card and the GPU power (TGP + Dynamic Boost) controls while
+        /// the EC manual-control gate is locked. The firmware makes manual EC control and
+        /// the OEM Performance-button engine mutually exclusive, so a stock preset ignores
+        /// custom fan tables and cTGP/DB offsets — only a Custom preset unlocks them.
+        /// </summary>
+        private void ApplyManualControlLockGates()
+        {
+            bool enabled = _deviceApplier?.IsManualControlLocked != true;
+
+            sdEcFan.IsEnabled = enabled;
+            AdpGpuPowerPanel.IsEnabled = enabled;
+        }
+
+        private void OnManualControlLockChanged(object? sender, bool isLocked)
+        {
+            Dispatcher.Invoke(ApplyManualControlLockGates);
+        }
+
         // Named constants for repeated magic strings
         private const string AdaptivePresetsFile = "adaptivePresets.json";
 
@@ -309,6 +328,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 // Initialize DeviceApplier for centralized device commands
                 _deviceApplier = App.GetService<DeviceApplier>();
+                if (_deviceApplier is not null)
+                    _deviceApplier.ManualControlLockChanged += OnManualControlLockChanged;
                 _ = await gpuInventory.GetSnapshotAsync();
 
                 cbExcludeFromSwitching.IsChecked = false;
@@ -422,7 +443,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         // when getRunningGame already called it directly with resetTracking: false.
         private bool _isUpdatingPresetSelection;
 
-        // Voltage control is enabled when EnableCpuVoltageControl setting is True.
+        // Voltage control (Curve Optimizer) is AMD-only and gated by the EnableCpuVoltageControl setting.
         private bool AdpCpuVoltageEnabled => Settings.Default.EnableCpuVoltageControl;
 
         // Window classes that are NOT games (browsers, notifications, taskbar, etc.)
@@ -503,7 +524,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     StopFlydigiBs1SmartControl();
 
                     // Lift DeviceApplier overrides when Adaptive Mode stops so that
-                    // the Flydigi/Watercooler pages regain control and hide their overlays.
+                    // the Flydigi/HydroUI pages regain control and hide their overlays.
                     if (_deviceApplier != null)
                     {
                         _ = _deviceApplier.DisableFlydigiOverrideAsync();
@@ -603,7 +624,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void ApplyAdpPowerLimitMax()
         {
-            var waterCooler = App.GetService<WaterCoolerService>();
+            var waterCooler = App.GetService<HydroUIService>();
             bool hydro = waterCooler?.IsConnected == true;
             bool powerBoostMode = Settings.Default.EnablePowerBoostMode;
             var limits = SkuResolver.GetPowerLimits(hydro);
@@ -794,8 +815,85 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void LoadKeyboardToUI(AdaptivePreset preset)
         {
-            cbxKbMode.SelectedIndex = preset.KbPerKeyMode ? 1 : 0;
+            var brCfg = preset.KbBetterRgb;
+            bool brEnabled = brCfg != null && brCfg.Enabled;
+            cbxKbMode.SelectedIndex = brEnabled ? 2 : (preset.KbPerKeyMode ? 1 : 0);
             UpdateKbModeUI();
+            if (brEnabled)
+            {
+                cbxKbBrEffect.SelectedIndex = GetKbBrEffectIndex(brCfg.Mode);
+                UpdateKbBetterRgbUi();
+                _kbBrFps = Math.Clamp((int)Math.Round(Math.Clamp(brCfg.Fps, 15, 60) / 15.0) * 15, 15, 60);
+                UpdateKbBrFpsButtons();
+                var brBright = Math.Clamp(brCfg.BrightnessPercent, 3, 100);
+                sdKbBrBrightness.Value = brBright;
+                tbKbBrBrightnessValue.Text = brBright.ToString();
+                AdpTsKbBrLbSync.IsChecked = brCfg.LightBarSync;
+                ApplyLbSyncGate();
+
+                // Button-selected values restore their highlight state.
+                _kbBrAngle = Math.Clamp(brCfg.WaveAngle, 0, 315);
+                UpdateKbBrAngleButtons();
+                _kbBrDuration = Math.Clamp(brCfg.ReactiveDuration, 10, 45);
+                UpdateKbBrDurationButtons();
+                _kbBrMtStyle = Math.Clamp(brCfg.MatrixStyle, 0, 3);
+                UpdateKbBrStyleButtons();
+                _kbBrStLayout = Math.Clamp(brCfg.StaticLayout, 0, 1);
+                UpdateKbBrLayoutButtons();
+
+                tsKbBrBcRandom.IsChecked = brCfg.BreathRandom;
+                tsKbBrRcRandom.IsChecked = brCfg.ReactiveRandom;
+                tsKbBrWhReverse.IsChecked = brCfg.WheelReverse;
+                tsKbBrRpRandom.IsChecked = brCfg.RippleRandom;
+
+                // Slider values (the ValueChanged handlers refresh the label texts).
+                SetKbBrSlider(sdKbBrBcSpeed, brCfg.BreathSpeed, 1, 5);
+                SetKbBrSlider(sdKbBrBcSmooth, brCfg.BreathSmooth, 2, 150);
+                SetKbBrSlider(sdKbBrWvSpeed, brCfg.WaveSpeed, 1, 5);
+                SetKbBrSlider(sdKbBrSpSpeed, brCfg.SparkleSpeed, 1, 5);
+                SetKbBrSlider(sdKbBrSpDensity, brCfg.SparkleDensity, 3, 20);
+                SetKbBrSlider(sdKbBrWhSpeed, brCfg.WheelSpeed, 1, 5);
+                SetKbBrSlider(sdKbBrLtSpeed, brCfg.LightningSpeed, 1, 5);
+                SetKbBrSlider(sdKbBrLtSmooth, brCfg.LightningSmooth, 1, 20);
+                SetKbBrSlider(sdKbBrLtWidth, brCfg.LightningWidth, 1, 4);
+                SetKbBrSlider(sdKbBrLtConcurrent, brCfg.LightningConcurrent, 1, 4);
+                SetKbBrSlider(sdKbBrFlSpeed, brCfg.FlameSpeed, 1, 5);
+                SetKbBrSlider(sdKbBrFlSmooth, brCfg.FlameSmooth, 1, 10);
+                SetKbBrSlider(sdKbBrRnSpeed, brCfg.RainSpeed, 1, 5);
+                SetKbBrSlider(sdKbBrRnDensity, brCfg.RainDensity, 1, 5);
+                SetKbBrSlider(sdKbBrMtSpeed, brCfg.MatrixSpeed, 1, 5);
+                SetKbBrSlider(sdKbBrMtDensity, brCfg.MatrixDensity, 1, 5);
+                SetKbBrSlider(sdKbBrStZones, brCfg.StaticZones, 1, 7);
+                SetKbBrSlider(sdKbBrRpSpeed, brCfg.RippleSpeed, 1, 5);
+                SetKbBrSlider(sdKbBrRpWidth, brCfg.RippleWidth, 1, 4);
+                SetKbBrSlider(sdKbBrRbSpeed, brCfg.RainbowSpeed, 1, 5);
+                SetKbBrSlider(sdKbBrQsSpeed, brCfg.QuicksandSpeed, 1, 5);
+                SetKbBrSlider(sdKbBrQsScale, brCfg.QuicksandScale, 1, 10);
+                SetKbBrSlider(sdKbBrCuSpeed, brCfg.CurrentSpeed, 1, 5);
+                SetKbBrSlider(sdKbBrCuWidth, brCfg.CurrentWidth, 2, 8);
+
+                // Shared pickers: load the selected effect's own color fields.
+                string eff = brCfg.Mode;
+                string singleColor = eff == "Reactive" ? brCfg.ReactiveColor
+                    : eff == "Ripple" ? brCfg.RippleColor : brCfg.BreathColor;
+                AdpKbBrColorPicker.SelectedColor = HexToColor(singleColor);
+                string multiCsv = eff switch
+                {
+                    "Raindrop" => brCfg.RainColors,
+                    "Matrix" => brCfg.MatrixColors,
+                    "Static" => brCfg.StaticZoneColors,
+                    "Quicksand" => brCfg.QuicksandColors,
+                    "Current" => brCfg.CurrentColors,
+                    _ => "",
+                };
+                if (!string.IsNullOrEmpty(multiCsv))
+                {
+                    var brColors = ParseColorString(multiCsv);
+                    if (brColors.Count > 0)
+                        AdpKbBrMultiColorPicker.SetColors(brColors);
+                }
+                return;
+            }
             int brightness = Math.Clamp(preset.KbBrightness, 1, 7);
             sdKbBrightness.Value = brightness;
             tbKbBrightnessValue.Text = brightness.ToString();
@@ -898,8 +996,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 AdpTsLightBarPower.IsChecked = preset.LbPower;
                 AdpLbColorPicker.SelectedColor = Color.FromRgb(preset.LbColorR, preset.LbColorG, preset.LbColorB);
-                AdpLbBrightnessSlider.Value = Math.Clamp(preset.LbBrightness, 0, 100);
-                AdpLbBrightnessValueText.Text = Math.Clamp(preset.LbBrightness, 0, 100).ToString();
+                AdpLbBrightnessSlider.Value = Math.Clamp(preset.LbBrightness, 10, 100);
+                AdpLbBrightnessValueText.Text = Math.Clamp(preset.LbBrightness, 10, 100).ToString();
                 AdpLbEffect.SelectedIndex = Math.Clamp(preset.LbEffect, 0, 5);
                 AdpLbSpeedSlider.Value = Math.Clamp(preset.LbSpeed, 0, 11);
                 AdpLbSpeedValueText.Text = Math.Clamp(preset.LbSpeed, 0, 11).ToString();
@@ -963,6 +1061,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             lastKbPerKeyMode = false;
             lastKbBrightness = 0;
             lastKbEffectMode = "";
+            lastKbBetterRgbMode = false;
             lastKbEffectSpeed = 0;
             lastKbColorR = 0;
             lastKbColorG = 0;
@@ -976,7 +1075,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             lastCpuTjMax = 0;
             lastCpuPl1 = 0;
             lastCpuPl2 = 0;
-            lastCpuUndervolt = 0;
 
             // GPU tracking
             lastGpuTgp = 0;
@@ -1096,6 +1194,8 @@ namespace Uniwill_Control_Utility.Views.Pages
                     KbMultiColors = SerializeColors(KbMultiColorPicker.GetColors()),
                     KbPerKeyColors = _kbPerKeyColors,
                     KbDirection = _kbDirection,
+                    // BetterRGB streamer override (keyboard mode index 2)
+                    KbBetterRgb = BuildBetterRgbSettingsFromUi(),
                     isAutoSwitch = !(cbExcludeFromSwitching.IsChecked ?? false),
                     // CPU
                     CpuEnabled = cbxCpuEnabled.IsChecked ?? false,
@@ -1337,6 +1437,24 @@ namespace Uniwill_Control_Utility.Views.Pages
         private string _kbDirection = "LeftRight";
         private string _kbPerKeyColors = "";
         private string lastKbDirection = "";
+        // BetterRGB streamer override state (keyboard mode index 2). Button-selected
+        // values (angle/duration/style/layout) live in fields; sliders read directly.
+        private int _kbBrFps = 30;
+        private int _kbBrAngle = 180;    // Wave direction, 0-315 deg (45-degree steps; default = left-to-right)
+        private int _kbBrDuration = 20;  // Reactive fade: 10 (Short) / 20 (Medium) / 45 (Long)
+        private int _kbBrMtStyle = 0;    // Matrix: 0 Diagonal / 1 Columns / 2 Lasers / 3 Rings
+        private int _kbBrStLayout = 0;   // Static: 0 Horizontal / 1 Vertical
+        private bool lastKbBetterRgbMode = false;
+        private string lastKbBetterRgbEffect = "";
+        private int lastKbBetterRgbFps = 0;
+        private int lastKbBetterRgbBrightness = 0;
+        private string lastKbBetterRgbColor = "";
+        private string lastKbBetterRgbMultiColors = "";
+        private static readonly string[] s_kbBrEffects =
+        {
+            "Breathing", "Wave", "Sparkle", "Reactive", "Wheel", "Lightning", "Flame", "Raindrop",
+            "Matrix", "Static", "Ripple", "Rainbow", "Quicksand", "Current",
+        };
         // CPU diff-tracking
         private int lastCpuSustained = 0;
         private int lastCpuBoost = 0;
@@ -1347,7 +1465,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         private int lastCpuCoCcd1 = 0;
         private int lastCpuPl1 = 0;
         private int lastCpuPl2 = 0;
-        private int lastCpuUndervolt = 0;
         // GPU diff-tracking
         private int lastGpuTgp = 0;
         private bool lastGpuDynamicBoost = false;
@@ -1408,22 +1525,24 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (!Settings.Default.EnableHydroUiNavigation || !_hydroConnected || !(cbxWcEnabled.IsChecked ?? false))
                 return;
 
-            bool smartModeActive = _waterCoolerService?.IsSmartModeActive == true;
+            bool smartModeActive = _hydroUIService?.IsSmartModeActive == true;
             // Also check if Smart Mode is configured in the service settings.
             // At startup there is a gap between BLE connection and Smart Mode timer
             // starting — during that window IsSmartModeActive is false even though
             // Smart Mode will take over pump/fan control shortly. Checking the
             // configured flag prevents Adaptive from applying a one-shot preset
             // pump voltage that Smart Mode would immediately overwrite.
-            bool smartModeConfigured = _waterCoolerService?.GetSettings().SmartModeEnabled == true;
+            bool smartModeConfigured = _hydroUIService?.GetSettings().SmartModeEnabled == true;
             bool skipPumpFan = smartModeActive || smartModeConfigured;
+            // Also skip RGB when Smart Mode temperature-based RGB is active
+            bool skipRgb = smartModeActive && (_hydroUIService?.GetSettings().SmartModeTemperatureRgb == true);
 
             // When Smart Mode is active or configured, skip pump voltage and fan speed overrides
-            // — Smart Mode controls them internally. RGB still applies.
+            // — Smart Mode controls them internally. RGB still applies unless temperature-based RGB is active.
             PumpVoltage? curPump = skipPumpFan ? null : (PumpVoltage?)GetPumpVoltageFromIndex(cbxWcPumpVoltage.SelectedIndex);
             FanSpeed? curFan = skipPumpFan ? null : GetFanSpeedFromIndex(cbxWcFanSpeed.SelectedIndex);
-            RgbState curRgbMode = GetRgbModeFromIndex(cbxWcRgbMode.SelectedIndex);
-            RgbColor curRgbColor = GetRgbColorFromIndex(cbxWcRgbColor.SelectedIndex);
+            RgbState curRgbMode = skipRgb ? lastWcRgbMode : GetRgbModeFromIndex(cbxWcRgbMode.SelectedIndex);
+            RgbColor curRgbColor = skipRgb ? lastWcRgbColor : GetRgbColorFromIndex(cbxWcRgbColor.SelectedIndex);
 
             if (curPump != lastWcPump || curFan != lastWcFan ||
                 curRgbMode != lastWcRgbMode || curRgbColor != lastWcRgbColor)
@@ -1637,6 +1756,13 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (!(cbxKbEnabled.IsChecked ?? false) || _deviceApplier == null)
                 return;
 
+            bool betterRgbMode = cbxKbMode.SelectedIndex == 2;
+            if (betterRgbMode)
+            {
+                ApplyBetterRgbIfNeeded();
+                return;
+            }
+
             bool perKeyMode = cbxKbMode.SelectedIndex == 1;
             int brightness = (int)sdKbBrightness.Value;
             string effectMode = GetKbEffectFromIndex(cbxKbEffect.SelectedIndex);
@@ -1647,6 +1773,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             string multiColors = SerializeColors(KbMultiColorPicker.GetColors());
 
             bool changed = perKeyMode != lastKbPerKeyMode ||
+                betterRgbMode != lastKbBetterRgbMode ||
                 brightness != lastKbBrightness ||
                 effectMode != lastKbEffectMode ||
                 effectSpeed != lastKbEffectSpeed ||
@@ -1680,6 +1807,42 @@ namespace Uniwill_Control_Utility.Views.Pages
             lastKbColorG = colorG;
             lastKbColorB = colorB;
             lastKbMultiColors = multiColors;
+            lastKbBetterRgbMode = false;
+        }
+
+        /// <summary>
+        /// Applies the BetterRGB streamer preset (keyboard mode index 2): the full
+        /// per-effect control set (mirrored from the Keyboard page's BetterRGB card)
+        /// is captured into an AdaptiveBetterRgbSettings and routed through the
+        /// streamer. The diff check covers the shared controls; every per-effect
+        /// control change fires MarkBetterRgbChanged() which forces a re-apply.
+        /// </summary>
+        private void ApplyBetterRgbIfNeeded()
+        {
+            var cfg = BuildBetterRgbSettingsFromUi();
+            string effect = cfg.Mode;
+            int fps = cfg.Fps;
+            int brightness = cfg.BrightnessPercent;
+            string color = ColorToHex(AdpKbBrColorPicker.SelectedColor);
+            string multi = SerializeColors(AdpKbBrMultiColorPicker.GetColors());
+
+            bool changed = !lastKbBetterRgbMode
+                || effect != lastKbBetterRgbEffect
+                || fps != lastKbBetterRgbFps
+                || brightness != lastKbBetterRgbBrightness
+                || color != lastKbBetterRgbColor
+                || multi != lastKbBetterRgbMultiColors;
+            if (!changed)
+                return;
+
+            _deviceApplier.ApplyBetterRgbFromPreset(cfg);
+
+            lastKbBetterRgbMode = true;
+            lastKbBetterRgbEffect = effect;
+            lastKbBetterRgbFps = fps;
+            lastKbBetterRgbBrightness = brightness;
+            lastKbBetterRgbColor = color;
+            lastKbBetterRgbMultiColors = multi;
         }
 
         private void ApplyCpuIfNeeded()
@@ -1779,16 +1942,13 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             int pl1 = (int)AdpSdIntelPl1.Value;
             int pl2 = (int)AdpSdIntelPl2.Value;
-            int uv = (int)AdpSdIntelUndervolt.Value;
 
-            if (pl1 != lastCpuPl1 || pl2 != lastCpuPl2 || uv != lastCpuUndervolt)
+            if (pl1 != lastCpuPl1 || pl2 != lastCpuPl2)
             {
                 try
                 {
                     var parts = new System.Collections.Generic.List<string>();
                     parts.Add($"--intel-pl={pl1:F0},{pl2:F0}");
-                    if (AdpCpuVoltageEnabled && uv < 0)
-                        parts.Add($"--intel-volt-cpu={uv:F0}");
 
                     string cmd = string.Join(" ", parts);
                     _ = RyzenAdj_To_UCU.TranslateAsync(cmd);
@@ -1800,7 +1960,6 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 lastCpuPl1 = pl1;
                 lastCpuPl2 = pl2;
-                lastCpuUndervolt = uv;
             }
         }
 
@@ -1939,16 +2098,20 @@ namespace Uniwill_Control_Utility.Views.Pages
             UpdateFlydigiCardVisibility();
 
             // Apply Smart Mode state on navigation
-            bool smartModeActive = _waterCoolerService?.IsSmartModeActive == true;
+            bool smartModeActive = _hydroUIService?.IsSmartModeActive == true;
             if (smartModeActive)
             {
                 spWcPumpFan.Visibility = Visibility.Collapsed;
                 spWcSmartModeBadge.Visibility = Visibility.Visible;
+                bool tempRgb = _hydroUIService?.GetSettings().SmartModeTemperatureRgb == true;
+                spWcRgb.Visibility = tempRgb ? Visibility.Collapsed : Visibility.Visible;
+                tbWcSmartModeBadgeText.Text = "Smart Mode ON";
             }
             else
             {
                 spWcPumpFan.Visibility = Visibility.Visible;
                 spWcSmartModeBadge.Visibility = Visibility.Collapsed;
+                spWcRgb.Visibility = Visibility.Visible;
             }
 
             // Refresh CPU voltage control visibility so setting changes from Settings page take effect
@@ -1963,6 +2126,11 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // Apply dynamic power limit max and update GPU boost indicator
             ApplyAdpPowerLimitMax();
+
+            // Re-read the EC manual-control gate on navigation — a preset may have been
+            // applied while this page was hidden, and the event only fires on change.
+            _deviceApplier?.SyncManualControlLock();
+            ApplyManualControlLockGates();
 
             // Update bottom bar boost mode label
             UpdateAdpPresetModeLabel(Settings.Default.EnablePowerBoostMode);
@@ -2012,6 +2180,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         existing.KbMultiColors = SerializeColors(KbMultiColorPicker.GetColors());
                         existing.KbPerKeyMode = cbxKbMode.SelectedIndex == 1;
                         existing.KbDirection = _kbDirection;
+                        existing.KbBetterRgb = BuildBetterRgbSettingsFromUi();
 
                         adaptivePresetManager.SavePreset(presetName, existing);
                     }
@@ -2022,11 +2191,11 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
             }
 
-            // Unsubscribe from WaterCoolerService events to allow this scoped instance to be GC'd.
-            if (_waterCoolerService != null)
+            // Unsubscribe from HydroUIService events to allow this scoped instance to be GC'd.
+            if (_hydroUIService != null)
             {
-                _waterCoolerService.ConnectionStateChanged -= OnWaterCoolerConnectionStateChanged;
-                _waterCoolerService.SmartModeStateChanged -= OnSmartModeStateChanged;
+                _hydroUIService.ConnectionStateChanged -= OnWaterCoolerConnectionStateChanged;
+                _hydroUIService.SmartModeStateChanged -= OnSmartModeStateChanged;
             }
         }
 
@@ -2202,12 +2371,12 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// Handles watercooler connection/disconnection events at runtime.
         /// Shows or hides the Hydro UI card and disables the checkbox when disconnected.
         /// </summary>
-        private void OnWaterCoolerConnectionStateChanged(object? sender, WaterCoolerService.WatercoolerConnectionState state)
+        private void OnWaterCoolerConnectionStateChanged(object? sender, HydroUIService.WatercoolerConnectionState state)
         {
             Dispatcher.Invoke(() =>
             {
                 bool wasConnected = _hydroConnected;
-                _hydroConnected = state == WaterCoolerService.WatercoolerConnectionState.Connected;
+                _hydroConnected = state == HydroUIService.WatercoolerConnectionState.Connected;
 
                 if (_hydroConnected && !wasConnected)
                 {
@@ -2237,11 +2406,17 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     spWcPumpFan.Visibility = Visibility.Collapsed;
                     spWcSmartModeBadge.Visibility = Visibility.Visible;
+                    tbWcSmartModeBadgeText.Text = "Smart Mode ON";
+
+                    // Hide RGB controls when Smart Mode temperature-based RGB is active
+                    bool tempRgb = _hydroUIService?.GetSettings().SmartModeTemperatureRgb == true;
+                    spWcRgb.Visibility = tempRgb ? Visibility.Collapsed : Visibility.Visible;
                 }
                 else
                 {
                     spWcPumpFan.Visibility = Visibility.Visible;
                     spWcSmartModeBadge.Visibility = Visibility.Collapsed;
+                    spWcRgb.Visibility = Visibility.Visible;
                 }
 
                 // Reset pump/fan tracking so the next update() tick picks up the
@@ -2796,6 +2971,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 lastKbPerKeyMode = false;
                 lastKbBrightness = 0;
                 lastKbEffectMode = "";
+                lastKbBetterRgbMode = false;
             }
             else
             {
@@ -2845,17 +3021,462 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void UpdateKbModeUI()
         {
-            if (spKbEffectControls == null || spKbPerKeyNote == null)
+            if (spKbEffectControls == null || spKbPerKeyNote == null || spKbBetterRgb == null)
                 return;
 
-            bool perKey = cbxKbMode.SelectedIndex == 1;
-            bool showEffects = !perKey;
+            int mode = cbxKbMode.SelectedIndex;
+            bool perKey = mode == 1;
+            bool betterRgb = mode == 2;
+            bool showEffects = mode == 0;
             spKbEffectControls.Visibility = showEffects ? Visibility.Visible : Visibility.Collapsed;
             spKbPerKeyNote.Visibility = perKey ? Visibility.Visible : Visibility.Collapsed;
             sepKbPerKey.Visibility = perKey ? Visibility.Visible : Visibility.Collapsed;
+            spKbBetterRgb.Visibility = betterRgb ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBetterRgb.Visibility = betterRgb ? Visibility.Visible : Visibility.Collapsed;
+            // The firmware brightness row (1-7) does not apply in BetterRGB mode —
+            // the BetterRGB group carries its own 2-100 software brightness.
+            grKbBrightness.Visibility = betterRgb ? Visibility.Collapsed : Visibility.Visible;
+            sepKbBrightness.Visibility = betterRgb ? Visibility.Collapsed : Visibility.Visible;
 
-            if (!perKey)
+            if (betterRgb)
+                UpdateKbBetterRgbUi();
+            else if (!perKey)
                 UpdateKbEffectUi();
+        }
+
+        private void cbxKbBrEffect_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateKbBetterRgbUi();
+        }
+
+        /// <summary>
+        /// Shows/hides the BetterRGB group's rows for the selected effect — mirrors
+        /// the Keyboard page's UpdateBetterRgbEffectUi: every effect's full control
+        /// block is visible only while selected. The shared single-color picker
+        /// serves Breathing/Reactive/Ripple; the shared multi-color picker serves
+        /// Raindrop (5), Static zones (7), Matrix/Quicksand/Current (3).
+        /// </summary>
+        private void UpdateKbBetterRgbUi()
+        {
+            if (grKbBrColor == null || grKbBrMulti == null || grKbBrFps == null || grKbBrBright == null)
+                return;
+            if (BrBcSpeedRow == null || BrCuWidthRow == null)
+                return;
+
+            string effect = GetKbBrEffectFromIndex(cbxKbBrEffect.SelectedIndex);
+            // Random color replaces the fixed color: with the selected effect's
+            // random toggle ON, the shared color row (and its divider) is hidden.
+            bool bcRandomOn = tsKbBrBcRandom.IsChecked == true;
+            bool rcRandomOn = tsKbBrRcRandom.IsChecked == true;
+            bool rpRandomOn = tsKbBrRpRandom.IsChecked == true;
+            bool single = (effect == "Breathing" && !bcRandomOn)
+                || (effect == "Reactive" && !rcRandomOn)
+                || (effect == "Ripple" && !rpRandomOn);
+            bool multi = effect == "Raindrop" || effect == "Matrix" || effect == "Static"
+                || effect == "Quicksand" || effect == "Current";
+
+            grKbBrColor.Visibility = single ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrColor.Visibility = single ? Visibility.Visible : Visibility.Collapsed;
+            grKbBrMulti.Visibility = multi ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrMulti.Visibility = multi ? Visibility.Visible : Visibility.Collapsed;
+
+            if (multi)
+            {
+                bool rain = effect == "Raindrop";
+                bool stat = effect == "Static";
+                AdpKbBrMultiColorPicker.MaxColors = rain ? 5 : stat ? 7 : 3;
+                tbKbBrMultiSubtitle.Text = rain
+                    ? "Up to 5 colors for this effect. Click a swatch to edit."
+                    : stat
+                        ? "Up to 7 zone colors for this effect. Click a swatch to edit."
+                        : "Up to 3 colors for this effect. Click a swatch to edit.";
+            }
+
+            bool br = effect == "Breathing";
+            BrBcSpeedRow.Visibility = br ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrBcSpeed.Visibility = br ? Visibility.Visible : Visibility.Collapsed;
+            BrBcSmoothRow.Visibility = br ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrBcSmooth.Visibility = br ? Visibility.Visible : Visibility.Collapsed;
+            BrBcRandomRow.Visibility = br ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrBcRandom.Visibility = br ? Visibility.Visible : Visibility.Collapsed;
+
+            bool wv = effect == "Wave";
+            BrWvAngleRow.Visibility = wv ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrWvAngle.Visibility = wv ? Visibility.Visible : Visibility.Collapsed;
+            BrWvSpeedRow.Visibility = wv ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrWvSpeed.Visibility = wv ? Visibility.Visible : Visibility.Collapsed;
+
+            bool sp = effect == "Sparkle";
+            BrSpSpeedRow.Visibility = sp ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrSpSpeed.Visibility = sp ? Visibility.Visible : Visibility.Collapsed;
+            BrSpDensityRow.Visibility = sp ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrSpDensity.Visibility = sp ? Visibility.Visible : Visibility.Collapsed;
+
+            bool rc = effect == "Reactive";
+            BrRcRandomRow.Visibility = rc ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrRcRandom.Visibility = rc ? Visibility.Visible : Visibility.Collapsed;
+            BrRcDurationRow.Visibility = rc ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrRcDuration.Visibility = rc ? Visibility.Visible : Visibility.Collapsed;
+
+            bool wh = effect == "Wheel";
+            BrWhReverseRow.Visibility = wh ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrWhReverse.Visibility = wh ? Visibility.Visible : Visibility.Collapsed;
+            BrWhSpeedRow.Visibility = wh ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrWhSpeed.Visibility = wh ? Visibility.Visible : Visibility.Collapsed;
+
+            bool lt = effect == "Lightning";
+            BrLtSpeedRow.Visibility = lt ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrLtSpeed.Visibility = lt ? Visibility.Visible : Visibility.Collapsed;
+            BrLtSmoothRow.Visibility = lt ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrLtSmooth.Visibility = lt ? Visibility.Visible : Visibility.Collapsed;
+            BrLtWidthRow.Visibility = lt ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrLtWidth.Visibility = lt ? Visibility.Visible : Visibility.Collapsed;
+            BrLtConcurrentRow.Visibility = lt ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrLtConcurrent.Visibility = lt ? Visibility.Visible : Visibility.Collapsed;
+
+            bool fl = effect == "Flame";
+            BrFlSpeedRow.Visibility = fl ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrFlSpeed.Visibility = fl ? Visibility.Visible : Visibility.Collapsed;
+            BrFlSmoothRow.Visibility = fl ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrFlSmooth.Visibility = fl ? Visibility.Visible : Visibility.Collapsed;
+
+            bool rn = effect == "Raindrop";
+            BrRnSpeedRow.Visibility = rn ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrRnSpeed.Visibility = rn ? Visibility.Visible : Visibility.Collapsed;
+            BrRnDensityRow.Visibility = rn ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrRnDensity.Visibility = rn ? Visibility.Visible : Visibility.Collapsed;
+
+            bool mt = effect == "Matrix";
+            BrMtStyleRow.Visibility = mt ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrMtStyle.Visibility = mt ? Visibility.Visible : Visibility.Collapsed;
+            BrMtSpeedRow.Visibility = mt ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrMtSpeed.Visibility = mt ? Visibility.Visible : Visibility.Collapsed;
+            BrMtDensityRow.Visibility = mt ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrMtDensity.Visibility = mt ? Visibility.Visible : Visibility.Collapsed;
+
+            bool st = effect == "Static";
+            BrStLayoutRow.Visibility = st ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrStLayout.Visibility = st ? Visibility.Visible : Visibility.Collapsed;
+            BrStZonesRow.Visibility = st ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrStZones.Visibility = st ? Visibility.Visible : Visibility.Collapsed;
+
+            bool rp = effect == "Ripple";
+            BrRpRandomRow.Visibility = rp ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrRpRandom.Visibility = rp ? Visibility.Visible : Visibility.Collapsed;
+            BrRpSpeedRow.Visibility = rp ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrRpSpeed.Visibility = rp ? Visibility.Visible : Visibility.Collapsed;
+            BrRpWidthRow.Visibility = rp ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrRpWidth.Visibility = rp ? Visibility.Visible : Visibility.Collapsed;
+
+            bool rb = effect == "Rainbow";
+            BrRbSpeedRow.Visibility = rb ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrRbSpeed.Visibility = rb ? Visibility.Visible : Visibility.Collapsed;
+
+            bool qs = effect == "Quicksand";
+            BrQsSpeedRow.Visibility = qs ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrQsSpeed.Visibility = qs ? Visibility.Visible : Visibility.Collapsed;
+            BrQsScaleRow.Visibility = qs ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrQsScale.Visibility = qs ? Visibility.Visible : Visibility.Collapsed;
+
+            bool cu = effect == "Current";
+            BrCuSpeedRow.Visibility = cu ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrCuSpeed.Visibility = cu ? Visibility.Visible : Visibility.Collapsed;
+            BrCuWidthRow.Visibility = cu ? Visibility.Visible : Visibility.Collapsed;
+            sepKbBrCuWidth.Visibility = cu ? Visibility.Visible : Visibility.Collapsed;
+
+            // Static and Rainbow render a constant frame (the engine caps them at the
+            // 10 FPS keepalive), so the FPS target is inert — hide it while selected.
+            bool staticSource = st || rb;
+            grKbBrFps.Visibility = staticSource ? Visibility.Collapsed : Visibility.Visible;
+            sepKbBrFps.Visibility = grKbBrFps.Visibility;
+            grKbBrBright.Visibility = Visibility.Visible;
+            sepKbBrBright.Visibility = Visibility.Visible;
+        }
+
+        private void KbBrFpsButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Wpf.Ui.Controls.Button btn && btn.Tag is string tag)
+                _kbBrFps = int.Parse(tag);
+            UpdateKbBrFpsButtons();
+        }
+
+        private void UpdateKbBrFpsButtons()
+        {
+            if (btnKbBrFps15 == null)
+                return;
+            void SetActive(Wpf.Ui.Controls.Button btn, int fps)
+            {
+                btn.Appearance = _kbBrFps == fps ? Wpf.Ui.Controls.ControlAppearance.Primary : Wpf.Ui.Controls.ControlAppearance.Transparent;
+            }
+            SetActive(btnKbBrFps15, 15);
+            SetActive(btnKbBrFps30, 30);
+            SetActive(btnKbBrFps45, 45);
+            SetActive(btnKbBrFps60, 60);
+        }
+
+        /// <summary>
+        /// Forces the next update() tick to re-apply the BetterRGB override — used
+        /// by every per-effect control handler (sliders, toggles, button groups).
+        /// </summary>
+        private void MarkBetterRgbChanged()
+        {
+            lastKbBetterRgbMode = false;
+        }
+
+        private void sdKbBrBrightness_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            tbKbBrBrightnessValue.Text = ((int)sdKbBrBrightness.Value).ToString();
+            MarkBetterRgbChanged();
+        }
+
+        private void AdpKbBrColorPicker_ColorChangedDelayed(object sender, EventArgs e)
+        {
+            // Color changed — force the next update() tick to re-apply.
+            MarkBetterRgbChanged();
+        }
+
+        private void AdpKbBrMultiColorPicker_ColorsChanged(object sender, EventArgs e)
+        {
+            // Colors changed — force the next update() tick to re-apply.
+            MarkBetterRgbChanged();
+        }
+
+        // Wave direction arrow buttons (45-degree steps)
+        private void KbBrWvAngleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Wpf.Ui.Controls.Button btn && btn.Tag is string tag)
+                _kbBrAngle = int.Parse(tag);
+            UpdateKbBrAngleButtons();
+            MarkBetterRgbChanged();
+        }
+
+        private void UpdateKbBrAngleButtons()
+        {
+            if (btnKbBrWvA0 == null)
+                return;
+            void SetActive(Wpf.Ui.Controls.Button btn, int angle)
+            {
+                btn.Appearance = _kbBrAngle == angle ? Wpf.Ui.Controls.ControlAppearance.Primary : Wpf.Ui.Controls.ControlAppearance.Transparent;
+            }
+            SetActive(btnKbBrWvA0, 0);
+            SetActive(btnKbBrWvA45, 45);
+            SetActive(btnKbBrWvA90, 90);
+            SetActive(btnKbBrWvA135, 135);
+            SetActive(btnKbBrWvA180, 180);
+            SetActive(btnKbBrWvA225, 225);
+            SetActive(btnKbBrWvA270, 270);
+            SetActive(btnKbBrWvA315, 315);
+        }
+
+        // Reactive fade duration buttons (Short/Medium/Long)
+        private void KbBrRcDurationButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Wpf.Ui.Controls.Button btn && btn.Tag is string tag)
+                _kbBrDuration = tag == "Short" ? 10 : tag == "Long" ? 45 : 20;
+            UpdateKbBrDurationButtons();
+            MarkBetterRgbChanged();
+        }
+
+        private void UpdateKbBrDurationButtons()
+        {
+            if (btnKbBrRcShort == null)
+                return;
+            void SetActive(Wpf.Ui.Controls.Button btn, int duration)
+            {
+                btn.Appearance = _kbBrDuration == duration ? Wpf.Ui.Controls.ControlAppearance.Primary : Wpf.Ui.Controls.ControlAppearance.Transparent;
+            }
+            SetActive(btnKbBrRcShort, 10);
+            SetActive(btnKbBrRcMedium, 20);
+            SetActive(btnKbBrRcLong, 45);
+        }
+
+        // Matrix style buttons (Diagonal/Columns/Lasers/Rings)
+        private void KbBrMtStyleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Wpf.Ui.Controls.Button btn && btn.Tag is string tag)
+                _kbBrMtStyle = tag == "Columns" ? 1 : tag == "Lasers" ? 2 : tag == "Rings" ? 3 : 0;
+            UpdateKbBrStyleButtons();
+            MarkBetterRgbChanged();
+        }
+
+        private void UpdateKbBrStyleButtons()
+        {
+            if (btnKbBrMtDiagonal == null)
+                return;
+            void SetActive(Wpf.Ui.Controls.Button btn, int style)
+            {
+                btn.Appearance = _kbBrMtStyle == style ? Wpf.Ui.Controls.ControlAppearance.Primary : Wpf.Ui.Controls.ControlAppearance.Transparent;
+            }
+            SetActive(btnKbBrMtDiagonal, 0);
+            SetActive(btnKbBrMtColumns, 1);
+            SetActive(btnKbBrMtLasers, 2);
+            SetActive(btnKbBrMtRings, 3);
+        }
+
+        // Static layout buttons (Horizontal/Vertical)
+        private void KbBrStLayoutButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Wpf.Ui.Controls.Button btn && btn.Tag is string tag)
+                _kbBrStLayout = tag == "Vertical" ? 1 : 0;
+            UpdateKbBrLayoutButtons();
+            MarkBetterRgbChanged();
+        }
+
+        private void UpdateKbBrLayoutButtons()
+        {
+            if (btnKbBrStHorizontal == null)
+                return;
+            void SetActive(Wpf.Ui.Controls.Button btn, int layout)
+            {
+                btn.Appearance = _kbBrStLayout == layout ? Wpf.Ui.Controls.ControlAppearance.Primary : Wpf.Ui.Controls.ControlAppearance.Transparent;
+            }
+            SetActive(btnKbBrStHorizontal, 0);
+            SetActive(btnKbBrStVertical, 1);
+        }
+
+        // Per-effect slider handlers: refresh the value label and force a re-apply.
+        private void sdKbBrBcSpeed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrBcSpeedValue.Text = ((int)sdKbBrBcSpeed.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrBcSmooth_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrBcSmoothValue.Text = ((int)sdKbBrBcSmooth.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrWvSpeed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrWvSpeedValue.Text = ((int)sdKbBrWvSpeed.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrSpSpeed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrSpSpeedValue.Text = ((int)sdKbBrSpSpeed.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrSpDensity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrSpDensityValue.Text = ((int)sdKbBrSpDensity.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrWhSpeed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrWhSpeedValue.Text = ((int)sdKbBrWhSpeed.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrLtSpeed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrLtSpeedValue.Text = ((int)sdKbBrLtSpeed.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrLtSmooth_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrLtSmoothValue.Text = ((int)sdKbBrLtSmooth.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrLtWidth_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrLtWidthValue.Text = ((int)sdKbBrLtWidth.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrLtConcurrent_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrLtConcurrentValue.Text = ((int)sdKbBrLtConcurrent.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrFlSpeed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrFlSpeedValue.Text = ((int)sdKbBrFlSpeed.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrFlSmooth_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrFlSmoothValue.Text = ((int)sdKbBrFlSmooth.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrRnSpeed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrRnSpeedValue.Text = ((int)sdKbBrRnSpeed.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrRnDensity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrRnDensityValue.Text = ((int)sdKbBrRnDensity.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrMtSpeed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrMtSpeedValue.Text = ((int)sdKbBrMtSpeed.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrMtDensity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrMtDensityValue.Text = ((int)sdKbBrMtDensity.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrStZones_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrStZonesValue.Text = ((int)sdKbBrStZones.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrRpSpeed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrRpSpeedValue.Text = ((int)sdKbBrRpSpeed.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrRpWidth_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrRpWidthValue.Text = ((int)sdKbBrRpWidth.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrRbSpeed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrRbSpeedValue.Text = ((int)sdKbBrRbSpeed.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrQsSpeed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrQsSpeedValue.Text = ((int)sdKbBrQsSpeed.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrQsScale_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrQsScaleValue.Text = ((int)sdKbBrQsScale.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrCuSpeed_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrCuSpeedValue.Text = ((int)sdKbBrCuSpeed.Value).ToString(); MarkBetterRgbChanged(); }
+        private void sdKbBrCuWidth_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        { tbKbBrCuWidthValue.Text = ((int)sdKbBrCuWidth.Value).ToString(); MarkBetterRgbChanged(); }
+
+        // Per-effect toggle handlers (value read from IsChecked at apply time).
+        // The random toggles also re-evaluate the color row's visibility.
+        private void TsKbBrBcRandom_Toggled(object sender, RoutedEventArgs e)
+        { UpdateKbBetterRgbUi(); MarkBetterRgbChanged(); }
+        private void TsKbBrRcRandom_Toggled(object sender, RoutedEventArgs e)
+        { UpdateKbBetterRgbUi(); MarkBetterRgbChanged(); }
+        private void TsKbBrWhReverse_Toggled(object sender, RoutedEventArgs e) => MarkBetterRgbChanged();
+        private void TsKbBrRpRandom_Toggled(object sender, RoutedEventArgs e)
+        { UpdateKbBetterRgbUi(); MarkBetterRgbChanged(); }
+
+        /// <summary>
+        /// Captures every BetterRGB control (effect, FPS, brightness, per-effect
+        /// sliders/toggles/buttons and the shared pickers) into the nested preset
+        /// settings object.
+        /// </summary>
+        private AdaptiveBetterRgbSettings BuildBetterRgbSettingsFromUi()
+        {
+            string multi = SerializeColors(AdpKbBrMultiColorPicker.GetColors());
+            string single = ColorToHex(AdpKbBrColorPicker.SelectedColor);
+            return new AdaptiveBetterRgbSettings
+            {
+                Enabled = cbxKbMode.SelectedIndex == 2,
+                Mode = GetKbBrEffectFromIndex(cbxKbBrEffect.SelectedIndex),
+                Fps = _kbBrFps,
+                BrightnessPercent = (int)sdKbBrBrightness.Value,
+                LightBarSync = AdpTsKbBrLbSync.IsChecked == true,
+                BreathSpeed = (int)sdKbBrBcSpeed.Value,
+                BreathSmooth = (int)sdKbBrBcSmooth.Value,
+                BreathRandom = tsKbBrBcRandom.IsChecked == true,
+                BreathColor = single,
+                WaveAngle = _kbBrAngle,
+                WaveSpeed = (int)sdKbBrWvSpeed.Value,
+                SparkleSpeed = (int)sdKbBrSpSpeed.Value,
+                SparkleDensity = (int)sdKbBrSpDensity.Value,
+                ReactiveRandom = tsKbBrRcRandom.IsChecked == true,
+                ReactiveDuration = _kbBrDuration,
+                ReactiveColor = single,
+                WheelReverse = tsKbBrWhReverse.IsChecked == true,
+                WheelSpeed = (int)sdKbBrWhSpeed.Value,
+                LightningSpeed = (int)sdKbBrLtSpeed.Value,
+                LightningSmooth = (int)sdKbBrLtSmooth.Value,
+                LightningWidth = (int)sdKbBrLtWidth.Value,
+                LightningConcurrent = (int)sdKbBrLtConcurrent.Value,
+                FlameSpeed = (int)sdKbBrFlSpeed.Value,
+                FlameSmooth = (int)sdKbBrFlSmooth.Value,
+                RainSpeed = (int)sdKbBrRnSpeed.Value,
+                RainDensity = (int)sdKbBrRnDensity.Value,
+                RainColors = multi,
+                MatrixStyle = _kbBrMtStyle,
+                MatrixSpeed = (int)sdKbBrMtSpeed.Value,
+                MatrixDensity = (int)sdKbBrMtDensity.Value,
+                MatrixColors = multi,
+                StaticLayout = _kbBrStLayout,
+                StaticZones = (int)sdKbBrStZones.Value,
+                StaticZoneColors = multi,
+                RippleRandom = tsKbBrRpRandom.IsChecked == true,
+                RippleSpeed = (int)sdKbBrRpSpeed.Value,
+                RippleWidth = (int)sdKbBrRpWidth.Value,
+                RippleColor = single,
+                RainbowSpeed = (int)sdKbBrRbSpeed.Value,
+                QuicksandSpeed = (int)sdKbBrQsSpeed.Value,
+                QuicksandScale = (int)sdKbBrQsScale.Value,
+                QuicksandColors = multi,
+                CurrentSpeed = (int)sdKbBrCuSpeed.Value,
+                CurrentWidth = (int)sdKbBrCuWidth.Value,
+                CurrentColors = multi,
+            };
+        }
+
+        /// <summary>
+        /// Sets a BetterRGB slider to a clamped value; the ValueChanged handler
+        /// refreshes the label text and forces a re-apply.
+        /// </summary>
+        private void SetKbBrSlider(Slider slider, int value, int min, int max)
+        {
+            slider.Value = Math.Clamp(value, min, max);
+        }
+
+        private static string GetKbBrEffectFromIndex(int index) =>
+            index >= 0 && index < s_kbBrEffects.Length ? s_kbBrEffects[index] : "Breathing";
+
+        private static int GetKbBrEffectIndex(string name)
+        {
+            var i = System.Array.IndexOf(s_kbBrEffects, name);
+            return i < 0 ? 0 : i;
+        }
+
+        private static string ColorToHex(Color c) => $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+
+        private static Color HexToColor(string hex)
+        {
+            var colors = ParseColorString(hex);
+            return colors.Count > 0 ? colors[0] : Color.FromRgb(0xFF, 0xFF, 0xFF);
         }
 
         /// <summary>
@@ -3173,9 +3794,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 AdpDividerAfterBoost.Visibility = Visibility.Collapsed;
                 AdpGridTjMax.Visibility = Visibility.Collapsed;
                 AdpCoControlsPanel.Visibility = Visibility.Collapsed;
-                // Intel undervolt visibility gated by voltage control setting
-                AdpGridIntelUndervolt.Visibility = voltageEnabled ? Visibility.Visible : Visibility.Collapsed;
-                AdpDividerAfterIntelPl2.Visibility = voltageEnabled ? Visibility.Visible : Visibility.Collapsed;
+                // Voltage control is AMD-only — Intel undervolt is not offered
+                AdpGridIntelUndervolt.Visibility = Visibility.Collapsed;
+                AdpDividerAfterIntelPl2.Visibility = Visibility.Collapsed;
             }
             else
             {
@@ -3268,7 +3889,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 lastCpuCoCcd1 = 0;
                 lastCpuPl1 = 0;
                 lastCpuPl2 = 0;
-                lastCpuUndervolt = 0;
             }
             else
             {
@@ -3453,6 +4073,41 @@ namespace Uniwill_Control_Utility.Views.Pages
                 AdpLbBrightnessValueText.Text = ((int)AdpLbBrightnessSlider.Value).ToString();
 
             ApplyLbOverrideImmediate();
+        }
+
+        /// <summary>
+        /// Light Bar Sync ownership gate: while the BetterRGB keyboard override
+        /// streams with sync, the streamer owns the front strip, so the per-game
+        /// Light Bar card is hidden and disabled (its controls would fight the
+        /// sync pushes). The card is restored when sync turns off.
+        /// </summary>
+        private bool _lbHiddenBySync;
+        private void ApplyLbSyncGate()
+        {
+            bool sync = AdpTsKbBrLbSync.IsChecked == true;
+            if (sync)
+            {
+                if (sdLightBar.Visibility == Visibility.Visible)
+                {
+                    _lbHiddenBySync = true;
+                    sdLightBar.Visibility = Visibility.Collapsed;
+                    sdLightBar.IsEnabled = false;
+                    // Release any active light bar override — the streamer owns the strip.
+                    _deviceApplier?.DisableLightBarOverride();
+                }
+            }
+            else if (_lbHiddenBySync)
+            {
+                sdLightBar.IsEnabled = true;
+                if (Settings.Default.EnableLightBarNavigation)
+                    sdLightBar.Visibility = Visibility.Visible;
+                _lbHiddenBySync = false;
+            }
+        }
+
+        private void AdpTsKbBrLbSync_Toggled(object sender, RoutedEventArgs e)
+        {
+            ApplyLbSyncGate();
         }
 
         private void AdpLbEffect_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -3657,7 +4312,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             lastCpuCoCcd1 = 0;
             lastCpuPl1 = 0;
             lastCpuPl2 = 0;
-            lastCpuUndervolt = 0;
             // Reset watercooler last values
             lastWcPump = PumpVoltage.Off;
             lastWcFan = FanSpeed.Off;
