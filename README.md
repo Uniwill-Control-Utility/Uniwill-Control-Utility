@@ -2,7 +2,7 @@
 
 A hardware tuning/monitoring application for laptops with **Uniwill-based embedded controllers**, with additional support for AMD Ryzen and Intel CPU tuning, NVIDIA GPU controls, and peripheral device management.
 
-Its purpose is to serve as an open-source alternative to the XMG/PCSpecialist's official Control Center.
+Its purpose is to serve as an open-source alternative to the official XMG/PCSpecialist Control Center.
 
 UCU was built on top of the foundation laid by [UXTU](https://github.com/JamesCJ60/Universal-x86-Tuning-Utility) (Universal x86 Tuning Utility), reworking/extending its capabilities with Uniwill EC integration, Flydigi cooler support, watercooler control, and a modern Fluent Design interface in order to provide a tailored software for the hardware used by the likes of XMG Neo A25/E25, PCSpecialist Recoil 3 16 (Intel/AMD) and so on.
 
@@ -10,10 +10,10 @@ UCU was built on top of the foundation laid by [UXTU](https://github.com/JamesCJ
 
 
 
-## ⚠️ Disclaimer & Trademarks
+##  Disclaimer & Trademarks
 
 * **This project is still very much a WORK IN PROGRESS** - Although a lot of attention and time has been invested into polishing this app, one should still expect some (minor) bugs
-* **Unofficial Software:** This project is an independent, community-driven, free and open-source utility. It is **not** affiliated with, endorsed by, or sponsored by Uniwill, Tongfang, Flydigi or any laptop/cooler brand/reseller mentioned above.
+* **Unofficial Software:** This project is an independent, community-driven, free and open-source utility. It is **not** affiliated with, endorsed by, or sponsored by XMG, Uniwill, Tongfang, Flydigi or any laptop/cooler brand/reseller mentioned above.
 * **Trademarks:** All product names, logos, images, brands, trademarks, and registered trademarks are property of their respective owners. Their use here is strictly for identification and compatibility purposes.
 * **No Warranty / Hardware Risks:** This software interfaces directly with hardware management features. **Use it at your own risk.** The developer assumes no liability for any hardware damage, system instability, battery degradation, or voided warranties resulting from the use of this utility.
 
@@ -46,24 +46,20 @@ If you come across any issues or errors, please [open an issue on GitHub](https:
     - GPU: **NVIDIA GeForce RTX 5090 Laptop**
     - Panel: **MiniLED**  
 
-## Testing limitations
-
-Intel CPU voltage control is currently not available.
-
-However, CPU TDP control has been tested and confirmed to be working on both AMD and Intel variants.
-
 ## How were the features achieved?
 
 A fair amount of research into other projects that have been mentioned in the Credits section.
 
 Without the hard work of all those developers, most of the features would have been either harder or impossible to implement.
 
-During my personal debugging/tinkering, I happened to stumble upon additional RGB effects for the Keyboard and Light Bar, and attempted to improve them further. 
+During my personal debugging/tinkering, I happened to stumble upon additional features/ideas, and attempted to improve them further. 
 
-And truth be told, a local AI agent was a game-changer when it came to discovering how everything ticked, which brings me to the next point.
+And truth be told, a local AI agent/model was a game-changer when it came to discovering how everything ticked, which brings me to the next point.
 
 ## AI  Disclaimer
-AI (**Qwen 3.6 27B**) was used to:
+For those who want to know, **Qwen3.6-27B** (Qwen Code harness) was used for the majority of the project, but recently there was a switch to **Qwen3.8 Flash Next** (Claude Code harness).
+
+AI was used to:
  - reverse-engineer closed-source software from the Credits section
  - research open-source software from the Credits section
  - implement a fair amount of the backend
@@ -71,25 +67,29 @@ AI (**Qwen 3.6 27B**) was used to:
 
 ## Pull Requests
 
-PRs with additional (well-structured and tested) features are welcome.
+PRs with additional (well-structured and tested) features and bug fixes are more than welcome.
 
-We do not mind features/code created with the assistance of AI, as long as it's thoroughly tested by the owner of said code and as long as the code is not of bad quality (aka "AI slop").
+Especially since I use (local) AI myself, I honestly do not mind features/code created with the assistance of it as long as:
+- it's thoroughly tested by the owner of said code
+- it doesn't break any of the existing features or UI
+- the code is not of ***horrible*** quality
 
 ## Features replicated from XMG's Control Center
  - Performance profiles
  - Keyboard global/per-key RGB control
- - BetterRGB software streamer engine (adaptive 15–60 FPS, default 30, on the ITE 0xFF03 RGB interface, AC auto-policy, wake resume)
  - Light Bar RGB control
  - Liquid Cooler control
  - CPU and GPU Fan Control
  - Battery control
  - MiniLED Local Dimming control
  - Display refresh rate control (laptop panel only)
- - Display color calibration control (Default / sRGB / P3 / Adobe RGB)
+ - Display color calibration control (Default / sRGB / DCI-P3 / Adobe RGB)
  - GPU MUX switch control (Hybrid / dGPU Only / iGPU Only)
  - GPU Power Saving (On / Off / Auto)
  - Performance button preset switching (physical Performance/Q-key button)
- - Device Manager hardware toggles (Wi-Fi / Bluetooth radios, webcam PnP enable/disable, touchpad Settings admin flow) on the Settings page
+ - Device Manager hardware toggles (Wi-Fi / Bluetooth radios, webcam PnP enable/disable, touchpad controll)
+ - CPU Advanced Performance Menu unlock in BIOS (Intel only, allows e.g. CPU/RAM clock/voltage control)
+ - Q-Key/Performance Button intercept (for power preset switching)
 
 ## Features replicated from Flydigi Space Center
  - Flydigi BS1, BS2, BS2 Pro, BS3 and BS3 Pro support
@@ -102,12 +102,11 @@ We do not mind features/code created with the assistance of AI, as long as it's 
  - Automatic performance profile application based on the charger being (un)plugged
  - Automatic GPU preference application based on the charger being (un)plugged (Hybrid mode)
  - Extra RGB effects/directions for the keyboard
+ - BetterRGB software streamer engine (adaptive 15–60 FPS, default 30, on the ITE 0xFF03 RGB interface, AC auto-policy, wake resume) for the keyboard and light bar
  - System tray controls for Power profile, Hydro UI, Fan and Flydigi control
  - Smart Hydro UI - turn the pump on/off and the fan up/down (noise optimization)
  - Smart Fan Mode - all fans now use one temperature sensor as the reference
  - Stock presets assert through the EC's own OEM mode engine (no power-register writes), so their power limits come from the firmware's factory table exactly like the official Control Center
- - Manual-control gating: Fan Control and the Adaptive GPU power controls are disabled while a stock preset is active, since the firmware ignores custom fan tables and cTGP/Dynamic Boost offsets then
- - Keyboard brightness re-assert after UCU hands EC manual control back to the firmware, so the firmware's own restore leaves no visible brightness flash
 
 # App Features
 
@@ -118,13 +117,13 @@ Simple metrics and toggles for quick changes.
 - **Page-container tray** — the QuickSettings grid is the default page of an in-tray NavigationView; a Display button navigates (with the page transition animation) to a Display page carrying the refresh-rate row, the laptop-panel color-calibration profile row, the runtime Nvidia Optimus switch (iGPU / Auto / dGPU power saving, Hybrid mode only) and the MiniLED local dimming toggle (MiniLED panels only), with the sections scrolling inside the page; a back button returns to the grid
 - **Title-bar hand-over button** — a button in the main window's title bar minimizes the main window and opens the mini-tray, mirroring a left-click on the tray icon
 
-![Tray](screenshots/tray.png)
+![Tray](screenshots/tray-qs.png)
 
 ### **Dashboard**
 
 At-a-glance system overview showing your device's specifications and live hardware metrics.
 
-- Device identification with laptop image (XMG, PC Specialist Recoil, and more)
+- Device identification with laptop image (XMG, PC Specialist, Tuxedo Computers, Mechrevo, and more)
 - Live CPU, GPU, memory, and battery telemetry cards (GPU metrics fall back to the iGPU when the dGPU is unavailable)
 - Quick-launch device controls for Flydigi coolers and Hydro UI watercoolers (when supported)
 
@@ -137,13 +136,14 @@ One-click tuning profiles and granular hardware controls for CPU, GPU, and syste
 - **Built-in profiles** — Office, Gaming, and Turbo presets optimized for common use cases, asserted through the EC's own OEM mode engine so their power limits stay in the firmware's factory table
 - **Custom profiles** — Save and load your own tuned configurations
 - **Status card** — Shows active values for CPU power limits, TjMax, Curve Optimizer, GPU TGP, and Dynamic Boost
-- **CPU Power Tuning** (AMD) — Sustained Power Limit (SPL), Fast Power Limit (FPL), TjMax, and Curve Optimizer
+- **CPU Power Tuning** (AMD) — Sustained Power Limit (SPL), Fast Power Limit (FPL), TjMax, and Curve Optimizer (AMD only)
 - **Intel Tuning** — PL1, PL2 power limits
 - **GPU Tuning** (NVIDIA) — GPU TGP, Dynamic Boost, Dynamic Boost Offset, Core/Memory Clock Offsets, and V-F Curve Editor (a fully working curve editor for undervolting)
 - **Custom presets** — Up to 5 custom presets can be set up (mirrored by another set when Power Boost Mode is ON)
 - **Preset backup & import** — Export and restore all custom presets and adaptive mode profiles
 
 ![Presets](screenshots/presets.png)
+
 ![GPU Curve](screenshots/gpu-curve.png)
 
 ### **Performance Button**
@@ -189,9 +189,11 @@ Click-through in-game performance overlay, rendered natively by RivaTuner Statis
 - **Refresh interval** — configurable (100–5000 ms) to balance accuracy and overhead
 - **Global shortcuts** — show/hide the overlay, plus a secondary alias shortcut
 - **Rendered by RTSS** — UCU writes the metric data into RTSS's on-screen display; positioning, scale, and opacity are configured in RTSS, and its native hooking keeps the overlay safe in anti-cheat (e.g. EAC) protected games
-- **RTSS required** — the overlay and FPS data depend on RTSS being installed and running
+
+![OSD](screenshots/OSD.png)
 
 ![Overlay](screenshots/overlay.png)
+
 
 ### **Automations**
 
@@ -205,7 +207,7 @@ Set-and-forget rules that apply presets automatically when system state changes.
 - **Refresh Rate on Battery** — Set the internal panel's refresh rate when running on battery (internal panel only; "No change" is the default)
 - **Refresh Rate when Plugged In** — Set the internal panel's refresh rate when connected to power (internal panel only; "No change" is the default)
 
-![Auto](screenshots/auto.png)
+![Auto](screenshots/automations.png)
 
 ### **Fan Control**
 
@@ -237,7 +239,10 @@ Per-key and global RGB keyboard backlight control via the ITE HID controller.
 - **BetterRGB Streamer Engine** — opt-in software mode ported from the open-source [BetterRGB-ITE8291-Adaptive](https://github.com/ZavierChen/BetterRGB-ITE8291-Adaptive) engine: all 14 effects (breathing, wave, sparkle, reactive, wheel, lightning, flame, raindrop, matrix, static, ripple, rainbow, quicksand, current) rendered in software and streamed on the dedicated ITE 0xFF03 RGB interface with the reference's interleaved 512-byte framing, at 15/30/45/60 FPS (button-selected, default 30; the pacer self-degrades if the device lags). Its own Effects card carries the full reference control set per effect (speeds, smoothness, widths, densities, multi-color palettes capped per effect — up to 5 for Raindrop, 3 for Matrix/Quicksand/Current, 7 for Static where the color count IS the zone count, random-color toggles, reactive duration, matrix styles, and Wave direction arrow buttons at 45° increments) — the firmware Effects card stays separate. 3–100 software brightness, keypress-driven reactive/ripple via the system key-state hook, AC auto-policy (plugged → streamer, on battery → firmware effects at 0% CPU), sleep/wake resume, a 3-attempt watchdog that falls back to Hardware MCU, and a live status line (running FPS + frame counter). On a normal UCU exit the engine hands the keyboard a static white firmware effect at the second-lowest brightness (in-memory only, never persisted) so the keyboard never goes black. Off by default — the hardware path is byte-identical
 - White-backlight-only mode for keyboards without RGB
 
-![Keyboard](screenshots/keyboard.png)
+![Keyboard - Normal](screenshots/keybaord-normal.png)
+
+![Keyboard - BetterRGB](screenshots/keyboard-betterrgb.png)
+
 ![Per-Key Keyboard](screenshots/keyboard-per-key.png)
 
 ### Light Bar
@@ -276,6 +281,7 @@ GPU display mode, GPU power management, and display panel controls (Uniwill EC h
 - **MiniLED Local Dimming** (MiniLED panels only) — Toggle the panel's local dimming, verified with an EC register readback.
 - **Display Refresh Rate** (panels offering multiple rates) — Switch the refresh rate of the **laptop panel only** (never an external monitor) through the Windows display-mode pathway (`EnumDisplaySettings`/`ChangeDisplaySettingsEx`). The panel is addressed by device name, so the write lands on it whether it is primary or secondary, and Windows' per-display registry carries the mode across primary/secondary switches. When only an external monitor is in use and the panel is detached (GDI hides it), the panel's known rate set is still offered, the last known rate stays selected, and a new selection is deferred — it is applied once the panel reattaches. Rates the panel does not report are hidden and the visible buttons spread evenly across the row.
 - **Color Calibration** (panels with Windows' ICC profiles) — Associate a Windows ICC color profile with the **laptop panel only** (never an external monitor): **Default** (uncalibrated), **sRGB**, **P3** (Display P3), or **Adobe RGB**, applied through the genuine Windows color-engine switch — `mscms.dll` `InstallColorProfile` + `WcsSetDefaultColorProfile` at SYSTEM_WIDE and CURRENT_USER scope (the exact sequence XMG Control Center's `GCUUtil.exe` runs), against the built-in spool profiles (`sRGB.icm`, `DCIP3.icm`, `AdobeRGB.icm`). Unlike a bare `ICM\ProfileAssociations` registry write (which only relabels the selection), this forces Windows' color engine to reload and actually repaint the panel. When the panel is detached (external-only), the last known profile stays selected and a new selection is deferred — it is applied once the panel reattaches.
+
 ![Display](screenshots/display.png)
 
 ### Flydigi Cooler
@@ -314,11 +320,11 @@ Application preferences, diagnostics, updates, and embedded system information.
 - **Application behaviour** — Start on boot, start minimized, minimize-to-tray, reapply settings on start, auto-reapply interval, auto-start Adaptive Mode
 - **Preset backup** — Export and import custom and adaptive mode presets as JSON
 - **Feature Control** - enable/disable various pages (e.g. the Flydigi cooler page if you do not need it)
-- **Advanced features** — Power boost mode, Q-Key button preset switching, and the CPU Advanced Performance Menu unlock (writes the OemMagicVariable NVRAM switch — offsets 111 and 51 together, mirroring XMG Control Center — so BIOS setup exposes the Advanced Performance Menu on next boot; the row only appears when the firmware reports support, i.e. Intel NB02)
+- **Advanced features** — Power boost mode, Q-Key button preset switching, and the CPU Advanced Performance Menu unlock (Intel ONLY - BIOS setup exposes the Advanced Performance Menu on next boot)
 - **Diagnostics** — Diagnostic logging level (Off, Error, Info, Debug)
 - **System Information** — Device, processor, memory, and battery specs with detailed RAM timings and SPD data
 
-![Settings](screenshots/settings.png)
+![Settings](screenshots/settings-1.png)
 
 ### **About**
 
@@ -359,6 +365,13 @@ RTSS is required for the **Game Overlay**. UCU writes its metrics into RTSS's on
 2. Download the latest zip
 3. Extract the zip
 4. Launch **Uniwill-Control-Utility.exe**
+
+## Optional
+For those who want to use color correction profiles, you need to:
+1. Download XMG's Control Center (since this one bundles the necessary .icm profiles)
+2. Install it
+3. Check that the 4 .icm files were added in ```C:\Windows\System32\spool\drivers\color```
+4. Uninstall XMG Control Center
 
 ## Credits
 
