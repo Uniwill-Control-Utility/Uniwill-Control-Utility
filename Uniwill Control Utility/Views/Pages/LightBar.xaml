@@ -108,7 +108,7 @@
                     <!-- Auto power: light bar follows the AC plug state -->
                     <ui:CardControl x:Name="AutoPowerCard" Margin="0,0,0,8">
                         <ui:CardControl.Icon>
-                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7E8;" FontSize="20" Margin="4,0,6,0" />
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE95F;" FontSize="20" Margin="4,0,6,0" />
                         </ui:CardControl.Icon>
                         <ui:CardControl.Header>
                             <StackPanel>
