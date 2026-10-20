@@ -98,7 +98,12 @@ namespace Uniwill_Control_Utility
                 // to this app even after GPU driver resets (PnP hotswap).
                 // Without this, Windows loses the taskbar association and shows
                 // a generic icon after dGPU disable/enable.
-                SetAppUserModelID("UniwillControlUtility.UCU");
+                SetAppUserModelID(NotificationShortcut.AppUserModelId);
+
+                // Windows only attributes unpackaged-app toasts to our AUMID when a
+                // Start Menu shortcut carries it; otherwise each exe location gets
+                // its own entry under Settings > Notifications.
+                NotificationShortcut.Ensure();
 
                 // Register code page provider so Encoding.GetEncoding(1252) works
                 // (required for RTSS OSD degree symbol rendering).
@@ -1252,7 +1257,7 @@ namespace Uniwill_Control_Utility
         /// </summary>
         public static void ReassertAppUserModelID()
         {
-            SetAppUserModelID("UniwillControlUtility.UCU");
+            SetAppUserModelID(NotificationShortcut.AppUserModelId);
 
             var window = System.Windows.Application.Current.MainWindow;
             if (window is not null)
