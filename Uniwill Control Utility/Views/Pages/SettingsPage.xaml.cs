@@ -1127,11 +1127,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             SetPresetBackupBusy(true);
             try
             {
-                var result = await PresetBackupService.ImportAsync(Settings.Default.Path, dialog.FileName);
+                await PresetBackupService.ImportAsync(Settings.Default.Path, dialog.FileName);
                 ShowPresetBackupStatus(
                     LocalizationService.Get("Import complete"),
-                    LocalizationService.Format("Imported {0} custom presets, {1} adaptive presets, {2} V-F curves, and {3} settings.",
-                        result.CustomPresetCount, result.AdaptivePresetCount, result.VfCurveCount, result.SettingsCount),
+                    LocalizationService.Get("Imported successfully"),
                     Wpf.Ui.Controls.InfoBarSeverity.Success);
             }
             catch (InvalidDataException)

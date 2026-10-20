@@ -254,12 +254,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (telemetry.IsAcPowered)
             {
                 iconPowerSource.Glyph = "\xE9A3"; // plug
-                tbPowerSource.Text = "AC Power";
+                tbPowerSource.Text = LocalizationService.Get("AC Power");
             }
             else
             {
                 iconPowerSource.Glyph = "\xF2BF"; // battery
-                tbPowerSource.Text = "Battery";
+                tbPowerSource.Text = LocalizationService.Get("Battery");
             }
 
             tbStateOfCharge.Text = telemetry.StateOfCharge >= 0 ? $"{telemetry.StateOfCharge}%" : "N/A";

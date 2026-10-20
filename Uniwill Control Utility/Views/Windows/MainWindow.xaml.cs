@@ -237,6 +237,14 @@ namespace Uniwill_Control_Utility.Views.Windows
             _navigationService.SetNavigationControl(RootNavigation);
             RootNavigation.SetPageProviderService(pageProvider);
             RootNavigation.SelectionChanged += OnNavigationSelectionChanged;
+            RootNavigation.Navigated += OnNavigationNavigated;
+        }
+
+        // Pages hosted by wpfui's Frame-based NavigationViewContentPresenter never fire
+        // Loaded events, so LocalizationService must walk every navigated page explicitly.
+        private void OnNavigationNavigated(NavigationView sender, NavigatedEventArgs e)
+        {
+            LocalizationService.RefreshElement(e.Page);
         }
 
         private void OnNavigationSelectionChanged(INavigationView sender, RoutedEventArgs e)
@@ -279,8 +287,8 @@ namespace Uniwill_Control_Utility.Views.Windows
 
                     string profileName = Settings.Default.presetProfile;
                     await PresetProfileApplier.ApplyProfileAsync(profileName, PresetProfileApplier.DisplayName(profileName));
-                    ToastNotification.ShowToastNotification($"{profileName} Preset Applied",
-                        $"Your {profileName} preset has been applied on startup!");
+                    ToastNotification.ShowToastNotification(LocalizationService.Format("{0} Preset Applied", profileName),
+                        LocalizationService.Format("Your {0} preset has been applied on startup!", profileName));
                     return;
                 }
 
@@ -323,7 +331,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                             {
                                 await ApplyCustomOnStart(command, p);
                                 ToastNotification.ShowToastNotification("Custom Preset Applied",
-                                    $"Your Custom preset (Profile {slot + 1}) has been applied on startup!");
+                                    LocalizationService.Format("Your Custom preset (Profile {0}) has been applied on startup!", slot + 1));
                             }
                         }
                         return;

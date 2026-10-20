@@ -118,6 +118,18 @@ namespace Uniwill_Control_Utility.Services
             CultureChanged?.Invoke(null, EventArgs.Empty);
         }
 
+        // Re-applies localization to an element subtree (e.g. a NavigationView page
+        // instance) without waiting for Loaded events, which never fire for pages
+        // hosted by wpfui's Frame-based NavigationViewContentPresenter.
+        public static void RefreshElement(object element)
+        {
+            if (element is DependencyObject dependencyObject)
+            {
+                dependencyObject.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+                    ApplyTree(element, new HashSet<object>(ReferenceEqualityComparer.Instance))));
+            }
+        }
+
         public static string Get(string source)
         {
             if (string.IsNullOrWhiteSpace(source))

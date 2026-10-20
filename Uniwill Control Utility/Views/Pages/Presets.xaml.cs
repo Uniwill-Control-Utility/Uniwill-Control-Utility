@@ -476,7 +476,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             tbCoOffset.Visibility = voltageEnabled ? Visibility.Visible : Visibility.Collapsed;
             coControlsPanel?.SetValue(VisibilityProperty, voltageEnabled ? Visibility.Visible : Visibility.Collapsed);
 
-            // NVIDIA visibility â€” check GPU inventory or fall back to NvTuning probe
+            // NVIDIA visibility — check GPU inventory or fall back to NvTuning probe
             bool hasNvidia = false;
             if (_gpuInventory != null)
             {
@@ -796,9 +796,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
             else
             {
-                btnOffice.ToolTip = "Office power profile â€” low power, quiet operation";
-                btnGaming.ToolTip = "Gaming power profile â€” balanced performance";
-                btnTurbo.ToolTip = "Turbo power profile â€” maximum performance";
+                btnOffice.ToolTip = "Office power profile — low power, quiet operation";
+                btnGaming.ToolTip = "Gaming power profile — balanced performance";
+                btnTurbo.ToolTip = "Turbo power profile — maximum performance";
                 btnCustom.ToolTip = "Apply your own custom power settings using the sliders below.";
             }
         }

@@ -771,7 +771,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Includes presets, fan curves, V-F curves, overlay, cooler settings, and application preferences. Existing data will be replaced during import"
+                                                   Text="Includes all app preferences"
                                                    TextWrapping="Wrap" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1"

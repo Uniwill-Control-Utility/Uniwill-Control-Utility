@@ -193,7 +193,7 @@
                                                HorizontalAlignment="Center"
                                                VerticalAlignment="Center"
                                                Margin="0,0,8,0"
-                                               Text="95 Â°C" />
+                                               Text="95 °C" />
                                     <Slider x:Name="AdpSdTjMax" Width="140" Maximum="105" Minimum="70" Value="95" TickFrequency="5" IsSnapToTickEnabled="True" TickPlacement="Both" VerticalAlignment="Center" ValueChanged="AdpSlider_ValueChanged" />
                                 </StackPanel>
                             </Grid>
@@ -971,7 +971,7 @@
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
                                     Visibility="Collapsed" />
 
-                            <!-- Embedded Curve Editor â€” full-width row (visible only for Custom profile) -->
+                            <!-- Embedded Curve Editor — full-width row (visible only for Custom profile) -->
                             <controls:FlydigiFanCurveEditor x:Name="Bs2ProCurveEditor"
                                                             Visibility="Collapsed"
                                                             Margin="0,4,0,4"/>
@@ -1084,7 +1084,7 @@
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
                                     Visibility="Collapsed" />
 
-                            <!-- Row: Brightness (visible for Static/Breathing/Flowing) â€” shared slider -->
+                            <!-- Row: Brightness (visible for Static/Breathing/Flowing) — shared slider -->
                             <Grid x:Name="spBs2ProRgbBrightness" Visibility="Collapsed">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
