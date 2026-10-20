@@ -168,7 +168,7 @@
   "Configuring services": "Configuration des services",
   "Connect": "Connecter",
   "Connected": "Connecté",
-  "Connecting devices": "Connecting devices",
+  "Connecting devices": "Connexion des appareils en cours",
   "Connecting...": "Connexion en cours...",
   "Connection, device behavior, and advanced control options": "Connexion, comportement de l'appareil et options de contrôle avancées",
   "Continue": "Continuer",
@@ -883,5 +883,6 @@
   "Your preset settings have been re-applied after resume.": "Vos paramètres de préréglage ont été réappliqués après la sortie de veille.",
   "Zone colors": "Couleurs des zones",
   "Zones": "Zones",
-  "~3-5 mV per 1 point": "~3-5 mV par point de curseur"
+  "~3-5 mV per 1 point": "~3-5 mV par point de curseur",
+  "Version {0}": "Version {0}"
 }

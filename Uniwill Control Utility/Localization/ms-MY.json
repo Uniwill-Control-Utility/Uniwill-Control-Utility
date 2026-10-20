@@ -168,7 +168,7 @@
   "Configuring services": "Mengkonfigurasi perkhidmatan",
   "Connect": "Sambung",
   "Connected": "Disambungkan",
-  "Connecting devices": "Connecting devices",
+  "Connecting devices": "Menyambung peranti",
   "Connecting...": "Menyambung...",
   "Connection, device behavior, and advanced control options": "Sambungan, tingkah laku peranti, dan pilihan kawalan lanjutan",
   "Continue": "Teruskan",
@@ -883,5 +883,6 @@
   "Your preset settings have been re-applied after resume.": "Tetapan pratetap anda telah digunakan semula selepas sambung semula.",
   "Zone colors": "Warna zon",
   "Zones": "Zon",
-  "~3-5 mV per 1 point": "~3-5 mV untuk 1 titik"
+  "~3-5 mV per 1 point": "~3-5 mV untuk 1 titik",
+  "Version {0}": "Versi {0}"
 }

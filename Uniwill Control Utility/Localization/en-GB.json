@@ -883,5 +883,6 @@
   "Your preset settings have been re-applied after resume.": "Your preset settings have been re-applied after resume.",
   "Zone colors": "Zone colors",
   "Zones": "Zones",
-  "~3-5 mV per 1 point": "~3-5 mV per 1 point"
+  "~3-5 mV per 1 point": "~3-5 mV per 1 point",
+  "Version {0}": "Version {0}"
 }

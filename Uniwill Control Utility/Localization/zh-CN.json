@@ -168,7 +168,7 @@
   "Configuring services": "正在配置服务",
   "Connect": "连接",
   "Connected": "已连接",
-  "Connecting devices": "Connecting devices",
+  "Connecting devices": "正在连接设备",
   "Connecting...": "正在连接...",
   "Connection, device behavior, and advanced control options": "连接、设备行为和高级控制选项",
   "Continue": "继续",
@@ -883,5 +883,6 @@
   "Your preset settings have been re-applied after resume.": "恢复后您的预设设置已重新应用。",
   "Zone colors": "区域颜色",
   "Zones": "区域",
-  "~3-5 mV per 1 point": "每 1 点约 3-5 mV"
+  "~3-5 mV per 1 point": "每 1 点约 3-5 mV",
+  "Version {0}": "版本 {0}"
 }

@@ -168,7 +168,7 @@
   "Configuring services": "جارٍ تكوين الخدمات",
   "Connect": "اتصال",
   "Connected": "متصل",
-  "Connecting devices": "Connecting devices",
+  "Connecting devices": "جارٍ الاتصال بالأجهزة",
   "Connecting...": "جاري الاتصال...",
   "Connection, device behavior, and advanced control options": "الاتصال، وسلوك الجهاز، وخيارات التحكم المتقدمة",
   "Continue": "متابعة",
@@ -883,5 +883,6 @@
   "Your preset settings have been re-applied after resume.": "تمت إعادة تطبيق إعداداتك المسبقة بعد الاستئناف.",
   "Zone colors": "ألوان المناطق",
   "Zones": "المناطق",
-  "~3-5 mV per 1 point": "حوالي 3-5 ملي فولت لكل نقطة"
+  "~3-5 mV per 1 point": "حوالي 3-5 ملي فولت لكل نقطة",
+  "Version {0}": "الإصدار {0}"
 }

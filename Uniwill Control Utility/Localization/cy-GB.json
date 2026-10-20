@@ -168,7 +168,7 @@
   "Configuring services": "Yn ffurfweddu gwasanaethau",
   "Connect": "Cysylltu",
   "Connected": "Wedi cysylltu",
-  "Connecting devices": "Connecting devices",
+  "Connecting devices": "Yn cysylltu â dyfeisiau",
   "Connecting...": "Yn cysylltu...",
   "Connection, device behavior, and advanced control options": "Cysylltiad, ymddygiad dyfais, ac opsiynau rheoli uwch",
   "Continue": "Parhau",
@@ -883,5 +883,6 @@
   "Your preset settings have been re-applied after resume.": "Mae eich gosodiadau rhagosodiad wedi'u hail-weithredu ar ôl ailddechrau.",
   "Zone colors": "Lliwiau parthau",
   "Zones": "Parthau",
-  "~3-5 mV per 1 point": "~3-5 mV y 1 phwynt"
+  "~3-5 mV per 1 point": "~3-5 mV y 1 phwynt",
+  "Version {0}": "Fersiwn {0}"
 }

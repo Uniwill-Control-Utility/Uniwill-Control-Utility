@@ -168,7 +168,7 @@
   "Configuring services": "Hizmetler yapılandırılıyor",
   "Connect": "Bağlan",
   "Connected": "Bağlandı",
-  "Connecting devices": "Connecting devices",
+  "Connecting devices": "Cihazlar bağlanıyor",
   "Connecting...": "Bağlanıyor...",
   "Connection, device behavior, and advanced control options": "Bağlantı, cihaz davranışı ve gelişmiş kontrol seçenekleri",
   "Continue": "Devam Et",
@@ -883,5 +883,6 @@
   "Your preset settings have been re-applied after resume.": "Önayar ayarlarınız uyanış sonrası yeniden uygulandı.",
   "Zone colors": "Bölge renkleri",
   "Zones": "Bölgeler",
-  "~3-5 mV per 1 point": "1 başına ~3-5 mV"
+  "~3-5 mV per 1 point": "1 başına ~3-5 mV",
+  "Version {0}": "Sürüm {0}"
 }

@@ -168,7 +168,7 @@
   "Configuring services": "กำลังกำหนดค่าบริการ",
   "Connect": "เชื่อมต่อ",
   "Connected": "เชื่อมต่อแล้ว",
-  "Connecting devices": "Connecting devices",
+  "Connecting devices": "กำลังเชื่อมต่ออุปกรณ์",
   "Connecting...": "กำลังเชื่อมต่อ...",
   "Connection, device behavior, and advanced control options": "ตัวเลือกการเชื่อมต่อ พฤติกรรมของอุปกรณ์ และการควบคุมขั้นสูง",
   "Continue": "ดำเนินการต่อ",
@@ -883,5 +883,6 @@
   "Your preset settings have been re-applied after resume.": "การตั้งค่าพรีเซ็ตของคุณถูกนำมาใช้อีกครั้งหลังระบบกลับมาทำงาน",
   "Zone colors": "สีของแต่ละโซน",
   "Zones": "โซน",
-  "~3-5 mV per 1 point": "~3-5 mV per 1 point"
+  "~3-5 mV per 1 point": "~3-5 mV per 1 point",
+  "Version {0}": "เวอร์ชัน {0}"
 }

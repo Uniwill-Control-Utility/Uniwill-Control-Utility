@@ -168,7 +168,7 @@
   "Configuring services": "Kino-configure ang mga serbisyo",
   "Connect": "Kumonekta",
   "Connected": "Konektado",
-  "Connecting devices": "Connecting devices",
+  "Connecting devices": "Kumokonekta sa mga device",
   "Connecting...": "Kumokonekta...",
   "Connection, device behavior, and advanced control options": "Koneksyon, gawi ng device, at mga advanced na opsyon sa kontrol",
   "Continue": "Magpatuloy",
@@ -883,5 +883,6 @@
   "Your preset settings have been re-applied after resume.": "Muling nailapat ang mga setting ng preset mo pagkatapos ng resume.",
   "Zone colors": "Mga kulay ng zone",
   "Zones": "Mga Zone",
-  "~3-5 mV per 1 point": "~3-5 mV bawat 1 punto"
+  "~3-5 mV per 1 point": "~3-5 mV bawat 1 punto",
+  "Version {0}": "Bersyon {0}"
 }

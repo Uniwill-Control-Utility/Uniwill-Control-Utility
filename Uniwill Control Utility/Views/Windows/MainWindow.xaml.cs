@@ -237,6 +237,14 @@ namespace Uniwill_Control_Utility.Views.Windows
             _navigationService.SetNavigationControl(RootNavigation);
             RootNavigation.SetPageProviderService(pageProvider);
             RootNavigation.SelectionChanged += OnNavigationSelectionChanged;
+            RootNavigation.Navigated += OnNavigationNavigated;
+        }
+
+        // Pages hosted by wpfui's Frame-based NavigationViewContentPresenter never fire
+        // Loaded events, so LocalizationService must walk every navigated page explicitly.
+        private void OnNavigationNavigated(NavigationView sender, NavigatedEventArgs e)
+        {
+            LocalizationService.RefreshElement(e.Page);
         }
 
         private void OnNavigationSelectionChanged(INavigationView sender, RoutedEventArgs e)

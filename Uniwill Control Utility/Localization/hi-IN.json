@@ -168,7 +168,7 @@
   "Configuring services": "सेवाएँ कॉन्फ़िगर की जा रही हैं",
   "Connect": "कनेक्ट करें",
   "Connected": "कनेक्ट हो गया",
-  "Connecting devices": "Connecting devices",
+  "Connecting devices": "डिवाइस कनेक्ट किए जा रहे हैं",
   "Connecting...": "कनेक्ट हो रहा है...",
   "Connection, device behavior, and advanced control options": "कनेक्शन, डिवाइस व्यवहार और उन्नत नियंत्रण विकल्प",
   "Continue": "जारी रखें",
@@ -883,5 +883,6 @@
   "Your preset settings have been re-applied after resume.": "रीज़्यूम के बाद आपकी प्रीसेट सेटिंग्स दोबारा लागू कर दी गई हैं।",
   "Zone colors": "क्षेत्र रंग",
   "Zones": "क्षेत्र",
-  "~3-5 mV per 1 point": "प्रति 1 अंक ~3-5 mV"
+  "~3-5 mV per 1 point": "प्रति 1 अंक ~3-5 mV",
+  "Version {0}": "संस्करण {0}"
 }

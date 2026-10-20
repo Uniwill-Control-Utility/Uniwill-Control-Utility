@@ -168,7 +168,7 @@
   "Configuring services": "Configurando los servicios",
   "Connect": "Conectar",
   "Connected": "Conectado",
-  "Connecting devices": "Connecting devices",
+  "Connecting devices": "Conectando dispositivos",
   "Connecting...": "Conectando...",
   "Connection, device behavior, and advanced control options": "Conexión, comportamiento del dispositivo y opciones de control avanzadas",
   "Continue": "Continuar",
@@ -883,5 +883,6 @@
   "Your preset settings have been re-applied after resume.": "Tus ajustes de preajuste se han vuelto a aplicar tras reanudar.",
   "Zone colors": "Colores de zona",
   "Zones": "Zonas",
-  "~3-5 mV per 1 point": "~3-5 mV por 1 punto"
+  "~3-5 mV per 1 point": "~3-5 mV por 1 punto",
+  "Version {0}": "Versión {0}"
 }

@@ -131,7 +131,7 @@ internal sealed class ParallelPhaseTracker
         _setLabel = setLabel;
         _setProgress = setProgress;
         _postToUiThread = postToUiThread;
-        _phaseLabel = phaseLabel;
+        _phaseLabel = LocalizationService.Get(phaseLabel);
         _startPercent = startPercent;
         _endPercent = endPercent;
 

@@ -168,7 +168,7 @@
   "Configuring services": "サービスを構成しています",
   "Connect": "接続",
   "Connected": "接続済み",
-  "Connecting devices": "Connecting devices",
+  "Connecting devices": "デバイスに接続しています",
   "Connecting...": "接続中...",
   "Connection, device behavior, and advanced control options": "接続、デバイス動作、高度な制御オプション",
   "Continue": "続行",
@@ -883,5 +883,6 @@
   "Your preset settings have been re-applied after resume.": "システム復帰後、プリセット設定が再適用されました。",
   "Zone colors": "ゾーンカラー",
   "Zones": "ゾーン",
-  "~3-5 mV per 1 point": "1 ポイントあたり約 3 ～ 5 mV"
+  "~3-5 mV per 1 point": "1 ポイントあたり約 3 ～ 5 mV",
+  "Version {0}": "バージョン {0}"
 }

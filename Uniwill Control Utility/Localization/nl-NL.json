@@ -168,7 +168,7 @@
   "Configuring services": "Services configureren",
   "Connect": "Verbinden",
   "Connected": "Verbonden",
-  "Connecting devices": "Connecting devices",
+  "Connecting devices": "Verbinding maken met apparaten",
   "Connecting...": "Verbinden...",
   "Connection, device behavior, and advanced control options": "Verbinding, apparaatgedrag en geavanceerde besturingsopties",
   "Continue": "Doorgaan",
@@ -883,5 +883,6 @@
   "Your preset settings have been re-applied after resume.": "Je preset-instellingen zijn na hervatten opnieuw toegepast.",
   "Zone colors": "Zonekleuren",
   "Zones": "Zones",
-  "~3-5 mV per 1 point": "~3-5 mV per 1 punt"
+  "~3-5 mV per 1 point": "~3-5 mV per 1 punt",
+  "Version {0}": "Versie {0}"
 }

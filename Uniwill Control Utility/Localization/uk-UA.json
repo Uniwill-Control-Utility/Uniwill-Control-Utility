@@ -168,7 +168,7 @@
   "Configuring services": "Налаштування служб",
   "Connect": "Підключити",
   "Connected": "Підключено",
-  "Connecting devices": "Connecting devices",
+  "Connecting devices": "Підключення пристроїв",
   "Connecting...": "Підключення...",
   "Connection, device behavior, and advanced control options": "Підключення, поведінка пристрою та розширені параметри керування",
   "Continue": "Продовжити",
@@ -883,5 +883,6 @@
   "Your preset settings have been re-applied after resume.": "Налаштування вашого пресета застосовано повторно після виходу зі сну.",
   "Zone colors": "Кольори зон",
   "Zones": "Зони",
-  "~3-5 mV per 1 point": "~3–5 мВ на 1 пункт"
+  "~3-5 mV per 1 point": "~3–5 мВ на 1 пункт",
+  "Version {0}": "Версія {0}"
 }
