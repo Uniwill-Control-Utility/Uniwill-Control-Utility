@@ -59,7 +59,7 @@ namespace Uniwill_Control_Utility
             return _host?.Services.GetService(typeof(T)) as T;
         }
 
-        internal static readonly string version = "0.9.5.1";
+        internal static readonly string version = "0.9.5.2";
         private Mutex? mutex;
         private const string MutexName = "UniwillControlUtility";
 
@@ -98,7 +98,7 @@ namespace Uniwill_Control_Utility
                 // to this app even after GPU driver resets (PnP hotswap).
                 // Without this, Windows loses the taskbar association and shows
                 // a generic icon after dGPU disable/enable.
-                SetAppUserModelID("UniwillControlUtility.UCU");
+                SetAppUserModelID(AppUserModelId);
 
                 // Register code page provider so Encoding.GetEncoding(1252) works
                 // (required for RTSS OSD degree symbol rendering).
@@ -1035,10 +1035,10 @@ namespace Uniwill_Control_Utility
             {
                 if (updateManager.NewVersion.StartsWith("3."))
                     ToastNotification.ShowToastNotification("Phantom Control Centre Now Available!",
-                        $"Head to the Phantom Control Centre GitHub releases page to easily download the latest build!");
+                        $"Head to the Phantom Control Centre GitHub releases page to easily download the latest build!", category: ToastCategory.Settings);
                 else
                     ToastNotification.ShowToastNotification("New Update Available!",
-                        $"Head to the settings menu to easily download the new Uniwill Control Utility update!");
+                        $"Head to the settings menu to easily download the new Uniwill Control Utility update!", category: ToastCategory.Settings);
             }
         }
 
@@ -1230,6 +1230,11 @@ namespace Uniwill_Control_Utility
         }
 
         /// <summary>
+        /// Stable identity for the taskbar button (see SetAppUserModelID).
+        /// </summary>
+        private const string AppUserModelId = "UniwillControlUtility.UCU";
+
+        /// <summary>
         /// Sets a stable AppUserModelID so the taskbar button stays pinned to this app
         /// even after GPU driver resets (PnP hotswap). Must be called before any windows
         /// are shown.
@@ -1252,7 +1257,7 @@ namespace Uniwill_Control_Utility
         /// </summary>
         public static void ReassertAppUserModelID()
         {
-            SetAppUserModelID("UniwillControlUtility.UCU");
+            SetAppUserModelID(AppUserModelId);
 
             var window = System.Windows.Application.Current.MainWindow;
             if (window is not null)

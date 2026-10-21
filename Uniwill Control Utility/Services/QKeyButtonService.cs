@@ -304,8 +304,7 @@ namespace Uniwill_Control_Utility.Services
                     },
                     DispatcherPriority.Normal);
 
-                ToastNotification.ShowToastNotification($"{displayName} Applied!",
-                    $"{displayName} has been applied!");
+                ToastNotification.ShowToastNotification(LocalizationService.Format("{0} Applied", displayName), accent: displayName);
 
                 Log.Information("[QKey] Cycled to {Profile} preset", displayName);
             }

@@ -1294,8 +1294,21 @@ namespace Uniwill_Control_Utility.Views.Pages
                     }
                 }
 
-                ToastNotification.ShowToastNotification($"{_currentProfile} Profile Applied",
-                    $"The {_currentProfile.ToLower()} power profile has been applied!");
+                if (_currentProfile == "Custom" && _customPresetSlot >= 0)
+                {
+                    // Name the slot like the other custom-apply paths do ("Custom 2 Applied"),
+                    // instead of the generic "Custom Profile Applied".
+                    string customTemplate = ActivePresetMode == Models.PresetMode.Boost
+                        ? "Custom {0} (Boost) Applied"
+                        : "Custom {0} Applied";
+                    ToastNotification.ShowToastNotification(LocalizationService.Format(customTemplate, _customPresetSlot + 1),
+                        accent: ToastNotification.AccentFor(customTemplate, (_customPresetSlot + 1).ToString()));
+                }
+                else
+                {
+                    ToastNotification.ShowToastNotification(LocalizationService.Format("{0} Applied", _currentProfile),
+                        accent: _currentProfile);
+                }
 
                 // Do NOT save to Settings.Default.CommandString.
                 // That field is shared with Custom Presets / Adaptive Mode auto-reapply.

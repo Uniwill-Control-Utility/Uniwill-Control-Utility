@@ -262,11 +262,14 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tbPowerSource.Text = LocalizationService.Get("Battery");
             }
 
-            tbStateOfCharge.Text = telemetry.StateOfCharge >= 0 ? $"{telemetry.StateOfCharge}%" : "N/A";
-            tbHealth.Text = telemetry.HealthPercent > 0 ? $"{telemetry.HealthPercent}%" : "N/A";
-            tbTemperature.Text = telemetry.TemperatureC >= 0 ? $"{telemetry.TemperatureC} °C" : "N/A";
-            tbCycleCount.Text = telemetry.CycleCount >= 0 ? telemetry.CycleCount.ToString() : "N/A";
-            tbVoltage.Text = telemetry.PresentVoltageMv > 0 ? $"{telemetry.PresentVoltageMv} mV" : "N/A";
+            // The XAML "N/A" defaults get localized at page load; the refresh timer
+            // must look the placeholder up too, or it reverts them to English.
+            string na = LocalizationService.Get("N/A");
+            tbStateOfCharge.Text = telemetry.StateOfCharge >= 0 ? $"{telemetry.StateOfCharge}%" : na;
+            tbHealth.Text = telemetry.HealthPercent > 0 ? $"{telemetry.HealthPercent}%" : na;
+            tbTemperature.Text = telemetry.TemperatureC >= 0 ? $"{telemetry.TemperatureC} °C" : na;
+            tbCycleCount.Text = telemetry.CycleCount >= 0 ? telemetry.CycleCount.ToString() : na;
+            tbVoltage.Text = telemetry.PresentVoltageMv > 0 ? $"{telemetry.PresentVoltageMv} mV" : na;
             int chargeRate = telemetry.ChargeRateMa;
             double chargeWatts = Math.Abs(chargeRate * (double)telemetry.PresentVoltageMv / 1_000_000.0);
             tbChargeRate.Text = $"{chargeRate} mA ({chargeWatts:F1} W)";

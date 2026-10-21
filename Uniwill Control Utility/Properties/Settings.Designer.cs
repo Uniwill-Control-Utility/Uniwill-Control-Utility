@@ -664,6 +664,18 @@ namespace Uniwill_Control_Utility.Properties {
                 this["MinimizeClose"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool DisableToastPopups {
+            get {
+                return ((bool)(this["DisableToastPopups"]));
+            }
+            set {
+                this["DisableToastPopups"] = value;
+            }
+        }
         
         
 

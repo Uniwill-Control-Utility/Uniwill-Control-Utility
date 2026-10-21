@@ -146,6 +146,11 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void TrayMenu_Opened(object sender, RoutedEventArgs e)
         {
+            // The tray ContextMenu lives outside the window's visual tree, so the
+            // Loaded/SetCulture localization passes never reach it — refresh it on
+            // every open (the deferred dispatch also covers items added below).
+            LocalizationService.RefreshElement(cmTrayMenu);
+
             // Sync all tray sections with current page state
             RefreshTrayStockPresetChecks();
             PopulateTrayCustomPresets();
@@ -287,8 +292,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
                     string profileName = Settings.Default.presetProfile;
                     await PresetProfileApplier.ApplyProfileAsync(profileName, PresetProfileApplier.DisplayName(profileName));
-                    ToastNotification.ShowToastNotification(LocalizationService.Format("{0} Preset Applied", profileName),
-                        LocalizationService.Format("Your {0} preset has been applied on startup!", profileName));
+                    ToastNotification.ShowToastNotification(LocalizationService.Format("{0} Applied", profileName), accent: profileName);
                     return;
                 }
 
@@ -330,8 +334,11 @@ namespace Uniwill_Control_Utility.Views.Windows
                             if (!string.IsNullOrWhiteSpace(command))
                             {
                                 await ApplyCustomOnStart(command, p);
-                                ToastNotification.ShowToastNotification("Custom Preset Applied",
-                                    LocalizationService.Format("Your Custom preset (Profile {0}) has been applied on startup!", slot + 1));
+                                string customTemplate = mode == Models.PresetMode.Boost
+                                    ? "Custom {0} (Boost) Applied"
+                                    : "Custom {0} Applied";
+                                ToastNotification.ShowToastNotification(LocalizationService.Format(customTemplate, slot + 1),
+                                    accent: ToastNotification.AccentFor(customTemplate, (slot + 1).ToString()));
                             }
                         }
                         return;
@@ -353,12 +360,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 Settings.Default.CommandString = Settings.Default.acCommandString;
                                 Settings.Default.Save();
                                 await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset);
-                                ToastNotification.ShowToastNotification("Charge Preset Applied!", $"Your charge preset settings have been applied!");
+                                ToastNotification.ShowToastNotification("Charge Applied");
                             }
                             else
                             {
                                 await RyzenAdj_To_UCU.TranslateAsync(Settings.Default.CommandString);
-                                ToastNotification.ShowToastNotification("Settings Reapplied!", $"Your last applied settings have been reapplied!");
+                                ToastNotification.ShowToastNotification("Settings Reapplied");
                             }
                         }
                         else
@@ -371,12 +378,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 Settings.Default.CommandString = Settings.Default.dcCommandString;
                                 Settings.Default.Save();
                                 await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset);
-                                ToastNotification.ShowToastNotification("Discharge Preset Applied!", $"Your discharge preset settings have been applied!");
+                                ToastNotification.ShowToastNotification("Discharge Applied");
                             }
                             else
                             {
                                 await RyzenAdj_To_UCU.TranslateAsync(Settings.Default.CommandString);
-                                ToastNotification.ShowToastNotification("Settings Reapplied!", $"Your last applied settings have been reapplied!");
+                                ToastNotification.ShowToastNotification("Settings Reapplied");
                             }
                         }
                     }
@@ -1069,7 +1076,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                             Settings.Default.Save();
                             await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset);
 
-                            if (lastAppliedState != "ac") ToastNotification.ShowToastNotification("Charge Preset Applied!", $"Your charge preset settings have been applied!");
+                            if (lastAppliedState != "ac") ToastNotification.ShowToastNotification("Charge Applied");
                             lastAppliedState = "ac";
                         }
                     }
@@ -1084,7 +1091,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                             Settings.Default.Save();
                             await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset);
 
-                            if (lastAppliedState != "dc") ToastNotification.ShowToastNotification("Discharge Preset Applied!", $"Your discharge preset settings have been applied!");
+                            if (lastAppliedState != "dc") ToastNotification.ShowToastNotification("Discharge Applied");
                             lastAppliedState = "dc";
                         }
 
@@ -1235,7 +1242,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 {
                                     await PresetProfileApplier.ApplyProfileAsync(activeProfile, PresetProfileApplier.DisplayName(activeProfile));
                                     Debug.WriteLine($"[Resume] Preset '{activeProfile}' re-applied");
-                                    ToastNotification.ShowToastNotification("Resume Preset Applied!", $"Your preset settings have been re-applied after resume.");
+                                    ToastNotification.ShowToastNotification("Resume Applied");
                                 }
                                 catch (Exception ex)
                                 {
@@ -1647,8 +1654,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 Settings.Default.CommandString = command;
                 Settings.Default.Save();
 
-                ToastNotification.ShowToastNotification($"{displayName} Applied!",
-                    $"{displayName} has been applied!");
+                ToastNotification.ShowToastNotification(LocalizationService.Format("{0} Applied", displayName), accent: displayName);
             }
             catch (Exception ex)
             {
@@ -1754,9 +1760,11 @@ namespace Uniwill_Control_Utility.Views.Windows
                     return;
 
                 await ApplyCustomOnStart(command, p);
-                string modeSuffix = mode == Models.PresetMode.Boost ? " (Boost)" : "";
-                ToastNotification.ShowToastNotification($"Custom {slot + 1}{modeSuffix} Applied!",
-                    $"Custom preset (Profile {slot + 1}) has been applied!");
+                string titleTemplate = mode == Models.PresetMode.Boost
+                    ? "Custom {0} (Boost) Applied"
+                    : "Custom {0} Applied";
+                ToastNotification.ShowToastNotification(LocalizationService.Format(titleTemplate, slot + 1),
+                    accent: ToastNotification.AccentFor(titleTemplate, (slot + 1).ToString()));
 
                 Settings.Default.presetProfile = "Custom";
                 if (mode == Models.PresetMode.Boost)
@@ -2008,7 +2016,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             var wc = App.GetService<HydroUIService>();
             if (wc == null || !wc.IsConnected)
             {
-                ToastNotification.ShowToastNotification("Hydro UI", "HydroUI not connected");
+                ToastNotification.ShowToastNotification("Hydro UI", "HydroUI not connected", category: ToastCategory.HydroUi);
                 return;
             }
 
@@ -2037,7 +2045,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             var wc = App.GetService<HydroUIService>();
             if (wc == null || !wc.IsConnected)
             {
-                ToastNotification.ShowToastNotification("Hydro UI", "HydroUI not connected");
+                ToastNotification.ShowToastNotification("Hydro UI", "HydroUI not connected", category: ToastCategory.HydroUi);
                 return;
             }
 
@@ -2068,7 +2076,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             var wc = App.GetService<HydroUIService>();
             if (wc == null || !wc.IsConnected)
             {
-                ToastNotification.ShowToastNotification("Hydro UI", "HydroUI not connected");
+                ToastNotification.ShowToastNotification("Hydro UI", "HydroUI not connected", category: ToastCategory.HydroUi);
                 return;
             }
 
@@ -2127,7 +2135,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             var fc = App.GetService<FlydigiCoolerHidService>();
             if (fc == null || !fc.IsConnected)
             {
-                ToastNotification.ShowToastNotification("Flydigi", "Cooler not connected");
+                ToastNotification.ShowToastNotification("Flydigi", "Cooler not connected", category: ToastCategory.Flydigi);
                 return;
             }
 
@@ -2197,7 +2205,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             var fc = App.GetService<FlydigiCoolerHidService>();
             if (fc == null || !fc.IsConnected)
             {
-                ToastNotification.ShowToastNotification("Flydigi", "Cooler not connected");
+                ToastNotification.ShowToastNotification("Flydigi", "Cooler not connected", category: ToastCategory.Flydigi);
                 return;
             }
 
@@ -2248,7 +2256,8 @@ namespace Uniwill_Control_Utility.Views.Windows
                     sc.ActiveProfile = profile;
                 }
 
-                ToastNotification.ShowToastNotification("Flydigi", $"Curve profile \"{profile.Name}\" applied");
+                var curveName = profile.Name.Length > 0 ? char.ToUpperInvariant(profile.Name[0]) + profile.Name[1..] : profile.Name;
+                ToastNotification.ShowToastNotification(LocalizationService.Format("Curve Profile {0} Applied", curveName), accent: curveName, category: ToastCategory.Flydigi);
             }
             catch (Exception ex)
             {
@@ -2264,7 +2273,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             var fc = App.GetService<FlydigiCoolerHidService>();
             if (fc == null || !fc.IsConnected)
             {
-                ToastNotification.ShowToastNotification("Flydigi", "Cooler not connected");
+                ToastNotification.ShowToastNotification("Flydigi", "Cooler not connected", category: ToastCategory.Flydigi);
                 return;
             }
 

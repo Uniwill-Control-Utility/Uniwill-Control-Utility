@@ -159,7 +159,7 @@
         <StackPanel x:Name="SlotAdaptiveMode"
                     Orientation="Vertical"
                     HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
+                    VerticalAlignment="Top">
             <ToggleButton x:Name="BtnAdaptiveMode"
                           Width="95"
                           Height="46"
@@ -178,6 +178,9 @@
             </ToggleButton>
             <ui:TextBlock FontSize="11"
                           Margin="0,12,0,0"
+                          TextWrapping="Wrap"
+                          TextAlignment="Center"
+                          MaxWidth="95"
                           HorizontalAlignment="Center"
                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                           Text="Adaptive Mode" />
@@ -187,7 +190,7 @@
         <StackPanel x:Name="SlotKeyboardBacklight"
                     Orientation="Vertical"
                     HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
+                    VerticalAlignment="Top">
             <ToggleButton x:Name="BtnKeyboardBacklight"
                           Width="95"
                           Height="46"
@@ -206,6 +209,9 @@
             </ToggleButton>
             <ui:TextBlock FontSize="11"
                           Margin="0,12,0,0"
+                          TextWrapping="Wrap"
+                          TextAlignment="Center"
+                          MaxWidth="95"
                           HorizontalAlignment="Center"
                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                           Text="Keyboard RGB" />
@@ -215,7 +221,7 @@
         <StackPanel x:Name="SlotLightBar"
                     Orientation="Vertical"
                     HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
+                    VerticalAlignment="Top">
             <ToggleButton x:Name="BtnLightBar"
                           Width="95"
                           Height="46"
@@ -234,6 +240,9 @@
             </ToggleButton>
             <ui:TextBlock FontSize="11"
                           Margin="0,12,0,0"
+                          TextWrapping="Wrap"
+                          TextAlignment="Center"
+                          MaxWidth="95"
                           HorizontalAlignment="Center"
                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                           Text="Light Bar" />
@@ -243,7 +252,7 @@
         <StackPanel x:Name="SlotFanSmartMode"
                     Orientation="Vertical"
                     HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
+                    VerticalAlignment="Top">
             <ToggleButton x:Name="BtnFanSmartMode"
                           Width="95"
                           Height="46"
@@ -264,6 +273,9 @@
             </ToggleButton>
             <ui:TextBlock FontSize="11"
                           Margin="0,12,0,0"
+                          TextWrapping="Wrap"
+                          TextAlignment="Center"
+                          MaxWidth="95"
                           HorizontalAlignment="Center"
                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                           Text="Smart Fan Mode" />
@@ -273,7 +285,7 @@
         <StackPanel x:Name="SlotOverlay"
                     Orientation="Vertical"
                     HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
+                    VerticalAlignment="Top">
             <ToggleButton x:Name="BtnOverlay"
                           Width="95"
                           Height="46"
@@ -292,6 +304,9 @@
             </ToggleButton>
             <ui:TextBlock FontSize="11"
                           Margin="0,12,0,0"
+                          TextWrapping="Wrap"
+                          TextAlignment="Center"
+                          MaxWidth="95"
                           HorizontalAlignment="Center"
                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                           Text="Overlay" />
@@ -301,7 +316,7 @@
         <StackPanel x:Name="SlotDisplay"
                     Orientation="Vertical"
                     HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
+                    VerticalAlignment="Top">
             <Button x:Name="BtnDisplay"
                     Width="95"
                     Height="46"
@@ -332,6 +347,9 @@
             </Button>
             <ui:TextBlock FontSize="11"
                           Margin="0,12,0,0"
+                          TextWrapping="Wrap"
+                          TextAlignment="Center"
+                          MaxWidth="95"
                           HorizontalAlignment="Center"
                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                           Text="Display" />
@@ -341,7 +359,7 @@
         <StackPanel x:Name="SlotHydroSmartMode"
                     Orientation="Vertical"
                     HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
+                    VerticalAlignment="Top">
             <ToggleButton x:Name="BtnHydroSmartMode"
                           Width="95"
                           Height="46"
@@ -362,6 +380,9 @@
             </ToggleButton>
             <ui:TextBlock FontSize="11"
                           Margin="0,12,0,0"
+                          TextWrapping="Wrap"
+                          TextAlignment="Center"
+                          MaxWidth="95"
                           HorizontalAlignment="Center"
                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                           Text="Smart Hydro" />
@@ -371,7 +392,7 @@
         <StackPanel x:Name="SlotHydroRgb"
                     Orientation="Vertical"
                     HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
+                    VerticalAlignment="Top">
             <ToggleButton x:Name="BtnHydroRgb"
                           Width="95"
                           Height="46"
@@ -390,6 +411,9 @@
             </ToggleButton>
             <ui:TextBlock FontSize="11"
                           Margin="0,12,0,0"
+                          TextWrapping="Wrap"
+                          TextAlignment="Center"
+                          MaxWidth="95"
                           HorizontalAlignment="Center"
                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                           Text="Hydro RGB" />
@@ -399,7 +423,7 @@
         <StackPanel x:Name="SlotFlydigiRgb"
                     Orientation="Vertical"
                     HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
+                    VerticalAlignment="Top">
             <ToggleButton x:Name="BtnFlydigiRgb"
                           Width="95"
                           Height="46"
@@ -418,6 +442,9 @@
             </ToggleButton>
             <ui:TextBlock FontSize="11"
                           Margin="0,12,0,0"
+                          TextWrapping="Wrap"
+                          TextAlignment="Center"
+                          MaxWidth="95"
                           HorizontalAlignment="Center"
                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                           Text="Flydigi RGB" />
