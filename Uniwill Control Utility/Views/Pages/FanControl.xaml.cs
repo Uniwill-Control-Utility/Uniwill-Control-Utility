@@ -997,10 +997,21 @@ namespace Uniwill_Control_Utility.Views.Pages
             FanControlSettingsService.Save(settings);
         }
 
+        // ComboBoxItem.Content is rewritten with the localized label by LocalizationService,
+        // so selection logic must read the language-neutral Tag names set in FanControl.xaml
+        // (ComboBoxItem.Tag is an Object property; XAML stores these as plain strings).
+        private static readonly string[] PresetNames = { "Silent", "Balanced", "Performance", "Full Speed", "Off", "Custom" };
+
+        private static string PresetNameOf(object? tag) => tag switch
+        {
+            string name when PresetNames.Contains(name) => name,
+            int code when code >= 0 && code < PresetNames.Length => PresetNames[code],
+            _ => "Balanced",
+        };
+
         private static string GetSelectedPresetName(ComboBox comboBox)
         {
-            return (comboBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString()
-                   ?? "Balanced";
+            return comboBox.SelectedItem is ComboBoxItem item ? PresetNameOf(item.Tag) : "Balanced";
         }
 
         #endregion
@@ -1010,7 +1021,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void cbPreset_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (cbPreset.SelectedItem is not ComboBoxItem item) return;
-            string? name = item.Content?.ToString();
+            string name = PresetNameOf(item.Tag);
             HandlePresetSelection(FanCurveEditor, name);
             if (!_loadingSettings)
             {
@@ -1023,7 +1034,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void cbCpuPreset_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (cbCpuPreset.SelectedItem is not ComboBoxItem item) return;
-            string? name = item.Content?.ToString();
+            string name = PresetNameOf(item.Tag);
             HandlePresetSelection(CpuFanCurveEditor, name);
             if (!_loadingSettings)
             {
@@ -1036,7 +1047,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void cbGpuPreset_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (cbGpuPreset.SelectedItem is not ComboBoxItem item) return;
-            string? name = item.Content?.ToString();
+            string name = PresetNameOf(item.Tag);
             HandlePresetSelection(GpuFanCurveEditor, name);
             if (!_loadingSettings)
             {
@@ -1639,11 +1650,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (cbxSmartFanTempSource.SelectedItem is not System.Windows.Controls.ComboBoxItem item)
                 return;
 
-            var source = item.Content?.ToString()?.ToLowerInvariant() switch
+            var source = item.Tag switch
             {
-                "cpu" => "cpu",
-                "gpu" => "gpu",
-                _ => "max"
+                string name => name.ToLowerInvariant() switch
+                {
+                    "cpu" => "cpu",
+                    "gpu" => "gpu",
+                    _ => "max",
+                },
+                int code => code == 1 ? "cpu" : code == 2 ? "gpu" : "max",
+                _ => "max",
             };
 
             var settings = FanControlSettingsService.Load();
