@@ -245,6 +245,32 @@
                             </Grid>
 
                             <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Disable notification pop-up -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Disable notification pop-up" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Hide the on-screen notification cards shown on preset, GPU mode and device changes" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbDisableToastPopups"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbDisableToastPopups_Checked"
+                                                 Unchecked="cbDisableToastPopups_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
                             <Border x:Name="AutoCheckDivider"
                                     Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"

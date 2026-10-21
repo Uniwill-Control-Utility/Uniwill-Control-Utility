@@ -363,6 +363,11 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
             Log.Information("[GpuPowerSaving] Applying mode: {Mode}", mode);
 
+            // Remember the mode that was live before this apply so the OSD card fires
+            // only on actual transitions — startup re-applies and charger transitions
+            // that keep the same mode stay silent.
+            bool modeChanged = Settings.Default.GpuPowerSavingMode != (int)mode;
+
             // Persist the applied mode as the current selection so the Display page's
             // power saving buttons and the tray section follow suite — including when
             // the Automations engine applies it on charger plug/unplug transitions.
@@ -409,6 +414,25 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
             // follow suite wherever the control is currently shown.
             Uniwill_Control_Utility.Views.Pages.Display.Instance?.NotifyPowerSavingApplied((int)mode);
             Uniwill_Control_Utility.Views.Windows.Tray.TrayDisplayPage.Instance?.NotifyPowerSavingApplied((int)mode);
+
+            // Announce which Optimus iGPU-power-saving mode went live — whether from a
+            // manual click or a charger-transition automation — as a "GPU mode: X" card
+            // with the value tinted/bolded exactly like preset names are (the value is
+            // the raw inserted argument, so the accent matches in every language).
+            // NoChange returns early above and never toasts.
+            if (modeChanged)
+            {
+                string modeName = mode switch
+                {
+                    GpuPowerSavingMode.Enable => "iGPU",
+                    GpuPowerSavingMode.Disable => "dGPU",
+                    GpuPowerSavingMode.Auto => "Auto",
+                    _ => GetModeDisplayName(mode),
+                };
+                Uniwill_Control_Utility.Scripts.Misc.ToastNotification.ShowToastNotification(
+                    Uniwill_Control_Utility.Services.LocalizationService.Format("GPU mode: {0}", modeName),
+                    accent: modeName, category: Uniwill_Control_Utility.Scripts.Misc.ToastCategory.Display);
+            }
         }
 
         /// <summary>
