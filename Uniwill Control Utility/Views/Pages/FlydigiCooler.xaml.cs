@@ -2393,7 +2393,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     dispatcher.Invoke(() =>
                     {
-                        tbTemperature.Text = temp.HasValue ? $"{temp.Value:F1}°C" : "N/A";
+                        tbTemperature.Text = temp.HasValue ? $"{temp.Value:F1}°C" : LocalizationService.Get("N/A");
                     });
                 }
                 catch { /* Dispatcher shutting down during app exit - safe to ignore */ }

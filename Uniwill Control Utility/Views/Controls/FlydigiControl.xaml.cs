@@ -55,7 +55,7 @@ namespace Uniwill_Control_Utility.Views.Controls
                 }
                 else
                 {
-                    _fanLabel.Text = "Off";
+                    _fanLabel.Text = LocalizationService.Get("Off");
                     _fanBar.Value = 0;
                 }
 

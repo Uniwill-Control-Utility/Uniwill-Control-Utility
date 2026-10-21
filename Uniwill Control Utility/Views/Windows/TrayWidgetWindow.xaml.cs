@@ -90,6 +90,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             // disabled in XAML, so we drive it here; the directional fade+slide is
             // only for the QuickSettings↔Display page hops).
             _ = TrayNavigation.Navigate(typeof(TrayQuickSettingsPage));
+            LocalizationService.RefreshElement(TrayQuickSettingsPage.Instance);
             _currentPage = typeof(TrayQuickSettingsPage);
             UpdateMoreSettingsButton(typeof(TrayQuickSettingsPage));
             _ = TransitionAnimationProvider.ApplyTransition(
@@ -180,6 +181,9 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             var toDisplay = pageType == typeof(TrayDisplayPage);
             var navigated = TrayNavigation.Navigate(pageType);
+            // wpfui NavigationView pages never fire Loaded, so the class-handler localization pass
+            // misses them — MainWindow applies the same RefreshElement on navigation (line 247).
+            LocalizationService.RefreshElement(pageType == typeof(TrayDisplayPage) ? TrayDisplayPage.Instance : TrayQuickSettingsPage.Instance);
             UpdateMoreSettingsButton(pageType);
             _currentPage = pageType;
 

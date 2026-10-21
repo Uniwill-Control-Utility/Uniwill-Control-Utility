@@ -34,7 +34,9 @@ namespace Uniwill_Control_Utility.Views.Controls
 
                 // Connection status pill
                 _statusDot.Fill = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString(ConnectedColor)!;
-                _statusText.Text = "Connected";
+                // Raw English here used to clobber the translated XAML default on
+                // every metrics refresh.
+                _statusText.Text = LocalizationService.Get("Connected");
 
                 // Smart mode pill
                 _smartModePill.Visibility = snapshot.HydroUiSmartModeActive ? Visibility.Visible : Visibility.Collapsed;
@@ -42,11 +44,11 @@ namespace Uniwill_Control_Utility.Views.Controls
                 // Pump
                 string pumpText = snapshot.HydroUiPumpVoltage switch
                 {
-                    0 => "Off",
+                    0 => LocalizationService.Get("Off"),
                     7 => "7V",
                     8 => "8V",
                     11 => "11V",
-                    _ => $"Unknown ({snapshot.HydroUiPumpVoltage})"
+                    _ => LocalizationService.Get("Unknown") + $" ({snapshot.HydroUiPumpVoltage})"
                 };
                 _pumpLabel.Text = pumpText;
                 _pumpBar.Value = snapshot.HydroUiPumpVoltage;
@@ -65,7 +67,7 @@ namespace Uniwill_Control_Utility.Views.Controls
                 else
                 {
                     _fanBar.Value = 0;
-                    _fanLabel.Text = "Off";
+                    _fanLabel.Text = LocalizationService.Get("Off");
                 }
             }
             else

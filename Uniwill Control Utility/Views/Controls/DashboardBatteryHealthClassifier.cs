@@ -4,7 +4,7 @@ internal enum DashboardBatteryHealthState
 {
     Unavailable,
     Healthy,
-    Reduced
+    Degraded
 }
 
 internal static class DashboardBatteryHealthClassifier
@@ -13,7 +13,7 @@ internal static class DashboardBatteryHealthClassifier
         => percent switch
         {
             >= 80 => DashboardBatteryHealthState.Healthy,
-            > 0 => DashboardBatteryHealthState.Reduced,
+            > 0 => DashboardBatteryHealthState.Degraded,
             _ => DashboardBatteryHealthState.Unavailable
         };
 }

@@ -81,7 +81,8 @@ namespace Uniwill_Control_Utility.Views.Controls
         private void ApplyHealthPresentation(DashboardBatteryHealthState state)
         {
             bool isHealthy = state == DashboardBatteryHealthState.Healthy;
-            _healthState.Text = isHealthy ? "Healthy" : "Reduced";
+            // Raw English here clobbered the translated XAML default on every refresh.
+            _healthState.Text = LocalizationService.Get(isHealthy ? "Healthy" : "Degraded");
             _healthPill.BorderBrush = isHealthy ? HealthyBorderBrush : ReducedBorderBrush;
             _healthPill.Background = isHealthy ? HealthyBackgroundBrush : ReducedBackgroundBrush;
             _healthIcon.Foreground = isHealthy ? HealthyIconBrush : ReducedIconBrush;

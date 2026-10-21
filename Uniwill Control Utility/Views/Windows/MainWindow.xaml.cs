@@ -146,6 +146,11 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void TrayMenu_Opened(object sender, RoutedEventArgs e)
         {
+            // The tray ContextMenu lives outside the window's visual tree, so the
+            // Loaded/SetCulture localization passes never reach it — refresh it on
+            // every open (the deferred dispatch also covers items added below).
+            LocalizationService.RefreshElement(cmTrayMenu);
+
             // Sync all tray sections with current page state
             RefreshTrayStockPresetChecks();
             PopulateTrayCustomPresets();
