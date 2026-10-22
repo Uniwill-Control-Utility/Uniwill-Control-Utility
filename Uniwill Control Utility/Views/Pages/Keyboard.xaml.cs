@@ -83,6 +83,11 @@ namespace Uniwill_Control_Utility.Views.Pages
             InitializeDebounce();
             InitializeIdleTimer();
 
+            // Effect names are enum values; render them through the culture-aware
+            // MultiBinding template (see BuildEffectNameTemplate).
+            cmbEffect.ItemTemplate = BuildEffectNameTemplate();
+            cmbBetterRgbEffect.ItemTemplate = BuildEffectNameTemplate();
+
             // BetterRGB streamer FPS presets (SelectedIndex 2 = 60, OpenRevo's default).
 
             // Subscribe to override state changes so the UI updates when Adaptive
@@ -95,7 +100,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Keyboard RGB toggle, Adaptive apply) so the visible page never shows
             // a stale ON/OFF without re-navigation.
             KeyboardSettingsService.SettingsChanged += OnKeyboardSettingsChangedExternally;
- 
+
             // Show unavailable state initially; HID opens in background
             KeyboardAvailable.Visibility = Visibility.Collapsed;
             KeyboardUnavailable.Visibility = Visibility.Visible;
@@ -148,6 +153,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             _visualizer.KeysSelected += OnKeysSelected;
             _visualizer.RefreshLayout();
+            UpdateEffectUi();
             UpdateEffectUi();
             UpdateDirectionButtons();
             // Re-assert the BetterRGB discrete-button highlights on every navigation: the
@@ -1215,6 +1221,29 @@ namespace Uniwill_Control_Utility.Views.Pages
                          && e != KeyboardEffect.TouchSpark
                          && (engine == KeyboardEngine.BetterRGB
                              || !s_softwareOnlyEffects.Contains(e)));
+        }
+
+        /// <summary>
+        /// Builds the effect-name ItemTemplate in code: a TextBlock whose Text is a
+        /// MultiBinding of the enum item + the culture version token. The token makes
+        /// the binding re-evaluate on language switch — the ComboBox selected-value
+        /// presenter caches converter output and never rebuilds for an equal enum
+        /// selection, so template swaps and navigation refreshes cannot repaint it.
+        /// </summary>
+        private static System.Windows.DataTemplate BuildEffectNameTemplate()
+        {
+            var text = new System.Windows.FrameworkElementFactory(typeof(System.Windows.Controls.TextBlock));
+            var binding = new System.Windows.Data.MultiBinding
+            {
+                Converter = new Helpers.EffectNameConverter()
+            };
+            binding.Bindings.Add(new System.Windows.Data.Binding()); // the enum item itself
+            binding.Bindings.Add(new System.Windows.Data.Binding("Version")
+            {
+                Source = Helpers.CultureToken.Instance
+            });
+            text.SetBinding(System.Windows.Controls.TextBlock.TextProperty, binding);
+            return new System.Windows.DataTemplate { VisualTree = text };
         }
 
         /// <summary>Effects that support a 7-color palette.</summary>

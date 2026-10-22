@@ -150,12 +150,12 @@
                                                   Width="140"
                                                   FontSize="12"
                                                   SelectionChanged="cbPreset_SelectionChanged">
-                                            <ComboBoxItem Content="Silent" />
-                                            <ComboBoxItem Content="Balanced" />
-                                            <ComboBoxItem Content="Performance" />
-                                            <ComboBoxItem Content="Full Speed" />
-                                            <ComboBoxItem Content="Off" />
-                                            <ComboBoxItem Content="Custom" />
+                                            <ComboBoxItem Content="Silent" Tag="Silent" />
+                                            <ComboBoxItem Content="Balanced" Tag="Balanced" />
+                                            <ComboBoxItem Content="Performance" Tag="Performance" />
+                                            <ComboBoxItem Content="Full Speed" Tag="Full Speed" />
+                                            <ComboBoxItem Content="Off" Tag="Off" />
+                                            <ComboBoxItem Content="Custom" Tag="Custom" />
                                         </ComboBox>
                                     </Grid>
                                 </Grid>
@@ -270,9 +270,9 @@
                                           VerticalAlignment="Center"
                                           FontSize="12"
                                           SelectionChanged="cbxSmartFanTempSource_SelectionChanged">
-                                    <ComboBoxItem Content="Max" />
-                                    <ComboBoxItem Content="CPU" />
-                                    <ComboBoxItem Content="GPU" />
+                                    <ComboBoxItem Content="Max" Tag="Max" />
+                                    <ComboBoxItem Content="CPU" Tag="CPU" />
+                                    <ComboBoxItem Content="GPU" Tag="GPU" />
                                 </ComboBox>
                             </Grid>
                         </StackPanel>
@@ -322,12 +322,12 @@
                                                   FontSize="12"
                                                   SelectionChanged="cbCpuPreset_SelectionChanged"
                                                   HorizontalAlignment="Right">
-                                            <ComboBoxItem Content="Silent" />
-                                            <ComboBoxItem Content="Balanced" />
-                                            <ComboBoxItem Content="Performance" />
-                                            <ComboBoxItem Content="Full Speed" />
-                                            <ComboBoxItem Content="Off" />
-                                            <ComboBoxItem Content="Custom" />
+                                            <ComboBoxItem Content="Silent" Tag="Silent" />
+                                            <ComboBoxItem Content="Balanced" Tag="Balanced" />
+                                            <ComboBoxItem Content="Performance" Tag="Performance" />
+                                            <ComboBoxItem Content="Full Speed" Tag="Full Speed" />
+                                            <ComboBoxItem Content="Off" Tag="Off" />
+                                            <ComboBoxItem Content="Custom" Tag="Custom" />
                                         </ComboBox>
                                     </Grid>
                                             <Border Height="1" 
@@ -371,12 +371,12 @@
                                                   FontSize="12"
                                                   SelectionChanged="cbGpuPreset_SelectionChanged"
                                                   HorizontalAlignment="Right">
-                                                    <ComboBoxItem Content="Silent" />
-                                                    <ComboBoxItem Content="Balanced" />
-                                                    <ComboBoxItem Content="Performance" />
-                                                    <ComboBoxItem Content="Full Speed" />
-                                                    <ComboBoxItem Content="Off" />
-                                                    <ComboBoxItem Content="Custom" />
+                                                    <ComboBoxItem Content="Silent" Tag="Silent" />
+                                                    <ComboBoxItem Content="Balanced" Tag="Balanced" />
+                                                    <ComboBoxItem Content="Performance" Tag="Performance" />
+                                                    <ComboBoxItem Content="Full Speed" Tag="Full Speed" />
+                                                    <ComboBoxItem Content="Off" Tag="Off" />
+                                                    <ComboBoxItem Content="Custom" Tag="Custom" />
                                                 </ComboBox>
                                             </Grid>
                                             <Border Height="1" 

@@ -31,6 +31,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         };
         private bool _pendingApply;
 
+        // Suppresses UpdateEffectUi/SaveSettings side effects while OnCultureChanged
+        // re-populates the effect ComboBox (restoring the selection fires
+        // SelectionChanged).
+        private bool _refreshingEffects;
+
         // BetterRGB light bar sync ownership is read live from the streamer
         // (IsLightBarSyncActive — a cheap field read on the running loop + the
         // live parameter snapshot), so the overlay tracks engine start/stop and
@@ -81,6 +86,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (_quickControl != null)
                 _quickControl.LightBarSettingsChanged += OnTrayLightBarSettingsChanged;
 
+            // Effect names are localized at population (see PopulateEffects), so a
+            // language switch must re-populate the list.
+            LocalizationService.CultureChanged += OnCultureChanged;
+
             // Show unavailable state initially; HID opens in background
             LightBarAvailable.Visibility = Visibility.Collapsed;
             LightBarUnavailable.Visibility = Visibility.Visible;
@@ -125,9 +134,35 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             foreach (var (name, _, _, _) in Effects)
             {
-                cbEffect.Items.Add(name);
+                // Localize at population: the selected-value box is a ContentPresenter
+                // inside the ComboBox template (TemplatedParent set), so
+                // LocalizationService skips it — the item strings must already be
+                // translated. Selection logic is index-based, so the strings are
+                // display-only.
+                cbEffect.Items.Add(LocalizationService.Get(name));
             }
             cbEffect.SelectedIndex = 0; // Static
+        }
+
+        /// <summary>
+        /// Re-populates the effect list with the new culture's names after a language
+        /// switch, preserving the selection. The selection churn is guarded by
+        /// <see cref="_refreshingEffects"/>.
+        /// </summary>
+        private void OnCultureChanged(object? sender, EventArgs e)
+        {
+            _refreshingEffects = true;
+            try
+            {
+                int index = cbEffect.SelectedIndex;
+                cbEffect.Items.Clear();
+                PopulateEffects();
+                cbEffect.SelectedIndex = index >= 0 ? index : 0;
+            }
+            finally
+            {
+                _refreshingEffects = false;
+            }
         }
 
         private byte GetSelectedEffect()
@@ -403,7 +438,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void CbEffect_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isFirstLoad)
+            if (_isFirstLoad || _refreshingEffects)
                 return;
 
             UpdateEffectUi();

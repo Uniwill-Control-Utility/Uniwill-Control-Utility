@@ -244,9 +244,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // after connect (e.g., auto-connect before page was visited).
                 if (!_hasAppliedConnectionUI)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[FlydigiCooler_Loaded] Calling UpdateConnectionUI, bs1Connected={bs1Connected}, current cbxFanMode.SelectedIndex={cbxFanMode.SelectedIndex}");
                     UpdateConnectionUI(true, bs1Connected);
-                    System.Diagnostics.Debug.WriteLine($"[FlydigiCooler_Loaded] After UpdateConnectionUI, cbxFanMode.SelectedIndex={cbxFanMode.SelectedIndex}");
                 }
 
                 // Keep temperature polling alive — restart only if timer was disposed
@@ -366,27 +364,43 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (_isSyncingFromPreset)
                 return;
 
-            UpdateFanModeUI();
+            // Capture the selection BEFORE any side effects: UpdateFanModeUI can re-enter
+            // us via ApplyRpmAsync's PersistSettings (which fires SettingsChanged and lets
+            // OnFlydigiSettingsChanged rewrite cbxFanMode.SelectedIndex). Reading the combo
+            // again after that would persist the clobbered value instead of the user's pick.
+            var selected = FanModeSelected();
 
-            // Persist fan mode to settings
+            // Persist fan mode BEFORE the UI update so nested PersistSettings from
+            // UpdateFanModeUI (Manual → ApplyRpmAsync) re-sync the combo to the NEW mode.
             if (_isBs1Device && _bs1Service != null)
             {
                 var settings = _bs1Service.GetSettings();
-                settings.FanMode = cbxFanMode.SelectedIndex;
-                System.Diagnostics.Debug.WriteLine($"[BS1 SelectionChanged] Saving FanMode={cbxFanMode.SelectedIndex}");
+                settings.FanMode = selected;
+                System.Diagnostics.Debug.WriteLine($"[BS1 SelectionChanged] Saving FanMode={selected}");
                 _bs1Service.PersistSettings();
             }
             else if (_coolerService != null)
             {
                 var settings = _coolerService.GetSettings();
-                settings.FanMode = cbxFanMode.SelectedIndex;
+                settings.FanMode = selected;
                 _coolerService.PersistSettings();
             }
+
+            UpdateFanModeUI();
+        }
+
+        /// <summary>
+        /// Reads the fan-mode combobox selection, clamping an unresolved selection
+        /// (-1) to Manual so the UI and persisted settings stay consistent.
+        /// </summary>
+        private int FanModeSelected()
+        {
+            return Math.Max(cbxFanMode.SelectedIndex, FanModeManual);
         }
 
         private void UpdateFanModeUI()
         {
-            var selectedIndex = cbxFanMode.SelectedIndex;
+            var selectedIndex = FanModeSelected();
             var enteringAuto = selectedIndex == FanModeAuto;
             var enteringManual = selectedIndex == FanModeManual;
             var enteringGear = selectedIndex == FanModeGear;
@@ -921,13 +935,18 @@ namespace Uniwill_Control_Utility.Views.Pages
                     {
                         return;
                     }
+
+                    // Runs INSIDE the guard: UpdateFanModeUI's side effects (Manual →
+                    // ApplyRpmAsync) persist, which re-fires SettingsChanged. With the
+                    // flag set, that re-entrant OnFlydigiSettingsChanged returns
+                    // immediately instead of recursing (previously caused a
+                    // StackOverflow loop of sync → UpdateFanModeUI → persist → sync).
+                    UpdateFanModeUI();
                 }
                 finally
                 {
                     _isSyncingFromPreset = false;
                 }
-
-                UpdateFanModeUI();
             });
         }
 
@@ -1712,7 +1731,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void OnStatusChanged(object? sender, string message)
         {
-            // Status is now shown via icon in the UI, no text update needed.
+            // Status messages are informational only; the page renders connection state
+            // from its own connected/fan-data events.
         }
 
         private void OnFanDataReceived(object? sender, FanRpmData data)
