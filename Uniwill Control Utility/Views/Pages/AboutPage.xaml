@@ -105,11 +105,11 @@
                             </StackPanel>
 
                             <!-- App name, version, copyright -->
-                            <StackPanel Grid.Column="2" 
-                                        Grid.Row="0" 
-                                        VerticalAlignment="Center" 
-                                        Grid.RowSpan="2" 
-                                        Margin="0,0,0,0" 
+                            <StackPanel Grid.Column="2"
+                                        Grid.Row="0"
+                                        VerticalAlignment="Center"
+                                        Grid.RowSpan="2"
+                                        Margin="0,0,0,0"
                                         Orientation="Horizontal">
                                 <TextBlock x:Name="tbDonate"
                                    Margin="0,0,16,0"
@@ -126,9 +126,62 @@
                                         <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEB51;" FontSize="12" Margin="6,0,4,0" />
                                     </ui:HyperlinkButton.Icon>
                                 </ui:HyperlinkButton>
-                                
+
                             </StackPanel>
                         </Grid>
+                    </ui:Card>
+
+                    <!-- Updates card: Velopack check/download against GitHub
+                         Releases. Installed (MSI) layouts only — portable zips
+                         show a "not available" message (see code-behind). -->
+                    <ui:Card Margin="0,0,0,8" Padding="16">
+                        <StackPanel>
+                            <TextBlock FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                       Text="Updates" />
+
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                <ui:Button x:Name="btnCheck"
+                                           Width="178"
+                                           Click="btnCheck_Click">
+
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="ArrowSync20"
+                                                       FontSize="22"
+                                                       Margin="0,0,8,0" />
+
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Text="Check for Updates" />
+                                    </StackPanel>
+                                </ui:Button>
+
+                                <ui:Button x:Name="btnDownload"
+                                           Width="178"
+                                           Margin="9,0,0,0"
+                                           Appearance="Primary"
+                                           Visibility="Collapsed"
+                                           Click="btnDownload_Click">
+
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon x:Name="btnDownloadIcon"
+                                                       Symbol="ArrowDownload20"
+                                                       FontSize="22"
+                                                       Margin="0,0,8,0" />
+
+                                        <TextBlock x:Name="btnDownloadText"
+                                                   VerticalAlignment="Center"
+                                                   Text="Download Update" />
+                                    </StackPanel>
+                                </ui:Button>
+                            </StackPanel>
+
+                            <TextBlock x:Name="tbDownloadMsg"
+                                       Margin="0,10,0,0"
+                                       HorizontalAlignment="Stretch"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
                     </ui:Card>
 
                     <!-- Links -->

@@ -25,20 +25,12 @@ namespace Uniwill_Control_Utility.Views.Pages
 {
     public partial class SettingsPage : INavigableView<ViewModels.SettingsViewModel>
     {
-        private const string UpdateGitHubOwner = "jgudec";
-        private const string UpdateGitHubRepo = "Uniwill-Control-Utility";
-        private const string RootDrivePath = "C:\\";
-        private const string InstallerFilePath = "C:\\Uniwill.Control.Utility.msi";
-
         private const string WmiNamespace = @"root\CIMV2";
         private const string WmiQueryProcessor = "SELECT * FROM Win32_Processor";
         private const string WmiQueryPhysicalMemory = "SELECT * FROM Win32_PhysicalMemory";
         private const string ScheduledTaskName = "UCU";
-        private const string InternetConnectivityHost = "8.8.8.8";
+        private const string GuardianTaskName = "UCU Guardian";
         private const string PresetExtension = ".UCUpresets";
-        private const string LegacyVersionPrefix = "3.";
-        private const string MsiExecCommand = "msiexec";
-        private const string MsiInstallFlag = "/i ";
 
         private readonly ILogger<SettingsPage> _logger;
         private readonly ViewModels.MainWindowViewModel _mainWindowViewModel;
@@ -221,6 +213,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbMinimizeClose.IsChecked = Settings.Default.MinimizeClose;
             cbDisableToastPopups.IsChecked = Settings.Default.DisableToastPopups;
             cbAutoCheck.IsChecked = Settings.Default.UpdateCheck;
+            cbAutoUpdate.IsChecked = Settings.Default.AutoUpdateApply;
+            cbGuardian.IsChecked = Settings.Default.GuardianEnabled;
             cbAdaptive.IsChecked = Settings.Default.isStartAdpative;
             cbPowerBoostMode.IsChecked = Settings.Default.EnablePowerBoostMode;
             cbHideFlydigi.IsChecked = Settings.Default.EnableFlydigi;
@@ -245,14 +239,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             _featureNavigationControlsReady = true;
 
             cbxLogLevel.SelectedIndex = Settings.Default.DiagnosticLogLevel;
-
-            tbAppVerion.Text = $"Uniwill Control Utility - {GetAssemblyVersion()}";
-
-            _ = checkUpdate();
-        }
-        private static string GetAssemblyVersion()
-        {
-            return System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? String.Empty;
         }
 
         #region System Info
@@ -422,13 +408,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             StartupDelayDivider.Visibility = Visibility.Collapsed;
             StartupDelayRow.Visibility = Visibility.Collapsed;
 
-            using (TaskService ts = new TaskService())
-            {
-                if (ts.RootFolder.AllTasks.Any(t => t.Name == ScheduledTaskName))
-                {
-                    ts.RootFolder.DeleteTask(ScheduledTaskName);
-                }
-            }
+            Services.ScheduledTaskService.Unregister(ScheduledTaskName);
 
             Settings.Default.StartOnBoot = false;
             Settings.Default.Save();
@@ -439,36 +419,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void UpdateScheduledTask()
         {
-            using (TaskService ts = new TaskService())
-            {
-                // Delete existing task so we can recreate with updated delay
-                if (ts.RootFolder.AllTasks.Any(t => t.Name == ScheduledTaskName))
-                {
-                    ts.RootFolder.DeleteTask(ScheduledTaskName);
-                }
-
-                TaskDefinition td = ts.NewTask();
-                td.Principal.RunLevel = TaskRunLevel.Highest;
-                td.RegistrationInfo.Description = "Start UCU";
-                td.Settings.DisallowStartIfOnBatteries = false;
-                td.Settings.StopIfGoingOnBatteries = false;
-                td.Settings.DisallowStartOnRemoteAppSession = false;
-
-                int delaySeconds = (int)(nbStartupDelay.Value ?? 0);
-                var trigger = new LogonTrigger()
-                {
-                    Delay = TimeSpan.FromSeconds(delaySeconds)
-                };
-                td.Triggers.Add(trigger);
-
-                string path = System.Reflection.Assembly.GetEntryAssembly()?.Location
-                    ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
-                path = Path.ChangeExtension(path, ".exe");
-
-                td.Actions.Add(path);
-
-                ts.RootFolder.RegisterTaskDefinition(ScheduledTaskName, td);
-            }
+            int delaySeconds = (int)(nbStartupDelay.Value ?? 0);
+            Services.ScheduledTaskService.Register(ScheduledTaskName, "Start UCU", "", TimeSpan.FromSeconds(delaySeconds));
         }
 
         private void nbStartupDelay_ValueChanged(object sender, RoutedEventArgs e)
@@ -543,6 +495,56 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             Settings.Default.UpdateCheck = false;
             Settings.Default.Save();
+        }
+
+        private void cbAutoUpdate_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.AutoUpdateApply = true;
+            Settings.Default.Save();
+        }
+
+        private void cbAutoUpdate_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.AutoUpdateApply = false;
+            Settings.Default.Save();
+        }
+
+        private void cbGuardian_Checked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.GuardianEnabled = true;
+            Settings.Default.Save();
+
+            try
+            {
+                // 30s logon delay: the guardian starts after the (possibly
+                // delayed) main app task and keeps it alive.
+                Services.ScheduledTaskService.Register(GuardianTaskName,
+                    "Keep UCU running (crash guardian)", string.Empty, TimeSpan.FromSeconds(30), App.GuardianExePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to register the guardian scheduled task");
+            }
+
+            // Spawn the guardian immediately — the startup respawn pass only
+            // runs at app launch, so without this the toggle needs a restart
+            // before anything is actually watching.
+            App.EnsureGuardianRunning();
+        }
+
+        private void cbGuardian_Unchecked(object sender, RoutedEventArgs e)
+        {
+            Settings.Default.GuardianEnabled = false;
+            Settings.Default.Save();
+
+            try
+            {
+                Services.ScheduledTaskService.Unregister(GuardianTaskName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to remove the guardian scheduled task");
+            }
         }
 
         private void cbAdaptive_Checked(object sender, RoutedEventArgs e)
@@ -901,84 +903,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
        #endregion
-
-        private async void btnCheck_Click(object sender, System.Windows.RoutedEventArgs e)
-        {
-            await checkUpdate(true);
-        }
-
-        private async System.Threading.Tasks.Task checkUpdate(bool isUserCheck = false)
-        {
-            if (IsInternetAvailable())
-            {
-                var updateManager = new UpdateManager(UpdateGitHubOwner, UpdateGitHubRepo, App.version, RootDrivePath);
-
-                var isUpdateAvailable = await updateManager.IsUpdateAvailable();
-
-                if (isUpdateAvailable)
-                {
-                    if (updateManager.NewVersion.StartsWith(LegacyVersionPrefix)) tbDownloadMsg.Text = LocalizationService.Get("Head to the Phantom Control Centre GitHub releases page to easily download the latest build!");
-                    else {
-                        tbDownloadMsg.Text = LocalizationService.Get("An update for Uniwill Control Utility has been found!");
-                        btnDownload.Visibility = System.Windows.Visibility.Visible;
-                    }
-                }
-                else if(isUserCheck) tbDownloadMsg.Text = LocalizationService.Get("Uniwill Control Utility is up to date!");
-            }
-            else if (isUserCheck) tbDownloadMsg.Text = LocalizationService.Get("No internet connection!");
-        }
-
-        private async void btnDownload_Click(object sender, System.Windows.RoutedEventArgs e)
-        {
-            var updateManager = new UpdateManager(UpdateGitHubOwner, UpdateGitHubRepo, App.version, RootDrivePath);
-
-            var isUpdateAvailable = await updateManager.IsUpdateAvailable();
-
-            if (isUpdateAvailable)
-            {
-                tbDownloadMsg.Text = LocalizationService.Get("Uniwill Control Utility will close and the installer will open when the download is complete");
-
-                await updateManager.DownloadAndInstallUpdate();
-
-                string filePath = InstallerFilePath;
-
-                try
-                {
-                    // show the MSI and close the main application
-                    Process p = new Process();
-                    p.StartInfo.UseShellExecute = false;
-                    p.StartInfo.FileName = MsiExecCommand;
-                    p.StartInfo.Arguments = MsiInstallFlag + filePath;
-                    p.Start();
-                    System.Windows.Application.Current.Shutdown();
-                }
-                catch (Exception ex)
-                {
-                    // log error or display error message to user
-                    _logger.LogError(ex, "Failed to launch MSI");
-                    System.Windows.MessageBox.Show(LocalizationService.Format("Failed to launch MSI: {0}", ex.Message));
-                }
-            }
-        }
-
-        private static bool IsInternetAvailable()
-        {
-            try
-            {
-                using (var ping = new Ping())
-                {
-                    var result = ping.Send(InternetConnectivityHost, 2000); // ping Google DNS server
-                    return result.Status == IPStatus.Success;
-                }
-            }
-            catch (Exception)
-            {
-                // Internet connectivity check failed; assume offline to avoid false-positive update checks.
-                // Suppressing the exception intentionally — transient network issues are common and
-                // a failed ping simply means "offline" from the perspective of update checking.
-                return false;
-            }
-        }
 
         private async void UiPage_Loaded(object sender, RoutedEventArgs e)
         {

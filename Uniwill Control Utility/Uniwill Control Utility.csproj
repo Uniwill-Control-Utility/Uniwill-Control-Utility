@@ -9,19 +9,30 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>favicon.ico</ApplicationIcon>
     <Platforms>AnyCPU;x64</Platforms>
-    <AssemblyName>Uniwill-Control-Utility</AssemblyName>
+    <!-- Task Manager shows the exe file name — spaces are intentional. -->
+    <AssemblyName>Uniwill Control Utility</AssemblyName>
     <PackageIcon>Assets/applicationIcon-256.png</PackageIcon>
     <Title>$(AssemblyName)</Title>
     <Authors>jgudec</Authors>
     <UseWindowsForms>True</UseWindowsForms>
     <SignAssembly>False</SignAssembly>
-	<Copyright>© 2020-2026 UXTU Team, 2026 UCU Team</Copyright>    
-	<AssemblyVersion>0.9.5.2</AssemblyVersion>
-    <FileVersion>0.9.5.2</FileVersion>
+	<Copyright>© 2020-2026 UXTU Team, 2026 UCU Team</Copyright>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <SupportedOSPlatformVersion>10.0.22621.0</SupportedOSPlatformVersion>
-    <Version>0.9.5.2</Version>
+    <!-- Single source of truth for the version: flows to AssemblyVersion, FileVersion,
+         the title-bar chip, the About page, and build\pack.ps1 (Velopack packVersion).
+         Must be 3-part (a.b.c) — Velopack rejects 4-part versions. Bump the third
+         part for every release. -->
+    <Version>0.9.5</Version>
+    <!-- Custom Main in App.xaml.cs runs the Velopack bootstrap before WPF starts,
+         so App.xaml is compiled as a Page (not ApplicationDefinition). -->
+    <StartupObject>Uniwill_Control_Utility.App</StartupObject>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Include="App.xaml" />
+  </ItemGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <Optimize>True</Optimize>
@@ -60,18 +71,54 @@
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.2.3" />
     <PackageReference Include="MouseKeyHook" Version="5.7.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="Octokit" Version="14.0.0" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="System.Management" Version="11.0.0-preview.7.26381.103" />
     <PackageReference Include="TaskScheduler" Version="2.12.2" />
+    <PackageReference Include="Velopack" Version="1.2.161" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
     <PackageReference Include="WPF-UI.Tray" Version="4.3.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
     <PackageReference Include="PixiEditor.ColorPicker" Version="3.4.2.3" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Crash guardian: the reference flows its output (exe/dll/deps/
+         runtimeconfig) into this project's bin and publish directories, so
+         VS Publish and build\pack.ps1 ship it automatically. -->
+    <ProjectReference Include="..\UCU.Guardian\UCU.Guardian.csproj" />
+  </ItemGroup>
+
+  <!-- Stage the guardian into a Service\ subfolder so the install directory
+       shows a single "Uniwill Control Utility.exe" — the service exe has a
+       similar name and the same icon, and side by side it confuses users.
+       Its private deps (Serilog) are copied, not moved: the app root needs
+       them too. Runs for Build (VS F5) and Publish (pack.ps1 / VS Publish). -->
+  <Target Name="StageGuardianInServiceFolder" AfterTargets="Build"
+          Condition="Exists('$(OutDir)Uniwill Control Utility Service.exe')">
+    <ItemGroup>
+      <_GuardianRoot Include="$(OutDir)Uniwill Control Utility Service.*" />
+      <_GuardianShared Include="$(OutDir)Serilog.dll" />
+      <_GuardianShared Include="$(OutDir)Serilog.Sinks.File.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)Service" />
+    <Move SourceFiles="@(_GuardianRoot)" DestinationFolder="$(OutDir)Service" />
+    <Copy SourceFiles="@(_GuardianShared)" DestinationFolder="$(OutDir)Service" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="StageGuardianInServiceFolderOnPublish" AfterTargets="Publish"
+          Condition="Exists('$(PublishDir)Uniwill Control Utility Service.exe')">
+    <ItemGroup>
+      <_GuardianRootPub Include="$(PublishDir)Uniwill Control Utility Service.*" />
+      <_GuardianSharedPub Include="$(PublishDir)Serilog.dll" />
+      <_GuardianSharedPub Include="$(PublishDir)Serilog.Sinks.File.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(PublishDir)Service" />
+    <Move SourceFiles="@(_GuardianRootPub)" DestinationFolder="$(PublishDir)Service" />
+    <Copy SourceFiles="@(_GuardianSharedPub)" DestinationFolder="$(PublishDir)Service" SkipUnchangedFiles="true" />
+  </Target>
 
   <ItemGroup>
     <None Remove="Assets\BuiltInScaleModels.json" />

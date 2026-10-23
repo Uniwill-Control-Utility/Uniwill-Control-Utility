@@ -361,10 +361,28 @@ RTSS is required for the **Game Overlay**. UCU writes its metrics into RTSS's on
 
 ## Installation
 
+### Recommended: installer (auto-updating)
+
 1. Head over to the [Releases](https://github.com/jgudec/Uniwill-Control-Utility/releases) page
-2. Download the latest zip
-3. Extract the zip
-4. Launch **Uniwill-Control-Utility.exe**
+2. Download and run **Uniwill-Control-Utility-win.msi** (installs to Program Files; requires the .NET 10 Desktop Runtime, which the installer sets up)
+3. UCU checks for updates on startup, downloads them silently, and installs them when you close the app — an accent card appears in the title bar when an update is ready. You can also use **Check for Updates** in Settings.
+
+### Portable (no auto-updates)
+
+1. Download the latest **zip** from the [Releases](https://github.com/jgudec/Uniwill-Control-Utility/releases) page
+2. Extract the zip
+3. Launch **Uniwill Control Utility.exe**
+
+The portable layout has no installer, so automatic updates are unavailable there (Settings will tell you). If you previously ran UCU from an extracted zip, install the MSI and delete the old folder — the app re-points your "Start on system boot" task at the new location automatically.
+
+## Building & packaging (maintainers)
+
+```powershell
+dotnet tool restore
+.\build\pack.ps1
+```
+
+The script reads the version from the project file (3-part `a.b.c` — bump the third part for every release), publishes, stages the native payload, and produces the GitHub release assets: the per-machine MSI, Velopack full/delta packages, the `releases.win.json` feed index, and the portable zip. Upload the printed manifest to a GitHub release **tagged with the same version**. See [wiki/operations/release-process.md](wiki/operations/release-process.md) for the full checklist.
 
 ## Optional
 For those who want to use color correction profiles, you need to:
