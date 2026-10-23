@@ -919,5 +919,21 @@
   "Zone colors": "Lliwiau parthau",
   "Zones": "Parthau",
   "~3-5 mV per 1 point": "~3-5 mV y 1 phwynt",
-  "Version {0}": "Fersiwn {0}"
+  "Version {0}": "Fersiwn {0}",
+  "Automatic updates": "Diweddariadau awtomatig",
+  "Check for updates automatically on startup": "Gwirio am ddiweddariadau'n awtomatig ar gychwyn",
+  "Download updates in the background and install when the application exits": "Lawrlwytho diweddariadau yn y cefndir a'u gosod pan fydd yr ap yn gadael",
+  "Update and restart": "Diweddaru ac ailddechrau",
+  "Update available": "Diweddariad ar gael",
+  "Update downloaded": "Diweddariad wedi'i lawrlwytho",
+  "Downloading update: {0}%": "Yn lawrlwytho diweddariad: {0}%",
+  "Checking for updates": "Yn gwirio am ddiweddariadau",
+  "Updates are not available for this installation type (portable)": "Nid yw diweddariadau ar gael ar gyfer y math hwn o osodiad (cludadwy)",
+  "Failed to check for updates": "Methwyd â gwirio am ddiweddariadau",
+  "Failed to download update": "Methwyd â lawrlwytho'r diweddariad",
+  "Update installed": "Diweddariad wedi'i osod",
+  "Updated to version {0}": "Wedi'i ddiweddaru i fersiwn {0}",
+  "Relaunch the application after a crash": "Ailgychwyn yr ap ar ôl chwalu",
+  "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Ailddechrau UCU yn awtomatig os yw'n gadael yn annisgwyl (cofrestru tasg wyliadwriaeth wedi'i hamserlennu)",
+  "Updates": "Diweddariadau"
 }

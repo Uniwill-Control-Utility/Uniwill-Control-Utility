@@ -919,5 +919,21 @@
   "Zone colors": "Zonekleuren",
   "Zones": "Zones",
   "~3-5 mV per 1 point": "~3-5 mV per 1 punt",
-  "Version {0}": "Versie {0}"
+  "Version {0}": "Versie {0}",
+  "Automatic updates": "Automatische updates",
+  "Check for updates automatically on startup": "Automatisch op updates controleren bij het opstarten",
+  "Download updates in the background and install when the application exits": "Updates op de achtergrond downloaden en installeren bij het afsluiten van de toepassing",
+  "Update and restart": "Bijwerken en opnieuw opstarten",
+  "Update available": "Update beschikbaar",
+  "Update downloaded": "Update gedownload",
+  "Downloading update: {0}%": "Update wordt gedownload: {0}%",
+  "Checking for updates": "Controleren op updates",
+  "Updates are not available for this installation type (portable)": "Updates zijn niet beschikbaar voor dit installatietype (portable)",
+  "Failed to check for updates": "Controleren op updates is mislukt",
+  "Failed to download update": "Downloaden van update is mislukt",
+  "Update installed": "Update geïnstalleerd",
+  "Updated to version {0}": "Bijgewerkt naar versie {0}",
+  "Relaunch the application after a crash": "Toepassing opnieuw starten na een crash",
+  "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "UCU automatisch opnieuw starten als het onverwacht wordt afgesloten (regelt een geplande bewakingstaak)",
+  "Updates": "Updates"
 }

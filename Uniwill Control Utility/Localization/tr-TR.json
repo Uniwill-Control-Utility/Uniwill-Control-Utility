@@ -919,5 +919,21 @@
   "Zone colors": "Bölge renkleri",
   "Zones": "Bölgeler",
   "~3-5 mV per 1 point": "1 başına ~3-5 mV",
-  "Version {0}": "Sürüm {0}"
+  "Version {0}": "Sürüm {0}",
+  "Automatic updates": "Otomatik güncelleştirmeler",
+  "Check for updates automatically on startup": "Başlangıçta güncelleştirmeleri otomatik denetle",
+  "Download updates in the background and install when the application exits": "Güncelleştirmeleri arka planda indirin ve uygulama kapatıldığında yükleyin",
+  "Update and restart": "Güncelleştir ve yeniden başlat",
+  "Update available": "Güncelleştirme kullanılabilir",
+  "Update downloaded": "Güncelleştirme indirildi",
+  "Downloading update: {0}%": "Güncelleştirme indiriliyor: %{0}",
+  "Checking for updates": "Güncelleştirmeler denetleniyor",
+  "Updates are not available for this installation type (portable)": "Bu kurulum türü için (taşınabilir) güncelleştirmeler kullanılamaz",
+  "Failed to check for updates": "Güncelleştirmeler denetlenemedi",
+  "Failed to download update": "Güncelleştirme indirilemedi",
+  "Update installed": "Güncelleştirme yüklendi",
+  "Updated to version {0}": "{0} sürümüne güncelleştirildi",
+  "Relaunch the application after a crash": "Çökmeden sonra uygulamayı yeniden başlat",
+  "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "UCU beklenmedik şekilde kapanırsa otomatik olarak yeniden başlat (zamanlanmış bir gözetim görevi kaydeder)",
+  "Updates": "Güncelleştirmeler"
 }

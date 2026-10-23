@@ -919,5 +919,21 @@
   "Zone colors": "영역 색상",
   "Zones": "영역",
   "~3-5 mV per 1 point": "1포인트당 ~3-5 mV",
-  "Version {0}": "버전 {0}"
+  "Version {0}": "버전 {0}",
+  "Automatic updates": "자동 업데이트",
+  "Check for updates automatically on startup": "시작 시 자동으로 업데이트 확인",
+  "Download updates in the background and install when the application exits": "업데이트를 백그라운드에서 다운로드하고 애플리케이션 종료 시 설치",
+  "Update and restart": "업데이트 후 다시 시작",
+  "Update available": "업데이트 사용 가능",
+  "Update downloaded": "업데이트 다운로드 완료",
+  "Downloading update: {0}%": "업데이트 다운로드 중: {0}%",
+  "Checking for updates": "업데이트 확인 중",
+  "Updates are not available for this installation type (portable)": "이 설치 유형(포터블)에서는 업데이트를 사용할 수 없습니다",
+  "Failed to check for updates": "업데이트 확인 실패",
+  "Failed to download update": "업데이트 다운로드 실패",
+  "Update installed": "업데이트 설치 완료",
+  "Updated to version {0}": "{0}(으)로 업데이트됨",
+  "Relaunch the application after a crash": "충돌 후 애플리케이션 다시 실행",
+  "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "UCU가 예상치 못하게 종료되면 자동으로 다시 시작합니다(예약된 감시 작업 등록)",
+  "Updates": "업데이트"
 }

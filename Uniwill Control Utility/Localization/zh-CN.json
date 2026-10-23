@@ -919,5 +919,21 @@
   "Zone colors": "区域颜色",
   "Zones": "区域",
   "~3-5 mV per 1 point": "每 1 点约 3-5 mV",
-  "Version {0}": "版本 {0}"
+  "Version {0}": "版本 {0}",
+  "Automatic updates": "自动更新",
+  "Check for updates automatically on startup": "启动时自动检查更新",
+  "Download updates in the background and install when the application exits": "在后台下载更新并在应用退出时安装",
+  "Update and restart": "更新并重启",
+  "Update available": "有可用更新",
+  "Update downloaded": "更新已下载",
+  "Downloading update: {0}%": "正在下载更新：{0}%",
+  "Checking for updates": "正在检查更新",
+  "Updates are not available for this installation type (portable)": "此安装类型（便携版）不支持更新",
+  "Failed to check for updates": "检查更新失败",
+  "Failed to download update": "下载更新失败",
+  "Update installed": "更新已安装",
+  "Updated to version {0}": "已更新到版本 {0}",
+  "Relaunch the application after a crash": "崩溃后重新启动应用",
+  "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "UCU 意外退出时自动重新启动（注册计划监视任务）",
+  "Updates": "更新"
 }

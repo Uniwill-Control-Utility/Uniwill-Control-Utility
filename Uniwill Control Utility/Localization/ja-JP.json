@@ -919,5 +919,21 @@
   "Zone colors": "ゾーンカラー",
   "Zones": "ゾーン",
   "~3-5 mV per 1 point": "1 ポイントあたり約 3 ～ 5 mV",
-  "Version {0}": "バージョン {0}"
+  "Version {0}": "バージョン {0}",
+  "Automatic updates": "自動更新",
+  "Check for updates automatically on startup": "起動時に自動的に更新を確認する",
+  "Download updates in the background and install when the application exits": "更新をバックグラウンドでダウンロードし、アプリの終了時にインストールする",
+  "Update and restart": "更新して再起動",
+  "Update available": "更新が利用可能です",
+  "Update downloaded": "更新をダウンロードしました",
+  "Downloading update: {0}%": "更新をダウンロード中: {0}%",
+  "Checking for updates": "更新を確認中",
+  "Updates are not available for this installation type (portable)": "このインストール形式(ポータブル)では更新を利用できません",
+  "Failed to check for updates": "更新の確認に失敗しました",
+  "Failed to download update": "更新のダウンロードに失敗しました",
+  "Update installed": "更新をインストールしました",
+  "Updated to version {0}": "バージョン {0} に更新しました",
+  "Relaunch the application after a crash": "クラッシュ後にアプリを再起動する",
+  "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "UCU が予期せず終了した場合は自動的に再起動します(監視タスクをスケジュール登録します)",
+  "Updates": "更新"
 }

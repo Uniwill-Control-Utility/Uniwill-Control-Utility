@@ -919,5 +919,21 @@
   "Zone colors": "Zone colors",
   "Zones": "Zones",
   "~3-5 mV per 1 point": "~3-5 mV per 1 point",
-  "Version {0}": "Version {0}"
+  "Version {0}": "Version {0}",
+  "Automatic updates": "Automatic updates",
+  "Check for updates automatically on startup": "Check for updates automatically on startup",
+  "Download updates in the background and install when the application exits": "Download updates in the background and install when the application exits",
+  "Update and restart": "Update and restart",
+  "Update available": "Update available",
+  "Update downloaded": "Update downloaded",
+  "Downloading update: {0}%": "Downloading update: {0}%",
+  "Checking for updates": "Checking for updates",
+  "Updates are not available for this installation type (portable)": "Updates are not available for this installation type (portable)",
+  "Failed to check for updates": "Failed to check for updates",
+  "Failed to download update": "Failed to download update",
+  "Update installed": "Update installed",
+  "Updated to version {0}": "Updated to version {0}",
+  "Relaunch the application after a crash": "Relaunch the application after a crash",
+  "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)",
+  "Updates": "Updates"
 }
