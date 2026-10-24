@@ -935,5 +935,6 @@
   "Updated to version {0}": "已更新到版本 {0}",
   "Relaunch the application after a crash": "當機後重新啟動應用程式",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "UCU 意外結束時自動重新啟動（註冊排程監視工作）",
-  "Updates": "更新"
+  "Updates": "更新",
+  "Lets you easily stay up to date with the latest releases": "輕鬆取得最新版本的更新"
 }

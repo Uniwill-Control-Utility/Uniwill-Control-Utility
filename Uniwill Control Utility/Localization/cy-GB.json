@@ -935,5 +935,6 @@
   "Updated to version {0}": "Wedi'i ddiweddaru i fersiwn {0}",
   "Relaunch the application after a crash": "Ailgychwyn yr ap ar ôl chwalu",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Ailddechrau UCU yn awtomatig os yw'n gadael yn annisgwyl (cofrestru tasg wyliadwriaeth wedi'i hamserlennu)",
-  "Updates": "Diweddariadau"
+  "Updates": "Diweddariadau",
+  "Lets you easily stay up to date with the latest releases": "Aros yn gyfredol yn hawdd gyda'r fersiynau diweddaraf"
 }

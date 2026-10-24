@@ -935,5 +935,6 @@
   "Updated to version {0}": "อัปเดตเป็นเวอร์ชัน {0}",
   "Relaunch the application after a crash": "เริ่มแอปพลิเคชันใหม่หลังขัดข้อง",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "เริ่ม UCU ใหม่โดยอัตโนมัติหากปิดโดยไม่คาดคิด (จะลงทะเบียนงานเฝ้าระวังตามกำหนดการ)",
-  "Updates": "การอัปเดต"
+  "Updates": "การอัปเดต",
+  "Lets you easily stay up to date with the latest releases": "อัปเดตเวอร์ชันล่าสุดได้ง่ายๆ"
 }

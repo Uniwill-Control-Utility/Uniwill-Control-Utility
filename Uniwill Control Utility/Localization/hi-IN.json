@@ -935,5 +935,6 @@
   "Updated to version {0}": "{0} संस्करण में अपडेट किया गया",
   "Relaunch the application after a crash": "क्रैश के बाद एप्लिकेशन पुनः चलाएँ",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "अप्रत्याशित बंद होने पर UCU को स्वतः पुनः चलाएँ (एक अनुसूचित वॉचडॉग कार्य पंजीकृत करता है)",
-  "Updates": "अपडेट"
+  "Updates": "अपडेट",
+  "Lets you easily stay up to date with the latest releases": "नवीनतम रिलीज़ के साथ आसानी से अपडेट रहें"
 }

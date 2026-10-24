@@ -935,5 +935,6 @@
   "Updated to version {0}": "Bijgewerkt naar versie {0}",
   "Relaunch the application after a crash": "Toepassing opnieuw starten na een crash",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "UCU automatisch opnieuw starten als het onverwacht wordt afgesloten (regelt een geplande bewakingstaak)",
-  "Updates": "Updates"
+  "Updates": "Updates",
+  "Lets you easily stay up to date with the latest releases": "Blijf eenvoudig up-to-date met de nieuwste releases"
 }

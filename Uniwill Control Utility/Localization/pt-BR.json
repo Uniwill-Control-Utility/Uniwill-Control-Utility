@@ -935,5 +935,6 @@
   "Updated to version {0}": "Atualizado para a versão {0}",
   "Relaunch the application after a crash": "Reiniciar o aplicativo após uma falha",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Reiniciar o UCU automaticamente se ele for fechado inesperadamente (registra uma tarefa agendada de monitoramento)",
-  "Updates": "Atualizações"
+  "Updates": "Atualizações",
+  "Lets you easily stay up to date with the latest releases": "Mantenha-se facilmente atualizado com as versões mais recentes"
 }

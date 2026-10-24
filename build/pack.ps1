@@ -60,7 +60,10 @@ foreach ($file in @(
 # the always-present .NET Framework csc — no toolchain dependency.
 $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 if (-not (Test-Path $csc)) { throw "csc.exe not found at $csc" }
-& $csc /nologo /target:exe /platform:x64 `
+# /target:winexe (not exe): the shim is a GUI app ([STAThread] + MessageBox);
+# a console-subsystem build makes Explorer allocate a console window for it
+# that sits empty through the whole uninstall.
+& $csc /nologo /target:winexe /platform:x64 `
     "/win32icon:$(Join-Path $projDir 'favicon.ico')" `
     "/win32manifest:$(Join-Path $PSScriptRoot 'uninstall-shim\admin.manifest')" `
     /r:System.Windows.Forms.dll /r:System.Drawing.dll `

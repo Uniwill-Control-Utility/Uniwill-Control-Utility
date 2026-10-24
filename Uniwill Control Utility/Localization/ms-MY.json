@@ -935,5 +935,6 @@
   "Updated to version {0}": "Dikemas kini ke versi {0}",
   "Relaunch the application after a crash": "Mulakan semula aplikasi selepas ranap",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Mulakan semula UCU secara automatik jika ia keluar secara tidak dijangka (mendaftarkan tugas pengawas berjadual)",
-  "Updates": "Kemas kini"
+  "Updates": "Kemas kini",
+  "Lets you easily stay up to date with the latest releases": "Sentiasa terkini dengan keluaran terbaharu"
 }

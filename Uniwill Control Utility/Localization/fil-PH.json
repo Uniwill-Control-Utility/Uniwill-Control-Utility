@@ -935,5 +935,6 @@
   "Updated to version {0}": "Na-update sa bersyon {0}",
   "Relaunch the application after a crash": "I-restart ang aplikasyon pagkatapos mag-crash",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Awtomatikong i-restart ang UCU kung ito ay biglang magsara (magre-register ng iskedyul na watchdog task)",
-  "Updates": "Mga update"
+  "Updates": "Mga update",
+  "Lets you easily stay up to date with the latest releases": "Madaling manatiling updated sa mga pinakabagong release"
 }

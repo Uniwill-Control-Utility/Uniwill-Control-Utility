@@ -182,7 +182,12 @@ namespace Uniwill_Control_Utility
 
                 // A guardian relaunch must be silent: no splash overlay, and the
                 // main window opens minimized to the tray (see mainWindow_Loaded).
-                bool showStartupProgressOverlay = Settings.Default.ShowStartupProgressOverlay && !GuardianRestart;
+                // A second-instance handoff also skips the overlay: it signals the
+                // running instance and exits within a second, so the splash would
+                // only flash.
+                bool handoffInstance = IsAppAlreadyRunning();
+                bool showStartupProgressOverlay = Settings.Default.ShowStartupProgressOverlay
+                    && !GuardianRestart && !handoffInstance;
                 if (showStartupProgressOverlay)
                 {
                     startupWindow = new StartupProgressWindow();
@@ -1004,6 +1009,12 @@ namespace Uniwill_Control_Utility
                 _logger?.LogError(ex, "Failed during deferred update and PawnIO checks");
             }
 
+            // Register the App Paths auto-elevation shim once (XMG CC-style
+            // launch UX): the app manifest stays requireAdministrator for
+            // EC/MSR access, but ShellExecute launches (Start menu, tray,
+            // taskbar, guardian) from an admin account then elevate silently.
+            TryRegisterAutoElevation();
+
             // Guardian: mutual guarding — the app respawns the watchdog if it is
             // enabled but not running (the watchdog already watches the app).
             if (Settings.Default.GuardianEnabled)
@@ -1068,6 +1079,63 @@ namespace Uniwill_Control_Utility
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "Failed to respawn the crash guardian");
+            }
+        }
+
+        /// <summary>
+        /// Non-creating probe of the single-instance mutex: true when an
+        /// instance is already running (this process is a handoff instance
+        /// that will signal it and exit).
+        /// </summary>
+        private static bool IsAppAlreadyRunning()
+        {
+            try
+            {
+                using var probe = new Mutex(false, MutexName, out bool createdNew);
+                return !createdNew;
+            }
+            catch (AbandonedMutexException)
+            {
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Registers the well-known App Paths auto-elevation shim
+        /// (HKLM\...\App Paths\&lt;exename&gt; with Type=AppUserModelID and an
+        /// empty PackageSid): ShellExecute launches of the exe from an
+        /// admin-account user then elevate without a UAC prompt. The manifest
+        /// itself stays requireAdministrator — EC/MSR access is non-negotiable;
+        /// this only removes the per-launch consent for our own exe. The
+        /// uninstall shim deletes this key. Idempotent, best-effort.
+        /// </summary>
+        private static void TryRegisterAutoElevation()
+        {
+            try
+            {
+                string? exe = Environment.ProcessPath;
+                if (string.IsNullOrEmpty(exe))
+                    return;
+
+                using var appPaths = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                    .OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths", writable: true);
+                if (appPaths is null)
+                    return;
+
+                string keyName = Path.GetFileName(exe);
+                using var key = appPaths.CreateSubKey(keyName, writable: true);
+                key.SetValue(null, exe);
+
+                if (key.GetValue("Type") as string != "AppUserModelID")
+                {
+                    key.SetValue("Type", "AppUserModelID");
+                    key.SetValue("PackageSid", string.Empty);
+                    _logger?.LogInformation("[Elevation] Registered App Paths auto-elevation shim for {Exe}", keyName);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "[Elevation] App Paths auto-elevation shim registration failed");
             }
         }
 

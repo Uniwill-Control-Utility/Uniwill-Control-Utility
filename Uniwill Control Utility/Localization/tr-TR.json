@@ -935,5 +935,6 @@
   "Updated to version {0}": "{0} sürümüne güncelleştirildi",
   "Relaunch the application after a crash": "Çökmeden sonra uygulamayı yeniden başlat",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "UCU beklenmedik şekilde kapanırsa otomatik olarak yeniden başlat (zamanlanmış bir gözetim görevi kaydeder)",
-  "Updates": "Güncelleştirmeler"
+  "Updates": "Güncelleştirmeler",
+  "Lets you easily stay up to date with the latest releases": "En son sürümlerle kolayca güncel kalın"
 }

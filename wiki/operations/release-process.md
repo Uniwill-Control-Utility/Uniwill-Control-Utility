@@ -114,8 +114,20 @@ runtime dependency), and zips the portable artifact.
   `msiexec /i app.msi VELOPACK_INSTALLDIR="D:\UCU"`, documented in the
   README. The in-app updater follows the exe, so custom roots update fine.
 - Uninstall: Apps & Features (MSI) and the `Uninstall.exe` shim compiled
-  into the layout by pack.ps1 step 2c (kills app + guardian, deletes the
-  UCU/UCU Guardian tasks, runs the MSI uninstall, removes leftovers).
+  into the layout by pack.ps1 step 2c. Sequence: kill guardian + app in
+  the shim itself (`Process.Kill` — `taskkill` costs ~9.5 s per call,
+  which was the ~30 s stall before the wizard), run `msiexec /x {GUID} /qb`
+  synchronously (the client blocks on the wizard; a `start /wait` wrapper
+  returns at hand-off and races the engine), remove the scheduled tasks,
+  the App Paths elevation-shim key and all three ARP entries, then `rd`
+  the install root with a 3 s retry (killed exes stay locked briefly under
+  AV scanning). Stage timestamps land in `%TEMP%\ucu_uninstall_log.txt`.
+  Velopack writes its ARP entry under HKCU\...\Uninstall\<packId> and its
+  uninstall-time removal runs in the MSI's deferred CA context, which
+  misses the user's HKCU — so a pure Control Panel uninstall leaves a
+  stale entry that errors 1605 on retry. The shim deletes it; users
+  uninstalling via Control Panel alone may need the entry right-click
+  removed.
 - Confirm startup elevation, prerequisites, settings upgrade, preserved user
   data, and that the "UCU" scheduled task points at the new path (the app
   self-heals the task after a zip → MSI migration).

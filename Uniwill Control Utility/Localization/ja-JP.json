@@ -935,5 +935,6 @@
   "Updated to version {0}": "バージョン {0} に更新しました",
   "Relaunch the application after a crash": "クラッシュ後にアプリを再起動する",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "UCU が予期せず終了した場合は自動的に再起動します(監視タスクをスケジュール登録します)",
-  "Updates": "更新"
+  "Updates": "更新",
+  "Lets you easily stay up to date with the latest releases": "最新のリリースを簡単にキャッチアップ"
 }

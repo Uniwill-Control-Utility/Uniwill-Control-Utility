@@ -935,5 +935,6 @@
   "Updated to version {0}": "Обновление до версии {0}",
   "Relaunch the application after a crash": "Перезапускать приложение после сбоя",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Автоматически перезапускать UCU при неожиданном завершении (регистрирует запланированную сторожевую задачу)",
-  "Updates": "Обновления"
+  "Updates": "Обновления",
+  "Lets you easily stay up to date with the latest releases": "Легко оставайтесь в курсе последних версий"
 }

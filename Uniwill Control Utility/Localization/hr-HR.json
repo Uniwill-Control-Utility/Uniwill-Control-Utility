@@ -935,5 +935,6 @@
   "Updated to version {0}": "Ažurirano na verziju {0}",
   "Relaunch the application after a crash": "Ponovno pokreni aplikaciju nakon rušenja",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Automatski ponovno pokreni UCU ako se neočekivano zatvori (registrira zakazani zadatak nadzora)",
-  "Updates": "Ažuriranja"
+  "Updates": "Ažuriranja",
+  "Lets you easily stay up to date with the latest releases": "Lako ostanite u toku s najnovijim izdanjima"
 }

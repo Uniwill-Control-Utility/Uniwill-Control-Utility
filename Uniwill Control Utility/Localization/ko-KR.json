@@ -935,5 +935,6 @@
   "Updated to version {0}": "{0}(으)로 업데이트됨",
   "Relaunch the application after a crash": "충돌 후 애플리케이션 다시 실행",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "UCU가 예상치 못하게 종료되면 자동으로 다시 시작합니다(예약된 감시 작업 등록)",
-  "Updates": "업데이트"
+  "Updates": "업데이트",
+  "Lets you easily stay up to date with the latest releases": "최신 릴리스를 손쉽게 최신 상태로 유지"
 }
