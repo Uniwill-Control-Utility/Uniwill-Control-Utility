@@ -54,6 +54,20 @@ foreach ($file in @(
     if (-not (Test-Path (Join-Path $publishDir $file))) { throw "Guardian output '$file' missing from publish dir (ProjectReference broken?)" }
 }
 
+# --- 2c. Compile the Uninstall.exe shim into the layout ---
+# The MSI template ships every file in the publish dir, so a shim compiled
+# here lands next to the app in MSI installs and portable zips. Built with
+# the always-present .NET Framework csc — no toolchain dependency.
+$csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+if (-not (Test-Path $csc)) { throw "csc.exe not found at $csc" }
+& $csc /nologo /target:exe /platform:x64 `
+    /win32icon (Join-Path $projDir "favicon.ico") `
+    /win32manifest (Join-Path $PSScriptRoot "uninstall-shim\admin.manifest") `
+    /r:System.Windows.Forms.dll /r:System.Drawing.dll `
+    /out (Join-Path $publishDir "Uninstall.exe") `
+    (Join-Path $PSScriptRoot "uninstall-shim\UninstallShim.cs")
+if ($LASTEXITCODE -ne 0) { throw "Uninstall.exe shim compile failed" }
+
 # --- 3. Stage loose native payload (this list IS the packaging manifest) ---
 # These files live in the project root and are not all produced by the publish
 # (see wiki/architecture/dependency-inventory.md). Fail loudly if any is
@@ -89,6 +103,25 @@ dotnet vpk pack -u Uniwill-Control-Utility -v $version -p $publishDir -o $releas
     -f net10-x64-desktop `
     --msi --instLocation PerMachine
 if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
+
+# --- 5b. Stamp the Setup.exe bootstrapper requireAdministrator ---
+# vpk's bootstrapper template is asInvoker and vpk exposes no manifest flag,
+# so a double-click on a per-machine pack fails mid-install with
+# ERROR_ELEVATION_REQUIRED and leaves a partial layout in %LOCALAPPDATA%.
+# Inject build\setup-elevation.manifest (resource #1) with the SDK's mt.exe.
+$setupExe = Get-ChildItem $releasesDir -Filter "*-Setup.exe" | Select-Object -First 1
+if ($setupExe) {
+    $mt = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\mt.exe" -ErrorAction SilentlyContinue |
+        Sort-Object { [version](Split-Path $_.Directory.Name -Leaf) } | Select-Object -Last 1
+    if (-not $mt) {
+        Write-Warning "mt.exe not found in the Windows SDK — Setup.exe stays asInvoker; run it elevated."
+    } else {
+        & $mt.FullName -manifest (Join-Path $PSScriptRoot "setup-elevation.manifest") `
+            "-outputresource:$($setupExe.FullName);#1"
+        if ($LASTEXITCODE -ne 0) { throw "mt.exe failed to stamp $($setupExe.Name)" }
+        Write-Host "Stamped $($setupExe.Name) requireAdministrator" -ForegroundColor Cyan
+    }
+}
 
 # --- 6. Portable zip side artifact (today's distribution format) ---
 $zip = Join-Path $releasesDir "Uniwill-Control-Utility-$version-win-x64.zip"

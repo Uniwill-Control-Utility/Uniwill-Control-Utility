@@ -102,6 +102,20 @@ runtime dependency), and zips the portable artifact.
 ### 5. Release validation
 
 - Install the MSI on a clean Windows account (Program Files, elevated).
+  The MSI is the shipped installer (Windows Installer auto-elevates on
+  double-click). The Velopack `*-Setup.exe` is a 7 MB web-installer
+  bootstrapper, is not part of the upload manifest, and is stamped
+  `requireAdministrator` by pack.ps1 step 5b only as a convenience;
+  a failed asInvoker run of it can leave a partial per-user layout in
+  `%LOCALAPPDATA%\Uniwill-Control-Utility` that must be deleted before
+  any install retry.
+- Install location: vpk's wizard has no destination page (its BrowseDlg
+  is unreachable); the supported override is
+  `msiexec /i app.msi VELOPACK_INSTALLDIR="D:\UCU"`, documented in the
+  README. The in-app updater follows the exe, so custom roots update fine.
+- Uninstall: Apps & Features (MSI) and the `Uninstall.exe` shim compiled
+  into the layout by pack.ps1 step 2c (kills app + guardian, deletes the
+  UCU/UCU Guardian tasks, runs the MSI uninstall, removes leftovers).
 - Confirm startup elevation, prerequisites, settings upgrade, preserved user
   data, and that the "UCU" scheduled task points at the new path (the app
   self-heals the task after a zip → MSI migration).
