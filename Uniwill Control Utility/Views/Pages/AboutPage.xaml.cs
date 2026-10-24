@@ -1,7 +1,9 @@
+using Serilog;
 using System;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using Uniwill_Control_Utility.Services;
@@ -38,6 +40,109 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             tbVersion.Text = LocalizationService.Format("Version {0}", VersionText);
             tbCopyright.Text = CopyrightText;
+
+            // Velopack updates only work for installed (MSI) layouts; on a
+            // portable zip the check/download controls have nothing to act on.
+            var updateService = App.GetService<VelopackUpdateService>();
+            if (updateService is { IsInstalled: false })
+            {
+                btnCheck.Visibility = Visibility.Collapsed;
+                btnDownload.Visibility = Visibility.Collapsed;
+                tbDownloadMsg.Text = LocalizationService.Get("Updates are not available for this installation type (portable)");
+            }
+            else if (updateService is not null)
+            {
+                // Reflect a package staged in a previous session.
+                ShowPendingUpdate(updateService);
+            }
+        }
+
+        private void ShowPendingUpdate(VelopackUpdateService updateService)
+        {
+            if (updateService.State == UpdateState.PendingApply)
+            {
+                tbDownloadMsg.Text = LocalizationService.Get("Update downloaded");
+                btnDownload.Visibility = Visibility.Visible;
+                btnDownloadText.Text = LocalizationService.Get("Update and restart");
+                btnDownloadIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.ArrowSync20;
+            }
+        }
+
+        private async void btnCheck_Click(object sender, RoutedEventArgs e)
+        {
+            var updateService = App.GetService<VelopackUpdateService>();
+            if (updateService is null || !updateService.IsInstalled)
+                return;
+
+            if (!App.IsInternetAvailable())
+            {
+                tbDownloadMsg.Text = LocalizationService.Get("No internet connection!");
+                return;
+            }
+
+            tbDownloadMsg.Text = LocalizationService.Get("Checking for updates");
+            btnCheck.IsEnabled = false;
+            try
+            {
+                var info = await updateService.CheckForUpdatesAsync();
+                if (info is not null)
+                {
+                    tbDownloadMsg.Text = LocalizationService.Get("An update for Uniwill Control Utility has been found!");
+                    btnDownload.Visibility = Visibility.Visible;
+                    btnDownloadText.Text = LocalizationService.Get("Download Update");
+                    btnDownloadIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.ArrowDownload20;
+                }
+                else
+                {
+                    tbDownloadMsg.Text = LocalizationService.Get("Uniwill Control Utility is up to date!");
+                }
+            }
+            catch (Exception ex)
+            {
+                tbDownloadMsg.Text = LocalizationService.Get("Failed to check for updates");
+                Log.Error(ex, "[Updates] Manual update check failed");
+            }
+            finally
+            {
+                btnCheck.IsEnabled = true;
+            }
+        }
+
+        private async void btnDownload_Click(object sender, RoutedEventArgs e)
+        {
+            var updateService = App.GetService<VelopackUpdateService>();
+            if (updateService is null || !updateService.IsInstalled)
+                return;
+
+            // Second click (package already staged): apply and restart now.
+            if (updateService.State == UpdateState.PendingApply)
+            {
+                updateService.ApplyAndRestart();
+                return;
+            }
+
+            tbDownloadMsg.Text = LocalizationService.Format("Downloading update: {0}%", 0);
+            var progress = new Progress<int>(value =>
+                tbDownloadMsg.Text = LocalizationService.Format("Downloading update: {0}%", value));
+            btnDownload.IsEnabled = false;
+            try
+            {
+                await updateService.DownloadAsync(progress);
+
+                // Staged: applies automatically on graceful exit; offer now.
+                tbDownloadMsg.Text = LocalizationService.Get("Update downloaded");
+                btnDownloadText.Text = LocalizationService.Get("Update and restart");
+                btnDownloadIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.ArrowSync20;
+            }
+            catch (Exception ex)
+            {
+                tbDownloadMsg.Text = LocalizationService.Get("Failed to download update");
+                Log.Error(ex, "[Updates] Update download failed");
+            }
+            finally
+            {
+                btnDownload.IsEnabled = true;
+            }
         }
 
         private void OpenLink_Click(object sender, RoutedEventArgs e)

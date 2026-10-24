@@ -63,6 +63,9 @@ project.lock.json
 project.fragment.lock.json
 artifacts/
 
+# Velopack release output (persistent delta store; binaries, not for git)
+Releases/
+
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
 

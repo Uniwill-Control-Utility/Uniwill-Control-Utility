@@ -78,6 +78,37 @@ FontWeight="SemiBold"
 Foreground="{DynamicResource TextFillColorPrimaryBrush}"
 VerticalAlignment="Center"/>
                     </ui:Card>
+                    <!-- Update card: accent-filled banner shown while a Velopack
+                         update is available / downloading / downloaded (see
+                         VelopackUpdateService.StateChanged in MainWindow.xaml.cs). -->
+                    <ui:Card x:Name="UpdateCard"
+                             Margin="4,4,0,4"
+                             Padding="8,4"
+                             Visibility="Collapsed"
+                             Background="{DynamicResource AccentFillColorDefaultBrush}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:SymbolIcon Symbol="ArrowSync20"
+                                           FontSize="14"
+                                           Margin="0,0,6,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"/>
+                            <TextBlock x:Name="UpdateCardText"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
+                                       Text="Update available"/>
+                            <ui:Button x:Name="UpdateRestartButton"
+                                       Content="Update and restart"
+                                       Appearance="Primary"
+                                       FontSize="11"
+                                       Height="22"
+                                       Margin="8,0,0,0"
+                                       Padding="6,0"
+                                       VerticalAlignment="Center"
+                                       Click="UpdateRestartButton_Click"/>
+                        </StackPanel>
+                    </ui:Card>
                 </StackPanel>
             </ui:TitleBar.Header>
 

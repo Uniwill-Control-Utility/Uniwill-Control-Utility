@@ -919,5 +919,22 @@
   "Zone colors": "ألوان المناطق",
   "Zones": "المناطق",
   "~3-5 mV per 1 point": "حوالي 3-5 ملي فولت لكل نقطة",
-  "Version {0}": "الإصدار {0}"
+  "Version {0}": "الإصدار {0}",
+  "Automatic updates": "التحديثات التلقائية",
+  "Check for updates automatically on startup": "البحث عن التحديثات تلقائيًا عند بدء التشغيل",
+  "Download updates in the background and install when the application exits": "تنزيل التحديثات في الخلفية وتثبيتها عند إغلاق التطبيق",
+  "Update and restart": "التحديث وإعادة التشغيل",
+  "Update available": "يتوفر تحديث",
+  "Update downloaded": "تم تنزيل التحديث",
+  "Downloading update: {0}%": "جارٍ تنزيل التحديث: {0}%",
+  "Checking for updates": "جارٍ البحث عن التحديثات",
+  "Updates are not available for this installation type (portable)": "التحديثات غير متوفرة لنوع التثبيت هذا (محمول)",
+  "Failed to check for updates": "تعذر البحث عن التحديثات",
+  "Failed to download update": "تعذر تنزيل التحديث",
+  "Update installed": "تم تثبيت التحديث",
+  "Updated to version {0}": "تم التحديث إلى الإصدار {0}",
+  "Relaunch the application after a crash": "إعادة تشغيل التطبيق بعد التعطل",
+  "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "إعادة تشغيل UCU تلقائيًا إذا أُغلق بشكل غير متوقع (يسجل مهمة مراقبة مجدولة)",
+  "Updates": "التحديثات",
+  "Lets you easily stay up to date with the latest releases": "ابقَ محدثًا بسهولة مع أحدث الإصدارات"
 }

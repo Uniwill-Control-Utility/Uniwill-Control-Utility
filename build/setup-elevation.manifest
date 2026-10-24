@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <!-- The per-machine install writes to Program Files; stamping the
+             Velopack Setup.exe bootstrapper (asInvoker by default) with this
+             makes a plain double-click show the UAC prompt instead of
+             failing mid-install with ERROR_ELEVATION_REQUIRED. -->
+        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>

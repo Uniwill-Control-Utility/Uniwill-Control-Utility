@@ -919,5 +919,22 @@
   "Zone colors": "Boje zona",
   "Zones": "Zone",
   "~3-5 mV per 1 point": "~3-5 mV po 1 boda",
-  "Version {0}": "Verzija {0}"
+  "Version {0}": "Verzija {0}",
+  "Automatic updates": "Automatska ažuriranja",
+  "Check for updates automatically on startup": "Automatski provjeri ažuriranja pri pokretanju",
+  "Download updates in the background and install when the application exits": "Preuzmi ažuriranja u pozadini i instaliraj ih pri zatvaranju aplikacije",
+  "Update and restart": "Ažuriraj i ponovno pokreni",
+  "Update available": "Ažuriranje je dostupno",
+  "Update downloaded": "Ažuriranje preuzeto",
+  "Downloading update: {0}%": "Preuzimanje ažuriranja: {0}%",
+  "Checking for updates": "Provjera ažuriranja",
+  "Updates are not available for this installation type (portable)": "Ažuriranja nisu dostupna za ovu vrstu instalacije (prenosiva)",
+  "Failed to check for updates": "Provjera ažuriranja nije uspjela",
+  "Failed to download update": "Preuzimanje ažuriranja nije uspjelo",
+  "Update installed": "Ažuriranje instalirano",
+  "Updated to version {0}": "Ažurirano na verziju {0}",
+  "Relaunch the application after a crash": "Ponovno pokreni aplikaciju nakon rušenja",
+  "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Automatski ponovno pokreni UCU ako se neočekivano zatvori (registrira zakazani zadatak nadzora)",
+  "Updates": "Ažuriranja",
+  "Lets you easily stay up to date with the latest releases": "Lako ostanite u toku s najnovijim izdanjima"
 }

@@ -105,11 +105,11 @@
                             </StackPanel>
 
                             <!-- App name, version, copyright -->
-                            <StackPanel Grid.Column="2" 
-                                        Grid.Row="0" 
-                                        VerticalAlignment="Center" 
-                                        Grid.RowSpan="2" 
-                                        Margin="0,0,0,0" 
+                            <StackPanel Grid.Column="2"
+                                        Grid.Row="0"
+                                        VerticalAlignment="Center"
+                                        Grid.RowSpan="2"
+                                        Margin="0,0,0,0"
                                         Orientation="Horizontal">
                                 <TextBlock x:Name="tbDonate"
                                    Margin="0,0,16,0"
@@ -126,7 +126,80 @@
                                         <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xEB51;" FontSize="12" Margin="6,0,4,0" />
                                     </ui:HyperlinkButton.Icon>
                                 </ui:HyperlinkButton>
-                                
+
+                            </StackPanel>
+                        </Grid>
+                    </ui:Card>
+
+                    <!-- Updates card: Velopack check/download against GitHub
+                         Releases, as a one-row card like the Settings rows —
+                         icon + title left, status caption under the title,
+                         action buttons right. Installed (MSI) layouts only;
+                         portable zips show a "not available" caption with the
+                         buttons collapsed (see code-behind). -->
+                    <ui:Card Margin="0,0,0,8" Padding="16">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <ui:FontIcon Grid.Column="0"
+                                         FontFamily="Segoe Fluent Icons"
+                                         Glyph="&#xF785;"
+                                         FontSize="20"
+                                         Margin="6,0,16,0"
+                                         VerticalAlignment="Center" />
+
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="Updates" />
+                                <!-- Default caption for installed layouts; the
+                                     code-behind overwrites it for portable
+                                     layouts and update state transitions. -->
+                                <ui:TextBlock x:Name="tbDownloadMsg"
+                                              Margin="0,2,0,2"
+                                              FontTypography="Caption"
+                                              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                              Text="Lets you easily stay up to date with the latest releases"
+                                              TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2"
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center">
+                                <ui:Button x:Name="btnCheck"
+                                           Padding="12,6"
+                                           Click="btnCheck_Click">
+
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="ArrowSync20"
+                                                       FontSize="18"
+                                                       Margin="0,0,8,0" />
+
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Text="Check for Updates" />
+                                    </StackPanel>
+                                </ui:Button>
+
+                                <ui:Button x:Name="btnDownload"
+                                           Padding="12,6"
+                                           Margin="9,0,0,0"
+                                           Appearance="Primary"
+                                           Visibility="Collapsed"
+                                           Click="btnDownload_Click">
+
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon x:Name="btnDownloadIcon"
+                                                       Symbol="ArrowDownload20"
+                                                       FontSize="18"
+                                                       Margin="0,0,8,0" />
+
+                                        <TextBlock x:Name="btnDownloadText"
+                                                   VerticalAlignment="Center"
+                                                   Text="Download Update" />
+                                    </StackPanel>
+                                </ui:Button>
                             </StackPanel>
                         </Grid>
                     </ui:Card>

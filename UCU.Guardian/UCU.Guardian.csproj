@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Crash guardian (GCUService-style). A separate tiny executable so Task
+       Manager shows "Uniwill Control Utility Service" instead of a second
+       indistinguishable "Uniwill Control Utility" entry. Headless: no window,
+       no EC access — it only polls the main app's mutex and relaunches it. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <!-- Task Manager shows the exe file name — spaces are intentional. -->
+    <AssemblyName>Uniwill Control Utility Service</AssemblyName>
+    <RootNamespace>Uniwill_Control_Utility_Guardian</RootNamespace>
+    <AssemblyTitle>Uniwill Control Utility Guardian</AssemblyTitle>
+    <Product>Uniwill Control Utility Guardian</Product>
+    <Copyright>© 2020-2026 UXTU Team, 2026 UCU Team</Copyright>
+    <Version>0.9.6</Version>
+    <Platforms>AnyCPU;x64</Platforms>
+    <ApplicationIcon>..\Uniwill Control Utility\favicon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Shared relaunch policy — the main app's xunit suite covers it. -->
+    <Compile Include="..\Uniwill Control Utility\Services\GuardianPolicy.cs" Link="Services\GuardianPolicy.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog" Version="4.2.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+</Project>

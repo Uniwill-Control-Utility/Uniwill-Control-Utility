@@ -919,5 +919,22 @@
   "Zone colors": "Mga kulay ng zone",
   "Zones": "Mga Zone",
   "~3-5 mV per 1 point": "~3-5 mV bawat 1 punto",
-  "Version {0}": "Bersyon {0}"
+  "Version {0}": "Bersyon {0}",
+  "Automatic updates": "Awtomatikong update",
+  "Check for updates automatically on startup": "Awtomatikong tingnan ang mga update sa pagsisimula",
+  "Download updates in the background and install when the application exits": "I-download ang mga update sa background at i-install kapag isinara ang aplikasyon",
+  "Update and restart": "I-update at i-restart",
+  "Update available": "May available na update",
+  "Update downloaded": "Na-download ang update",
+  "Downloading update: {0}%": "I-download ang update: {0}%",
+  "Checking for updates": "Tinitingnan ang mga update",
+  "Updates are not available for this installation type (portable)": "Hindi available ang mga update para sa uri ng instalasyon na ito (portable)",
+  "Failed to check for updates": "Nabigong tingnan ang mga update",
+  "Failed to download update": "Nabigong i-download ang update",
+  "Update installed": "Nai-install ang update",
+  "Updated to version {0}": "Na-update sa bersyon {0}",
+  "Relaunch the application after a crash": "I-restart ang aplikasyon pagkatapos mag-crash",
+  "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Awtomatikong i-restart ang UCU kung ito ay biglang magsara (magre-register ng iskedyul na watchdog task)",
+  "Updates": "Mga update",
+  "Lets you easily stay up to date with the latest releases": "Madaling manatiling updated sa mga pinakabagong release"
 }

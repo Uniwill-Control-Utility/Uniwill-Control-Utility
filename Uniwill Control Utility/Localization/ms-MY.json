@@ -919,5 +919,22 @@
   "Zone colors": "Warna zon",
   "Zones": "Zon",
   "~3-5 mV per 1 point": "~3-5 mV untuk 1 titik",
-  "Version {0}": "Versi {0}"
+  "Version {0}": "Versi {0}",
+  "Automatic updates": "Kemas kini automatik",
+  "Check for updates automatically on startup": "Semak kemas kini secara automatik pada permulaan",
+  "Download updates in the background and install when the application exits": "Muat turun kemas kini di latar belakang dan pasang apabila aplikasi keluar",
+  "Update and restart": "Kemas kini dan mulakan semula",
+  "Update available": "Kemas kini tersedia",
+  "Update downloaded": "Kemas kini dimuat turun",
+  "Downloading update: {0}%": "Memuat turun kemas kini: {0}%",
+  "Checking for updates": "Menyemak kemas kini",
+  "Updates are not available for this installation type (portable)": "Kemas kini tidak tersedia untuk jenis pemasangan ini (mudah alih)",
+  "Failed to check for updates": "Gagal menyemak kemas kini",
+  "Failed to download update": "Gagal memuat turun kemas kini",
+  "Update installed": "Kemas kini dipasang",
+  "Updated to version {0}": "Dikemas kini ke versi {0}",
+  "Relaunch the application after a crash": "Mulakan semula aplikasi selepas ranap",
+  "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Mulakan semula UCU secara automatik jika ia keluar secara tidak dijangka (mendaftarkan tugas pengawas berjadual)",
+  "Updates": "Kemas kini",
+  "Lets you easily stay up to date with the latest releases": "Sentiasa terkini dengan keluaran terbaharu"
 }

@@ -273,11 +273,10 @@
                             <!-- Divider -->
                             <Border x:Name="AutoCheckDivider"
                                     Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
-                                    Visibility="Collapsed" />
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 
-                            <!-- Row: Check for updates automatically (hidden) -->
-                            <Grid x:Name="AutoCheckRow" Visibility="Collapsed">
+                            <!-- Row: Check for updates automatically -->
+                            <Grid x:Name="AutoCheckRow">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -296,6 +295,60 @@
                                                  OffContent="Off"
                                                  Checked="cbAutoCheck_Checked"
                                                  Unchecked="cbAutoCheck_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border x:Name="AutoUpdateDivider"
+                                    Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Automatic updates (silent download + apply on exit) -->
+                            <Grid x:Name="AutoUpdateRow">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Automatic updates" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Download updates in the background and install when the application exits" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbAutoUpdate"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbAutoUpdate_Checked"
+                                                 Unchecked="cbAutoUpdate_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border x:Name="GuardianDivider"
+                                    Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Row: Crash guardian (watchdog) -->
+                            <Grid x:Name="GuardianRow">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Relaunch the application after a crash" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbGuardian"
+                                                 Grid.Column="1"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbGuardian_Checked"
+                                                 Unchecked="cbGuardian_Unchecked" />
                             </Grid>
 
                             <!-- Divider -->
@@ -885,57 +938,6 @@
                         </StackPanel>
                     </ui:CardExpander>
 
-                    <!-- About Uniwill Control Utility -->
-                    <ui:Card Margin="0,0,0,8" Visibility="Collapsed">
-                        <StackPanel>
-                            <TextBlock FontSize="17"
-                                       FontWeight="Medium"
-                                       Text="About Uniwill Control Utility" />
-
-                            <TextBlock x:Name="tbAppVerion"
-                                       Margin="0,7,0,12" />
-
-                            <StackPanel Orientation="Horizontal"
-                                       Visibility="Collapsed">
-                                <ui:Button x:Name="btnCheck"
-                                           Width="178"
-                                           Click="btnCheck_Click">
-
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="ArrowSync20"
-                                                       FontSize="22"
-                                                       Margin="0,0,8,0" />
-
-                                        <TextBlock VerticalAlignment="Center"
-                                                   Text="Check for Updates" />
-                                    </StackPanel>
-                                </ui:Button>
-
-                                <ui:Button x:Name="btnDownload"
-                                           Width="178"
-                                           Margin="9,0,0,0"
-                                           Appearance="Primary"
-                                           Visibility="Collapsed"
-                                           Click="btnDownload_Click">
-
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="ArrowDownload20"
-                                                       FontSize="22"
-                                                       Margin="0,0,8,0" />
-
-                                        <TextBlock VerticalAlignment="Center"
-                                                   Text="Download Update" />
-                                    </StackPanel>
-                                </ui:Button>
-                            </StackPanel>
-
-                            <TextBlock x:Name="tbDownloadMsg"
-                                       Margin="0,10,0,0"
-                                       HorizontalAlignment="Stretch"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </ui:Card>
 
                     <!-- System Info section -->
                     <TextBlock Margin="0,16,0,0"

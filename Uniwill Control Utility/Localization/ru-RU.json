@@ -919,5 +919,22 @@
   "Zone colors": "Цвета зон",
   "Zones": "Зоны",
   "~3-5 mV per 1 point": "~3-5 мВ на 1 пункт",
-  "Version {0}": "Версия {0}"
+  "Version {0}": "Версия {0}",
+  "Automatic updates": "Автоматические обновления",
+  "Check for updates automatically on startup": "Автоматически проверять обновления при запуске",
+  "Download updates in the background and install when the application exits": "Загружать обновления в фоне и устанавливать при завершении работы приложения",
+  "Update and restart": "Обновить и перезапустить",
+  "Update available": "Доступно обновление",
+  "Update downloaded": "Обновление загружено",
+  "Downloading update: {0}%": "Загрузка обновления: {0}%",
+  "Checking for updates": "Проверка обновлений",
+  "Updates are not available for this installation type (portable)": "Обновления недоступны для данного типа установки (портативная версия)",
+  "Failed to check for updates": "Не удалось проверить обновления",
+  "Failed to download update": "Не удалось загрузить обновление",
+  "Update installed": "Обновление установлено",
+  "Updated to version {0}": "Обновление до версии {0}",
+  "Relaunch the application after a crash": "Перезапускать приложение после сбоя",
+  "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Автоматически перезапускать UCU при неожиданном завершении (регистрирует запланированную сторожевую задачу)",
+  "Updates": "Обновления",
+  "Lets you easily stay up to date with the latest releases": "Легко оставайтесь в курсе последних версий"
 }
