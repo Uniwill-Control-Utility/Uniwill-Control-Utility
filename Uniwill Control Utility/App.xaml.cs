@@ -32,6 +32,7 @@ using Uniwill_Control_Utility.Services;
 using Uniwill_Control_Utility.Services.Performance;
 using Uniwill_Control_Utility.Views.Pages;
 using Uniwill_Control_Utility.Views.Windows;
+using Velopack;
 using Wpf.Ui;
 using Wpf.Ui.Abstractions;
 
@@ -59,9 +60,75 @@ namespace Uniwill_Control_Utility
             return _host?.Services.GetService(typeof(T)) as T;
         }
 
-        internal static readonly string version = "0.9.5.2";
+        /// <summary>
+        /// Custom entry point required by Velopack: runs the Velopack bootstrap
+        /// (install/update hooks, package cleanup) before any WPF object exists,
+        /// then starts the application. On portable (non-installed) layouts,
+        /// VelopackApp.Run() is a no-op. Auto-apply on startup is disabled —
+        /// updates are applied on exit (title-bar card / graceful quit), never
+        /// as a surprise restart under the user.
+        /// </summary>
+        [STAThread]
+        public static void Main(string[] args)
+        {
+            StartupArgs = args ?? Array.Empty<string>();
+            GuardianRestart = StartupArgs.Contains("--from-guardian");
+
+            VelopackApp.Build()
+                .SetAppUserModelId(AppUserModelId)
+                .SetAutoApplyOnStartup(false)
+                .OnRestarted(_ => RestartedByVelopack = true)
+                .Run();
+
+            var app = new App();
+            app.InitializeComponent();
+            app.Run();
+        }
+
+        /// <summary>
+        /// Command-line arguments captured in Main before the WPF app exists.
+        /// Used for --from-update (Velopack restart) and --from-guardian
+        /// (crash-guardian relaunch).
+        /// </summary>
+        internal static string[] StartupArgs { get; private set; } = Array.Empty<string>();
+
+        /// <summary>
+        /// True when the guardian relaunched us after a crash: the startup
+        /// overlay is suppressed and the main window opens minimized to the
+        /// tray, so the recovery never interrupts what the user is doing.
+        /// </summary>
+        internal static bool GuardianRestart { get; private set; }
+
+        /// <summary>
+        /// Set by the Velopack OnRestarted hook when Update.exe relaunched us
+        /// after applying an update (VELOPACK_RESTART environment variable).
+        /// </summary>
+        internal static bool RestartedByVelopack;
+
         private Mutex? mutex;
         private const string MutexName = "UniwillControlUtility";
+
+        // Written at the top of OnExit so the guardian distinguishes an
+        // intentional shutdown from a crash (see UCU.Guardian / GuardianPolicy).
+        // A file, not a named event: kernel objects die with the process, and
+        // the guardian's 5s poll only opens the handle after we are gone.
+        internal static string GracefulExitFlagPath => Path.Combine(LOGS_FOLDER, "graceful-exit.flag");
+
+        // Must match GuardianConstants in UCU.Guardian\Program.cs.
+        private const string GuardianMutexName = "UniwillControlUtility.Guardian";
+
+        private const string AutostartTaskName = "UCU";
+        private const string GuardianTaskName = "UCU Guardian";
+        private static DispatcherTimer? _guardianWatchTimer;
+
+        /// <summary>
+        /// The guardian ships as its own executable (project UCU.Guardian) in
+        /// the Service\ subfolder, so the install directory shows a single
+        /// "Uniwill Control Utility.exe" and Task Manager shows a distinct
+        /// "Uniwill Control Utility Service" entry.
+        /// </summary>
+        internal static string GuardianExePath =>
+            Path.Combine(AppContext.BaseDirectory, "Service", "Uniwill Control Utility Service.exe");
 
         internal static readonly string SCALE_MODELS_JSON_PATH = ".\\ScaleModels.json";
         internal static readonly string LOGS_FOLDER = ".\\logs\\";
@@ -113,7 +180,14 @@ namespace Uniwill_Control_Utility
                 // so it renders with the right brushes instead of flashing Dark first.
                 ApplySystemTheme();
 
-                bool showStartupProgressOverlay = Settings.Default.ShowStartupProgressOverlay;
+                // A guardian relaunch must be silent: no splash overlay, and the
+                // main window opens minimized to the tray (see mainWindow_Loaded).
+                // A second-instance handoff also skips the overlay: it signals the
+                // running instance and exits within a second, so the splash would
+                // only flash.
+                bool handoffInstance = IsAppAlreadyRunning();
+                bool showStartupProgressOverlay = Settings.Default.ShowStartupProgressOverlay
+                    && !GuardianRestart && !handoffInstance;
                 if (showStartupProgressOverlay)
                 {
                     startupWindow = new StartupProgressWindow();
@@ -224,6 +298,9 @@ namespace Uniwill_Control_Utility
                         // Service containing navigation, same as INavigationWindow... but without window
                         services.AddSingleton<INavigationService, NavigationService>();
                         services.AddSingleton<PresetsNavigationRequest>();
+
+                        // Velopack update engine (GitHub Releases feed; no-op on portable layouts).
+                        services.AddSingleton<VelopackUpdateService>();
 
                         services.AddSingleton<IHardwareMonitoringService, HardwareMonitoringService>();
                         services.AddSingleton<GpuInventoryService>();
@@ -341,13 +418,11 @@ namespace Uniwill_Control_Utility
 
                     Shutdown();
                     return;
-                } else StartSingleInstanceListener();
-
-                if (File.Exists("C:\\Uniwill.Control.Utility.V2.msi"))
-                    File.Delete("C:\\Uniwill.Control.Utility.V2.msi");
-
-                if (File.Exists("C:\\Uniwill.Control.Utility.msi"))
-                    File.Delete("C:\\Uniwill.Control.Utility.msi");
+                }
+                else
+                {
+                    StartSingleInstanceListener();
+                }
 
                 // --- Phase 1: independent startup tasks (all run in parallel) ---
                 // Hardware detection + sensor init, device connections, startup settings
@@ -368,6 +443,8 @@ namespace Uniwill_Control_Utility
                     Scripts.RyzenAdj_To_UCU.EcService = ecService;
                 }
 
+                var updateService = _host.Services.GetRequiredService<VelopackUpdateService>();
+
                 var phase1TasksList = new[]
                 {
                     ("Detecting hardware", true),
@@ -375,6 +452,7 @@ namespace Uniwill_Control_Utility
                     ("Connecting devices", Settings.Default.EnableHydroUiNavigation || Settings.Default.EnableFlydigi),
                     ("Applying startup settings", true),
                     ("Loading game library", true),
+                    ("Checking for updates", Settings.Default.UpdateCheck && updateService.IsInstalled),
                 };
 
                 // Wait for any queued pre-Phase-1 animations to finish so the tracker
@@ -474,6 +552,54 @@ namespace Uniwill_Control_Utility
                     finally
                     {
                         _ = startupWindow?.Dispatcher.InvokeAsync(() => tracker?.TaskCompleted(4));
+                    }
+                }));
+
+                // Check the GitHub Releases feed for a new Velopack package. The
+                // check is gated to 10 seconds so a slow network call never stalls
+                // the splash — if it runs long, the decision continues in the
+                // background. A found update is downloaded silently (fire-and-
+                // forget) when automatic updates are on; the title-bar card
+                // tracks progress and the package applies on graceful exit.
+                phase1Tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        var checkTask = updateService.CheckForUpdatesAsync();
+                        var winner = await Task.WhenAny(checkTask, Task.Delay(TimeSpan.FromSeconds(10)));
+
+                        if (winner == checkTask)
+                        {
+                            _ = await checkTask;
+                            if (UpdatePolicy.ShouldSilentDownload(updateService.IsInstalled,
+                                    Settings.Default.UpdateCheck, Settings.Default.AutoUpdateApply, updateService.State))
+                                SafeFireAndForget(updateService.DownloadAsync(null));
+                        }
+                        else
+                        {
+                            _ = checkTask.ContinueWith(t =>
+                            {
+                                try
+                                {
+                                    if (t.IsCompletedSuccessfully && t.Result is not null &&
+                                        UpdatePolicy.ShouldSilentDownload(updateService.IsInstalled,
+                                            Settings.Default.UpdateCheck, Settings.Default.AutoUpdateApply, updateService.State))
+                                        SafeFireAndForget(updateService.DownloadAsync(null));
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger?.LogWarning(ex, "Background update check failed");
+                                }
+                            }, TaskScheduler.Default);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Update check failed");
+                    }
+                    finally
+                    {
+                        _ = startupWindow?.Dispatcher.InvokeAsync(() => tracker?.TaskCompleted(5));
                     }
                 }));
 
@@ -865,12 +991,15 @@ namespace Uniwill_Control_Utility
         {
             try
             {
-                var isInternetAvailable = await Task.Run(IsInternetAvailable);
-
-                if (isInternetAvailable && Settings.Default.UpdateCheck)
+                // Relaunched by Velopack after "Update and restart" (title-bar card).
+                if (StartupArgs.Contains("--from-update"))
                 {
-                    SafeFireAndForget(CheckForUpdate());
+                    var newVersion = Assembly.GetEntryAssembly()?.GetName().Version;
+                    ToastNotification.ShowToastNotification("Update installed",
+                        LocalizationService.Format("Updated to version {0}", newVersion), category: ToastCategory.Settings);
                 }
+
+                var isInternetAvailable = await Task.Run(IsInternetAvailable);
 
                 if (isInternetAvailable && PawnIoDetectionService.ShouldOpenInstaller())
                     new InstallpawnIo().Show();
@@ -880,9 +1009,160 @@ namespace Uniwill_Control_Utility
                 _logger?.LogError(ex, "Failed during deferred update and PawnIO checks");
             }
 
+            // Register the App Paths auto-elevation shim once (XMG CC-style
+            // launch UX): the app manifest stays requireAdministrator for
+            // EC/MSR access, but ShellExecute launches (Start menu, tray,
+            // taskbar, guardian) from an admin account then elevate silently.
+            TryRegisterAutoElevation();
+
+            // Guardian: mutual guarding — the app respawns the watchdog if it is
+            // enabled but not running (the watchdog already watches the app).
+            if (Settings.Default.GuardianEnabled)
+                EnsureGuardianRunning();
+
+            // Self-heal the scheduled task action paths: the path is baked at
+            // registration time, so installs that moved (zip → MSI migration)
+            // would otherwise autostart / watchdog-launch the old exe.
+            SelfHealScheduledTask(AutostartTaskName, "", null, TimeSpan.FromSeconds(Settings.Default.StartupDelaySeconds), "Start UCU");
+            if (Settings.Default.GuardianEnabled)
+                SelfHealScheduledTask(GuardianTaskName, "", GuardianExePath, TimeSpan.FromSeconds(30), "Keep UCU running (crash guardian)");
+
             // Show the prerequisite checklist on first startup.
             if (Settings.Default.ShowPrerequisiteDialog)
                 SafeFireAndForget(ShowPrerequisiteDialogAsync());
+        }
+
+        /// <summary>
+        /// Starts the guardian now (if not already running) and arms the 5-min
+        /// respawn timer. Called at startup when GuardianEnabled is set and
+        /// immediately when the user flips the Settings toggle, so enabling the
+        /// feature takes effect without an app restart.
+        /// </summary>
+        public static void EnsureGuardianRunning()
+        {
+            RespawnGuardianIfMissing();
+
+            if (_guardianWatchTimer is null)
+            {
+                _guardianWatchTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(5) };
+                _guardianWatchTimer.Tick += (s, e) => RespawnGuardianIfMissing();
+                _guardianWatchTimer.Start();
+            }
+        }
+
+        /// <summary>
+        /// Relaunches the guardian executable when the user has the feature
+        /// enabled but the guardian is not running (GCUService-style mutual
+        /// guarding).
+        /// </summary>
+        private static void RespawnGuardianIfMissing()
+        {
+            try
+            {
+                using var probe = new Mutex(false, GuardianMutexName, out bool createdNew);
+                if (!createdNew)
+                    return; // guardian is already running
+
+                string guardianExe = GuardianExePath;
+                if (!File.Exists(guardianExe))
+                {
+                    _logger?.LogWarning("Guardian executable missing: {Path}", guardianExe);
+                    return;
+                }
+
+                Process.Start(new ProcessStartInfo(guardianExe)
+                {
+                    UseShellExecute = true,
+                });
+                _logger?.LogInformation("Respawned the crash guardian");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to respawn the crash guardian");
+            }
+        }
+
+        /// <summary>
+        /// Non-creating probe of the single-instance mutex: true when an
+        /// instance is already running (this process is a handoff instance
+        /// that will signal it and exit).
+        /// </summary>
+        private static bool IsAppAlreadyRunning()
+        {
+            try
+            {
+                using var probe = new Mutex(false, MutexName, out bool createdNew);
+                return !createdNew;
+            }
+            catch (AbandonedMutexException)
+            {
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Registers the well-known App Paths auto-elevation shim
+        /// (HKLM\...\App Paths\&lt;exename&gt; with Type=AppUserModelID and an
+        /// empty PackageSid): ShellExecute launches of the exe from an
+        /// admin-account user then elevate without a UAC prompt. The manifest
+        /// itself stays requireAdministrator — EC/MSR access is non-negotiable;
+        /// this only removes the per-launch consent for our own exe. The
+        /// uninstall shim deletes this key. Idempotent, best-effort.
+        /// </summary>
+        private static void TryRegisterAutoElevation()
+        {
+            try
+            {
+                string? exe = Environment.ProcessPath;
+                if (string.IsNullOrEmpty(exe))
+                    return;
+
+                using var appPaths = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                    .OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths", writable: true);
+                if (appPaths is null)
+                    return;
+
+                string keyName = Path.GetFileName(exe);
+                using var key = appPaths.CreateSubKey(keyName, writable: true);
+                key.SetValue(null, exe);
+
+                if (key.GetValue("Type") as string != "AppUserModelID")
+                {
+                    key.SetValue("Type", "AppUserModelID");
+                    key.SetValue("PackageSid", string.Empty);
+                    _logger?.LogInformation("[Elevation] Registered App Paths auto-elevation shim for {Exe}", keyName);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "[Elevation] App Paths auto-elevation shim registration failed");
+            }
+        }
+
+        /// <summary>
+        /// Re-registers a scheduled task when its action path no longer points
+        /// at the running executable (install moved, e.g. zip → MSI migration).
+        /// Never creates tasks that the user has not enabled.
+        /// </summary>
+        private static void SelfHealScheduledTask(string taskName, string arguments, string? exePath, TimeSpan delay, string description)
+        {
+            try
+            {
+                var registeredPath = ScheduledTaskService.GetActionPath(taskName);
+                if (registeredPath is null)
+                    return; // task not registered — nothing to heal
+
+                string expectedPath = exePath ?? ScheduledTaskService.CurrentExePath;
+                if (!string.Equals(registeredPath, expectedPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    ScheduledTaskService.Register(taskName, description, arguments, delay, exePath);
+                    _logger?.LogInformation("Re-pointed the {Task} scheduled task at {Path}", taskName, expectedPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to self-heal the {Task} scheduled task", taskName);
+            }
         }
 
         private static async Task ShowPrerequisiteDialogAsync()
@@ -1025,23 +1305,6 @@ namespace Uniwill_Control_Utility
         [DllImport("shell32.dll")]
         private static extern int SetCurrentProcessExplicitAppUserModelID(string appId);
 
-        public static async Task CheckForUpdate()
-        {
-            var updateManager = new UpdateManager("jgudec", "Uniwill-Control-Utility", App.version, "C:\\");
-
-            var isUpdateAvailable = await updateManager.IsUpdateAvailable();
-
-            if (isUpdateAvailable)
-            {
-                if (updateManager.NewVersion.StartsWith("3."))
-                    ToastNotification.ShowToastNotification("Phantom Control Centre Now Available!",
-                        $"Head to the Phantom Control Centre GitHub releases page to easily download the latest build!", category: ToastCategory.Settings);
-                else
-                    ToastNotification.ShowToastNotification("New Update Available!",
-                        $"Head to the settings menu to easily download the new Uniwill Control Utility update!", category: ToastCategory.Settings);
-            }
-        }
-
         public static bool IsInternetAvailable()
         {
             try
@@ -1075,6 +1338,17 @@ namespace Uniwill_Control_Utility
         /// </summary>
         private void OnExit(object sender, ExitEventArgs e)
         {
+            // Marks this shutdown as intentional (tray Exit / window close), so the
+            // guardian does not relaunch the app. Crash paths never reach OnExit.
+            // The flag file outlives the process, so the guardian's next poll
+            // (up to 5s later) still sees it.
+            try
+            {
+                Directory.CreateDirectory(LOGS_FOLDER);
+                File.WriteAllText(GracefulExitFlagPath, DateTime.UtcNow.ToString("O"));
+            }
+            catch { /* best-effort during teardown */ }
+
             _showListenerCts?.Cancel();
             _showEvent?.Dispose();
             mutex?.Dispose();
@@ -1126,6 +1400,16 @@ namespace Uniwill_Control_Utility
             try
             {
                 App._host?.Services.GetService<BetterRgbStreamService>()?.StopEngine("shutdown");
+            }
+            catch { /* best-effort during teardown */ }
+
+            // Apply a downloaded update on graceful exit. ApplyUpdatesAndExit
+            // terminates the process, so this must run after all synchronous
+            // hardware teardown above (SMU / Flydigi / BetterRGB) — it skips
+            // the async host stop below, which is best-effort by design.
+            try
+            {
+                App._host?.Services.GetService<VelopackUpdateService>()?.TryApplyOnExit();
             }
             catch { /* best-effort during teardown */ }
 

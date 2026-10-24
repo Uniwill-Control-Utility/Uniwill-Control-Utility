@@ -919,5 +919,22 @@
   "Zone colors": "Cores das zonas",
   "Zones": "Zonas",
   "~3-5 mV per 1 point": "~3-5 mV por 1 ponto",
-  "Version {0}": "Versão {0}"
+  "Version {0}": "Versão {0}",
+  "Automatic updates": "Atualizações automáticas",
+  "Check for updates automatically on startup": "Procurar atualizações automaticamente ao iniciar",
+  "Download updates in the background and install when the application exits": "Transferir atualizações em segundo plano e instalá-las ao sair da aplicação",
+  "Update and restart": "Atualizar e reiniciar",
+  "Update available": "Atualização disponível",
+  "Update downloaded": "Atualização transferida",
+  "Downloading update: {0}%": "A transferir a atualização: {0}%",
+  "Checking for updates": "A procurar atualizações",
+  "Updates are not available for this installation type (portable)": "As atualizações não estão disponíveis para este tipo de instalação (portátil)",
+  "Failed to check for updates": "Falha ao procurar atualizações",
+  "Failed to download update": "Falha ao transferir a atualização",
+  "Update installed": "Atualização instalada",
+  "Updated to version {0}": "Atualizado para a versão {0}",
+  "Relaunch the application after a crash": "Reiniciar a aplicação após um encerramento inesperado",
+  "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Reiniciar o UCU automaticamente se for encerrado inesperadamente (registra uma tarefa de vigilância agendada)",
+  "Updates": "Atualizações",
+  "Lets you easily stay up to date with the latest releases": "Mantenha-se facilmente atualizado com as versões mais recentes"
 }

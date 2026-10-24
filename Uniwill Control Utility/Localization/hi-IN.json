@@ -919,5 +919,22 @@
   "Zone colors": "क्षेत्र रंग",
   "Zones": "क्षेत्र",
   "~3-5 mV per 1 point": "प्रति 1 अंक ~3-5 mV",
-  "Version {0}": "संस्करण {0}"
+  "Version {0}": "संस्करण {0}",
+  "Automatic updates": "स्वचालित अपडेट",
+  "Check for updates automatically on startup": "स्टार्टअप पर स्वतः अपडेट की जाँच करें",
+  "Download updates in the background and install when the application exits": "अपडेट को पृष्ठभूमि में डाउनलोड करें और एप्लिकेशन बंद होने पर इंस्टॉल करें",
+  "Update and restart": "अपडेट करें और पुनः आरंभ करें",
+  "Update available": "अपडेट उपलब्ध",
+  "Update downloaded": "अपडेट डाउनलोड हो गया",
+  "Downloading update: {0}%": "अपडेट डाउनलोड हो रहा है: {0}%",
+  "Checking for updates": "अपडेट की जाँच की जा रही है",
+  "Updates are not available for this installation type (portable)": "इस इंस्टॉलेशन प्रकार (पोर्टेबल) के लिए अपडेट उपलब्ध नहीं हैं",
+  "Failed to check for updates": "अपडेट की जाँच विफल",
+  "Failed to download update": "अपडेट डाउनलोड विफल",
+  "Update installed": "अपडेट इंस्टॉल हो गया",
+  "Updated to version {0}": "{0} संस्करण में अपडेट किया गया",
+  "Relaunch the application after a crash": "क्रैश के बाद एप्लिकेशन पुनः चलाएँ",
+  "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "अप्रत्याशित बंद होने पर UCU को स्वतः पुनः चलाएँ (एक अनुसूचित वॉचडॉग कार्य पंजीकृत करता है)",
+  "Updates": "अपडेट",
+  "Lets you easily stay up to date with the latest releases": "नवीनतम रिलीज़ के साथ आसानी से अपडेट रहें"
 }

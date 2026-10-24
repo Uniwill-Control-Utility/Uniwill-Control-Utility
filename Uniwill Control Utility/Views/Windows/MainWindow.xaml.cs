@@ -79,6 +79,11 @@ namespace Uniwill_Control_Utility.Views.Windows
             SetupNavigationService(pageProvider);
             SetupUI();
 
+            // Title-bar update card follows the Velopack update state.
+            var updateService = App.GetService<VelopackUpdateService>();
+            if (updateService is not null)
+                updateService.StateChanged += OnUpdateStateChanged;
+
             SystemEvents.PowerModeChanged += HandlePowerModeChange;
 
             // Subscribe to window messages for display change detection.
@@ -259,6 +264,40 @@ namespace Uniwill_Control_Utility.Views.Windows
             ModelNameText.Visibility = visibility;
             VersionCard.Visibility = visibility;
             LaptopNameCard.Visibility = visibility;
+            ApplyUpdateCardVisibility();
+        }
+
+        // The update card is gated by both the update state and the current page
+        // (hidden on Dashboard, like the version chip).
+        private bool _updateCardVisible;
+
+        private void OnUpdateStateChanged(Services.UpdateState state, int progress)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                _updateCardVisible = Services.UpdatePolicy.ShouldShowTitleBarCard(state);
+                UpdateCardText.Text = state switch
+                {
+                    Services.UpdateState.Downloading => LocalizationService.Format("Downloading update: {0}%", progress),
+                    Services.UpdateState.PendingApply => LocalizationService.Get("Update downloaded"),
+                    _ => LocalizationService.Get("Update available"),
+                };
+                ApplyUpdateCardVisibility();
+            });
+        }
+
+        private void ApplyUpdateCardVisibility()
+        {
+            bool isDashboard = IsPageSelected(typeof(Views.Pages.DashboardPage));
+            UpdateCard.Visibility = _updateCardVisible && !isDashboard
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private void UpdateRestartButton_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+            // Applies the staged package and relaunches the app (terminates us).
+            App.GetService<VelopackUpdateService>()?.ApplyAndRestart();
         }
 
         private void SetupUI()
@@ -1858,7 +1897,9 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void mainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            if (Settings.Default.StartMini)
+            // StartMini is the user's own setting; a guardian relaunch after a
+            // crash always opens minimized, so recovery stays out of the way.
+            if (Settings.Default.StartMini || App.GuardianRestart)
             {
                 this.WindowState = WindowState.Minimized;
             }
