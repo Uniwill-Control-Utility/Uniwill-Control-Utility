@@ -61,10 +61,10 @@ foreach ($file in @(
 $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 if (-not (Test-Path $csc)) { throw "csc.exe not found at $csc" }
 & $csc /nologo /target:exe /platform:x64 `
-    /win32icon (Join-Path $projDir "favicon.ico") `
-    /win32manifest (Join-Path $PSScriptRoot "uninstall-shim\admin.manifest") `
+    "/win32icon:$(Join-Path $projDir 'favicon.ico')" `
+    "/win32manifest:$(Join-Path $PSScriptRoot 'uninstall-shim\admin.manifest')" `
     /r:System.Windows.Forms.dll /r:System.Drawing.dll `
-    /out (Join-Path $publishDir "Uninstall.exe") `
+    "/out:$(Join-Path $publishDir 'Uninstall.exe')" `
     (Join-Path $PSScriptRoot "uninstall-shim\UninstallShim.cs")
 if ($LASTEXITCODE -ne 0) { throw "Uninstall.exe shim compile failed" }
 
@@ -111,8 +111,12 @@ if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
 # Inject build\setup-elevation.manifest (resource #1) with the SDK's mt.exe.
 $setupExe = Get-ChildItem $releasesDir -Filter "*-Setup.exe" | Select-Object -First 1
 if ($setupExe) {
-    $mt = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\mt.exe" -ErrorAction SilentlyContinue |
-        Sort-Object { [version](Split-Path $_.Directory.Name -Leaf) } | Select-Object -Last 1
+    # SDK bin dirs are versioned (10.0.26100.0\x64) plus an unversioned x64\
+    # fallback; pick the newest versioned dir, fall back to any hit.
+    $mtCandidates = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\mt.exe" -ErrorAction SilentlyContinue
+    $mt = $mtCandidates | Where-Object { $_.Directory.Name -match '^\d+(\.\d+){3}$' } |
+        Sort-Object { [version]$_.Directory.Name } | Select-Object -Last 1
+    if (-not $mt) { $mt = $mtCandidates | Select-Object -First 1 }
     if (-not $mt) {
         Write-Warning "mt.exe not found in the Windows SDK — Setup.exe stays asInvoker; run it elevated."
     } else {

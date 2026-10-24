@@ -23,7 +23,7 @@
          the title-bar chip, the About page, and build\pack.ps1 (Velopack packVersion).
          Must be 3-part (a.b.c) — Velopack rejects 4-part versions. Bump the third
          part for every release. -->
-    <Version>0.9.5</Version>
+    <Version>0.9.6</Version>
     <!-- Custom Main in App.xaml.cs runs the Velopack bootstrap before WPF starts,
          so App.xaml is compiled as a Page (not ApplicationDefinition). -->
     <StartupObject>Uniwill_Control_Utility.App</StartupObject>

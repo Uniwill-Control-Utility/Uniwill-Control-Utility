@@ -14,7 +14,7 @@
     <AssemblyTitle>Uniwill Control Utility Guardian</AssemblyTitle>
     <Product>Uniwill Control Utility Guardian</Product>
     <Copyright>© 2020-2026 UXTU Team, 2026 UCU Team</Copyright>
-    <Version>0.9.5</Version>
+    <Version>0.9.6</Version>
     <Platforms>AnyCPU;x64</Platforms>
     <ApplicationIcon>..\Uniwill Control Utility\favicon.ico</ApplicationIcon>
   </PropertyGroup>
