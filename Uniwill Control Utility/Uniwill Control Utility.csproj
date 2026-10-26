@@ -106,24 +106,48 @@
   <!-- Engine service: staged into Service\ by running the engine project's own
        Build/Publish with its output redirected there. Redirecting (instead of
        flowing the files into the app root) keeps the service's full
-       dependency closure — hosting, Serilog, UCU.Core/Contracts/Hardware —
+       dependency closure - hosting, Serilog, UCU.Core/Contracts/Hardware -
        inside Service\ and leaves the app root's assemblies alone, which is
        what keeps the app process free of the hardware layer. The redirect must
        be an absolute path: a relative OutDir would resolve against the engine
        project's directory. Runs for Build (VS F5) and Publish (pack.ps1 / VS
-       Publish). -->
+       Publish).
+
+       IntermediateOutputPath is redirected too, and that is not cosmetic. The
+       engine's own Build (into bin\) and this staging Build share one obj\ by
+       default, and the copy-local/copy-to-output markers MSBuild uses for
+       incrementality live in obj\ - so the second OutDir is judged against the
+       first one's markers and its copy is skipped. Measured in the field: a
+       rebuilt engine left Service\ on the previous binary, so the elevated
+       install pass registered a stale exe. A staging-specific obj makes the markers
+       describe the output they actually govern, so Service\ is refreshed
+       whenever the engine changes.
+
+       The paths are computed inside each target, never in a project-level
+       PropertyGroup: OutDir and IntermediateOutputPath are assigned by the SDK
+       targets, which MSBuild imports after the project body, so an earlier
+       evaluation sees them empty and the engine's output lands next to the
+       project directory instead of in Service\. -->
   <Target Name="StageEngineInServiceFolder" AfterTargets="Build"
           Condition="Exists('$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj')">
+    <PropertyGroup>
+      <_EngineStagingOutDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(OutDir)Service\'))</_EngineStagingOutDir>
+      <_EngineStagingIntermediateDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(IntermediateOutputPath)engine\'))</_EngineStagingIntermediateDir>
+    </PropertyGroup>
     <MSBuild Projects="$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj"
              Targets="Build"
-             Properties="Configuration=$(Configuration);Platform=AnyCPU;OutDir=$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(OutDir)Service\'))" />
+             Properties="Configuration=$(Configuration);Platform=AnyCPU;OutDir=$(_EngineStagingOutDir);IntermediateOutputPath=$(_EngineStagingIntermediateDir)" />
   </Target>
 
   <Target Name="StageEngineInServiceFolderOnPublish" AfterTargets="Publish"
           Condition="Exists('$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj')">
+    <PropertyGroup>
+      <_EngineStagingPublishDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(PublishDir)Service\'))</_EngineStagingPublishDir>
+      <_EngineStagingIntermediateDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(IntermediateOutputPath)engine\'))</_EngineStagingIntermediateDir>
+    </PropertyGroup>
     <MSBuild Projects="$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj"
              Targets="Publish"
-             Properties="Configuration=$(Configuration);Platform=AnyCPU;PublishDir=$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(PublishDir)Service\'))" />
+             Properties="Configuration=$(Configuration);Platform=AnyCPU;PublishDir=$(_EngineStagingPublishDir);IntermediateOutputPath=$(_EngineStagingIntermediateDir)" />
   </Target>
 
   <ItemGroup>
