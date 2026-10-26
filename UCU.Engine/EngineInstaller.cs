@@ -29,7 +29,14 @@ namespace UCU.Engine
         /// </summary>
         internal const string ServiceSddl = "D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;CCLCSWLOCRRC;;;AU)";
 
-        private const string DisplayName = "Uniwill Control Utility Engine";
+        /// <summary>
+        /// What services.msc shows. The SCM service name stays the stable
+        /// identity (<c>UCUEngine</c>: sc commands, the pipe contract, the
+        /// app's ServiceController lookups), and the exe keeps the product
+        /// name; this is the short user-facing label. Re-applied by the
+        /// install self-heal so existing registrations rename themselves.
+        /// </summary>
+        private const string DisplayName = "UCU Engine";
 
         private const string Description =
             "Runs the privileged Uniwill Control Utility hardware operations (Embedded Controller) as a system service, so the application runs unelevated.";
@@ -83,10 +90,12 @@ namespace UCU.Engine
                 return rc;
             }
 
-            // Registration self-heal: the binPath must follow the exe through an
-            // update, and the DACL/failure rules travel with the build that
-            // installed them, so re-assert both.
-            rc = await RunScAsync("config", name, binPath).ConfigureAwait(false);
+            // Registration self-heal: the binPath and display name must follow the
+            // exe/build through an update (the rename from the product-length name to
+            // "UCU Engine" re-applies here for installs that predate it), and the
+            // DACL/failure rules travel with the build that installed them, so
+            // re-assert all of them.
+            rc = await RunScAsync("config", name, binPath, displayName).ConfigureAwait(false);
             if (rc != 0)
                 return rc;
 
