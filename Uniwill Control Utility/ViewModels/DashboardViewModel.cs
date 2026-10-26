@@ -343,8 +343,8 @@ namespace Uniwill_Control_Utility.ViewModels
 
                 try
                 {
-                    // Availability check opens the engine (the RPC gate initialises lazily,
-                    // and dev-inprocess mirrors that through its own probe).
+                    // Availability check opens the engine (the RPC gate initialises
+                    // lazily, so this is the call that wakes it).
                     await _engine.IsHardwareAvailableAsync().ConfigureAwait(false);
                 }
                 catch { /* EC not available on this hardware */ }

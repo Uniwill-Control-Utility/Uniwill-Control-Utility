@@ -141,7 +141,7 @@ public sealed class ContractShapeTests
         // again through a type it already references.
         string[] forbidden =
         {
-            "UCU.Hardware", "UCU.Engine", "UCU.Client", "UCU.Guardian",
+            "UCU.Hardware", "UCU.Engine", "UCU.Client",
             "PresentationFramework", "PresentationCore", "WindowsBase",
             "Serilog", "System.IO.Pipes", "System.Management",
             "Microsoft.Extensions.Hosting", "System.ServiceProcess.ServiceController",

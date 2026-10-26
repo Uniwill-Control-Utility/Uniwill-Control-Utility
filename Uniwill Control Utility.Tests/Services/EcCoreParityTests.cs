@@ -112,11 +112,12 @@ public sealed class EcCoreParityTests
     [Fact]
     public void AppAssemblyDoesNotReferenceTheHardwareLayer()
     {
-        // The phase-3 layering contract: the UI process reaches the EC only through
-        // the capability interfaces (RPC proxies to the engine service in the shipped
-        // product), so the app assembly must not reference UCU.Hardware or UCU.Engine
-        // directly. The dev-only UCU.Bridge is the single app-adjacent project that
-        // carries the hardware layer, and it exists solely for the dev-inprocess mode.
+        // The layering contract: the UI process reaches the EC only through
+        // the capability interfaces (RPC proxies into the engine service, the
+        // product's single path to a register), so the app assembly must not
+        // reference UCU.Hardware or UCU.Engine. The dev-only UCU.Bridge that
+        // briefly carried the hardware layer for a dev-inprocess mode is
+        // deleted; a dev run points the same proxies at a console-mode engine.
         string[] referenced = typeof(App).Assembly
             .GetReferencedAssemblies()
             .Select(a => a.Name!)

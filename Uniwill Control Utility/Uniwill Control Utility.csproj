@@ -92,19 +92,9 @@
 
     <!-- The engine RPC client and its wire contract: the UI process drives the EC
          only through the capability interfaces these provide (proxies to the
-         engine service). -->
+         engine service). This is the app's only path to the EC. -->
     <ProjectReference Include="..\UCU.Client\UCU.Client.csproj" />
     <ProjectReference Include="..\UCU.Contracts\UCU.Contracts.csproj" />
-
-    <!-- Dev-only in-process capability bridge, for the "dev-inprocess" dev flag.
-         It is the reference that carries the hardware layer; the app's source never
-         touches UCU.Hardware types. Deleted in phase 6. -->
-    <ProjectReference Include="..\UCU.Bridge\UCU.Bridge.csproj" />
-
-    <!-- Crash guardian: the reference flows its output (exe/dll/deps/
-         runtimeconfig) into this project's bin and publish directories, so
-         VS Publish and build\pack.ps1 ship it automatically. -->
-    <ProjectReference Include="..\UCU.Guardian\UCU.Guardian.csproj" />
 
     <!-- Engine service: kept out of the app's compile graph on purpose (the UI
          process must never reach the hardware assembly), the reference exists
@@ -113,38 +103,9 @@
     <ProjectReference Include="..\UCU.Engine\UCU.Engine.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
-  <!-- Stage the guardian into a Service\ subfolder so the install directory
-       shows a single "Uniwill Control Utility.exe" — the service exe has a
-       similar name and the same icon, and side by side it confuses users.
-       Its private deps (Serilog) are copied, not moved: the app root needs
-       them too. Runs for Build (VS F5) and Publish (pack.ps1 / VS Publish). -->
-  <Target Name="StageGuardianInServiceFolder" AfterTargets="Build"
-          Condition="Exists('$(OutDir)Uniwill Control Utility Service.exe')">
-    <ItemGroup>
-      <_GuardianRoot Include="$(OutDir)Uniwill Control Utility Service.*" />
-      <_GuardianShared Include="$(OutDir)Serilog.dll" />
-      <_GuardianShared Include="$(OutDir)Serilog.Sinks.File.dll" />
-    </ItemGroup>
-    <MakeDir Directories="$(OutDir)Service" />
-    <Move SourceFiles="@(_GuardianRoot)" DestinationFolder="$(OutDir)Service" />
-    <Copy SourceFiles="@(_GuardianShared)" DestinationFolder="$(OutDir)Service" SkipUnchangedFiles="true" />
-  </Target>
-
-  <Target Name="StageGuardianInServiceFolderOnPublish" AfterTargets="Publish"
-          Condition="Exists('$(PublishDir)Uniwill Control Utility Service.exe')">
-    <ItemGroup>
-      <_GuardianRootPub Include="$(PublishDir)Uniwill Control Utility Service.*" />
-      <_GuardianSharedPub Include="$(PublishDir)Serilog.dll" />
-      <_GuardianSharedPub Include="$(PublishDir)Serilog.Sinks.File.dll" />
-    </ItemGroup>
-    <MakeDir Directories="$(PublishDir)Service" />
-    <Move SourceFiles="@(_GuardianRootPub)" DestinationFolder="$(PublishDir)Service" />
-    <Copy SourceFiles="@(_GuardianSharedPub)" DestinationFolder="$(PublishDir)Service" SkipUnchangedFiles="true" />
-  </Target>
-
   <!-- Engine service: staged into Service\ by running the engine project's own
        Build/Publish with its output redirected there. Redirecting (instead of
-       flowing files like the guardian reference does) keeps the service's full
+       flowing the files into the app root) keeps the service's full
        dependency closure — hosting, Serilog, UCU.Core/Contracts/Hardware —
        inside Service\ and leaves the app root's assemblies alone, which is
        what keeps the app process free of the hardware layer. The redirect must

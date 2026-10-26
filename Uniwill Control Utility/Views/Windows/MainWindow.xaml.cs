@@ -1894,7 +1894,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void mainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            // StartMini is the user's own setting; a guardian relaunch after a
+            // StartMini is the user's own setting; a supervisor relaunch after a
             // crash always opens minimized, so recovery stays out of the way.
             if (Settings.Default.StartMini || App.GuardianRestart)
             {

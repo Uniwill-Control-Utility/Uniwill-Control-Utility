@@ -325,33 +325,6 @@
                             </Grid>
 
                             <!-- Divider -->
-                            <Border x:Name="GuardianDivider"
-                                    Height="1" Margin="-58,12,-46,12"
-                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
-
-                            <!-- Row: Crash guardian (watchdog) -->
-                            <Grid x:Name="GuardianRow">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <ui:TextBlock FontTypography="Body" Text="Relaunch the application after a crash" />
-                                    <ui:TextBlock Margin="0,2,0,2"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)" />
-                                </StackPanel>
-                                <ui:ToggleSwitch x:Name="cbGuardian"
-                                                 Grid.Column="1"
-                                                 LabelPosition="Left"
-                                                 OnContent="On"
-                                                 OffContent="Off"
-                                                 Checked="cbGuardian_Checked"
-                                                 Unchecked="cbGuardian_Unchecked" />
-                            </Grid>
-
-                            <!-- Divider -->
                             <Border Height="1" Margin="-58,12,-46,12"
                                     Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
 

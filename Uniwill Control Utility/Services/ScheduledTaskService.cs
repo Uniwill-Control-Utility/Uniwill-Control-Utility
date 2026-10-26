@@ -7,11 +7,13 @@ using System.Reflection;
 namespace Uniwill_Control_Utility.Services
 {
     /// <summary>
-    /// Shared registration of the logon scheduled tasks ("UCU Autostart"
-    /// autostart and "UCU Guardian" watchdog). Both run with LIMITED privileges:
-    /// the app manifest is asInvoker (the privileged EC work lives in the
-    /// UCUEngine service), so an unelevated app registers and runs these tasks
-    /// as the plain interactive user — no UAC prompt at logon.
+    /// Shared registration of the logon scheduled task ("UCU Autostart"). It
+    /// runs with LIMITED privileges: the app manifest is asInvoker (the
+    /// privileged EC work lives in the UCUEngine service), so an unelevated app
+    /// registers and runs the task as the plain interactive user — no UAC
+    /// prompt at logon. Crash relaunch is the engine's supervisor, not a task
+    /// (the retired "UCU Guardian" watchdog is cleaned up by
+    /// App.RetireGuardianTask and the uninstall shim).
     ///
     /// The action path is baked in at registration time, so a moved install
     /// (zip → MSI migration) needs the self-heal in App.RunPostStartupTasksAsync.
@@ -29,8 +31,8 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <param name="exePath">
-        /// Action executable; defaults to the main app exe. The guardian task
-        /// points at Uniwill-Control-Utility-Guardian.exe instead.
+        /// Action executable; defaults to the main app exe (the parameter
+        /// exists for tasks that point at a sibling executable).
         /// </param>
         public static void Register(string name, string description, string arguments, TimeSpan delay, string? exePath = null)
         {

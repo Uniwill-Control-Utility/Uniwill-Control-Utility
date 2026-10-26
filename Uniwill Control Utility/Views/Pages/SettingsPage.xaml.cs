@@ -29,7 +29,6 @@ namespace Uniwill_Control_Utility.Views.Pages
         private const string WmiQueryProcessor = "SELECT * FROM Win32_Processor";
         private const string WmiQueryPhysicalMemory = "SELECT * FROM Win32_PhysicalMemory";
         private const string ScheduledTaskName = "UCU Autostart";
-        private const string GuardianTaskName = "UCU Guardian";
         private const string PresetExtension = ".UCUpresets";
 
         private readonly ILogger<SettingsPage> _logger;
@@ -212,7 +211,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbDisableToastPopups.IsChecked = Settings.Default.DisableToastPopups;
             cbAutoCheck.IsChecked = Settings.Default.UpdateCheck;
             cbAutoUpdate.IsChecked = Settings.Default.AutoUpdateApply;
-            cbGuardian.IsChecked = Settings.Default.GuardianEnabled;
             cbAdaptive.IsChecked = Settings.Default.isStartAdpative;
             cbPowerBoostMode.IsChecked = Settings.Default.EnablePowerBoostMode;
             cbHideFlydigi.IsChecked = Settings.Default.EnableFlydigi;
@@ -507,43 +505,6 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.Save();
         }
 
-        private void cbGuardian_Checked(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.GuardianEnabled = true;
-            Settings.Default.Save();
-
-            try
-            {
-                // 30s logon delay: the guardian starts after the (possibly
-                // delayed) main app task and keeps it alive.
-                Services.ScheduledTaskService.Register(GuardianTaskName,
-                    "Keep UCU running (crash guardian)", string.Empty, TimeSpan.FromSeconds(30), App.GuardianExePath);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to register the guardian scheduled task");
-            }
-
-            // Spawn the guardian immediately — the startup respawn pass only
-            // runs at app launch, so without this the toggle needs a restart
-            // before anything is actually watching.
-            App.EnsureGuardianRunning();
-        }
-
-        private void cbGuardian_Unchecked(object sender, RoutedEventArgs e)
-        {
-            Settings.Default.GuardianEnabled = false;
-            Settings.Default.Save();
-
-            try
-            {
-                Services.ScheduledTaskService.Unregister(GuardianTaskName);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to remove the guardian scheduled task");
-            }
-        }
 
         private void cbAdaptive_Checked(object sender, RoutedEventArgs e)
         {

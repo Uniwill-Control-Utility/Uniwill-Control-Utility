@@ -42,18 +42,13 @@ Write-Host "Packaging UCU v$version" -ForegroundColor Cyan
 dotnet publish $proj -c Release -r win-x64 --self-contained false -o $publishDir
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 
-# --- 2b. Verify the crash guardian and engine flowed into the layout ---
-# The guardian and the engine service ship in the Service\ subfolder (csproj
-# staging targets) so the install root shows a single app exe. The guardian is
-# staged by a file-flow ProjectReference; the engine is staged by building its
-# project with the output redirected into Service\, which puts the service's
-# full dependency closure (Core/Contracts/Hardware, hosting, Serilog) in the
-# same folder. The "UCU Guardian" task points at the guardian; the app ensures
-# the "UCUEngine" service at startup.
+# --- 2b. Verify the engine service flowed into the layout ---
+# The engine ships in the Service\ subfolder (csproj staging target: the
+# engine project is built/published with its output redirected there), so the
+# install root shows a single app exe and the service's full dependency
+# closure (Core/Contracts/Hardware, hosting, Serilog) is self-contained. The
+# app ensures the "UCUEngine" service at startup.
 foreach ($file in @(
-    "Service\Uniwill Control Utility Service.exe", "Service\Uniwill Control Utility Service.dll",
-    "Service\Uniwill Control Utility Service.deps.json", "Service\Uniwill Control Utility Service.runtimeconfig.json",
-    "Service\Serilog.dll", "Service\Serilog.Sinks.File.dll",
     "Service\Uniwill Control Utility Engine.exe", "Service\Uniwill Control Utility Engine.dll",
     "Service\Uniwill Control Utility Engine.deps.json", "Service\Uniwill Control Utility Engine.runtimeconfig.json",
     "Service\UCU.Core.dll", "Service\UCU.Contracts.dll", "Service\UCU.Hardware.dll",

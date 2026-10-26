@@ -2,81 +2,91 @@
 
 ## Overview
 
-UCU runs multiple independent polling, control, monitoring, reconnect, and UI-refresh loops. They use WPF dispatcher timers, `System.Threading.Timer`, background tasks, named threads, OS callbacks, and hosted-service lifetimes.
+Work runs on both sides of the RPC boundary. The **app** runs UI-refresh, device-session, control-loop and telemetry timers; the **engine service** runs the pipe accept loop, the per-domain hardware queues, the queue watchdog, and the app supervisor.
 
 ```mermaid
 flowchart TB
     OS[OS events] --> Main[MainWindow power/device handlers]
     UI[Visible pages] --> Dispatcher[Dispatcher timers]
-    Host[Hosted services] --> Overlay[Overlay manager and FPS]
+    Host[App hosted services] --> Overlay[Overlay manager and FPS]
     Device[Connected devices] --> Control[Thread-pool control loops]
-    Device --> Reconnect[Reconnect/health threads]
-    Control --> Hardware[EC / HID / BLE writes]
+    Control -->|RPC verbs| Queues[Engine SerialExecutor queues]
     Dispatcher --> Snapshot[Monitoring snapshots]
-    Reconnect --> Hardware
+    Dispatcher --> Tele[EcTelemetryService cache]
+    Tele -->|telemetry verbs| Queues
+    Queues --> HW[EC writes via EcEngine]
+    Pipe[Engine pipe accept loop] --> Queues
+    Watchdog[Engine watchdog] --> Queues
+    Supervise[AppSupervision 5s poll] -->|relaunch| App[UI process]
 ```
 
-## Process-lifetime work
+## Engine process-lifetime work
+
+| Owner | Work | Cadence and guards |
+| --- | --- | --- |
+| `EnginePipeServer` | Accept connections, frame, dispatch, reply. | One request per connection; caller timeout releases the client without cancelling the hardware write. |
+| `SerialExecutor` × 7 (fan, power, mux, keyboard, battery, telemetry, engine) | FIFO, single-threaded hardware operations per domain. | 30 s per-item budget; depth 64 → `Busy`; unknown verb prefixes route to telemetry. |
+| `EngineWatchdog` | Detect a queue wedged on a stuck call. | `FailFast` beyond 2 min → SCM restart (3/min). |
+| `AppSupervision` | Watch the app, relaunch after crash/kill. | 5 s poll; armed only after sighting the app; `GuardianPolicy` backoff (10 s base, ×2, ≤10 min, 3 fast-crash budget); disarms on graceful exit. |
+
+## App process-lifetime work
 
 | Owner | Work | Start | Stop |
 | --- | --- | --- | --- |
-| `App` | Single-instance show-event listener | First instance startup | App exit cancellation/disposal |
-| `HardwareMonitoringService` | LibreHardwareMonitor tree and category snapshots | Persistent startup lease plus consumer leases | Host disposal |
-| `OverlayManagerService` | Overlay visibility, hooks and view model | Hosted-service start | Hosted-service stop/disposal |
-| `FpsMonitoringService` | RTSS reads or ETW trace session | Acquired by overlay | Lease release/disposal |
-| Flydigi HID service | Input loop, power/device notifications, health and reconnect | Service construction/connection | Suspend, disconnect or disposal |
-| Flydigi BLE service | GATT notifications, heartbeat, OS device watcher | Connection/background resume | Suspend, disconnect or disposal |
-| Watercooler service | GATT notifications, reconnect, meter polling, smart mode | Connection/settings | Disconnect or disposal |
+| `App` | Single-instance show-event listener | First instance | Exit cancellation/disposal |
+| `HardwareMonitoringService` | LHM tree and category snapshots | Startup lease + consumer leases | Host disposal |
+| `EcTelemetryService` | Fan duty/temperature/RPM cache over RPC | Host start / page demand | Host disposal |
+| `OverlayManagerService` | Overlay visibility, hooks, view model | Hosted-service start | Hosted-service stop |
+| `FpsMonitoringService` | RTSS reads or ETW session | Acquired by overlay | Lease release |
+| Flydigi HID / BLE, Watercooler | Input loops, heartbeats, reconnect, smart mode | Connection | Suspend/disconnect/disposal |
+| `EngineLifecycle` | One-shot engine install/start at startup | Deferred at launch | Completes; the service outlives the app |
 
 ## View-lifetime work
 
 | Surface | Work and cadence |
 | --- | --- |
-| Dashboard | Hardware snapshot each second; EC battery details every 10 seconds while active. |
-| Fan Control | Temperature/RPM status each second; separate debounce for curve writes. |
-| Keyboard | 150 ms apply debounce; one-second idle check; 500 ms wake check. |
+| Dashboard | Snapshot each second; EC battery details every 10 s while active. |
+| Fan Control | Temperature/RPM each second; debounce for curve writes. |
+| Keyboard | 150 ms apply debounce; 1 s idle check; 500 ms wake check. |
 | Light Bar | 150 ms apply debounce. |
-| Overlay Settings | RTSS status every two seconds. |
-| Overlay view model | User-configured refresh, clamped by store to 100–5000 ms and by view model to at least 16 ms. |
-| V-F curve editor | Live clocks every two seconds and a 300 ms resize debounce. |
-| Flydigi page | Temperature display every two seconds plus UI animation/debounce timers. |
-| Watercooler page | Temperature/visual status timers in addition to service-level meters. |
-| Adaptive page | Process/profile and sensor timers with a semaphore preventing overlapping update bodies. |
+| Overlay Settings | RTSS status every 2 s. |
+| Overlay view model | Configured refresh, clamped 100–5000 ms (store) / ≥16 ms (view model). |
+| V-F curve editor | Live clocks every 2 s; 300 ms resize debounce. |
+| Flydigi page | Temperature every 2 s plus animation/debounce timers. |
+| Watercooler page | Temperature/visual timers plus service meters. |
+| Adaptive page | Process/profile and sensor timers, semaphore-guarded bodies. |
 
 ## Smart-control loops
 
-- `EcSmartFanControl`: default 1,000 ms; computes linked CPU/GPU demand and writes EC tables/duty.
-- `FlydigiSmartControl`: default 1,000 ms; maps selected temperature to HID cooler RPM.
-- `FlydigiBs1SmartControl`: default 2,000 ms; maps temperature to BLE cooler RPM.
-- Watercooler Smart Mode: service timer applies pump/fan policy from current metrics and settings.
+- `EcSmartFanControl`: ~1,000 ms; computes linked CPU/GPU demand and writes EC tables/duty **through the capability proxies** (each write lands on the fan queue, ordered against manual fan changes).
+- `FlydigiSmartControl`: ~1,000 ms; temperature → HID cooler RPM. Realtime RPM needs a keepalive re-send ≤5 s.
+- `FlydigiBs1SmartControl`: ~2,000 ms; temperature → BLE RPM.
+- Watercooler Smart Mode: service timer applies pump/fan policy.
 
-Control loops must remain single-owner. Manual pages and Adaptive Mode use override flags so two loops do not continuously compete for one device.
+Control loops remain single-owner; manual pages and Adaptive Mode use override flags.
 
 ## Reconnect behavior
 
-Flydigi HID and Hydro UI maintain background reconnect loops with delay arrays, cancellation, generation counters, and wake signals from device-arrival notifications. Generation checks prevent an earlier loop from reconnecting after a newer user action. Health checks can begin a new HID reconnect round after backoff is exhausted.
-
-Flydigi BS1 uses retry delays around GATT creation, responsiveness verification, OS-level device watcher callbacks, and a 2.5-second heartbeat because the device expects traffic near every three seconds.
+Flydigi HID and Hydro UI run reconnect loops with delay arrays, cancellation, generation counters, and device-arrival wake signals; generation checks prevent stale loops from reconnecting after newer user actions. Flydigi BS1 retries GATT creation, verifies responsiveness, watches OS arrival/removal, and heartbeats every 2.5 s.
 
 ## Coordination risks
 
-- Timers owned by pages must stop on navigation/unload; singleton pages require explicit disposal at process exit.
-- `async void` callbacks cannot be awaited by their caller. Exceptions and overlap must be handled inside the callback.
-- Dispatcher `Invoke` can deadlock if shutdown blocks the UI thread while a background loop synchronously marshals back; the current shutdown intentionally stops the host on a background task.
-- `Thread.Sleep`, `.Wait`, and dispatcher calls are used around protocol timing and UI state. Keep protocol-mandated waits off the UI thread.
-- Fire-and-forget work must observe exceptions and have a cancellation/ownership story.
-- Resume can start loops while stale sessions still exist; current flows disconnect and delay before rebuilding device state.
+- **RPC and the dispatcher:** proxies complete on the thread pool; synchronous call sites use `.GetAwaiter().GetResult()`. A hardware call can block a caller up to the engine's 30 s queue budget — long waits belong on background tasks, not dispatcher callbacks.
+- Telemetry polling must stay on the telemetry domain; do not poll state through a write-heavy domain queue (it will ride behind curve writes).
+- Timers owned by pages stop on navigation/unload; singleton pages dispose at exit.
+- `async void` callbacks must handle their own exceptions/overlap; fire-and-forget work observes exceptions (`SafeFireAndForget`).
+- Dispatcher `Invoke` deadlocks if shutdown blocks the UI thread — shutdown stops the host on a background task.
+- Engine restarts (crash, watchdog fail-fast) are transparent to loops: the next verb connects a fresh pipe; `EngineException(HardwareUnavailable)` between death and SCM restart is a normal transient to handle, not retry-bombard.
+- Resume can start loops while stale sessions exist; disconnect and delay before rebuilding.
 
 ## Review checklist for a new loop
 
-1. Define owner and lifetime.
-2. Use a cancellation token or disposable timer.
-3. Prevent overlapping callback bodies.
-4. Separate protocol timing from UI dispatch.
-5. Stop on navigation/suspend/disconnect as appropriate.
-6. Restart exactly once on resume/reconnect.
-7. Expose failures in the diagnostic log and state model.
-8. Add deterministic fake-clock tests.
-9. Include the loop in process-exit and long-run soak scenarios.
+1. Define owner and lifetime; pick the domain queue the work belongs to.
+2. Cancellation token or disposable timer; prevent overlapping bodies.
+3. Separate protocol timing from UI dispatch; keep polling off write domains.
+4. Handle `EngineException` codes per feature (disable, retry-with-backoff, log).
+5. Stop on navigation/suspend/disconnect; restart exactly once on resume.
+6. Expose failures in the diagnostic log (app log and `Service\` engine log are separate streams).
+7. Add deterministic fake-clock tests; include the loop in exit and soak scenarios.
 
 [Back to documentation index](../README.md)

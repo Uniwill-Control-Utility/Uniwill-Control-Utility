@@ -2,158 +2,120 @@
 
 ## Executive view
 
-UCU is a single-process, administrator-elevated WPF application built around the .NET Generic Host. The host supplies dependency injection, application lifecycle, structured logging, navigation services, and two hosted services. Most product behavior is divided among WPF pages, long-lived device services, static tuning backends, and JSON/.NET settings stores.
+UCU is a two-process product. The UI is a WPF application built on the .NET Generic Host that runs **unelevated** (`asInvoker` manifest). All privileged Embedded Controller work lives in a LocalSystem Windows service, **UCUEngine** (`Uniwill Control Utility Engine.exe`, staged in the `Service\` subfolder), which the UI drives over a named-pipe RPC protocol. This is the XMG Control Center architecture (service + `GCUBridge` shell): the service owns the hardware, the shell owns the user experience, and the shell never needs UAC.
 
-The architecture is layered by convention rather than enforced project boundaries: all code compiles into one executable assembly, and UI code can call service, model, script, and static settings APIs directly.
+The codebase is divided by project boundary, not convention. The UI assembly cannot reference the hardware assembly — a test pins that. The only path from a UI page to an EC register is:
+
+```text
+page → capability interface → RPC proxy (UCU.Client) → \\.\pipe\UCUEngine.v1
+     → engine dispatcher → domain queue → EcEngine → \\.\ACPIDriver → EC
+```
+
+CPU/GPU tuning backends that never went through the EC (AMD SMU via PawnIO, Intel MSR/MCHBAR, NVAPI/NVML, HID, BLE, WMI, LibreHardwareMonitor, RTSS) remain in the UI process, exactly as before; operations that need admin use a per-operation elevation helper, not a process-wide elevation.
+
+## Projects
+
+| Project | TFM | Role |
+| --- | --- | --- |
+| `Uniwill Control Utility` | net10.0-windows10.0.22621.0 | WPF UI, asInvoker. Pages, view models, device services (HID/BLE), SMU/Intel/NVIDIA backends, presets, overlay, tray. |
+| `UCU.Core` | net10.0 | Pure domain: EC byte encodings, curve validation, supervision policy. No I/O, no Windows APIs. |
+| `UCU.Contracts` | net10.0 | The wire contract: verb names, request/response envelope, DTOs, frame codec, capability interfaces, source-generated JSON context. |
+| `UCU.Client` | net10.0 | RPC client (`EngineClient`) and the capability-interface proxies the app registers in DI. |
+| `UCU.Hardware` | net10.0-windows | EC I/O: `EcEngine` (register-level operations) over `IEcTransport` (`\\.\ACPIDriver` IOCTL transport; fakes in tests). Loaded only by the engine. |
+| `UCU.Engine` | net10.0-windows | The service: pipe server, dispatcher, per-domain queues, EC gate, watchdog, app supervisor, SCM installer. |
+
+Test projects mirror each layer: `UCU.Core.Tests` (121), `UCU.Contracts.Tests` (22), `UCU.Hardware.Tests` (52), `UCU.Engine.Tests` (34), `Uniwill Control Utility.Tests` (157 + 4 pre-existing UI-composition failures).
 
 ## Component model
 
 ```mermaid
 flowchart TB
-    subgraph Presentation
-        Main[MainWindow and tray]
-        Pages[Feature pages]
-        VMs[View models]
-        Overlay[Overlay window]
+    subgraph AppProcess["Uniwill Control Utility.exe (asInvoker)"]
+        Pages[Pages, view models, tray, overlay]
+        Caps[Capability proxies (UCU.Client)]
+        Telemetry[EcTelemetryService cache]
+        Backends[SMU / Intel / NVAPI / HID / BLE / WMI / LHM / RTSS]
+        Lifecycle[EngineLifecycle + VelopackUpdateService]
     end
 
-    subgraph Coordination
-        Host[.NET Generic Host]
-        Nav[Navigation and PageService]
-        Preset[PresetProfileApplier]
-        Adaptive[Adaptive page engine]
-        DeviceApplier[DeviceApplier]
-        OverlayMgr[OverlayManagerService]
+    subgraph EngineProcess["Uniwill Control Utility Engine.exe (LocalSystem, service UCUEngine)"]
+        Pipe[EnginePipeServer]
+        Dispatch[EngineDispatcher]
+        Queues[SerialExecutor queues per domain]
+        Gate[EcEngineGate]
+        HW[EcEngine (UCU.Hardware)]
+        Watchdog[EngineWatchdog]
+        Supervise[AppSupervision]
     end
 
-    subgraph DomainServices[Hardware and domain services]
-        Monitor[HardwareMonitoringService]
-        EC[UniwillECService]
-        Keyboard[KeyboardHidService]
-        FlyHid[FlydigiCoolerHidService]
-        FlyBle[FlydigiCoolerBleService]
-        Water[WaterCoolerService]
-        Smart[Smart-control loops]
-        FPS[FpsMonitoringService]
-    end
-
-    subgraph Backends
-        AMD[AMD SMU / PawnIO]
-        Intel[Intel MSR + MCHBAR / PawnIO]
-        Nvidia[NvAPI / NVML / EC]
-        Win[WMI / Win32 / Windows power APIs]
-        USB[HID]
-        Bluetooth[WinRT BLE/GATT]
-        LHM[LibreHardwareMonitor]
-        RTSS[RTSS shared memory / ETW fallback]
-    end
-
-    subgraph Persistence
-        DotNet[Properties.Settings]
-        Roaming[%APPDATA%/UCU JSON]
-        Local[%LOCALAPPDATA%/UCU JSON]
-        Install[Application-directory JSON]
-    end
-
-    Presentation --> Coordination
-    Pages --> DomainServices
-    Coordination --> DomainServices
-    DomainServices --> Backends
-    Presentation --> Persistence
-    Coordination --> Persistence
-    DomainServices --> Persistence
+    Pages --> Caps --> Pipe --> Dispatch --> Queues --> Gate --> HW
+    Telemetry --> Caps
+    Pages --> Backends
+    Lifecycle -->|install/start| SCM[(SCM)]
+    Supervise -->|CreateProcessAsUser| AppProcess
+    HW -->|IOCTL| Driver[\\.\ACPIDriver — UWACPIDriver.sys]
 ```
 
 ## Layer responsibilities
 
-### Presentation
+### UI process
 
-- `Views/Windows/MainWindow.xaml.cs` owns navigation setup, notification-area commands, startup hardware application, power-mode event handling, resume reapplication, and close/minimize behavior.
-- Feature pages own both UI state and significant domain orchestration. The largest are Adaptive, Flydigi Cooler, Fan Control, Presets, Keyboard, and Watercooler.
-- View models exist for the dashboard, main window, settings, and overlay. MVVM is therefore selective, not a repository-wide rule.
-- The performance overlay is a separate click-through WPF window controlled by a hosted manager and view model.
+- `App.xaml.cs` composes the Generic Host, enforces the single-instance mutex, runs prerequisite and detection work, registers the capability proxies as singletons, and kicks `EngineLifecycle.EnsureAsync()` (install/start the engine) plus task migrations as deferred work.
+- Feature pages own UI state and domain orchestration, but EC-touching features (Fan Control, Keyboard, Light Bar, Battery, dashboard telemetry) call the capability interfaces, never hardware types.
+- `EcTelemetryService` polls temperatures, fan RPM and fan duty through `IEcTelemetryCapability` and feeds the tray, overlay and dashboard.
+- SMU/Intel/NVIDIA/HID/BLE/WMI code stays as-is; `Scripts/Misc/ElevatedProcess` performs the few operations that need admin (webcam and dGPU PnP toggles, touchpad admin flow) with a per-operation `runas` launch.
 
-### Coordination
+### Engine process
 
-- `App.xaml.cs` builds the host, performs prerequisite checks, initializes hardware identity and monitoring, enforces a single process instance, starts the UI, and schedules deferred work.
-- `ApplicationHostService` creates/shows the navigation window and applies light-bar boot state.
-- `PresetProfileApplier` converts profile identities into CPU/GPU command sequences and applies V-F curve and EC power operations in a defined order.
-- `DeviceApplier` coordinates Adaptive Mode overrides for Flydigi, Hydro UI, EC fans, keyboard, light bar, and CPU/GPU domains. It captures user state, applies profile state, notifies visible pages, and restores user state when an override ends.
-- `PageService` resolves WPF pages from the dependency-injection container.
+- `EngineHostFactory` composes the service graph identically for the installed service, `--console` dev runs and in-process tests (fake transport, private pipe name, pipe DACL off).
+- `EnginePipeServer` accepts connections on `\\.\pipe\UCUEngine.v1` and frames requests (4-byte length prefix, JSON envelope, request ≤ 256 KiB, response ≤ 1 MiB).
+- `EngineDispatcher` checks the protocol version, looks up the verb, selects the queue, and maps exceptions to stable error codes so verb handlers stay terse.
+- `EngineDomainQueues`/`SerialExecutor` give each domain (fan, power, mux, keyboard, battery, telemetry, engine) a FIFO, single-threaded executor: hardware writes in a domain stay ordered, a call budget of 30 s and a depth of 64 answer `Busy` instead of growing, and the telemetry queue keeps the UI responsive while a slow fan-curve write runs.
+- `EcEngineGate` owns the `EcEngine` lifecycle: first use opens `\\.\ACPIDriver`; if the driver is absent every verb answers `HardwareUnavailable` — the service survives and the UI degrades.
+- `EngineWatchdog` fails fast (`FailFast`) when a queue is parked beyond 2 min; SCM failure actions (restart ×3/min) bring the service back.
+- `AppSupervision` relaunches the UI app after a crash/kill (see [Startup and lifecycle](startup-and-lifecycle.md)).
+- `EngineInstaller` runs the `--install-engine` / `--uninstall-engine` SCM passes.
 
-### Hardware and domain services
+## Protocol
 
-- `HardwareMonitoringService` uses category leases to keep only requested LibreHardwareMonitor domains active and returns immutable snapshots.
-- `UniwillECService` serializes EC access, performs the activation handshake, applies fan tables and platform power fields, and reads temperatures/RPM/battery telemetry.
-- Peripheral services own HID or GATT sessions plus their reconnect, heartbeat, notification, and persistence behavior.
-- Smart-control services run periodic control loops that translate temperatures into device commands.
-- FPS monitoring prefers RTSS shared memory and falls back to an ETW trace processor.
+The RPC is hand-rolled and small by design. A request envelope carries `Id`, `Verb`, `ProtocolVersion`, and optional `Params`; the response carries `Ok`, `Result`, and an error code/message. All JSON goes through `EngineJsonContext` (source-generated contracts); a type missing from the context throws at the first call, which keeps trimming and AOT publishing safe. Verb names, DTOs, capability interfaces, error codes and the frame codec live only in `UCU.Contracts`, the single contract shared by app, client and engine.
 
-### Backends
+The pipe DACL is `D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;GRGW;;;IU)`: System and Administrators get full control, every interactive user get-and-read — no network access, no other users' impersonation surface.
 
-- AMD controls use PawnIO-loaded modules and the SMU mailbox implementation.
-- Intel controls use PawnIO modules for MSR and MCHBAR operations.
-- NVIDIA controls use `LLT.NvAPIWrapper.Net`, NVML P/Invoke, private NVAPI calls, and Uniwill EC fields.
-- Platform discovery and selected controls use WMI, registry APIs, power notifications, display APIs, and other Win32 calls.
-- Device I/O uses HID libraries/direct output reports and WinRT BLE/GATT.
+## Elevation model
 
-## Dependency-injection registrations
-
-The application registers the following long-lived services as singletons:
-
-- Navigation, theme, and taskbar services.
-- `IHardwareMonitoringService` and `GpuInventoryService`.
-- `IFpsMonitoringService`, `OverlaySettingsStore`, and `OverlayManagerService`.
-- `WaterCoolerService`, `FlydigiCoolerHidService`, `FlydigiCoolerBleService`.
-- `UniwillECService` and `DeviceApplier`.
-- The Flydigi page itself, because it owns timers that must be disposed with the host.
-
-Most other pages and the main window are registered as scoped. In this desktop process, they are resolved from the host provider and effectively live according to navigation/host usage rather than web-style request scopes.
+- The app manifest is `asInvoker`. Double-clicking the app shows no UAC prompt. The legacy App Paths auto-elevation shim is retired (the uninstall shim still deletes the key on old machines).
+- The single UAC prompt of the product is the one-time elevated engine install: `EngineLifecycle.EnsureAsync` self-launches `Service\Uniwill Control Utility Engine.exe --install-engine` (verb `runas`) when the service is missing. `sc create start= auto` plus a DACL granting Authenticated Users `SERVICE_START` means every later start is unelevated.
+- The update apply is the other elevation point: `UCU.Updater.exe` (stamped `requireAdministrator`, compiled by `build\pack.ps1`) stops the engine, runs the elevated Velopack apply, and restarts the engine.
+- Per-operation elevation (`ElevatedProcess`) covers the handful of non-EC admin operations.
 
 ## State and communication styles
 
-UCU uses several communication mechanisms:
-
-- Direct method calls from code-behind to services and static helpers.
-- Dependency-injected singleton services for long-lived device sessions.
-- .NET events for override changes, applied presets, connection state, settings changes, and monitoring updates.
+- Capability interfaces with async methods are the UI-to-EC channel; proxies complete on the thread pool, so synchronous call sites use `.GetAwaiter().GetResult()` without deadlocking the dispatcher.
+- .NET events for override changes, applied presets, connection state, settings changes, monitoring updates.
 - WPF `DispatcherTimer` and thread-pool timers for polling/control loops.
-- Static application state such as detected processor family, resolved SKU, cached system information, and active profile data.
-- JSON files and `Properties.Settings.Default` for durable state.
-
-```mermaid
-flowchart LR
-    UIAction[UI or tray action] --> Handler[Code-behind handler]
-    Handler --> Service[Injected service or static coordinator]
-    Service --> IO[Hardware I/O]
-    Service --> Disk[Persisted state]
-    Service --> Event[State-change event]
-    Event --> OtherUI[Other page or tray synchronizer]
-```
+- `Properties.Settings.Default` and JSON stores for durable state; the engine keeps only its logs (`%ProgramData%\UCU\engine\`).
 
 ## Concurrency model
 
-- The WPF dispatcher owns visual state.
-- Startup parallelizes WMI/system discovery and LibreHardwareMonitor initialization.
-- BLE/HID services use background loops, cancellation tokens, notifications, timers, locks, and reconnect backoff.
-- Hardware monitoring serializes category changes and snapshot refreshes.
-- Adaptive Mode has multiple timers and an explicit guard to avoid concurrent application work.
-- Shutdown intentionally avoids blocking the UI thread while hosted services stop, because some stop paths may dispatch back to WPF.
+- The WPF dispatcher owns visual state; the RPC client is connection-per-call, so UI concurrency is unchanged.
+- Hardware ordering is enforced in the engine: one queue per domain, FIFO, one operation at a time; cross-domain writes are intentionally unordered (they touch different register groups).
+- The supervision loop, pipe accept loop and watchdog run as hosted background services.
+- Shutdown: the app writes `logs\graceful-exit.flag` first so the supervisor distinguishes exit from crash; the engine keeps running after the app exits (it is a machine service).
 
 ## Architectural constraints
 
-- The executable requires Windows and a Windows 11 SDK-level target (`10.0.22621.0`).
-- The manifest requests administrator elevation on every launch.
-- Several features require bundled native DLLs/modules to be colocated with the executable.
-- Hardware behavior is model- and firmware-dependent; SKU resolution and detector results determine which controls are shown or which values are used.
-- The application directory is also used for logs and some legacy JSON data, so writable deployment layout affects operation.
+- Windows only; app targets the Windows 11 SDK (`10.0.22621.0`).
+- EC features require `UWACPIDriver.sys` installed (the app's prerequisite detection checks `C:\Windows\System32\drivers\UWACPIDriver.sys`); the engine service requires the `Service\` payload staged by the csproj targets.
+- SMU/PawnIO/NVIDIA features require the bundled native modules beside the app exe (PawnIO `.bin` modules stay in the app root because the RyzenSmu loader resolves them there).
+- Hardware behavior is model- and firmware-dependent; SKU resolution and detector results determine which controls are shown. The engine resolves the CPU platform (AMD/Intel) from the kernel's boot-processor vendor identifier; the app resolves the same fact from `Family.TYPE` for its own encodings.
 
 ## Related pages
 
 - [Startup and lifecycle](startup-and-lifecycle.md)
-- [Preset and Adaptive Mode pipelines](preset-and-adaptive-pipelines.md)
 - [Hardware integration](hardware-integration.md)
-- [Dependency inventory](dependency-inventory.md)
+- [Preset and Adaptive Mode pipelines](preset-and-adaptive-pipelines.md)
 - [Background processing](background-processing.md)
+- [Dependency inventory](dependency-inventory.md)
 - [Configuration and data](../operations/configuration-and-data.md)
 - [Codebase map](codebase-map.md)

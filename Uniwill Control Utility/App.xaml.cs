@@ -37,7 +37,6 @@ using Wpf.Ui;
 using Wpf.Ui.Abstractions;
 using UCU.Contracts;
 using UCU.Client;
-using UCU.Bridge;
 using UCU.Contracts.Capabilities;
 
 namespace Uniwill_Control_Utility
@@ -92,14 +91,15 @@ namespace Uniwill_Control_Utility
         /// <summary>
         /// Command-line arguments captured in Main before the WPF app exists.
         /// Used for --from-update (Velopack restart) and --from-guardian
-        /// (crash-guardian relaunch).
+        /// (supervisor relaunch; the name is the app's historical marker for
+        /// "relaunched after a crash", and the engine's supervisor passes it).
         /// </summary>
         internal static string[] StartupArgs { get; private set; } = Array.Empty<string>();
 
         /// <summary>
-        /// True when the guardian relaunched us after a crash: the startup
-        /// overlay is suppressed and the main window opens minimized to the
-        /// tray, so the recovery never interrupts what the user is doing.
+        /// True when the engine's supervisor relaunched us after a crash: the
+        /// startup overlay is suppressed and the main window opens minimized to
+        /// the tray, so the recovery never interrupts what the user is doing.
         /// </summary>
         internal static bool GuardianRestart { get; private set; }
 
@@ -112,28 +112,15 @@ namespace Uniwill_Control_Utility
         private Mutex? mutex;
         private const string MutexName = "UniwillControlUtility";
 
-        // Written at the top of OnExit so the guardian distinguishes an
-        // intentional shutdown from a crash (see UCU.Guardian / GuardianPolicy).
-        // A file, not a named event: kernel objects die with the process, and
-        // the guardian's 5s poll only opens the handle after we are gone.
+        // Written at the top of OnExit so the engine's supervisor (and any
+        // lingering legacy guardian) distinguishes an intentional shutdown from
+        // a crash (see AppSupervision / GuardianPolicy). A file, not a named
+        // event: kernel objects die with the process, and the supervisor's 5s
+        // poll only observes the death after we are gone.
         internal static string GracefulExitFlagPath => Path.Combine(LOGS_FOLDER, "graceful-exit.flag");
-
-        // Must match GuardianConstants in UCU.Guardian\Program.cs.
-        private const string GuardianMutexName = "UniwillControlUtility.Guardian";
 
         private const string AutostartTaskName = "UCU Autostart";
         private const string LegacyAutostartTaskName = "UCU";
-        private const string GuardianTaskName = "UCU Guardian";
-        private static DispatcherTimer? _guardianWatchTimer;
-
-        /// <summary>
-        /// The guardian ships as its own executable (project UCU.Guardian) in
-        /// the Service\ subfolder, so the install directory shows a single
-        /// "Uniwill Control Utility.exe" and Task Manager shows a distinct
-        /// "Uniwill Control Utility Service" entry.
-        /// </summary>
-        internal static string GuardianExePath =>
-            Path.Combine(AppContext.BaseDirectory, "Service", "Uniwill Control Utility Service.exe");
 
         internal static readonly string SCALE_MODELS_JSON_PATH = ".\\ScaleModels.json";
         internal static readonly string LOGS_FOLDER = ".\\logs\\";
@@ -358,35 +345,18 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<FlydigiCoolerBleService>();
 
                         // EC access (for XMG / TUXEDO laptops). The UI process reaches the
-                        // EC only through the capability interfaces: RPC proxies to the
-                        // engine service in the shipped product, and the in-process bridge
-                        // for --dev-inprocess. The bridge is the assembly that references
-                        // the hardware layer, so the app itself never can.
-                        bool devInProcess = Environment.GetCommandLineArgs()
-                            .Any(a => string.Equals(a, "--dev-inprocess", StringComparison.OrdinalIgnoreCase));
-
-                        if (devInProcess)
-                        {
-                            services.AddSingleton<BridgeEngine>(new BridgeEngine(EcPlatformResolver.Current));
-                            services.AddSingleton<IFanCapability>(sp => sp.GetRequiredService<BridgeEngine>().Fan);
-                            services.AddSingleton<IPowerCapability>(sp => sp.GetRequiredService<BridgeEngine>().Power);
-                            services.AddSingleton<IGpuMuxCapability>(sp => sp.GetRequiredService<BridgeEngine>().Mux);
-                            services.AddSingleton<IKeyboardCapability>(sp => sp.GetRequiredService<BridgeEngine>().Keyboard);
-                            services.AddSingleton<IBatteryCapability>(sp => sp.GetRequiredService<BridgeEngine>().Battery);
-                            services.AddSingleton<IEcTelemetryCapability>(sp => sp.GetRequiredService<BridgeEngine>().Telemetry);
-                            services.AddSingleton<IEngineCapability>(sp => sp.GetRequiredService<BridgeEngine>().Engine);
-                        }
-                        else
-                        {
-                            services.AddSingleton<EngineClient>();
-                            services.AddSingleton<IFanCapability, FanCapability>();
-                            services.AddSingleton<IPowerCapability, PowerCapability>();
-                            services.AddSingleton<IGpuMuxCapability, GpuMuxCapability>();
-                            services.AddSingleton<IKeyboardCapability, KeyboardCapability>();
-                            services.AddSingleton<IBatteryCapability, BatteryCapability>();
-                            services.AddSingleton<IEcTelemetryCapability, EcTelemetryCapability>();
-                            services.AddSingleton<IEngineCapability, EngineCapability>();
-                        }
+                        // EC only through the capability interfaces: RPC proxies into the
+                        // UCUEngine service — the product's single path to a register. No
+                        // app assembly references the hardware layer (the test suite's
+                        // layering guard pins that).
+                        services.AddSingleton<EngineClient>();
+                        services.AddSingleton<IFanCapability, FanCapability>();
+                        services.AddSingleton<IPowerCapability, PowerCapability>();
+                        services.AddSingleton<IGpuMuxCapability, GpuMuxCapability>();
+                        services.AddSingleton<IKeyboardCapability, KeyboardCapability>();
+                        services.AddSingleton<IBatteryCapability, BatteryCapability>();
+                        services.AddSingleton<IEcTelemetryCapability, EcTelemetryCapability>();
+                        services.AddSingleton<IEngineCapability, EngineCapability>();
                         services.AddSingleton<EcTelemetryService>();
 
                         // Hardware Performance / Q-key button intercept: polls the EC
@@ -1052,75 +1022,23 @@ namespace Uniwill_Control_Utility
             // requireAdministrator manifest needed: the app is asInvoker now.
             SafeFireAndForget(EngineLifecycle.EnsureAsync());
 
-            // Guardian: mutual guarding — the app respawns the watchdog if it is
-            // enabled but not running (the watchdog already watches the app).
-            if (Settings.Default.GuardianEnabled)
-                EnsureGuardianRunning();
-
             // Migrate the legacy "UCU" autostart task (pre-engine name,
             // registered with highest privileges) to the "UCU Autostart" task.
             MigrateLegacyAutostartTask();
 
+            // The engine's supervisor replaced the scheduled-task guardian
+            // (the guardian exe is no longer shipped), so an install that had
+            // the feature enabled drops its "UCU Guardian" task on this start.
+            RetireGuardianTask();
+
             // Self-heal the scheduled task action paths: the path is baked at
             // registration time, so installs that moved (zip → MSI migration)
-            // would otherwise autostart / watchdog-launch the old exe.
+            // would otherwise autostart the old exe.
             SelfHealScheduledTask(AutostartTaskName, "", null, TimeSpan.FromSeconds(Settings.Default.StartupDelaySeconds), "Start UCU");
-            if (Settings.Default.GuardianEnabled)
-                SelfHealScheduledTask(GuardianTaskName, "", GuardianExePath, TimeSpan.FromSeconds(30), "Keep UCU running (crash guardian)");
 
             // Show the prerequisite checklist on first startup.
             if (Settings.Default.ShowPrerequisiteDialog)
                 SafeFireAndForget(ShowPrerequisiteDialogAsync());
-        }
-
-        /// <summary>
-        /// Starts the guardian now (if not already running) and arms the 5-min
-        /// respawn timer. Called at startup when GuardianEnabled is set and
-        /// immediately when the user flips the Settings toggle, so enabling the
-        /// feature takes effect without an app restart.
-        /// </summary>
-        public static void EnsureGuardianRunning()
-        {
-            RespawnGuardianIfMissing();
-
-            if (_guardianWatchTimer is null)
-            {
-                _guardianWatchTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(5) };
-                _guardianWatchTimer.Tick += (s, e) => RespawnGuardianIfMissing();
-                _guardianWatchTimer.Start();
-            }
-        }
-
-        /// <summary>
-        /// Relaunches the guardian executable when the user has the feature
-        /// enabled but the guardian is not running (GCUService-style mutual
-        /// guarding).
-        /// </summary>
-        private static void RespawnGuardianIfMissing()
-        {
-            try
-            {
-                using var probe = new Mutex(false, GuardianMutexName, out bool createdNew);
-                if (!createdNew)
-                    return; // guardian is already running
-
-                string guardianExe = GuardianExePath;
-                if (!File.Exists(guardianExe))
-                {
-                    _logger?.LogWarning("Guardian executable missing: {Path}", guardianExe);
-                    return;
-                }
-
-                Process.Start(new ProcessStartInfo(guardianExe)
-                {
-                    UseShellExecute = true,
-                });
-                _logger?.LogInformation("Respawned the crash guardian");
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Failed to respawn the crash guardian");
-            }
         }
 
         /// <summary>
@@ -1169,6 +1087,32 @@ namespace Uniwill_Control_Utility
             {
                 _logger?.LogWarning(ex, "Failed to migrate the legacy autostart scheduled task");
             }
+        }
+
+        /// <summary>
+        /// The engine's supervisor (AppSupervision) replaced the scheduled-task
+        /// guardian, and the guardian exe no longer ships: an install that had
+        /// the feature enabled unregisters its "UCU Guardian" task and clears
+        /// the (now vestigial) setting. Idempotent: the setting is cleared the
+        /// first time, so the task removal runs once.
+        /// </summary>
+        private static void RetireGuardianTask()
+        {
+            if (!Settings.Default.GuardianEnabled)
+                return;
+
+            try
+            {
+                ScheduledTaskService.Unregister("UCU Guardian");
+                _logger?.LogInformation("Removed the retired 'UCU Guardian' task (the engine supervisor owns crash relaunch now)");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to remove the retired guardian scheduled task");
+            }
+
+            Settings.Default.GuardianEnabled = false;
+            Settings.Default.Save();
         }
 
         /// <summary>

@@ -2,11 +2,11 @@
 // install layout, so the install directory gets a familiar uninstall entry
 // point next to the app. It:
 //   1. stops the UCUEngine service (before killing the app: a force-killed
-//      app is a crash the engine would relaunch), kills running app +
-//      guardian (Process.Kill in-proc — milliseconds, taskkill cost ~9.5s
-//      per call), then deletes the "UCU Autostart" / "UCU" (legacy) /
-//      "UCU Guardian" tasks and the UCUEngine service registration (all
-//      console children run hidden — no flashing terminal windows),
+//      app is a crash the engine's supervisor would relaunch), kills running
+//      app + legacy guardian (Process.Kill in-proc — milliseconds, taskkill
+//      cost ~9.5s per call), then deletes the "UCU Autostart" task, the legacy
+//      "UCU" / "UCU Guardian" tasks, and the UCUEngine service registration
+//      (all console children run hidden — no flashing terminal windows),
 //   2. launches a hidden detached helper that waits for this shim to exit,
 //      runs the Apps & Features uninstaller synchronously (blocking
 //      msiexec client, so it lasts exactly as long as the wizard needs —
@@ -99,12 +99,13 @@ internal static class UninstallShim
         RunHidden("sc.exe", "stop UCUEngine", 15000);
         Thread.Sleep(2000); // let the service's file handles close
 
-        // Kill running app + guardian directly from this elevated process.
+        // Kill running app + legacy guardian directly from this elevated
+        // process (the guardian shipped in older builds; killing it here
+        // sweeps installs where its task outlived App.RetireGuardianTask).
         // taskkill was the ~30s stall: the stage log timed each
         // "taskkill /f /im" at ~9.5s (process enumeration as admin) — two
         // of them plus ping equaled the entire delay before the wizard.
-        // Process.Kill is milliseconds. Guardian first: a force-killed app
-        // is a "crash" the guardian would relaunch.
+        // Process.Kill is milliseconds.
         KillProcess("Uniwill Control Utility Service");
         KillProcess("Uniwill Control Utility");
 

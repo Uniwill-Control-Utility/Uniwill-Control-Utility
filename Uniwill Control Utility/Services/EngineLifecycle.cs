@@ -20,8 +20,8 @@ namespace Uniwill_Control_Utility.Services
     /// UAC prompt of the product. A stopped service is started unelevated: the
     /// install grants Authenticated Users SERVICE_START, which is what lets the
     /// de-elevated app restart the engine without consent. A missing engine exe
-    /// (dev checkout, no Service\ staging) is normal and silent: dev runs use
-    /// the dev-inprocess bridge instead.
+    /// (dev checkout, no Service\ staging) is normal and silent: a dev run
+    /// targets a console-mode engine (dotnet run --project UCU.Engine -- --console).
     /// </summary>
     internal static class EngineLifecycle
     {

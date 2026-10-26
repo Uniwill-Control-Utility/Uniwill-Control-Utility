@@ -14,7 +14,7 @@ The code also retains legacy `PresetManager` files in the application directory 
 
 ## Built-in and custom profile application
 
-`PresetProfileApplier` is the shared coordinator for Presets, tray commands, power automations, and resume.
+`PresetProfileApplier` is the shared coordinator for Presets, tray commands, power automations, and resume. Its CPU/GPU translation runs in the UI process (SMU/Intel/NVIDIA backends); every EC field it touches (power ceilings, fan tables) travels as an RPC verb to the engine service.
 
 ```mermaid
 flowchart TD
@@ -34,7 +34,7 @@ flowchart TD
     Translate --> Windows[Windows power/display operations]
     Custom --> VF{V-F offsets present?}
     VF -->|Yes| ApplyVF[Set power, apply curve, set power again]
-    ApplyVF --> ECPL[Apply AMD EC CPU limits]
+    ApplyVF --> ECPL[Apply AMD EC CPU limits via engine power verbs]
     VF -->|No| ECPL
     Translate --> ECPL
 ```
@@ -71,11 +71,11 @@ Adaptive Mode associates discovered games/applications with `AdaptivePreset` rec
 
 - CPU tuning.
 - GPU power, clocks, Dynamic Boost, and per-profile V-F offsets.
-- EC fan curves.
+- EC fan curves (fan-domain verbs).
 - Flydigi fan and RGB behavior.
 - Hydro UI pump, fan, and RGB behavior.
-- Keyboard global/per-key lighting.
-- Light-bar state.
+- Keyboard global/per-key lighting (HID session) and EC effects.
+- Light-bar state (keyboard-domain verbs).
 
 ### Runtime loop
 
@@ -107,13 +107,13 @@ sequenceDiagram
     participant A as Adaptive Mode
     participant D as DeviceApplier
     participant P as Manual device page
-    participant H as Hardware service
+    participant H as Capability proxy / device session
 
     A->>D: Enable domain override
     D->>D: Capture current user settings
     D-->>P: OverrideChanged(true)
     A->>D: Apply profile-specific settings
-    D->>H: Send device commands
+    D->>H: Send device commands (EC writes RPC to the engine)
     D-->>P: PresetApplied(values)
     A->>D: Disable domain override
     D->>D: Restore captured settings

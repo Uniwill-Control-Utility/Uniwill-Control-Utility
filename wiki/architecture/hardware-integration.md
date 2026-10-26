@@ -2,126 +2,100 @@
 
 ## Integration map
 
+The processes split by privilege: the **engine service** owns the Embedded Controller (the only operation that made the old build require elevation); the **UI process** owns everything that runs at user privilege.
+
 ```mermaid
 flowchart LR
-    UCU[UCU process]
-    UCU --> ECAPI[ACPIDriverDll.dll]
-    ECAPI --> EC[Uniwill embedded controller]
-    UCU --> Pawn[PawnIO device]
+    subgraph Engine[UCUEngine service — LocalSystem]
+        EC[EcEngine] --> T[EcDriverTransport]
+        T --> DRV[\\.\ACPIDriver]
+        DRV --> ECHW[Uniwill embedded controller<br/>UWACPIDriver.sys on INOU0000]
+    end
+    App[UI app — asInvoker] -->|RPC verbs| Engine
+    App --> Pawn[PawnIO device]
     Pawn --> SMU[AMD SMU]
     Pawn --> MSR[Intel MSR/MCHBAR]
-    UCU --> NV[NvAPI / NVML]
+    App --> NV[NvAPI / NVML]
     NV --> GPU[NVIDIA GPU driver]
-    UCU --> HID[Windows HID]
+    App --> HID[Windows HID]
     HID --> ITE[ITE 8291 keyboard]
     HID --> Fly[Flydigi BS2+]
-    UCU --> GATT[Windows BLE/GATT]
+    App --> GATT[Windows BLE/GATT]
     GATT --> BS1[Flydigi BS1]
     GATT --> LCT[LCT Hydro UI]
-    UCU --> WMI[WMI]
+    App --> WMI[WMI]
     WMI --> OEM[System identity / MiniLED interface]
-    UCU --> LHM[LibreHardwareMonitor]
+    App --> LHM[LibreHardwareMonitor]
     LHM --> Sensors[CPU, GPU, memory, battery sensors]
 ```
 
-## Uniwill embedded controller
+## Embedded controller (engine-owned)
 
-`UniwillECService` dynamically loads `ACPIDriverDll.dll` and binds exported read/write functions. A lock serializes low-level EC access, and operations insert protocol-specific delays. The service exposes higher-level operations for:
+`UCU.Hardware\Ec\EcEngine.cs` is the register-level EC implementation: the activation handshake, fan tables and PWM, turbo/boost fields, GPU power control and Dynamic Boost fields, platform power values, keyboard/light-bar operations, battery charge mode, and telemetry reads. It talks to `UWACPIDriver.sys` through the `\\.\ACPIDriver` device IOCTLs via `EcDriverTransport` (`IEcTransport`), which the hardware test suite replaces with a fake.
 
-- CPU/GPU temperatures and fan RPM.
-- Fan curves, direct PWM, turbo, and automatic-control restoration.
-- GPU power-control activation/deactivation and Dynamic Boost fields.
-- Intel/AMD platform power values stored in EC registers.
-- Keyboard and light-bar operations exposed by the EC.
-- Battery charge mode and telemetry.
+The engine exposes the EC as a **verb surface** — the domain verbs `fan`, `power`, `mux`, `keyboard`, `battery`, `telemetry` and the engine-management verbs — and the UI consumes it through the capability interfaces (`IFanCapability`, `IPowerCapability`, `IGpuMuxCapability`, `IKeyboardCapability`, `IBatteryCapability`, `IEcTelemetryCapability`, `IEngineCapability`) implemented as RPC proxies. The scope is deliberately EC-only: SMU, Intel MSR, and NVAPI features stayed app-side when the service was introduced.
 
-The service has an explicit initialization/activation sequence and checks support before feature pages rely on it. Detailed registers and table formats are documented in [Uniwill EC fan control](../protocols/uniwill-ec-fan-control.md) and [NVIDIA GPU power control](../protocols/nvidia-gpu-power-control.md).
+Ordering and fault isolation are structural:
 
-## AMD CPU path
+- One `SerialExecutor` FIFO queue per domain — a fan-curve write is ordered against every other fan write, and a slow write parks only its domain.
+- `EcEngineGate` opens the driver on first use; when `UWACPIDriver.sys` is absent, every verb answers `HardwareUnavailable` and the UI disables EC features. The app's `EcDriverDetectionService` surfaces the prerequisite (driver file presence) up front.
+- The engine watchdog fails fast on a queue wedged beyond 2 minutes; SCM recovery restarts the service.
 
-The AMD backend loads PawnIO modules from `Assets/AMD/PawnIO` and uses a mailbox abstraction to communicate with the Ryzen SMU. `Family.setCpuFamily()` chooses a processor family and supported command mapping. Profile commands can apply:
+CPU platform (AMD vs Intel) matters for the GPU-mux byte encodings: the engine reads the boot processor's vendor identifier from `HARDWARE\DESCRIPTION\System\CentralProcessor\0`, the app resolves the same fact from `Family.TYPE` (CPUID + WMI) for its own encodings.
 
-- Sustained and fast power limits.
-- Thermal limits.
-- Unified or per-CCD Curve Optimizer offsets.
-- Other inherited UXTU SMU operations retained by the translator.
+Register and table formats are documented in [Uniwill EC fan control](../protocols/uniwill-ec-fan-control.md) and [NVIDIA GPU power control](../protocols/nvidia-gpu-power-control.md).
 
-On shutdown, the shared Ryzen access layer is deinitialized.
+## AMD CPU path (app-side)
 
-## Intel CPU path
+The AMD backend loads PawnIO modules from the app's `Assets/AMD/PawnIO` (the `.bin` files stay in the app root where the RyzenSmu loader resolves them) and uses a mailbox abstraction to talk to the Ryzen SMU. `Family.setCpuFamily()` selects the processor family and command mapping. Profile commands apply sustained/fast power limits, thermal limits, Curve Optimizer offsets and other inherited UXTU operations. The shared Ryzen access layer is deinitialized on shutdown.
 
-The Intel backend loads `IntelMSR.bin` and `IntelMCHBAR.bin` through PawnIO. It implements power-limit and voltage controls and deinitializes on exit. CPU voltage controls may be unavailable when firmware locks the relevant interface even if the processor family is recognized.
+## Intel CPU path (app-side)
 
-## NVIDIA GPU path
+The Intel backend loads `IntelMSR.bin` and `IntelMCHBAR.bin` through PawnIO and implements power-limit and voltage controls. CPU voltage controls may be unavailable when firmware locks the interface even if the family is recognized.
 
-`NvTuning` combines several interfaces:
+## NVIDIA GPU path (app-side)
 
-- Managed NvAPI wrapper for public driver operations.
-- NVML P/Invoke for inventory/telemetry and selected controls.
-- Private NVAPI calls for V-F curve access.
-- Uniwill EC registers for laptop power ceilings and Dynamic Boost coordination.
+`NvTuning` combines the managed NvAPI wrapper, NVML P/Invoke, private NVAPI calls for V-F curve access, and — for laptop power ceilings and Dynamic Boost coordination — the EC fields, which now travel as `power`-domain RPC verbs. Application order matters: power ceilings affect whether the driver accepts a curve, so custom-profile logic sets power before and after curve changes.
 
-GPU application order matters. Power ceilings can affect whether the driver accepts or clamps a V-F curve, so custom-profile logic applies power both before and after curve changes.
+Per-operation admin flows (dGPU PnP hotswap, webcam PnP) elevate through `Scripts/Misc\ElevatedProcess` (`runas`, hidden, exit-code verified) rather than running the whole app elevated.
 
-## ITE keyboard HID
+## ITE keyboard HID (app-side)
 
-`KeyboardHidService` discovers the controller, opens HID handles, uses feature reports for global control, and direct output reports for per-key color rows. The code accounts for firmware settle delays, direction priming, BGR channel order, row announcements, and BIOS persistence.
+`KeyboardHidService` owns the HID transport (discovery, feature reports, per-key direct output reports, settle delays, BGR order, BIOS persistence). The EC-side keyboard/light-bar operations are `keyboard`-domain verbs. See [ITE 8291 keyboard HID protocol](../protocols/ite-8291-keyboard-hid-protocol.md).
 
-See [ITE 8291 keyboard HID protocol](../protocols/ite-8291-keyboard-hid-protocol.md).
+## Flydigi HID devices (app-side)
 
-## Flydigi HID devices
+`FlydigiCoolerHidService` supports the BS2-family USB protocol: enumeration, input-report parsing, fan gear/direct RPM/curve/RGB writes, power and arrival notifications, health checks with reconnect backoff, and settings at `%APPDATA%/UCU/bs2pro_settings.json`. Realtime RPM commands need a keepalive re-send every ≤5 s (firmware leaves realtime mode otherwise).
 
-`FlydigiCoolerHidService` supports the BS2-family USB protocol and owns:
+## Flydigi BS1 BLE (app-side)
 
-- Enumeration and connection.
-- Input report parsing and query-response correlation.
-- Fan gear, direct RPM, curve, RGB, and device-setting writes.
-- Windows power notifications and HID arrival notifications.
-- Health checks, reconnect loops with backoff, and scheduled behavior.
-- Persistent device settings in `%APPDATA%/UCU/bs2pro_settings.json`.
+`FlydigiCoolerBleService` uses WinRT enumeration and GATT: discovery, characteristic discovery, session state, heartbeat writes (~2.5 s, the device expects traffic near every 3 s), notification parsing, OS arrival/removal monitoring. Settings: `%APPDATA%/UCU/bs1_settings.json`.
 
-The service is a singleton and implements `IDisposable`; the Flydigi page is also a singleton so its timers can be disposed during process teardown.
+## Hydro UI / LCT BLE (app-side)
 
-## Flydigi BS1 BLE
+`WaterCoolerService` uses the Nordic UART GATT service: scanning, connection, pump/fan/RGB commands, smart-mode scheduling, standby/resume, reconnection. Settings: `%APPDATA%/UCU/watercooler_settings.json`.
 
-`FlydigiCoolerBleService` uses WinRT device enumeration and GATT. It handles discovery, address parsing, characteristic discovery, connection/session state, heartbeat writes, notification parsing, and OS-level arrival/removal monitoring. Settings are stored in `%APPDATA%/UCU/bs1_settings.json`.
+## Hardware monitoring (app-side)
 
-## Hydro UI / LCT BLE
+`HardwareMonitoringService` exposes category leases over LibreHardwareMonitor; Dashboard holds a persistent CPU/GPU/memory/battery lease, temporary consumers get `IDisposable` leases.
 
-`WaterCoolerService` uses the Nordic UART GATT service implemented by supported LCT devices. It owns scanning, connection, notification parsing, pump/fan/RGB commands, smart-mode scheduling, standby/resume behavior, and reconnection. Settings are stored in `%APPDATA%/UCU/watercooler_settings.json`.
-
-## Hardware monitoring
-
-`HardwareMonitoringService` exposes category leases rather than a permanently maximal sensor tree. Consumers request any combination of CPU, GPU, memory, storage, motherboard, controller, and battery categories. The service reconfigures LibreHardwareMonitor when the union changes and returns `HardwareMetricsSnapshot` records.
-
-Dashboard startup acquires a persistent CPU/GPU/memory/battery lease to avoid a costly reprobe when navigating. Temporary consumers receive `IDisposable` leases and release categories when finished.
+`EcTelemetryService` is the EC-telemetry counterpart: it polls fan duty, temperatures and RPM through `IEcTelemetryCapability` (the `telemetry` queue keeps these fast reads unblocked behind writes in other domains) and feeds the tray, overlay and dashboard.
 
 ## FPS monitoring
 
-`FpsMonitoringService` uses this preference order:
-
-1. RTSS shared memory when RTSS exposes a matching foreground process.
-2. ETW DXGI/D3D present events through `TraceEventSession`.
-3. No FPS value when the process is unavailable, protected, or unrecognized.
-
-Process metadata is cached because foreground-process and module enumeration can be expensive or denied by anti-cheat-protected games.
+`FpsMonitoringService` prefers RTSS shared memory, falls back to ETW DXGI/D3D present events, and yields no FPS for protected/unrecognized processes; process metadata is cached because enumeration can be expensive or denied.
 
 ## Display and MiniLED
 
-- Refresh-rate discovery and selection use Win32 display configuration APIs.
-- MiniLED local dimming uses WMI class/method calls compatible with the OEM interface and verifies state after writing.
-- Panel identity is cached during startup so UI controls can be shown only on identified MiniLED configurations.
+Refresh-rate selection uses Win32 display configuration APIs; MiniLED dimming uses the OEM WMI class/methods with write verification; panel identity is cached at startup.
 
 ## Common adapter behavior
 
-Hardware adapters generally follow a degraded-operation model:
-
-- Unsupported or missing devices hide/disable feature surfaces.
-- Discovery and connection failures are logged or exposed as status events.
-- Reconnect-capable services back off or wait for device-arrival events.
-- Resume treats previously connected BLE/HID sessions as potentially stale and rebuilds them.
+- Unsupported or missing devices hide/disable feature surfaces; discovery failures log or raise status events.
+- An engine that is stopped, crashed mid-call, or missing answers `EngineException` with a stable code (`HardwareUnavailable`, `Timeout`, `Busy`, `InvalidValue`, `HardwareFault`); pages degrade per feature.
+- Reconnect-capable services back off or wait for device-arrival events; resume treats BLE/HID sessions as stale and rebuilds them.
 - Persistence loads defaults when a settings file is absent or unreadable.
 
-The exact wire formats are maintained under [`wiki/protocols`](../protocols/device-communication-protocols.md).
+Wire formats live under [`wiki/protocols`](../protocols/device-communication-protocols.md).
 
 [Back to documentation index](../README.md)
