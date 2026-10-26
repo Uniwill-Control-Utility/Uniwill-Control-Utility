@@ -42,6 +42,7 @@ namespace UCU.Engine
                 services.AddSingleton<EngineDispatcher>();
                 services.AddHostedService<EnginePipeServer>();
                 services.AddHostedService<EngineWatchdog>();
+                services.AddHostedService<AppSupervision>();
             });
 
             return builder.Build();
@@ -72,6 +73,10 @@ namespace UCU.Engine
                     case "--no-pipe-security":
                         // Test hook only; the installer never sets it.
                         options = options with { RestrictPipeAccess = false };
+                        break;
+                    case "--no-supervision":
+                        // Dev/test hook: the console host must not spawn UI processes.
+                        options = options with { SupervisionEnabled = false };
                         break;
                 }
             }

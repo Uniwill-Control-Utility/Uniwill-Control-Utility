@@ -54,7 +54,14 @@ namespace Uniwill_Control_Utility.Services
 
             td.Triggers.Add(new LogonTrigger { Delay = delay });
 
-            td.Actions.Add(new ExecAction(exePath ?? CurrentExePath, string.IsNullOrEmpty(arguments) ? null : arguments));
+            // Working directory = the exe's folder: the app resolves its logs
+            // folder (and the graceful-exit flag the guardian and the engine's
+            // supervisor read) relative to the CWD, and the task scheduler's
+            // default CWD is the system directory.
+            string target = exePath ?? CurrentExePath;
+            td.Actions.Add(new ExecAction(target,
+                string.IsNullOrEmpty(arguments) ? null : arguments,
+                Path.GetDirectoryName(target)));
 
             ts.RootFolder.RegisterTaskDefinition(name, td);
         }

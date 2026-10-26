@@ -58,6 +58,16 @@ namespace UCU.Engine
         public static string ConsoleLogDirectory =>
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UCU", "engine");
 
+        /// <summary>
+        /// The app's graceful-exit flag, in the install root's logs folder (the
+        /// engine ships in the Service\ subfolder, so the install root is one
+        /// level up — the same path the app writes on OnExit and the guardian
+        /// reads). The supervisor distinguishes "the user closed the app" from
+        /// "the app died" through this file.
+        /// </summary>
+        public static string GracefulExitFlagPath =>
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "logs", "graceful-exit.flag"));
+
         public static string ResolveLogDirectory(EngineRuntimeOptions options, bool isService) =>
             options.LogDirectory
                 ?? (isService ? ServiceLogDirectory : ConsoleLogDirectory);

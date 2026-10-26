@@ -44,6 +44,14 @@ namespace UCU.Engine
         /// </summary>
         public TimeSpan StuckCallThreshold { get; init; } = TimeSpan.FromMinutes(2);
 
+        /// <summary>
+        /// App crash supervision (phase 5): the engine relaunches the app after
+        /// a crash/kill, following GuardianPolicy. True for the installed
+        /// service; tests and dev console runs pass <c>--no-supervision</c> so
+        /// a debug session never spawns UI processes.
+        /// </summary>
+        public bool SupervisionEnabled { get; init; } = true;
+
         /// <summary>Log directory. Null selects ProgramData for the service, LocalAppData for --console.</summary>
         public string? LogDirectory { get; init; }
 
