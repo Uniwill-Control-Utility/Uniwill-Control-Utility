@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The app's side of the engine RPC: a connection-per-call client plus one proxy
+       per capability interface. Referenced by the UI process; references nothing
+       privileged, which is the point: the app can hold this and still not reach the
+       EC except through the service's verb table. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>10.0</LangVersion>
+    <Platforms>AnyCPU;x64</Platforms>
+    <AssemblyName>UCU.Client</AssemblyName>
+    <RootNamespace>UCU.Client</RootNamespace>
+    <Version>0.9.6</Version>
+    <Copyright>© 2020-2026 UXTU Team, 2026 UCU Team</Copyright>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UCU.Core\UCU.Core.csproj" />
+    <ProjectReference Include="..\UCU.Contracts\UCU.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="UCU.Engine.Tests" />
+  </ItemGroup>
+
+</Project>

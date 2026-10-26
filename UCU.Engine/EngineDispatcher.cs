@@ -1,0 +1,111 @@
+using System.Text.Json;
+using UCU.Contracts;
+
+namespace UCU.Engine
+{
+    /// <summary>
+    /// Routes a request envelope to its verb handler and turns the result into a
+    /// response envelope. This is the dispatcher's whole job: verb lookup, protocol
+    /// version check, queue selection, and the exception-to-error-code mapping.
+    ///
+    /// The mapping is concentrated here on purpose. Hardware code reports faults by
+    /// exception type (the driver throws <c>Win32Exception</c>, validation throws
+    /// <c>ArgumentOutOfRangeException</c>), and the client needs stable codes, not
+    /// exception type names: every handler can therefore stay as terse as the engine
+    /// call it wraps.
+    /// </summary>
+    public sealed class EngineDispatcher
+    {
+        private readonly Dictionary<string, VerbHandler> _handlers;
+        private readonly EngineDomainQueues _queues;
+        private readonly EcEngineGate _gate;
+
+        public EngineDispatcher(EcEngineGate gate, EngineDomainQueues queues)
+        {
+            _gate = gate;
+            _queues = queues;
+            _handlers = BuildHandlers(gate);
+        }
+
+        public IReadOnlyCollection<string> Verbs => _handlers.Keys;
+
+        public async Task<EngineResponse> DispatchAsync(EngineRequest request, CancellationToken cancellationToken)
+        {
+            if (request.ProtocolVersion != EngineProtocol.Version)
+            {
+                return EngineResponse.Failure(request.Id, EngineErrorCode.ProtocolVersion,
+                    $"client protocol {request.ProtocolVersion}, engine protocol {EngineProtocol.Version}");
+            }
+
+            if (!_handlers.TryGetValue(request.Verb, out VerbHandler handler))
+            {
+                return EngineResponse.Failure(request.Id, EngineErrorCode.UnsupportedVerb,
+                    $"'{request.Verb}' is not a verb of this engine");
+            }
+
+            try
+            {
+                object? result = await RunOnAppropriateQueueAsync(request.Verb, handler, request.Params, cancellationToken)
+                    .ConfigureAwait(false);
+
+                return EngineResponse.Success(request.Id, result == null ? null : EngineSerializer.ToParamsObject(result));
+            }
+            catch (Exception ex)
+            {
+                return EngineResponse.Failure(request.Id, CodeFor(ex), MessageFor(ex));
+            }
+        }
+
+        private async Task<object?> RunOnAppropriateQueueAsync(
+            string verb, VerbHandler handler, JsonElement? parameters, CancellationToken cancellationToken)
+        {
+            SerialExecutor? queue = _queues.QueueFor(verb);
+            if (queue == null)
+                return await handler(parameters, cancellationToken).ConfigureAwait(false);
+
+            // The whole handler (parameter binding plus the engine call) runs on the
+            // domain queue, so a verb is ordered against every other verb in its domain.
+            return await queue.RunAsync(verb, () => handler(parameters, cancellationToken).GetAwaiter().GetResult(), cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        private static EngineErrorCode CodeFor(Exception ex) => ex switch
+        {
+            EngineException engineEx => engineEx.Code,
+            ProtocolViolationException => EngineErrorCode.BadRequest,
+            JsonException => EngineErrorCode.BadRequest,
+            ArgumentOutOfRangeException => EngineErrorCode.InvalidValue,
+            System.ComponentModel.Win32Exception => EngineErrorCode.HardwareUnavailable,
+            InvalidOperationException => EngineErrorCode.HardwareFault,
+            OperationCanceledException => EngineErrorCode.Timeout,
+            _ => EngineErrorCode.Internal,
+        };
+
+        private static string MessageFor(Exception ex) => ex switch
+        {
+            EngineException engineEx => engineEx.Message,
+            // Driver and validation messages name the register or the value, which is
+            // what a support log needs; they carry no paths or account names.
+            System.ComponentModel.Win32Exception or ArgumentOutOfRangeException or InvalidOperationException
+                => ex.Message,
+            _ => "unexpected engine fault; see the engine log",
+        };
+
+        private static Dictionary<string, VerbHandler> BuildHandlers(EcEngineGate gate)
+        {
+            var handlers = new Dictionary<string, VerbHandler>(StringComparer.Ordinal);
+
+            void Add(string verb, VerbHandler handler) => handlers.Add(verb, handler);
+
+            FanVerbs.Register(Add, gate);
+            PowerVerbs.Register(Add, gate);
+            MuxVerbs.Register(Add, gate);
+            KeyboardVerbs.Register(Add, gate);
+            BatteryVerbs.Register(Add, gate);
+            TelemetryVerbs.Register(Add, gate);
+            EngineVerbsImpl.Register(Add, gate);
+
+            return handlers;
+        }
+    }
+}

@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The engine service: the only process that loads UCU.Hardware, and the only
+       process that needs privilege. Installed as the Windows service "UCUEngine"
+       (LocalSystem), it exposes the EC operations over a named pipe so the UI process
+       can start unelevated.
+       Exe name has spaces on purpose: Task Manager shows the file name, and next to
+       "Uniwill Control Utility.exe" the pair reads as one product. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>10.0</LangVersion>
+    <Platforms>AnyCPU;x64</Platforms>
+    <AssemblyName>Uniwill Control Utility Engine</AssemblyName>
+    <RootNamespace>UCU.Engine</RootNamespace>
+    <AssemblyTitle>Uniwill Control Utility Engine</AssemblyTitle>
+    <Product>Uniwill Control Utility Engine</Product>
+    <Copyright>© 2020-2026 UXTU Team, 2026 UCU Team</Copyright>
+    <Version>0.9.6</Version>
+    <ApplicationIcon>..\Uniwill Control Utility\favicon.ico</ApplicationIcon>
+    <!-- Service name in the SCM, and the display name the user sees in services.msc. -->
+    <EngineServiceName>UCUEngine</EngineServiceName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.9" />
+    <PackageReference Include="Serilog" Version="4.3.0" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UCU.Core\UCU.Core.csproj" />
+    <ProjectReference Include="..\UCU.Contracts\UCU.Contracts.csproj" />
+    <ProjectReference Include="..\UCU.Hardware\UCU.Hardware.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- In-process host tests drive the pipe server with a fake EC transport. -->
+    <InternalsVisibleTo Include="UCU.Engine.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The wire contract between the UI process and the engine service: verbs, request
+       and response envelopes, DTOs, the frame codec and the capability interfaces.
+       Referenced by UCU.Engine, UCU.Client and the app. Kept free of hardware, WPF
+       and driver types, and AOT/trimming-friendly (source-generated JSON), because
+       the engine service is the assembly that ships with the driver access. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>10.0</LangVersion>
+    <Platforms>AnyCPU;x64</Platforms>
+    <AssemblyName>UCU.Contracts</AssemblyName>
+    <RootNamespace>UCU.Contracts</RootNamespace>
+    <Version>0.9.6</Version>
+    <Copyright>© 2020-2026 UXTU Team, 2026 UCU Team</Copyright>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UCU.Core\UCU.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="UCU.Contracts.Tests" />
+    <InternalsVisibleTo Include="UCU.Engine" />
+    <InternalsVisibleTo Include="UCU.Client" />
+  </ItemGroup>
+
+</Project>
