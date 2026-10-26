@@ -81,21 +81,33 @@ namespace UCU.Client
             {
                 responseCts.CancelAfter(DefaultResponseBudget);
 
-                await FrameCodec.WriteFrameAsync(pipe, EngineSerializer.SerializeToUtf8Bytes(request), responseCts.Token)
-                    .ConfigureAwait(false);
+                try
+                {
+                    await FrameCodec.WriteFrameAsync(pipe, EngineSerializer.SerializeToUtf8Bytes(request), responseCts.Token)
+                        .ConfigureAwait(false);
 
-                byte[] payload = await FrameCodec.ReadFrameAsync(pipe, EngineProtocol.MaxResponseBytes, responseCts.Token)
-                    .ConfigureAwait(false);
+                    byte[] payload = await FrameCodec.ReadFrameAsync(pipe, EngineProtocol.MaxResponseBytes, responseCts.Token)
+                        .ConfigureAwait(false);
 
-                EngineResponse response = EngineSerializer.Deserialize<EngineResponse>(payload);
+                    EngineResponse response = EngineSerializer.Deserialize<EngineResponse>(payload);
 
-                if (!response.Ok)
-                    throw new EngineException(response.Error ?? EngineErrorCode.Internal, response.Message);
+                    if (!response.Ok)
+                        throw new EngineException(response.Error ?? EngineErrorCode.Internal, response.Message);
 
-                if (response.Result == null)
-                    return default!; // result-less verbs run with T=object?; result verbs always carry a Result, and FromElement enforces that
+                    if (response.Result == null)
+                        return default!; // result-less verbs run with T=object?; result verbs always carry a Result, and FromElement enforces that
 
-                return EngineSerializer.FromElement<T>(response.Result.Value);
+                    return EngineSerializer.FromElement<T>(response.Result.Value);
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    // The response budget expired (the engine accepted the connection
+                    // and stopped answering): report the stable code, not a raw
+                    // OperationCanceledException the caller cannot tell from its own
+                    // cancellation.
+                    throw new EngineException(EngineErrorCode.Timeout,
+                        $"the engine did not answer '{verb}' within {DefaultResponseBudget.TotalSeconds:0} s");
+                }
             }
         }
     }

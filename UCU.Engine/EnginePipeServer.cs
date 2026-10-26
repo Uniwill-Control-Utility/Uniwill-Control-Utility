@@ -71,21 +71,14 @@ namespace UCU.Engine
 
         private NamedPipeServerStream CreatePipe()
         {
-            var pipe = new NamedPipeServerStream(
-                _options.PipeName,
-                PipeDirection.InOut,
-                NamedPipeServerStream.MaxAllowedServerInstances,
-                PipeTransmissionMode.Byte,
-                PipeOptions.Asynchronous);
-
-            if (_options.RestrictPipeAccess)
-            {
-                // Applying the ACL before the first connection is the point: the pipe
-                // exists, and is open to the world, from the constructor until this call.
-                pipe.SetAccessControl(PipeSecurityBuilder.BuildRestricted());
-            }
-
-            return pipe;
+            // The DACL must be baked into CreateNamedPipeW (.NET 10 has no managed
+            // secured-pipe API: the PipeSecurity constructor overload is gone, and
+            // SetAccessControl on the created handle throws UnauthorizedAccessException
+            // - the first field run spun the accept loop every second). The service
+            // always runs the restricted SDDL; dev/test hosts take the default
+            // descriptor. See PipeSecurityBuilder for what the SDDL means.
+            string? sddl = _options.RestrictPipeAccess ? PipeSecurityBuilder.RestrictedSddl : null;
+            return NativePipeFactory.Create(_options.PipeName, sddl);
         }
 
         private async Task ServeConnectionAsync(NamedPipeServerStream pipe, SemaphoreSlim limiter, CancellationToken appStopping)

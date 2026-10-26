@@ -25,7 +25,7 @@ sequenceDiagram
     SCM->>Eng: boot: start= auto starts the service
 ```
 
-- The install pass (`EngineInstaller` in the engine) is idempotent and re-applies binPath (the registration follows the exe through Velopack version directories), the DACL `D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;CCSWWPCR;;;AU)` (Authenticated Users: query config/status, `SERVICE_START`, interrogate), the description, and SCM failure actions (restart ×3/min).
+- The install pass (`EngineInstaller` in the engine) is idempotent and re-applies binPath (the registration follows the exe through Velopack version directories), the DACL `D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;CCLCSWLOCRRC;;;AU)` (the canonical "query, start" grant for Authenticated Users), the description, and SCM failure actions (restart ×3/min).
 - `--console` runs the identical host as a console app with logs under `%LOCALAPPDATA%\UCU\engine`; the installed service logs to `%ProgramData%\UCU\engine\`.
 
 ## App startup sequence

@@ -18,13 +18,16 @@ namespace UCU.Engine
     {
         /// <summary>
         /// Service DACL. System and Administrators keep full control;
-        /// Authenticated Users get query-config (CC), query-status (SW),
-        /// SERVICE_START (WP) and SERVICE_INTERROGATE (CR) — exactly what the
-        /// unelevated app needs to keep the engine alive, and nothing else gains
-        /// a right. Without the start grant the de-elevated app could never
-        /// restart a stopped engine without a UAC prompt.
+        /// Authenticated Users get the canonical SDDL grant for
+        /// "query config, query status, start, interrogate, read control"
+        /// (CCLCSWLOCRRC - rights parse right-to-left in pairs) - exactly
+        /// what the unelevated app needs to keep the engine alive
+        /// (ServiceController status + start), and nothing else gains a
+        /// right. Without the start grant the de-elevated app could never
+        /// restart a stopped engine without a UAC prompt; without the
+        /// status grant it cannot even see that the service is stopped.
         /// </summary>
-        internal const string ServiceSddl = "D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;CCSWWPCR;;;AU)";
+        internal const string ServiceSddl = "D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;CCLCSWLOCRRC;;;AU)";
 
         private const string DisplayName = "Uniwill Control Utility Engine";
 
