@@ -17,6 +17,7 @@ using Uniwill_Control_Utility.Scripts.Intel_Backend;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Abstractions.Controls;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
@@ -216,7 +217,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Filters out Adaptive game-detection spam, fan polling, etc.
             if (line.Contains("[RyzenAdj_To_UCU.") ||
                 line.Contains("[NvTuning.") ||
-                line.Contains("[UniwillECService.") ||
+                line.Contains("[EcEngine.") ||
                 line.Contains("[Presets.") ||
                 line.Contains("[Translate") ||
                 line.Contains("[WinPower]") ||

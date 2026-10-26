@@ -11,6 +11,7 @@ using Uniwill_Control_Utility.Scripts.Intel_Backend;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
 using Settings = Uniwill_Control_Utility.Properties.Settings;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.Scripts
 {
@@ -29,7 +30,7 @@ namespace Uniwill_Control_Utility.Scripts
 
         // Optional EC service reference for --ec-* command routing.
         // Set from App.xaml.cs or MainWindowViewModel after DI resolves the service.
-        internal static UniwillECService? EcService { get; set; }
+        internal static EcEngine? EcService { get; set; }
 
         public static void Translate(string ryzenAdjString, bool isAutoReapply = false, string? appliedName = null, bool localizeAppliedName = false) =>
             _ = TranslateAsync(ryzenAdjString, isAutoReapply, appliedName, localizeAppliedName);

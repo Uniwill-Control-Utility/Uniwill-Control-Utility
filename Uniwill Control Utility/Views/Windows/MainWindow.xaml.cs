@@ -41,6 +41,7 @@ using static Uniwill_Control_Utility.Scripts.Game_Manager;
 using Application = System.Windows.Application;
 using MessageBox = System.Windows.Forms.MessageBox;
 using Settings = Uniwill_Control_Utility.Properties.Settings;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.Views.Windows
 {
@@ -895,7 +896,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// </summary>
         internal static void ApplyEcSettingsOnStart()
         {
-            var ec = App.GetService<UniwillECService>();
+            var ec = App.GetService<EcEngine>();
             if (ec is null)
                 return;
 
@@ -956,12 +957,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                     catch (Exception ex)
                     {
                         System.Diagnostics.Debug.WriteLine($"WARN | MainWindow: Smart Fan Mode auto-start failed: {ex.Message}");
-                        ec.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                        ec.ApplyFanCurve( cpuCurve.ToEngineSpec(), gpuCurve.ToEngineSpec(), cpuTemps, gpuTemps);
                     }
                 }
                 else
                 {
-                    ec.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                    ec.ApplyFanCurve( cpuCurve.ToEngineSpec(), gpuCurve.ToEngineSpec(), cpuTemps, gpuTemps);
                     System.Diagnostics.Debug.WriteLine("INFO | MainWindow: Fan curve auto-applied on startup");
                 }
             }
@@ -1328,7 +1329,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                             // Re-apply Battery charge limit
                             try
                             {
-                                var ecService = App.GetService<UniwillECService>();
+                                var ecService = App.GetService<EcEngine>();
                                 if (ecService != null && ecService.Initialize())
                                 {
                                     int savedMode = Settings.Default.BatteryMode;
@@ -1386,7 +1387,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                             // custom EC curve after resume would undo the OEM mode engine.
                             try
                             {
-                                var ecService = App.GetService<UniwillECService>();
+                                var ecService = App.GetService<EcEngine>();
                                 if (ecService != null && !IsFanCustomizationAllowed())
                                 {
                                     Debug.WriteLine("[Resume] Stock preset active — EC fan duties not re-applied");
@@ -1430,7 +1431,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                                     }
                                     else
                                     {
-                                        ecService.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                                        ecService.ApplyFanCurve( cpuCurve.ToEngineSpec(), gpuCurve.ToEngineSpec(), cpuTemps, gpuTemps);
                                         Debug.WriteLine("[Resume] Fan Control EC duties re-applied");
                                     }
                                 }
@@ -2364,19 +2365,19 @@ namespace Uniwill_Control_Utility.Views.Windows
             FanControlSettingsService.Save(settings);
 
             // Apply the curve
-            var ec = App.GetService<UniwillECService>();
+            var ec = App.GetService<EcEngine>();
             if (ec != null && IsFanCustomizationAllowed())
             {
                 var curve = GetFanPresetCurve(settings.UnifiedPreset);
                 if (enabled)
                 {
-                    ec.ApplyFanCurve(curve, curve, EcFanCurve.CpuTemperatures, EcFanCurve.CpuTemperatures);
+                    ec.ApplyFanCurve( curve.ToEngineSpec(), curve.ToEngineSpec(), EcFanCurve.CpuTemperatures, EcFanCurve.CpuTemperatures);
                 }
                 else
                 {
                     var cpuCurve = GetFanPresetCurve(settings.CpuPreset);
                     var gpuCurve = GetFanPresetCurve(settings.GpuPreset);
-                    ec.ApplyFanCurve(cpuCurve, gpuCurve, EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
+                    ec.ApplyFanCurve( cpuCurve.ToEngineSpec(), gpuCurve.ToEngineSpec(), EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
                 }
             }
 
@@ -2407,7 +2408,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
             FanControlSettingsService.Save(settings);
 
-            var ec = App.GetService<UniwillECService>();
+            var ec = App.GetService<EcEngine>();
             if (ec != null && IsFanCustomizationAllowed())
             {
                 Models.EcFanCurve curve = presetName == "Custom"
@@ -2415,11 +2416,11 @@ namespace Uniwill_Control_Utility.Views.Windows
                     : GetFanPresetCurve(presetName);
                 if (settings.UnifiedMode)
                 {
-                    ec.ApplyFanCurve(curve, curve, EcFanCurve.CpuTemperatures, EcFanCurve.CpuTemperatures);
+                    ec.ApplyFanCurve( curve.ToEngineSpec(), curve.ToEngineSpec(), EcFanCurve.CpuTemperatures, EcFanCurve.CpuTemperatures);
                 }
                 else
                 {
-                    ec.ApplyFanCurve(curve, curve, EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
+                    ec.ApplyFanCurve( curve.ToEngineSpec(), curve.ToEngineSpec(), EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
                 }
             }
         }
@@ -2442,7 +2443,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             settings.CpuPreset = presetName;
             FanControlSettingsService.Save(settings);
 
-            var ec = App.GetService<UniwillECService>();
+            var ec = App.GetService<EcEngine>();
             if (ec != null && IsFanCustomizationAllowed())
             {
                 Models.EcFanCurve cpuCurve = presetName == "Custom"
@@ -2451,7 +2452,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 Models.EcFanCurve gpuCurve = settings.GpuPreset == "Custom"
                     ? GetFanCustomCurve(settings.GpuDuties)
                     : GetFanPresetCurve(settings.GpuPreset);
-                ec.ApplyFanCurve(cpuCurve, gpuCurve, EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
+                ec.ApplyFanCurve( cpuCurve.ToEngineSpec(), gpuCurve.ToEngineSpec(), EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
             }
         }
 
@@ -2473,7 +2474,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             settings.GpuPreset = presetName;
             FanControlSettingsService.Save(settings);
 
-            var ec = App.GetService<UniwillECService>();
+            var ec = App.GetService<EcEngine>();
             if (ec != null && IsFanCustomizationAllowed())
             {
                 Models.EcFanCurve cpuCurve = settings.CpuPreset == "Custom"
@@ -2482,7 +2483,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 Models.EcFanCurve gpuCurve = presetName == "Custom"
                     ? GetFanCustomCurve(settings.GpuDuties)
                     : GetFanPresetCurve(presetName);
-                ec.ApplyFanCurve(cpuCurve, gpuCurve, EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
+                ec.ApplyFanCurve( cpuCurve.ToEngineSpec(), gpuCurve.ToEngineSpec(), EcFanCurve.CpuTemperatures, EcFanCurve.GpuTemperatures);
             }
         }
 
@@ -2530,7 +2531,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             settings.EcSmartFanMode = enabled;
             FanControlSettingsService.Save(settings);
 
-            var ec = App.GetService<UniwillECService>();
+            var ec = App.GetService<EcEngine>();
             if (ec == null || !IsFanCustomizationAllowed())
                 return;
 
@@ -2566,7 +2567,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                     ? cpuTemps
                     : (settings.GpuTempThresholds ?? EcFanCurve.GpuTemperatures);
 
-                ec.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                ec.ApplyFanCurve( cpuCurve.ToEngineSpec(), gpuCurve.ToEngineSpec(), cpuTemps, gpuTemps);
             }
         }
 

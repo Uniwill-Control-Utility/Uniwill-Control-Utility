@@ -9,6 +9,7 @@ using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Views.Pages;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -39,7 +40,7 @@ namespace Uniwill_Control_Utility.Services
     /// paths announces the switch.
     ///
     /// Q-key LED: the EC firmware drives the LED from its own internal mode state,
-    /// and the 0x0751 literal in UniwillECService.ApplyOemStockMode is what recolors
+    /// and the 0x0751 literal in EcEngine.ApplyOemStockMode is what recolors
     /// it (Office white / Gaming yellow / Turbo red on this platform; other firmware
     /// maps the same literals to its own colors). The corrected OpenRevo disassembly
     /// (second linear sweep of its mode-apply function) shows Mechrevo/IDB firmware
@@ -76,7 +77,7 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private const int StartupDelayMs = 4000;
 
-        private readonly UniwillECService _ec;
+        private readonly EcEngine _ec;
         private readonly CancellationTokenSource _cts = new();
         private Task? _watchTask;
 
@@ -86,7 +87,7 @@ namespace Uniwill_Control_Utility.Services
         private bool _disposed;
         private Presets? _presetsPage;
 
-        public QKeyButtonService(UniwillECService ec)
+        public QKeyButtonService(EcEngine ec)
         {
             _ec = ec;
         }

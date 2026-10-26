@@ -7,6 +7,7 @@ using System.Windows.Threading;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Abstractions.Controls;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
@@ -19,7 +20,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         // milliseconds to avoid reading back the stale value before the EC commits.
         private const int ApplyGraceMs = 10000; // 10 seconds
 
-        private readonly UniwillECService? _ecService;
+        private readonly EcEngine? _ecService;
         private readonly DispatcherTimer _refreshTimer = new()
         {
             Interval = TimeSpan.FromSeconds(RefreshIntervalSeconds),
@@ -44,7 +45,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             _refreshTimer.Tick += OnRefreshTimerTick;
 
-            _ecService = App.GetService<UniwillECService>();
+            _ecService = App.GetService<EcEngine>();
             if (_ecService is not null)
             {
                 try
@@ -249,7 +250,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private void UpdateTelemetryUi(UniwillECService.BatteryTelemetry telemetry)
+        private void UpdateTelemetryUi(BatteryTelemetry telemetry)
         {
             if (telemetry.IsAcPowered)
             {

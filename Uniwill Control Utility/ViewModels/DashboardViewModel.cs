@@ -10,6 +10,7 @@ using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui;
 using Wpf.Ui.Abstractions.Controls;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.ViewModels
 {
@@ -22,7 +23,7 @@ namespace Uniwill_Control_Utility.ViewModels
         private readonly INavigationService _navigationService;
         private readonly IHardwareMonitoringService _hardwareMonitoring;
         private readonly EcTelemetryService _ecTelemetry;
-        private readonly UniwillECService? _uniwillEc;
+        private readonly EcEngine? _uniwillEc;
         private readonly HydroUIService _hydroUIService;
         private readonly FlydigiCoolerHidService _flydigiService;
         private readonly FlydigiCoolerBleService _bs1Service;
@@ -38,7 +39,7 @@ namespace Uniwill_Control_Utility.ViewModels
             INavigationService navigationService,
             IHardwareMonitoringService hardwareMonitoring,
             EcTelemetryService ecTelemetry,
-            UniwillECService? uniwillEc,
+            EcEngine? uniwillEc,
             HydroUIService hydroUIService,
             FlydigiCoolerHidService flydigiService,
             FlydigiCoolerBleService bs1Service)

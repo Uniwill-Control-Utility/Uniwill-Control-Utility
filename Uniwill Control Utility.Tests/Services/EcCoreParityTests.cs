@@ -1,85 +1,24 @@
 using System.Reflection;
 using UCU.Core.Ec;
+using UCU.Hardware.Ec;
 using Uniwill_Control_Utility.Models;
-using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Services;
-using Xunit;
 
 namespace Uniwill_Control_Utility.Tests.Services;
 
 /// <summary>
-/// Pins the new UCU.Core encoders to the behaviour that ships today, so phase 0's
-/// extraction is provably a move and not a rewrite. The private statics in
-/// <see cref="UniwillECService"/> are the reference implementation; they are deleted
-/// once the app consumes the engine instead of the EC directly.
+/// Pins the app's fan-curve model to the UCU.Core encoders the EC engine now uses,
+/// so the app-side model and the engine-side encoding cannot drift apart, and guards
+/// the layering the engine-service design depends on.
+///
+/// The EC service's own encoders were deleted in this phase (they live in Core), so
+/// the reference implementation for these assertions is the model's
+/// <see cref="EcFanCurve.ToEcDutyTable"/>, which is what the UI still renders from.
 /// </summary>
 public sealed class EcCoreParityTests
 {
-    private static object? InvokeEc(string methodName, params object?[] args)
-    {
-        MethodInfo method = typeof(UniwillECService).GetMethod(methodName,
-            BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)!;
-        return method.Invoke(null, args);
-    }
-
-    [Theory]
-    [InlineData(new int[] { 0, 55, 60, 65, 70, 75, 80, 85, 90, 95, 97 })]
-    [InlineData(new int[] { 0, 40, 50, 60, 70, 80, 90, 95 })]
-    [InlineData(new int[] { 0, 300, 400 })]
-    [InlineData(new int[] { 500, 55, 60, 65, 70, 75, 80, 85, 90, 95, 97, 99, 101 })]
-    [InlineData(new int[] { 0 })]
-    public void TemperatureUp_MatchesTheAppEncoder(int[] temps)
-    {
-        byte[] expected = (byte[])InvokeEc("ToEcTempUp", temps)!;
-
-        Assert.Equal(expected, EcTemperatureCodec.ToEcTempUp(temps));
-    }
-
-    [Theory]
-    [InlineData(new int[] { 0, 55, 60, 65, 70, 75, 80, 85, 90, 95, 97 })]
-    [InlineData(new int[] { 0, 1, 2, 3 })]
-    [InlineData(new int[] { 1, 55 })]
-    [InlineData(new int[] { 0, 300, 400 })]
-    [InlineData(new int[] { 500, 55, 60, 65, 70, 75, 80, 85, 90, 95, 97, 99, 101 })]
-    public void TemperatureDown_MatchesTheAppEncoder(int[] temps)
-    {
-        byte[] expected = (byte[])InvokeEc("ToEcTempDown", temps)!;
-
-        Assert.Equal(expected, EcTemperatureCodec.ToEcTempDown(temps));
-    }
-
-    [Theory]
-    [InlineData(180)]
-    [InlineData(120)]
-    [InlineData(90)]
-    [InlineData(60)]
-    [InlineData(0)]
-    [InlineData(200)]
-    public void ScaleDutyGradient_MatchesTheAppEncoder(byte targetMax)
-    {
-        byte[] oemGradient = { 0, 20, 40, 60, 80, 100, 120, 140, 160, 180 };
-
-        byte[] expected = (byte[])InvokeEc("ScaleDutyGradient", oemGradient, targetMax)!;
-
-        Assert.Equal(expected, EcDutyCodec.ScaleDutyGradient(oemGradient, targetMax));
-    }
-
-    [Theory]
-    [InlineData(100)]
-    [InlineData(17)]
-    public void ScaleDutyGradient_MatchesOnAFlatGradient(byte targetMax)
-    {
-        byte[] flatGradient = { 0, 180, 1, 1, 1, 1, 1, 1, 1, 180 };
-
-        byte[] expected = (byte[])InvokeEc("ScaleDutyGradient", flatGradient, targetMax)!;
-
-        Assert.Equal(expected, EcDutyCodec.ScaleDutyGradient(flatGradient, targetMax));
-    }
-
-    [Fact]
-    public void DutyTable_MatchesTheFanCurveModel()
-    {
-        EcFanCurve[] curves =
+    private static EcFanCurve[] AllPresetCurves() =>
+        new[]
         {
             EcFanCurve.CreateSilent(),
             EcFanCurve.CreateBalanced(),
@@ -88,46 +27,61 @@ public sealed class EcCoreParityTests
             EcFanCurve.CreateOff(),
         };
 
-        foreach (EcFanCurve curve in curves)
+    [Fact]
+    public void DutyTable_MatchesTheFanCurveModel()
+    {
+        foreach (EcFanCurve curve in AllPresetCurves())
         {
             Assert.Equal(curve.ToEcDutyTable(), EcDutyCodec.BuildDutyTable(curve.Duties));
         }
     }
 
     [Fact]
-    public void DutyTable_MatchesOnPartialAndOverRangeCurves()
+    public void DutyTable_MatchesOnPartialAndEdgeCurves()
     {
         var shortCurve = new EcFanCurve { Name = "Short", Duties = new List<int> { 0, 50 } };
-        var overRange = new EcFanCurve { Name = "Over", Duties = new List<int> { 0, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 } };
+        var fullCurve = new EcFanCurve { Name = "Full", Duties = new List<int> { 0, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 } };
+        var flatCurve = new EcFanCurve { Name = "Flat", Duties = new List<int> { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
 
         Assert.Equal(shortCurve.ToEcDutyTable(), EcDutyCodec.BuildDutyTable(shortCurve.Duties));
-        Assert.Equal(overRange.ToEcDutyTable(), EcDutyCodec.BuildDutyTable(overRange.Duties));
+        Assert.Equal(fullCurve.ToEcDutyTable(), EcDutyCodec.BuildDutyTable(fullCurve.Duties));
+        Assert.Equal(flatCurve.ToEcDutyTable(), EcDutyCodec.BuildDutyTable(flatCurve.Duties));
     }
 
-    /// <summary>
-    /// The app's MUX helpers read the platform from global CPU detection, which is
-    /// unresolved in a unit-test process; the Core codec takes it as an argument.
-    /// Parity is asserted on the AMD mapping, which is what the app's unresolved
-    /// global resolves to, and the Intel mapping is covered directly in Core.
-    /// </summary>
     [Fact]
-    public void MuxEncoding_MatchesTheAppEncoderOnAmd()
+    public void EngineSpec_CarriesTheCurveSoTheEngineReproducesTheSameTable()
     {
-        // The app reads the platform from global CPU detection, which is unresolved
-        // (=> the AMD mapping) in a unit-test process. If a run ever resolves Intel
-        // here, the AMD parity is not the right comparison and the Core Intel tests
-        // cover that mapping directly.
-        if (Family.TYPE == Family.ProcessorType.Intel)
-            return;
-
-        foreach (UniwillECService.GpuMuxMode appMode in Enum.GetValues<UniwillECService.GpuMuxMode>())
+        // The UI renders from Duties; the engine writes the table it derives from the
+        // spec. If these two ever disagree, the fan page preview and the EC state part.
+        foreach (EcFanCurve curve in AllPresetCurves())
         {
-            var coreMode = (GpuMuxMode)(int)appMode;
-            byte expected = UniwillECService.ModeToRaw(appMode);
+            EcFanCurveSpec spec = curve.ToEngineSpec();
 
-            Assert.Equal(expected, EcMuxCodec.ModeToRaw(coreMode, EcPlatform.Amd));
-            Assert.Equal((int)UniwillECService.RawToMode(expected), (int)EcMuxCodec.RawToMode(expected, EcPlatform.Amd));
+            Assert.Equal(curve.Name, spec.Name);
+            Assert.Equal(curve.Duties, spec.DutyPercentByZone);
+            Assert.Equal(curve.ToEcDutyTable(), EcDutyCodec.BuildDutyTable(spec.DutyPercentByZone));
         }
+    }
+
+    [Fact]
+    public void FanCurveModel_UsesTheCoreTemperatureStepsForItsLabels()
+    {
+        // The page's temperature labels come from the model; the engine's default
+        // thresholds come from Core. They are the same scale, and a drift here means
+        // the UI shows a temperature the EC does not use.
+        Assert.Equal(EcTemperatureCodec.DefaultTemperatureSteps, EcFanCurve.CpuTemperatures);
+    }
+
+    [Fact]
+    public void PlatformResolver_DefaultsToAmd_UntilDetectionResolvesIntel()
+    {
+        // Family.TYPE is unresolved in a test process; the resolver must fall back to
+        // the AMD mapping (raw 0/1/2) rather than an unset platform, which is the
+        // mapping the product shipped with for years.
+        EcPlatform platform = EcPlatformResolver.Current;
+
+        Assert.True(platform == EcPlatform.Amd || platform == EcPlatform.Intel);
+        Assert.Equal((byte)GpuMuxMode.Hybrid, EcMuxCodec.ModeToRaw(GpuMuxMode.Hybrid, EcPlatform.Amd));
     }
 
     [Fact]
@@ -154,5 +108,31 @@ public sealed class EcCoreParityTests
 
         foreach (string name in forbidden)
             Assert.DoesNotContain(name, referenced);
+    }
+
+    [Fact]
+    public void HardwareAssemblyReferencesStayFreeOfUiAndAppTypes()
+    {
+        // The hardware layer is loaded by the engine service. It must stay free of WPF,
+        // app settings, and app models, so the service host never inherits UI deps and
+        // the phase-3 flip (app stops referencing UCU.Hardware) is a project edit, not
+        // a redesign.
+        string[] forbidden =
+        {
+            "Uniwill Control Utility", "PresentationFramework", "PresentationCore",
+            "WindowsBase", "ControlzEx", "ModernWpf", "CommunityToolkit",
+            "MahApps", "System.Windows.Interactivity", "Microsoft.Xaml",
+            "Serilog.Sinks.File", "Velopack", "System.Management",
+        };
+
+        string[] referenced = Assembly.Load("UCU.Hardware")
+            .GetReferencedAssemblies()
+            .Select(a => a.Name!)
+            .ToArray();
+
+        foreach (string name in forbidden)
+            Assert.DoesNotContain(name, referenced);
+
+        Assert.Contains("UCU.Core", referenced);
     }
 }

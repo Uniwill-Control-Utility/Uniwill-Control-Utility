@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -35,6 +35,7 @@ using Uniwill_Control_Utility.Views.Windows;
 using Velopack;
 using Wpf.Ui;
 using Wpf.Ui.Abstractions;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility
 {
@@ -352,10 +353,12 @@ namespace Uniwill_Control_Utility
                         // Flydigi BS1 (BLE-only) cooling pad service
                         services.AddSingleton<FlydigiCoolerBleService>();
 
-                        // Uniwill EC access (for XMG / TUXEDO laptops)
-                        services.AddSingleton<UniwillECService>(provider =>
+                        // EC access (for XMG / TUXEDO laptops). In-process today; from the
+                        // engine-service phase the app talks to these over RPC instead, and
+                        // this registration moves to the client-side capability proxies.
+                        services.AddSingleton<EcEngine>(provider =>
                         {
-                            return new UniwillECService();
+                            return new EcEngine(new EcDriverTransport(), EcPlatformResolver.Current);
                         });
                         services.AddSingleton<EcTelemetryService>();
 
@@ -437,7 +440,7 @@ namespace Uniwill_Control_Utility
                 // phase _before_ _host.StartAsync() creates the MainWindow.
                 // Without this, RyzenAdj_To_UCU.EcService is null during startup preset
                 // apply and GPU power limit writes fail silently.
-                var ecService = _host.Services.GetService<UniwillECService>();
+                var ecService = _host.Services.GetService<EcEngine>();
                 if (ecService != null)
                 {
                     Scripts.RyzenAdj_To_UCU.EcService = ecService;

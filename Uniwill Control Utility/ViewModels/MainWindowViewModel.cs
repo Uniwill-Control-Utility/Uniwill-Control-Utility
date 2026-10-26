@@ -10,6 +10,7 @@ using Uniwill_Control_Utility.Services;
 using Uniwill_Control_Utility.Views.Controls;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.ViewModels
 {
@@ -33,9 +34,9 @@ namespace Uniwill_Control_Utility.ViewModels
         [ObservableProperty]
         private string _lastAppliedSettingsToolTip = string.Empty;
 
-        private readonly UniwillECService? _uniwillEc;
+        private readonly EcEngine? _uniwillEc;
 
-        public MainWindowViewModel(INavigationService navigationService, UniwillECService? uniwillEc = null)
+        public MainWindowViewModel(INavigationService navigationService, EcEngine? uniwillEc = null)
         {
             _uniwillEc = uniwillEc;
             RyzenAdj_To_UCU.EcService = uniwillEc;

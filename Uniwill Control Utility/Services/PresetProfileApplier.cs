@@ -7,6 +7,7 @@ using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -147,7 +148,7 @@ namespace Uniwill_Control_Utility.Services
         /// Maps a stock preset to OpenRevo's mode-apply case selector (0=Office,
         /// 1=Balance, 2=Beast). This is NOT the value written to 0x7AB: the per-mode
         /// signal is the literal written to 0x751 plus the 0x45B flag and the 0x7AB
-        /// bit4 force, all derived inside UniwillECService.ApplyOemStockMode.
+        /// bit4 force, all derived inside EcEngine.ApplyOemStockMode.
         /// </summary>
         public static int OemModeIndexFor(string profileName)
         {
@@ -649,7 +650,7 @@ namespace Uniwill_Control_Utility.Services
 
             try
             {
-                ec.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                ec.ApplyFanCurve( cpuCurve.ToEngineSpec(), gpuCurve.ToEngineSpec(), cpuTemps, gpuTemps);
                 Debug.WriteLine($"[PresetProfileApplier] Fan curve applied from preset: unified={preset.FanUnifiedMode}");
             }
             catch (Exception ex)

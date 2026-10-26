@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using Serilog;
 using Uniwill_Control_Utility.Models;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -42,7 +43,7 @@ namespace Uniwill_Control_Utility.Services
         /// and settings instead of creating a new one.
         /// </summary>
         public static EcSmartFanControl GetOrCreate(
-            UniwillECService ec,
+            EcEngine ec,
             FlydigiTemperatureProvider temperatureProvider,
             FanControlSettings settings,
             EcFanCurve curve,
@@ -84,7 +85,7 @@ namespace Uniwill_Control_Utility.Services
         /// Useful after resume from sleep/hibernation when the EC needs re-initialization.
         /// </summary>
         public static EcSmartFanControl Recreate(
-            UniwillECService ec,
+            EcEngine ec,
             FlydigiTemperatureProvider temperatureProvider,
             FanControlSettings settings,
             EcFanCurve curve,
@@ -98,7 +99,7 @@ namespace Uniwill_Control_Utility.Services
             }
         }
 
-        private readonly UniwillECService _ec;
+        private readonly EcEngine _ec;
         private readonly FlydigiTemperatureProvider _temperatureProvider;
         private readonly EcSmartFanCycleGate _cycleGate = new();
         private Timer? _timer;
@@ -189,7 +190,7 @@ namespace Uniwill_Control_Utility.Services
         /* ------------------------------------------------------------------ */
 
         public EcSmartFanControl(
-            UniwillECService ec,
+            EcEngine ec,
             FlydigiTemperatureProvider temperatureProvider,
             FanControlSettings settings,
             EcFanCurve curve,

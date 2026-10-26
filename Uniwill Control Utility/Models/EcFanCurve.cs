@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.Models
 {
@@ -88,6 +89,14 @@ namespace Uniwill_Control_Utility.Models
 
             return table;
         }
+
+        /// <summary>
+        /// Converts to the shape the EC engine consumes: a name for the log plus the
+        /// per-zone duty percentages. The engine derives the EC 0-200 duty table itself
+        /// (UCU.Core's <c>EcDutyCodec</c>), so the hardware layer receives plain data
+        /// and never depends on this UI/persistence model.
+        /// </summary>
+        public EcFanCurveSpec ToEngineSpec() => new EcFanCurveSpec(Name, Duties);
 
         #region Presets
         /// Each preset has 11 duty values for zones 0-10.

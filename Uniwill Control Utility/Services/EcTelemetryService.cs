@@ -1,22 +1,10 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.Services
 {
-    public readonly record struct EcFanDutySnapshot(
-        int CpuFanDuty,
-        int GpuFanDuty)
-    {
-        public static EcFanDutySnapshot Empty { get; } = new();
-
-        public int CpuFanPercent => DutyToPercent(CpuFanDuty);
-        public int GpuFanPercent => DutyToPercent(GpuFanDuty);
-
-        private static int DutyToPercent(int duty) =>
-            (int)Math.Round(Math.Clamp(duty, 0, 200) * 100.0 / 200.0);
-    }
-
     /// <summary>
     /// Shares one demand-driven EC telemetry sample between UI consumers. Reads
     /// return immediately while stale data is refreshed on a worker thread.
@@ -41,7 +29,7 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public int ConsecutiveFailures => Volatile.Read(ref _consecutiveFailures);
 
-        public EcTelemetryService(UniwillECService ecService)
+        public EcTelemetryService(EcEngine ecService)
             : this(CreateCaptures(ecService), DefaultMaxAge)
         {
         }
@@ -129,7 +117,7 @@ namespace Uniwill_Control_Utility.Services
         }
 
         private static (Func<EcFanDutySnapshot> fanDuty, Func<int> mainFanRpm)
-            CreateCaptures(UniwillECService ecService)
+            CreateCaptures(EcEngine ecService)
         {
             ArgumentNullException.ThrowIfNull(ecService);
             var available = new Lazy<bool>(

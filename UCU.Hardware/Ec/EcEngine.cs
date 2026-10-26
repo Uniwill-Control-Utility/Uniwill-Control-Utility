@@ -1,14 +1,12 @@
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Serilog;
-using System.Management;
-using Uniwill_Control_Utility.Properties;
+using UCU.Core.Ec;
 
-namespace Uniwill_Control_Utility.Services
+namespace UCU.Hardware.Ec
 {
     /// <summary>
     /// Direct EC access to the Uniwill Embedded Controller via DeviceIoControl.
@@ -20,8 +18,15 @@ namespace Uniwill_Control_Utility.Services
     /// 
     /// All EC register addresses come from the uniwill-laptop-driver Linux kernel
     /// module source (which documents the same EC on the same hardware under Linux).
+    ///
+    /// This is the privileged half of the product: it is loaded only by the engine
+    /// service (UCU.Engine, LocalSystem), never by the UI process, which is what lets
+    /// the UI start unelevated. The register encodings themselves live in UCU.Core
+    /// codecs; byte transfer lives in <see cref="IEcTransport"/>. Everything left
+    /// here is sequencing: the EC state machine (handshake, table-then-enable order),
+    /// the delays the firmware needs, and serialising access under one lock.
     /// </summary>
-    public sealed class UniwillECService : IDisposable
+    public sealed class EcEngine : IDisposable
     {
         #region EC Register Addresses (from uniwill-laptop-driver)
 
@@ -172,66 +177,10 @@ namespace Uniwill_Control_Utility.Services
 
         #endregion
 
-        #region Driver Communication (kernel32.dll P/Invoke)
-
-        // Device path for the UWACPIDriver.sys kernel driver
-        private const string AcpiDriverDevice = @"\\.\ACPIDriver";
-
-        // IOCTL codes from MechControl's EcDevice.cs - proven to work on NB05.
-        // MechControl decimal values: 2621482120u (read) / 2621482124u (write)
-        // IOCTL_ECREAD  = 0x9C40A488
-        // IOCTL_ECWRITE = 0x9C40A48C
-        private const uint IOCTL_ECREAD = 0x9C40A488;
-        private const uint IOCTL_ECWRITE = 0x9C40A48C;
-
-        // File access/share flags
-        private const uint GENERIC_READ_WRITE = 0xC0000000; // GENERIC_READ | GENERIC_WRITE
-        private const uint FILE_SHARE_RW = 3;               // FILE_SHARE_READ | FILE_SHARE_WRITE
-        private const uint OPEN_EXISTING = 3;
-
-        private static readonly nint InvalidHandle = new(-1);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern nint CreateFileW(
-            string lpFileName,
-            uint dwDesiredAccess,
-            uint dwShareMode,
-            nint lpSecurityAttributes,
-            uint dwCreationDisposition,
-            uint dwFlagsAndAttributes,
-            nint hTemplateFile);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool DeviceIoControl(
-            nint hDevice,
-            uint dwIoControlCode,
-            ref int lpInBuffer,
-            int nInBufferSize,
-            ref int lpOutBuffer,
-            int nOutBufferSize,
-            out int lpBytesReturned,
-            nint lpOverlapped);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool DeviceIoControl(
-            nint hDevice,
-            uint dwIoControlCode,
-            int[] lpInBuffer,
-            int nInBufferSize,
-            ref int lpOutBuffer,
-            int nOutBufferSize,
-            out int lpBytesReturned,
-            nint lpOverlapped);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool CloseHandle(nint hObject);
-
-        #endregion
-
         #region Private State
 
-        private nint _driverHandle = InvalidHandle;
-        private readonly int[] _writeBuffer = new int[2];
+        private readonly IEcTransport _transport;
+        private readonly EcPlatform _platform;
         private bool _initialized;
         private bool _disposed;
         private bool _boostActive;
@@ -254,11 +203,22 @@ namespace Uniwill_Control_Utility.Services
         #region Constructor & Initialization
 
         /// <summary>
-        /// Creates a new UniwillECService that communicates directly with UWACPIDriver.sys.
+        /// Creates an EC engine over a transport, for one CPU family.
         /// </summary>
-        public UniwillECService()
+        /// <param name="transport">Byte-level register transport (the driver, or a fake in tests).</param>
+        /// <param name="platform">
+        /// CPU family, resolved from hardware by the host. It selects the register
+        /// encodings that differ by platform (the GPU MUX bytes), so the codecs stay
+        /// pure functions of their arguments instead of reading global CPU detection.
+        /// </param>
+        public EcEngine(IEcTransport transport, EcPlatform platform)
         {
+            _transport = transport ?? throw new ArgumentNullException(nameof(transport));
+            _platform = platform;
         }
+
+        /// <summary>The CPU family this engine encodes writes for.</summary>
+        public EcPlatform Platform => _platform;
 
         /// <summary>
         /// Initializes the EC service by opening a handle to \\.\ACPIDriver.
@@ -276,56 +236,32 @@ namespace Uniwill_Control_Utility.Services
 
                 try
                 {
-                    _driverHandle = OpenDriverHandle();
+                    _transport.Open();
 
                     // Test EC access by reading the PROJECT_ID register
                     byte projectId = ReadECInternal(REG_PROJECT_ID);
-                    DebugLog($"UniwillEC: Initialized successfully. PROJECT_ID = 0x{projectId:X2}");
+                    DebugLog($"EcEngine: Initialized successfully. PROJECT_ID = 0x{projectId:X2}");
                     _initialized = true;
                     return true;
                 }
                 catch (Win32Exception ex)
                 {
-                    DebugLog($"[ERROR] UniwillEC: Cannot open {AcpiDriverDevice} (error {ex.NativeErrorCode}). " +
-                        "Is UWACPIDriver.sys installed? Are you running as Administrator?");
+                    DebugLog($"[ERROR] EcEngine: Cannot open the EC device (error {ex.NativeErrorCode}). " +
+                        "Is UWACPIDriver.sys installed and running?");
                     return false;
                 }
                 catch (Exception ex)
                 {
-                    DebugLog($"[ERROR] UniwillEC: Failed to initialize EC access: {ex.Message}");
+                    DebugLog($"[ERROR] EcEngine: Failed to initialize EC access: {ex.Message}");
                     return false;
                 }
             }
         }
 
-        /// <summary>Opens a handle to \\.\ACPIDriver for EC communication.</summary>
-        private nint OpenDriverHandle()
-        {
-            nint handle = CreateFileW(
-                AcpiDriverDevice,
-                GENERIC_READ_WRITE,
-                FILE_SHARE_RW,
-                nint.Zero,
-                OPEN_EXISTING,
-                0,
-                nint.Zero);
-
-            if (handle == InvalidHandle)
-            {
-                int error = Marshal.GetHRForLastWin32Error();
-                throw new Win32Exception(Marshal.GetLastWin32Error(),
-                    $"Failed to open {AcpiDriverDevice} (error {Marshal.GetLastWin32Error()}). " +
-                    "Is the UWACPIDriver.sys kernel driver installed and started?");
-            }
-
-            return handle;
-        }
-
-        /// <summary>Tries to reconnect the driver handle after a failure.</summary>
+        /// <summary>Reopens the transport handle after a failed transfer.</summary>
         private void TryReconnect()
         {
-            try { CloseHandle(_driverHandle); } catch { /* ignore */ }
-            _driverHandle = OpenDriverHandle();
+            _transport.Reconnect();
         }
 
         /// <summary>
@@ -365,18 +301,18 @@ namespace Uniwill_Control_Utility.Services
             {
                 if (_ecHandshakeDone)
                 {
-                    DebugLog("[DIAG] UniwillEC: EC handshake already done — skipping");
+                    DebugLog("[DIAG] EcEngine: EC handshake already done — skipping");
                     return;
                 }
 
-                DebugLog("[DIAG] UniwillEC: Starting EC activation handshake...");
+                DebugLog("[DIAG] EcEngine: Starting EC activation handshake...");
 
                 // Step 1: Handshake — write to 0x709 then 0x708
                 WriteECRaw(0x0709, 0x05);
                 Thread.Sleep(50);
                 WriteECRaw(0x0708, 0x01);
                 Thread.Sleep(50);
-                DebugLog("[DIAG] UniwillEC: Step 1 — Handshake complete");
+                DebugLog("[DIAG] EcEngine: Step 1 — Handshake complete");
 
                 // Step 2: 0x0741 is not written here. bit0 (manual control) is ORed in
                 // on demand by UnlockManualMode / ApplyOemStockMode, which keeps the
@@ -385,12 +321,12 @@ namespace Uniwill_Control_Utility.Services
                 // bit0 itself — OpenRevo keeps bit0 set in every mode and the button
                 // still cycles.
                 byte reg741 = ReadECRaw(0x0741);
-                DebugLog($"[DIAG] UniwillEC: Step 2 — 0x741 left at firmware value (0x{reg741:X2}); bit0 is ORed in only where manual control is needed");
+                DebugLog($"[DIAG] EcEngine: Step 2 — 0x741 left at firmware value (0x{reg741:X2}); bit0 is ORed in only where manual control is needed");
 
                 // Step 3: Feature enable — write 0x81 to 0x748
                 WriteECRaw(0x0748, 0x81);
                 Thread.Sleep(50);
-                DebugLog("[DIAG] UniwillEC: Step 3 — Feature enable complete");
+                DebugLog("[DIAG] EcEngine: Step 3 — Feature enable complete");
 
                 // Step 3b: Power management activation — set bit 7 of 0x726 and bit 6 of 0x727.
                 // MechControl performs this step between feature enable and fan curve enable.
@@ -401,18 +337,18 @@ namespace Uniwill_Control_Utility.Services
                 byte reg727 = (byte)(ReadECRaw(0x0727) | 0x40);
                 WriteECRaw(0x0727, reg727);
                 Thread.Sleep(50);
-                DebugLog($"[DIAG] UniwillEC: Step 3b — Power management activation (0x726=0x{reg726:X2}, 0x727=0x{reg727:X2})");
+                DebugLog($"[DIAG] EcEngine: Step 3b — Power management activation (0x726=0x{reg726:X2}, 0x727=0x{reg727:X2})");
 
                 // Step 4: Fan curve enable bits — set bits 7,6,5 of 0x7C5 (OR with 0xE0)
                 byte ufCtrl = (byte)(ReadECRaw(0x07C5) | 0xE0);
                 WriteECRaw(0x07C5, ufCtrl);
                 Thread.Sleep(50);
-                DebugLog($"[DIAG] UniwillEC: Step 4 — Fan curve enable bits set (0x{ufCtrl:X2})");
+                DebugLog($"[DIAG] EcEngine: Step 4 — Fan curve enable bits set (0x{ufCtrl:X2})");
 
                 // Step 5: Write default OEM fan tables.
                 // The EC expects this as part of the init sequence. Skipping it causes
                 // the EC to reject subsequent custom table writes.
-                DebugLog("[DIAG] UniwillEC: Step 5 — Writing default OEM fan tables...");
+                DebugLog("[DIAG] EcEngine: Step 5 — Writing default OEM fan tables...");
                 WriteECRegistersRaw(REG_CPU_TEMP_END_TABLE, DefaultCpuTempUp);
                 WriteECRegistersRaw(REG_CPU_TEMP_START_TABLE, DefaultCpuTempDown);
                 WriteECRegistersRaw(REG_CPU_FAN_SPEED_TABLE, DefaultCpuDuty);
@@ -420,56 +356,41 @@ namespace Uniwill_Control_Utility.Services
                 WriteECRegistersRaw(REG_GPU_TEMP_END_TABLE, DefaultGpuTempUp);
                 WriteECRegistersRaw(REG_GPU_TEMP_START_TABLE, DefaultGpuTempDown);
                 WriteECRegistersRaw(REG_GPU_FAN_SPEED_TABLE, DefaultGpuDuty);
-                DebugLog("[DIAG] UniwillEC: Step 5 — Default fan tables written");
+                DebugLog("[DIAG] EcEngine: Step 5 — Default fan tables written");
 
                 // Step 6: Fan curve parameter — write 0x0C to 0x7C7
                 WriteECRaw(0x07C7, 0x0C);
                 Thread.Sleep(50);
-                DebugLog("[DIAG] UniwillEC: Step 6 — Fan curve parameter set");
+                DebugLog("[DIAG] EcEngine: Step 6 — Fan curve parameter set");
 
                 // Step 7: Fan curve mode — write 0x04 to 0x7C6
                 WriteECRaw(0x07C6, 0x04);
                 Thread.Sleep(50);
-                DebugLog("[DIAG] UniwillEC: Step 7 — Fan curve mode enabled");
+                DebugLog("[DIAG] EcEngine: Step 7 — Fan curve mode enabled");
 
                 // Step 8: BIOS_CTRL — write 0x41 to 0x706
                 WriteECRaw(0x0706, 0x41);
                 Thread.Sleep(50);
-                DebugLog("[DIAG] UniwillEC: Step 8 — BIOS_CTRL set");
+                DebugLog("[DIAG] EcEngine: Step 8 — BIOS_CTRL set");
 
                 _ecHandshakeDone = true;
-                DebugLog("[DIAG] UniwillEC: EC activation handshake complete — fan curves should now apply");
+                DebugLog("[DIAG] EcEngine: EC activation handshake complete — fan curves should now apply");
             }
         }
 
         /// <summary>
-        /// Reads a single byte from EC via IOCTL_ECREAD.
+        /// Reads a single register through the transport. Callers hold <see cref="_lock"/>
+        /// when a sequence of reads and writes must stay contiguous for the EC state machine.
         /// </summary>
         private byte ReadECInternal(ushort address)
         {
-            int lpIn = address;
-            int lpOut = 0;
-            if (!DeviceIoControl(_driverHandle, IOCTL_ECREAD, ref lpIn, 4, ref lpOut, 4, out _, nint.Zero))
-            {
-                throw new Win32Exception(Marshal.GetLastWin32Error(),
-                    $"EC read failed at 0x{address:X3}");
-            }
-            return (byte)(lpOut & 0xFF);
+            return _transport.Read(address);
         }
 
-        /// <summary>
-        /// Writes a byte to EC via IOCTL_ECWRITE.
-        /// </summary>
+        /// <summary>Writes a single register through the transport.</summary>
         private void WriteECInternal(ushort address, byte value)
         {
-            _writeBuffer[0] = address;
-            _writeBuffer[1] = value;
-            int lpOut = 0;
-            if (!DeviceIoControl(_driverHandle, IOCTL_ECWRITE, _writeBuffer, 8, ref lpOut, 4, out _, nint.Zero))
-            {
-                throw new Win32Exception(Marshal.GetLastWin32Error(),
-                    $"EC write failed at 0x{address:X3} value 0x{value:X2}");
-            }
+            _transport.Write(address, value);
         }
 
         /// <summary>
@@ -715,8 +636,8 @@ namespace Uniwill_Control_Utility.Services
                 byte after = (byte)(before | MANUAL_MODE_ENABLE);
                 WriteECInternal(REG_AP_OEM, after);
                 if ((after & AP_OEM_FIRMWARE_BOOT_BIT) == 0)
-                    DebugLog($"[WARN] UniwillEC: 0x741 bit2 clear after unlocking manual mode (0x{after:X2}) — the EC dropped the firmware boot bit");
-                DebugLog($"[DIAG] UniwillEC: Manual mode UNLOCKED (0x741: 0x{before:X2} -> 0x{after:X2}) — EC honors custom fan tables and cTGP/DB offsets");
+                    DebugLog($"[WARN] EcEngine: 0x741 bit2 clear after unlocking manual mode (0x{after:X2}) — the EC dropped the firmware boot bit");
+                DebugLog($"[DIAG] EcEngine: Manual mode UNLOCKED (0x741: 0x{before:X2} -> 0x{after:X2}) — EC honors custom fan tables and cTGP/DB offsets");
             }
         }
 
@@ -756,57 +677,15 @@ namespace Uniwill_Control_Utility.Services
         #region GPU MUX / Direct Connect
 
         /// <summary>
-        /// GPU MUX mode. On AMD platforms: 0=Hybrid, 1=dGPU-only, 2=iGPU-only.
-        /// (From Define.DGgpuDirectConnectionMode in GCUService.exe)
+        /// Semantic mode to the raw EC/NVRAM byte for this engine's platform. The mapping
+        /// (AMD 0/1/2; Intel encodes MS Hybrid as 4 and swaps the direct-connect pair)
+        /// lives in <see cref="EcMuxCodec"/>; these two wrappers only bind the platform,
+        /// so a MUX write cannot be issued with the platform left unresolved.
         /// </summary>
-        public enum GpuMuxMode
-        {
-            Hybrid = 0x00,      // MS Hybrid (MUX open, both GPUs active)
-            DgpuOnly = 0x01,   // dGPU only (MUX closed, discrete GPU)
-            IgpuOnly = 0x02,   // iGPU only (MUX open, integrated GPU)
-        }
+        public byte ModeToRaw(GpuMuxMode mode) => EcMuxCodec.ModeToRaw(mode, _platform);
 
-        /// <summary>
-        /// On Intel platforms the EC/NVRAM encoding differs from AMD (observed on Intel
-        /// NB02 units): the dGPU-only and iGPU-only modes are swapped (raw 1 = iGPU-only,
-        /// raw 2 = dGPU-only), and MS Hybrid is encoded as raw 4 (Dynamic) instead of 0 —
-        /// the Intel BIOS declares MSHybrid as 4, so raw 0 never appears there. These
-        /// helpers translate between the semantic <see cref="GpuMuxMode"/> used by the UI
-        /// and the raw byte the firmware expects on the current platform.
-        /// </summary>
-        private static bool IsIntelPlatform()
-        {
-            return Uniwill_Control_Utility.Scripts.Family.TYPE == Uniwill_Control_Utility.Scripts.Family.ProcessorType.Intel;
-        }
-
-        /// Semantic mode -> raw EC/NVRAM byte for the current platform.
-        public static byte ModeToRaw(GpuMuxMode mode)
-        {
-            byte raw = (byte)mode;
-            if (IsIntelPlatform())
-            {
-                // Intel BIOS encodes MS Hybrid as 4 (Dynamic), not 0.
-                if (raw == MUX_MODE_HYBRID)
-                    return MUX_MODE_HYBRID_INTEL;
-                if (raw == MUX_MODE_DGPU_ONLY || raw == MUX_MODE_IGPU_ONLY)
-                    return (byte)(MUX_MODE_DGPU_ONLY + MUX_MODE_IGPU_ONLY - raw); // swap 1 <-> 2
-            }
-            return raw;
-        }
-
-        /// Raw EC/NVRAM byte -> semantic mode for the current platform.
-        public static GpuMuxMode RawToMode(byte raw)
-        {
-            if (IsIntelPlatform())
-            {
-                // Intel BIOS declares MS Hybrid as raw 4 (Dynamic).
-                if (raw == MUX_MODE_HYBRID_INTEL)
-                    return GpuMuxMode.Hybrid;
-                if (raw == MUX_MODE_DGPU_ONLY || raw == MUX_MODE_IGPU_ONLY)
-                    return (GpuMuxMode)(MUX_MODE_DGPU_ONLY + MUX_MODE_IGPU_ONLY - raw);
-            }
-            return (GpuMuxMode)raw;
-        }
+        /// <summary>Raw EC/NVRAM byte to the semantic mode for this engine's platform.</summary>
+        public GpuMuxMode RawToMode(byte raw) => EcMuxCodec.RawToMode(raw, _platform);
 
         /// <summary>
         /// Reads the current GPU MUX mode from the EC.
@@ -1011,7 +890,7 @@ namespace Uniwill_Control_Utility.Services
             WriteECRegisters(REG_GPU_TEMP_START_TABLE, gpuTempDown);
             WriteECRegisters(REG_GPU_FAN_SPEED_TABLE, gpuDuty);
 
-            DebugLog($"[DIAG] UniwillEC: Wrote near-flat duty tables (targetDuty={targetDuty}) for {percent}% speed");
+            DebugLog($"[DIAG] EcEngine: Wrote near-flat duty tables (targetDuty={targetDuty}) for {percent}% speed");
 
             // Clear boost mode — custom tables don't need it
             byte fanCtrl = ReadECRegister(REG_MANUAL_FAN_CTRL);
@@ -1036,7 +915,7 @@ namespace Uniwill_Control_Utility.Services
                 apOem6 = ReadECRegister(REG_AP_OEM_6);
                 apOem6 |= ENABLE_UNIVERSAL_FAN_CTRL;
                 WriteECRegister(REG_AP_OEM_6, apOem6);
-                DebugLog($"[DIAG] UniwillEC: Set fan speed to {percent}% (targetDuty {targetDuty}), SPLIT already True — toggled custom to force re-read");
+                DebugLog($"[DIAG] EcEngine: Set fan speed to {percent}% (targetDuty {targetDuty}), SPLIT already True — toggled custom to force re-read");
             }
             else
             {
@@ -1052,49 +931,12 @@ namespace Uniwill_Control_Utility.Services
                 apOem6 |= ENABLE_UNIVERSAL_FAN_CTRL;
                 WriteECRegister(REG_AP_OEM_6, apOem6);
 
-                DebugLog($"[DIAG] UniwillEC: Set fan speed to {percent}% (targetDuty {targetDuty}) via SPLIT False→True transition");
+                DebugLog($"[DIAG] EcEngine: Set fan speed to {percent}% (targetDuty {targetDuty}) via SPLIT False→True transition");
             }
         }
 
-        /// <summary>
-        /// Scales an OEM default duty gradient to a target max duty value.
-        /// The EC expects monotonically non-decreasing duty values across zones,
-        /// with padding zones set to 180 (not the raw target, to match OEM format).
-        /// Returns a full 16-byte array (10 active zones + 6 padding).
-        /// </summary>
-        private static byte[] ScaleDutyGradient(byte[] defaultDuty, byte targetMax)
-        {
-            byte[] result = new byte[16];
-            int activeCount = defaultDuty.Length; // 10
-
-            for (int i = 0; i < activeCount; i++)
-            {
-                // Scale each zone proportionally to the target max.
-                // The OEM max is 180, so we scale targetMax/180 * defaultValue.
-                // Zone 0 is always 0 (fan off at lowest temp).
-                if (i == 0)
-                {
-                    result[i] = 0;
-                }
-                else
-                {
-                    int scaled = (int)Math.Round((double)defaultDuty[i] * targetMax / 180.0);
-                    // Ensure monotonically non-decreasing
-                    scaled = Math.Max(scaled, result[i - 1]);
-                    result[i] = (byte)Math.Clamp(scaled, 0, 200);
-                }
-            }
-
-            // Padding zones: use 180 as OEM does (not the raw target value).
-            // When targetMax < 180, use targetMax for padding to maintain the flat top.
-            byte padValue = (byte)Math.Min((int)targetMax, 180);
-            for (int i = activeCount; i < 16; i++)
-            {
-                result[i] = padValue;
-            }
-
-            return result;
-        }
+        // Duty-table and OEM-gradient scaling live in UCU.Core (EcDutyCodec), where
+        // the 0-100 % / 0-200 EC / OEM-180 scale rules are unit-tested.
 
         /// <summary>
         /// Disables custom fan tables and restores EC automatic profile mode.
@@ -1120,7 +962,7 @@ namespace Uniwill_Control_Utility.Services
             // Also clear turbo state flag so button UI resets
             _turboActive = false;
 
-            DebugLog("UniwillEC: Restored automatic fan control");
+            DebugLog("EcEngine: Restored automatic fan control");
         }
 
         /// <summary>
@@ -1149,7 +991,7 @@ namespace Uniwill_Control_Utility.Services
                 WriteECRegister(REG_UNIVERSAL_FAN_CTRL, _savedUfCtrl);
 
                 _turboActive = false;
-                DebugLog("[DIAG] UniwillEC: Turbo mode DISABLED — state restored");
+                DebugLog("[DIAG] EcEngine: Turbo mode DISABLED — state restored");
                 return;
             }
 
@@ -1170,7 +1012,7 @@ namespace Uniwill_Control_Utility.Services
             WriteECRegister(REG_UNIVERSAL_FAN_CTRL, SPLIT_TABLES);
 
             _turboActive = true;
-            DebugLog("[DIAG] UniwillEC: Turbo mode ENABLED — fans at max duty");
+            DebugLog("[DIAG] EcEngine: Turbo mode ENABLED — fans at max duty");
         }
 
         /// <summary>
@@ -1207,7 +1049,7 @@ namespace Uniwill_Control_Utility.Services
                 WriteECRegister(REG_UNIVERSAL_FAN_CTRL, SPLIT_TABLES);
 
                 _turboActive = true;
-                DebugLog("[DIAG] UniwillEC: Turbo mode ENABLED — fans at max duty (async)");
+                DebugLog("[DIAG] EcEngine: Turbo mode ENABLED — fans at max duty (async)");
             });
         }
 
@@ -1226,7 +1068,7 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public void ResetFanState()
         {
-            DebugLog("[DIAG] UniwillEC: Attempting fan state reset...");
+            DebugLog("[DIAG] EcEngine: Attempting fan state reset...");
 
             // Step 1: Clear ALL control bits
             byte apOem6 = ReadECRegister(REG_AP_OEM_6);
@@ -1245,8 +1087,8 @@ namespace Uniwill_Control_Utility.Services
             Thread.Sleep(200);
 
             // Step 3: Write safe default tables (gradient to 100% duty to prevent thermal issues)
-            byte[] safeCpuDuty = ScaleDutyGradient(OemDefaultCpuDuty, 200);
-            byte[] safeGpuDuty = ScaleDutyGradient(OemDefaultGpuDuty, 200);
+            byte[] safeCpuDuty = EcDutyCodec.ScaleDutyGradient(OemDefaultCpuDuty, 200);
+            byte[] safeGpuDuty = EcDutyCodec.ScaleDutyGradient(OemDefaultGpuDuty, 200);
 
             WriteECRegisters(REG_CPU_FAN_SPEED_TABLE, safeCpuDuty);
             Thread.Sleep(150); // EC needs time to process CPU table before GPU
@@ -1264,7 +1106,7 @@ namespace Uniwill_Control_Utility.Services
             apOem6 |= ENABLE_UNIVERSAL_FAN_CTRL;
             WriteECRegister(REG_AP_OEM_6, apOem6);
 
-            DebugLog("[DIAG] UniwillEC: Fan state reset complete — fans at 100%");
+            DebugLog("[DIAG] EcEngine: Fan state reset complete — fans at 100%");
         }
 
         /// <summary>
@@ -1272,15 +1114,15 @@ namespace Uniwill_Control_Utility.Services
         /// Each zone has: temp_up (°C), temp_down (°C, hysteresis), duty (0-200 scale).
         /// The table has 16 zones (indices 0-15).
         /// </summary>
-        public void UploadFanCurve(FanCurveSource source, int[] tempUp, int[] tempDown, int[] duty)
+        public void UploadFanCurve(EcFanCurveSource source, int[] tempUp, int[] tempDown, int[] duty)
         {
             if (tempUp.Length != 16 || tempDown.Length != 16 || duty.Length != 16)
                 throw new ArgumentException("Fan curve tables must have 16 entries.");
 
             ushort baseAddr = source switch
             {
-                FanCurveSource.Cpu => REG_CPU_TEMP_END_TABLE,
-                FanCurveSource.Gpu => REG_GPU_TEMP_END_TABLE,
+                EcFanCurveSource.Cpu => REG_CPU_TEMP_END_TABLE,
+                EcFanCurveSource.Gpu => REG_GPU_TEMP_END_TABLE,
                 _ => throw new ArgumentOutOfRangeException(nameof(source))
             };
 
@@ -1313,7 +1155,7 @@ namespace Uniwill_Control_Utility.Services
             apOem6 |= ENABLE_UNIVERSAL_FAN_CTRL;
             WriteECRegister(REG_AP_OEM_6, apOem6);
 
-            DebugLog($"UniwillEC: Uploaded {source} fan curve (16 zones)");
+            DebugLog($"EcEngine: Uploaded {source} fan curve (16 zones)");
         }
 
         /// <summary>
@@ -1321,9 +1163,7 @@ namespace Uniwill_Control_Utility.Services
         /// Runs the EC activation handshake, writes the curves, and forces the EC
         /// to re-read the tables by toggling ENABLE_CUSTOM.
         /// </summary>
-        public void ApplyFanCurve(
-            Uniwill_Control_Utility.Models.EcFanCurve cpuCurve,
-            Uniwill_Control_Utility.Models.EcFanCurve gpuCurve)
+        public void ApplyFanCurve(EcFanCurveSpec cpuCurve, EcFanCurveSpec gpuCurve)
         {
             ApplyFanCurve(cpuCurve, gpuCurve, null, null);
         }
@@ -1335,8 +1175,8 @@ namespace Uniwill_Control_Utility.Services
         /// Zone 0 (OFF) is handled specially: temp_up = 0, temp_down = step - 2.
         /// </summary>
         public void ApplyFanCurve(
-            Uniwill_Control_Utility.Models.EcFanCurve cpuCurve,
-            Uniwill_Control_Utility.Models.EcFanCurve gpuCurve,
+            EcFanCurveSpec cpuCurve,
+            EcFanCurveSpec gpuCurve,
             int[]? cpuTemps = null, int[]? gpuTemps = null)
         {
             InitializeEc();
@@ -1344,16 +1184,16 @@ namespace Uniwill_Control_Utility.Services
             // Custom tables are only honored while 0x741 bit0 is set.
             UnlockManualMode();
 
-            byte[] cpuDuty = cpuCurve.ToEcDutyTable();
-            byte[] gpuDuty = gpuCurve.ToEcDutyTable();
+            byte[] cpuDuty = EcDutyCodec.BuildDutyTable(cpuCurve.DutyPercentByZone);
+            byte[] gpuDuty = EcDutyCodec.BuildDutyTable(gpuCurve.DutyPercentByZone);
 
             // Default temperature steps from XMG Control Center (9-point scale).
-            int[] defaultTemps = { 0, 55, 60, 65, 70, 75, 80, 85, 90, 95, 97 };
+            int[] defaultTemps = EcTemperatureCodec.DefaultTemperatureSteps;
 
-            byte[] finalCpuTempUp = ToEcTempUp(cpuTemps ?? defaultTemps);
-            byte[] finalCpuTempDown = ToEcTempDown(cpuTemps ?? defaultTemps);
-            byte[] finalGpuTempUp = ToEcTempUp(gpuTemps ?? defaultTemps);
-            byte[] finalGpuTempDown = ToEcTempDown(gpuTemps ?? defaultTemps);
+            byte[] finalCpuTempUp = EcTemperatureCodec.ToEcTempUp(cpuTemps ?? defaultTemps);
+            byte[] finalCpuTempDown = EcTemperatureCodec.ToEcTempDown(cpuTemps ?? defaultTemps);
+            byte[] finalGpuTempUp = EcTemperatureCodec.ToEcTempUp(gpuTemps ?? defaultTemps);
+            byte[] finalGpuTempDown = EcTemperatureCodec.ToEcTempDown(gpuTemps ?? defaultTemps);
 
             WriteECRegisters(REG_CPU_TEMP_END_TABLE, finalCpuTempUp);
             WriteECRegisters(REG_CPU_TEMP_START_TABLE, finalCpuTempDown);
@@ -1397,18 +1237,18 @@ namespace Uniwill_Control_Utility.Services
             WriteECRegister(REG_AP_OEM_6, apOem6);
             Thread.Sleep(150);
 
-            DebugLog($"[DIAG] UniwillEC: Applied fan curves - CPU '{cpuCurve.Name}': [{string.Join(", ", cpuDuty)}] | GPU '{gpuCurve.Name}': [{string.Join(", ", gpuDuty)}]");
+            DebugLog($"[DIAG] EcEngine: Applied fan curves - CPU '{cpuCurve.Name}': [{string.Join(", ", cpuDuty)}] | GPU '{gpuCurve.Name}': [{string.Join(", ", gpuDuty)}]");
         }
 
         /// <summary>
         /// Reads the current fan curve table from the EC.
         /// </summary>
-        public (int[] tempUp, int[] tempDown, int[] duty) ReadFanCurve(FanCurveSource source)
+        public (int[] tempUp, int[] tempDown, int[] duty) ReadFanCurve(EcFanCurveSource source)
         {
             ushort baseAddr = source switch
             {
-                FanCurveSource.Cpu => REG_CPU_TEMP_END_TABLE,
-                FanCurveSource.Gpu => REG_GPU_TEMP_END_TABLE,
+                EcFanCurveSource.Cpu => REG_CPU_TEMP_END_TABLE,
+                EcFanCurveSource.Gpu => REG_GPU_TEMP_END_TABLE,
                 _ => throw new ArgumentOutOfRangeException(nameof(source))
             };
 
@@ -1443,7 +1283,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 WriteECInternal(reg, (byte)duty);
                 Thread.Sleep(EcDelayMs);
-                DebugLog($"[DIAG] UniwillEC: Direct PWM write to 0x{reg:X2} = {duty}");
+                DebugLog($"[DIAG] EcEngine: Direct PWM write to 0x{reg:X2} = {duty}");
                 return true;
             }
         }
@@ -1465,7 +1305,7 @@ namespace Uniwill_Control_Utility.Services
                 else
                     fanCtrl &= unchecked((byte)~FAN_MODE_USER);
                 WriteECRegister(REG_MANUAL_FAN_CTRL, fanCtrl);
-                DebugLog($"[DIAG] UniwillEC: {(enable ? "Set" : "Cleared")} MANUAL_FAN_CTRL USER mode (0x{fanCtrl:X2})");
+                DebugLog($"[DIAG] EcEngine: {(enable ? "Set" : "Cleared")} MANUAL_FAN_CTRL USER mode (0x{fanCtrl:X2})");
             }
         }
 
@@ -1481,11 +1321,11 @@ namespace Uniwill_Control_Utility.Services
             byte fanCtrl = ReadECRegister(REG_MANUAL_FAN_CTRL);
             fanCtrl |= FAN_MODE_USER;
             WriteECRegister(REG_MANUAL_FAN_CTRL, fanCtrl);
-            DebugLog($"[DIAG] UniwillEC: Set MANUAL_FAN_CTRL USER mode (0x{fanCtrl:X2})");
+            DebugLog($"[DIAG] EcEngine: Set MANUAL_FAN_CTRL USER mode (0x{fanCtrl:X2})");
 
             SetFanPwmDirect(0, duty);
             SetFanPwmDirect(1, duty);
-            DebugLog($"[DIAG] UniwillEC: Set both fans direct PWM to {duty}/200 in USER mode");
+            DebugLog($"[DIAG] EcEngine: Set both fans direct PWM to {duty}/200 in USER mode");
         }
 
         /// <summary>
@@ -1503,7 +1343,7 @@ namespace Uniwill_Control_Utility.Services
 
             WriteECRegister(REG_FAN_SWITCH_SPEED, lo);
             WriteECRegister((ushort)(REG_FAN_SWITCH_SPEED + 1), hi);
-            DebugLog($"[DIAG] UniwillEC: Set fanSwitchSpeed(0x787) = {rpm} (0x{rpm:X4})");
+            DebugLog($"[DIAG] EcEngine: Set fanSwitchSpeed(0x787) = {rpm} (0x{rpm:X4})");
         }
 
         /// <summary>
@@ -1569,7 +1409,7 @@ namespace Uniwill_Control_Utility.Services
             WriteECRegister(REG_AP_OEM_6, apOem6);
             Thread.Sleep(150);
 
-            DebugLog($"[DIAG] UniwillEC: Applied smart fan curves - CPU duty: [{string.Join(", ", cpuDuty[1..11])}] | GPU duty: [{string.Join(", ", gpuDuty[1..11])}]");
+            DebugLog($"[DIAG] EcEngine: Applied smart fan curves - CPU duty: [{string.Join(", ", cpuDuty[1..11])}] | GPU duty: [{string.Join(", ", gpuDuty[1..11])}]");
         }
 
         /// <summary>
@@ -1589,7 +1429,7 @@ namespace Uniwill_Control_Utility.Services
 
             WriteECRegisters(REG_GPU_FAN_SPEED_TABLE, gpuDuty);
 
-            DebugLog($"[DIAG] UniwillEC: Updated smart fan duty only - CPU: [{string.Join(", ", cpuDuty[1..11])}] | GPU: [{string.Join(", ", gpuDuty[1..11])}]");
+            DebugLog($"[DIAG] EcEngine: Updated smart fan duty only - CPU: [{string.Join(", ", cpuDuty[1..11])}] | GPU: [{string.Join(", ", gpuDuty[1..11])}]");
         }
 
         #endregion
@@ -1625,7 +1465,7 @@ namespace Uniwill_Control_Utility.Services
             trigger ^= TRIGGER_RGB_APPLY_COLOR; // toggle bit 5
             WriteECRegister(REG_TRIGGER, trigger);
 
-            DebugLog($"[KBD] UniwillEC: Set keyboard color to R={red} G={green} B={blue}");
+            DebugLog($"[KBD] EcEngine: Set keyboard color to R={red} G={green} B={blue}");
         }
 
         /// <summary>
@@ -1642,7 +1482,7 @@ namespace Uniwill_Control_Utility.Services
 
             WriteECRegister(REG_KBD_STATUS, kbdStatus);
 
-            DebugLog($"[KBD] UniwillEC: Set keyboard brightness to {brightness}");
+            DebugLog($"[KBD] EcEngine: Set keyboard brightness to {brightness}");
         }
 
         /// <summary>
@@ -1652,7 +1492,7 @@ namespace Uniwill_Control_Utility.Services
         {
             byte support2 = ReadECRegister(REG_SUPPORT_2);
             bool isRgb = (support2 & RGB_KEYBOARD) != 0;
-            DebugLog($"[KBD] UniwillEC: IsRgbKeyboard check — SUPPORT_2(0x{REG_SUPPORT_2:X4}) = 0x{support2:X2}, RGB bit = {isRgb}");
+            DebugLog($"[KBD] EcEngine: IsRgbKeyboard check — SUPPORT_2(0x{REG_SUPPORT_2:X4}) = 0x{support2:X2}, RGB bit = {isRgb}");
             return isRgb;
         }
 
@@ -1662,7 +1502,7 @@ namespace Uniwill_Control_Utility.Services
         public bool IsWhiteOnlyKeyboard()
         {
             byte kbdStatus = ReadECRegister(REG_KBD_STATUS);
-            DebugLog($"[KBD] UniwillEC: IsWhiteOnlyKeyboard check — KBD_STATUS(0x{REG_KBD_STATUS:X4}) = 0x{kbdStatus:X2}, WHITE_ONLY bit = {(kbdStatus & KBD_WHITE_ONLY) != 0}");
+            DebugLog($"[KBD] EcEngine: IsWhiteOnlyKeyboard check — KBD_STATUS(0x{REG_KBD_STATUS:X4}) = 0x{kbdStatus:X2}, WHITE_ONLY bit = {(kbdStatus & KBD_WHITE_ONLY) != 0}");
             return (kbdStatus & KBD_WHITE_ONLY) != 0;
         }
 
@@ -1675,7 +1515,7 @@ namespace Uniwill_Control_Utility.Services
             byte biosOem2 = ReadECRegister(REG_BIOS_OEM_2);
             biosOem2 |= ENABLE_CHINA_MODE; // set bit 6
             WriteECRegister(REG_BIOS_OEM_2, biosOem2);
-            DebugLog($"[KBD] UniwillEC: Set China mode — BIOS_OEM_2(0x{REG_BIOS_OEM_2:X4}) = 0x{biosOem2:X2}");
+            DebugLog($"[KBD] EcEngine: Set China mode — BIOS_OEM_2(0x{REG_BIOS_OEM_2:X4}) = 0x{biosOem2:X2}");
         }
 
         /// <summary>
@@ -1687,7 +1527,7 @@ namespace Uniwill_Control_Utility.Services
             byte trigger = ReadECRegister(REG_TRIGGER);
             trigger ^= TRIGGER_RGB_LOGO_EFFECT; // toggle bit 6
             WriteECRegister(REG_TRIGGER, trigger);
-            DebugLog("[KBD] UniwillEC: Triggered Logo keyboard effect");
+            DebugLog("[KBD] EcEngine: Triggered Logo keyboard effect");
         }
 
         /// <summary>
@@ -1699,7 +1539,7 @@ namespace Uniwill_Control_Utility.Services
             byte trigger = ReadECRegister(REG_TRIGGER);
             trigger ^= TRIGGER_RGB_RAINBOW_EFFECT; // toggle bit 7
             WriteECRegister(REG_TRIGGER, trigger);
-            DebugLog("[KBD] UniwillEC: Triggered Rainbow keyboard effect");
+            DebugLog("[KBD] EcEngine: Triggered Rainbow keyboard effect");
         }
 
         /// <summary>
@@ -1711,7 +1551,7 @@ namespace Uniwill_Control_Utility.Services
             kbdStatus |= KBD_POWER_OFF; // set bit 1
             kbdStatus |= KBD_APPLY;     // set bit 4 to tell EC to apply the change
             WriteECRegister(REG_KBD_STATUS, kbdStatus);
-            DebugLog($"[KBD] UniwillEC: Keyboard backlight turned off (KBD_STATUS = 0x{kbdStatus:X2})");
+            DebugLog($"[KBD] EcEngine: Keyboard backlight turned off (KBD_STATUS = 0x{kbdStatus:X2})");
         }
 
         /// <summary>
@@ -1720,11 +1560,11 @@ namespace Uniwill_Control_Utility.Services
         public void TurnOnKeyboard()
         {
             byte kbdStatus = ReadECRegister(REG_KBD_STATUS);
-            DebugLog($"[KBD] UniwillEC: TurnOnKeyboard — current KBD_STATUS = 0x{kbdStatus:X2}");
+            DebugLog($"[KBD] EcEngine: TurnOnKeyboard — current KBD_STATUS = 0x{kbdStatus:X2}");
             kbdStatus &= unchecked((byte)~KBD_POWER_OFF); // clear bit 1
             kbdStatus |= KBD_APPLY;     // set bit 4 to tell EC to apply the change
             WriteECRegister(REG_KBD_STATUS, kbdStatus);
-            DebugLog($"[KBD] UniwillEC: Keyboard backlight turned on (writing KBD_STATUS = 0x{kbdStatus:X2})");
+            DebugLog($"[KBD] EcEngine: Keyboard backlight turned on (writing KBD_STATUS = 0x{kbdStatus:X2})");
         }
 
         /// <summary>
@@ -1759,7 +1599,7 @@ namespace Uniwill_Control_Utility.Services
             byte prev = ReadECRegister(REG_MODE_INDEX);
             byte value = (byte)((prev & 0xE0) | mode | MODE_INDEX_ARM);
             WriteECRegister(REG_MODE_INDEX, value);
-            DebugLog($"UniwillEC: Set performance mode to {mode} (0x07AB: 0x{prev:X2} -> 0x{value:X2})");
+            DebugLog($"EcEngine: Set performance mode to {mode} (0x07AB: 0x{prev:X2} -> 0x{value:X2})");
         }
 
         /// <summary>
@@ -1829,9 +1669,9 @@ namespace Uniwill_Control_Utility.Services
 
                 byte r741 = ReadECInternal(REG_AP_OEM);
                 if ((r741 & AP_OEM_FIRMWARE_BOOT_BIT) == 0)
-                    DebugLog($"[WARN] UniwillEC: 0x0741 bit2 clear (readback 0x{r741:X2}) — the EC dropped its boot bit");
+                    DebugLog($"[WARN] EcEngine: 0x0741 bit2 clear (readback 0x{r741:X2}) — the EC dropped its boot bit");
 
-                DebugLog($"UniwillEC: OEM stock mode {modeCase} asserted (0x0726: 0x{v726:X2} -> 0x{v726 & ~POWER_MGMT_726_ENABLE:X2}, 0x0727: 0x{v727:X2} -> 0x{v727 & ~CUSTOM_PROFILE_ENABLE:X2}, 0x0751 -> 0x{fanProfile:X2}, 0x07AB: 0x{prevMode:X2} -> 0x{modeValue:X2}, 0x0767: 0x{prevTrigger:X2} -> 0x{triggerValue:X2}, 0x045B -> 0x{modeFlag:X2}, 0x0787 -> 0x{OEM_MODE_COMMIT:X2}) — power values yielded to the firmware factory table");
+                DebugLog($"EcEngine: OEM stock mode {modeCase} asserted (0x0726: 0x{v726:X2} -> 0x{v726 & ~POWER_MGMT_726_ENABLE:X2}, 0x0727: 0x{v727:X2} -> 0x{v727 & ~CUSTOM_PROFILE_ENABLE:X2}, 0x0751 -> 0x{fanProfile:X2}, 0x07AB: 0x{prevMode:X2} -> 0x{modeValue:X2}, 0x0767: 0x{prevTrigger:X2} -> 0x{triggerValue:X2}, 0x045B -> 0x{modeFlag:X2}, 0x0787 -> 0x{OEM_MODE_COMMIT:X2}) — power values yielded to the firmware factory table");
             }
         }
 
@@ -1919,11 +1759,11 @@ namespace Uniwill_Control_Utility.Services
                 next |= 0x10; // set bit 4 (OVERBOOST)
                 WriteECRaw(REG_MANUAL_FAN_CTRL, next);
                 Thread.Sleep(50);
-                DebugLog($"[DIAG] UniwillEC: Overboost profile set (0x751: 0x{current:X2} -> 0x{next:X2})");
+                DebugLog($"[DIAG] EcEngine: Overboost profile set (0x751: 0x{current:X2} -> 0x{next:X2})");
             }
             catch (Exception ex)
             {
-                DebugLog($"[DIAG] UniwillEC: Failed to set overboost profile: {ex.Message}");
+                DebugLog($"[DIAG] EcEngine: Failed to set overboost profile: {ex.Message}");
             }
         }
 
@@ -1968,7 +1808,7 @@ namespace Uniwill_Control_Utility.Services
                 byte set727 = (byte)(clear727 | (1 << 6));
                 WriteECRaw(REG_CUSTOM_PROFILE, set727);
                 Thread.Sleep(50);
-                DebugLog($"[DIAG] UniwillEC: Custom profile toggle 0x727: 0x{cur727:X2} -> 0x{clear727:X2} -> 0x{set727:X2}");
+                DebugLog($"[DIAG] EcEngine: Custom profile toggle 0x727: 0x{cur727:X2} -> 0x{clear727:X2} -> 0x{set727:X2}");
 
                 // Step 4: 0x0741 is left untouched here — this is the Custom path, which
                 // needs bit0 set (UnlockManualMode did that). Clearing bit0 would disarm
@@ -1980,11 +1820,11 @@ namespace Uniwill_Control_Utility.Services
                 //   clear bits 1,4,7 (0xa0 | 0x10), then set bit 4 (0x10)
                 WriteECRaw(REG_MANUAL_FAN_CTRL, 0x10);
                 Thread.Sleep(50);
-                DebugLog("[DIAG] UniwillEC: Overboost profile set (0x751=0x10)");
+                DebugLog("[DIAG] EcEngine: Overboost profile set (0x751=0x10)");
             }
             catch (Exception ex)
             {
-                DebugLog($"[DIAG] UniwillEC: Failed to ensure power management active: {ex.Message}");
+                DebugLog($"[DIAG] EcEngine: Failed to ensure power management active: {ex.Message}");
             }
         }
 
@@ -2009,7 +1849,7 @@ namespace Uniwill_Control_Utility.Services
 
             lock (_lock)
             {
-                DebugLog($"[DIAG] UniwillEC: ApplyCpuPowerLimits(pl1={pl1Watts}W, pl2={pl2Watts}W, pl4={pl4Watts}W)");
+                DebugLog($"[DIAG] EcEngine: ApplyCpuPowerLimits(pl1={pl1Watts}W, pl2={pl2Watts}W, pl4={pl4Watts}W)");
 
                 // Step 1: Ensure power management is active (prerequisite for EC to accept power writes)
                 try
@@ -2018,7 +1858,7 @@ namespace Uniwill_Control_Utility.Services
                 }
                 catch (Exception ex)
                 {
-                    DebugLog($"[WARN] UniwillEC: EnsurePowerManagementActiveInternal failed: {ex.Message}");
+                    DebugLog($"[WARN] EcEngine: EnsurePowerManagementActiveInternal failed: {ex.Message}");
                 }
 
                 // Step 2: Write PL1 (0x0783) — sustained power limit
@@ -2037,7 +1877,7 @@ namespace Uniwill_Control_Utility.Services
                 byte rPl1 = ReadECRaw(REG_PL1_SETTING);
                 byte rPl2 = ReadECRaw(REG_PL2_SETTING);
                 byte rPl4 = ReadECRaw(REG_PL4_SETTING);
-                DebugLog($"[DIAG] UniwillEC: Readback — PL1=0x{rPl1:X2}({rPl1}W) PL2=0x{rPl2:X2}({rPl2}W) PL4=0x{rPl4:X2}({rPl4}W)");
+                DebugLog($"[DIAG] EcEngine: Readback — PL1=0x{rPl1:X2}({rPl1}W) PL2=0x{rPl2:X2}({rPl2}W) PL4=0x{rPl4:X2}({rPl4}W)");
             }
         }
 
@@ -2092,7 +1932,7 @@ namespace Uniwill_Control_Utility.Services
             WriteECRaw(REG_MANUAL_FAN_CTRL, want751);
             Thread.Sleep(50);
 
-            DebugLog($"[DIAG] UniwillEC: Power management active for CPU power limits (0x751: 0x{cur751:X2} -> 0x{want751:X2})");
+            DebugLog($"[DIAG] EcEngine: Power management active for CPU power limits (0x751: 0x{cur751:X2} -> 0x{want751:X2})");
         }
 
         #endregion
@@ -2114,9 +1954,9 @@ namespace Uniwill_Control_Utility.Services
         private void EnsureInitialized()
         {
             if (!_initialized)
-                throw new InvalidOperationException("UniwillECService not initialized. Call Initialize() first.");
+                throw new InvalidOperationException("EcEngine not initialized. Call Initialize() first.");
             if (_disposed)
-                throw new ObjectDisposedException(nameof(UniwillECService));
+                throw new ObjectDisposedException(nameof(EcEngine));
         }
 
         #endregion
@@ -2134,67 +1974,11 @@ namespace Uniwill_Control_Utility.Services
             try { Log.Information("[EC] {Message}", message); } catch { /* Serilog may not be ready */ }
         }
 
-        /// <summary>
-        /// Derives the temp_up (rising threshold) EC array from user temperature steps.
-        /// temp_up[i] = step[i] + 1 for zones 1-10; zone 0 = 0.
-        /// Padded to 16 elements with 255.
-        /// </summary>
-        private static byte[] ToEcTempUp(int[] temps)
-        {
-            byte[] result = new byte[16];
-            Array.Fill(result, (byte)255);
-            int count = Math.Min(temps.Length, 11);
-            for (int i = 0; i < count; i++)
-            {
-                if (i == 0)
-                    result[i] = 0;
-                else
-                    result[i] = (byte)Math.Clamp(temps[i] + 1, 0, 255);
-            }
-            return result;
-        }
-
-        /// <summary>
-        /// Derives the temp_down (falling/hysteresis threshold) EC array from user temperature steps.
-        /// temp_down[i] = step[i] - 1 for zones 1-10; zone 0 = step[0] - 2 (clamped to 0).
-        /// Padded to 16 elements with 255.
-        /// </summary>
-        private static byte[] ToEcTempDown(int[] temps)
-        {
-            byte[] result = new byte[16];
-            Array.Fill(result, (byte)255);
-            int count = Math.Min(temps.Length, 11);
-            for (int i = 0; i < count; i++)
-            {
-                if (i == 0)
-                    result[i] = (byte)Math.Clamp(temps[i] - 2, 0, 255);
-                else
-                    result[i] = (byte)Math.Clamp(temps[i] - 1, 0, 255);
-            }
-            return result;
-        }
+        // temp_up / temp_down derivation lives in UCU.Core (EcTemperatureCodec),
+        // together with the validation seam the engine uses to reject bad curves.
 
         #endregion
         #region Battery
-
-        /// <summary>
-        /// Battery telemetry data read from EC registers and Windows battery API.
-        /// </summary>
-        public struct BatteryTelemetry
-        {
-            public bool IsAcPowered;
-            public int StateOfCharge;       // percentage 0-100
-            public int HealthPercent;       // percentage, 0 if unknown
-            public int TemperatureC;        // Celsius, negative if unknown
-            public int CycleCount;          // -1 if unknown
-            public int PresentVoltageMv;    // millivolts, 0 if unknown
-            public int ChargeRateMa;        // milliamps (positive=charging, negative=discharging), 0 if unknown
-        }
-
-        // Battery mode raw values from MechControl IDY_7Y profile.
-        // bitfields: batteryMode mask 0x38 (bits 3-5 of register 0x7A6)
-        // batteryModes: High Capacity (0x08), Balanced (0x18), Stationary (0x28)
-        private static readonly byte[] BatteryModeValues = { 0x08, 0x18, 0x28 };
 
         /// <summary>
         /// Reads the battery charging mode from EC register 0x7A6.
@@ -2206,13 +1990,11 @@ namespace Uniwill_Control_Utility.Services
         {
             EnsureInitialized();
             byte val = ReadECRegister(REG_BATTERY_MODE);
-            // Mask to bits 3-5 (the battery mode field). The EC may have other
-            // flags in the same register, so an exact-byte match is unreliable.
-            byte masked = (byte)(val & 0x38);
-            int mode = Array.IndexOf(BatteryModeValues, masked);
-            if (mode < 0)
-                mode = 0; // Default to High Capacity if value unrecognized
-            DebugLog($"[Battery] GetBatteryMode: raw=0x{val:X2}, masked=0x{masked:X2}, mode={mode}");
+            // The mode is the field at bits 3-5; the EC may hold other flags in the
+            // same register, so an exact-byte match is unreliable. EcBatteryCodec
+            // masks the field and falls back to High Capacity on an unknown value.
+            int mode = EcBatteryCodec.DecodeMode(val);
+            DebugLog($"[Battery] GetBatteryMode: raw=0x{val:X2}, masked=0x{val & EcBatteryCodec.ModeMask:X2}, mode={mode}");
             return mode;
         }
 
@@ -2223,10 +2005,7 @@ namespace Uniwill_Control_Utility.Services
         public void SetBatteryMode(int mode)
         {
             EnsureInitialized();
-            if (mode < 0 || mode > 2)
-                throw new ArgumentOutOfRangeException(nameof(mode), "Battery mode must be 0, 1, or 2.");
-
-            byte val = BatteryModeValues[mode];
+            byte val = EcBatteryCodec.EncodeMode(mode);
             WriteECRegister(REG_BATTERY_MODE, val);
             DebugLog($"[Battery] SetBatteryMode: mode={mode} (raw=0x{val:X2})");
         }
@@ -2254,7 +2033,7 @@ namespace Uniwill_Control_Utility.Services
             {
                 // Power source: bit 0 of 0x490
                 byte powerSource = ReadECRegister(REG_BATTERY_POWER_SOURCE);
-                bool isAcPowered = (powerSource & 1) != 0;
+                bool isAcPowered = EcWordCodec.IsAcPowered(powerSource);
 
                 // State of charge from 0x4AB (byte, percentage)
                 int stateOfCharge = ReadECRegister(REG_BATTERY_SOC);
@@ -2264,7 +2043,7 @@ namespace Uniwill_Control_Utility.Services
 
                 // Temperature: LE u16 at 0x4A2, value is Kelvin×10
                 int tempKelvinX10 = ReadEcUInt16(REG_BATTERY_TEMP_LO);
-                int temperatureC = (int)(tempKelvinX10 / 10.0 - 273.15);
+                int temperatureC = EcWordCodec.KelvinTenthsToCelsius(tempKelvinX10);
 
                 // Present voltage: LE u16 at 0x438 (mV)
                 int presentVoltageMv = ReadEcUInt16(REG_BATTERY_PRESENT_VOLTAGE_LO);
@@ -2275,9 +2054,7 @@ namespace Uniwill_Control_Utility.Services
                 // Health: FullChargeCapacity / DesignCapacity × 100
                 int designCapacityMah = ReadEcUInt16(REG_BATTERY_DESIGN_CAP_LO);
                 int fullChargeCapacityMah = ReadEcUInt16(REG_BATTERY_FULL_CHARGE_CAP_LO);
-                int healthPercent = designCapacityMah > 0
-                    ? (int)((long)fullChargeCapacityMah * 100 / designCapacityMah)
-                    : 0;
+                int healthPercent = EcWordCodec.ComputeHealthPercent(fullChargeCapacityMah, designCapacityMah);
 
                 var telemetry = new BatteryTelemetry
                 {
@@ -2307,7 +2084,7 @@ namespace Uniwill_Control_Utility.Services
         {
             EnsureInitialized();
             int tempKelvinX10 = ReadEcUInt16(REG_BATTERY_TEMP_LO);
-            return (int)(tempKelvinX10 / 10.0 - 273.15);
+            return EcWordCodec.KelvinTenthsToCelsius(tempKelvinX10);
         }
 
         /// <summary>
@@ -2317,7 +2094,7 @@ namespace Uniwill_Control_Utility.Services
         {
             byte lo = ReadECRegister(loAddress);
             byte hi = ReadECRegister((ushort)(loAddress + 1));
-            return (hi << 8) | lo;
+            return EcWordCodec.CombineLittleEndian(lo, hi);
         }
 
         #endregion
@@ -2334,24 +2111,11 @@ namespace Uniwill_Control_Utility.Services
                 return;
             _disposed = true;
 
-            if (_driverHandle != InvalidHandle)
-            {
-                try { CloseHandle(_driverHandle); } catch { /* ignore */ }
-                _driverHandle = InvalidHandle;
-            }
+            _transport.Dispose();
         }
 
         #endregion
 
-        #region Enums
-
-        public enum FanCurveSource
-        {
-            Cpu,
-            Gpu
-        }
-
-        #endregion
     }
 }
 

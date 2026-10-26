@@ -89,6 +89,11 @@
          and no Windows APIs in this reference, so the app stays testable. -->
     <ProjectReference Include="..\UCU.Core\UCU.Core.csproj" />
 
+    <!-- EC engine + driver transport. Transitional: the app talks to the EC
+         in-process until the engine-service phase moves this reference behind the
+         RPC client. The engine service is the assembly that ships with it. -->
+    <ProjectReference Include="..\UCU.Hardware\UCU.Hardware.csproj" />
+
     <!-- Crash guardian: the reference flows its output (exe/dll/deps/
          runtimeconfig) into this project's bin and publish directories, so
          VS Publish and build\pack.ps1 ship it automatically. -->

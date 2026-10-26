@@ -9,6 +9,8 @@ using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.ViewModels;
+using UCU.Hardware.Ec;
+using UCU.Core.Ec;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -32,7 +34,7 @@ namespace Uniwill_Control_Utility.Services
 
     public sealed class TrayQuickControlService
     {
-        private readonly UniwillECService _ec;
+        private readonly EcEngine _ec;
         private readonly HydroUIService _waterCooler;
         private readonly DeviceApplier _deviceApplier;
         private readonly IHardwareMonitoringService _hardwareMonitoring;
@@ -49,7 +51,7 @@ namespace Uniwill_Control_Utility.Services
         public event EventHandler? LightBarSettingsChanged;
 
         public TrayQuickControlService(
-            UniwillECService ec,
+            EcEngine ec,
             HydroUIService waterCooler,
             DeviceApplier deviceApplier,
             IHardwareMonitoringService hardwareMonitoring,
@@ -91,8 +93,8 @@ namespace Uniwill_Control_Utility.Services
             try
             {
                 var muxMode = _ec.GetCurrentGpuMuxMode();
-                gpuModeHybrid = muxMode == UniwillECService.GpuMuxMode.Hybrid;
-                gpuModeDgpuOnly = muxMode == UniwillECService.GpuMuxMode.DgpuOnly;
+                gpuModeHybrid = muxMode == GpuMuxMode.Hybrid;
+                gpuModeDgpuOnly = muxMode == GpuMuxMode.DgpuOnly;
             }
             catch (Exception ex)
             {

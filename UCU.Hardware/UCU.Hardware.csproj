@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Privileged hardware access: the EC engine and the driver transport that talks
+       to UWACPIDriver.sys. Only the engine service loads this assembly — the UI
+       process is never allowed a reference to it, which is what keeps the app
+       unelevated. Encoding rules live in UCU.Core; this assembly is I/O only. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>10.0</LangVersion>
+    <Platforms>AnyCPU;x64</Platforms>
+    <AssemblyName>UCU.Hardware</AssemblyName>
+    <RootNamespace>UCU.Hardware</RootNamespace>
+    <Version>0.9.6</Version>
+    <Copyright>© 2020-2026 UXTU Team, 2026 UCU Team</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog" Version="4.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UCU.Core\UCU.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Fake-transport write-sequence tests. -->
+    <InternalsVisibleTo Include="UCU.Hardware.Tests" />
+  </ItemGroup>
+
+</Project>

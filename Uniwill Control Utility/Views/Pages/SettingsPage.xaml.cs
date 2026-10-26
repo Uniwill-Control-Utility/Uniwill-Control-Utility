@@ -20,6 +20,7 @@ using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Abstractions.Controls;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
@@ -47,7 +48,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private int _ramSpeed = 0, _ramType = 0, _ramWidth = 0, _ramSlots = 0;
         private string _ramProducer = "", _ramModel = "";
 
-        private UniwillECService? _ecService;
+        private EcEngine? _ecService;
 
         // Hardware Management card state (Wi-Fi/Bluetooth radios + state-changed listeners)
         private Radio? _wifiRadio;

@@ -15,6 +15,8 @@ using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Abstractions.Controls;
+using UCU.Hardware.Ec;
+using UCU.Core.Ec;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
@@ -30,7 +32,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private const string NvramGuidStr = "{9F33F85C-13CA-4FD1-9C4A-96217722C593}";
         private const int OffsetOemDisplayMode = 98; // OpenRevo probe confirmed offset 98 (not 99)
 
-        private readonly UniwillECService? _ecService;
+        private readonly EcEngine? _ecService;
         private bool _isEcAvailable;
         private bool _isLoaded;
         private bool _isAdministrator;
@@ -106,7 +108,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             InitializeComponent();
             Instance = this;
 
-            _ecService = App.GetService<UniwillECService>();
+            _ecService = App.GetService<EcEngine>();
             if (_ecService is not null)
             {
                 try
@@ -330,9 +332,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             try
             {
                 // Write EC register
-                _ecService!.SetGpuMuxMode((UniwillECService.GpuMuxMode)mode);
+                _ecService!.SetGpuMuxMode((GpuMuxMode)mode);
                 _lastUserApplyTime = DateTime.UtcNow;
-                Debug.WriteLine($"[Display] Applied GPU mode: {(UniwillECService.GpuMuxMode)mode}");
+                Debug.WriteLine($"[Display] Applied GPU mode: {(GpuMuxMode)mode}");
 
                 // Update button visual state immediately
                 UpdateGpuModeButtons(mode);
@@ -565,7 +567,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             try
             {
                 return _ecService is not null
-                    && _ecService.GetCurrentGpuMuxMode() == UniwillECService.GpuMuxMode.DgpuOnly;
+                    && _ecService.GetCurrentGpuMuxMode() == GpuMuxMode.DgpuOnly;
             }
             catch
             {
@@ -1022,9 +1024,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return null;
 
             // The NVRAM byte uses the same platform-specific encoding as the EC
-            // register; return the semantic mode so callers can compare it directly
-            // against the button tags / GpuMuxMode values.
-            return (byte)UniwillECService.RawToMode(nvram[OffsetOemDisplayMode]);
+            // register; decode through the engine so the platform it was written with
+            // is the platform we read it back with.
+            return (byte)_ecService!.RawToMode(nvram[OffsetOemDisplayMode]);
         }
 
         /// <summary>
@@ -1045,8 +1047,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             // The caller passes the semantic mode; the firmware expects the
-            // platform-specific raw byte (swapped on Intel platforms).
-            byte raw = UniwillECService.ModeToRaw((UniwillECService.GpuMuxMode)mode);
+            // platform-specific raw byte (swapped on Intel platforms), so encode with
+            // the same platform the EC reports.
+            byte raw = _ecService!.ModeToRaw((GpuMuxMode)mode);
             byte[] modified = (byte[])nvram.Clone();
             modified[OffsetOemDisplayMode] = raw;
 

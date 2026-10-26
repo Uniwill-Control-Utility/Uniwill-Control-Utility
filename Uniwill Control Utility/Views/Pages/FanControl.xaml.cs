@@ -15,6 +15,7 @@ using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
@@ -23,7 +24,7 @@ namespace Uniwill_Control_Utility.Views.Pages
  
         private readonly IHardwareMonitoringService _hardwareMonitoring;
         private readonly EcTelemetryService _ecTelemetry;
-        private readonly UniwillECService? _uniwillEc;
+        private readonly EcEngine? _uniwillEc;
         private readonly FlydigiCoolerHidService _flydigiService;
         private readonly FlydigiCoolerBleService _bs1Service;
         private readonly DeviceApplier _deviceApplier;
@@ -52,7 +53,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             IHardwareMonitoringService hardwareMonitoring,
             DeviceApplier deviceApplier,
             EcTelemetryService ecTelemetry,
-            UniwillECService? uniwillEc = null,
+            EcEngine? uniwillEc = null,
             FlydigiCoolerHidService? flydigiService = null,
             FlydigiCoolerBleService? bs1Service = null)
         {
@@ -1295,7 +1296,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 try
                 {
-                    _uniwillEc!.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                    _uniwillEc!.ApplyFanCurve( cpuCurve.ToEngineSpec(), gpuCurve.ToEngineSpec(), cpuTemps, gpuTemps);
                 }
                 catch (Exception ex)
                 {

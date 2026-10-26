@@ -27,6 +27,7 @@ using GameLib.Plugin.Steam.Model;
 using Windows.Gaming.Preview.GamesEnumeration;
 using System.ComponentModel;
 using static Uniwill_Control_Utility.Scripts.Game_Manager;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
@@ -119,7 +120,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             _ = Task.Run(() =>
             {
                 bool uniwillAvailable = false;
-                var uniwillEc = App.GetService<UniwillECService>();
+                var uniwillEc = App.GetService<EcEngine>();
                 if (uniwillEc is not null)
                 {
                     try { uniwillAvailable = uniwillEc.Initialize(); }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.Services;
 
@@ -23,8 +24,8 @@ public static class EcSmartFanWritePlan
 
         return new[]
         {
-            new EcRegisterBlock(UniwillECService.REG_CPU_FAN_SPEED_TABLE, (byte[])cpuDuty.Clone()),
-            new EcRegisterBlock(UniwillECService.REG_GPU_FAN_SPEED_TABLE, (byte[])gpuDuty.Clone())
+            new EcRegisterBlock(EcEngine.REG_CPU_FAN_SPEED_TABLE, (byte[])cpuDuty.Clone()),
+            new EcRegisterBlock(EcEngine.REG_GPU_FAN_SPEED_TABLE, (byte[])gpuDuty.Clone())
         };
     }
 }

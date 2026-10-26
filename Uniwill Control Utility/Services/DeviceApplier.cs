@@ -6,6 +6,7 @@ using Serilog;
 using System.Windows.Media;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Scripts.Misc;
+using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -19,7 +20,7 @@ namespace Uniwill_Control_Utility.Services
         private readonly FlydigiCoolerHidService _flydigiService;
         private readonly FlydigiCoolerBleService? _bs1Service;
         private readonly HydroUIService _hydroUIService;
-        private readonly UniwillECService? _uniwillEc;
+        private readonly EcEngine? _uniwillEc;
 
         /// <summary>Whether Adaptive Mode is currently overriding Flydigi device control.</summary>
         public bool IsFlydigiOverridden { get; private set; }
@@ -145,7 +146,7 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private (byte R, byte G, byte B, int Brightness, int EffectIndex, int Speed, bool Enabled)? _savedLightBarSettings;
 
-        public DeviceApplier(FlydigiCoolerHidService flydigiService, FlydigiCoolerBleService? bs1Service, HydroUIService hydroUIService, UniwillECService? uniwillEc = null)
+        public DeviceApplier(FlydigiCoolerHidService flydigiService, FlydigiCoolerBleService? bs1Service, HydroUIService hydroUIService, EcEngine? uniwillEc = null)
         {
             _flydigiService = flydigiService;
             _bs1Service = bs1Service;
@@ -326,7 +327,7 @@ namespace Uniwill_Control_Utility.Services
                         var cpuTemps = saved.CpuTempThresholds ?? EcFanCurve.CpuTemperatures;
                         var gpuTemps = saved.GpuTempThresholds ?? EcFanCurve.GpuTemperatures;
 
-                        _uniwillEc.ApplyFanCurve(cpuCurve, gpuCurve, cpuTemps, gpuTemps);
+                        _uniwillEc.ApplyFanCurve( cpuCurve.ToEngineSpec(), gpuCurve.ToEngineSpec(), cpuTemps, gpuTemps);
                     }
                     catch (Exception ex)
                     {
@@ -432,7 +433,7 @@ namespace Uniwill_Control_Utility.Services
                         : GetPresetCurve(presetName);
                 }
 
-                _uniwillEc.ApplyFanCurve(cpuCurve, gpuCurve, finalCpuTemps, finalGpuTemps);
+                _uniwillEc.ApplyFanCurve( cpuCurve.ToEngineSpec(), gpuCurve.ToEngineSpec(), finalCpuTemps, finalGpuTemps);
 
                 var args = new EcFanPresetAppliedEventArgs(
                     unifiedMode, presetName, customDuties, cpuPresetDuties, gpuPresetDuties, cpuTemps, gpuTemps);
