@@ -57,13 +57,20 @@ namespace UCU.Engine
 
             string exePath = Environment.ProcessPath
                 ?? Path.Combine(AppContext.BaseDirectory, "Uniwill Control Utility Engine.exe");
+
+            // sc.exe's key= value convention depends on exact quoting: a value with
+            // spaces must be wrapped in quotes on the command line. The argument
+            // strings below are what a cmd user would type; RunScAsync passes them
+            // through verbatim (ArgumentList escaping would merge the pairs into a
+            // single argv and sc rejects the line with exit code 1639).
             string binPath = $"binPath= \"{exePath}\"";
+            string displayName = $"DisplayName= \"{DisplayName}\"";
             string name = EngineHostFactory.ServiceName;
 
             int rc = await RunScAsync("query", name).ConfigureAwait(false);
             if (rc == ErrorServiceDoesNotExist)
             {
-                rc = await RunScAsync("create", name, binPath, "start= auto", $"DisplayName= {DisplayName}")
+                rc = await RunScAsync("create", name, binPath, "start= auto", displayName)
                     .ConfigureAwait(false);
                 if (rc != 0 && rc != ErrorServiceAlreadyExists)
                     return rc;
@@ -85,8 +92,9 @@ namespace UCU.Engine
                 return rc;
 
             // Best effort: a missing description or failure rule degrades the
-            // service, it never makes it wrong.
-            await RunScAsync("description", name, Description).ConfigureAwait(false);
+            // service, it never makes it wrong. The description is a free-text
+            // value with spaces, so it travels quoted.
+            await RunScAsync("description", name, $"\"{Description}\"").ConfigureAwait(false);
             await RunScAsync("failure", name, "reset= 86400", $"actions= {FailureActions}").ConfigureAwait(false);
 
             rc = await RunScAsync("start", name).ConfigureAwait(false);
@@ -138,13 +146,16 @@ namespace UCU.Engine
             var psi = new ProcessStartInfo
             {
                 FileName = "sc.exe",
+                // Verbatim command line (as typed in cmd): sc.exe's parser needs
+                // the exact key= value quoting, which ArgumentList's automatic
+                // escaping destroys. The values here are our own exe path and
+                // fixed strings, never user input.
+                Arguments = string.Join(" ", args),
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             };
-            foreach (string arg in args)
-                psi.ArgumentList.Add(arg);
 
             using var proc = Process.Start(psi);
             if (proc is null)
