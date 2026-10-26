@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Uniwill_Control_Utility.Services;
+using UCU.Core.Supervision;
 
 // Crash guardian (GCUService-style), shipped as "Uniwill Control Utility
 // Service.exe" in the Service\ subfolder (out of the install root, where its

@@ -1,7 +1,11 @@
-using Uniwill_Control_Utility.Services;
+using UCU.Core.Supervision;
 
-namespace Uniwill_Control_Utility.Tests.Services;
+namespace UCU.Core.Tests.Supervision;
 
+/// <summary>
+/// Relaunch policy shared by the crash guardian and (from the engine phase) the
+/// service session supervisor. Moved out of the app with its cases intact.
+/// </summary>
 public sealed class GuardianPolicyTests
 {
     private const int MaxAttempts = 3;

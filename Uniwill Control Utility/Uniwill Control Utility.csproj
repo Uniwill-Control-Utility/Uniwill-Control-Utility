@@ -85,6 +85,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Pure domain logic (EC encodings, validation, supervision policy). No I/O
+         and no Windows APIs in this reference, so the app stays testable. -->
+    <ProjectReference Include="..\UCU.Core\UCU.Core.csproj" />
+
     <!-- Crash guardian: the reference flows its output (exe/dll/deps/
          runtimeconfig) into this project's bin and publish directories, so
          VS Publish and build\pack.ps1 ship it automatically. -->

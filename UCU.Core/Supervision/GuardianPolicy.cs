@@ -1,8 +1,8 @@
 using System;
 
-namespace Uniwill_Control_Utility.Services
+namespace UCU.Core.Supervision
 {
-    internal enum GuardianAction
+    public enum GuardianAction
     {
         /// <summary>Relaunch the app immediately (it survived a real run, then died).</summary>
         Relaunch,
@@ -12,7 +12,7 @@ namespace Uniwill_Control_Utility.Services
         Stop,
     }
 
-    internal readonly record struct GuardianDecision(GuardianAction Action, TimeSpan Delay);
+    public readonly record struct GuardianDecision(GuardianAction Action, TimeSpan Delay);
 
     /// <summary>
     /// Pure relaunch policy for the guardian — no process/IPC types, unit-testable.
@@ -23,11 +23,15 @@ namespace Uniwill_Control_Utility.Services
     ///   This is what keeps "Close Application" from fighting the watchdog.
     /// - Crash after a real run (runDuration >= threshold) → relaunch immediately
     ///   and reset the failure budget.
-    /// - Crash fast (runDuration < threshold) → exponential backoff; after
+    /// - Crash fast (runDuration &lt; threshold) → exponential backoff; after
     ///   maxFastCrashAttempts consecutive fast crashes, Stop (a startup crash
     ///   loop must not hammer the EC/hardware forever).
+    ///
+    /// Lives in UCU.Core because the same policy governs the engine service's
+    /// session supervisor: the process handle wait replaces the mutex poll, the
+    /// decision logic is unchanged.
     /// </summary>
-    internal static class GuardianPolicy
+    public static class GuardianPolicy
     {
         public static GuardianDecision Evaluate(
             bool gracefulExitSignaled,
