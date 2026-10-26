@@ -42,16 +42,24 @@ Write-Host "Packaging UCU v$version" -ForegroundColor Cyan
 dotnet publish $proj -c Release -r win-x64 --self-contained false -o $publishDir
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 
-# --- 2b. Verify the crash guardian flowed into the layout ---
-# The service exe ships in the Service\ subfolder (csproj staging target) so
-# the install root shows a single app exe; the "UCU Guardian" scheduled task
-# points at it.
+# --- 2b. Verify the crash guardian and engine flowed into the layout ---
+# The guardian and the engine service ship in the Service\ subfolder (csproj
+# staging targets) so the install root shows a single app exe. The guardian is
+# staged by a file-flow ProjectReference; the engine is staged by building its
+# project with the output redirected into Service\, which puts the service's
+# full dependency closure (Core/Contracts/Hardware, hosting, Serilog) in the
+# same folder. The "UCU Guardian" task points at the guardian; the app ensures
+# the "UCUEngine" service at startup.
 foreach ($file in @(
     "Service\Uniwill Control Utility Service.exe", "Service\Uniwill Control Utility Service.dll",
     "Service\Uniwill Control Utility Service.deps.json", "Service\Uniwill Control Utility Service.runtimeconfig.json",
-    "Service\Serilog.dll", "Service\Serilog.Sinks.File.dll"
+    "Service\Serilog.dll", "Service\Serilog.Sinks.File.dll",
+    "Service\Uniwill Control Utility Engine.exe", "Service\Uniwill Control Utility Engine.dll",
+    "Service\Uniwill Control Utility Engine.deps.json", "Service\Uniwill Control Utility Engine.runtimeconfig.json",
+    "Service\UCU.Core.dll", "Service\UCU.Contracts.dll", "Service\UCU.Hardware.dll",
+    "Service\Microsoft.Extensions.Hosting.dll", "Service\Serilog.Extensions.Hosting.dll"
 )) {
-    if (-not (Test-Path (Join-Path $publishDir $file))) { throw "Guardian output '$file' missing from publish dir (ProjectReference broken?)" }
+    if (-not (Test-Path (Join-Path $publishDir $file))) { throw "Service payload '$file' missing from publish dir (staging target broken?)" }
 }
 
 # --- 2c. Compile the Uninstall.exe shim into the layout ---
@@ -70,6 +78,19 @@ if (-not (Test-Path $csc)) { throw "csc.exe not found at $csc" }
     "/out:$(Join-Path $publishDir 'Uninstall.exe')" `
     (Join-Path $PSScriptRoot "uninstall-shim\UninstallShim.cs")
 if ($LASTEXITCODE -ne 0) { throw "Uninstall.exe shim compile failed" }
+
+# --- 2d. Compile the UCU.Updater.exe shim (elevated update apply) ---
+# The per-machine layout needs admin to write, and the running engine service
+# locks the Service\ payload the update replaces. The shim (requireAdministrator,
+# same manifest as Uninstall.exe) stops the engine, runs Uninstall.exe -a
+# --from-update, and starts the engine again; the app routes its Velopack apply
+# through it when it exists. Same framework csc as above, no dependencies.
+& $csc /nologo /target:winexe /platform:x64 `
+    "/win32icon:$(Join-Path $projDir 'favicon.ico')" `
+    "/win32manifest:$(Join-Path $PSScriptRoot 'uninstall-shim\admin.manifest')" `
+    "/out:$(Join-Path $publishDir 'UCU.Updater.exe')" `
+    (Join-Path $PSScriptRoot "updater-shim\UpdaterShim.cs")
+if ($LASTEXITCODE -ne 0) { throw "UCU.Updater.exe shim compile failed" }
 
 # --- 3. Stage loose native payload (this list IS the packaging manifest) ---
 # These files live in the project root and are not all produced by the publish

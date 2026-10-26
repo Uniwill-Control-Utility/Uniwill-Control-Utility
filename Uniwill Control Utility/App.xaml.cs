@@ -121,7 +121,8 @@ namespace Uniwill_Control_Utility
         // Must match GuardianConstants in UCU.Guardian\Program.cs.
         private const string GuardianMutexName = "UniwillControlUtility.Guardian";
 
-        private const string AutostartTaskName = "UCU";
+        private const string AutostartTaskName = "UCU Autostart";
+        private const string LegacyAutostartTaskName = "UCU";
         private const string GuardianTaskName = "UCU Guardian";
         private static DispatcherTimer? _guardianWatchTimer;
 
@@ -1044,16 +1045,21 @@ namespace Uniwill_Control_Utility
                 _logger?.LogError(ex, "Failed during deferred update and PawnIO checks");
             }
 
-            // Register the App Paths auto-elevation shim once (XMG CC-style
-            // launch UX): the app manifest stays requireAdministrator for
-            // EC/MSR access, but ShellExecute launches (Start menu, tray,
-            // taskbar, guardian) from an admin account then elevate silently.
-            TryRegisterAutoElevation();
+            // Engine service: install when missing (one elevated self-launch,
+            // the single UAC prompt of the product), start when stopped (the
+            // service DACL grants the unelevated app SERVICE_START). This
+            // replaces the App Paths auto-elevation shim the retired
+            // requireAdministrator manifest needed: the app is asInvoker now.
+            SafeFireAndForget(EngineLifecycle.EnsureAsync());
 
             // Guardian: mutual guarding — the app respawns the watchdog if it is
             // enabled but not running (the watchdog already watches the app).
             if (Settings.Default.GuardianEnabled)
                 EnsureGuardianRunning();
+
+            // Migrate the legacy "UCU" autostart task (pre-engine name,
+            // registered with highest privileges) to the "UCU Autostart" task.
+            MigrateLegacyAutostartTask();
 
             // Self-heal the scheduled task action paths: the path is baked at
             // registration time, so installs that moved (zip → MSI migration)
@@ -1136,41 +1142,32 @@ namespace Uniwill_Control_Utility
         }
 
         /// <summary>
-        /// Registers the well-known App Paths auto-elevation shim
-        /// (HKLM\...\App Paths\&lt;exename&gt; with Type=AppUserModelID and an
-        /// empty PackageSid): ShellExecute launches of the exe from an
-        /// admin-account user then elevate without a UAC prompt. The manifest
-        /// itself stays requireAdministrator — EC/MSR access is non-negotiable;
-        /// this only removes the per-launch consent for our own exe. The
-        /// uninstall shim deletes this key. Idempotent, best-effort.
+        /// Moves the pre-engine "UCU" autostart task (registered with highest
+        /// privileges for the requireAdministrator manifest) to the
+        /// "UCU Autostart" task the asInvoker app registers with limited
+        /// privileges. The old task only exists on installs that had autostart
+        /// enabled, so re-registering the new one preserves the user's choice;
+        /// a task created by the new app never appears under the old name.
+        /// Idempotent: after one run the legacy task is gone.
         /// </summary>
-        private static void TryRegisterAutoElevation()
+        private static void MigrateLegacyAutostartTask()
         {
             try
             {
-                string? exe = Environment.ProcessPath;
-                if (string.IsNullOrEmpty(exe))
+                string? legacyPath = ScheduledTaskService.GetActionPath(LegacyAutostartTaskName);
+                if (legacyPath is null)
                     return;
 
-                using var appPaths = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
-                    .OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths", writable: true);
-                if (appPaths is null)
-                    return;
-
-                string keyName = Path.GetFileName(exe);
-                using var key = appPaths.CreateSubKey(keyName, writable: true);
-                key.SetValue(null, exe);
-
-                if (key.GetValue("Type") as string != "AppUserModelID")
-                {
-                    key.SetValue("Type", "AppUserModelID");
-                    key.SetValue("PackageSid", string.Empty);
-                    _logger?.LogInformation("[Elevation] Registered App Paths auto-elevation shim for {Exe}", keyName);
-                }
+                ScheduledTaskService.Register(
+                    AutostartTaskName, "Start UCU", "",
+                    TimeSpan.FromSeconds(Settings.Default.StartupDelaySeconds));
+                ScheduledTaskService.Unregister(LegacyAutostartTaskName);
+                _logger?.LogInformation("Migrated the legacy '{Legacy}' autostart task to '{Task}'",
+                    LegacyAutostartTaskName, AutostartTaskName);
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "[Elevation] App Paths auto-elevation shim registration failed");
+                _logger?.LogWarning(ex, "Failed to migrate the legacy autostart scheduled task");
             }
         }
 

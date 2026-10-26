@@ -1,5 +1,8 @@
 using System;
+using System.Diagnostics;
+using System.IO;
 using System.Threading.Tasks;
+using Serilog;
 using Velopack;
 
 namespace Uniwill_Control_Utility.Services
@@ -173,6 +176,16 @@ namespace Uniwill_Control_Utility.Services
                 return;
 
             SetState(UpdateState.Applying, 100);
+
+            if (UpdaterShimPath is string shim)
+            {
+                if (LaunchUpdaterShim(shim))
+                    return; // the shim owns the apply, the restart and this process's exit
+
+                SetState(UpdateState.Failed, 0);
+                return;
+            }
+
             _manager.ApplyUpdatesAndRestart(asset, new[] { "--from-update" });
         }
 
@@ -180,7 +193,7 @@ namespace Uniwill_Control_Utility.Services
         /// Applies the staged package on graceful exit (called from App.OnExit
         /// after all hardware teardown). Terminates the process — must be the
         /// last statement of the shutdown path. Returns false when there is
-        /// nothing staged (the common case).
+        /// nothing staged (the common case) or the elevation was declined.
         /// </summary>
         public bool TryApplyOnExit()
         {
@@ -189,8 +202,70 @@ namespace Uniwill_Control_Utility.Services
                 return false;
 
             SetState(UpdateState.Applying, 100);
+
+            if (UpdaterShimPath is string shim)
+            {
+                if (LaunchUpdaterShim(shim))
+                {
+                    Environment.Exit(0); // same process-death contract as ApplyUpdatesAndExit
+                    return true;
+                }
+
+                return false;
+            }
+
             _manager.ApplyUpdatesAndExit(asset);
             return true;
+        }
+
+        /// <summary>
+        /// The stamped updater shim pack.ps1 ships next to the app, or null on
+        /// layouts without it (plain dev builds).
+        /// </summary>
+        private static string? UpdaterShimPath
+        {
+            get
+            {
+                string path = Path.Combine(AppContext.BaseDirectory, "UCU.Updater.exe");
+                return File.Exists(path) ? path : null;
+            }
+        }
+
+        /// <summary>
+        /// Hands the apply to UCU.Updater.exe. The per-machine layout needs
+        /// admin to write, and the running engine service locks the Service\
+        /// payload the update replaces: the shim (requireAdministrator manifest,
+        /// compiled by pack.ps1) stops the engine, runs the elevated Velopack
+        /// apply (Uninstall.exe -a --from-update, which relaunches the app), and
+        /// starts the engine again. Returns false when the user declined the
+        /// consent prompt (1223), so callers can fall back to a normal shutdown.
+        /// On success this method does not return to the caller's message loop:
+        /// the app exits as Velopack's own apply-restart does.
+        /// </summary>
+        private static bool LaunchUpdaterShim(string shimPath)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = shimPath,
+                    UseShellExecute = true,
+                    Verb = "runas",
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                };
+                Process.Start(psi);
+
+                Log.Information("[Update] Handed the apply to UCU.Updater.exe; exiting for the elevated apply.");
+                Environment.Exit(0);
+                return true;
+            }
+            catch (System.ComponentModel.Win32Exception ex)
+            {
+                // 1223: consent declined at the prompt. The staged package
+                // stays staged; the next attempt re-asks.
+                Log.Warning(ex, "[Update] Update elevation declined (code {Code})", ex.NativeErrorCode);
+                return false;
+            }
         }
 
         private VelopackAsset? GetPendingAsset()

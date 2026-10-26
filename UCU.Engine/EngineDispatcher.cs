@@ -37,7 +37,7 @@ namespace UCU.Engine
                     $"client protocol {request.ProtocolVersion}, engine protocol {EngineProtocol.Version}");
             }
 
-            if (!_handlers.TryGetValue(request.Verb, out VerbHandler handler))
+            if (!_handlers.TryGetValue(request.Verb, out VerbHandler? handler) || handler is null)
             {
                 return EngineResponse.Failure(request.Id, EngineErrorCode.UnsupportedVerb,
                     $"'{request.Verb}' is not a verb of this engine");

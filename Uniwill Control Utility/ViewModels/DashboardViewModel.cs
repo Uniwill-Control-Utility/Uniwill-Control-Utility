@@ -11,7 +11,6 @@ using Uniwill_Control_Utility.Services;
 using Wpf.Ui;
 using Wpf.Ui.Abstractions.Controls;
 using UCU.Contracts.Capabilities;
-using Uniwill_Control_Utility.Models;
 
 namespace Uniwill_Control_Utility.ViewModels
 {

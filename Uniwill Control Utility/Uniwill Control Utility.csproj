@@ -75,6 +75,7 @@
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="System.Management" Version="11.0.0-preview.7.26381.103" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.9" />
     <PackageReference Include="TaskScheduler" Version="2.12.2" />
     <PackageReference Include="Velopack" Version="1.2.161" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
@@ -104,6 +105,12 @@
          runtimeconfig) into this project's bin and publish directories, so
          VS Publish and build\pack.ps1 ship it automatically. -->
     <ProjectReference Include="..\UCU.Guardian\UCU.Guardian.csproj" />
+
+    <!-- Engine service: kept out of the app's compile graph on purpose (the UI
+         process must never reach the hardware assembly), the reference exists
+         only to order the build; the staging targets below drive the engine's
+         own Build/Publish with their output redirected into Service\. -->
+    <ProjectReference Include="..\UCU.Engine\UCU.Engine.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <!-- Stage the guardian into a Service\ subfolder so the install directory
@@ -133,6 +140,29 @@
     <MakeDir Directories="$(PublishDir)Service" />
     <Move SourceFiles="@(_GuardianRootPub)" DestinationFolder="$(PublishDir)Service" />
     <Copy SourceFiles="@(_GuardianSharedPub)" DestinationFolder="$(PublishDir)Service" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Engine service: staged into Service\ by running the engine project's own
+       Build/Publish with its output redirected there. Redirecting (instead of
+       flowing files like the guardian reference does) keeps the service's full
+       dependency closure — hosting, Serilog, UCU.Core/Contracts/Hardware —
+       inside Service\ and leaves the app root's assemblies alone, which is
+       what keeps the app process free of the hardware layer. The redirect must
+       be an absolute path: a relative OutDir would resolve against the engine
+       project's directory. Runs for Build (VS F5) and Publish (pack.ps1 / VS
+       Publish). -->
+  <Target Name="StageEngineInServiceFolder" AfterTargets="Build"
+          Condition="Exists('$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj')">
+    <MSBuild Projects="$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj"
+             Targets="Build"
+             Properties="Configuration=$(Configuration);Platform=AnyCPU;OutDir=$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(OutDir)Service\'))" />
+  </Target>
+
+  <Target Name="StageEngineInServiceFolderOnPublish" AfterTargets="Publish"
+          Condition="Exists('$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj')">
+    <MSBuild Projects="$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);Platform=AnyCPU;PublishDir=$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(PublishDir)Service\'))" />
   </Target>
 
   <ItemGroup>

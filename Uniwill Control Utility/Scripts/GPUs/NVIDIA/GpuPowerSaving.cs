@@ -205,37 +205,23 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 // Target the NVIDIA device that is physically present (Present=$true).
                 // Blackwell GPUs may show as "Unknown" status after disable (not "Error" like older GPUs),
                 // so we filter by Present=$true to always hit the active device.
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "powershell.exe",
-                    Arguments = "-NoProfile -Command \"Disable-PnpDevice -InstanceId (Get-PnpDevice -FriendlyName '*NVIDIA*' -Class Display | Where-Object { $_.Present -eq $true }).InstanceId -Confirm:$false\"",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                    // UCU runs elevated by default, no need for runas
-                };
+                // The app is unelevated: the mutation runs consented-elevated, and
+                // the PnP status re-read is the verification.
+                int exitCode = await ElevatedProcess.RunPowershellAsync(
+                    "Disable-PnpDevice -InstanceId (Get-PnpDevice -FriendlyName '*NVIDIA*' -Class Display | Where-Object { $_.Present -eq $true }).InstanceId -Confirm:$false",
+                    "dGPU PnP disable").ConfigureAwait(false);
 
-                using var proc = Process.Start(psi);
-                if (proc == null) return false;
-
-                string output = await proc.StandardOutput.ReadToEndAsync();
-                string error = await proc.StandardError.ReadToEndAsync();
-                proc.WaitForExit();
-
-                bool success = proc.ExitCode == 0;
+                bool success = exitCode == 0;
                 if (success)
                 {
                     var statusAfter = GetDgpuPnpStatus();
                     Log.Information("[GpuPowerSaving] dGPU disabled via PnP hotswap, new status: {Status}", statusAfter);
-                    Log.Information("[GpuPowerSaving] PowerShell output: {Output}", output.Trim());
                     // Trigger the interop guard - the GPU driver is now in a transitional state
                     GpuInteropGuard.Reset();
                 }
                 else
                 {
-                    Log.Information("[GpuPowerSaving] PnP disable failed (exit code {ExitCode}): {Error}", proc.ExitCode, error);
-                    Log.Information("[GpuPowerSaving] PowerShell output: {Output}", output.Trim());
+                    Log.Information("[GpuPowerSaving] PnP disable failed (exit code {ExitCode})", exitCode);
                 }
                 return success;
             }
@@ -262,39 +248,24 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 Log.Information("[GpuPowerSaving] Enabling dGPU, current PnP status: {Status}", statusBefore);
 
                 // After PnP disable, Blackwell GPUs show status "Unknown" (not "Error" like older Turing/Ampere).
-                // We target physically present devices that are NOT in OK state — this catches both
+                // We target physically present devices that are NOT in OK state - this catches both
                 // Error (older GPUs) and Unknown (Blackwell) disabled states, while ignoring ghost replicas.
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "powershell.exe",
-                    Arguments = "-NoProfile -Command \"Enable-PnpDevice -InstanceId (Get-PnpDevice -FriendlyName '*NVIDIA*' -Class Display | Where-Object { $_.Present -eq $true -and $_.Status -ne 'OK' }).InstanceId -Confirm:$false\"",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                    // UCU runs elevated by default, no need for runas
-                };
+                // Elevated per-operation (the app is unelevated); status re-read verifies.
+                int exitCode = await ElevatedProcess.RunPowershellAsync(
+                    "Enable-PnpDevice -InstanceId (Get-PnpDevice -FriendlyName '*NVIDIA*' -Class Display | Where-Object { $_.Present -eq $true -and $_.Status -ne 'OK' }).InstanceId -Confirm:$false",
+                    "dGPU PnP enable").ConfigureAwait(false);
 
-                using var proc = Process.Start(psi);
-                if (proc == null) return false;
-
-                string output = await proc.StandardOutput.ReadToEndAsync();
-                string error = await proc.StandardError.ReadToEndAsync();
-                proc.WaitForExit();
-
-                bool success = proc.ExitCode == 0;
+                bool success = exitCode == 0;
                 if (success)
                 {
                     var statusAfter = GetDgpuPnpStatus();
                     Log.Information("[GpuPowerSaving] dGPU enabled via PnP hotswap, new status: {Status}", statusAfter);
-                    Log.Information("[GpuPowerSaving] PowerShell output: {Output}", output.Trim());
                     // GPU driver just re-initialized, need a cooldown
                     GpuInteropGuard.Reset();
                 }
                 else
                 {
-                    Log.Information("[GpuPowerSaving] PnP enable failed (exit code {ExitCode}): {Error}", proc.ExitCode, error);
-                    Log.Information("[GpuPowerSaving] PowerShell output: {Output}", output.Trim());
+                    Log.Information("[GpuPowerSaving] PnP enable failed (exit code {ExitCode})", exitCode);
                 }
                 return success;
             }

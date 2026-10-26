@@ -46,12 +46,12 @@ namespace UCU.Client
             InvokeCoreAsync<object?>(verb, EngineSerializer.ToParams(parameters), cancellationToken);
 
         public Task<T> InvokeAsync<T>(string verb, CancellationToken cancellationToken = default) =>
-            InvokeCoreAsync<T>(verb, null, cancellationToken)!;
+            InvokeCoreAsync<T>(verb, null, cancellationToken);
 
         public Task<T> InvokeAsync<T>(string verb, JsonElement parameters, CancellationToken cancellationToken = default) =>
             InvokeCoreAsync<T>(verb, parameters, cancellationToken);
 
-        private async Task<T?> InvokeCoreAsync<T>(string verb, JsonElement? parameters, CancellationToken cancellationToken)
+        private async Task<T> InvokeCoreAsync<T>(string verb, JsonElement? parameters, CancellationToken cancellationToken)
         {
             using var pipe = new NamedPipeClientStream(
                 ".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
@@ -93,7 +93,7 @@ namespace UCU.Client
                     throw new EngineException(response.Error ?? EngineErrorCode.Internal, response.Message);
 
                 if (response.Result == null)
-                    return default;
+                    return default!; // result-less verbs run with T=object?; result verbs always carry a Result, and FromElement enforces that
 
                 return EngineSerializer.FromElement<T>(response.Result.Value);
             }

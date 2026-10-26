@@ -7,9 +7,11 @@ using System.Reflection;
 namespace Uniwill_Control_Utility.Services
 {
     /// <summary>
-    /// Shared registration of the logon scheduled tasks ("UCU" autostart and
-    /// "UCU Guardian" watchdog). Both run with highest privileges so they can
-    /// launch the requireAdministrator app without a UAC prompt.
+    /// Shared registration of the logon scheduled tasks ("UCU Autostart"
+    /// autostart and "UCU Guardian" watchdog). Both run with LIMITED privileges:
+    /// the app manifest is asInvoker (the privileged EC work lives in the
+    /// UCUEngine service), so an unelevated app registers and runs these tasks
+    /// as the plain interactive user — no UAC prompt at logon.
     ///
     /// The action path is baked in at registration time, so a moved install
     /// (zip → MSI migration) needs the self-heal in App.RunPostStartupTasksAsync.
@@ -39,7 +41,12 @@ namespace Uniwill_Control_Utility.Services
                 ts.RootFolder.DeleteTask(name);
 
             TaskDefinition td = ts.NewTask();
-            td.Principal.RunLevel = TaskRunLevel.Highest;
+
+            // LUA (the library's name for the limited/filtered token): the app
+            // runs unelevated, and a standard user can register and run a
+            // limited task for their own logon session without a UAC prompt.
+            // Highest would demand elevation the asInvoker app no longer has.
+            td.Principal.RunLevel = TaskRunLevel.LUA;
             td.RegistrationInfo.Description = description;
             td.Settings.DisallowStartIfOnBatteries = false;
             td.Settings.StopIfGoingOnBatteries = false;

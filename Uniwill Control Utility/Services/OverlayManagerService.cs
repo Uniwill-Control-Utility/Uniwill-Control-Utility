@@ -7,7 +7,6 @@ using System.Timers;
 using System.Windows.Forms;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Services.Performance;
-using Uniwill_Control_Utility.Models;
 
 namespace Uniwill_Control_Utility.Services
 {

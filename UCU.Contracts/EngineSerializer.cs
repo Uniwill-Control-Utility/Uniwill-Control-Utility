@@ -139,7 +139,9 @@ namespace UCU.Contracts
             IJsonTypeInfoResolver resolver = Options.TypeInfoResolver
                 ?? throw new InvalidOperationException("the contract serializer has no resolver");
 
-            return (JsonTypeInfo<T>)resolver.GetTypeInfo(typeof(T), Options);
+            return (JsonTypeInfo<T>?)resolver.GetTypeInfo(typeof(T), Options)
+                ?? throw new InvalidOperationException(
+                    $"'{typeof(T).Name}' is not registered in {nameof(EngineJsonContext)}");
         }
     }
 }

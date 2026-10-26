@@ -147,8 +147,11 @@ namespace UCU.Engine
             {
                 while (await _queue.Reader.WaitToReadAsync().ConfigureAwait(false))
                 {
-                    while (_queue.Reader.TryRead(out WorkItem item))
+                    while (_queue.Reader.TryRead(out WorkItem? item))
                     {
+                        if (item is null)
+                            continue;
+
                         Interlocked.Decrement(ref _queued);
                         _currentStartedUtc = DateTime.UtcNow;
                         _currentLabel = item.Label;

@@ -140,6 +140,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         private const string SearchWebcamStatus =
             "Get-PnpDevice -FriendlyName *Webcam*,*Camera* -Class Camera | Where-Object { $_.Present -eq $true } | ForEach-Object { $_.Status }";
 
+        /// <summary>
+        /// Runs a PowerShell status query unelevated and captures its output.
+        /// Get-PnpDevice queries need no elevation; the mutations (SetWebcamAsync)
+        /// go through ElevatedProcess instead.
+        /// </summary>
         private static async Task<(int exitCode, string output, string error)> RunPowershellAsync(string command)
         {
             var psi = new ProcessStartInfo
@@ -150,7 +155,6 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true
-                // UCU runs elevated by default, no need for runas
             };
 
             using var proc = Process.Start(psi);
@@ -167,13 +171,17 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         /// Enables/disables the webcam via PnP device hotswap on the Camera device class.
         /// One query covers both *Webcam* and *Camera* friendly names; the action only runs
         /// on present devices whose state differs, so already-in-state is a silent no-op.
+        /// PnP enable/disable is an administrator operation: the app runs unelevated, so
+        /// the mutation goes through a consented elevated PowerShell and the page learns
+        /// the result from the status re-query.
         /// </summary>
         public static async Task<bool> SetWebcamAsync(bool enable)
         {
-            var (code, output, error) = await RunPowershellAsync(enable ? EnableWebcamCommand : DisableWebcamCommand);
+            int code = await ElevatedProcess.RunPowershellAsync(
+                enable ? EnableWebcamCommand : DisableWebcamCommand, "Webcam PnP toggle").ConfigureAwait(false);
 
-            Log.Information("[HardwareManagement] Webcam PnP {Action} results: exit={Code} out=[{Output}] err=[{Error}]",
-                enable ? "enable" : "disable", code, output, error);
+            Log.Information("[HardwareManagement] Webcam PnP {Action} elevated exit={Code}",
+                enable ? "enable" : "disable", code);
 
             return code == 0;
         }
@@ -211,28 +219,16 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             try
             {
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "SystemSettingsAdminFlows.exe",
-                    Arguments = enable ? "EnableTouchpad 1" : "EnableTouchpad 0",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                    // UCU runs elevated by default, no need for runas
-                };
+                // The admin flow is by name an administrator operation: elevated
+                // per-operation consent, since the app process is unelevated.
+                int exitCode = await ElevatedProcess.RunAsync(
+                    "SystemSettingsAdminFlows.exe",
+                    enable ? "EnableTouchpad 1" : "EnableTouchpad 0",
+                    "Touchpad admin flow").ConfigureAwait(false);
 
-                using var proc = Process.Start(psi);
-                if (proc == null)
-                    return false;
-
-                string output = await proc.StandardOutput.ReadToEndAsync();
-                string error = await proc.StandardError.ReadToEndAsync();
-                proc.WaitForExit();
-
-                Log.Information("[HardwareManagement] Touchpad admin flow (enable={Enable}) exit code: {ExitCode}, out=[{Output}], err=[{Error}]",
-                    enable, proc.ExitCode, output.Trim(), error.Trim());
-                return proc.ExitCode == 0;
+                Log.Information("[HardwareManagement] Touchpad admin flow (enable={Enable}) exit code: {ExitCode}",
+                    enable, exitCode);
+                return exitCode == 0;
             }
             catch (Exception ex)
             {

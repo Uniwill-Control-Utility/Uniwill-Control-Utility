@@ -28,7 +28,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         private const string WmiNamespace = @"root\CIMV2";
         private const string WmiQueryProcessor = "SELECT * FROM Win32_Processor";
         private const string WmiQueryPhysicalMemory = "SELECT * FROM Win32_PhysicalMemory";
-        private const string ScheduledTaskName = "UCU";
+        private const string ScheduledTaskName = "UCU Autostart";
         private const string GuardianTaskName = "UCU Guardian";
         private const string PresetExtension = ".UCUpresets";
 
