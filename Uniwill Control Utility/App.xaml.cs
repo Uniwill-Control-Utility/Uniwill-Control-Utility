@@ -35,7 +35,10 @@ using Uniwill_Control_Utility.Views.Windows;
 using Velopack;
 using Wpf.Ui;
 using Wpf.Ui.Abstractions;
-using UCU.Hardware.Ec;
+using UCU.Contracts;
+using UCU.Client;
+using UCU.Bridge;
+using UCU.Contracts.Capabilities;
 
 namespace Uniwill_Control_Utility
 {
@@ -353,13 +356,36 @@ namespace Uniwill_Control_Utility
                         // Flydigi BS1 (BLE-only) cooling pad service
                         services.AddSingleton<FlydigiCoolerBleService>();
 
-                        // EC access (for XMG / TUXEDO laptops). In-process today; from the
-                        // engine-service phase the app talks to these over RPC instead, and
-                        // this registration moves to the client-side capability proxies.
-                        services.AddSingleton<EcEngine>(provider =>
+                        // EC access (for XMG / TUXEDO laptops). The UI process reaches the
+                        // EC only through the capability interfaces: RPC proxies to the
+                        // engine service in the shipped product, and the in-process bridge
+                        // for --dev-inprocess. The bridge is the assembly that references
+                        // the hardware layer, so the app itself never can.
+                        bool devInProcess = Environment.GetCommandLineArgs()
+                            .Any(a => string.Equals(a, "--dev-inprocess", StringComparison.OrdinalIgnoreCase));
+
+                        if (devInProcess)
                         {
-                            return new EcEngine(new EcDriverTransport(), EcPlatformResolver.Current);
-                        });
+                            services.AddSingleton<BridgeEngine>(new BridgeEngine(EcPlatformResolver.Current));
+                            services.AddSingleton<IFanCapability>(sp => sp.GetRequiredService<BridgeEngine>().Fan);
+                            services.AddSingleton<IPowerCapability>(sp => sp.GetRequiredService<BridgeEngine>().Power);
+                            services.AddSingleton<IGpuMuxCapability>(sp => sp.GetRequiredService<BridgeEngine>().Mux);
+                            services.AddSingleton<IKeyboardCapability>(sp => sp.GetRequiredService<BridgeEngine>().Keyboard);
+                            services.AddSingleton<IBatteryCapability>(sp => sp.GetRequiredService<BridgeEngine>().Battery);
+                            services.AddSingleton<IEcTelemetryCapability>(sp => sp.GetRequiredService<BridgeEngine>().Telemetry);
+                            services.AddSingleton<IEngineCapability>(sp => sp.GetRequiredService<BridgeEngine>().Engine);
+                        }
+                        else
+                        {
+                            services.AddSingleton<EngineClient>();
+                            services.AddSingleton<IFanCapability, FanCapability>();
+                            services.AddSingleton<IPowerCapability, PowerCapability>();
+                            services.AddSingleton<IGpuMuxCapability, GpuMuxCapability>();
+                            services.AddSingleton<IKeyboardCapability, KeyboardCapability>();
+                            services.AddSingleton<IBatteryCapability, BatteryCapability>();
+                            services.AddSingleton<IEcTelemetryCapability, EcTelemetryCapability>();
+                            services.AddSingleton<IEngineCapability, EngineCapability>();
+                        }
                         services.AddSingleton<EcTelemetryService>();
 
                         // Hardware Performance / Q-key button intercept: polls the EC
@@ -434,16 +460,22 @@ namespace Uniwill_Control_Utility
 
                 var monitoring = _host.Services.GetRequiredService<IHardwareMonitoringService>();
 
-                // Wire the EC service to the static field before startup preset apply.
+                // Wire the power capability to the static field before startup preset apply.
                 // The MainWindowViewModel constructor also sets this field (idempotent —
                 // same singleton instance), but ApplyOnStart() runs here in the pre-loader
                 // phase _before_ _host.StartAsync() creates the MainWindow.
                 // Without this, RyzenAdj_To_UCU.EcService is null during startup preset
                 // apply and GPU power limit writes fail silently.
-                var ecService = _host.Services.GetService<EcEngine>();
-                if (ecService != null)
+                var powerCapability = _host.Services.GetService<IPowerCapability>();
+                if (powerCapability != null)
                 {
-                    Scripts.RyzenAdj_To_UCU.EcService = ecService;
+                    Scripts.RyzenAdj_To_UCU.EcService = powerCapability;
+                }
+
+                var fanCapability = _host.Services.GetService<IFanCapability>();
+                if (fanCapability != null)
+                {
+                    Scripts.RyzenAdj_To_UCU.FanService = fanCapability;
                 }
 
                 var updateService = _host.Services.GetRequiredService<VelopackUpdateService>();

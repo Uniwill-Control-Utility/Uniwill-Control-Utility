@@ -15,7 +15,7 @@ using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Abstractions.Controls;
-using UCU.Hardware.Ec;
+using UCU.Contracts.Capabilities;
 using UCU.Core.Ec;
 
 namespace Uniwill_Control_Utility.Views.Pages
@@ -32,7 +32,20 @@ namespace Uniwill_Control_Utility.Views.Pages
         private const string NvramGuidStr = "{9F33F85C-13CA-4FD1-9C4A-96217722C593}";
         private const int OffsetOemDisplayMode = 98; // OpenRevo probe confirmed offset 98 (not 99)
 
-        private readonly EcEngine? _ecService;
+        private readonly IGpuMuxCapability? _mux;
+        private readonly IEcTelemetryCapability? _telemetry;
+        private readonly IEngineCapability? _engine;
+        private EcPlatform? _ecPlatform;
+
+        /// <summary>
+        /// The platform the engine resolved, fetched once. The NVRAM mirror of the
+        /// mux mode stores a raw byte whose encoding is platform-specific, and only
+        /// the engine knows the platform (it reads the boot CPU vendor), so the page
+        /// asks the engine's identity verb one time and caches the answer: the
+        /// processor cannot change during a session.
+        /// </summary>
+        private EcPlatform EcPlatformForNvram =>
+            _ecPlatform ??= _engine!.GetInfoAsync().GetAwaiter().GetResult().Platform;
         private bool _isEcAvailable;
         private bool _isLoaded;
         private bool _isAdministrator;
@@ -108,12 +121,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             InitializeComponent();
             Instance = this;
 
-            _ecService = App.GetService<EcEngine>();
-            if (_ecService is not null)
+            _mux = App.GetService<IGpuMuxCapability>();
+            _telemetry = App.GetService<IEcTelemetryCapability>();
+            _engine = App.GetService<IEngineCapability>();
+            if (_mux is not null && _engine is not null)
             {
                 try
                 {
-                    _isEcAvailable = _ecService.Initialize();
+                    _isEcAvailable = _engine.IsHardwareAvailableAsync().GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
                 {
@@ -223,7 +238,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         // the mode. We show the NVRAM value and let the user decide.
                         try
                         {
-                            int ecMode = (int)_ecService!.GetCurrentGpuMuxMode();
+                            int ecMode = (int)_mux!.GetModeAsync().GetAwaiter().GetResult();
                             if (ecMode != mode)
                             {
                                 Debug.WriteLine($"[Display] EC mode ({ecMode}) differs from NVRAM ({mode}) — showing NVRAM value");
@@ -250,7 +265,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Fallback: read from EC if NVRAM is unavailable
                 try
                 {
-                    mode = (int)_ecService.GetCurrentGpuMuxMode();
+                    mode = (int)_mux!.GetModeAsync().GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
                 {
@@ -332,7 +347,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             try
             {
                 // Write EC register
-                _ecService!.SetGpuMuxMode((GpuMuxMode)mode);
+                _mux!.SetModeAsync((GpuMuxMode)mode).GetAwaiter().GetResult();
                 _lastUserApplyTime = DateTime.UtcNow;
                 Debug.WriteLine($"[Display] Applied GPU mode: {(GpuMuxMode)mode}");
 
@@ -566,8 +581,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             try
             {
-                return _ecService is not null
-                    && _ecService.GetCurrentGpuMuxMode() == GpuMuxMode.DgpuOnly;
+                return _mux is not null
+                    && _mux.GetModeAsync().GetAwaiter().GetResult() == GpuMuxMode.DgpuOnly;
             }
             catch
             {
@@ -878,7 +893,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void RefreshAll()
         {
-            if (_ecService is null) return;
+            if (_mux is null) return;
 
             // Skip syncing the buttons if the user recently changed the setting
             bool withinGrace = (DateTime.UtcNow - _lastUserApplyTime).TotalMilliseconds < ApplyGraceMs;
@@ -896,7 +911,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     }
                     else
                     {
-                        mode = (int)_ecService.GetCurrentGpuMuxMode();
+                        mode = (int)_mux!.GetModeAsync().GetAwaiter().GetResult();
                     }
                     UpdateGpuModeButtons(mode);
                 }
@@ -1024,9 +1039,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return null;
 
             // The NVRAM byte uses the same platform-specific encoding as the EC
-            // register; decode through the engine so the platform it was written with
-            // is the platform we read it back with.
-            return (byte)_ecService!.RawToMode(nvram[OffsetOemDisplayMode]);
+            // register; decode through the shared codec with the platform the engine
+            // resolved, so the value written at factory time decodes as written.
+            return (byte)EcMuxCodec.RawToMode(nvram[OffsetOemDisplayMode], EcPlatformForNvram);
         }
 
         /// <summary>
@@ -1048,8 +1063,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             // The caller passes the semantic mode; the firmware expects the
             // platform-specific raw byte (swapped on Intel platforms), so encode with
-            // the same platform the EC reports.
-            byte raw = _ecService!.ModeToRaw((GpuMuxMode)mode);
+            // the same platform the engine reports.
+            byte raw = EcMuxCodec.ModeToRaw((GpuMuxMode)mode, EcPlatformForNvram);
             byte[] modified = (byte[])nvram.Clone();
             modified[OffsetOemDisplayMode] = raw;
 
@@ -1186,9 +1201,9 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Thread.Sleep(100);
 
                 // Verify via EC readback.
-                if (_ecService != null && _isEcAvailable)
+                if (_telemetry != null && _isEcAvailable)
                 {
-                    byte ecValue = _ecService.ReadECRegister(EcLocalDimmingRegister);
+                    byte ecValue = _telemetry.ReadRegisterAsync(EcLocalDimmingRegister).GetAwaiter().GetResult();
                     bool actualState = (ecValue & EcLocalDimmingBit) != 0;
 
                     if (actualState != enable)

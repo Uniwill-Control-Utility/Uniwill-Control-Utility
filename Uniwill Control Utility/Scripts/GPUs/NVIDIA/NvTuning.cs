@@ -213,7 +213,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 //   0x0744 = cTGP offset (targetWatts - defaultWatts)
                 //   0x0745 = TPP offset
                 //   0x0746 = Dynamic Boost offset
-                ec.ActivateGpuPowerControl(ctgpOffset, dbOffset);
+                ec.ActivateGpuPowerControlAsync(ctgpOffset, dbOffset).GetAwaiter().GetResult();
 
                 return 1;
             }
@@ -888,7 +888,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 // Offset 0x44: entries start, stride = 0x24 (36 bytes) per point
                 //   Each entry: 5 uint32 + FrequencyDeltaInkHz(4) + 3 uint32 = 36 bytes
                 //   FrequencyDeltaInkHz at offset 0x14 within each entry
-                // Total buffer: 0x2420 (9248 bytes) — supports up to 255 point indices
+                // Total buffer: 0x2420 (9248 bytes) ï¿½ supports up to 255 point indices
 
                 const int bufferSize = 0x2420;
                 const int entryStride = 0x24; // 36 bytes per entry
@@ -907,7 +907,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                     int pointIndex = kvp.Key;
                     if (pointIndex < 0 || pointIndex >= UsableVfPointCount) continue;
 
-                    // Set mask bit — bitmap at offset 0x04, one bit per point index
+                    // Set mask bit ï¿½ bitmap at offset 0x04, one bit per point index
                     int maskByteOffset = 0x04 + (pointIndex / 8);
                     int maskBit = pointIndex % 8;
                     buffer[maskByteOffset] |= (byte)(1 << maskBit);
@@ -966,7 +966,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 // Offset 0x0C: _ClockBoostLocks[32] (24 bytes each)
                 // Total: 0x0C + 32*24 = 0x30C (780 bytes)
 
-                const int bufferSize = 0x30C; // 780 bytes — Marshal.SizeOf<PrivateClockBoostLockV2>()
+                const int bufferSize = 0x30C; // 780 bytes ï¿½ Marshal.SizeOf<PrivateClockBoostLockV2>()
                 const int lockStride = 24;
                 const int maxLocks = 32;
 
@@ -1013,7 +1013,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         /// <summary>
         /// Applies per-point frequency offsets using NvAPI_GPU_SetClocks (0x6F151055).
-        /// Unexposed function — buffer layout is unknown. Using a minimal structure
+        /// Unexposed function ï¿½ buffer layout is unknown. Using a minimal structure
         /// based on PerformanceStates20Info patterns.
         /// </summary>
         public static int ApplyVfCurveOffsets_SetClocks(Dictionary<int, int> offsetsMHz)
@@ -1035,7 +1035,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 var setControl = Marshal.GetDelegateForFunctionPointer<NvApiPrivate.GpuBufferDelegate>(setPtr);
 
                 // Unknown buffer layout. Try a minimal structure similar to PerformanceStates20InfoV1.
-                // This is speculative — we're guessing based on the pattern of other NvAPI GPU set functions.
+                // This is speculative ï¿½ we're guessing based on the pattern of other NvAPI GPU set functions.
                 const int bufferSize = 0x200;
                 byte[] buffer = new byte[bufferSize];
 
@@ -1065,7 +1065,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         /// <summary>
         /// Reads the current VF control table via NvAPI getControl (0x23F1B133).
-        /// Required before setControl — the driver expects a valid base state.
+        /// Required before setControl ï¿½ the driver expects a valid base state.
         /// </summary>
         private static bool ReadControlTable(IntPtr gpu, out byte[] buffer)
         {
@@ -1264,7 +1264,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         /// <summary>
         /// Queries the VFCurve-specific NvAPI interfaces to check availability.
-        /// Read-only — does not call the interfaces, only queries them.
+        /// Read-only ï¿½ does not call the interfaces, only queries them.
         /// </summary>
         public static VfCurveInterfaceResult QueryInterfaces()
         {
@@ -1298,7 +1298,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         /// <summary>
         /// Attempts to read VFCurve data using the VFCurve-specific getInfo interface (0x2A70).
-        /// Read-only probe — does not modify GPU state.
+        /// Read-only probe ï¿½ does not modify GPU state.
         /// </summary>
         public static bool TryReadVfCurveGetInfo(
             IntPtr gpu,
@@ -1360,7 +1360,7 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         /// <summary>
         /// Runs a full diagnostic probe of the VFCurve-specific interfaces.
-        /// Read-only — does not modify GPU state.
+        /// Read-only ï¿½ does not modify GPU state.
         /// </summary>
         public static string RunDiagnostic()
         {

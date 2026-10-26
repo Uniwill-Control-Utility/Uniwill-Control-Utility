@@ -1,6 +1,5 @@
 using System.Reflection;
 using UCU.Core.Ec;
-using UCU.Hardware.Ec;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Services;
 
@@ -49,17 +48,17 @@ public sealed class EcCoreParityTests
     }
 
     [Fact]
-    public void EngineSpec_CarriesTheCurveSoTheEngineReproducesTheSameTable()
+    public void CurveDto_CarriesTheCurveSoTheEngineReproducesTheSameTable()
     {
         // The UI renders from Duties; the engine writes the table it derives from the
-        // spec. If these two ever disagree, the fan page preview and the EC state part.
+        // DTO. If these two ever disagree, the fan page preview and the EC state part.
         foreach (EcFanCurve curve in AllPresetCurves())
         {
-            EcFanCurveSpec spec = curve.ToEngineSpec();
+            UCU.Contracts.FanCurveDto dto = curve.ToCurveDto();
 
-            Assert.Equal(curve.Name, spec.Name);
-            Assert.Equal(curve.Duties, spec.DutyPercentByZone);
-            Assert.Equal(curve.ToEcDutyTable(), EcDutyCodec.BuildDutyTable(spec.DutyPercentByZone));
+            Assert.Equal(curve.Name, dto.Name);
+            Assert.Equal(curve.Duties, dto.DutyPercentByZone);
+            Assert.Equal(curve.ToEcDutyTable(), EcDutyCodec.BuildDutyTable(dto.DutyPercentByZone));
         }
     }
 
@@ -108,6 +107,25 @@ public sealed class EcCoreParityTests
 
         foreach (string name in forbidden)
             Assert.DoesNotContain(name, referenced);
+    }
+
+    [Fact]
+    public void AppAssemblyDoesNotReferenceTheHardwareLayer()
+    {
+        // The phase-3 layering contract: the UI process reaches the EC only through
+        // the capability interfaces (RPC proxies to the engine service in the shipped
+        // product), so the app assembly must not reference UCU.Hardware or UCU.Engine
+        // directly. The dev-only UCU.Bridge is the single app-adjacent project that
+        // carries the hardware layer, and it exists solely for the dev-inprocess mode.
+        string[] referenced = typeof(App).Assembly
+            .GetReferencedAssemblies()
+            .Select(a => a.Name!)
+            .ToArray();
+
+        Assert.DoesNotContain("UCU.Hardware", referenced);
+        Assert.DoesNotContain("UCU.Engine", referenced);
+        Assert.Contains("UCU.Client", referenced);
+        Assert.Contains("UCU.Contracts", referenced);
     }
 
     [Fact]

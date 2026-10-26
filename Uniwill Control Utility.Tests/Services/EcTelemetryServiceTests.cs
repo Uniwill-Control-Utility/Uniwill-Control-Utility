@@ -1,4 +1,4 @@
-using UCU.Hardware.Ec;
+using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Services;
 
 namespace Uniwill_Control_Utility.Tests.Services;
@@ -20,9 +20,9 @@ public sealed class EcTelemetryServiceTests
                 Interlocked.Increment(ref captureCount);
                 captureStarted.SetResult();
                 releaseCapture.Task.GetAwaiter().GetResult();
-                return new EcFanDutySnapshot(100, 80);
+                return Task.FromResult(new EcFanDutySnapshot(100, 80));
             },
-            mainFanRpmCapture: () => 0,
+            mainFanRpmCapture: () => Task.FromResult(0),
             maxAge: TimeSpan.FromSeconds(1));
 
         EcFanDutySnapshot first = service.ReadFanDuty();
@@ -59,8 +59,8 @@ public sealed class EcTelemetryServiceTests
     {
         int captureCount = 0;
         using var service = new EcTelemetryService(
-            fanDutyCapture: () => EcFanDutySnapshot.Empty,
-            mainFanRpmCapture: () => Interlocked.Increment(ref captureCount) * 1000,
+            fanDutyCapture: () => Task.FromResult(EcFanDutySnapshot.Empty),
+            mainFanRpmCapture: () => Task.FromResult(Interlocked.Increment(ref captureCount) * 1000),
             maxAge: TimeSpan.FromMinutes(1));
 
         int first = await service.RefreshMainFanRpmAsync();
@@ -79,7 +79,7 @@ public sealed class EcTelemetryServiceTests
             TaskCreationOptions.RunContinuationsAsynchronously);
         int captureCount = 0;
         using var service = new EcTelemetryService(
-            fanDutyCapture: () => EcFanDutySnapshot.Empty,
+            fanDutyCapture: () => Task.FromResult(EcFanDutySnapshot.Empty),
             mainFanRpmCapture: () =>
             {
                 int capture = Interlocked.Increment(ref captureCount);
@@ -89,7 +89,7 @@ public sealed class EcTelemetryServiceTests
                     releaseFirstCapture.Task.GetAwaiter().GetResult();
                 }
 
-                return capture * 1000;
+                return Task.FromResult(capture * 1000);
             },
             maxAge: TimeSpan.FromMinutes(1));
 

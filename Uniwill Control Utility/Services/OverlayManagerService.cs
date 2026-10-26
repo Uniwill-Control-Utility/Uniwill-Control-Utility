@@ -1,4 +1,4 @@
-﻿using Gma.System.MouseKeyHook;
+using Gma.System.MouseKeyHook;
 using Microsoft.Extensions.Hosting;
 using System;
 using System.Threading;
@@ -7,7 +7,7 @@ using System.Timers;
 using System.Windows.Forms;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Services.Performance;
-using UCU.Hardware.Ec;
+using Uniwill_Control_Utility.Models;
 
 namespace Uniwill_Control_Utility.Services
 {

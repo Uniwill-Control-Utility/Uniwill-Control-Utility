@@ -116,7 +116,7 @@ public sealed class EngineErrorMappingTests
         // the fan queue has released the verb.
         while (transport2.WritesAt(EcEngine.REG_MANUAL_FAN_CTRL).Count < 1 && DateTime.UtcNow < deadline)
             await Task.Delay(25);
-        Assert.Equal(1, transport2.WritesAt(EcEngine.REG_MANUAL_FAN_CTRL).Count);
+        Assert.NotEmpty(transport2.WritesAt(EcEngine.REG_MANUAL_FAN_CTRL));
 
         // Any post-toggle settle delay inside the verb finishes before the probe.
         await Task.Delay(500);

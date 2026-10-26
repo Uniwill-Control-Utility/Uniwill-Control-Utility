@@ -11,7 +11,7 @@ using Uniwill_Control_Utility.Scripts.Intel_Backend;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
 using Settings = Uniwill_Control_Utility.Properties.Settings;
-using UCU.Hardware.Ec;
+using UCU.Contracts.Capabilities;
 
 namespace Uniwill_Control_Utility.Scripts
 {
@@ -30,7 +30,13 @@ namespace Uniwill_Control_Utility.Scripts
 
         // Optional EC service reference for --ec-* command routing.
         // Set from App.xaml.cs or MainWindowViewModel after DI resolves the service.
-        internal static EcEngine? EcService { get; set; }
+        internal static IPowerCapability? EcService { get; set; }
+
+        /// <summary>
+        /// Fan capability companion: preset apply writes fan curves too, and the
+        /// capabilities split EC work by domain, so the static wiring carries both.
+        /// </summary>
+        internal static IFanCapability? FanService { get; set; }
 
         public static void Translate(string ryzenAdjString, bool isAutoReapply = false, string? appliedName = null, bool localizeAppliedName = false) =>
             _ = TranslateAsync(ryzenAdjString, isAutoReapply, appliedName, localizeAppliedName);
@@ -136,19 +142,19 @@ namespace Uniwill_Control_Utility.Scripts
                                 // the EC to raise the power ceiling above the default 55W.
                                 if (ryzenAdjCommandString == "ec-overboost")
                                 {
-                                    EcService.SetOverboostProfile();
+                                    EcService.SetOverboostProfileAsync().GetAwaiter().GetResult();
                                     DiagnosticLogger.LogDebug($"EC applied: {ryzenAdjCommandString}");
                                     continue;
                                 }
 
                                 int ecValue = Convert.ToInt32(ryzenAdjCommandValueString);
 
-                                if (ryzenAdjCommandString == "ec-pl1") EcService.SetPl1(ecValue);
-                                else if (ryzenAdjCommandString == "ec-pl2") EcService.SetPl2(ecValue);
-                                else if (ryzenAdjCommandString == "ec-pl4") EcService.SetPl4(ecValue);
-                                else if (ryzenAdjCommandString == "ec-pl5") EcService.SetPl5(ecValue);
-                                else if (ryzenAdjCommandString == "ec-tcc-offset") EcService.SetTccOffset(ecValue);
-                                else if (ryzenAdjCommandString == "ec-mode") EcService.SetPerformanceMode(ecValue);
+                                if (ryzenAdjCommandString == "ec-pl1") EcService.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl1, ecValue).GetAwaiter().GetResult();
+                                else if (ryzenAdjCommandString == "ec-pl2") EcService.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl2, ecValue).GetAwaiter().GetResult();
+                                else if (ryzenAdjCommandString == "ec-pl4") EcService.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl4, ecValue).GetAwaiter().GetResult();
+                                else if (ryzenAdjCommandString == "ec-pl5") EcService.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl5, ecValue).GetAwaiter().GetResult();
+                                else if (ryzenAdjCommandString == "ec-tcc-offset") EcService.SetTccOffsetAsync(ecValue).GetAwaiter().GetResult();
+                                else if (ryzenAdjCommandString == "ec-mode") EcService.SetPerformanceModeAsync(ecValue).GetAwaiter().GetResult();
                                 else DiagnosticLogger.LogDebug($"Unknown EC command: {ryzenAdjCommandString}");
 
                                 DiagnosticLogger.LogDebug($"EC applied: {ryzenAdjCommandString}={ecValue}");

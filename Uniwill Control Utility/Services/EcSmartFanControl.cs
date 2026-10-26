@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading;
 using Serilog;
 using Uniwill_Control_Utility.Models;
-using UCU.Hardware.Ec;
+using UCU.Contracts.Capabilities;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -43,7 +43,7 @@ namespace Uniwill_Control_Utility.Services
         /// and settings instead of creating a new one.
         /// </summary>
         public static EcSmartFanControl GetOrCreate(
-            EcEngine ec,
+            IFanCapability ec,
             FlydigiTemperatureProvider temperatureProvider,
             FanControlSettings settings,
             EcFanCurve curve,
@@ -85,7 +85,7 @@ namespace Uniwill_Control_Utility.Services
         /// Useful after resume from sleep/hibernation when the EC needs re-initialization.
         /// </summary>
         public static EcSmartFanControl Recreate(
-            EcEngine ec,
+            IFanCapability ec,
             FlydigiTemperatureProvider temperatureProvider,
             FanControlSettings settings,
             EcFanCurve curve,
@@ -99,7 +99,7 @@ namespace Uniwill_Control_Utility.Services
             }
         }
 
-        private readonly EcEngine _ec;
+        private readonly IFanCapability _ec;
         private readonly FlydigiTemperatureProvider _temperatureProvider;
         private readonly EcSmartFanCycleGate _cycleGate = new();
         private Timer? _timer;
@@ -190,7 +190,7 @@ namespace Uniwill_Control_Utility.Services
         /* ------------------------------------------------------------------ */
 
         public EcSmartFanControl(
-            EcEngine ec,
+            IFanCapability ec,
             FlydigiTemperatureProvider temperatureProvider,
             FanControlSettings settings,
             EcFanCurve curve,
@@ -347,13 +347,20 @@ namespace Uniwill_Control_Utility.Services
                         {
                             byte[] tempUp = BuildTempUpTable();
                             byte[] tempDown = BuildTempDownTable();
-                            _ec.ApplySmartFanCurve(tempUp, tempDown, cpuDutyTable,
-                                tempUp, tempDown, gpuDutyTable);
+                            _ec.ApplySmartFanCurveAsync(new UCU.Contracts.SmartFanCurveDto
+                            {
+                                CpuTempUp = tempUp,
+                                CpuTempDown = tempDown,
+                                CpuDuty = cpuDutyTable,
+                                GpuTempUp = tempUp,
+                                GpuTempDown = tempDown,
+                                GpuDuty = gpuDutyTable,
+                            }).GetAwaiter().GetResult();
                             _curveTablesInitialized = true;
                         }
                         else
                         {
-                            _ec.ApplySmartFanDuty(cpuDutyTable, gpuDutyTable);
+                            _ec.ApplySmartFanDutyAsync(cpuDutyTable, gpuDutyTable).GetAwaiter().GetResult();
                         }
                     }
                     catch (Exception ex)

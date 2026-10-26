@@ -10,7 +10,7 @@ using Uniwill_Control_Utility.Services;
 using Uniwill_Control_Utility.Views.Controls;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
-using UCU.Hardware.Ec;
+using UCU.Contracts.Capabilities;
 
 namespace Uniwill_Control_Utility.ViewModels
 {
@@ -34,12 +34,13 @@ namespace Uniwill_Control_Utility.ViewModels
         [ObservableProperty]
         private string _lastAppliedSettingsToolTip = string.Empty;
 
-        private readonly EcEngine? _uniwillEc;
+        private readonly IBatteryCapability? _battery;
 
-        public MainWindowViewModel(INavigationService navigationService, EcEngine? uniwillEc = null)
+        public MainWindowViewModel(INavigationService navigationService, IPowerCapability? power = null, IFanCapability? fan = null, IBatteryCapability? battery = null)
         {
-            _uniwillEc = uniwillEc;
-            RyzenAdj_To_UCU.EcService = uniwillEc;
+            _battery = battery;
+            RyzenAdj_To_UCU.EcService = power;
+            RyzenAdj_To_UCU.FanService = fan;
             InitializeViewModel();
             LocalizationService.CultureChanged += OnCultureChanged;
             LastAppliedSettingsService.Changed += OnLastAppliedSettingsChanged;
@@ -167,7 +168,7 @@ namespace Uniwill_Control_Utility.ViewModels
                 Settings.Default.EnableOverlayNavigation,
                 Settings.Default.EnableAutoNavigation);
             bool hydroUiAvailable = WaterCoolerHardwareDetector.IsSupportedHardware();
-            bool lightBarAvailable = _uniwillEc is not null;
+            bool lightBarAvailable = _battery is not null;
 
             NavigationItems.Clear();
 
@@ -194,7 +195,7 @@ namespace Uniwill_Control_Utility.ViewModels
             // Fan Control, Keyboard, Light Bar, Battery in nav for Uniwill EC hardware (XMG / TUXEDO).
             // EC initialization runs asynchronously in DashboardViewModel.OnNavigatedToAsync(),
             // so we don't block MainWindow construction waiting for the EC handshake.
-            if (_uniwillEc is not null)
+            if (_battery is not null)
             {
                 NavigationItems.Add(CreateFanControlNavItem());
 

@@ -7,7 +7,8 @@ using System.Windows.Threading;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Abstractions.Controls;
-using UCU.Hardware.Ec;
+using UCU.Contracts;
+using UCU.Contracts.Capabilities;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
@@ -20,7 +21,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         // milliseconds to avoid reading back the stale value before the EC commits.
         private const int ApplyGraceMs = 10000; // 10 seconds
 
-        private readonly EcEngine? _ecService;
+        private readonly IBatteryCapability? _battery;
+        private readonly IEngineCapability? _engine;
         private readonly DispatcherTimer _refreshTimer = new()
         {
             Interval = TimeSpan.FromSeconds(RefreshIntervalSeconds),
@@ -45,12 +47,13 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             _refreshTimer.Tick += OnRefreshTimerTick;
 
-            _ecService = App.GetService<EcEngine>();
-            if (_ecService is not null)
+            _battery = App.GetService<IBatteryCapability>();
+            _engine = App.GetService<IEngineCapability>();
+            if (_battery is not null && _engine is not null)
             {
                 try
                 {
-                    _isEcAvailable = _ecService.Initialize();
+                    _isEcAvailable = _engine.IsHardwareAvailableAsync().GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
                 {
@@ -115,7 +118,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             int currentMode;
             try
             {
-                currentMode = _ecService!.GetBatteryMode();
+                currentMode = _battery!.GetModeAsync().GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -133,7 +136,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 try
                 {
-                    _ecService.SetBatteryMode(savedMode);
+                    _battery!.SetModeAsync(savedMode).GetAwaiter().GetResult();
                     _lastUserApplyTime = DateTime.UtcNow;
                     Debug.WriteLine($"[Battery] Startup: EC mode ({currentMode}) differed from saved ({savedMode}), applied saved");
                 }
@@ -160,7 +163,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             try
             {
-                _ecService!.SetBatteryMode(mode);
+                _battery!.SetModeAsync(mode).GetAwaiter().GetResult();
                 Settings.Default.BatteryMode = mode;
                 Settings.Default.Save();
                 _lastUserApplyTime = DateTime.UtcNow;
@@ -202,7 +205,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void RefreshAll()
         {
-            if (_ecService is null) return;
+            if (_battery is null) return;
 
             // Skip syncing the combo box if the user recently changed the setting —
             // the EC may not have committed yet.
@@ -210,7 +213,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             try
             {
-                int ecMode = _ecService.GetBatteryMode();
+                int ecMode = _battery!.GetModeAsync().GetAwaiter().GetResult();
                 if (!withinGrace)
                 {
                     // Sync combo box to EC state without triggering SelectionChanged
@@ -236,13 +239,13 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void RefreshTelemetry()
         {
-            if (_ecService is null) return;
+            if (_battery is null) return;
 
             try
             {
-                var telemetry = _ecService.ReadBatteryTelemetry();
+                BatteryTelemetryDto? telemetry = _battery.GetTelemetryAsync().GetAwaiter().GetResult();
                 if (telemetry is not null)
-                    Application.Current.Dispatcher.Invoke(() => UpdateTelemetryUi(telemetry.Value));
+                    Application.Current.Dispatcher.Invoke(() => UpdateTelemetryUi(telemetry));
             }
             catch (Exception ex)
             {
@@ -250,7 +253,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
-        private void UpdateTelemetryUi(BatteryTelemetry telemetry)
+        private void UpdateTelemetryUi(BatteryTelemetryDto telemetry)
         {
             if (telemetry.IsAcPowered)
             {

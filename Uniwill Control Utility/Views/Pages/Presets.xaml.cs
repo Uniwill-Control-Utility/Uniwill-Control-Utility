@@ -17,8 +17,6 @@ using Uniwill_Control_Utility.Scripts.Intel_Backend;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Abstractions.Controls;
-using UCU.Hardware.Ec;
-
 namespace Uniwill_Control_Utility.Views.Pages
 {
     public partial class Presets : INavigationAware
@@ -1221,7 +1219,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     var ecGate = RyzenAdj_To_UCU.EcService;
                     if (ecGate != null)
                     {
-                        ecGate.ApplyOemStockMode(PresetProfileApplier.OemModeIndexFor(_currentProfile));
+                        ecGate.ApplyOemStockModeAsync(PresetProfileApplier.OemModeIndexFor(_currentProfile)).GetAwaiter().GetResult();
                     }
                 }
 
@@ -1283,7 +1281,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                         int pl1 = (int)sdSustained.Value;
                         int pl2 = (int)sdBoost.Value;
                         DebugLog($"  Applying EC CPU power limits: PL1={pl1}W PL2={pl2}W");
-                        ec.ApplyCpuPowerLimits(pl1, pl2);
+                        ec.ApplyCpuPowerLimitsAsync(pl1, pl2).GetAwaiter().GetResult();
                         DebugLog($"  EC CPU power limits applied");
 
                         // TjMax is now handled via SMU path (--tctl-temp) in buildCommandString().

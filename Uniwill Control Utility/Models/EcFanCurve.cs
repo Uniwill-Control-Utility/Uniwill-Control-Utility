@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using UCU.Hardware.Ec;
+using UCU.Contracts;
 
 namespace Uniwill_Control_Utility.Models
 {
@@ -96,7 +96,7 @@ namespace Uniwill_Control_Utility.Models
         /// (UCU.Core's <c>EcDutyCodec</c>), so the hardware layer receives plain data
         /// and never depends on this UI/persistence model.
         /// </summary>
-        public EcFanCurveSpec ToEngineSpec() => new EcFanCurveSpec(Name, Duties);
+        public FanCurveDto ToCurveDto() => new FanCurveDto { Name = Name, DutyPercentByZone = Duties };
 
         #region Presets
         /// Each preset has 11 duty values for zones 0-10.

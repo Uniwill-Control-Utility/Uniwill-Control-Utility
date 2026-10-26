@@ -9,7 +9,7 @@ using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Views.Pages;
-using UCU.Hardware.Ec;
+using UCU.Contracts.Capabilities;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -77,7 +77,8 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private const int StartupDelayMs = 4000;
 
-        private readonly EcEngine _ec;
+        private readonly IEngineCapability _engine;
+        private readonly IFanCapability _fan;
         private readonly CancellationTokenSource _cts = new();
         private Task? _watchTask;
 
@@ -87,9 +88,10 @@ namespace Uniwill_Control_Utility.Services
         private bool _disposed;
         private Presets? _presetsPage;
 
-        public QKeyButtonService(EcEngine ec)
+        public QKeyButtonService(IEngineCapability engine, IFanCapability fan)
         {
-            _ec = ec;
+            _engine = engine;
+            _fan = fan;
         }
 
         /// <summary>
@@ -134,7 +136,7 @@ namespace Uniwill_Control_Utility.Services
         {
             await Task.Delay(StartupDelayMs, ct);
 
-            if (!_ec.Initialize())
+            if (!await _engine.IsHardwareAvailableAsync(ct).ConfigureAwait(false))
             {
                 if (!_providerUnavailableLogged)
                 {
@@ -147,7 +149,7 @@ namespace Uniwill_Control_Utility.Services
             // The EC raises the press echo only while 0x0741 bit0 is set, so arm
             // manual control before subscribing: a machine that booted at the
             // firmware's own gate (0x04) would otherwise leave the listener deaf.
-            _ec.UnlockManualMode();
+            await _fan.UnlockManualModeAsync(ct).ConfigureAwait(false);
 
             try
             {

@@ -89,10 +89,16 @@
          and no Windows APIs in this reference, so the app stays testable. -->
     <ProjectReference Include="..\UCU.Core\UCU.Core.csproj" />
 
-    <!-- EC engine + driver transport. Transitional: the app talks to the EC
-         in-process until the engine-service phase moves this reference behind the
-         RPC client. The engine service is the assembly that ships with it. -->
-    <ProjectReference Include="..\UCU.Hardware\UCU.Hardware.csproj" />
+    <!-- The engine RPC client and its wire contract: the UI process drives the EC
+         only through the capability interfaces these provide (proxies to the
+         engine service). -->
+    <ProjectReference Include="..\UCU.Client\UCU.Client.csproj" />
+    <ProjectReference Include="..\UCU.Contracts\UCU.Contracts.csproj" />
+
+    <!-- Dev-only in-process capability bridge, for the "dev-inprocess" dev flag.
+         It is the reference that carries the hardware layer; the app's source never
+         touches UCU.Hardware types. Deleted in phase 6. -->
+    <ProjectReference Include="..\UCU.Bridge\UCU.Bridge.csproj" />
 
     <!-- Crash guardian: the reference flows its output (exe/dll/deps/
          runtimeconfig) into this project's bin and publish directories, so

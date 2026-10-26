@@ -10,7 +10,8 @@ using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui;
 using Wpf.Ui.Abstractions.Controls;
-using UCU.Hardware.Ec;
+using UCU.Contracts.Capabilities;
+using Uniwill_Control_Utility.Models;
 
 namespace Uniwill_Control_Utility.ViewModels
 {
@@ -23,7 +24,8 @@ namespace Uniwill_Control_Utility.ViewModels
         private readonly INavigationService _navigationService;
         private readonly IHardwareMonitoringService _hardwareMonitoring;
         private readonly EcTelemetryService _ecTelemetry;
-        private readonly EcEngine? _uniwillEc;
+        private readonly IBatteryCapability? _battery;
+        private readonly IEngineCapability? _engine;
         private readonly HydroUIService _hydroUIService;
         private readonly FlydigiCoolerHidService _flydigiService;
         private readonly FlydigiCoolerBleService _bs1Service;
@@ -39,7 +41,8 @@ namespace Uniwill_Control_Utility.ViewModels
             INavigationService navigationService,
             IHardwareMonitoringService hardwareMonitoring,
             EcTelemetryService ecTelemetry,
-            EcEngine? uniwillEc,
+            IBatteryCapability? battery,
+            IEngineCapability? engine,
             HydroUIService hydroUIService,
             FlydigiCoolerHidService flydigiService,
             FlydigiCoolerBleService bs1Service)
@@ -50,7 +53,8 @@ namespace Uniwill_Control_Utility.ViewModels
                 ?? throw new ArgumentNullException(nameof(hardwareMonitoring));
             _ecTelemetry = ecTelemetry
                 ?? throw new ArgumentNullException(nameof(ecTelemetry));
-            _uniwillEc = uniwillEc;
+            _battery = battery;
+            _engine = engine;
             _hydroUIService = hydroUIService;
             _flydigiService = flydigiService;
             _bs1Service = bs1Service;
@@ -82,7 +86,7 @@ namespace Uniwill_Control_Utility.ViewModels
                 HardwareMetricsSnapshot snapshot = _hardwareMonitoring.ReadSnapshot();
 
                 // Enrich with EC fan speed data if available
-                if (_uniwillEc is not null)
+                if (_battery is not null)
                 {
                     EcFanDutySnapshot ecSnapshot = _ecTelemetry.ReadFanDuty();
                     snapshot = snapshot with
@@ -124,7 +128,7 @@ namespace Uniwill_Control_Utility.ViewModels
             if (Application.Current.MainWindow?.WindowState == WindowState.Minimized)
                 return;
 
-            if (_uniwillEc is null)
+            if (_battery is null)
                 return;
 
             if (Interlocked.Exchange(ref _batteryRefreshInProgress, 1) != 0)
@@ -134,7 +138,7 @@ namespace Uniwill_Control_Utility.ViewModels
             // are fetched once on navigation and cached.
             try
             {
-                int temp = await Task.Run(_uniwillEc.ReadBatteryTemperatureC);
+                int temp = await _battery.GetTemperatureAsync().ConfigureAwait(false);
                 _batteryTemperatureC = temp;
             }
             catch { /* EC read failed, keep cached value */ }
@@ -333,14 +337,16 @@ namespace Uniwill_Control_Utility.ViewModels
             // enriches snapshots on subsequent ticks but is not required for core metrics.
             // Fan curve and battery charge limit apply moved to MainWindow.mainWindow_Loaded
             // so they only fire once at app launch, not on every Dashboard navigation.
-            _ = System.Threading.Tasks.Task.Run(() =>
+            _ = System.Threading.Tasks.Task.Run(async () =>
             {
-                if (_uniwillEc is null)
+                if (_battery is null || _engine is null)
                     return;
 
                 try
                 {
-                    _uniwillEc.Initialize();
+                    // Availability check opens the engine (the RPC gate initialises lazily,
+                    // and dev-inprocess mirrors that through its own probe).
+                    await _engine.IsHardwareAvailableAsync().ConfigureAwait(false);
                 }
                 catch { /* EC not available on this hardware */ }
 
@@ -348,11 +354,11 @@ namespace Uniwill_Control_Utility.ViewModels
                 // Temperature is refreshed on the timer below.
                 try
                 {
-                    var telemetry = _uniwillEc.ReadBatteryTelemetry();
+                    var telemetry = await _battery.GetTelemetryAsync().ConfigureAwait(false);
                     if (telemetry is not null)
                     {
-                        _batteryHealthPercent = telemetry.Value.HealthPercent;
-                        _batteryTemperatureC = telemetry.Value.TemperatureC;
+                        _batteryHealthPercent = telemetry.HealthPercent;
+                        _batteryTemperatureC = telemetry.TemperatureC;
                     }
                 }
                 catch { /* EC read failed */ }

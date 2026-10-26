@@ -1,5 +1,5 @@
 using System;
-using UCU.Hardware.Ec;
+using Uniwill_Control_Utility.Models;
 
 namespace Uniwill_Control_Utility.Services
 {

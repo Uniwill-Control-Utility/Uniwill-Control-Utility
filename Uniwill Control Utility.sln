@@ -27,6 +27,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UCU.Client", "UCU.Client\UC
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UCU.Engine.Tests", "UCU.Engine.Tests\UCU.Engine.Tests.csproj", "{C07DCD06-0CF4-4C2A-A54D-A83E9F104347}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UCU.Bridge", "UCU.Bridge\UCU.Bridge.csproj", "{C7031036-0172-4FE8-8A80-E48957CD0CB9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -281,6 +283,26 @@ Global
 		{C07DCD06-0CF4-4C2A-A54D-A83E9F104347}.Release|x64.Build.0 = Release|x64
 		{C07DCD06-0CF4-4C2A-A54D-A83E9F104347}.Release|x86.ActiveCfg = Release|Any CPU
 		{C07DCD06-0CF4-4C2A-A54D-A83E9F104347}.Release|x86.Build.0 = Release|Any CPU
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Debug|ARM.ActiveCfg = Debug|Any CPU
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Debug|ARM.Build.0 = Debug|Any CPU
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Debug|x64.ActiveCfg = Debug|x64
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Debug|x64.Build.0 = Debug|x64
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Debug|x86.Build.0 = Debug|Any CPU
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Release|ARM.ActiveCfg = Release|Any CPU
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Release|ARM.Build.0 = Release|Any CPU
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Release|ARM64.Build.0 = Release|Any CPU
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Release|x64.ActiveCfg = Release|x64
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Release|x64.Build.0 = Release|x64
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Release|x86.ActiveCfg = Release|Any CPU
+		{C7031036-0172-4FE8-8A80-E48957CD0CB9}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

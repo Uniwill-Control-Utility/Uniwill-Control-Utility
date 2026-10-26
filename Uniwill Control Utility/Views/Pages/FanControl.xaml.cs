@@ -15,7 +15,7 @@ using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
-using UCU.Hardware.Ec;
+using UCU.Contracts.Capabilities;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
@@ -24,7 +24,8 @@ namespace Uniwill_Control_Utility.Views.Pages
  
         private readonly IHardwareMonitoringService _hardwareMonitoring;
         private readonly EcTelemetryService _ecTelemetry;
-        private readonly EcEngine? _uniwillEc;
+        private readonly IFanCapability? _fan;
+        private readonly IEngineCapability? _engine;
         private readonly FlydigiCoolerHidService _flydigiService;
         private readonly FlydigiCoolerBleService _bs1Service;
         private readonly DeviceApplier _deviceApplier;
@@ -53,14 +54,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             IHardwareMonitoringService hardwareMonitoring,
             DeviceApplier deviceApplier,
             EcTelemetryService ecTelemetry,
-            EcEngine? uniwillEc = null,
+            IFanCapability? fanCapability = null,
+            IEngineCapability? engineCapability = null,
             FlydigiCoolerHidService? flydigiService = null,
             FlydigiCoolerBleService? bs1Service = null)
         {
             _hardwareMonitoring = hardwareMonitoring;
             _deviceApplier = deviceApplier;
             _ecTelemetry = ecTelemetry;
-            _uniwillEc = uniwillEc;
+            _fan = fanCapability;
+            _engine = engineCapability;
             _flydigiService = flydigiService;
             _bs1Service = bs1Service;
             InitializeComponent();
@@ -101,13 +104,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             _flydigiService.ConnectionStateChanged += (s, e) => UpdateBanner();
             _bs1Service.ConnectionStateChanged += (s, e) => UpdateBanner();
 
-            // Try to initialize Uniwill EC if injected
+            // Probe the engine service once so the page shows the EC panels only
+            // when the hardware is actually reachable.
             bool uniwillAvailable = false;
-            if (_uniwillEc is not null)
+            if (_fan is not null && _engine is not null)
             {
                 try
                 {
-                    uniwillAvailable = _uniwillEc.Initialize();
+                    uniwillAvailable = _engine.IsHardwareAvailableAsync().GetAwaiter().GetResult();
                 }
                 catch
                 {
@@ -243,7 +247,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     tsSmartFanMode.IsChecked = settings.EcSmartFanMode;
 
                     // If Smart Fan Mode was toggled from the tray, update the control loop.
-                    if (smartFanWasChecked != settings.EcSmartFanMode && _uniwillEc is not null)
+                    if (smartFanWasChecked != settings.EcSmartFanMode && _fan is not null)
                     {
                         if (settings.EcSmartFanMode)
                         {
@@ -252,7 +256,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                                 _smartFanTempProvider = new FlydigiTemperatureProvider();
 
                             _smartFanControl = EcSmartFanControl.GetOrCreate(
-                                _uniwillEc,
+                                _fan,
                                 _smartFanTempProvider,
                                 settings,
                                 GetActiveCurve(),
@@ -528,7 +532,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             try
             {
-                if (_uniwillEc is null) return;
+                if (_fan is null) return;
 
                 int rpm = await _ecTelemetry.RefreshMainFanRpmAsync();
                 if (!_isUnloaded && rpm > 0)
@@ -554,7 +558,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 // Enrich with the shared EC cache. Native EC reads run on a worker
                 // and never block this DispatcherTimer callback.
-                if (_uniwillEc is not null)
+                if (_fan is not null)
                 {
                     EcFanDutySnapshot ecSnapshot = _ecTelemetry.ReadFanDuty();
                     snapshot = snapshot with
@@ -1247,7 +1251,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void ApplyCurveInBackground()
         {
-            if (_uniwillEc is null)
+            if (_fan is null)
             {
                 SetStatusText("EC not available");
                 return;
@@ -1296,7 +1300,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 try
                 {
-                    _uniwillEc!.ApplyFanCurve( cpuCurve.ToEngineSpec(), gpuCurve.ToEngineSpec(), cpuTemps, gpuTemps);
+                    _fan!.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
                 {
@@ -1330,7 +1334,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void btnRestore_Click(object sender, RoutedEventArgs e)
         {
-            if (_uniwillEc is null) return;
+            if (_fan is null) return;
 
             SetStatusText(LocalizationService.Get("Restoring auto mode..."));
 
@@ -1346,7 +1350,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 try
                 {
-                    _uniwillEc!.RestoreAutoFanControl();
+                    _fan!.RestoreAutoControlAsync().GetAwaiter().GetResult();
                 }
                 finally
                 {
@@ -1407,7 +1411,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void tsTurbo_Checked(object sender, RoutedEventArgs e)
         {
-            if (_uniwillEc is null) return;
+            if (_fan is null) return;
 
             // Remember whether Smart Fan Mode was active so we can restore it
             // when Turbo is disabled. Do NOT overwrite the persisted setting —
@@ -1441,7 +1445,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 try
                 {
-                    await _uniwillEc!.ToggleTurboAsync();
+                    await _fan!.ToggleTurboAsync();
                 }
                 catch (Exception ex)
                 {
@@ -1467,7 +1471,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void tsTurbo_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (_uniwillEc is null) return;
+            if (_fan is null) return;
 
             // Restart smart fan mode if it was active before turbo was enabled.
             // Use the in-memory flag instead of persisted settings because Turbo
@@ -1487,7 +1491,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                     var curve = GetActiveCurve();
                     var temps = GetActiveTemperatures();
                     _smartFanControl = new EcSmartFanControl(
-                        _uniwillEc,
+                        _fan,
                         _smartFanTempProvider,
                         settings,
                         curve,
@@ -1519,7 +1523,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 try
                 {
-                    _uniwillEc!.ToggleTurbo();
+                    _fan!.ToggleTurboAsync().GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
                 {
@@ -1570,7 +1574,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void tsSmartFanMode_Checked(object sender, RoutedEventArgs e)
         {
-            if (_uniwillEc is null) return;
+            if (_fan is null) return;
 
             // Skip if triggered by ApplySettings during startup
             if (_loadingSettings) return;
@@ -1595,7 +1599,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _smartFanTempProvider = new FlydigiTemperatureProvider();
 
             _smartFanControl = EcSmartFanControl.GetOrCreate(
-                _uniwillEc,
+                _fan,
                 _smartFanTempProvider,
                 settings,
                 curve,
@@ -1755,7 +1759,7 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void btnResetFanState_Click(object sender, RoutedEventArgs e)
         {
-            if (_uniwillEc is null) return;
+            if (_fan is null) return;
 
             SetStatusText(LocalizationService.Get("Resetting fan state..."));
 
@@ -1771,7 +1775,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
                 try
                 {
-                    _uniwillEc!.ResetFanState();
+                    _fan!.ResetStateAsync().GetAwaiter().GetResult();
                 }
                 finally
                 {
@@ -1892,7 +1896,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
 
             // Restart Smart Fan Mode if it was active before navigation away.
-            if (settings.EcSmartFanMode && _uniwillEc is not null)
+            if (settings.EcSmartFanMode && _fan is not null)
             {
                 // If no provider yet, create one
                 if (_smartFanTempProvider == null)
@@ -1902,7 +1906,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 var temps = GetActiveTemperatures();
 
                 _smartFanControl = EcSmartFanControl.GetOrCreate(
-                    _uniwillEc,
+                    _fan,
                     _smartFanTempProvider,
                     settings,
                     curve,

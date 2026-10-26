@@ -10,7 +10,7 @@ using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Uniwill_Control_Utility.Services;
-using UCU.Hardware.Ec;
+using UCU.Contracts.Capabilities;
 using UCU.Core.Ec;
 
 namespace Uniwill_Control_Utility.Views.Pages
@@ -18,14 +18,14 @@ namespace Uniwill_Control_Utility.Views.Pages
     public partial class Automations : Page
     {
         bool setup = false;
-        private readonly EcEngine? _ecService;
+        private readonly IGpuMuxCapability? _mux;
 
         public Automations()
         {
             InitializeComponent();
             _ = Tablet.TabletDevices;
 
-            _ecService = App.GetService<EcEngine>();
+            _mux = App.GetService<IGpuMuxCapability>();
 
             PopulateComboBox(cbxCharge, ActivePresetMode);
             PopulateComboBox(cbxDischarge, ActivePresetMode);
@@ -337,9 +337,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             try
             {
-                if (_ecService is not null)
+                if (_mux is not null)
                 {
-                    var mode = _ecService.GetCurrentGpuMuxMode();
+                    var mode = _mux.GetModeAsync().GetAwaiter().GetResult();
                     isHybrid = mode == GpuMuxMode.Hybrid;
                 }
             }
@@ -416,8 +416,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             try
             {
-                return _ecService is not null
-                    && _ecService.GetCurrentGpuMuxMode() == GpuMuxMode.DgpuOnly;
+                return _mux is not null
+                    && _mux.GetModeAsync().GetAwaiter().GetResult() == GpuMuxMode.DgpuOnly;
             }
             catch
             {

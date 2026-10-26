@@ -7,7 +7,6 @@ using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
-using UCU.Hardware.Ec;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -242,7 +241,7 @@ namespace Uniwill_Control_Utility.Services
                 var ecGate = RyzenAdj_To_UCU.EcService;
                 if (ecGate is not null)
                 {
-                    ecGate.ApplyOemStockMode(OemModeIndexFor(profileName));
+                    await ecGate.ApplyOemStockModeAsync(OemModeIndexFor(profileName)).ConfigureAwait(false);
                 }
             }
 
@@ -299,7 +298,7 @@ namespace Uniwill_Control_Utility.Services
                             };
                         }
                     }
-                    ec.ApplyCpuPowerLimits(pl1, pl2);
+                    await ec.ApplyCpuPowerLimitsAsync(pl1, pl2).ConfigureAwait(false);
                 }
             }
 
@@ -606,7 +605,7 @@ namespace Uniwill_Control_Utility.Services
 
         private static void ApplyFanCurveToEc(CustomPreset preset)
         {
-            var ec = RyzenAdj_To_UCU.EcService;
+            var ec = RyzenAdj_To_UCU.FanService;
             if (ec is null)
                 return;
 
@@ -650,7 +649,7 @@ namespace Uniwill_Control_Utility.Services
 
             try
             {
-                ec.ApplyFanCurve( cpuCurve.ToEngineSpec(), gpuCurve.ToEngineSpec(), cpuTemps, gpuTemps);
+                ec.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
                 Debug.WriteLine($"[PresetProfileApplier] Fan curve applied from preset: unified={preset.FanUnifiedMode}");
             }
             catch (Exception ex)

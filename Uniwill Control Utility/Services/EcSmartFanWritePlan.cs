@@ -1,20 +1,21 @@
 using System;
 using System.Collections.Generic;
-using UCU.Hardware.Ec;
+using UCU.Contracts;
+using UCU.Core.Ec;
 
 namespace Uniwill_Control_Utility.Services;
 
-public readonly record struct EcRegisterBlock(ushort StartAddress, byte[] Data);
-
 /// <summary>
-/// Builds the minimal recurring EC write plan for smart fan duty updates.
+/// Builds the minimal recurring EC write plan for smart fan duty updates, as the
+/// <c>fan.write_register_blocks</c> payload: the plan crosses the RPC as data and the
+/// engine writes the blocks in the order given, so the sequencing stays one call.
 /// Temperature tables are configured separately when the loop starts.
 /// </summary>
 public static class EcSmartFanWritePlan
 {
     private const int TableSize = 16;
 
-    public static IReadOnlyList<EcRegisterBlock> CreateDutyUpdate(byte[] cpuDuty, byte[] gpuDuty)
+    public static IReadOnlyList<EcRegisterBlockDto> CreateDutyUpdate(byte[] cpuDuty, byte[] gpuDuty)
     {
         ArgumentNullException.ThrowIfNull(cpuDuty);
         ArgumentNullException.ThrowIfNull(gpuDuty);
@@ -24,8 +25,8 @@ public static class EcSmartFanWritePlan
 
         return new[]
         {
-            new EcRegisterBlock(EcEngine.REG_CPU_FAN_SPEED_TABLE, (byte[])cpuDuty.Clone()),
-            new EcRegisterBlock(EcEngine.REG_GPU_FAN_SPEED_TABLE, (byte[])gpuDuty.Clone())
+            new EcRegisterBlockDto { Address = EcFanRegisters.CpuFanSpeedTable, Data = (byte[])cpuDuty.Clone() },
+            new EcRegisterBlockDto { Address = EcFanRegisters.GpuFanSpeedTable, Data = (byte[])gpuDuty.Clone() }
         };
     }
 }

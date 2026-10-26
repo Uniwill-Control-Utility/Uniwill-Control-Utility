@@ -9,7 +9,7 @@ using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.ViewModels;
-using UCU.Hardware.Ec;
+using UCU.Contracts.Capabilities;
 using UCU.Core.Ec;
 
 namespace Uniwill_Control_Utility.Services
@@ -34,7 +34,8 @@ namespace Uniwill_Control_Utility.Services
 
     public sealed class TrayQuickControlService
     {
-        private readonly EcEngine _ec;
+        private readonly IGpuMuxCapability _mux;
+        private readonly IFanCapability _fan;
         private readonly HydroUIService _waterCooler;
         private readonly DeviceApplier _deviceApplier;
         private readonly IHardwareMonitoringService _hardwareMonitoring;
@@ -51,7 +52,8 @@ namespace Uniwill_Control_Utility.Services
         public event EventHandler? LightBarSettingsChanged;
 
         public TrayQuickControlService(
-            EcEngine ec,
+            IGpuMuxCapability mux,
+            IFanCapability fan,
             HydroUIService waterCooler,
             DeviceApplier deviceApplier,
             IHardwareMonitoringService hardwareMonitoring,
@@ -60,7 +62,8 @@ namespace Uniwill_Control_Utility.Services
             OverlayManagerService overlayManager,
             FlydigiCoolerHidService flydigiCooler)
         {
-            _ec = ec;
+            _mux = mux;
+            _fan = fan;
             _waterCooler = waterCooler;
             _deviceApplier = deviceApplier;
             _hardwareMonitoring = hardwareMonitoring;
@@ -92,7 +95,7 @@ namespace Uniwill_Control_Utility.Services
             bool gpuModeDgpuOnly = false;
             try
             {
-                var muxMode = _ec.GetCurrentGpuMuxMode();
+                var muxMode = _mux.GetModeAsync().GetAwaiter().GetResult();
                 gpuModeHybrid = muxMode == GpuMuxMode.Hybrid;
                 gpuModeDgpuOnly = muxMode == GpuMuxMode.DgpuOnly;
             }
@@ -441,7 +444,7 @@ namespace Uniwill_Control_Utility.Services
 
                 var tempProvider = new FlydigiTemperatureProvider();
                 EcSmartFanControl.GetOrCreate(
-                    _ec,
+                    _fan,
                     tempProvider,
                     settings,
                     curve,

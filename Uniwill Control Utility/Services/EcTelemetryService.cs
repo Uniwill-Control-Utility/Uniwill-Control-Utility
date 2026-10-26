@@ -1,7 +1,8 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using UCU.Hardware.Ec;
+using UCU.Contracts.Capabilities;
+using Uniwill_Control_Utility.Models;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -9,9 +10,12 @@ namespace Uniwill_Control_Utility.Services
     /// Shares one demand-driven EC telemetry sample between UI consumers. Reads
     /// return immediately while stale data is refreshed on a worker thread.
     ///
-    /// If EC reads fail (driver handle lost, EC unresponsive), the service attempts
-    /// to reconnect automatically and logs the failure. Consecutive failures are
-    /// tracked so the UI can detect a persistent loss of EC access.
+    /// If EC reads fail (engine not running, driver handle lost, EC unresponsive), the
+    /// service attempts to recover on the next refresh and logs the failure.
+    /// Consecutive failures are tracked so the UI can detect a persistent loss of EC
+    /// access. Availability is re-checked on every refresh, never cached: the shipped
+    /// app starts alongside the engine service, and a startup probe that raced the
+    /// service starting must not latch the UI into a permanently degraded state.
     /// </summary>
     public sealed class EcTelemetryService : IDisposable
     {
@@ -29,14 +33,14 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public int ConsecutiveFailures => Volatile.Read(ref _consecutiveFailures);
 
-        public EcTelemetryService(EcEngine ecService)
-            : this(CreateCaptures(ecService), DefaultMaxAge)
+        public EcTelemetryService(IEcTelemetryCapability telemetry, IEngineCapability engine)
+            : this(CreateCaptures(telemetry, engine), DefaultMaxAge)
         {
         }
 
         internal EcTelemetryService(
-            Func<EcFanDutySnapshot> fanDutyCapture,
-            Func<int> mainFanRpmCapture,
+            Func<Task<EcFanDutySnapshot>> fanDutyCapture,
+            Func<Task<int>> mainFanRpmCapture,
             TimeSpan maxAge,
             TimeProvider? timeProvider = null)
         {
@@ -56,7 +60,7 @@ namespace Uniwill_Control_Utility.Services
         }
 
         private EcTelemetryService(
-            (Func<EcFanDutySnapshot> fanDuty, Func<int> mainFanRpm) captures,
+            (Func<Task<EcFanDutySnapshot>> fanDuty, Func<Task<int>> mainFanRpm) captures,
             TimeSpan maxAge)
             : this(captures.fanDuty, captures.mainFanRpm, maxAge)
         {
@@ -101,7 +105,7 @@ namespace Uniwill_Control_Utility.Services
 
         private static StaleWhileRevalidateCache<T> CreateCache<T>(
             T initialValue,
-            Func<T> capture,
+            Func<Task<T>> capture,
             TimeSpan maxAge,
             TimeProvider? timeProvider,
             Action<Exception>? onRefreshError = null,
@@ -110,47 +114,46 @@ namespace Uniwill_Control_Utility.Services
             return new StaleWhileRevalidateCache<T>(
                 initialValue,
                 maxAge,
-                _ => Task.FromResult(capture()),
+                _ => capture(),
                 timeProvider,
                 onRefreshError,
                 onRefreshSuccess);
         }
 
-        private static (Func<EcFanDutySnapshot> fanDuty, Func<int> mainFanRpm)
-            CreateCaptures(EcEngine ecService)
+        private static (Func<Task<EcFanDutySnapshot>> fanDuty, Func<Task<int>> mainFanRpm)
+            CreateCaptures(IEcTelemetryCapability telemetry, IEngineCapability engine)
         {
-            ArgumentNullException.ThrowIfNull(ecService);
-            var available = new Lazy<bool>(
-                ecService.Initialize,
-                System.Threading.LazyThreadSafetyMode.ExecutionAndPublication);
+            ArgumentNullException.ThrowIfNull(telemetry);
+            ArgumentNullException.ThrowIfNull(engine);
 
             return (
-                () =>
+                async () =>
                 {
-                    if (!available.Value)
+                    if (!await engine.IsHardwareAvailableAsync().ConfigureAwait(false))
                         return EcFanDutySnapshot.Empty;
 
                     try
                     {
-                        return ecService.ReadFanDutyTelemetry();
+                        UCU.Contracts.FanDutySnapshotDto dto = await telemetry.GetFanDutyAsync().ConfigureAwait(false);
+                        return new EcFanDutySnapshot(dto.CpuFanDuty, dto.GpuFanDuty);
                     }
                     catch (Exception ex)
                     {
-                        // Log and attempt reconnect on the next call. Re-throw so the
+                        // Log and attempt recovery on the next refresh. Re-throw so the
                         // cache error handler counts this as a failure.
                         try { Serilog.Log.Debug(ex, "[EC] Fan duty telemetry read threw"); }
                         catch { /* Serilog may not be ready */ }
                         throw;
                     }
                 },
-                () =>
+                async () =>
                 {
-                    if (!available.Value)
+                    if (!await engine.IsHardwareAvailableAsync().ConfigureAwait(false))
                         return 0;
 
                     try
                     {
-                        return ecService.GetMainFanRpm();
+                        return await telemetry.GetMainFanRpmAsync().ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {

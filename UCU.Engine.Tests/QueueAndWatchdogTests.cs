@@ -35,7 +35,7 @@ public sealed class QueueAndWatchdogTests
         await using var queue = new SerialExecutor("test", options);
 
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        Task blocker = queue.RunAsync("blocker", () => gate.Task.GetAwaiter().GetResult(), CancellationToken.None);
+        Task blocker = queue.RunAsync("blocker", () => BlockOn(gate.Task), CancellationToken.None);
 
         // The blocker is picked up (running, not queued); then exactly two calls fit.
         await Task.Delay(50);
@@ -101,14 +101,13 @@ public sealed class QueueAndWatchdogTests
         Assert.Contains("wedged-io", terminated);
 
         blocked.Set();
-        work.GetAwaiter().GetResult();
+        await work;
     }
 
     [Fact]
-    public void Watchdog_StaysSilentWhenQueuesAreHealthy()
+    public async Task Watchdog_StaysSilentWhenQueuesAreHealthy()
     {
         var options = new EngineRuntimeOptions { StuckCallThreshold = TimeSpan.FromMinutes(2) };
-        using var cts = new CancellationTokenSource();
         var queue = new SerialExecutor("fan", options);
 
         string? terminated = null;
@@ -121,7 +120,19 @@ public sealed class QueueAndWatchdogTests
         watchdog.Check(CancellationToken.None);
 
         Assert.Null(terminated);
-        queue.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        await queue.DisposeAsync();
+    }
+
+    /// <summary>
+    /// Blocks the queue worker on a task, the way a synchronous EC write parks a
+    /// queue thread. A helper (not a lambda in the test) because the blocking
+    /// <em>is</em> the scenario: a queue call is a plain delegate, cancellable
+    /// by nothing.
+    /// </summary>
+    private static object BlockOn(Task task)
+    {
+        task.GetAwaiter().GetResult();
+        return 0;
     }
 
     [Fact]
@@ -131,7 +142,7 @@ public sealed class QueueAndWatchdogTests
         var queue = new SerialExecutor("fan", options);
 
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        Task blocker = queue.RunAsync("blocker", () => gate.Task.GetAwaiter().GetResult(), CancellationToken.None);
+        Task blocker = queue.RunAsync("blocker", () => BlockOn(gate.Task), CancellationToken.None);
         await Task.Delay(50);
         Task<int> queued = queue.RunAsync("queued", () => 1, CancellationToken.None);
 

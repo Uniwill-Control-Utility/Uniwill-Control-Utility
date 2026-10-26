@@ -6,7 +6,7 @@ using Serilog;
 using System.Windows.Media;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Scripts.Misc;
-using UCU.Hardware.Ec;
+using UCU.Contracts.Capabilities;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -20,7 +20,8 @@ namespace Uniwill_Control_Utility.Services
         private readonly FlydigiCoolerHidService _flydigiService;
         private readonly FlydigiCoolerBleService? _bs1Service;
         private readonly HydroUIService _hydroUIService;
-        private readonly EcEngine? _uniwillEc;
+        private readonly IFanCapability? _fan;
+        private readonly IPowerCapability? _power;
 
         /// <summary>Whether Adaptive Mode is currently overriding Flydigi device control.</summary>
         public bool IsFlydigiOverridden { get; private set; }
@@ -146,12 +147,13 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private (byte R, byte G, byte B, int Brightness, int EffectIndex, int Speed, bool Enabled)? _savedLightBarSettings;
 
-        public DeviceApplier(FlydigiCoolerHidService flydigiService, FlydigiCoolerBleService? bs1Service, HydroUIService hydroUIService, EcEngine? uniwillEc = null)
+        public DeviceApplier(FlydigiCoolerHidService flydigiService, FlydigiCoolerBleService? bs1Service, HydroUIService hydroUIService, IFanCapability? fanCapability = null, IPowerCapability? powerCapability = null)
         {
             _flydigiService = flydigiService;
             _bs1Service = bs1Service;
             _hydroUIService = hydroUIService;
-            _uniwillEc = uniwillEc;
+            _fan = fanCapability;
+            _power = powerCapability;
         }
 
         /* ------------------------------------------------------------------ */
@@ -312,7 +314,7 @@ namespace Uniwill_Control_Utility.Services
                 _savedEcFanSettings = null;
 
                 // Re-apply restored settings to the EC immediately.
-                if (_uniwillEc is not null)
+                if (_fan is not null)
                 {
                     try
                     {
@@ -327,7 +329,10 @@ namespace Uniwill_Control_Utility.Services
                         var cpuTemps = saved.CpuTempThresholds ?? EcFanCurve.CpuTemperatures;
                         var gpuTemps = saved.GpuTempThresholds ?? EcFanCurve.GpuTemperatures;
 
-                        _uniwillEc.ApplyFanCurve( cpuCurve.ToEngineSpec(), gpuCurve.ToEngineSpec(), cpuTemps, gpuTemps);
+                        // The capability call is fully asynchronous off-thread (bridge
+                        // task pool / RPC), so blocking this worker keeps the pre-RPC
+                        // synchronous flow without parking an EC sequence on the UI thread.
+                        _fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), cpuTemps, gpuTemps).GetAwaiter().GetResult();
                     }
                     catch (Exception ex)
                     {
@@ -373,12 +378,12 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public void SyncManualControlLock()
         {
-            if (_uniwillEc is null)
+            if (_power is null)
                 return;
 
             try
             {
-                if (_uniwillEc.IsCustomProfileActive())
+                if (_power.IsCustomProfileActiveAsync().GetAwaiter().GetResult())
                     DisableManualControlLock();
                 else
                     EnableManualControlLock();
@@ -402,7 +407,7 @@ namespace Uniwill_Control_Utility.Services
             int[]? cpuTemps = null,
             int[]? gpuTemps = null)
         {
-            if (_uniwillEc is null)
+            if (_fan is null)
                 return;
 
             try
@@ -433,7 +438,7 @@ namespace Uniwill_Control_Utility.Services
                         : GetPresetCurve(presetName);
                 }
 
-                _uniwillEc.ApplyFanCurve( cpuCurve.ToEngineSpec(), gpuCurve.ToEngineSpec(), finalCpuTemps, finalGpuTemps);
+                _fan.ApplyCurveAsync(cpuCurve.ToCurveDto(), gpuCurve.ToCurveDto(), finalCpuTemps, finalGpuTemps).GetAwaiter().GetResult();
 
                 var args = new EcFanPresetAppliedEventArgs(
                     unifiedMode, presetName, customDuties, cpuPresetDuties, gpuPresetDuties, cpuTemps, gpuTemps);
@@ -713,12 +718,12 @@ namespace Uniwill_Control_Utility.Services
                             if (arg.StartsWith("--slow-limit="))
                             {
                                 if (int.TryParse(arg.Substring("--slow-limit=".Length), out int slow))
-                                    ec.SetPl1(slow / 1000);
+                                    ec.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl1, slow / 1000).GetAwaiter().GetResult();
                             }
                             else if (arg.StartsWith("--fast-limit="))
                             {
                                 if (int.TryParse(arg.Substring("--fast-limit=".Length), out int fast))
-                                    ec.SetPl2(fast / 1000);
+                                    ec.SetPowerLimitAsync(UCU.Contracts.PowerLimitKind.Pl2, fast / 1000).GetAwaiter().GetResult();
                             }
                         }
                     }
