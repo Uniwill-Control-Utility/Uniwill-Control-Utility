@@ -17,9 +17,14 @@ The repository now owns its packaging end to end:
 
 ## Version contract
 
-- `<Version>` in `Uniwill Control Utility.csproj` is the only version field.
-  It flows to `AssemblyVersion`/`FileVersion` (SDK), the title-bar chip, the
-  About page, and `build\pack.ps1` (Velopack `packVersion`).
+- `<Version>` in `Uniwill Control Utility.csproj` is the version
+  `build\pack.ps1` reads (Velopack `packVersion`) and it feeds the title-bar
+  chip and the About page. It is **not** the only version field in the
+  build: the five `UCU.*` projects (`Core`, `Contracts`, `Hardware`,
+  `Client`, `Engine`) each carry their own `<Version>`, so a release bump
+  touches six files. Keeping them aligned matters beyond tidiness: the
+  staged engine payload's file version is the cheap freshness probe for
+  `Service\Uniwill Control Utility Engine.dll`, and drift makes it lie.
 - The version must be 3-part SemVer2 (`0.9.5`). Bump the third part for every
   release. The GitHub release tag must equal the version (e.g. tag `0.9.5`).
 
@@ -101,6 +106,18 @@ runtime dependency), and zips the portable artifact.
 
 ### 5. Release validation
 
+The debug (F5) layout is not a release layout: Velopack puts the app under
+`packages\<version>` behind a `current` link, the per-machine install root
+is admin-writable, and the engine service is registered from the installed
+path. Each shipped route needs its own pass.
+
+- Payload freshness: confirm
+  `artifacts\publish\Service\Uniwill Control Utility Engine.dll` is built
+  from the same commit as the app exe (timestamp, and file version once
+  the versions are aligned). pack.ps1 step 2b checks presence only, and
+  the staging target's copy step is the one place a stale engine can ride
+  into both the MSI and the ZIP (it did, before the staging
+  `IntermediateOutputPath` fix).
 - Install the MSI on a clean Windows account (Program Files, elevated).
   The MSI is the shipped installer (Windows Installer auto-elevates on
   double-click). The Velopack `*-Setup.exe` is a 7 MB web-installer
@@ -133,9 +150,30 @@ runtime dependency), and zips the portable artifact.
   self-heals the task after a zip → MSI migration).
 - Test in-app update discovery against a local feed
   (`UCU_UPDATE_FEED_PATH=<Releases dir>`) before publishing.
-- Confirm the crash guardian (`Uniwill Control Utility Service.exe`,
-  "UCU Guardian" task) relaunches after a process kill and stays silent
-  after tray exit.
+- Engine service state after install: `services.msc` shows **UCU Engine**
+  (SCM name `UCUEngine`, `start= auto`, recovery restart x3/min),
+  `sc qc UCUEngine` reports a binPath inside the install root's version
+  directory, `sc sdshow UCUEngine` shows the Authenticated Users
+  query/start grant, and every fan/battery/keyboard operation runs with no
+  UAC prompt (the one prompt of the product is the first-launch engine
+  install).
+- Supervision: kill the app process (Task Manager) and confirm the engine
+  relaunches it; a tray exit must stay silent (no relaunch).
+- In-app update (MSI layout only): point the feed at a local `Releases\`
+  directory (`UCU_UPDATE_FEED_PATH=<dir>`), apply on graceful exit, and
+  confirm `UCU.Updater.exe` stops the engine, swaps the layout, restarts
+  the engine, and that `sc qc` then reports the new version directory with
+  the "UCU Engine" label intact (the install self-heal re-applies binPath
+  and DisplayName).
+- Portable route (ZIP): extract to a folder and run the exe. Update
+  features no-op (no Velopack layout) and Settings says so; the engine
+  installs from that folder's `Service\` (one UAC prompt) and EC
+  operations work. Move the folder and confirm the app re-points the
+  service registration before EC operations work again.
+- Uninstall end state (`Uninstall.exe` shim, or Apps & Features for the
+  MSI): `sc query UCUEngine` reports 1060 (gone), no "UCU" / "UCU
+  Autostart" / "UCU Guardian" tasks, no ARP entries, and the install root
+  plus `%ProgramData%\UCU` are deleted.
 - Confirm application exit releases HID/BLE sessions.
 
 ### 6. Publish and observe
