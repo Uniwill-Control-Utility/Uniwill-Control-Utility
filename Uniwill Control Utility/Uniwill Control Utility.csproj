@@ -110,7 +110,13 @@
        inside Service\ and leaves the app root's assemblies alone, which is
        what keeps the app process free of the hardware layer. The redirect must
        be an absolute path: a relative OutDir would resolve against the engine
-       project's directory. Runs for Build (VS F5) and Publish (pack.ps1 / VS
+       project's directory, and the value is composed with Path.Combine
+       semantics rather than string concatenation: under `dotnet publish -o
+       <dir>` PublishDir is already absolute, and appending it to the project
+       directory yields "projectDir\C:\path", which MSBuild reports as
+       MSB3191 (unable to create directory). The MSI route failed exactly
+       there; the F5 layout, where OutDir is relative, hid it. Runs for Build
+       (VS F5) and Publish (pack.ps1 / VS
        Publish).
 
        IntermediateOutputPath is redirected too, and that is not cosmetic. The
@@ -131,8 +137,8 @@
   <Target Name="StageEngineInServiceFolder" AfterTargets="Build"
           Condition="Exists('$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj')">
     <PropertyGroup>
-      <_EngineStagingOutDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(OutDir)Service\'))</_EngineStagingOutDir>
-      <_EngineStagingIntermediateDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(IntermediateOutputPath)engine\'))</_EngineStagingIntermediateDir>
+      <_EngineStagingOutDir>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(OutDir)', 'Service\'))</_EngineStagingOutDir>
+      <_EngineStagingIntermediateDir>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'engine\'))</_EngineStagingIntermediateDir>
     </PropertyGroup>
     <MSBuild Projects="$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj"
              Targets="Build"
@@ -142,8 +148,8 @@
   <Target Name="StageEngineInServiceFolderOnPublish" AfterTargets="Publish"
           Condition="Exists('$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj')">
     <PropertyGroup>
-      <_EngineStagingPublishDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(PublishDir)Service\'))</_EngineStagingPublishDir>
-      <_EngineStagingIntermediateDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\$(IntermediateOutputPath)engine\'))</_EngineStagingIntermediateDir>
+      <_EngineStagingPublishDir>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(PublishDir)', 'Service\'))</_EngineStagingPublishDir>
+      <_EngineStagingIntermediateDir>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'engine\'))</_EngineStagingIntermediateDir>
     </PropertyGroup>
     <MSBuild Projects="$(MSBuildProjectDirectory)\..\UCU.Engine\UCU.Engine.csproj"
              Targets="Publish"

@@ -57,7 +57,12 @@ The app project (25 packages) keeps the product surface:
 
 ## Build and packaging payload
 
-- **Engine staging:** the app csproj runs the engine project's `Build`/`Publish` with an **absolute** `OutDir`/`PublishDir` redirect into `$(OutDir)Service\` plus a staging-specific `IntermediateOutputPath` (the staging copy markers must describe the staged output: sharing one `obj\` with the engine's own build makes MSBuild skip the copy, which left `Service\` on a stale binary after an engine change). The absolute path keeps the service's full dependency closure (`UCU.Core/Contracts/Hardware`, hosting, Serilog) self-contained there and the app root never gains hardware-layer assemblies. The engine `ProjectReference` carries `ReferenceOutputAssembly="false"` (build order only).
+- **Engine staging:** the app csproj runs the engine project's `Build`/`Publish` with an **absolute** `OutDir`/`PublishDir` redirect into `$(OutDir)Service\` plus a staging-specific `IntermediateOutputPath` (the staging copy markers must describe the staged output: sharing one `obj\` with the engine's own build makes MSBuild skip the copy, which left `Service\` on a stale binary after an engine change). The absolute path keeps the service's full dependency closure (`UCU.Core/Contracts/Hardware`, hosting, Serilog) self-contained there and the app root never gains hardware-layer assemblies. The redirect composes paths with `Path.Combine`, not string concatenation: under
+`dotnet publish -o <dir>` the `PublishDir` is already absolute, and appending it
+to the project directory yields `projectDir\C:\path`, which MSBuild fails with
+MSB3191 - that broke the MSI route (no engine payload in the publish dir) while
+the F5 layout, where `OutDir` is relative, hid it. The engine
+`ProjectReference` carries `ReferenceOutputAssembly="false"` (build order only).
 - **Shims compiled at pack time** by `build\pack.ps1` with the .NET Framework `csc` (GAC only, C# 5 syntax): `Uninstall.exe` (uninstall chain, `requireAdministrator`) and `UCU.Updater.exe` (elevated update apply, same manifest).
 - **Verified payload:** pack step 2b fails the build when the engine payload (`Service\Uniwill Control Utility Engine.exe/.dll/.deps/.runtimeconfig`, `UCU.Core/Contracts/Hardware.dll`, hosting, Serilog hosting sink) is missing from the publish dir.
 
