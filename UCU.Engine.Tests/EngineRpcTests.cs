@@ -25,6 +25,16 @@ public sealed class EngineRpcTests
     }
 
     [Fact]
+    public async Task NotifyAppExit_RoundTrips()
+    {
+        await using var host = await EngineHostFixture.StartAsync();
+
+        // The supervisor's graceful-vs-crash input: the app sends this on its way
+        // out (App.OnExit), and the engine records it in AppExitSignal.
+        Assert.True(await host.Engine.NotifyAppExitAsync());
+    }
+
+    [Fact]
     public async Task GetInfo_ReportsProtocolPlatformAndAvailability()
     {
         await using var host = await EngineHostFixture.StartAsync();

@@ -169,8 +169,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void OpenLogFolder_Click(object sender, RoutedEventArgs e)
         {
-            var appPath = Path.GetDirectoryName(Assembly.GetEntryAssembly()?.Location ?? AppDomain.CurrentDomain.BaseDirectory) ?? ".";
-            var logFolder = Path.Combine(appPath, "logs");
+            // The log folder is per-user (App.LOGS_FOLDER): in a per-machine install
+            // the exe's own directory is not writable by the user at all.
+            var logFolder = App.LOGS_FOLDER;
 
             if (Directory.Exists(logFolder))
             {

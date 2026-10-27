@@ -63,7 +63,7 @@ sequenceDiagram
 
 Detailed stages:
 
-1. **Process preparation.** Working directory set to the exe directory (the autostart task and the supervisor also set it, so `logs\` and the graceful-exit flag land in the install root on every launch path). Localization from settings. `./logs/` plus daily-rolling `ucu_log.txt`. UI/AppDomain exception handlers. VC++ runtime registry probe.
+1. **Process preparation.** Working directory set to the exe directory (native modules load from there; the autostart task and the supervisor set it too). Localization from settings. Logs go to `%LOCALAPPDATA%\UCU\logs\` — daily-rolling `ucu_log.txt` — and the file sink is non-fatal: a directory the user cannot write degrades logging to the console instead of refusing the launch. UI/AppDomain exception handlers. VC++ runtime registry probe.
 2. **Host composition.** Navigation, monitoring, overlay, peripheral sessions, pages — plus the EC capability interfaces bound to the **RPC proxies** (`UCU.Client`). There is no in-process EC path: no app assembly references `UCU.Hardware`/`UCU.Engine` (the test suite's layering guard pins it). A developer points the same proxies at a console engine: `dotnet run --project UCU.Engine -- --console`.
 3. **Settings migration and single instance.** `Upgrade()` once per version. The `UniwillControlUtility` mutex elects the active process; a second instance signals the first to show, then exits.
 4. **Detection gate.** WMI/identity and LibreHardwareMonitor leases run in parallel; failures degrade, the UI still starts.
@@ -86,7 +86,7 @@ stateDiagram-v2
     [*] --> Disarmed: engine start / app never sighted
     Disarmed --> Armed: probe sees the app running (5 s poll)
     Armed --> Armed: app still running
-    Armed --> Disarmed: graceful-exit flag (user closed the app)
+    Armed --> Disarmed: graceful-exit signal (user closed the app)
     Armed --> Relaunch: crash after a real run (immediate, budget reset)
     Armed --> Backoff: fast crash (10 s base, exponential, max 3 budgeted)
     Backoff --> Relaunch: delay elapsed
@@ -95,7 +95,7 @@ stateDiagram-v2
 ```
 
 - Arming rule: the supervisor watches only after it has seen the app — logon autostart is the task's job, the supervisor is a crash/kill respawn.
-- The probe reads the app process's `StartTime` (LocalSystem sees every session). The graceful-exit flag (`logs\graceful-exit.flag`, written at the top of `OnExit`) must belong to the run that ended; residue from an earlier clean exit does not mask a crash.
+- The probe reads the app process's `StartTime` (LocalSystem sees every session). The graceful-exit signal is a verb, not a file: the app calls `engine.notify_app_exit` at the top of `OnExit` and `AppExitSignal` records the timestamp. It must belong to the run that ended, so a signal from an earlier run (or one older than the 2-minute window) does not mask a crash. A flag file in the install root was the old mechanism — an unelevated app cannot write Program Files in a per-machine install, and no privilege boundary should require it to.
 - The relaunch crosses the session-0 boundary through `AppSessionLauncher`: `WTSGetActiveConsoleSessionId` → `WTSQueryUserToken` (needs `SE_TCB_NAME`, LocalSystem holds it) → `DuplicateTokenEx` → `CreateEnvironmentBlock` → `CreateProcessAsUser` on `winsta0\default`, carrying `--from-guardian` (the app's historical crash-relaunch marker: minimized, no overlay).
 - `--no-supervision` and a missing app exe beside the engine (dev layout) disable it, so dev and test hosts never spawn UI processes.
 
@@ -132,7 +132,7 @@ The engine service survives sleep itself; after resume, the gate's driver handle
 ## Minimize, close and shutdown
 
 - The tray icon persists while the window is hidden; `MinimizeClose` decides whether close hides or exits; tray exit terminates.
-- `App.OnExit` writes the graceful-exit flag **first**, then deinitializes SMU/Intel backends, disposes peripheral services, and stops the Generic Host on a background task (dispatcher-deadlock avoidance). A staged Velopack update can be applied via the updater shim from here.
+- `App.OnExit` reports the intentional exit to the engine first — `engine.notify_app_exit`, best-effort with a 2 s budget so a wedged engine cannot wedge the exit — then deinitializes SMU/Intel backends, disposes peripheral services, and stops the Generic Host on a background task (dispatcher-deadlock avoidance). A staged Velopack update can be applied via the updater shim from here.
 - Stopping the app never stops the engine; the service remains for the next launch and supervises this one's death as intentional.
 
 ## Updates and uninstall

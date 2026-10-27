@@ -32,7 +32,7 @@ public sealed class AppSupervisionTests
                 new EngineRuntimeOptions { SupervisionEnabled = false },
                 NullLogger<AppSupervision>.Instance,
                 probeAppStartUtc: () => AppStartUtc,
-                gracefulFlagFresh: _ => Graceful,
+                gracefulExitFresh: _ => Graceful,
                 launchApp: () => { Launches++; return true; },
                 clock: () => Now);
         }
@@ -176,42 +176,44 @@ public sealed class AppSupervisionTests
     }
 
     [Fact]
-    public void GracefulFlag_MustBelongToTheRunThatEnded()
+    public void GracefulSignal_MustBelongToTheRunThatEnded()
     {
         DateTime now = new(2026, 10, 26, 12, 0, 0, DateTimeKind.Utc);
-        string flag = Path.Combine(Path.GetTempPath(), "ucu-test-graceful-" + Guid.NewGuid().ToString("N") + ".flag");
 
-        try
-        {
-            File.WriteAllText(flag, "2026-10-26T11:00:00Z");
-            DateTime lastWrite = new(2026, 10, 26, 11, 59, 30, DateTimeKind.Utc);
-            File.SetLastWriteTimeUtc(flag, lastWrite);
+        var inRun = new AppExitSignal();
+        inRun.SignalGracefulExit(now.AddSeconds(-30));
 
-            // Flag written during the run (run 11:54:30, flag 11:59:30): the run
-            // ended cleanly.
-            Assert.True(AppSupervision.GracefulExitSignaled(flag, lastWrite.AddMinutes(-5), lastWrite.AddSeconds(2)));
-            // Flag written BEFORE the run started: it is an earlier clean exit's
-            // residue (the file outlives the process) — this death is a crash.
-            Assert.False(AppSupervision.GracefulExitSignaled(flag, runStartedUtc: lastWrite.AddSeconds(30), nowUtc: lastWrite.AddSeconds(31)));
+        // Signalled during the run (run started 11:55, signal 11:59:30): the run
+        // ended cleanly.
+        Assert.True(inRun.IsFreshGracefulExit(now.AddMinutes(-5), now, AppSupervision.GracefulExitWindow));
 
-            // Flag written during the run, fresh: graceful.
-            Assert.True(AppSupervision.GracefulExitSignaled(flag, lastWrite.AddMinutes(-2), lastWrite.AddSeconds(2)));
+        // Signalled BEFORE the run started: it belongs to an earlier run, so this
+        // death is a crash - the rule the flag file needed for the same case.
+        Assert.False(inRun.IsFreshGracefulExit(now.AddSeconds(-10), now, AppSupervision.GracefulExitWindow));
 
-            // Stale flag (older than the window): crash.
-            Assert.False(AppSupervision.GracefulExitSignaled(flag, lastWrite.AddHours(-3), lastWrite.AddMinutes(5)));
-        }
-        finally
-        {
-            File.Delete(flag);
-        }
+        // Signalled outside the window: that app died long ago, and an old signal
+        // must not suppress the relaunch of a later run.
+        var stale = new AppExitSignal();
+        stale.SignalGracefulExit(now - AppSupervision.GracefulExitWindow - TimeSpan.FromSeconds(1));
+        Assert.False(stale.IsFreshGracefulExit(now.AddHours(-3), now, AppSupervision.GracefulExitWindow));
     }
 
     [Fact]
-    public void GracefulFlag_MissingFile_IsACrash()
+    public void GracefulSignal_NothingSignalled_IsACrash()
     {
-        Assert.False(AppSupervision.GracefulExitSignaled(
-            Path.Combine(Path.GetTempPath(), "ucu-definitely-absent-" + Guid.NewGuid().ToString("N") + ".flag"),
-            runStartedUtc: null,
-            nowUtc: DateTime.UtcNow));
+        Assert.False(new AppExitSignal().IsFreshGracefulExit(null, DateTime.UtcNow, AppSupervision.GracefulExitWindow));
+    }
+
+    [Fact]
+    public async Task GracefulSignal_ReadsWhatAnotherThreadSignalled()
+    {
+        // The verb handler runs on a pipe worker and the supervisor polls on its
+        // own timer: the Interlocked hand-off is what makes the value visible there.
+        DateTime when = new(2026, 10, 26, 12, 0, 0, DateTimeKind.Utc);
+        var signal = new AppExitSignal();
+
+        Assert.Null(signal.LastGracefulExitUtc);
+        await Task.Run(() => signal.SignalGracefulExit(when));
+        Assert.Equal(when, signal.LastGracefulExitUtc);
     }
 }

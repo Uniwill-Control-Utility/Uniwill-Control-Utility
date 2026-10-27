@@ -56,10 +56,10 @@ namespace Uniwill_Control_Utility.Services
 
             td.Triggers.Add(new LogonTrigger { Delay = delay });
 
-            // Working directory = the exe's folder: the app resolves its logs
-            // folder (and the graceful-exit flag the guardian and the engine's
-            // supervisor read) relative to the CWD, and the task scheduler's
-            // default CWD is the system directory.
+            // Working directory = the exe's folder: the app pins its CWD to the
+            // payload directory on startup (native DLLs load from there), and the
+            // task scheduler's default CWD is the system directory. Logs, presets
+            // and the graceful-exit signal are per-user/RPC, no longer CWD-relative.
             string target = exePath ?? CurrentExePath;
             td.Actions.Add(new ExecAction(target,
                 string.IsNullOrEmpty(arguments) ? null : arguments,

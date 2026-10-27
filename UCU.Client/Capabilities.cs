@@ -284,5 +284,8 @@ namespace UCU.Client
 
         public Task<bool> IsHardwareAvailableAsync(CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<bool>(EngineVerbs.Engine.IsHardwareAvailable, cancellationToken);
+
+        public Task<bool> NotifyAppExitAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Engine.NotifyAppExit, cancellationToken);
     }
 }

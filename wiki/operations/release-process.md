@@ -145,9 +145,17 @@ path. Each shipped route needs its own pass.
   stale entry that errors 1605 on retry. The shim deletes it; users
   uninstalling via Control Panel alone may need the entry right-click
   removed.
-- Confirm startup elevation, prerequisites, settings upgrade, preserved user
-  data, and that the "UCU" scheduled task points at the new path (the app
-  self-heals the task after a zip → MSI migration).
+- Launch the installed app from an **unelevated** account: it must start with
+  no prompt and write nothing to the install root, which a per-machine layout
+  gives to Administrators only. App logs belong in `%LOCALAPPDATA%\UCU\logs`,
+  settings and presets in `%APPDATA%\UCU` / `%LOCALAPPDATA%\UCU`; a log
+  directory that cannot be created must degrade logging to the console, not
+  abort the launch (the launch-level symptom of this defect is an
+  "Access to the path …\current\logs is denied" popup). Known gap:
+  `Settings.Default.Path` defaults to empty, so `adaptivePresets.json` is
+  relative to the install root. Also confirm prerequisites, the settings
+  upgrade, preserved user data, and that the autostart task points at the new
+  path (the app self-heals the task after a zip → MSI migration).
 - Test in-app update discovery against a local feed
   (`UCU_UPDATE_FEED_PATH=<Releases dir>`) before publishing.
 - Engine service state after install: `services.msc` shows **UCU Engine**

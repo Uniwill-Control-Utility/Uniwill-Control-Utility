@@ -15,6 +15,12 @@ namespace UCU.Engine
     /// mutex trick, and launches into the user's session through
     /// <see cref="AppSessionLauncher"/>.
     ///
+    /// The graceful-vs-crash input also changed: the app reports an intentional
+    /// exit through the RPC verb engine.notify_app_exit (see
+    /// <see cref="AppExitSignal"/>) instead of writing a flag file into the
+    /// install root, which an unelevated app cannot write in a per-machine
+    /// install and which no privilege boundary should require it to.
+    ///
     /// Arming rule: the supervisor watches only once it has seen the app
     /// running — it is a crash/kill respawn, not the logon autostart (the
     /// "UCU Autostart" scheduled task owns that). After the policy stops
@@ -34,11 +40,11 @@ namespace UCU.Engine
         internal static readonly TimeSpan BaseDelay = TimeSpan.FromSeconds(10);
         internal static readonly TimeSpan MaxDelay = TimeSpan.FromMinutes(10);
         internal static readonly TimeSpan FastExitThreshold = TimeSpan.FromMinutes(2);
-        internal static readonly TimeSpan GracefulFlagWindow = TimeSpan.FromMinutes(2);
+        internal static readonly TimeSpan GracefulExitWindow = TimeSpan.FromMinutes(2);
 
         private readonly ILogger<AppSupervision> _logger;
         private readonly Func<DateTime?> _probeAppStartUtc;
-        private readonly Func<DateTime?, bool> _gracefulFlagFresh;
+        private readonly Func<DateTime?, bool> _gracefulExitFresh;
         private readonly Func<bool> _launchApp;
         private readonly Func<DateTime> _clock;
 
@@ -47,11 +53,14 @@ namespace UCU.Engine
         private int _consecutiveFastFailures;
         private DateTime? _relaunchDueUtc;
 
-        /// <summary>Production composition: real process probe, real flag, real launcher.</summary>
-        public AppSupervision(EngineRuntimeOptions options, ILogger<AppSupervision> logger)
+        /// <summary>
+        /// Production composition: real process probe, the verb-carried graceful
+        /// exit signal, real launcher.
+        /// </summary>
+        public AppSupervision(EngineRuntimeOptions options, AppExitSignal appExit, ILogger<AppSupervision> logger)
             : this(options, logger,
                 ProbeAppProcess,
-                runStartedUtc => GracefulExitSignaled(EnginePaths.GracefulExitFlagPath, runStartedUtc, DateTime.UtcNow),
+                runStartedUtc => appExit.IsFreshGracefulExit(runStartedUtc, DateTime.UtcNow, GracefulExitWindow),
                 () => LaunchApp(logger),
                 () => DateTime.UtcNow)
         {
@@ -66,13 +75,13 @@ namespace UCU.Engine
             EngineRuntimeOptions options,
             ILogger<AppSupervision> logger,
             Func<DateTime?> probeAppStartUtc,
-            Func<DateTime?, bool> gracefulFlagFresh,
+            Func<DateTime?, bool> gracefulExitFresh,
             Func<bool> launchApp,
             Func<DateTime> clock)
         {
             _logger = logger;
             _probeAppStartUtc = probeAppStartUtc;
-            _gracefulFlagFresh = gracefulFlagFresh;
+            _gracefulExitFresh = gracefulExitFresh;
             _launchApp = launchApp;
             _clock = clock;
             Options = options;
@@ -142,7 +151,7 @@ namespace UCU.Engine
             // Running → stopped transition: the policy decides.
             _watching = false;
             TimeSpan runDuration = now - (_runningSince ?? now);
-            bool graceful = _gracefulFlagFresh(_runningSince);
+            bool graceful = _gracefulExitFresh(_runningSince);
 
             GuardianDecision decision = GuardianPolicy.Evaluate(
                 graceful, runDuration, _consecutiveFastFailures,
@@ -223,31 +232,6 @@ namespace UCU.Engine
             {
                 // Process enumeration is not the critical path; treat as not running.
                 return null;
-            }
-        }
-
-        /// <summary>
-        /// Fresh graceful-exit flag = the user closed the app; stale or missing =
-        /// crash/kill. The flag must belong to the run that ended: the file
-        /// outlives the process, so a previous clean exit's flag is filtered by
-        /// the run's start time (5 s tolerance for clock granularity).
-        /// </summary>
-        internal static bool GracefulExitSignaled(string flagPath, DateTime? runStartedUtc, DateTime nowUtc)
-        {
-            try
-            {
-                if (!File.Exists(flagPath))
-                    return false;
-
-                DateTime lastWrite = File.GetLastWriteTimeUtc(flagPath);
-                if (nowUtc - lastWrite >= GracefulFlagWindow)
-                    return false;
-
-                return runStartedUtc is null || lastWrite >= runStartedUtc.Value.AddSeconds(-5);
-            }
-            catch (Exception)
-            {
-                return false;
             }
         }
     }

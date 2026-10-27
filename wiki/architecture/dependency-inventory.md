@@ -54,6 +54,7 @@ The app project (25 packages) keeps the product surface:
 - Task Scheduler (app autostart task), registry APIs, power/device-arrival notifications, display APIs.
 - Session-token APIs in the engine's `AppSessionLauncher`: `wtsapi32` (`WTSGetActiveConsoleSessionId`, `WTSQueryUserToken`), `advapi32` (`DuplicateTokenEx`, `CreateProcessAsUser`), `userenv` (`CreateEnvironmentBlock`).
 - `\\.\ACPIDriver` IOCTLs (engine-only, `EcDriverTransport`), ETW sessions, `kernel32`/`user32`/`hid`/`setupapi` calls.
+- Writable state is per-user by requirement, not by layout: settings and presets in `%APPDATA%/UCU` and `%LOCALAPPDATA%/UCU`, logs in `%LOCALAPPDATA%/UCU/logs`. In a per-machine install the app is unelevated and its own directory (Program Files) is read-only to it, so no code path may write relative to the install root; the app's graceful-exit signal reaches the engine as the `engine.notify_app_exit` verb instead of a file in the install root. `Settings.Default.Path` (empty default, so a relative path) is the known remaining violation.
 
 ## Build and packaging payload
 
@@ -64,7 +65,7 @@ MSB3191 - that broke the MSI route (no engine payload in the publish dir) while
 the F5 layout, where `OutDir` is relative, hid it. The engine
 `ProjectReference` carries `ReferenceOutputAssembly="false"` (build order only).
 - **Shims compiled at pack time** by `build\pack.ps1` with the .NET Framework `csc` (GAC only, C# 5 syntax): `Uninstall.exe` (uninstall chain, `requireAdministrator`) and `UCU.Updater.exe` (elevated update apply, same manifest).
-- **Verified payload:** pack step 2b fails the build when the engine payload (`Service\Uniwill Control Utility Engine.exe/.dll/.deps/.runtimeconfig`, `UCU.Core/Contracts/Hardware.dll`, hosting, Serilog hosting sink) is missing from the publish dir.
+- **Verified payload:** pack step 2b fails the build when the engine payload (`Service\Uniwill Control Utility Engine.exe/.dll/.deps/.runtimeconfig`, `UCU.Core/Contracts/Hardware.dll`, hosting, Serilog hosting sink) is missing from the publish dir. Step 2b' then fails it when the staged engine is stale: `FileVersion` not matching the release version, or a build older than the app exe beside it - a `Service\` binary from an earlier build ships an engine that speaks an older verb set, which the client answers with `Unsupported`.
 
 ## Tracked binary payload
 

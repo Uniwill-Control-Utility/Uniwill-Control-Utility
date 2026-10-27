@@ -19,12 +19,14 @@ namespace UCU.Engine
         private readonly Dictionary<string, VerbHandler> _handlers;
         private readonly EngineDomainQueues _queues;
         private readonly EcEngineGate _gate;
+        private readonly AppExitSignal _appExit;
 
-        public EngineDispatcher(EcEngineGate gate, EngineDomainQueues queues)
+        public EngineDispatcher(EcEngineGate gate, EngineDomainQueues queues, AppExitSignal appExit)
         {
             _gate = gate;
             _queues = queues;
-            _handlers = BuildHandlers(gate);
+            _appExit = appExit;
+            _handlers = BuildHandlers(gate, appExit);
         }
 
         public IReadOnlyCollection<string> Verbs => _handlers.Keys;
@@ -91,7 +93,7 @@ namespace UCU.Engine
             _ => "unexpected engine fault; see the engine log",
         };
 
-        private static Dictionary<string, VerbHandler> BuildHandlers(EcEngineGate gate)
+        private static Dictionary<string, VerbHandler> BuildHandlers(EcEngineGate gate, AppExitSignal appExit)
         {
             var handlers = new Dictionary<string, VerbHandler>(StringComparer.Ordinal);
 
@@ -103,7 +105,7 @@ namespace UCU.Engine
             KeyboardVerbs.Register(Add, gate);
             BatteryVerbs.Register(Add, gate);
             TelemetryVerbs.Register(Add, gate);
-            EngineVerbsImpl.Register(Add, gate);
+            EngineVerbsImpl.Register(Add, gate, appExit);
 
             return handlers;
         }

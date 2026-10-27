@@ -38,6 +38,7 @@ namespace UCU.Engine
             {
                 services.AddSingleton(options);
                 services.AddSingleton<EcEngineGate>();
+            services.AddSingleton<AppExitSignal>();
                 services.AddSingleton<EngineDomainQueues>();
                 services.AddSingleton<EngineDispatcher>();
                 services.AddHostedService<EnginePipeServer>();

@@ -112,18 +112,18 @@ namespace Uniwill_Control_Utility
         private Mutex? mutex;
         private const string MutexName = "UniwillControlUtility";
 
-        // Written at the top of OnExit so the engine's supervisor (and any
-        // lingering legacy guardian) distinguishes an intentional shutdown from
-        // a crash (see AppSupervision / GuardianPolicy). A file, not a named
-        // event: kernel objects die with the process, and the supervisor's 5s
-        // poll only observes the death after we are gone.
-        internal static string GracefulExitFlagPath => Path.Combine(LOGS_FOLDER, "graceful-exit.flag");
-
         private const string AutostartTaskName = "UCU Autostart";
         private const string LegacyAutostartTaskName = "UCU";
 
         internal static readonly string SCALE_MODELS_JSON_PATH = ".\\ScaleModels.json";
-        internal static readonly string LOGS_FOLDER = ".\\logs\\";
+
+        // Logs live with the app's other per-user state, not beside the exe: a
+        // per-machine (MSI) install runs from Program Files, which an unelevated
+        // user cannot write, and this is the process that logs. %LOCALAPPDATA% is
+        // writable in every layout (dev, portable, installed), and it is where the
+        // About page's "Open logs" button and the docs point.
+        internal static readonly string LOGS_FOLDER = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UCU", "logs") + "\\";
 
         internal static string product = "";
         public static Task DisplaySetupTask { get; private set; } = Task.CompletedTask;
@@ -193,18 +193,28 @@ namespace Uniwill_Control_Utility
 
                 await startupProgressReporter.ReportAsync(StartupStage.PreparingDiagnostics);
 
-                // Ensure logs directory exists before configuring the logger
-                if (!Directory.Exists(LOGS_FOLDER))
-                    Directory.CreateDirectory(LOGS_FOLDER);
-
-                Log.Logger = new LoggerConfiguration()
+                var loggerConfiguration = new LoggerConfiguration()
                     .MinimumLevel.ControlledBy(Scripts.Misc.DiagnosticLogger.LevelSwitch)
-                    .WriteTo.Console(theme: AnsiConsoleTheme.Code, applyThemeToRedirectedOutput: true)
-                    .WriteTo.File(LOGS_FOLDER + "ucu_log.txt",
+                    .WriteTo.Console(theme: AnsiConsoleTheme.Code, applyThemeToRedirectedOutput: true);
+
+                // The file sink is diagnostics, never a reason to refuse startup: a
+                // directory the user may not write (a per-machine install root, a
+                // full disk) degrades logging to the console instead of ending the
+                // launch with an access-denied popup.
+                try
+                {
+                    Directory.CreateDirectory(LOGS_FOLDER);
+                    loggerConfiguration.WriteTo.File(LOGS_FOLDER + "ucu_log.txt",
                         fileSizeLimitBytes: 8 * 1024 * 1024, // 8MB
                         rollingInterval: RollingInterval.Day
-                    )
-                    .CreateLogger();
+                    );
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"File logging to '{LOGS_FOLDER}' unavailable: {ex.Message}");
+                }
+
+                Log.Logger = loggerConfiguration.CreateLogger();
 
                 Log.Information("Logger initialized");
 
@@ -1314,16 +1324,25 @@ namespace Uniwill_Control_Utility
         /// </summary>
         private void OnExit(object sender, ExitEventArgs e)
         {
-            // Marks this shutdown as intentional (tray Exit / window close), so the
-            // guardian does not relaunch the app. Crash paths never reach OnExit.
-            // The flag file outlives the process, so the guardian's next poll
-            // (up to 5s later) still sees it.
+            // Tell the engine this shutdown is intentional so its supervisor does
+            // not relaunch the app (a crash never reaches OnExit). The app exits
+            // right after this, so the call is waited on - bounded, because a
+            // wedged engine must never wedge the exit. A signal the engine never
+            // receives costs one relaunch, not correctness.
             try
             {
-                Directory.CreateDirectory(LOGS_FOLDER);
-                File.WriteAllText(GracefulExitFlagPath, DateTime.UtcNow.ToString("O"));
+                IEngineCapability? engine = GetService<IEngineCapability>();
+                if (engine is not null)
+                {
+                    using var notifyCts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                    engine.NotifyAppExitAsync(notifyCts.Token).GetAwaiter().GetResult();
+                }
             }
-            catch { /* best-effort during teardown */ }
+            catch
+            {
+                // Best effort during teardown. This is also the normal path when
+                // the engine is not running, where there is nothing to disarm.
+            }
 
             _showListenerCts?.Cancel();
             _showEvent?.Dispose();

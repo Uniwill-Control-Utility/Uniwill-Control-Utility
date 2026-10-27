@@ -101,7 +101,7 @@ The pipe DACL is `D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;GRGW;;;IU)`: System and Adminis
 - The WPF dispatcher owns visual state; the RPC client is connection-per-call, so UI concurrency is unchanged.
 - Hardware ordering is enforced in the engine: one queue per domain, FIFO, one operation at a time; cross-domain writes are intentionally unordered (they touch different register groups).
 - The supervision loop, pipe accept loop and watchdog run as hosted background services.
-- Shutdown: the app writes `logs\graceful-exit.flag` first so the supervisor distinguishes exit from crash; the engine keeps running after the app exits (it is a machine service).
+- Shutdown: the app reports its intentional exit over RPC (`engine.notify_app_exit`) first so the supervisor distinguishes exit from crash; the engine keeps running after the app exits (it is a machine service).
 
 ## Architectural constraints
 

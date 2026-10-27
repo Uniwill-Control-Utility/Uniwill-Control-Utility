@@ -10,7 +10,7 @@ namespace UCU.Engine
     /// </summary>
     internal static class EngineVerbsImpl
     {
-        public static void Register(Action<string, VerbHandler> add, EcEngineGate gate)
+        public static void Register(Action<string, VerbHandler> add, EcEngineGate gate, AppExitSignal appExit)
         {
             add(EngineVerbs.Engine.Ping, (p, ct) => Task.FromResult<object?>(true));
 
@@ -32,6 +32,15 @@ namespace UCU.Engine
 
             add(EngineVerbs.Engine.IsHardwareAvailable, (p, ct) =>
                 Task.FromResult<object?>(gate.TryProbe()));
+
+            add(EngineVerbs.Engine.NotifyAppExit, (p, ct) =>
+            {
+                // The app's "this shutdown is intentional". Inline, and the timestamp
+                // is taken as received: the supervisor's poll is the consumer, the app
+                // is on its way out, and a hardware queue has nothing to do with it.
+                appExit.SignalGracefulExit(DateTime.UtcNow);
+                return Task.FromResult<object?>(true);
+            });
         }
     }
 }

@@ -35,13 +35,13 @@ Only one UCU process should remain. Launching again should bring the existing wi
 
 ## Logging
 
-Logs are written relative to the executable:
+Logs are written per user, under the local application data directory:
 
 ```text
-<application directory>/logs/ucu_log.txt
+%LOCALAPPDATA%/UCU/logs/ucu_log.txt
 ```
 
-The file sink rolls daily and limits each file to 8 MiB. Logging level is controlled in Settings through `DiagnosticLogLevel` and the shared Serilog level switch.
+The file sink rolls daily and limits each file to 8 MiB. Logging level is controlled in Settings through `DiagnosticLogLevel` and the shared Serilog level switch. The sink is never a startup requirement: if the directory cannot be created (a read-only profile, a full disk) logging degrades to the console and the launch continues.
 
 For a useful incident report, capture:
 

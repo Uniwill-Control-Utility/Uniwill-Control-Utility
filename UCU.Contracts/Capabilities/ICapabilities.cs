@@ -176,5 +176,13 @@ namespace UCU.Contracts.Capabilities
         Task<EngineInfoDto> GetInfoAsync(CancellationToken cancellationToken = default);
 
         Task<bool> IsHardwareAvailableAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Reports an intentional app shutdown (tray Exit / window close) so the
+        /// engine's supervisor does not relaunch the app. Call it best-effort with
+        /// a short budget: the engine poll is the consumer, a crash never sends it,
+        /// and a lost signal costs one relaunch.
+        /// </summary>
+        Task<bool> NotifyAppExitAsync(CancellationToken cancellationToken = default);
     }
 }

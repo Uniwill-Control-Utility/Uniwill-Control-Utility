@@ -97,6 +97,14 @@ namespace UCU.Contracts
             public const string Ping = "engine.ping";
             public const string GetInfo = "engine.get_info";
             public const string IsHardwareAvailable = "engine.is_hardware_available";
+
+            /// <summary>
+            /// "This shutdown is intentional": the app reports its own graceful
+            /// exit as a verb, so the supervisor can tell a user close from a
+            /// crash without a file path shared between an unelevated app and a
+            /// LocalSystem service. Best-effort by contract: a crash never sends it.
+            /// </summary>
+            public const string NotifyAppExit = "engine.notify_app_exit";
         }
     }
 }
