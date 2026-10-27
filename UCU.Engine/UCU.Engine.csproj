@@ -18,7 +18,7 @@
     <AssemblyTitle>Uniwill Control Utility Engine</AssemblyTitle>
     <Product>Uniwill Control Utility Engine</Product>
     <Copyright>© 2020-2026 UXTU Team, 2026 UCU Team</Copyright>
-    <Version>0.9.6</Version>
+    <!-- Version: Directory.Build.props, the single source of truth. -->
     <ApplicationIcon>..\Uniwill Control Utility\favicon.ico</ApplicationIcon>
     <!-- The SCM service name (the stable identity used by sc.exe and the app).
          The user-facing label in services.msc is the DisplayName in

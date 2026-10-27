@@ -12,7 +12,7 @@
     <Platforms>AnyCPU;x64</Platforms>
     <AssemblyName>UCU.Hardware</AssemblyName>
     <RootNamespace>UCU.Hardware</RootNamespace>
-    <Version>0.9.6</Version>
+    <!-- Version: Directory.Build.props, the single source of truth. -->
     <Copyright>© 2020-2026 UXTU Team, 2026 UCU Team</Copyright>
   </PropertyGroup>
 

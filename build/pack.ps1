@@ -57,6 +57,30 @@ foreach ($file in @(
     if (-not (Test-Path (Join-Path $publishDir $file))) { throw "Service payload '$file' missing from publish dir (staging target broken?)" }
 }
 
+# --- 2b'. Freshness: the staged engine must come from this build ---
+# Presence is not freshness. The staging target runs the engine's Build/Publish
+# with its output redirected into Service\, and that copy step is the one place a
+# stale service binary can ride into both the MSI and the portable ZIP: before the
+# target got its own IntermediateOutputPath, MSBuild's copy markers made it skip
+# the copy, so Service\ kept the previous binary while the app build stayed green.
+# The publish dir is written by this run, so an engine file older than the app exe
+# means exactly that skip. The version check catches the other drift: Version
+# lives in Directory.Build.props for every project, so a mismatched engine file
+# version can only be a stale payload.
+$appExe = Get-Item (Join-Path $publishDir "Uniwill Control Utility.exe")
+foreach ($engineFile in @(
+    "Service\Uniwill Control Utility Engine.dll",
+    "Service\Uniwill Control Utility Engine.exe"
+)) {
+    $engine = Get-Item (Join-Path $publishDir $engineFile)
+    if ($engine.LastWriteTime -lt $appExe.LastWriteTime) {
+        throw "Stale engine payload: '$engineFile' ($($engine.LastWriteTime)) is older than the app exe ($($appExe.LastWriteTime)) - the staging target skipped its copy"
+    }
+    if ($engine.VersionInfo.FileVersion -notlike "$version*") {
+        throw "Engine payload version drift: '$engineFile' file version '$($engine.VersionInfo.FileVersion)' does not match release version $version"
+    }
+}
+
 # --- 2c. Compile the Uninstall.exe shim into the layout ---
 # The MSI template ships every file in the publish dir, so a shim compiled
 # here lands next to the app in MSI installs and portable zips. Built with

@@ -10,21 +10,21 @@ The repository now owns its packaging end to end:
 - `vpk` is pinned in `dotnet-tools.json` (`dotnet tool restore`).
 - The in-app updater is Velopack (`Services\VelopackUpdateService.cs`) reading
   the GitHub Releases feed; the legacy Octokit/msiexec flow is removed.
-- Version has a single source of truth: `<Version>` in the project file
+- Version has a single source of truth: `<Version>` in `Directory.Build.props`
   (3-part `a.b.c` — Velopack rejects 4-part versions).
 - Releases are published manually: run the script, upload the printed
   manifest to a GitHub release tagged with the same version.
 
 ## Version contract
 
-- `<Version>` in `Uniwill Control Utility.csproj` is the version
-  `build\pack.ps1` reads (Velopack `packVersion`) and it feeds the title-bar
-  chip and the About page. It is **not** the only version field in the
-  build: the five `UCU.*` projects (`Core`, `Contracts`, `Hardware`,
-  `Client`, `Engine`) each carry their own `<Version>`, so a release bump
-  touches six files. Keeping them aligned matters beyond tidiness: the
-  staged engine payload's file version is the cheap freshness probe for
-  `Service\Uniwill Control Utility Engine.dll`, and drift makes it lie.
+- `<Version>` in `Directory.Build.props` (repository root) is the only version
+  field. It flows to `AssemblyVersion`/`FileVersion`/`ProductVersion` for every
+  project (app, `UCU.Client/Contracts/Core/Hardware`, the engine and the test
+  assemblies), to the title-bar chip and the About page, and to
+  `build\pack.ps1`, which reads it through the app project as the Velopack
+  `packVersion`. Per-project `<Version>` fields are gone deliberately: they
+  let a release ship a new app over a stale engine, and the engine payload's
+  file version is the freshness probe `pack.ps1` asserts.
 - The version must be 3-part SemVer2 (`0.9.5`). Bump the third part for every
   release. The GitHub release tag must equal the version (e.g. tag `0.9.5`).
 
@@ -76,7 +76,7 @@ runtime dependency), and zips the portable artifact.
 
 ### 1. Prepare version metadata
 
-- Bump `<Version>` (3-part) in the project file.
+- Bump `<Version>` (3-part) in `Directory.Build.props`.
 - Prepare a changelog for the average user (features, fixes, behavior
   changes) for the GitHub release body — the in-app updater shows only the
   version, so the release page is the only place users learn what is new.
@@ -111,13 +111,13 @@ The debug (F5) layout is not a release layout: Velopack puts the app under
 is admin-writable, and the engine service is registered from the installed
 path. Each shipped route needs its own pass.
 
-- Payload freshness: confirm
-  `artifacts\publish\Service\Uniwill Control Utility Engine.dll` is built
-  from the same commit as the app exe (timestamp, and file version once
-  the versions are aligned). pack.ps1 step 2b checks presence only, and
-  the staging target's copy step is the one place a stale engine can ride
-  into both the MSI and the ZIP (it did, before the staging
-  `IntermediateOutputPath` fix).
+- Payload freshness: pack.ps1 step 2b' fails the pack when the staged engine
+  (`artifacts\publish\Service\Uniwill Control Utility Engine.dll/.exe`) is
+  older than the app exe, or its file version is not the release version.
+  Presence alone is not freshness: the staging target's copy step is the one
+  place a stale engine can ride into both the MSI and the portable ZIP (it
+  did, before the staging `IntermediateOutputPath` fix), which is why the
+  assertion exists.
 - Install the MSI on a clean Windows account (Program Files, elevated).
   The MSI is the shipped installer (Windows Installer auto-elevates on
   double-click). The Velopack `*-Setup.exe` is a 7 MB web-installer

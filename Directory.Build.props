@@ -1,0 +1,17 @@
+<Project>
+
+  <!-- The product version: the single source of truth for the whole build.
+       build\pack.ps1 reads it (through the app project) as the Velopack
+       packVersion, and the SDK derives AssemblyVersion, FileVersion and
+       ProductVersion from it, so every shipped assembly (the app,
+       UCU.Client/Contracts/Core/Hardware and the engine) carries the same
+       number. That alignment is not cosmetic: the engine payload's file
+       version is the cheap freshness probe pack.ps1 asserts, and per-project
+       version fields let a release ship a new app over a stale engine.
+
+       3-part SemVer2 (Velopack rejects 4-part). Bump it here, nowhere else. -->
+  <PropertyGroup>
+    <Version>0.9.6</Version>
+  </PropertyGroup>
+
+</Project>
