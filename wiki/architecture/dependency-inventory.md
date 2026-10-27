@@ -55,6 +55,7 @@ The app project (25 packages) keeps the product surface:
 - Session-token APIs in the engine's `AppSessionLauncher`: `wtsapi32` (`WTSGetActiveConsoleSessionId`, `WTSQueryUserToken`), `advapi32` (`DuplicateTokenEx`, `CreateProcessAsUser`), `userenv` (`CreateEnvironmentBlock`).
 - `\\.\ACPIDriver` IOCTLs (engine-only, `EcDriverTransport`), ETW sessions, `kernel32`/`user32`/`hid`/`setupapi` calls.
 - Writable state is per-user by requirement, not by layout: settings and presets in `%APPDATA%/UCU` and `%LOCALAPPDATA%/UCU`, logs in `%LOCALAPPDATA%/UCU/logs`. In a per-machine install the app is unelevated and its own directory (Program Files) is read-only to it, so no code path may write relative to the install root; the app's graceful-exit signal reaches the engine as the `engine.notify_app_exit` verb instead of a file in the install root. `Settings.Default.Path` (empty default, so a relative path) is the known remaining violation.
+- WinRT package queries must be the current-user forms (`FindPackagesForUser("")`, `FindPackageForUser("", fullName)`). The all-users equivalents (`FindPackages()`, `FindPackage(fullName)`) are documented to require administrative privileges and throw `AccessDenied` for the unelevated app - they are the game-library sync's Store/Xbox enumeration and its Store-game launch. A denied enumeration degrades to an empty Store list (the launcher games survive), never a dialog: the sync runs on a startup thread.
 
 ## Build and packaging payload
 

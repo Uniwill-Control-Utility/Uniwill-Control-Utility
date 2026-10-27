@@ -171,10 +171,13 @@ namespace Uniwill_Control_Utility.Scripts
 
                 }
 
-                //microsoft store apps below
-
-                PackageManager packageManager = new PackageManager();
-                IEnumerable<Windows.ApplicationModel.Package> packages = packageManager.FindPackages();
+                // Microsoft Store / Xbox entries: matched against each drive's XboxGames
+                // folder below. Enumerated for the current user: PackageManager.FindPackages()
+                // is the all-users enumeration and is documented to require administrative
+                // privileges, which the app has not had since the engine service took the
+                // privileged work - unelevated it threw AccessDenied out of the whole library
+                // sync, so the game list came back empty behind a raw exception dialog.
+                List<Package> storePackages = EnumerateCurrentUserStorePackages();
 
                 DriveInfo[] allDrives = DriveInfo.GetDrives();
 
@@ -194,7 +197,7 @@ namespace Uniwill_Control_Utility.Scripts
 
                                 if (strings.Length > 0)
                                 {
-                                    foreach (Package package in packages)
+                                    foreach (Package package in storePackages)
                                     {
                                         string install = package.InstalledLocation.Path;
                                         string sig = package.SignatureKind.ToString();
@@ -278,8 +281,59 @@ namespace Uniwill_Control_Utility.Scripts
             }
             catch (Exception ex) when (ex is not COMException)
             {
-                MessageBox.Show(ex.ToString());
+                // A library sync runs on a startup thread with no user to answer a
+                // dialog, and null means "no games" to every consumer: log the cause
+                // and degrade.
+                Misc.DiagnosticLogger.LogError(ex, "Unexpected error while syncing game library");
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// The current user's Microsoft Store packages, used by the XboxGames match.
+        /// FindPackagesForUser with an empty SID is the documented current-user form
+        /// and needs no privileges (the all-users FindPackages() does). Any failure
+        /// degrades to an empty list and is logged: the Store entries are an addition to
+        /// the launcher list, never a reason to lose it.
+        /// </summary>
+        private static List<Package> EnumerateCurrentUserStorePackages()
+        {
+            try
+            {
+                return new PackageManager().FindPackagesForUser(string.Empty).ToList();
+            }
+            catch (Exception ex)
+            {
+                Misc.DiagnosticLogger.LogError(ex, "Microsoft Store package enumeration unavailable");
+                return new List<Package>();
+            }
+        }
+
+        /// <summary>
+        /// Launch a Microsoft Store app by package full name. FindPackageForUser with
+        /// an empty SID is the current-user form and needs no privileges; FindPackage
+        /// is the all-users lookup and is documented to require administrative ones, so
+        /// unelevated it threw AccessDenied and the Launch button did nothing useful.
+        /// A package with no app entry is a logged no-op: the list is built from the same
+        /// enumeration, so that is a package removed after the list was built.
+        /// </summary>
+        private static void LaunchStoreApp(string packageFullName)
+        {
+            try
+            {
+                Package? package = new PackageManager().FindPackageForUser(string.Empty, packageFullName);
+                var entries = package?.GetAppListEntries();
+                if (entries is null || !entries.Any())
+                {
+                    Misc.DiagnosticLogger.LogInfo($"Microsoft Store package '{packageFullName}' has no launchable app entry");
+                    return;
+                }
+
+                _ = entries[0].LaunchAsync();
+            }
+            catch (Exception ex)
+            {
+                Misc.DiagnosticLogger.LogError(ex, "Failed to launch Microsoft Store app");
             }
         }
 
@@ -316,8 +370,7 @@ namespace Uniwill_Control_Utility.Scripts
                         Run_CLI.RunCommand(" /command=runGame /gameId=" + gameID, false, Path.Combine(pfGog, "GOG Galaxy", "GalaxyClient.exe"));
                         break;
                     case "Microsoft Store":
-                        PackageManager pm = new PackageManager();
-                        _ = pm.FindPackage(gameID).GetAppListEntries()[0].LaunchAsync();
+                        LaunchStoreApp(gameID);
                         break;
                 }
             }
