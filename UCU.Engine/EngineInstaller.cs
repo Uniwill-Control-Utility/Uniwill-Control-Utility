@@ -265,6 +265,20 @@ namespace UCU.Engine
                 entry.SetValue("UninstallString", command, RegistryValueKind.String);
                 entry.SetValue("QuietUninstallString", command, RegistryValueKind.String);
 
+                // The value that makes Control Panel ignore those strings: an
+                // ARP entry declaring WindowsInstaller=1 is routed by PRODUCT
+                // CODE (appwiz.cpl and Settings call the Windows Installer
+                // APIs with the key name), never by UninstallString - the
+                // redirect above is dead code as long as the value is there.
+                // Deleting it routes Control Panel to the shim: the complete
+                // sweep (app kill, MSI uninstall, engine service, ARP, root),
+                // so the thin-MSI "Removal completed successfully, nothing
+                // happened" state disappears with the route. An MSI repair
+                // (/f) rewrites the registry table and restores the value;
+                // this elevated pass re-asserts it, and the sentinel with its
+                // evidence floor remains the net for genuine msiexec routes.
+                entry.DeleteValue("WindowsInstaller", throwOnMissingValue: false);
+
                 Log.Information("[EngineInstaller] Control Panel uninstall for {Product} now runs the shim {Shim}",
                     productKey, shim);
             }
