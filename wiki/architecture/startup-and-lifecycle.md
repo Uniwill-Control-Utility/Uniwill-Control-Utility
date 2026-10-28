@@ -79,19 +79,7 @@ The deferred tasks probe resources outside the app's control, and each is bounde
 - **Update check:** 10 s.
 - **Game-library scan:** 10 s (`SyncGameLibraryWithBudgetAsync`). The scan walks every local volume plus the current user's Store packages, so the splash is released at the budget and the list publishes whenever the scan lands (`PublishGameLibraryScan`); a failed scan keeps the list already published, since `null` reads as "no games" to the FPS overlay and Adaptive Mode. The scan's drive loop also skips `DriveType.Network`: a disconnected mapped drive blocks `Directory.Exists` in the redirector until the redirector times out (measured 21–63 s per process pass against a dead host), which is what the "sluggish 60–71%" report was.
 
-- **EC writes at startup:** gated, not attempted. `EngineAvailability` answers "is the
-  engine service running" from the SCM (sub-millisecond, no pipe); the EC apply
-  (`MainWindow.ApplyEcSettingsOnStart`) and the preset's `ec-*` chain
-  (`RyzenAdj_To_UCU`) skip their writes when it says no, and a preset batch stops
-  sending `ec-*` verbs at the first `HardwareUnavailable`/`Timeout`/`Busy` because
-  that state does not change mid-batch. The gate exists because every engine verb is
-  a pipe connect and a connect to the missing pipe of a stopped engine costs the whole
-  5 s connect timeout (measured): the un-gated path paid it per verb - the EC apply
-  issues 2-3 and a preset up to 7 - which is what froze the splash at 78 %
-  (4 of 6 visible tasks done: `50 + 4/6 × 42`). Writes skipped this way are marked
-  pending (`EngineStartupApply`) and applied once the service reaches `Running`:
-  the EC resets the battery charge limit to the BIOS default at every cold boot, so
-  "skipped" must not become "lost".
+- **EC writes at startup:** the engine is ensured first, then the writes are gated. Phase-1 task "Applying startup settings" begins with `EnsureEngineAndApplyDeferredAsync`: a missing service is registered and started there (the one UAC prompt of the product, inside the splash), and a stopped one is started unelevated through the DACL's `SERVICE_START` grant, which is why a first launch ends with the EC-fed metrics on screen and no trip to `services.msc`. The writes are then gated inside `EngineClient` by `IEngineServiceGate`: a verb for a service the SCM says is stopped is refused with `HardwareUnavailable` before the connect, because a connect to the missing pipe polls for the whole 5 s connect timeout and the call sites are many - the EC apply chain, a preset's `ec-*` writes, page constructors, the tray tick, the three EC telemetry caches. A preset batch also stops sending `ec-*` verbs at the first `HardwareUnavailable`/`Timeout`/`Busy`: that state does not change mid-batch. Writes skipped for a stopped engine are marked pending (`EngineStartupApply`) and applied when the service reaches `Running`: the EC resets the battery charge limit to the BIOS default at every cold boot, so "skipped" must not become "lost". The 78 % freeze this replaces was arithmetic: the tracker maps phase 1 as `50 + done/6 x 42`, so 78 % is 4 of 6 visible tasks done with the EC apply still pending, every verb in it paying 5 s.
 
 Bounded tasks report at `Warning` when they outlive their budget, so the log distinguishes "the app is slow" from "a resource the user has is offline".
 

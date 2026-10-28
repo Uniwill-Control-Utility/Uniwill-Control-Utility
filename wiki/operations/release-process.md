@@ -148,10 +148,21 @@ path. Each shipped route needs its own pass.
   AV scanning). Stage timestamps land in `%TEMP%\ucu_uninstall_log.txt`.
   Velopack writes its ARP entry under HKCU\...\Uninstall\<packId> and its
   uninstall-time removal runs in the MSI's deferred CA context, which
-  misses the user's HKCU — so a pure Control Panel uninstall leaves a
-  stale entry that errors 1605 on retry. The shim deletes it; users
-  uninstalling via Control Panel alone may need the entry right-click
-  removed.
+  misses the user's HKCU, so a pure Control Panel uninstall leaves a stale
+  entry that errors 1605 on retry - and it leaves the engine service
+  registration behind, because the MSI never owned it (the app registers
+  the service). The shim deletes both, so Control Panel's entry is
+  redirected to the shim: the elevated engine install pass points the
+  machine-level (MSI product-key) entry's `UninstallString` at
+  `Uninstall.exe` (`EngineInstaller.RepairControlPanelUninstall`), and
+  the app self-heals its own HKCU entry the same way at startup.
+  Acceptance: uninstall from Control Panel, then confirm `sc.exe query
+  UCUEngine` reports 1060, no `Uniwill Control Utility` entry remains in
+  the program list, and the install root is gone. Known edge: `sc delete`
+  on a registration with open handles (an open `services.msc`) leaves a
+  delete-pending tombstone that vanishes when the last handle closes; a
+  re-install against a tombstone fails with 1072.
+
 - Launch the installed app from an **unelevated** account: it must start with
   no prompt and write nothing to the install root, which a per-machine layout
   gives to Administrators only. App logs belong in `%LOCALAPPDATA%\UCU\logs`,

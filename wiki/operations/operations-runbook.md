@@ -76,6 +76,10 @@ Check the app log for "Game library scan outlived the ... startup budget": it na
 
 Open the prerequisite flow and verify PawnIO is installed and its device path exists. Confirm the correct AMD or Intel module files were copied into the application output. Restart UCU after driver installation.
 
+### The engine service is not created at all
+
+The app registers the service in its post-startup chain, so a service that never appears means that chain never ran: read the app log (`%LOCALAPPDATA%\UCU\logs`) for the phase markers and the `[Engine]` lines, and the engine installer's own log (`%LOCALAPPDATA%\UCU\engine\install<yyyyMMdd>.log`), which records every `sc` step with its exit code. An install log with no entry for the launch means the app never reached the ensure - a frozen window is the usual cause, because the chain runs after the window renders. `sc create` failing with 1073 means a registration exists (a leftover), and 1072 means it is delete-pending: an `msiexec /x` uninstall leaves the registration (only the `Uninstall.exe` shim, now also what Control Panel runs, deletes it), and a tombstone from an open `services.msc` blocks re-creation until the last handle closes.
+
 ### Dashboard CPU temperature shows `--`
 
 The CPU's own sensor requires the PawnIO driver, and PawnIO's device ACL admits System and Administrators only - an installed, unelevated app cannot open it even when the driver is installed and running, which is the normal state of a per-machine install. UCU then displays the embedded controller's reading and the card's tooltip names the source ("Embedded controller sensor"), so a value from the EC is expected, not a defect: the two sensors are not the same number.

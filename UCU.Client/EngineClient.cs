@@ -18,11 +18,17 @@ namespace UCU.Client
     /// with an "engine service" message: from the app's point of view "the service is
     /// not running" and "the EC is not reachable" both mean the hardware features are
     /// degraded, and the banner text distinguishes them.
+    ///
+    /// When a <see cref="IEngineServiceGate"/> is supplied, a verb is refused with the
+    /// same code before the connect is attempted, if the SCM says the service is not
+    /// running. That is what keeps a stopped engine from costing 5 s per call across
+    /// the startup path, page constructors, the tray tick and the telemetry caches.
     /// </summary>
     public sealed class EngineClient
     {
         private readonly string _pipeName;
         private readonly TimeSpan _connectTimeout;
+        private readonly IEngineServiceGate? _serviceGate;
 
         /// <summary>
         /// How long the client waits for a response. Must exceed the engine's hardware
@@ -33,10 +39,12 @@ namespace UCU.Client
 
         public EngineClient(
             string pipeName = EngineProtocol.PipeName,
-            TimeSpan? connectTimeout = null)
+            TimeSpan? connectTimeout = null,
+            IEngineServiceGate? serviceGate = null)
         {
             _pipeName = pipeName;
             _connectTimeout = connectTimeout ?? TimeSpan.FromSeconds(5);
+            _serviceGate = serviceGate;
         }
 
         public async Task InvokeAsync(string verb, CancellationToken cancellationToken = default) =>
@@ -53,6 +61,17 @@ namespace UCU.Client
 
         private async Task<T> InvokeCoreAsync<T>(string verb, JsonElement? parameters, CancellationToken cancellationToken)
         {
+            // The gate runs before the connect, which is the whole point: a connect to
+            // the missing pipe of a stopped service polls for the full connect timeout,
+            // and this method is called from the startup path, page constructors, the
+            // tray tick and the telemetry caches. Answered from the SCM, a stopped
+            // engine costs a sub-millisecond query per verb instead of 5 s.
+            if (_serviceGate is not null && !_serviceGate.IsServiceAvailable())
+            {
+                throw new EngineException(EngineErrorCode.HardwareUnavailable,
+                    $"the '{EngineServiceIdentity.ServiceName}' service is not running (call skipped, no connect attempted)");
+            }
+
             using var pipe = new NamedPipeClientStream(
                 ".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
 

@@ -165,4 +165,29 @@ namespace Uniwill_Control_Utility.Services
             };
         }
     }
+
+    /// <summary>
+    /// The app's implementation of the client's transport gate: a verb is refused
+    /// before it costs a pipe connect when the SCM says the engine service is
+    /// installed and not running.
+    ///
+    /// Not installed is "available": a developer points the same proxies at a
+    /// console-mode engine (<c>dotnet run --project UCU.Engine -- --console</c>), which
+    /// has no service, so there the connect is the only probe. Access denied is
+    /// "available" too: this process cannot read the state, and guessing "down" would
+    /// hide a running engine behind a fake unavailability.
+    /// </summary>
+    public sealed class EngineServiceGate : UCU.Contracts.IEngineServiceGate
+    {
+        private readonly EngineAvailability _availability;
+
+        public EngineServiceGate(EngineAvailability availability)
+        {
+            ArgumentNullException.ThrowIfNull(availability);
+            _availability = availability;
+        }
+
+        public bool IsServiceAvailable() =>
+            _availability.Query() != EngineServiceState.Stopped;
+    }
 }

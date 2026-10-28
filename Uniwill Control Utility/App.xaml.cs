@@ -383,6 +383,13 @@ namespace Uniwill_Control_Utility
                         // pending marker for EC writes skipped while it was down.
                         services.AddSingleton<EngineAvailability>();
                         services.AddSingleton<EngineStartupApply>();
+                        // The client's transport gate: a verb for a stopped engine is
+                        // refused before the connect (which costs the full 5 s
+                        // connect timeout), so the startup path, page constructors,
+                        // the tray tick and the EC telemetry caches degrade at the
+                        // cost of an SCM query.
+                        services.AddSingleton<UCU.Contracts.IEngineServiceGate>(provider =>
+                            new EngineServiceGate(provider.GetRequiredService<EngineAvailability>()));
 
                         // Hardware Performance / Q-key button intercept: polls the EC
                         // TCC offset register for button presses and cycles UCU presets.
@@ -1001,6 +1008,18 @@ namespace Uniwill_Control_Utility
         /// </summary>
         private static async Task ApplyStartupSettingsAsync()
         {
+            // The EC branches below need the engine, and keeping the engine alive is
+            // the app's job (the XMG Control Center shell does the same for GCUBridge).
+            // So the engine is ensured first, inside the splash: the SCM query is
+            // sub-millisecond in the common case (already running), a missing service
+            // is registered here - the one UAC prompt of the product, and the reason
+            // the service is created AND started by the first launch - and a stopped
+            // one is started unelevated through the DACL's SERVICE_START grant. The EC
+            // writes that follow then land on a running engine, which is why the
+            // dashboard shows the EC-fed metrics on a first launch rather than after
+            // the user opens services.msc.
+            await EnsureEngineAndApplyDeferredAsync();
+
             // Run keyboard RGB, EC fan control, and preset apply in parallel.
             // Keyboard RGB has retries (up to ~6s), EC writes are fast, preset
             // translation varies. Running them concurrently hides all latency.
@@ -1010,25 +1029,27 @@ namespace Uniwill_Control_Utility
                 Views.Windows.MainWindow.AsyncApplyKeyboardOnStart());
         }
 
+        /// <summary>One subscription per process to the engine's Running transition.</summary>
+        private static bool _engineStartedHooked;
+
         /// <summary>
         /// Ensures the engine service, then applies the EC settings that startup
         /// skipped because the engine was not running (fan curve, battery charge
         /// limit - see <see cref="EngineStartupApply"/>).
         ///
-        /// The order is the point: the service ensure is an SCM operation and is
-        /// cheap, so it runs first; the EC writes need the engine up, so they follow
-        /// it instead of racing it on the splash. A start that needs elevation shows
-        /// its prompt here, after the window is up, not inside the splash.
+        /// Called from the startup EC task (so the service is created and started
+        /// before any EC verb) and again from the post-splash deferred chain: a start
+        /// that needed elevation shows its prompt there, with the window already up.
         /// </summary>
-        private static async Task EnsureEngineAndApplyDeferredEcSettingsAsync()
+        private static async Task<EngineEnsureOutcome> EnsureEngineAndApplyDeferredAsync()
         {
             var availability = GetService<EngineAvailability>();
             if (availability is null)
-                return;
+                return EngineEnsureOutcome.Failed;
 
-            // A service the app cannot start (declined UAC) may be started later by
-            // the SCM at boot, by services.msc, or by a repair pass in this process.
-            // The transition event is what makes the deferred apply survive that.
+            // A service the app cannot start (declined UAC) may come up later: at the
+            // next boot, from services.msc, or from a repair pass in this process. The
+            // transition event is what makes the deferred apply survive that.
             if (!_engineStartedHooked)
             {
                 _engineStartedHooked = true;
@@ -1038,10 +1059,9 @@ namespace Uniwill_Control_Utility
             EngineEnsureOutcome outcome = await EngineLifecycle.EnsureAsync(availability);
 
             await ApplyDeferredEcSettingsIfPendingAsync(outcome);
-        }
 
-        /// <summary>One subscription per process to the engine's Running transition.</summary>
-        private static bool _engineStartedHooked;
+            return outcome;
+        }
 
         /// <summary>
         /// Applies the deferred EC settings when the engine is up and the mark is
@@ -1112,7 +1132,7 @@ namespace Uniwill_Control_Utility
             // before that grant). This replaces the App Paths auto-elevation
             // shim the retired requireAdministrator manifest needed: the app is
             // asInvoker now.
-            SafeFireAndForget(EnsureEngineAndApplyDeferredEcSettingsAsync());
+            SafeFireAndForget(EnsureEngineAndApplyDeferredAsync());
 
             // Migrate the legacy "UCU" autostart task (pre-engine name,
             // registered with highest privileges) to the "UCU Autostart" task.
@@ -1127,6 +1147,14 @@ namespace Uniwill_Control_Utility
             // registration time, so installs that moved (zip → MSI migration)
             // would otherwise autostart the old exe.
             SelfHealScheduledTask(AutostartTaskName, "", null, TimeSpan.FromSeconds(Settings.Default.StartupDelaySeconds), "Start UCU");
+
+            // Point the per-user Add/Remove Programs entry (Velopack writes
+            // HKCU\...\Uninstall\Uniwill-Control-Utility) at the layout's
+            // Uninstall.exe shim. Its default action is Velopack's own uninstaller,
+            // which leaves the engine service registration and the MSI's ARP entry
+            // behind - the "husk" entry users report after an uninstall. The shim is
+            // the complete route; this hive is the user's own, so no elevation.
+            SelfHealControlPanelUninstall();
 
             // Show the prerequisite checklist on first startup.
             if (Settings.Default.ShowPrerequisiteDialog)
@@ -1205,6 +1233,41 @@ namespace Uniwill_Control_Utility
 
             Settings.Default.GuardianEnabled = false;
             Settings.Default.Save();
+        }
+
+        /// <summary>
+        /// Points this user's Add/Remove Programs entry (Velopack writes
+        /// HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Uniwill-Control-Utility)
+        /// at the layout's <c>Uninstall.exe</c> shim. Its default action is Velopack's
+        /// own uninstaller, which leaves the engine service registration and the MSI's
+        /// ARP entry behind - the husk entry that stays in the program list after a
+        /// "successful" uninstall. The shim is the complete route (service stop +
+        /// delete, MSI uninstall, ARP entries, install root), and this hive belongs to
+        /// the user, so it needs no elevation. The MSI's machine-level entry is
+        /// redirected by the elevated engine install pass.
+        /// </summary>
+        private static void SelfHealControlPanelUninstall()
+        {
+            try
+            {
+                string shim = Path.Combine(AppContext.BaseDirectory, "Uninstall.exe");
+                if (!File.Exists(shim))
+                    return;
+
+                using RegistryKey? entry = Registry.CurrentUser.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Uniwill-Control-Utility",
+                    writable: true);
+
+                if (entry is null)
+                    return;
+
+                // Quoted: the path contains spaces, and the shell splits an unquoted value.
+                entry.SetValue("UninstallString", "\"" + shim + "\"", RegistryValueKind.String);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "Control Panel uninstall redirect (per-user entry) skipped");
+            }
         }
 
         /// <summary>
