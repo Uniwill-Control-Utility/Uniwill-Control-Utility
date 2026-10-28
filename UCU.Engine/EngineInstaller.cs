@@ -379,6 +379,7 @@ namespace UCU.Engine
             DeleteArpHusks(RegistryHive.CurrentUser);
             DeleteUserHiveArpHusks();
             DeleteProgramDataLogs();
+            DeleteUserVelopackRoots();
             DeleteInstallLayout();
 
             return rc;
@@ -785,6 +786,64 @@ namespace UCU.Engine
             catch (Exception ex)
             {
                 Log.Debug(ex, "[EngineInstaller] ProgramData log directory not removed");
+            }
+        }
+
+        /// <summary>
+        /// Remove the per-user Velopack root (AppData\Local\Uniwill-Control-Utility)
+        /// from every profile on the machine. The ghost root is the fuel of
+        /// Velopack's registration-repair /x storm (field-proven: a GUI install
+        /// recreated it, the app's UpdateManager /x-ed the live registrations
+        /// four minutes later, and the uninstall sentinel - contractually
+        /// trusting vanished registrations plus genuine removal events - ran
+        /// the sweep under a running app). An uninstall that leaves the roots
+        /// behind re-poisons the next install for every user of this machine,
+        /// so the sweep enumerates ProfileList and deletes each profile's root;
+        /// SYSTEM reaches every hive. Best effort: a locked profile directory
+        /// is a cosmetic leftover, never a sweep failure.
+        /// </summary>
+        private static void DeleteUserVelopackRoots()
+        {
+            try
+            {
+                using RegistryKey baseKey = RegistryKey.OpenBaseKey(
+                    RegistryHive.LocalMachine, RegistryView.Registry64);
+                using RegistryKey? profileList = baseKey.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList");
+                if (profileList == null)
+                    return;
+
+                foreach (string sid in profileList.GetSubKeyNames())
+                {
+                    try
+                    {
+                        using RegistryKey? sidKey = profileList.OpenSubKey(sid);
+                        string? profilePath = sidKey?.GetValue("ProfileImagePath") as string;
+                        if (string.IsNullOrEmpty(profilePath) ||
+                            profilePath!.Contains('%', StringComparison.Ordinal))
+                        {
+                            // Expansion-dependent defaults (e.g. %SystemRoot%)
+                            // are not real user profiles on this machine.
+                            continue;
+                        }
+
+                        string root = Path.Combine(profilePath,
+                            "AppData", "Local", "Uniwill-Control-Utility");
+                        if (!Directory.Exists(root))
+                            continue;
+
+                        Directory.Delete(root, recursive: true);
+                        Log.Debug("[EngineInstaller] per-user Velopack root removed: {Root}", root);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Debug(ex, "[EngineInstaller] per-user Velopack root not removed for {Sid}", sid);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "[EngineInstaller] ProfileList not opened for the Velopack root sweep");
             }
         }
 

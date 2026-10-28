@@ -285,6 +285,11 @@ namespace Uniwill_Control_Utility
                 UninstallSentinel.CreateDefault(
                     message => Log.Warning("[UninstallSentinel] {Message}", message)).Start();
 
+                // Ghost-registration self-heal (see SelfHealStaleVelopackRoot):
+                // must run before the first UpdateManager call, which is where
+                // Velopack's registration-repair /x storm fires from.
+                SelfHealStaleVelopackRoot();
+
                 // Catch unhandled exceptions from all threads (not just the UI thread)
                 AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
 
@@ -1371,6 +1376,67 @@ namespace Uniwill_Control_Utility
             {
                 _logger?.LogDebug(ex, "Control Panel uninstall redirect (per-user entry) skipped");
             }
+        }
+
+        /// <summary>
+        /// Ghost-registration self-heal, field-proven necessity. The per-user
+        /// Velopack root (%LOCALAPPDATA%\Uniwill-Control-Utility, created by
+        /// the per-machine MSI install's bootstrap in a user context) feeds
+        /// Velopack's registration-repair: the app's own UpdateManager sees
+        /// the ghost root, decides the live machine registrations are stale,
+        /// and runs "msiexec /x" on them - observed at +4 min into a healthy
+        /// session, removing the live product's registration. The sentinel
+        /// reads the vanished registration plus the genuine removal events as
+        /// the Control Panel uninstall it is contracted to detect, and runs
+        /// the full sweep: the app dies seconds after the dashboard, the
+        /// machine is cleaned under a running app. This is the upgrade path
+        /// every old per-user-install user walks into. The per-machine layout
+        /// is authoritative: when the app runs from Program Files, the
+        /// per-user root is stale by definition and this app never reads it,
+        /// so the self-heal deletes it. The root lives in the user's own
+        /// AppData, so no elevation is involved. Runs before the first
+        /// UpdateManager call.
+        /// </summary>
+        private static void SelfHealStaleVelopackRoot()
+        {
+            try
+            {
+                string? root = StaleVelopackRootPath(
+                    AppContext.BaseDirectory,
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+                if (root is null || !Directory.Exists(root))
+                    return;
+
+                Directory.Delete(root, recursive: true);
+                _logger?.LogWarning(
+                    "[SelfHeal] removed the stale per-user Velopack root {Root}: the app runs " +
+                    "per-machine, and the ghost root drives Velopack's registration-repair /x " +
+                    "storm that the uninstall sentinel executes",
+                    root);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "[SelfHeal] stale per-user Velopack root not removed");
+            }
+        }
+
+        /// <summary>
+        /// Derivation seam: the per-user Velopack root is stale only when the
+        /// app image runs from the per-machine layout (Program Files);
+        /// dev/portable layouts keep their roots (Velopack's own storage)
+        /// untouched. The machine root name is the packer's app name
+        /// (vpk pack -u Uniwill-Control-Utility).
+        /// </summary>
+        internal static string? StaleVelopackRootPath(string appBaseDirectory, string programFiles, string localAppData)
+        {
+            if (string.IsNullOrEmpty(programFiles) ||
+                !appBaseDirectory.StartsWith(programFiles, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            return Path.Combine(localAppData, "Uniwill-Control-Utility");
         }
 
         /// <summary>
