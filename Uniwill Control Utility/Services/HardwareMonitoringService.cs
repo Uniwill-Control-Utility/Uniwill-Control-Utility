@@ -152,17 +152,62 @@ namespace Uniwill_Control_Utility.Services
     public sealed partial class HardwareMonitoringService : IHardwareMonitoringService, IDisposable
     {
         private static readonly TimeSpan SnapshotMaxAge = TimeSpan.FromSeconds(1);
+
+        /// <summary>
+        /// Lease bookkeeping only (leases, lease ids, disposed flag). Never
+        /// held across hardware I/O, so Acquire/Release from a UI thread are
+        /// bounded by dictionary work.
+        /// </summary>
         private readonly object _sync = new();
+
+        /// <summary>
+        /// Exclusive right to touch the LibreHardwareMonitor Computer
+        /// (Open/Update/Close/sensor reads). A storage DeviceIoControl inside
+        /// the update pass can be held indefinitely by a filter driver
+        /// (field-proven on an AV-guarded machine: the disk open hung, the
+        /// pass held the update lock, the UI thread's Acquire waited on it,
+        /// the whole app froze with the dashboard up). Pool threads may block
+        /// on this gate; every app-thread consumer uses Monitor.TryEnter with
+        /// a zero/bounded timeout and degrades instead.
+        /// </summary>
+        private readonly object _probeGate = new();
+
         private readonly Dictionary<long, HardwareMonitoringCategory> _leases = new();
         private readonly StaleWhileRevalidateCache<HardwareMonitoringState> _stateCache;
 
         /// <summary>EC CPU temperature source; null = no engine (dev/test composition).</summary>
         private readonly IEcCpuTemperatureSource? _ecCpuTemperature;
+
+        /// <summary>Last published state; read by the OS-only fallback path (volatile).</summary>
+        private HardwareMonitoringState _lastState = HardwareMonitoringState.Empty;
+
+        /// <summary>Categories requested by leases (UI writes under _sync, pool reads).</summary>
+        private volatile HardwareMonitoringCategory _requestedCategories;
+
+        /// <summary>Categories the Computer instance was built for (gate-owned).</summary>
+        private HardwareMonitoringCategory _configuredCategories;
+
+        /// <summary>A ResetComputer() the gate owner must apply on its next pass.</summary>
+        private int _resetPending;
+
         private Computer? _computer;
-        private HardwareMonitoringCategory _activeCategories;
         private DateTime _lastUpdateUtc = DateTime.MinValue;
         private long _nextLeaseId;
         private bool _disposed;
+
+        /// <summary>
+        /// How long AcquirePersistent waits for the first snapshot on the
+        /// startup worker. A healthy probe opens in 1-2 s; a hung driver
+        /// probe must not stretch the splash, the dashboard fills from the
+        /// OS-only path and completes when the probe ever returns.
+        /// </summary>
+        private static readonly TimeSpan StartupSnapshotBudget = TimeSpan.FromSeconds(20);
+
+        /// <summary>
+        /// How long Dispose waits for the gate to close the Computer. A hung
+        /// probe keeps the gate; the app must still exit.
+        /// </summary>
+        private static readonly TimeSpan ShutdownGateBudget = TimeSpan.FromSeconds(3);
 
         /// <summary>Consecutive UpdateHardware failures (reset on success).</summary>
         private int _updateFailureCount;
@@ -190,7 +235,7 @@ namespace Uniwill_Control_Utility.Services
             _stateCache = new StaleWhileRevalidateCache<HardwareMonitoringState>(
                 HardwareMonitoringState.Empty,
                 SnapshotMaxAge,
-                _ => Task.FromResult(CaptureState()),
+                _ => Task.Run(ProbeOnce),
                 onRefreshError: ex =>
                 {
                     try { Serilog.Log.Warning(ex, "[LHM] Background snapshot refresh failed"); }
@@ -213,15 +258,27 @@ namespace Uniwill_Control_Utility.Services
             {
                 ThrowIfDisposed();
                 _leases[long.MinValue] = categories; // persistent lease id
-                categoriesChanged = ApplyRequestedCategoriesLocked();
+                categoriesChanged = RequestRequestedCategoriesLocked();
             }
 
             if (categoriesChanged)
                 _stateCache.Invalidate();
 
-            // Startup invokes this method from a worker thread and waits for it.
-            // Warm the first snapshot there so the first UI read already has data.
-            _stateCache.RefreshAsync().GetAwaiter().GetResult();
+            // The probe runs on the pool under the gate; the startup worker
+            // waits for the first snapshot with a bounded budget. A hung
+            // driver probe parks the gate, not the splash: the dashboard
+            // fills from the OS-only path and completes later.
+            try
+            {
+                if (!_stateCache.RefreshAsync().Wait(StartupSnapshotBudget))
+                {
+                    try { Serilog.Log.Warning("[LHM] First snapshot not ready within the startup budget; the probe is hung or slow, metrics fill as it completes"); } catch { }
+                }
+            }
+            catch
+            {
+                // A failed warm is a metrics gap, never a startup failure.
+            }
         }
 
         public IDisposable Acquire(HardwareMonitoringCategory categories)
@@ -236,10 +293,14 @@ namespace Uniwill_Control_Utility.Services
                 ThrowIfDisposed();
                 long id = ++_nextLeaseId;
                 _leases[id] = categories;
-                categoriesChanged = ApplyRequestedCategoriesLocked();
+                categoriesChanged = RequestRequestedCategoriesLocked();
                 lease = new MonitoringLease(this, id);
             }
 
+            // Bookkeeping only up to here: the UI thread must never wait on
+            // hardware I/O (field-proven freeze: a storage probe inside the
+            // update pass held the old single lock forever). The kick is
+            // fire-and-forget; the probe serializes on the gate on the pool.
             if (categoriesChanged)
                 _stateCache.Invalidate();
 
@@ -247,42 +308,52 @@ namespace Uniwill_Control_Utility.Services
             return lease;
         }
 
-        public HardwareMetricsSnapshot ReadSnapshot() => _stateCache.Read().Metrics;
+        public HardwareMetricsSnapshot ReadSnapshot()
+        {
+            HardwareMonitoringState state = _stateCache.Read();
+            if (!ReferenceEquals(state, HardwareMonitoringState.Empty))
+                return state.Metrics;
 
-        public float ReadSensor(HardwareType hardwareType, SensorType sensorType, string sensorName) =>
-            _stateCache.Read().ReadSensor(hardwareType, sensorType, sensorName);
+            // No probe has completed (the first pass is slow, parked on the
+            // gate, or hung in a filter driver): serve the OS-only snapshot
+            // so the dashboard fills battery/memory/EC-CPU numbers anyway.
+            return BuildOsOnlySnapshot();
+        }
+
+        public float ReadSensor(HardwareType hardwareType, SensorType sensorType, string sensorName)
+        {
+            HardwareMonitoringState state = _stateCache.Read();
+            if (ReferenceEquals(state, HardwareMonitoringState.Empty))
+                state = Volatile.Read(ref _lastState);
+
+            return state.ReadSensor(hardwareType, sensorType, sensorName);
+        }
 
         /// <summary>
         /// Closes the LibreHardwareMonitor Computer to release stale GPU driver handles.
         /// Call this proactively after events that invalidate GPU driver state:
         /// monitor hotplug (display topology change), hibernation resume, etc.
         ///
-        /// This method does NOT immediately reopen the Computer — it only closes it and
-        /// invalidates the cache. The next background refresh cycle will handle reopening
-        /// with fresh handles. This avoids calling computer.Open() on the calling thread,
-        /// which can trigger ExecutionEngineException if the GPU driver is in a corrupted state.
+        /// The reset is deferred, never performed on the caller: Close() is
+        /// LHM driver I/O that a filter driver can hold indefinitely, and the
+        /// gate owner applies it on the next probe pass. The cache
+        /// invalidation immediately re-serves the OS-only/last-state view.
         /// </summary>
         public void ResetComputer()
         {
             lock (_sync)
             {
                 ThrowIfDisposed();
-
-                try { Serilog.Log.Information("[LHM] ResetComputer called — releasing stale handles, reopening deferred to next refresh"); }
-                catch { /* Serilog may not be ready */ }
-
-                // Close releases NVML/ADL handles. Do this while holding the lock so
-                // no other thread is accessing the computer.
-                _computer?.Close();
-                _computer = null;
-                _lastUpdateUtc = DateTime.MinValue;
-                _updateFailureCount = 0;
-                _lastResetUtc = DateTime.UtcNow;
-
-                // Invalidate cache so the next ReadSnapshot() triggers a background
-                // refresh which will reopen the Computer with fresh handles.
-                _stateCache.Invalidate();
             }
+
+            try { Serilog.Log.Information("[LHM] ResetComputer called — releasing stale handles, reopening deferred to next refresh"); }
+            catch { /* Serilog may not be ready */ }
+
+            Interlocked.Exchange(ref _resetPending, 1);
+
+            // Invalidate cache so the next ReadSnapshot() triggers a background
+            // refresh which will reopen the Computer with fresh handles.
+            _stateCache.Invalidate();
         }
 
         private void Release(long id)
@@ -293,77 +364,78 @@ namespace Uniwill_Control_Utility.Services
                 if (_disposed || !_leases.Remove(id))
                     return;
 
-                categoriesChanged = ApplyRequestedCategoriesLocked();
+                categoriesChanged = RequestRequestedCategoriesLocked();
             }
 
             if (categoriesChanged)
                 _stateCache.Invalidate();
         }
 
-        /// <summary>Must be called while holding _sync.</summary>
-        private bool ApplyRequestedCategoriesLocked()
+        /// <summary>
+        /// Must be called while holding _sync. Bookkeeping only: recompute the
+        /// union of the lease categories and publish it for the gate owner.
+        /// Rebuilding the Computer is the probe's job (UpdateHardware): the
+        /// old version closed and reopened drivers here, under the same lock
+        /// the UI thread's Acquire took, which is how one hung storage open
+        /// froze the whole app.
+        /// </summary>
+        private bool RequestRequestedCategoriesLocked()
         {
             HardwareMonitoringCategory requested = HardwareMonitoringCategory.None;
             foreach (HardwareMonitoringCategory lease in _leases.Values)
                 requested |= lease;
 
-            if (requested == _activeCategories)
+            if (requested == _requestedCategories)
                 return false;
 
-            _computer?.Close();
-            _computer = null;
-            _activeCategories = requested;
-            _lastUpdateUtc = DateTime.MinValue;
-
-            if (requested == HardwareMonitoringCategory.None)
-                return true;
-
-            // Build the Computer under lock but open it outside to avoid
-            // blocking other Acquire() callers during driver initialization.
-            var computer = new Computer
-            {
-                IsCpuEnabled = requested.HasFlag(HardwareMonitoringCategory.Cpu),
-                IsMemoryEnabled = requested.HasFlag(HardwareMonitoringCategory.Memory),
-                IsGpuEnabled = requested.HasFlag(HardwareMonitoringCategory.Gpu),
-                IsBatteryEnabled = requested.HasFlag(HardwareMonitoringCategory.Battery),
-                IsMotherboardEnabled = true,
-                IsStorageEnabled = true,
-                IsControllerEnabled = true
-            };
-
-            // Open outside the lock — this probes hardware drivers and can take
-            // 1-2 seconds on first call (NVML, ADL, WMI provider initialization).
-            Monitor.Exit(_sync);
-            try
-            {
-                computer.Open();
-            }
-            finally
-            {
-                Monitor.Enter(_sync);
-            }
-
-            // Another caller may have changed _activeCategories while we held
-            // the lock open. Only assign if our categories are still current.
-            if (_activeCategories == requested)
-                _computer = computer;
-            else
-                computer.Close();
-
+            _requestedCategories = requested;
             return true;
         }
 
-        private HardwareMonitoringState CaptureState()
+        /// <summary>
+        /// The probe pass: one serialized touch of the Computer, on a pool
+        /// thread (the cache factory's Task.Run). Blocking on the gate here
+        /// is safe and is the whole point: the cache's single-flight contract
+        /// keeps at most one pass queued, a hung driver parks only that pass,
+        /// and every app-thread consumer keeps reading the last state plus
+        /// the OS-only snapshot.
+        /// </summary>
+        private HardwareMonitoringState ProbeOnce()
         {
-            lock (_sync)
+            Monitor.Enter(_probeGate);
+            try
             {
-                ThrowIfDisposed();
+                ApplyPendingReset();
                 UpdateHardware();
-                return new HardwareMonitoringState(BuildMetricsSnapshot(), CaptureSensorReadings());
+
+                var state = new HardwareMonitoringState(BuildMetricsSnapshot(), CaptureSensorReadings());
+                Volatile.Write(ref _lastState, state);
+                return state;
+            }
+            finally
+            {
+                Monitor.Exit(_probeGate);
             }
         }
 
-        /// <summary>Must be called while holding _sync.</summary>
+        /// <summary>
+        /// Gate-owned: performs the Close() that ResetComputer() deferred,
+        /// then starts the settle cooldown from this moment (the driver gets
+        /// its window after the handles are actually released).
+        /// </summary>
+        private void ApplyPendingReset()
+        {
+            if (Interlocked.Exchange(ref _resetPending, 0) == 0)
+                return;
+
+            _computer?.Close();
+            _computer = null;
+            _lastUpdateUtc = DateTime.MinValue;
+            _updateFailureCount = 0;
+            _lastResetUtc = DateTime.UtcNow;
+        }
+
+        /// <summary>Must be called while holding _probeGate.</summary>
         private HardwareMetricsSnapshot BuildMetricsSnapshot()
         {
             IHardware? cpu = FindHardware(HardwareType.Cpu);
@@ -435,7 +507,40 @@ namespace Uniwill_Control_Utility.Services
             return metrics with { CpuTemperatureSource = CpuTemperatureSource.None };
         }
 
-        /// <summary>Must be called while holding _sync.</summary>
+        /// <summary>
+        /// Snapshot with no LibreHardwareMonitor touch: battery state from
+        /// kernel32 GetSystemPowerStatus, memory from GlobalMemoryStatusEx,
+        /// CPU temperature from the engine's EC telemetry - all cheap,
+        /// filter-driver-free sources. The LHM-only fields (CPU usage/clock,
+        /// GPU, battery watts, DIMM/storage temperatures) carry the last
+        /// completed probe's values, and stay 0 (UI renders "--") when the
+        /// probe has never finished. This is what keeps the dashboard alive
+        /// while a hardware probe hangs in a filter driver.
+        /// </summary>
+        private HardwareMetricsSnapshot BuildOsOnlySnapshot()
+        {
+            HardwareMetricsSnapshot last = Volatile.Read(ref _lastState).Metrics;
+
+            GetSystemPowerStatus(out SystemPowerStatus powerStatus);
+            (double memoryUsed, double memoryTotal, double memoryCommitted, double pagefileTotal) = ReadPhysicalMemory();
+
+            HardwareMetricsSnapshot metrics = last with
+            {
+                SystemMemoryUsedGb = memoryUsed,
+                SystemMemoryTotalGb = memoryTotal,
+                SystemMemoryCommittedGb = memoryCommitted,
+                SystemMemoryPagefileTotalGb = pagefileTotal,
+                HasBattery = powerStatus.BatteryFlag != 128 && powerStatus.BatteryLifePercent <= 100,
+                BatteryPercent = powerStatus.BatteryLifePercent <= 100 ? powerStatus.BatteryLifePercent : 0,
+                IsBatteryCharging = (powerStatus.BatteryFlag & 8) != 0,
+                IsBatteryFullyCharged = powerStatus.BatteryLifePercent == 100 && powerStatus.ACLineStatus == 1,
+                BatteryTimeRemainingMinutes = powerStatus.BatteryLifeTime > 0 ? powerStatus.BatteryLifeTime / 60 : 0
+            };
+
+            return ApplyCpuTemperatureSource(metrics, _ecCpuTemperature?.ReadCpuTemperature() ?? 0);
+        }
+
+        /// <summary>Must be called while holding _probeGate.</summary>
         private IReadOnlyList<HardwareSensorReading> CaptureSensorReadings()
         {
             if (_computer is null)
@@ -460,13 +565,28 @@ namespace Uniwill_Control_Utility.Services
             return readings.ToArray();
         }
 
+        /// <summary>Must be called while holding _probeGate.</summary>
         private void UpdateHardware()
         {
-            // If _computer is null but categories are active, attempt to reopen.
+            // Reconcile the Computer with what the leases ask for. This was
+            // the lease path's job under _sync; it lives here now because
+            // Open/Close is driver I/O a filter driver can hold forever, and
+            // no app thread may ever wait behind it.
+            HardwareMonitoringCategory requested = _requestedCategories;
+            if (requested != _configuredCategories)
+            {
+                _computer?.Close();
+                _computer = null;
+                _configuredCategories = requested;
+                _lastUpdateUtc = DateTime.MinValue;
+                _updateFailureCount = 0;
+            }
+
+            // If _computer is null but categories are requested, attempt to reopen.
             // This can happen after ResetComputer() releases stale handles, or after
             // a previous failure cleared the computer. We only reopen if enough time
             // has passed since the last failure to avoid tight loops on broken drivers.
-            if (_computer is null && _activeCategories != HardwareMonitoringCategory.None)
+            if (_computer is null && _configuredCategories != HardwareMonitoringCategory.None)
             {
                 // Enforce cooldown after ResetComputer() — give the GPU driver time to
                 // settle after display topology changes before probing with fresh handles.
@@ -482,47 +602,25 @@ namespace Uniwill_Control_Utility.Services
                     return;
                 }
 
+                Computer? computer = null;
                 try
                 {
-                    var computer = new Computer
+                    computer = new Computer
                     {
-                        IsCpuEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Cpu),
-                        IsMemoryEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Memory),
-                        IsGpuEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Gpu),
-                        IsBatteryEnabled = _activeCategories.HasFlag(HardwareMonitoringCategory.Battery),
+                        IsCpuEnabled = _configuredCategories.HasFlag(HardwareMonitoringCategory.Cpu),
+                        IsMemoryEnabled = _configuredCategories.HasFlag(HardwareMonitoringCategory.Memory),
+                        IsGpuEnabled = _configuredCategories.HasFlag(HardwareMonitoringCategory.Gpu),
+                        IsBatteryEnabled = _configuredCategories.HasFlag(HardwareMonitoringCategory.Battery),
                         IsMotherboardEnabled = true,
                         IsStorageEnabled = true,
                         IsControllerEnabled = true
                     };
 
-                    // Release lock during Open() — it probes drivers and can take 1-2 seconds.
-                    Monitor.Exit(_sync);
-                    try
-                    {
-                        computer.Open();
-                    }
-                    catch (Exception ex)
-                    {
-                        try { Serilog.Log.Warning(ex, "[LHM] UpdateHardware: failed to reopen Computer"); } catch { }
-                        computer.Close();
-                        _updateFailureCount++;
-                        _lastUpdateFailureUtc = DateTime.UtcNow;
-                        return;
-                    }
-                    finally
-                    {
-                        Monitor.Enter(_sync);
-                    }
-
-                    // Check that categories didn't change while we were opening.
-                    if (_activeCategories != HardwareMonitoringCategory.None && _computer is null)
-                    {
-                        _computer = computer;
-                    }
-                    else
-                    {
-                        computer.Close();
-                    }
+                    // Open on this pool thread under the gate: it probes drivers,
+                    // takes 1-2 s on healthy machines, and can be held by a
+                    // filter driver on guarded ones - the gate absorbs all of it.
+                    computer.Open();
+                    _computer = computer;
                 }
                 catch (Exception ex)
                 {
@@ -531,7 +629,8 @@ namespace Uniwill_Control_Utility.Services
                      * this catch block executes. However, when it doesn't, we log and
                      * rate-limit retries so the app stays alive.
                      */
-                    try { Serilog.Log.Warning(ex, "[LHM] UpdateHardware: exception during Computer reopen"); } catch { }
+                    try { Serilog.Log.Warning(ex, "[LHM] UpdateHardware: failed to reopen Computer"); } catch { }
+                    try { computer?.Close(); } catch { /* half-opened instance */ }
                     _updateFailureCount++;
                     _lastUpdateFailureUtc = DateTime.UtcNow;
                     return;
@@ -706,13 +805,31 @@ namespace Uniwill_Control_Utility.Services
                 if (_disposed)
                     return;
 
-                _computer?.Close();
-                _computer = null;
-                _leases.Clear();
                 _disposed = true;
+                _leases.Clear();
             }
 
             _stateCache.Dispose();
+
+            // Close is LHM driver I/O and the gate owner may be parked in a
+            // filter driver forever; app exit must not wait on it. Bounded:
+            // process exit releases the handles regardless.
+            if (Monitor.TryEnter(_probeGate, ShutdownGateBudget))
+            {
+                try
+                {
+                    _computer?.Close();
+                    _computer = null;
+                }
+                finally
+                {
+                    Monitor.Exit(_probeGate);
+                }
+            }
+            else
+            {
+                try { Serilog.Log.Warning("[LHM] Dispose: hardware probe is parked, skipping Computer.Close at shutdown"); } catch { }
+            }
         }
 
         private sealed class MonitoringLease : IDisposable
