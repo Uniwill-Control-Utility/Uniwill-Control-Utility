@@ -1,4 +1,4 @@
-namespace Uniwill_Control_Utility.Tests.Services;
+﻿namespace Uniwill_Control_Utility.Tests.Services;
 
 /// <summary>
 /// The self-heal state machine behind the Control Panel / Settings uninstall
@@ -14,7 +14,7 @@ public sealed class UninstallSentinelTests
         Action onDetected,
         TimeSpan? pollInterval = null) =>
         new(enumerate, onDetected, _ => { }, pollInterval ?? TimeSpan.FromMilliseconds(10),
-            removalEvidence: () => true);
+            removalEvidence: _ => true);
 
     [Fact]
     public void Step_NeverArmedProductMissing_DoesNotFire()
@@ -97,7 +97,7 @@ public sealed class UninstallSentinelTests
             _ => { },
             pollInterval: TimeSpan.FromMilliseconds(10),
             installedLayoutProbe: () => true,
-            removalEvidence: () => true);
+            removalEvidence: _ => true);
 
         var run = sentinel.RunAsync();
         var winner = await Task.WhenAny(run, Task.Delay(2000));
@@ -117,7 +117,7 @@ public sealed class UninstallSentinelTests
             _ => { },
             pollInterval: TimeSpan.FromMilliseconds(10),
             installedLayoutProbe: () => false,
-            removalEvidence: () => true);
+            removalEvidence: _ => true);
 
         var run = sentinel.RunAsync();
         await Task.Delay(300);
@@ -141,7 +141,7 @@ public sealed class UninstallSentinelTests
             _ => { },
             pollInterval: TimeSpan.FromMilliseconds(10),
             installedLayoutProbe: () => true,
-            removalEvidence: () => false);
+            removalEvidence: _ => false);
 
         var run = sentinel.RunAsync();
         await Task.Delay(300);
@@ -164,7 +164,7 @@ public sealed class UninstallSentinelTests
             _ => { },
             pollInterval: TimeSpan.FromMilliseconds(10),
             installedLayoutProbe: () => true,
-            removalEvidence: () => evidence);
+            removalEvidence: _ => evidence);
 
         var run = sentinel.RunAsync();
         await Task.Delay(150);          // banked misses, evidence parked it
@@ -172,6 +172,33 @@ public sealed class UninstallSentinelTests
         var winner = await Task.WhenAny(run, Task.Delay(2000));
         Assert.Same(run, winner);
         Assert.Equal(1, fired);
+    }
+
+    [Fact]
+    public async Task RunAsync_FireAsksEvidenceForTheWatchedCode()
+    {
+        // A previous uninstall's success event must not license the verb for
+        // a fresh install: the sentinel watched {WATCHED-GUID} while the
+        // registration was visible, and the evidence probe must be asked
+        // about that exact code.
+        string? asked = null;
+        int fired = 0;
+        bool present = true;
+        var sentinel2 = new UninstallSentinel(
+            () => present ? [UninstallSentinel.ProductName] : Array.Empty<string>(),
+            () => fired++,
+            _ => { },
+            pollInterval: TimeSpan.FromMilliseconds(10),
+            removalEvidence: code => { asked = code; return true; },
+            enumerateCodes: () => present ? ["{WATCHED-GUID}"] : Array.Empty<string>());
+
+        var run = sentinel2.RunAsync();
+        await Task.Delay(60);
+        present = false;                      // the Control Panel /x lands
+        var winner = await Task.WhenAny(run, Task.Delay(2000));
+        Assert.Same(run, winner);             // fired
+        Assert.Equal(1, fired);
+        Assert.Equal("{WATCHED-GUID}", asked); // bound to the watched code
     }
 
     [Fact]

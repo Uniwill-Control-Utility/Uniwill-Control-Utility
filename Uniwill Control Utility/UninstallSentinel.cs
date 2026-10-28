@@ -62,8 +62,9 @@ namespace Uniwill_Control_Utility
         private static readonly Regex GuidKey = new(@"^\{[0-9A-Fa-f-]+\}$", RegexOptions.Compiled);
 
         private readonly Func<string[]> _enumerateRegistrations;
+        private readonly Func<string[]> _enumerateCodes;
         private readonly Func<bool> _installedLayoutProbe;
-        private readonly Func<bool> _removalEvidence;
+        private readonly Func<string?, bool> _removalEvidence;
         private readonly Action _onUninstallDetected;
         private readonly Action<string> _log;
         private readonly TimeSpan _pollInterval;
@@ -72,6 +73,7 @@ namespace Uniwill_Control_Utility
         private bool _armed;
         private bool _fire;
         private bool _noEvidenceLogged;
+        private string? _lastSeenCode;
 
         /// <summary>Test seam: inject the probe and the reaction.</summary>
         internal UninstallSentinel(
@@ -80,9 +82,11 @@ namespace Uniwill_Control_Utility
             Action<string> log,
             TimeSpan? pollInterval = null,
             Func<bool>? installedLayoutProbe = null,
-            Func<bool>? removalEvidence = null)
+            Func<string?, bool>? removalEvidence = null,
+            Func<string[]>? enumerateCodes = null)
         {
             _enumerateRegistrations = enumerateRegistrations;
+            _enumerateCodes = enumerateCodes ?? EnumerateMachineRegistrationCodes;
             _installedLayoutProbe = installedLayoutProbe ?? NeverInstalled;
             _removalEvidence = removalEvidence ?? MsiRemovalEvidence;
             _onUninstallDetected = onUninstallDetected;
@@ -114,6 +118,14 @@ namespace Uniwill_Control_Utility
                 try
                 {
                     registrationFound = Registered(_enumerateRegistrations());
+                    if (registrationFound)
+                    {
+                        // Remember the product code while it is visible: the
+                        // removal evidence must name this exact transaction.
+                        string[] codes = _enumerateCodes();
+                        if (codes.Length > 0)
+                            _lastSeenCode = codes[0];
+                    }
 
                     // Arming signal for the race the thin uninstall wins:
                     // the app needs ~2 minutes of startup on a cold machine,
@@ -146,7 +158,7 @@ namespace Uniwill_Control_Utility
                     // removals leave a machine-wide trace: the MsiInstaller
                     // "Removal completed successfully" event. Evidence
                     // required, phantom ignored.
-                    if (!_removalEvidence())
+                    if (!_removalEvidence(_lastSeenCode))
                     {
                         if (!_noEvidenceLogged)
                         {
@@ -227,16 +239,29 @@ namespace Uniwill_Control_Utility
         /// husks do not keep the sentinel armed, and per-user registrations
         /// live in other hives, so old ones cannot poison the probe.
         /// </summary>
-        internal static string[] EnumerateMachineRegistrations()
+        internal static string[] EnumerateMachineRegistrations() =>
+            MachineRegistrations().Select(pair => pair.DisplayName).ToArray();
+
+        /// <summary>
+        /// The product codes (ARP GUID key names) of the live machine
+        /// registrations, same rule as EnumerateMachineRegistrations: the
+        /// sentinel remembers the code while the registration is visible, and
+        /// the removal evidence must name that same code - a previous
+        /// uninstall's event must never license the verb for a fresh install.
+        /// </summary>
+        internal static string[] EnumerateMachineRegistrationCodes() =>
+            MachineRegistrations().Select(pair => pair.Key).ToArray();
+
+        private static List<(string Key, string DisplayName)> MachineRegistrations()
         {
+            var found = new List<(string, string)>();
             using RegistryKey localMachine =
                 RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
             using RegistryKey? uninstall = localMachine.OpenSubKey(
                 @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
             if (uninstall == null)
-                return Array.Empty<string>();
+                return found;
 
-            var names = new List<string>();
             foreach (string keyName in uninstall.GetSubKeyNames())
             {
                 if (!GuidKey.IsMatch(keyName))
@@ -251,10 +276,10 @@ namespace Uniwill_Control_Utility
 
                 string uninstallString = entry.GetValue("UninstallString") as string ?? "";
                 if (uninstallString.Contains("MsiExec", StringComparison.OrdinalIgnoreCase))
-                    names.Add(displayName);
+                    found.Add((keyName, displayName));
             }
 
-            return names.ToArray();
+            return found;
         }
 
         /// <summary>
@@ -313,27 +338,46 @@ namespace Uniwill_Control_Utility
         /// an unreadable event log reads as no evidence, and the destructive
         /// verb stays parked.
         /// </summary>
-        internal static bool MsiRemovalEvidence()
+        internal static bool MsiRemovalEvidence(string? productCode = null)
         {
             try
             {
                 using var application = new EventLog("Application");
                 EventLogEntryCollection entries = application.Entries;
-                DateTime cutoff = DateTime.Now - TimeSpan.FromMinutes(5);
+                DateTime cutoff = DateTime.Now - TimeSpan.FromMinutes(3);
+
+                bool removalCompleted = false;
+                bool transactionEnded = false;
 
                 for (int i = entries.Count - 1; i >= 0; i--)
                 {
                     EventLogEntry entry = entries[i];
                     if (entry.TimeGenerated < cutoff)
                         break;
-                    if (entry.InstanceId != 11724)
-                        continue;
-                    if (entry.Message.IndexOf(ProductName, StringComparison.OrdinalIgnoreCase) < 0)
-                        continue;
-                    return true;
+
+                    switch (entry.InstanceId)
+                    {
+                        case 11724 when removalCompleted == false:
+                            if (entry.Message.IndexOf(ProductName, StringComparison.OrdinalIgnoreCase) >= 0)
+                                removalCompleted = true;
+                            break;
+                        case 1042 when transactionEnded == false:
+                            // "Ending a Windows Installer transaction: {GUID}"
+                            // - bind to the code the sentinel watched when the
+                            // registration was visible, so an older uninstall's
+                            // fingerprint cannot license a fresh install's verb.
+                            if (productCode is null)
+                                transactionEnded = entry.Message.IndexOf("}", StringComparison.Ordinal) >= 0;
+                            else
+                                transactionEnded = entry.Message.IndexOf(productCode, StringComparison.OrdinalIgnoreCase) >= 0;
+                            break;
+                    }
+
+                    if (removalCompleted && transactionEnded)
+                        return true;
                 }
 
-                return false;
+                return removalCompleted && transactionEnded;
             }
             catch
             {
