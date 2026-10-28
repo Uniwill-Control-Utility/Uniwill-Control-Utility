@@ -441,8 +441,11 @@ namespace Uniwill_Control_Utility
                         // Engine service state: the SCM probe every EC call site gates
                         // on (a connect to a stopped engine's pipe costs the full 5 s
                         // connect timeout, and the startup path issues many), plus the
-                        // pending marker for EC writes skipped while it was down.
-                        services.AddSingleton<EngineAvailability>();
+                        // pending marker for EC writes skipped while it was down. The
+                        // RPC ping is the liveness override for the state where the SCM
+                        // cannot speak (a security product guarding service descriptors
+                        // denies the app's opens while the engine answers RPC fine).
+                        services.AddSingleton(new EngineAvailability(EngineRpcReachableAsync));
                         services.AddSingleton<EngineStartupApply>();
                         // The client's transport gate: a verb for a stopped engine is
                         // refused before the connect (which costs the full 5 s
@@ -1129,22 +1132,34 @@ namespace Uniwill_Control_Utility
         /// cannot describe the service (a security product guarding service
         /// descriptors reverts every DACL write, so the app's opens are denied):
         /// the RPC pipe is independent of the SCM descriptor, and the engine
-        /// answers. Budget is tight because the startup path is where this runs.
+        /// answers. Two attempts with a gap: a service in START_PENDING has not
+        /// opened its pipe yet, and declaring it dead on the first miss is how a
+        /// working engine gets a repair elevation. The probe re-runs on its own
+        /// 5 s timer, so the budget here is only the startup path's stall.
         /// </summary>
         private static async Task<bool> EngineRpcReachableAsync()
         {
-            try
+            for (int attempt = 1; attempt <= 2; attempt++)
             {
-                var client = new UCU.Client.EngineClient(
-                    connectTimeout: TimeSpan.FromSeconds(1.5));
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
-                await client.InvokeAsync(UCU.Contracts.EngineVerbs.Engine.Ping, cts.Token);
-                return true;
+                try
+                {
+                    var client = new UCU.Client.EngineClient(
+                        connectTimeout: TimeSpan.FromSeconds(2));
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+                    await client.InvokeAsync(UCU.Contracts.EngineVerbs.Engine.Ping, cts.Token);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogDebug(
+                        ex, "Engine RPC liveness probe attempt {Attempt} failed", attempt);
+
+                    if (attempt < 2)
+                        await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
+                }
             }
-            catch
-            {
-                return false;
-            }
+
+            return false;
         }
 
         /// <summary>

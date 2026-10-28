@@ -108,6 +108,93 @@ public sealed class EngineAvailabilityTests
     }
 
     [Fact]
+    public void AccessDenied_WithALiveProbe_IsRunning()
+    {
+        // The guarded-machine case (field-proven: Emsisoft): a security product
+        // reverts every service-descriptor write, so the app's SCM opens are
+        // denied permanently while the engine answers RPC fine. Reporting
+        // "not running" here skipped EC writes on a working engine - the fan
+        // curve and charge limit silently never applied. The probe is the
+        // liveness truth for exactly this state.
+        var availability = new EngineAvailability(
+            () => EngineServiceState.AccessDenied,
+            async () =>
+            {
+                await Task.Delay(10);
+                return true;
+            });
+
+        Assert.True(WaitFor(() => availability.IsRunning, TimeSpan.FromSeconds(2)));
+    }
+
+    [Fact]
+    public void AccessDenied_WithADeadProbe_IsNotRunning()
+    {
+        var availability = new EngineAvailability(
+            () => EngineServiceState.AccessDenied,
+            () => Task.FromResult(false));
+
+        Assert.False(availability.IsRunning);
+        Assert.False(WaitFor(() => availability.IsRunning, TimeSpan.FromMilliseconds(500)));
+    }
+
+    [Fact]
+    public void TheScmAnswerOutranksTheProbe()
+    {
+        // The probe speaks only where the SCM cannot. Running is Running with a
+        // dead probe (a pipe hiccup must not mark a healthy service down), and
+        // Stopped is Stopped with a live probe (the SCM can describe the service
+        // and says it is not up; the pipe answering a dev console engine must
+        // not make the app believe the service runs).
+        var running = new EngineAvailability(
+            () => EngineServiceState.Running,
+            () => Task.FromResult(false));
+        Assert.True(running.IsRunning);
+
+        var stopped = new EngineAvailability(
+            () => EngineServiceState.Stopped,
+            () => Task.FromResult(true));
+        Assert.False(stopped.IsRunning);
+        Assert.False(WaitFor(() => stopped.IsRunning, TimeSpan.FromMilliseconds(500)));
+    }
+
+    [Fact]
+    public void ProbeLiveness_TransitionFiresStartedOnce()
+    {
+        // Consumers deferred EC work because the engine looked down; the probe
+        // noticing it alive is the same "it came up" moment the SCM transition
+        // is, and the deferred apply is a once-only consume.
+        var availability = new EngineAvailability(
+            () => EngineServiceState.AccessDenied,
+            async () =>
+            {
+                await Task.Delay(10);
+                return true;
+            });
+
+        int started = 0;
+        availability.Started += () => started++;
+
+        Assert.True(WaitFor(() => availability.IsRunning, TimeSpan.FromSeconds(2)));
+        Assert.Equal(1, started);
+        Thread.Sleep(300);
+        Assert.Equal(1, started);
+    }
+
+    private static bool WaitFor(Func<bool> condition, TimeSpan timeout)
+    {
+        DateTime deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (condition())
+                return true;
+            Thread.Sleep(25);
+        }
+
+        return condition();
+    }
+
+    [Fact]
     public void EngineStartupApply_MarksAndConsumesExactlyOnce()
     {
         // The deferred EC apply must run for one consumer only: the post-splash

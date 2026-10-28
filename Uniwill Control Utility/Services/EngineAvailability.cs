@@ -1,5 +1,7 @@
 using System;
 using System.ComponentModel;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -38,6 +40,15 @@ namespace Uniwill_Control_Utility.Services
     /// next read is authoritative within the TTL. <see cref="Started"/> publishes the
     /// transition so work that was skipped while the engine was down can be applied
     /// once when it comes up.
+    ///
+    /// The SCM is not always able to speak. On a machine whose security product
+    /// guards service descriptors (field-proven: Emsisoft), every DACL write is
+    /// reverted, the app's opens are permanently denied, and the state is
+    /// <see cref="AccessDenied"/> forever while the engine answers RPC fine. For that
+    /// state <see cref="IsRunning"/> consults an injected RPC liveness probe - the
+    /// pipe is independent of the SCM descriptor - on a background timer, so the
+    /// consumers that gate EC writes on liveness keep working. The probe never
+    /// overrules a real SCM answer.
     /// </summary>
     public sealed class EngineAvailability
     {
@@ -50,25 +61,48 @@ namespace Uniwill_Control_Utility.Services
         internal const int ErrorServiceDoesNotExist = 1060;
 
         private static readonly TimeSpan StatusTtl = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan ProbeInterval = TimeSpan.FromSeconds(5);
 
         private readonly Func<EngineServiceState> _readState;
+        private readonly Func<Task<bool>>? _livenessProbe;
         private readonly TimeSpan _ttl;
         private readonly object _sync = new();
         private EngineServiceState? _cached;
         private EngineServiceState? _lastState;
         private DateTime _cachedUtc;
+        private System.Threading.Timer? _probeTimer;
+        private int _probeAlive;
+        private int _probeInFlight;
 
         public EngineAvailability()
-            : this(ReadStateFromScm)
+            : this(ReadStateFromScm, null)
         {
         }
 
-        /// <summary>Test composition: the SCM read is a seam, so the caching, the
-        /// transition event and the state mapping are all observable.</summary>
-        internal EngineAvailability(Func<EngineServiceState> readState, TimeSpan? ttl = null)
+        /// <summary>Production composition: the SCM read plus the app's RPC ping.</summary>
+        public EngineAvailability(Func<Task<bool>> livenessProbe)
+            : this(ReadStateFromScm, livenessProbe)
+        {
+            ArgumentNullException.ThrowIfNull(livenessProbe);
+        }
+
+        /// <summary>
+        /// Composition: the SCM read is a seam, so the caching, the transition event
+        /// and the state mapping are all observable. The liveness probe is the RPC
+        /// ping the app injects: on a machine whose security product guards service
+        /// descriptors (the AU ace cannot be made to stick - field-proven), the SCM
+        /// state is permanently AccessDenied while the engine answers RPC fine; the
+        /// probe is then the only honest liveness, and consumers ask for liveness,
+        /// not for SCM vocabulary.
+        /// </summary>
+        internal EngineAvailability(
+            Func<EngineServiceState> readState,
+            Func<Task<bool>>? livenessProbe = null,
+            TimeSpan? ttl = null)
         {
             ArgumentNullException.ThrowIfNull(readState);
             _readState = readState;
+            _livenessProbe = livenessProbe;
             _ttl = ttl ?? StatusTtl;
         }
 
@@ -101,6 +135,13 @@ namespace Uniwill_Control_Utility.Services
                 _lastState = state;
                 _cached = state;
                 _cachedUtc = DateTime.UtcNow;
+
+                // Keep the liveness probe's lifetime tied to the state that needs it.
+                if (state == EngineServiceState.AccessDenied && _livenessProbe is not null)
+                    EnsureProbeTimer();
+                else
+                    _probeTimer?.Dispose();
+                _probeTimer = null;
             }
 
             if (started)
@@ -109,7 +150,26 @@ namespace Uniwill_Control_Utility.Services
             return state;
         }
 
-        public bool IsRunning => Query() == EngineServiceState.Running;
+        /// <summary>
+        /// Liveness, for the consumers that skip EC work while the engine is down
+        /// (deferred fan curve, charge limit, dashboard telemetry). The SCM answer
+        /// is the primary truth; the RPC probe is the override for the one state
+        /// where the SCM cannot speak: <see cref="AccessDenied"/>. On a machine
+        /// whose security product guards service descriptors (field-proven:
+        /// Emsisoft), the app's opens are denied permanently while the engine
+        /// answers RPC fine - treating that as "not running" skips the EC writes
+        /// of a working engine, which is the defect the probe closes.
+        /// </summary>
+        public bool IsRunning
+        {
+            get
+            {
+                EngineServiceState state = Query();
+                return state == EngineServiceState.Running
+                    || (state == EngineServiceState.AccessDenied
+                        && Volatile.Read(ref _probeAlive) == 1);
+            }
+        }
 
         /// <summary>
         /// Drops the cached answer, so the next read re-queries. Used after the app
@@ -124,6 +184,65 @@ namespace Uniwill_Control_Utility.Services
             {
                 _cached = null;
             }
+        }
+
+        /// <summary>
+        /// Starts the probe timer on the first AccessDenied read. The first tick is
+        /// immediate so the first read after startup pays one ping, not one interval;
+        /// the interval is far above the ping cost and well below the interval a
+        /// service start can take, so a late-starting engine is picked up promptly.
+        /// Call under <see cref="_sync"/>.
+        /// </summary>
+        private void EnsureProbeTimer()
+        {
+            _probeTimer ??= new Timer(_ => ProbeNow(), null, TimeSpan.Zero, ProbeInterval);
+        }
+
+        private void ProbeNow()
+        {
+            Func<Task<bool>>? probe = _livenessProbe;
+            if (probe is null)
+                return;
+
+            // One ping at a time: the interval keeps ticking while one is in flight.
+            if (Interlocked.Exchange(ref _probeInFlight, 1) == 1)
+                return;
+
+            _ = ProbeCoreAsync(probe);
+        }
+
+        private async Task ProbeCoreAsync(Func<Task<bool>> probe)
+        {
+            bool alive;
+            try
+            {
+                alive = await probe().ConfigureAwait(false);
+            }
+            catch
+            {
+                alive = false;
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _probeInFlight, 0);
+            }
+
+            bool transitioned;
+            lock (_sync)
+            {
+                // The probe only speaks for the state where the SCM cannot: a real
+                // SCM answer (Running, Stopped, NotInstalled) outranks the pipe.
+                int target = alive && _lastState == EngineServiceState.AccessDenied ? 1 : 0;
+                int previous = _probeAlive;
+                _probeAlive = target;
+                transitioned = target == 1 && previous == 0;
+            }
+
+            // Same contract as the SCM transition: consumers deferred EC work
+            // because the engine looked down, and this is the moment it stopped
+            // being down.
+            if (transitioned)
+                Started?.Invoke();
         }
 
         private static EngineServiceState ReadStateFromScm()
