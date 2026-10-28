@@ -44,6 +44,13 @@ namespace UCU.Engine
                 services.AddHostedService<EnginePipeServer>();
                 services.AddHostedService<EngineWatchdog>();
                 services.AddHostedService<AppSupervision>();
+
+                // Service mode only: the app-contract DACL asserted from inside the
+                // service (a security product that guards service descriptors can
+                // revert the installer's sdset; the service is the writer that
+                // always has rights). See ServiceSelfSecurityService.
+                if (isService)
+                    services.AddHostedService<ServiceSelfSecurityService>();
             });
 
             return builder.Build();

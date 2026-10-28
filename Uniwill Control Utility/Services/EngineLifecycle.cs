@@ -93,6 +93,32 @@ namespace Uniwill_Control_Utility.Services
                 state = EngineServiceState.AccessDenied;
             }
 
+            if (state == EngineServiceState.AccessDenied)
+            {
+                // Grace for the service's own DACL assertion: the engine re-grants
+                // the app contract from inside (ServiceSelfSecurityService) because
+                // a security product that guards service descriptors reverts the
+                // installer's sdset (field-proven: Emsisoft - SetServiceObjectSecurity
+                // SUCCESS, read-back is the template, immediately, every time).
+                // Just after a service start the assertion may be in flight, and
+                // elevation is meant to be once-ever: re-read once before taking it.
+                await Task.Delay(TimeSpan.FromMilliseconds(750)).ConfigureAwait(false);
+                availability.Invalidate();
+
+                state = availability.Query();
+                if (state == EngineServiceState.Running)
+                    return EngineEnsureOutcome.Running;
+
+                if (state == EngineServiceState.Stopped)
+                {
+                    EngineEnsureOutcome? retarted = TryStart(availability);
+                    if (retarted is not null)
+                        return retarted.Value;
+
+                    state = EngineServiceState.AccessDenied;
+                }
+            }
+
             string? exe = EngineExePath;
             if (exe is null)
             {
