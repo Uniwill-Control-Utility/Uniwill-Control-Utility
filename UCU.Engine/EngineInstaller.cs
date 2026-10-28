@@ -475,7 +475,11 @@ namespace UCU.Engine
             try
             {
                 using RegistryKey baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
-                using RegistryKey? uninstall = baseKey.OpenSubKey(UninstallPath);
+                // Writable open: a default OpenSubKey is a read handle, and
+                // DeleteSubKeyTree on it throws "Cannot write to the registry
+                // key" - which, logged only at debug level, made this sweep
+                // silently delete nothing (field-proven in the verb log).
+                using RegistryKey? uninstall = baseKey.OpenSubKey(UninstallPath, writable: true);
                 if (uninstall == null)
                     return;
 
@@ -739,7 +743,7 @@ namespace UCU.Engine
                     try
                     {
                         using RegistryKey? hive = users.OpenSubKey(sid);
-                        using RegistryKey? uninstall = hive?.OpenSubKey(UninstallPath);
+                        using RegistryKey? uninstall = hive?.OpenSubKey(UninstallPath, writable: true);
                         if (uninstall == null)
                             continue;
 
