@@ -322,12 +322,16 @@ namespace UCU.Engine
             rc = await RunScAsync("delete", name).ConfigureAwait(false);
             Log.Information("[EngineInstaller] Engine service removed (rc {Code})", rc);
 
-            // The MSI uninstall CustomAction invokes this verb as LocalSystem,
-            // so it also sweeps everything the installer itself cannot: the
-            // running app (it locks the layout the removal deletes), the
-            // scheduled tasks, the ARP husk the registration pass writes, and
-            // the service's ProgramData log directory. The Uninstall.exe shim
-            // shares this exact list, so both removal routes converge on the
+            // Removal routes launch this verb elevated (the app's
+            // UninstallSentinel after a Control Panel / Settings msiexec /x,
+            // the Uninstall.exe shim, the Velopack uninstall hook), so it also
+            // sweeps everything the MSI's thin removal cannot: the running app
+            // (it locks the layout), the scheduled tasks, every ARP husk that
+            // names the product, the service's ProgramData log directory, and
+            // the install layout itself (Velopack's Update.exe cannot be
+            // launched from the MSI's uninstall context - documented dead
+            // end - so the verb destroys the layout). The Uninstall.exe shim
+            // shares this exact list, so all removal routes converge on the
             // same end state. All best effort: an uninstall never fails here.
             KillRunningApp();
             await RunCleanupCommandAsync(
@@ -336,8 +340,9 @@ namespace UCU.Engine
                 "schtasks.exe", "/Delete /TN \"UCU Autostart\" /F").ConfigureAwait(false);
             await RunCleanupCommandAsync(
                 "schtasks.exe", "/Delete /TN \"UCU Guardian\" /F").ConfigureAwait(false);
-            DeleteHklmUninstallHusk();
+            DeleteArpHusks();
             DeleteProgramDataLogs();
+            DeleteInstallLayout();
 
             return rc;
         }
@@ -391,20 +396,52 @@ namespace UCU.Engine
             }
         }
 
-        private static void DeleteHklmUninstallHusk()
+        /// <summary>
+        /// Delete every Add/Remove Programs entry that names the product: the
+        /// "MSI:Uniwill-Control-Utility" husk the registration pass leaves
+        /// when the thin MSI removal unregisters the product, Velopack's GUID
+        /// husk (its HKLM entry, plus the orphaned product-key entry when the
+        /// MSI's display pass orphans it), and the legacy plain-name key.
+        /// Matching is by DisplayName so no key name is hardcoded.
+        /// </summary>
+        private static void DeleteArpHusks()
         {
-            const string HuskKey =
-                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MSI:Uniwill-Control-Utility";
+            const string UninstallPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
 
             try
             {
                 using RegistryKey localMachine =
                     RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
-                localMachine.DeleteSubKeyTree(HuskKey, throwOnMissingSubKey: false);
+                using RegistryKey? uninstall = localMachine.OpenSubKey(UninstallPath);
+                if (uninstall == null)
+                    return;
+
+                // GetSubKeyNames snapshot first: deleting while enumerating.
+                foreach (string keyName in uninstall.GetSubKeyNames())
+                {
+                    try
+                    {
+                        using (RegistryKey? entry = uninstall.OpenSubKey(keyName))
+                        {
+                            if (!string.Equals(entry?.GetValue("DisplayName") as string,
+                                    "Uniwill Control Utility", StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
+                        }
+
+                        uninstall.DeleteSubKeyTree(keyName, throwOnMissingSubKey: false);
+                        Log.Debug("[EngineInstaller] ARP husk removed: {Key}", keyName);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Debug(ex, "[EngineInstaller] ARP husk {Key} not removed", keyName);
+                    }
+                }
             }
             catch (Exception ex)
             {
-                Log.Debug(ex, "[EngineInstaller] HKLM uninstall husk not removed");
+                Log.Debug(ex, "[EngineInstaller] ARP husks not swept");
             }
         }
 
@@ -420,6 +457,50 @@ namespace UCU.Engine
             catch (Exception ex)
             {
                 Log.Debug(ex, "[EngineInstaller] ProgramData log directory not removed");
+            }
+        }
+
+        /// <summary>
+        /// Destroy the install layout: the thin MSI removal deletes no files
+        /// (the layout is deployed by the package's bootstrap custom action,
+        /// so RemoveFiles sees almost nothing), and Velopack's Update.exe
+        /// cannot be launched from the MSI's uninstall context (documented
+        /// dead end), so the verb - the only route that runs elevated with
+        /// full access - removes the root. This exe runs from
+        /// &lt;root&gt;\current\Service\, so the root is two levels up; the
+        /// Update.exe marker proves the layout is a real Velopack root before
+        /// anything is deleted (source/dev layouts are never touched). The
+        /// image files delete fine: Windows opens running exes and loaded
+        /// assemblies for delete (the standard self-update pattern).
+        /// </summary>
+        private static void DeleteInstallLayout()
+        {
+            try
+            {
+                string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", ".."));
+                if (!Directory.Exists(root) || !File.Exists(Path.Combine(root, "Update.exe")))
+                    return;
+
+                for (int attempt = 0; ; attempt++)
+                {
+                    try
+                    {
+                        Directory.Delete(root, recursive: true);
+                        Log.Information("[EngineInstaller] Install layout removed: {Root}", root);
+                        return;
+                    }
+                    catch (Exception ex) when (attempt < 2)
+                    {
+                        // The app's just-killed images stay locked for a
+                        // moment while AV scans them; a retry clears them.
+                        Log.Debug(ex, "[EngineInstaller] layout delete attempt {Attempt}", attempt + 1);
+                        Thread.Sleep(1500);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "[EngineInstaller] install layout not removed");
             }
         }
 

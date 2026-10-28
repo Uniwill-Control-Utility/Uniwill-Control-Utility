@@ -1343,6 +1343,18 @@ namespace Uniwill_Control_Utility
             // the complete route; this hive is the user's own, so no elevation.
             SelfHealControlPanelUninstall();
 
+            // Self-heal the Control Panel / Settings route: those run the MSI
+            // by product code, and vpk's thin package unregisters the product
+            // while leaving the service, layout, app, tasks, and husk behind
+            // (its CustomActions cannot launch the installed exes at
+            // uninstall - documented dead end). This app outlives every such
+            // removal, so it watches the product registration and, when it
+            // vanishes, self-runs the elevated engine --uninstall-engine verb:
+            // the single full-cleanup entry point, the same end state as the
+            // shim route. See UninstallSentinel.
+            UninstallSentinel.CreateDefault(
+                message => _logger?.LogInformation("[UninstallSentinel] {Message}", message)).Start();
+
             // Show the prerequisite checklist on first startup.
             if (Settings.Default.ShowPrerequisiteDialog)
                 SafeFireAndForget(ShowPrerequisiteDialogAsync());
