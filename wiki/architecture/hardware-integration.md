@@ -27,6 +27,7 @@ flowchart LR
     WMI --> OEM[System identity / MiniLED interface]
     App --> LHM[LibreHardwareMonitor]
     LHM --> Sensors[CPU, GPU, memory, battery sensors]
+    LHM -.->|CPU temperature needs| Pawn
 ```
 
 ## Embedded controller (engine-owned)
@@ -80,6 +81,10 @@ Per-operation admin flows (dGPU PnP hotswap, webcam PnP) elevate through `Script
 `HardwareMonitoringService` exposes category leases over LibreHardwareMonitor; Dashboard holds a persistent CPU/GPU/memory/battery lease, temporary consumers get `IDisposable` leases.
 
 `EcTelemetryService` is the EC-telemetry counterpart: it polls fan duty, temperatures and RPM through `IEcTelemetryCapability` (the `telemetry` queue keeps these fast reads unblocked behind writes in other domains) and feeds the tray, overlay and dashboard.
+
+**CPU temperature has two sources, and which one answers is a privilege question.** The CPU's own sensor (LHM's MSR-derived "Core Average"/"CPU Package") needs the PawnIO driver, and PawnIO's device ACL is System + Administrators (its INF ships `D:P(A;;GA;;;SY)(A;;GA;;;BA)`), so an asInvoker process - the app in a per-machine install - gets access denied and no CPU sensor at all. The fallback is the EC's own reading (register `0x043E`, the sensor the EC fan curve runs on), which reaches the app over `telemetry.get_cpu_temperature` with no privilege: the LocalSystem engine opens `\\.\ACPIDriver`, and the pipe DACL admits the interactive user.
+
+`HardwareMonitoringService.ApplyCpuTemperatureSource` applies the precedence: the CPU sensor wins when it answered, the EC replaces it when it did not, and both absent leaves `0` with source `None`, which the UI renders as `--`. The source is recorded on the snapshot (`CpuTemperatureSource`) and the dashboard card's tooltip names it, because the two sensors are not the same number - the EC reading is quantized and follows the EC's own polling - so a fallback must never be silent. Consumers of the snapshot (dashboard, tray widget, overlay, Flydigi smart-fan temperature input) all receive the fallback through that one seam; `ReadSensor` consumers (Adaptive mode's per-sensor reads) see only the LHM tree and have no EC fallback.
 
 ## FPS monitoring
 

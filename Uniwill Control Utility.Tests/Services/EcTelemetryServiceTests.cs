@@ -104,6 +104,35 @@ public sealed class EcTelemetryServiceTests
         Assert.Equal(2, Volatile.Read(ref captureCount));
     }
 
+    [Fact]
+    public async Task CpuTemperature_PublishesTheEcReading()
+    {
+        // The EC reading is the CPU-temperature source for a process that cannot open the
+        // CPU sensor's driver, so the cached read has to reach a polling consumer.
+        using var service = new EcTelemetryService(
+            fanDutyCapture: () => Task.FromResult(EcFanDutySnapshot.Empty),
+            mainFanRpmCapture: () => Task.FromResult(0),
+            maxAge: TimeSpan.FromMinutes(1),
+            cpuTemperatureCapture: () => Task.FromResult(57));
+
+        Assert.Equal(57, await WaitForCpuTemperatureAsync(service));
+    }
+
+    [Fact]
+    public void CpuTemperature_WithoutAnEcSource_IsUnavailableNotThrown()
+    {
+        // Composition with no EC source (the test ctor's default, as in a dev run without
+        // the engine): the fallback answers "unavailable", which the UI renders as "--".
+        using var service = new EcTelemetryService(
+            fanDutyCapture: () => Task.FromResult(EcFanDutySnapshot.Empty),
+            mainFanRpmCapture: () => Task.FromResult(0),
+            maxAge: TimeSpan.FromMinutes(1));
+
+        _ = service.ReadCpuTemperature();
+
+        Assert.Equal(0, service.ReadCpuTemperature());
+    }
+
     private static async Task<EcFanDutySnapshot> WaitForSnapshotAsync(
         EcTelemetryService service)
     {
@@ -118,5 +147,20 @@ public sealed class EcTelemetryServiceTests
         }
 
         throw new TimeoutException("The EC telemetry cache did not publish the capture.");
+    }
+
+    private static async Task<int> WaitForCpuTemperatureAsync(EcTelemetryService service)
+    {
+        DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            int temperature = service.ReadCpuTemperature();
+            if (temperature > 0)
+                return temperature;
+
+            await Task.Delay(10);
+        }
+
+        throw new TimeoutException("The EC telemetry cache did not publish the CPU temperature.");
     }
 }

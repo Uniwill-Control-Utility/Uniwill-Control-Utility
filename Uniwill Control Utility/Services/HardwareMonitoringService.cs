@@ -59,9 +59,27 @@ namespace Uniwill_Control_Utility.Services
         Intel = 3
     }
 
+    /// <summary>
+    /// Where a snapshot's CPU temperature came from. The CPU's own sensor (MSR-derived:
+    /// Tctl/Tdie, TjMax offset) needs the PawnIO kernel driver, whose device ACL is
+    /// System + Administrators - so an asInvoker process has no CPU sensor. The embedded
+    /// controller's reading (register 0x043E, the sensor the EC fan curve runs on) reaches
+    /// the app through the LocalSystem engine with no privilege at all. None = neither
+    /// answered, and the UI shows "--".
+    /// </summary>
+    public enum CpuTemperatureSource
+    {
+        None = 0,
+        CpuSensor = 1,
+        EcSensor = 2
+    }
+
     public sealed record HardwareMetricsSnapshot
     {
         public int CpuTemperature { get; init; }
+
+        /// <summary>Which sensor produced CpuTemperature (0 values pair with None).</summary>
+        public CpuTemperatureSource CpuTemperatureSource { get; init; }
         public int CpuUsage { get; init; }
         public int CpuPowerWatts { get; init; }
         public int CpuClockMhz { get; init; }
@@ -137,6 +155,9 @@ namespace Uniwill_Control_Utility.Services
         private readonly object _sync = new();
         private readonly Dictionary<long, HardwareMonitoringCategory> _leases = new();
         private readonly StaleWhileRevalidateCache<HardwareMonitoringState> _stateCache;
+
+        /// <summary>EC CPU temperature source; null = no engine (dev/test composition).</summary>
+        private readonly IEcCpuTemperatureSource? _ecCpuTemperature;
         private Computer? _computer;
         private HardwareMonitoringCategory _activeCategories;
         private DateTime _lastUpdateUtc = DateTime.MinValue;
@@ -155,8 +176,17 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>How long to wait after ResetComputer() before attempting to reopen (gives GPU driver time to settle).</summary>
         private static readonly TimeSpan ResetCooldown = TimeSpan.FromSeconds(3);
 
-        public HardwareMonitoringService()
+        /// <param name="ecCpuTemperature">
+        /// The embedded controller's CPU temperature, used when the in-process MSR sensor
+        /// path cannot answer: the CPU sensor needs the PawnIO driver, whose device ACL
+        /// admits System and Administrators, so the asInvoker app installed per-machine has
+        /// no CPU sensor. Optional, so a composition without an engine keeps the
+        /// single-source behaviour.
+        /// </param>
+        public HardwareMonitoringService(IEcCpuTemperatureSource? ecCpuTemperature = null)
         {
+            _ecCpuTemperature = ecCpuTemperature;
+
             _stateCache = new StaleWhileRevalidateCache<HardwareMonitoringState>(
                 HardwareMonitoringState.Empty,
                 SnapshotMaxAge,
@@ -347,7 +377,7 @@ namespace Uniwill_Control_Utility.Services
             (int memTemp0, int memTemp1) = ReadMemoryTemperatures();
             int storageTemp = ReadStorageTemperature();
 
-            return new HardwareMetricsSnapshot
+            var metrics = new HardwareMetricsSnapshot
             {
                 CpuTemperature = Round(ReadFirstValue(cpu, SensorType.Temperature, "Core Average", "CPU Package", "Core")),
                 CpuUsage = Round(ReadFirstValue(cpu, SensorType.Load, "CPU Total", "Total")),
@@ -374,6 +404,35 @@ namespace Uniwill_Control_Utility.Services
                 BatteryPowerWatts = Math.Abs(ReadFirstValue(battery, SensorType.Power, "Charge Rate", "Discharge Rate", "Power")),
                 BatteryTimeRemainingMinutes = powerStatus.BatteryLifeTime > 0 ? powerStatus.BatteryLifeTime / 60 : 0
             };
+
+            return ApplyCpuTemperatureSource(metrics, _ecCpuTemperature?.ReadCpuTemperature() ?? 0);
+        }
+
+        /// <summary>
+        /// CPU temperature source precedence: the CPU's own sensor wins when it answered
+        /// (Tctl/Tdie is the number the CPU's thermal behaviour is defined by). When it is
+        /// absent - the case for an unelevated app, which cannot open PawnIO, whose device
+        /// ACL is System + Administrators - the embedded controller's reading replaces it,
+        /// and the source is recorded so the UI can say where the number came from. Both
+        /// absent stays 0/None, which the UI renders as "--".
+        /// </summary>
+        internal static HardwareMetricsSnapshot ApplyCpuTemperatureSource(
+            HardwareMetricsSnapshot metrics,
+            int ecCpuTemperature)
+        {
+            if (metrics.CpuTemperature > 0)
+                return metrics with { CpuTemperatureSource = CpuTemperatureSource.CpuSensor };
+
+            if (ecCpuTemperature > 0)
+            {
+                return metrics with
+                {
+                    CpuTemperature = ecCpuTemperature,
+                    CpuTemperatureSource = CpuTemperatureSource.EcSensor
+                };
+            }
+
+            return metrics with { CpuTemperatureSource = CpuTemperatureSource.None };
         }
 
         /// <summary>Must be called while holding _sync.</summary>

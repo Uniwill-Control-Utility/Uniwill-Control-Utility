@@ -70,6 +70,12 @@ The first instance should receive `UniwillControlUtility.Show`. Check whether an
 
 Open the prerequisite flow and verify PawnIO is installed and its device path exists. Confirm the correct AMD or Intel module files were copied into the application output. Restart UCU after driver installation.
 
+### Dashboard CPU temperature shows `--`
+
+The CPU's own sensor requires the PawnIO driver, and PawnIO's device ACL admits System and Administrators only - an installed, unelevated app cannot open it even when the driver is installed and running, which is the normal state of a per-machine install. UCU then displays the embedded controller's reading and the card's tooltip names the source ("Embedded controller sensor"), so a value from the EC is expected, not a defect: the two sensors are not the same number.
+
+`--` means neither source answered. Check that the engine is running (`sc.exe query UCUEngine`) and that its log (`%ProgramData%\UCU\engine\`) reports the EC driver opened; an engine-side loss shows `--` on every EC-fed card (fan speed, battery health) at the same time. A tooltip reading "CPU core sensor" with no value points at the PawnIO path (driver installed, device openable, module files present).
+
 ### EC fan or battery controls are unavailable
 
 Confirm laptop detection, `ACPIDriverDll.dll` loading, and EC initialization in the log. OEM firmware and register maps differ; do not infer support only from the chassis brand.

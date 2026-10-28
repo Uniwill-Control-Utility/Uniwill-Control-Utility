@@ -27,6 +27,16 @@ namespace Uniwill_Control_Utility.Views.Controls
             _cpuTempHero.Text = snapshot.CpuTemperature > 0 ? $"{snapshot.CpuTemperature}°C" : "--";
             _temperatureSeries.AddSample(snapshot.CpuTemperature);
 
+            // Where the number came from is worth saying: the EC reading is the fallback
+            // used when the CPU's own sensor is unavailable, and it is a different sensor
+            // (the EC's fan-curve input), so a graph should not be ambiguous about it.
+            _cpuTempHero.ToolTip = snapshot.CpuTemperatureSource switch
+            {
+                CpuTemperatureSource.CpuSensor => "CPU core sensor (model-specific registers)",
+                CpuTemperatureSource.EcSensor => "Embedded controller sensor (the EC fan-curve input)",
+                _ => "No CPU temperature source available",
+            };
+
             _cpuPowerBar.Value = snapshot.CpuPowerWatts;
             _cpuPowerLabel.Text = snapshot.CpuPowerWatts > 0 ? $"{snapshot.CpuPowerWatts}W" : "--";
 

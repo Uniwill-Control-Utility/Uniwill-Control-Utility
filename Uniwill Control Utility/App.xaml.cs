@@ -304,7 +304,13 @@ namespace Uniwill_Control_Utility
                         // Velopack update engine (GitHub Releases feed; no-op on portable layouts).
                         services.AddSingleton<VelopackUpdateService>();
 
-                        services.AddSingleton<IHardwareMonitoringService, HardwareMonitoringService>();
+                        // The EC CPU temperature is the fallback sensor source for the CPU
+                        // metric: the CPU's own MSR sensor needs the PawnIO driver, whose
+                        // device ACL admits System + Administrators, so the asInvoker app
+                        // of a per-machine install has no CPU sensor at all. The source is
+                        // EcTelemetryService (engine RPC, cached, non-blocking).
+                        services.AddSingleton<IHardwareMonitoringService>(provider =>
+                            new HardwareMonitoringService(provider.GetService<IEcCpuTemperatureSource>()));
                         services.AddSingleton<GpuInventoryService>();
                         services.AddSingleton<IFpsMonitoringService, FpsMonitoringService>();
                         services.AddSingleton<OverlaySettingsStore>();
@@ -368,6 +374,8 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<IEcTelemetryCapability, EcTelemetryCapability>();
                         services.AddSingleton<IEngineCapability, EngineCapability>();
                         services.AddSingleton<EcTelemetryService>();
+                        services.AddSingleton<IEcCpuTemperatureSource>(provider =>
+                            provider.GetRequiredService<EcTelemetryService>());
 
                         // Hardware Performance / Q-key button intercept: polls the EC
                         // TCC offset register for button presses and cycles UCU presets.
