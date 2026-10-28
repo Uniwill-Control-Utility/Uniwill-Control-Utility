@@ -72,6 +72,10 @@ The phase progress reflects deferred tasks, and the game-library scan walks ever
 
 Check the app log for "Game library scan outlived the ... startup budget": it names the resource class. `net use` shows mapped drives and their `Disconnected` state. A second machine, or the same drive connected, confirms the environment rather than the app.
 
+### Startup freezes at exactly 92 % "Initializing", forever, reboots do not help
+
+92 % is the top of the Phase-1 tracker: all deferred tasks finished, and the chain is building the main window - the dashboard page constructor. A freeze *at exactly this number, every launch, reboot-proof* is the signature of a **synchronous image decode on the UI thread** being held by a security product's file filter: WPF's `BitmapImage` decoder resolves the picture's ICC color context through a synchronous `FileWebRequest` on `C:\Windows\System32\spool\drivers\color`, and a guard that system directory (observed: Emsisoft) parks the open's IRP indefinitely - the dispatcher thread never returns, so the window paints its last progress value and freezes. `dotnet-stack report -p <pid>` shows it directly: the UI thread sits in `FileWebRequest.GetResponse` under `BitmapImage.FinalizeCreation` under the page constructor. The app is not corrupt and the install is not broken; the AV's system-directory guard is the machine condition, and an AV allowlist for the app (or the guard off for its file opens) is the permanent fix on that machine. The product-side fix is the rule the code now follows: images decode off the UI thread with a bounded wait (`SafeImageSource`: pool-thread decode, `IgnoreColorProfile` to skip the ICC file open, cache-on-load + freeze, 5 s budget, image collapses on failure) - the worst case on a guarded machine is a missing laptop photo, never a frozen pre-loader.
+
 ### PawnIO-backed controls are unavailable
 
 Open the prerequisite flow and verify PawnIO is installed and its device path exists. Confirm the correct AMD or Intel module files were copied into the application output. Restart UCU after driver installation.
