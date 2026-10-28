@@ -73,7 +73,9 @@ namespace Uniwill_Control_Utility.Services
             }
         }
 
-        public static async Task<EngineEnsureOutcome> EnsureAsync(EngineAvailability availability)
+        public static async Task<EngineEnsureOutcome> EnsureAsync(
+            EngineAvailability availability,
+            Func<Task<bool>>? engineReachable = null)
         {
             ArgumentNullException.ThrowIfNull(availability);
 
@@ -117,6 +119,36 @@ namespace Uniwill_Control_Utility.Services
 
                     state = EngineServiceState.AccessDenied;
                 }
+            }
+
+            if (state == EngineServiceState.AccessDenied)
+            {
+                // The SCM descriptor is the app's PERFORMANCE contract, not its
+                // functional one: the RPC pipe answers regardless of who can read
+                // the SCM. So ask the engine itself - a ping answers liveness that
+                // the SCM cannot describe. An engine that answers is running, the
+                // elevation repairs a descriptor, not the engine, and repairing
+                // what works is how "UAC on every launch" was born.
+                if (engineReachable is not null && await engineReachable().ConfigureAwait(false))
+                {
+                    Log.Information("[Engine] The service is not openable by this app, but the engine answers RPC - treating it as running and leaving the descriptor to the service's own assertions.");
+                    return EngineEnsureOutcome.Running;
+                }
+
+                if (RepairAttempted())
+                {
+                    // One elevation was already spent on this registration's
+                    // descriptor and it did not stick: on a machine whose security
+                    // product guards service descriptors, every write is reverted
+                    // (installer sdset, service self-assert, all of them), and the
+                    // repair would re-elevate on every launch forever. The marker
+                    // keeps the elevation once-ever; the runbook's service-protection
+                    // entry is the fix on such machines.
+                    Log.Warning("[Engine] The engine service is not openable and not answering, and the DACL repair was already attempted - a security product is reverting the service descriptor. The runbook's service-protection entry is the permanent fix.");
+                    return EngineEnsureOutcome.Failed;
+                }
+
+                MarkRepairAttempted();
             }
 
             string? exe = EngineExePath;
@@ -188,6 +220,49 @@ namespace Uniwill_Control_Utility.Services
             {
                 Log.Warning(ex, "[Engine] The engine service did not reach Running within {Budget}s", StartBudget.TotalSeconds);
                 return EngineEnsureOutcome.Failed;
+            }
+        }
+
+        /// <summary>
+        /// One-ever marker for the elevated DACL repair. Content is a contract tag:
+        /// when the repair contract changes (new SDDL, new assertion design), the
+        /// marker stops matching and machines get one fresh attempt. A file, not a
+        /// setting: it must survive settings resets and be per-user like the service
+        /// registration it guards.
+        /// </summary>
+        internal const string RepairContractTag = "dacl-v2-selfassert";
+
+        private static string RepairMarkerPath =>
+            System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "UCU", "engine", "dacl-repair-attempted");
+
+        internal static bool RepairAttempted()
+        {
+            try
+            {
+                return System.IO.File.Exists(RepairMarkerPath)
+                    && System.IO.File.ReadAllText(RepairMarkerPath).Trim() == RepairContractTag;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        internal static void MarkRepairAttempted()
+        {
+            try
+            {
+                System.IO.Directory.CreateDirectory(
+                    System.IO.Path.GetDirectoryName(RepairMarkerPath)!);
+                System.IO.File.WriteAllText(RepairMarkerPath, RepairContractTag);
+            }
+            catch
+            {
+                // The marker is a kindness to the user, not a safety property:
+                // without it the next launch repeats the elevation, which is the
+                // symptom, never a correctness break.
             }
         }
     }

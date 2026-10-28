@@ -1118,11 +1118,34 @@ namespace Uniwill_Control_Utility
                 availability.Started += () => SafeFireAndForget(ApplyDeferredEcSettingsIfPendingAsync());
             }
 
-            EngineEnsureOutcome outcome = await EngineLifecycle.EnsureAsync(availability);
+            EngineEnsureOutcome outcome = await EngineLifecycle.EnsureAsync(availability, EngineRpcReachableAsync);
 
             await ApplyDeferredEcSettingsIfPendingAsync(outcome);
 
             return outcome;
+        }
+
+        /// <summary>
+        /// Liveness through the engine's own pipe, for the state where the SCM
+        /// cannot describe the service (a security product guarding service
+        /// descriptors reverts every DACL write, so the app's opens are denied):
+        /// the RPC pipe is independent of the SCM descriptor, and the engine
+        /// answers. Budget is tight because the startup path is where this runs.
+        /// </summary>
+        private static async Task<bool> EngineRpcReachableAsync()
+        {
+            try
+            {
+                var client = new UCU.Client.EngineClient(
+                    connectTimeout: TimeSpan.FromSeconds(1.5));
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+                await client.InvokeAsync(UCU.Contracts.EngineVerbs.Engine.Ping, cts.Token);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         /// <summary>
