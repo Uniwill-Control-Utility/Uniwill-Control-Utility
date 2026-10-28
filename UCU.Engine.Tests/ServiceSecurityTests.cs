@@ -81,6 +81,28 @@ public sealed class ServiceSecurityTests
         Assert.StartsWith("D:P", Sddl);
     }
 
+    [Fact]
+    public void SddlReadBackRecognizesTheContractAndRejectsTheTemplate()
+    {
+        // The install pass verifies the descriptor it wrote actually committed
+        // (the field incident: sc create's default SD lands in the registry after
+        // sc.exe returns, silently reverting the pass's sdset - the app then
+        // cannot open its own service and elevates every launch). The read-back
+        // must accept exactly the contract ace and reject what create stamps.
+        string contract = "D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;CCSWRPRC;;;AU)";
+        string createTemplate =
+            "D:P(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;KR;;;AU)";
+
+        Assert.True(EngineInstaller.SddlCarriesAppContract(contract));
+        Assert.False(EngineInstaller.SddlCarriesAppContract(createTemplate));
+        Assert.False(EngineInstaller.SddlCarriesAppContract(null));
+        Assert.False(EngineInstaller.SddlCarriesAppContract("[SC] OpenService FAILED 5:"));
+
+        // The shipped SDDL itself must satisfy the predicate, or the verification
+        // loop can never converge.
+        Assert.True(EngineInstaller.SddlCarriesAppContract(Sddl));
+    }
+
     /// <summary>The 2-letter rights of one access-ace trustee.</summary>
     private static HashSet<string> RightsOf(string trustee)
     {

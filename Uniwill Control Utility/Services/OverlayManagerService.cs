@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
 using System.Windows.Forms;
+using System.Windows.Threading;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Services.Performance;
 
@@ -23,8 +24,23 @@ namespace Uniwill_Control_Utility.Services
 
         private readonly object _settingsSaveLock = new();
         private readonly object _hookLock = new();
+        private readonly object _hookThreadLock = new();
 
         private IKeyboardMouseEvents? _hook;
+
+        // The global hook's owning thread: a dedicated pumped dispatcher thread.
+        // SetWindowsHookEx(WH_KEYBOARD_LL) can stall in win32k - proven from a
+        // process dump of a frozen app: the UI thread sat inside the native call
+        // (installing the hook during the secure-desktop transition of a UAC
+        // prompt), and the frozen dispatcher left the splash overlay unable to
+        // dismiss and the dashboard never rendered. Installing on a dedicated
+        // thread, and posting rather than invoking, makes a stalled install cost
+        // a late-activating hotkey - never a frozen window. The pump is required:
+        // low-level hook callbacks are delivered to the installing thread's
+        // message queue, and an unpumped thread gets the hook silently removed
+        // after LowLevelHooksTimeout.
+        private Thread? _hookThread;
+        private Dispatcher? _hookDispatcher;
 
         private DateTime _lastHotkeyUtc = DateTime.MinValue;
         private bool _disposed;
@@ -80,17 +96,17 @@ namespace Uniwill_Control_Utility.Services
             if (options.Enabled)
             {
                 /*
-                 * MouseKeyHook installs WH_KEYBOARD_LL / WH_MOUSE_LL hooks via
-                 * SetWindowsHookEx.  Although low-level hooks don't require a
-                 * message pump on the calling thread, the hook is scoped to the
-                 * desktop of the thread that calls SetWindowsHookEx.  When
-                 * IHostedService.StartAsync fires on a thread-pool thread the
-                 * hook may end up on a different desktop or fail silently, so
-                 * keyboard events never reach the callback.  Installing on the
-                 * UI thread (which is guaranteed to be on WinSta0\Default)
-                 * avoids this problem.
+                 * The global hook goes to its dedicated pumped thread (field-
+                 * proven): installing WH_KEYBOARD_LL on the UI thread stalled
+                 * inside native SetWindowsHookEx during a UAC secure-desktop
+                 * transition, and the frozen dispatcher froze the whole window
+                 * (splash overlay unable to close at 92 %, dashboard never
+                 * rendered). The hook is scoped to the installing thread's
+                 * desktop, and every thread of an interactive-session process is
+                 * on WinSta0\Default, so the dedicated thread keeps the events
+                 * flowing without owning the UI.
                  */
-                RunOnUiThread(EnsureHook);
+                PostToHookThread(EnsureHook);
 
                 // Start RTSS OSD timer.
                 StartRtssOsd(options);
@@ -109,7 +125,15 @@ namespace Uniwill_Control_Utility.Services
 
             StopRtssOsd();
 
-            RunOnUiThread(RemoveHook);
+            // Uninstall on the hook thread (the callbacks' delivering thread), then
+            // end its pump. BeginInvoke ordering: the removal runs before shutdown.
+            PostToHookThread(RemoveHook);
+            lock (_hookThreadLock)
+            {
+                _hookDispatcher?.BeginInvokeShutdown(DispatcherPriority.Normal);
+                _hookDispatcher = null;
+                _hookThread = null;
+            }
 
             return Task.CompletedTask;
         }
@@ -123,13 +147,18 @@ namespace Uniwill_Control_Utility.Services
 
             SaveOptionsIfChanged(normalisedOptions);
 
-            RunOnUiThread(() =>
+            // Hook enable/disable belongs to the hook thread; the RTSS timer keeps
+            // the dispatcher it has always run on.
+            PostToHookThread(() =>
             {
                 if (normalisedOptions.Enabled)
                     EnsureHook();
                 else
                     RemoveHook();
+            });
 
+            RunOnUiThread(() =>
+            {
                 // Manage RTSS OSD timer based on enabled state.
                 if (normalisedOptions.Enabled)
                     StartRtssOsd(normalisedOptions);
@@ -210,13 +239,55 @@ namespace Uniwill_Control_Utility.Services
         {
             lock (_hookLock)
             {
-                if (_hook is null)
-                    return;
-
-                _hook.KeyDown -= OnGlobalKeyDown;
-                _hook.Dispose();
-                _hook = null;
+                if (_hook is not null)
+                {
+                    _hook.KeyDown -= OnGlobalKeyDown;
+                    _hook.Dispose();
+                    _hook = null;
+                }
             }
+        }
+
+        /// <summary>
+        /// Queues hook work onto the dedicated pumped hook thread, starting it on
+        /// first use. Post (BeginInvoke), never Invoke: the point of the thread is
+        /// that a stalled SetWindowsHookEx cannot block the caller - least of all
+        /// the UI thread. The thread is on the interactive session's window
+        /// station like every thread of this process, so the hook sees the same
+        /// desktop it always did.
+        /// </summary>
+        private void PostToHookThread(Action action)
+        {
+            ArgumentNullException.ThrowIfNull(action);
+
+            Dispatcher dispatcher;
+            lock (_hookThreadLock)
+            {
+                if (_hookDispatcher is null)
+                {
+                    var pumpReady = new ManualResetEventSlim(false);
+                    _hookThread = new Thread(() =>
+                    {
+                        _hookDispatcher = Dispatcher.CurrentDispatcher;
+                        pumpReady.Set();
+                        Dispatcher.Run();
+                    })
+                    {
+                        IsBackground = true,
+                        Name = "UCU Global Hook",
+                    };
+                    _hookThread.SetApartmentState(ApartmentState.STA);
+                    _hookThread.Start();
+                    pumpReady.Wait();
+                }
+
+                dispatcher = _hookDispatcher!;
+            }
+
+            if (dispatcher.CheckAccess())
+                action();
+            else
+                dispatcher.BeginInvoke(action, DispatcherPriority.Input);
         }
 
         private void OnGlobalKeyDown(
@@ -347,7 +418,24 @@ namespace Uniwill_Control_Utility.Services
 
             StopRtssOsd();
 
-            RunOnUiThread(RemoveHook);
+            // Uninstall on the hook thread if there is one (never start a thread
+            // to tear one down), then end its pump.
+            lock (_hookThreadLock)
+            {
+                if (_hookDispatcher is not null)
+                {
+                    Dispatcher dispatcher = _hookDispatcher;
+                    _hookDispatcher = null;
+                    _hookThread = null;
+
+                    if (dispatcher.CheckAccess())
+                        RemoveHook();
+                    else
+                        dispatcher.BeginInvoke(RemoveHook, DispatcherPriority.Normal);
+
+                    dispatcher.BeginInvokeShutdown(DispatcherPriority.Normal);
+                }
+            }
 
             GC.SuppressFinalize(this);
         }

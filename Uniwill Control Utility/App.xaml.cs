@@ -77,6 +77,19 @@ namespace Uniwill_Control_Utility
             StartupArgs = args ?? Array.Empty<string>();
             GuardianRestart = StartupArgs.Contains("--from-guardian");
 
+            // Velopack's MSI - the Control Panel / Settings uninstall route - launches
+            // this exe with --velopackuninstall, elevated, during the uninstall.
+            // Control Panel and Settings run MSI products by product code and ignore
+            // the ARP UninstallString, so the Uninstall.exe shim redirect cannot serve
+            // that route, and the MSI alone leaves the engine service behind (the MSI
+            // never owned it: the app registers it). This is the only in-band place
+            // the Control Panel uninstall can complete: hand the SCM cleanup to the
+            // engine's own uninstall verb (stop + delete, the same result the shim
+            // produces) and remove the autostart task. Best effort throughout - an
+            // uninstall never fails on SCM cleanup.
+            if (StartupArgs.Contains("--velopackuninstall", StringComparer.OrdinalIgnoreCase))
+                CleanupEngineOnVelopackUninstall();
+
             VelopackApp.Build()
                 .SetAppUserModelId(AppUserModelId)
                 .SetAutoApplyOnStartup(false)
@@ -86,6 +99,55 @@ namespace Uniwill_Control_Utility
             var app = new App();
             app.InitializeComponent();
             app.Run();
+        }
+
+        /// <summary>
+        /// Uninstall-time cleanup on the elevated Velopack hook: stops and deletes
+        /// the engine service via the staged engine's <c>--uninstall-engine</c> pass
+        /// (inheriting the hook's elevation), and deletes the root-path scheduled
+        /// tasks so none outlive the files they point at.
+        /// </summary>
+        private static void CleanupEngineOnVelopackUninstall()
+        {
+            try
+            {
+                string engine = System.IO.Path.Combine(
+                    AppContext.BaseDirectory, "Service", "Uniwill Control Utility Engine.exe");
+                if (System.IO.File.Exists(engine))
+                {
+                    using Process? proc = System.Diagnostics.Process.Start(new ProcessStartInfo(
+                        engine, "--uninstall-engine")
+                    {
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                    });
+                    proc?.WaitForExit(60_000);
+                }
+            }
+            catch
+            {
+                // Uninstall proceeds; the service removal is reported by the engine's
+                // own install log, and the Uninstall.exe shim remains the full route.
+            }
+
+            foreach (string taskName in new[] { "UCU Autostart", "UCU", "UCU Guardian" })
+            {
+                try
+                {
+                    using Process? proc = System.Diagnostics.Process.Start(new ProcessStartInfo(
+                        "schtasks.exe", "/delete /tn \"" + taskName + "\" /f")
+                    {
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                    });
+                    proc?.WaitForExit(15_000);
+                }
+                catch
+                {
+                    // Task absent (the normal case) or unremovable: the shim deletes
+                    // these too on the Uninstall.exe route.
+                }
+            }
         }
 
         /// <summary>

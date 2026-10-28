@@ -134,6 +134,21 @@ namespace UCU.Engine
             if (rc != 0 && rc != ErrorServiceAlreadyRunning)
                 return rc;
 
+            // The DACL is the contract the unelevated app runs on, and a fresh
+            // registration has a proven way to swallow it: sc create commits the
+            // default security descriptor into the registry after sc.exe has already
+            // returned, and a sdset that ran inside that window is silently reverted
+            // (field incident: the install log recorded sdset rc=0, twenty seconds
+            // later sc sdshow showed the create template, and the app - no AU
+            // query-status, no start - elevated for a "DACL repair" on every launch).
+            // Read the descriptor back, re-assert until it sticks.
+            if (!await EnsureSddlCommittedAsync(name).ConfigureAwait(false))
+            {
+                Log.Warning(
+                    "[EngineInstaller] Engine service DACL did not converge to {Sddl} - the app cannot open the service it owns",
+                    ServiceSddl);
+            }
+
             // The ARP entries are part of this install's health, not a separate
             // feature: see RepairControlPanelUninstall.
             RepairControlPanelUninstall(exePath);
@@ -141,6 +156,44 @@ namespace UCU.Engine
             Log.Information("[EngineInstaller] Engine service installed and running from {Path}", exePath);
             return 0;
         }
+
+        /// <summary>
+        /// Verifies the service's live DACL carries the app contract ace
+        /// (<see cref="ServiceSddl"/>'s AU ace), re-asserting sdset until it does.
+        /// The create-commit race needs one or two rounds; the budget is generous so
+        /// a descriptor that converges slowly (antivirus on the registry write)
+        /// still lands.
+        /// </summary>
+        internal static async Task<bool> EnsureSddlCommittedAsync(string name)
+        {
+            for (int attempt = 0; attempt < 10; attempt++)
+            {
+                string shown = await RunScCaptureAsync("sdshow", name).ConfigureAwait(false);
+                if (SddlCarriesAppContract(shown))
+                {
+                    if (attempt > 0)
+                        Log.Information("[EngineInstaller] Engine service DACL converged after {Attempts} re-assertions", attempt + 1);
+                    return true;
+                }
+
+                Log.Warning("[EngineInstaller] Engine service DACL reads {Shown} - re-asserting (attempt {Attempt})",
+                    shown.Trim(), attempt + 1);
+                await RunScAsync("sdset", name, ServiceSddl).ConfigureAwait(false);
+                await Task.Delay(500).ConfigureAwait(false);
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// True when an <c>sc sdshow</c> line grants Authenticated Users the rights
+        /// the app's design (gate + unelevated start) requires: the exact
+        /// <c>CCSWRPRC</c> mask. The create-template ace (AU: <c>KR</c>) answers
+        /// false, which is the point: anything short of the contract is the
+        /// elevation-every-launch state.
+        /// </summary>
+        internal static bool SddlCarriesAppContract(string? sdshowOutput) =>
+            sdshowOutput is not null && sdshowOutput.Contains("CCSWRPRC;;;AU", StringComparison.Ordinal);
 
         /// <summary>Display name the MSI writes to Add/Remove Programs, and the shim file name.</summary>
         internal const string MsiDisplayName = "Uniwill Control Utility";
@@ -289,15 +342,17 @@ namespace UCU.Engine
                 .CreateLogger();
         }
 
-        private static async Task<int> RunScAsync(params string[] args)
+        /// <summary>
+        /// Runs sc.exe and returns its exit code with standard output. The command
+        /// line is verbatim (as typed in cmd): sc.exe's parser needs the exact
+        /// key= value quoting, which ArgumentList's automatic escaping destroys.
+        /// The values here are our own exe path and fixed strings, never user input.
+        /// </summary>
+        private static async Task<(int Code, string Output, string Error)> RunScFullAsync(params string[] args)
         {
             var psi = new ProcessStartInfo
             {
                 FileName = "sc.exe",
-                // Verbatim command line (as typed in cmd): sc.exe's parser needs
-                // the exact key= value quoting, which ArgumentList's automatic
-                // escaping destroys. The values here are our own exe path and
-                // fixed strings, never user input.
                 Arguments = string.Join(" ", args),
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -307,13 +362,26 @@ namespace UCU.Engine
 
             using var proc = Process.Start(psi);
             if (proc is null)
-                return -1;
+                return (-1, string.Empty, string.Empty);
 
             string output = await proc.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
             string error = await proc.StandardError.ReadToEndAsync().ConfigureAwait(false);
             await proc.WaitForExitAsync().ConfigureAwait(false);
 
-            int rc = proc.ExitCode;
+            return (proc.ExitCode, output, error);
+        }
+
+        /// <summary>sc.exe standard output (the elevated pass reads sdshow through
+        /// this to verify the DACL it just wrote actually committed).</summary>
+        private static async Task<string> RunScCaptureAsync(params string[] args)
+        {
+            (int code, string output, string _) = await RunScFullAsync(args).ConfigureAwait(false);
+            return output;
+        }
+
+        private static async Task<int> RunScAsync(params string[] args)
+        {
+            (int rc, string output, string error) = await RunScFullAsync(args).ConfigureAwait(false);
             if (rc != 0)
             {
                 Log.Warning("[EngineInstaller] sc {Args} exited with {Code}: {Output} {Error}",
