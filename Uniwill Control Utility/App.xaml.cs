@@ -1155,7 +1155,16 @@ namespace Uniwill_Control_Utility
                     var client = new UCU.Client.EngineClient(
                         connectTimeout: TimeSpan.FromSeconds(2));
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
-                    await client.InvokeAsync(UCU.Contracts.EngineVerbs.Engine.Ping, cts.Token);
+                    // Typed overload, deliberately: engine.ping is a result-bearing
+                    // verb (it answers true), and the untyped InvokeAsync runs with
+                    // T=object, which the source-generated contract refuses
+                    // ("'Object' is not registered"). Field-proven (2026-10-28):
+                    // the untyped call threw AFTER a healthy 60 ms round trip, so
+                    // the probe reported a live engine dead on every guarded-SCM
+                    // machine, and every EC feature (fan speeds, battery health,
+                    // charge control) stayed gated off while the pipe answered
+                    // fine. The typed shape is the one the proxy (PingAsync) uses.
+                    await client.InvokeAsync<bool>(UCU.Contracts.EngineVerbs.Engine.Ping, cts.Token);
                     return true;
                 }
                 catch (Exception ex)

@@ -25,6 +25,37 @@ public sealed class EngineRpcTests
     }
 
     [Fact]
+    public async Task Ping_AsTheLivenessProbeCallsIt_ReturnsTrueThroughTheTypedOverload()
+    {
+        // The app's engine-liveness probe (the only liveness truth on a machine
+        // whose security product guards the SCM descriptor) calls the client
+        // directly, not through the proxy. Field-proven (2026-10-28): it used
+        // the untyped InvokeAsync, which ran T=object against this
+        // result-bearing verb and threw AFTER a healthy 60 ms round trip -
+        // the probe reported a live engine dead, forever, and every EC
+        // feature stayed gated off. This test pins the probe's exact shape.
+        await using var host = await EngineHostFixture.StartAsync();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+        Assert.True(await host.Client.InvokeAsync<bool>(EngineVerbs.Engine.Ping, cts.Token));
+    }
+
+    [Fact]
+    public async Task Ping_ThroughTheUntypedOverload_IsRefusedByTheContract()
+    {
+        // Pins WHY the probe must use the typed overload: the source-generated
+        // contract has no object result, so the untyped call on a
+        // result-bearing verb is a compile-time-clean, run-time refusal. The
+        // enforcement is deliberate (it catches result-less / result-bearing
+        // mismatches at the first call); this test keeps it from silently
+        // degrading into a swallowed result.
+        await using var host = await EngineHostFixture.StartAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => host.Client.InvokeAsync(EngineVerbs.Engine.Ping));
+    }
+
+    [Fact]
     public async Task NotifyAppExit_RoundTrips()
     {
         await using var host = await EngineHostFixture.StartAsync();

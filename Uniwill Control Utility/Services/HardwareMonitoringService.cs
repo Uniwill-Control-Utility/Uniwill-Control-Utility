@@ -200,8 +200,12 @@ namespace Uniwill_Control_Utility.Services
         /// startup worker. A healthy probe opens in 1-2 s; a hung driver
         /// probe must not stretch the splash, the dashboard fills from the
         /// OS-only path and completes when the probe ever returns.
+        /// Field-tuned (2026-10-28): 20 s gave a healthy machine 10x margin
+        /// and handed a guarded machine (a probe that hangs indefinitely) a
+        /// 20 s splash on every launch. 6 s keeps a 3x healthy margin and
+        /// caps the guarded-box splash; the fill contract is unchanged.
         /// </summary>
-        private static readonly TimeSpan StartupSnapshotBudget = TimeSpan.FromSeconds(20);
+        private static readonly TimeSpan StartupSnapshotBudget = TimeSpan.FromSeconds(6);
 
         /// <summary>
         /// How long Dispose waits for the gate to close the Computer. A hung
