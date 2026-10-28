@@ -283,7 +283,7 @@ namespace Uniwill_Control_Utility
                 // dialog and the whole window init, and the Control Panel
                 // /x it must react to can land at any moment.
                 UninstallSentinel.CreateDefault(
-                    message => Log.Information("[UninstallSentinel] {Message}", message)).Start();
+                    message => Log.Warning("[UninstallSentinel] {Message}", message)).Start();
 
                 // Catch unhandled exceptions from all threads (not just the UI thread)
                 AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
