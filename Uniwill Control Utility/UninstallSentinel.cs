@@ -88,7 +88,12 @@ namespace Uniwill_Control_Utility
             _enumerateRegistrations = enumerateRegistrations;
             _enumerateCodes = enumerateCodes ?? EnumerateMachineRegistrationCodes;
             _installedLayoutProbe = installedLayoutProbe ?? NeverInstalled;
-            _removalEvidence = removalEvidence ?? MsiRemovalEvidence;
+            // The destructive firing demands the time floor (a removal that
+            // predates this process cannot describe this install's uninstall);
+            // IsBeingUninstalled is the mid-sweep machine fact and keeps the
+            // plain 3-minute window.
+            _removalEvidence = removalEvidence
+                ?? (code => MsiRemovalEvidence(code, requireAfterThisProcessStart: true));
             _onUninstallDetected = onUninstallDetected;
             _log = log;
             _pollInterval = pollInterval ?? DefaultPollInterval;
@@ -352,65 +357,120 @@ namespace Uniwill_Control_Utility
                 && MsiRemovalEvidence();
         }
 
+        /// <summary>One Application-log event as the evidence rule sees it.</summary>
+        internal readonly record struct EvidenceEntry(int InstanceId, DateTime TimeGenerated, string Message);
+
         /// <summary>
         /// Machine-wide proof that a real uninstall of this product just ran:
         /// the MsiInstaller "Removal completed successfully" event (11724,
         /// the Windows Installer success fingerprint - 11707 is the install
-        /// twin) naming the product within the last 5 minutes. The event log
-        /// is written by the Windows Installer service itself - an AV registry
-        /// view trick cannot fabricate it - and a ghost registration's
-        /// self-repair /x ends 1603 and never writes this event. Fail-closed:
-        /// an unreadable event log reads as no evidence, and the destructive
-        /// verb stays parked.
+        /// twin) naming the product, paired with the code-bound, non-self-issued
+        /// 1042 transaction end. The event log is written by the Windows
+        /// Installer service itself - an AV registry view trick cannot
+        /// fabricate it - and a ghost registration's self-repair /x ends 1603
+        /// and never writes this event. Fail-closed: a missing floor match
+        /// reads as no evidence, and the destructive verb stays parked.
+        ///
+        /// <paramref name="evidenceFloor"/> is the time floor, the third
+        /// binding after code and pid - field-proven necessity (21:55:22):
+        /// the user uninstalled with the shim (11724 + a code-bound 1042 for
+        /// {09C0B11B} at 21:53:59), reinstalled the SAME package 67 s later -
+        /// pack.ps1 pins the product code per package, so the fresh install
+        /// carries the same code - and the relaunched app's sentinel found the
+        /// OLD uninstall's fingerprint in its 3-minute pool naming exactly the
+        /// watched code. Code and pid bound; the fresh install died 16 s after
+        /// launch. Events older than this process started cannot describe
+        /// THIS install's uninstall: the app that outlives a real removal
+        /// started before it, so the floor is the process start (paired
+        /// halves included: 11724 is name-only, so a fresh 1042 must not pair
+        /// with a stale 11724 of ours).
         /// </summary>
-        internal static bool MsiRemovalEvidence(string? productCode = null)
+        internal static bool HasRemovalEvidence(
+            IEnumerable<EvidenceEntry> entriesNewestFirst,
+            string? productCode,
+            int selfPid,
+            DateTime evidenceFloor)
+        {
+            bool removalCompleted = false;
+            bool transactionEnded = false;
+
+            foreach (EvidenceEntry entry in entriesNewestFirst)
+            {
+                if (entry.TimeGenerated < evidenceFloor)
+                    break;
+
+                switch (entry.InstanceId)
+                {
+                    case 11724 when !removalCompleted:
+                        if (entry.Message.IndexOf(ProductName, StringComparison.OrdinalIgnoreCase) >= 0)
+                            removalCompleted = true;
+                        break;
+
+                    case 1042 when !transactionEnded:
+                        // "Ending a Windows Installer transaction: {GUID}"
+                        // - bind to the code the sentinel watched when the
+                        // registration was visible, so an uninstall of a
+                        // different product cannot license our verb.
+                        bool codeMatch = productCode is null
+                            ? entry.Message.IndexOf("}", StringComparison.Ordinal) >= 0
+                            : entry.Message.IndexOf(productCode, StringComparison.OrdinalIgnoreCase) >= 0;
+
+                        // A removal this very process initiated is Velopack's
+                        // registration repair, not the Control Panel uninstall
+                        // the sentinel is contracted to execute - field-proven:
+                        // the app's own UpdateManager /x-ed the live code 17 s
+                        // after a GUI install (registry-guarded machine) and the
+                        // sentinel executed it, sweeping the live app mid-splash.
+                        if (codeMatch && !IsSelfIssuedTransaction(entry.Message, selfPid))
+                            transactionEnded = true;
+                        break;
+                }
+
+                if (removalCompleted && transactionEnded)
+                    return true;
+            }
+
+            return removalCompleted && transactionEnded;
+        }
+
+        /// <summary>
+        /// The event-log adapter for <see cref="HasRemovalEvidence"/>. The
+        /// wall window is 3 minutes; <paramref name="requireAfterThisProcessStart"/>
+        /// raises the floor to this process's start - the sentinel's destructive
+        /// firing demands it (a pre-launch uninstall is evidence for the install
+        /// it removed, not for the one running now), while
+        /// <see cref="IsBeingUninstalled"/> keeps the plain window: the machine
+        /// being mid-sweep is a fact newer processes must see, relaunch
+        /// suppression included.
+        /// </summary>
+        internal static bool MsiRemovalEvidence(
+            string? productCode = null,
+            bool requireAfterThisProcessStart = false)
         {
             try
             {
                 using var application = new EventLog("Application");
+
+                DateTime floor = DateTime.Now - TimeSpan.FromMinutes(3);
+                if (requireAfterThisProcessStart)
+                {
+                    DateTime processStart = Process.GetCurrentProcess().StartTime;
+                    if (processStart > floor)
+                        floor = processStart;
+                }
+
                 EventLogEntryCollection entries = application.Entries;
-                DateTime cutoff = DateTime.Now - TimeSpan.FromMinutes(3);
-
-                bool removalCompleted = false;
-                bool transactionEnded = false;
-
+                var newestFirst = new List<EvidenceEntry>((int)Math.Min(entries.Count, 4096));
                 for (int i = entries.Count - 1; i >= 0; i--)
                 {
                     EventLogEntry entry = entries[i];
-                    if (entry.TimeGenerated < cutoff)
+                    if (entry.TimeGenerated < floor)
                         break;
 
-                    switch (entry.InstanceId)
-                    {
-                        case 11724 when removalCompleted == false:
-                            if (entry.Message.IndexOf(ProductName, StringComparison.OrdinalIgnoreCase) >= 0)
-                                removalCompleted = true;
-                            break;
-                        case 1042 when transactionEnded == false:
-                            // "Ending a Windows Installer transaction: {GUID}"
-                            // - bind to the code the sentinel watched when the
-                            // registration was visible, so an older uninstall's
-                            // fingerprint cannot license a fresh install's verb.
-                            bool codeMatch = productCode is null
-                                ? entry.Message.IndexOf("}", StringComparison.Ordinal) >= 0
-                                : entry.Message.IndexOf(productCode, StringComparison.OrdinalIgnoreCase) >= 0;
-
-                            // A removal this very process initiated is Velopack's
-                            // registration repair, not the Control Panel uninstall
-                            // the sentinel is contracted to execute - field-proven:
-                            // the app's own UpdateManager /x-ed the live code 17 s
-                            // after a GUI install (registry-guarded machine) and the
-                            // sentinel executed it, sweeping the live app mid-splash.
-                            if (codeMatch && !IsSelfIssuedTransaction(entry.Message, Environment.ProcessId))
-                                transactionEnded = true;
-                            break;
-                    }
-
-                    if (removalCompleted && transactionEnded)
-                        return true;
+                    newestFirst.Add(new EvidenceEntry((int)entry.InstanceId, entry.TimeGenerated, entry.Message));
                 }
 
-                return removalCompleted && transactionEnded;
+                return HasRemovalEvidence(newestFirst, productCode, Environment.ProcessId, floor);
             }
             catch
             {
