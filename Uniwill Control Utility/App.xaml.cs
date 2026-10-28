@@ -77,18 +77,17 @@ namespace Uniwill_Control_Utility
             StartupArgs = args ?? Array.Empty<string>();
             GuardianRestart = StartupArgs.Contains("--from-guardian");
 
-            // Velopack's MSI - the Control Panel / Settings uninstall route - launches
-            // this exe with --velopackuninstall, elevated, during the uninstall.
-            // Control Panel and Settings run MSI products by product code and ignore
-            // the ARP UninstallString, so the Uninstall.exe shim redirect cannot serve
-            // that route, and the MSI alone leaves the engine service behind (the MSI
-            // never owned it: the app registers it). This is the only in-band place
-            // the Control Panel uninstall can complete: hand the SCM cleanup to the
-            // engine's own uninstall verb (stop + delete, the same result the shim
-            // produces) and remove the autostart task. Best effort throughout - an
-            // uninstall never fails on SCM cleanup.
-            if (StartupArgs.Contains("--velopackuninstall", StringComparer.OrdinalIgnoreCase))
-                CleanupEngineOnVelopackUninstall();
+            // Velopack's MSI launches this exe elevated with --velopackuninstall during
+            // the Control Panel / Settings uninstall. A synchronous cleanup here is
+            // field-proven to stall the MSI's uninstall custom action (the wizard sat
+            // >5 minutes on this hook, and the CA's child-wait is exactly where a WPF
+            // exe doing SCM work deadlocks). Disabled pending a redesign - the cleanup
+            // must be a detached elevated helper that exits the CA immediately (the
+            // Uninstall.exe shim already is that pattern). The Control Panel uninstall
+            // leaves the engine registration behind; Uninstall.exe is the complete
+            // route, documented in release-process.md.
+            // if (StartupArgs.Contains("--velopackuninstall", StringComparer.OrdinalIgnoreCase))
+            //     CleanupEngineOnVelopackUninstall();
 
             VelopackApp.Build()
                 .SetAppUserModelId(AppUserModelId)
