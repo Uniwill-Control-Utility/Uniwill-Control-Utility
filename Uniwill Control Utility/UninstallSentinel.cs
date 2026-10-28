@@ -12,39 +12,40 @@ using Microsoft.Win32;
 namespace Uniwill_Control_Utility
 {
     /// <summary>
-    /// Self-heal for the Control Panel / Settings uninstall route.
+    /// Self-heal net for the raw <c>msiexec /x</c> uninstall routes (scripts,
+    /// GPO, <c>appwiz</c> on machines where a legacy GUID-keyed entry still
+    /// routes by product code).
     ///
-    /// The Control Panel and Settings run the product's MSI by product code,
-    /// and vpk's generated MSI is a thin bootstrap: its RemoveFiles sees
-    /// almost nothing (the layout is deployed by the package's own bootstrap
-    /// custom action, not MSI file records), so the removal unregisters the
-    /// product in ~2 s and leaves the engine service, the running app, the
-    /// layout, the tasks, and the ARP husk behind. Injecting CustomActions
-    /// that launch the installed exes at uninstall is a proven dead end in
-    /// this package: every exe-CustomAction encoding fails to CreateProcess
-    /// a .NET apphost from the msiserver service session (1721 empty source
-    /// location / process-creation failures), and Velopack's own uninstall
-    /// hook is a per-user-temp design that no-ops in the SYSTEM execute
-    /// context of a per-machine install.
+    /// The canonical Control Panel route no longer needs the net: the packed
+    /// MSI (build\pack.ps1 step 5a + build\msi-edit) publishes ONE Add/Remove
+    /// Programs entry — ARPSYSTEMCOMPONENT=1 suppresses the Windows Installer
+    /// engine's GUID-keyed entry, and the package's own entry (component
+    /// <c>ArpRegistration</c>) carries UninstallString = the complete-sweep
+    /// shim <c>Uninstall.exe</c>. The shim is the shared full-cleanup entry
+    /// point: service stop+delete, app kill, tasks, MSI /x, ARP husks, stale
+    /// per-user MSI registrations, ProgramData logs, install layout.
     ///
-    /// What is guaranteed present during every such uninstall is the app
-    /// itself: the removal never kills it, so it outlives the transaction.
-    /// This sentinel watches the one fact the thin uninstall does change -
-    /// the machine's Add/Remove Programs registration for the product (the
-    /// HKLM GUID entry whose UninstallString is the MsiExec call the Control
-    /// Panel is running; watching MSI product enumeration instead is
-    /// poisoned by stale per-user registrations old broken uninstalls
-    /// leave) - and when it vanishes, the app self-executes the engine's
-    /// elevated --uninstall-engine verb: the single full-cleanup entry point
-    /// shared with the Uninstall.exe shim (service stop+delete, app kill,
-    /// tasks, ARP husks, stale per-user MSI registrations, ProgramData logs,
-    /// install layout). The vanish alone is not trusted: AV registry
+    /// What remains thin is a direct <c>msiexec /x {code}</c>: vpk's package
+    /// is a thin bootstrap (the layout is deployed by the package's own
+    /// bootstrap custom action, invisible to MSI file records), so the
+    /// removal unregisters the product in ~2 s and leaves the engine service,
+    /// the running app, the layout, and the tasks behind. What is guaranteed
+    /// present during every such removal is the app itself: the transaction
+    /// never kills it. This sentinel watches the product's machine
+    /// registration — the ARP GUID entry when one is published (its
+    /// UninstallString is the MsiExec call, which distinguishes it from the
+    /// shim-keyed entry), the MSI database enumeration via MsiEnumProductsW
+    /// when it is not (the suppressed case; filtered to Machine context so
+    /// stale per-user ghosts of old broken uninstalls never keep the probe
+    /// armed) — and when it vanishes, the app self-executes the engine's
+    /// elevated --uninstall-engine verb, converging every removal route on
+    /// the shim's end state. The vanish alone is not trusted: AV registry
     /// protection (field-proven: Emsisoft) can hide the live registration
     /// from the app's own view, so firing also requires the MsiInstaller
-    /// "Removal completed successfully" event - a machine-wide trace only
-    /// the Windows Installer service writes. One UAC prompt at uninstall,
-    /// the same consent the shim route asks for, and every removal route
-    /// converges on the same end state.
+    /// "Removal completed successfully" event bound to the watched product
+    /// code and postdating this process — a machine-wide trace only the
+    /// Windows Installer service writes. One UAC prompt at the verb, the
+    /// same consent the shim route asks for.
     /// </summary>
     internal sealed class UninstallSentinel
     {
@@ -100,12 +101,15 @@ namespace Uniwill_Control_Utility
         }
 
         /// <summary>
-        /// Production wiring: watch the real machine ARP registration, run
-        /// the elevated engine verb, log through the app logger.
+        /// Production wiring: the union registration probe (ARP GUID entry
+        /// when the MSI publishes one, MSI database enumeration when it does
+        /// not - the packed MSI suppresses its ARP entry: see pack.ps1), the
+        /// elevated engine verb, the app logger.
         /// </summary>
         public static UninstallSentinel CreateDefault(Action<string> log) =>
-            new(EnumerateMachineRegistrations, RunEngineUninstallVerb, log,
-                pollInterval: null, installedLayoutProbe: InstalledLayoutPresent);
+            new(EnumerateRegistrations, RunEngineUninstallVerb, log,
+                pollInterval: null, installedLayoutProbe: InstalledLayoutPresent,
+                enumerateCodes: EnumerateRegistrationCodes);
 
         private static bool NeverInstalled() => false;
 
@@ -271,6 +275,107 @@ namespace Uniwill_Control_Utility
         /// </summary>
         internal static string[] EnumerateMachineRegistrations() =>
             MachineRegistrations().Select(pair => pair.DisplayName).ToArray();
+
+        /// <summary>
+        /// The registration probe for the production sentinel: the ARP GUID
+        /// entry when the MSI publishes one, and the MSI database enumeration
+        /// when it does not. The packed MSI suppresses its own ARP entry
+        /// (ARPSYSTEMCOMPONENT=1) and ships the Control Panel entry as our
+        /// shim-keyed row (Uninstall.exe, the complete sweep), so the
+        /// canonical Control Panel route no longer produces a thin /x and
+        /// the GUID-ARP probe would never arm the sentinel. MsiEnumProductsW
+        /// sees the live product registration itself - the same installed
+        /// fact, one level below the display entry. Same degradation
+        /// contract as the ARP probe: a registry-guarded product blinds the
+        /// enumeration too (field-proven: Velopack's in-process check on the
+        /// Emsisoft box), the probe then reports "not installed", and the
+        /// binding gate parks the verb; the removal evidence rule plus the
+        /// process-start floor stay the firing gate either way. Stale
+        /// per-user ghost registrations enumerate as User context and are
+        /// filtered out: they would keep the probe "installed" through a
+        /// real machine-scope removal.
+        /// </summary>
+        internal static string[] EnumerateRegistrations()
+        {
+            string[] arp = EnumerateMachineRegistrations();
+            return arp.Length > 0 ? arp : EnumerateMsiProductDisplayNames();
+        }
+
+        /// <summary>
+        /// Product codes for the probe union: ARP GUID key names when visible
+        /// (they ARE the product codes the evidence names), MSI enumeration
+        /// otherwise. ARP-first because a visible ARP entry is the trustworthy
+        /// in-process view; the enumeration is the fallback the ARP
+        /// suppression makes the norm.
+        /// </summary>
+        internal static string[] EnumerateRegistrationCodes()
+        {
+            string[] arp = EnumerateMachineRegistrationCodes();
+            return arp.Length > 0 ? arp : EnumerateMsiProductCodes();
+        }
+
+        internal static string[] EnumerateMsiProductDisplayNames() =>
+            MsiRegisteredProducts().Select(pair => pair.DisplayName).ToArray();
+
+        internal static string[] EnumerateMsiProductCodes() =>
+            MsiRegisteredProducts().Select(pair => pair.Key).ToArray();
+
+        /// <summary>
+        /// Machine-context MSI registrations of the product (product code,
+        /// display name). Machine-context only: per-user ghosts of old broken
+        /// uninstalls are the verb's sweep targets, not a registration the
+        /// sentinel should stay armed on. Fails open to empty on any
+        /// enumeration error.
+        /// </summary>
+        private static List<(string Key, string DisplayName)> MsiRegisteredProducts()
+        {
+            var found = new List<(string, string)>();
+            try
+            {
+                var code = new StringBuilder(39);
+                for (int index = 0; index < 4096; index++)
+                {
+                    if (MsiEnumProductsW(index, code) != 0)
+                        break;
+
+                    string candidate = code.ToString();
+                    code.Clear();
+                    if (candidate.Length == 0)
+                        continue;
+
+                    var name = new StringBuilder(256);
+                    int nameLength = 256;
+                    if (MsiGetProductInfoW(candidate, "ProductName", name, ref nameLength) != 0 ||
+                        !string.Equals(name.ToString(), ProductName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var context = new StringBuilder(32);
+                    int contextLength = 32;
+                    if (MsiGetProductInfoW(candidate, "AssignmentType", context, ref contextLength) == 0 &&
+                        context.ToString().Equals("Machine", StringComparison.OrdinalIgnoreCase))
+                    {
+                        found.Add((candidate, ProductName));
+                    }
+                }
+            }
+            catch
+            {
+                // Fail open toward "not installed": the sentinel then parks on
+                // the binding gate (no watched code) and the verb stays inert -
+                // the safe direction for a destructive verb.
+            }
+
+            return found;
+        }
+
+        [DllImport("msi.dll", CharSet = CharSet.Unicode)]
+        private static extern int MsiEnumProductsW(int iProductIndex, StringBuilder lpProductBuf);
+
+        [DllImport("msi.dll", CharSet = CharSet.Unicode)]
+        private static extern int MsiGetProductInfoW(
+            string szProduct, string szAttribute, StringBuilder lpValueBuf, ref int pcchValueBuf);
 
         /// <summary>
         /// The product codes (ARP GUID key names) of the live machine

@@ -174,24 +174,66 @@ dotnet vpk pack -u Uniwill-Control-Utility -v $version -p $publishDir -o $releas
     --msi --instLocation PerMachine
 if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
 
-# --- 5a. (No MSI post-configuration) -------------------------------------
-# The Control Panel / Settings uninstall runs vpk's generated MSI by product
-# code, and that package is a thin bootstrap: its RemoveFiles deletes almost
-# nothing (the layout is deployed by the package's own bootstrap custom
-# action, invisible to MSI file records), so the removal unregisters the
-# product in ~2 s and leaves the service, layout, running app, tasks, and ARP
-# husk behind. Injecting CustomActions that launch the installed exes at
-# uninstall is a field-proven dead end in this package (verbose-log forensics
-# in the git history: every exe-CA encoding fails 1721/2715/2723/2727 or a
-# CreateProcess failure under the msiserver session, and Velopack's own
-# uninstall hook is a per-user-temp design that no-ops in the SYSTEM execute
-# context of a per-machine install).
-# The complete Control Panel uninstall is instead an app-side self-heal: the
-# app outlives every such removal, watches its MSI product registration, and
-# when it vanishes self-runs the elevated engine --uninstall-engine verb -
-# the single full-cleanup entry point shared with the Uninstall.exe shim.
-# See Uniwill Control Utility\UninstallSentinel.cs and the wiki operations
-# runbook's uninstall forensics section.
+# --- 5a. Rebind the MSI's Add/Remove Programs entry to Uninstall.exe ------
+# The Control Panel / Settings uninstall must run the complete-sweep shim,
+# not a thin `msiexec /x`. The packed vpk template already publishes ONE ARP
+# entry itself (ARPSYSTEMCOMPONENT=1 suppresses the Windows Installer engine's
+# GUID-keyed entry — the one carrying WindowsInstaller=1, i.e. the entry the
+# Control Panel routes by product code straight into msiexec), under
+#   HKLM\...\Uninstall\MSI:Uniwill-Control-Utility
+# with UninstallString "msiexec.exe /x [ProductCode]": the entry is
+# component-clean (installed and deleted with `ArpRegistration`), but the
+# command is thin — the engine service is registered by the app, not the MSI,
+# so the removal leaves service, layout, tasks and entry behind.
+#
+# This step authors the rebind INTO the package: UninstallString and
+# QuietUninstallString become "[INSTALLFOLDER]Uninstall.exe" (the
+# requireAdministrator shim: app kill, service stop+delete, tasks, MSI /x,
+# ARP entries, install root). The key is non-GUID and carries no
+# WindowsInstaller value, so appwiz.cpl/Settings shell-execute the string
+# verbatim — the one Control Panel entry the product has IS the complete
+# route. Values ship inside the signed-source MSI: no runtime registry
+# writer, so no AV anti-hijack enforcer class applies (the runtime
+# re-assertion in EngineInstaller.RepairControlPanelUninstall stays as the
+# belt for dev layouts and hand-installed packages). The sentinel + evidence
+# floor remain the net for scripted `msiexec /x` routes: with the engine GUID
+# entry suppressed there is no GUID-keyed registration to watch, so the
+# sentinel's probe unions the ARP view with MsiEnumProductsW.
+#
+# Exe-CustomActions that launch the shim at uninstall stay a field-proven
+# dead end in this package (verbose-log forensics in the git history: every
+# exe-CA encoding fails 1721/2715/2723/2727 or a CreateProcess failure under
+# the msiserver session) — this table edit needs no CustomAction at all.
+#
+# msi-edit is compiled on demand: the IDatabase interface is vtable-only
+# (no late-bound route), so the step needs a TlbImp interop of msi.dll;
+# both tools live in the SDK, and the artifacts are cached under obj\.
+$msiEditDir = Join-Path $PSScriptRoot "msi-edit\obj"
+New-Item -ItemType Directory -Path $msiEditDir -Force | Out-Null
+$wiInterop = Join-Path $msiEditDir "WindowsInstaller.Interop.dll"
+if (-not (Test-Path $wiInterop)) {
+    $tlbimp = Get-ChildItem "C:\Program Files (x86)\Microsoft SDKs\Windows\*\bin\NETFX*\x64\TlbImp.exe" -ErrorAction SilentlyContinue |
+        Sort-Object FullName -Descending | Select-Object -First 1
+    if (-not $tlbimp) { $tlbimp = Get-Command tlbimp.exe -ErrorAction SilentlyContinue }
+    if (-not $tlbimp) { throw "TlbImp.exe not found (Windows SDK): cannot rebind the MSI's ARP entry" }
+    $tiPath = if ($tlbimp.FullName) { $tlbimp.FullName } else { $tlbimp.Source }
+    & $tiPath "$env:WINDIR\System32\msi.dll" "/out:$wiInterop" "/namespace:WindowsInstaller" /silent
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $wiInterop)) { throw "TlbImp interop of msi.dll failed" }
+}
+$msiEdit = Join-Path $msiEditDir "msi-edit.exe"
+if (-not (Test-Path $msiEdit)) {
+    & $csc /nologo /target:exe "/out:$msiEdit" "/reference:$wiInterop" (Join-Path $PSScriptRoot "msi-edit\MsiEdit.cs")
+    if ($LASTEXITCODE -ne 0) { throw "msi-edit compile failed" }
+}
+$packedMsi = Get-ChildItem $releasesDir -Filter "*.msi" | Select-Object -First 1
+if (-not $packedMsi) { throw "no packed MSI found in $releasesDir" }
+& $msiEdit suppress $packedMsi.FullName
+if ($LASTEXITCODE -ne 0) { throw "msi-edit suppress failed: ARP entry not bound to the shim" }
+$arpEcho = & $msiEdit inspect $packedMsi.FullName 2>&1 | Out-String
+if ($arpEcho -notmatch "UninstallString\s*\|\s*""\[INSTALLFOLDER\]Uninstall\.exe""") {
+    throw "post-edit verification: no ARP row rebound to the shim visible in the MSI"
+}
+Write-Host "Rebound $($packedMsi.Name): the single Control Panel entry now runs Uninstall.exe" -ForegroundColor Cyan
 
 # --- 5b. Stamp the Setup.exe bootstrapper requireAdministrator ---
 # vpk's bootstrapper template is asInvoker and vpk exposes no manifest flag,

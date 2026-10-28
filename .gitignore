@@ -379,3 +379,4 @@ skills-lock.json
 
 # SonarQube
 .sonarqube/
+build/msi-edit/obj/

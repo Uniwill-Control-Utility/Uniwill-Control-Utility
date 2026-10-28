@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
@@ -42,10 +43,11 @@ internal static class UninstallShim
         // deletes the key on machines that ran the old builds. Best-effort.
         string shimKey = "\"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\Uniwill Control Utility.exe\"";
 
-        string productKey = FindMsiProductKey("Uniwill Control Utility");
+        string productKey = FindMsiProductCode("Uniwill Control Utility", root.TrimEnd('\\'));
 
         const string hkcuUninstall = "\"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Uniwill-Control-Utility\"";
         const string hklmUninstall = "\"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MSI:Uniwill-Control-Utility\"";
+        const string hklmShimEntry = "\"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Uniwill-Control-Utility\"";
 
         // The hidden helper's command list, joined with " & " — a strict
         // sequence, one command per element (string concatenation of the
@@ -97,6 +99,7 @@ internal static class UninstallShim
         cmds.Add("reg delete " + shimKey + " /f");
         cmds.Add("reg delete " + hkcuUninstall + " /f");
         cmds.Add("reg delete " + hklmUninstall + " /f");
+        cmds.Add("reg delete " + hklmShimEntry + " /f");
         if (!string.IsNullOrEmpty(productKey))
             cmds.Add("reg delete \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + productKey + "\" /f");
         cmds.Add(Echo("stage4-cleanup-done"));
@@ -207,6 +210,62 @@ internal static class UninstallShim
         {
         }
     }
+
+    // The MSI product code (a GUID) for this product. Two sources, in order:
+    // the ARP GUID key whose DisplayName matches (what shipped before), and
+    // the MSI database itself via MsiEnumProductsW. The second source is why
+    // this exists: the packed MSI suppresses its ARP display entry
+    // (ARPSYSTEMCOMPONENT=1), so FindMsiProductKey alone finds nothing on a
+    // fresh install and the shim would skip "msiexec /x" - leaving the
+    // registration, the cached package and the service behind. The shim runs
+    // elevated, so the MSI enumeration reads the unobstructed machine view
+    // (the guarded-box field evidence: only unelevated processes get the
+    // registry blinded). Match is by ProductName, and the install-location
+    // attribute prefers the registration that owns THIS layout, so a stale
+    // per-user ghost of the same name is never the one we /x.
+    private static string FindMsiProductCode(string displayName, string root)
+    {
+        string fromArp = FindMsiProductKey(displayName);
+        if (!string.IsNullOrEmpty(fromArp))
+            return fromArp;
+
+        string first = null;
+        StringBuilder product = new StringBuilder(39);
+        for (int index = 0; index < 4096; index++)
+        {
+            if (MsiEnumProductsW(index, product) != 0)
+                break;
+
+            string candidate = product.ToString();
+            product.Clear();
+            if (candidate.Length == 0)
+                continue;
+
+            StringBuilder name = new StringBuilder(256);
+            uint nameLength = 256;
+            if (MsiGetProductInfoW(candidate, "ProductName", name, ref nameLength) != 0 ||
+                !string.Equals(name.ToString(), displayName, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            StringBuilder location = new StringBuilder(260);
+            uint locationLength = 260;
+            if (MsiGetProductInfoW(candidate, "InstalledLocation", location, ref locationLength) == 0 &&
+                string.Equals(location.ToString().TrimEnd('\\'), root, StringComparison.OrdinalIgnoreCase))
+                return candidate;
+
+            if (first == null)
+                first = candidate;
+        }
+
+        return first;
+    }
+
+    [System.Runtime.InteropServices.DllImport("msi.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int MsiEnumProductsW(int iProductIndex, StringBuilder lpProductBuf);
+
+    [System.Runtime.InteropServices.DllImport("msi.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int MsiGetProductInfoW(
+        string szProduct, string szAttribute, StringBuilder lpValueBuf, ref uint pcchValueBuf);
 
     // The MSI product registration key (a GUID) whose DisplayName matches.
     // We build "msiexec.exe /x {GUID}" from it and delete the key if the
