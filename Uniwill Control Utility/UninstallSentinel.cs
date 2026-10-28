@@ -304,9 +304,10 @@ namespace Uniwill_Control_Utility
 
         /// <summary>
         /// Machine-wide proof that a real uninstall of this product just ran:
-        /// the MsiInstaller "Removal completed successfully" event (11727)
-        /// naming the product within the last 5 minutes. The event log is
-        /// written by the Windows Installer service itself - an AV registry
+        /// the MsiInstaller "Removal completed successfully" event (11724,
+        /// the Windows Installer success fingerprint - 11707 is the install
+        /// twin) naming the product within the last 5 minutes. The event log
+        /// is written by the Windows Installer service itself - an AV registry
         /// view trick cannot fabricate it - and a ghost registration's
         /// self-repair /x ends 1603 and never writes this event. Fail-closed:
         /// an unreadable event log reads as no evidence, and the destructive
@@ -325,7 +326,7 @@ namespace Uniwill_Control_Utility
                     EventLogEntry entry = entries[i];
                     if (entry.TimeGenerated < cutoff)
                         break;
-                    if (entry.InstanceId != 11727)
+                    if (entry.InstanceId != 11724)
                         continue;
                     if (entry.Message.IndexOf(ProductName, StringComparison.OrdinalIgnoreCase) < 0)
                         continue;
