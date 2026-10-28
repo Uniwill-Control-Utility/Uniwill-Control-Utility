@@ -312,6 +312,7 @@ namespace UCU.Engine
         public static async Task<int> UninstallAsync()
         {
             ConfigureLogging();
+            LogInvocationChain();
 
             string name = EngineHostFactory.ServiceName;
 
@@ -696,6 +697,81 @@ namespace UCU.Engine
                 }
             }
         }
+
+        /// <summary>
+        /// Verb forensics (field-proven need): on a dev box carrying stale
+        /// per-user ghost registrations, the verb fired ~15 s after an ordinary
+        /// elevated app launch and swept the live install - and no route in the
+        /// source explained it (hook no-op, sentinel unarmed, shim task absent).
+        /// The verb therefore logs its launcher: the parent pid resolved via
+        /// ntdll (no WMI dependency), its image name and start time. The parent
+        /// is captured at verb entry, while it is alive.
+        /// </summary>
+        private static void LogInvocationChain()
+        {
+            try
+            {
+                int parentPid = 0;
+                try
+                {
+                    var status = NtQueryInformationProcess(
+                        System.Diagnostics.Process.GetCurrentProcess().Handle,
+                        0, out PROCESS_BASIC_INFORMATION pbi,
+                        System.Runtime.InteropServices.Marshal.SizeOf<PROCESS_BASIC_INFORMATION>(),
+                        out _);
+                    if (status == 0)
+                        parentPid = pbi.InheritedFromUniqueProcessId.ToInt32();
+                }
+                catch
+                {
+                    // Parent line is the optional half.
+                }
+
+                string parent = parentPid == 0 ? "unknown" : DescribeProcess(parentPid);
+                string self = DescribeProcess(System.Environment.ProcessId);
+                Log.Information(
+                    "[EngineInstaller] verb invoked: self {Self}, parent {Parent}, args {Args}",
+                    self, parent, string.Join(" ", Environment.GetCommandLineArgs()));
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "[EngineInstaller] invocation chain probe failed");
+            }
+        }
+
+        private static string DescribeProcess(int pid)
+        {
+            try
+            {
+                using var process = System.Diagnostics.Process.GetProcessById(pid);
+                string name = string.Empty;
+                try { name = process.ProcessName; } catch { }
+                string started = string.Empty;
+                try { started = ", started " + process.StartTime.ToString("HH:mm:ss"); } catch { }
+                return pid + " '" + name + "'" + started;
+            }
+            catch
+            {
+                return pid + " (gone)";
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct PROCESS_BASIC_INFORMATION
+        {
+            public IntPtr Reserved1;
+            public IntPtr PebBaseAddress;
+            public IntPtr Reserved2_0;
+            public IntPtr Reserved2_1;
+            public IntPtr UniqueProcessId;
+            public IntPtr InheritedFromUniqueProcessId;
+        }
+
+        [DllImport("ntdll.dll")]
+        private static extern int NtQueryInformationProcess(
+            IntPtr processHandle, int processInformationClass,
+            out PROCESS_BASIC_INFORMATION processInformation,
+            int processInformationLength, out int returnLength);
 
         private static void DeleteProgramDataLogs()
         {
