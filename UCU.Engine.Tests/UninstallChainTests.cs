@@ -12,6 +12,20 @@ namespace UCU.Engine.Tests;
 public sealed class UninstallChainTests
 {
     [Fact]
+    public void CompressProductCode_MatchesTheRealMsiRegistrationKeys()
+    {
+        // Field-verified pairs: the UserData\<SID>\Products record keys read
+        // back from a machine carrying these registrations. The sweep deletes
+        // these keys, so a wrong form silently deletes nothing.
+        Assert.Equal(
+            "54792657DF4DB274387B84C7563DF230",
+            EngineInstaller.CompressProductCode("{75629745-D4FD-472B-83B7-487C65D32F03}"));
+        Assert.Equal(
+            "D6FDFD89F775DD94196370D49A1980A7",
+            EngineInstaller.CompressProductCode("{98DFDF6D-577F-49DD-9136-074DA991087A}"));
+    }
+
+    [Fact]
     public void ShimPath_ResolvesFromTheServiceDirectoryToTheLayoutRoot()
     {
         string dir = Path.Combine(Path.GetTempPath(), "ucu-uninstall-chain-" + Guid.NewGuid().ToString("N"));

@@ -548,6 +548,22 @@ namespace UCU.Engine
 
             foreach (string code in codes)
             {
+                // The registration of the install this verb process is running
+                // from is not stale: the sentinel design fires the verb only
+                // after the registration is gone, and the Velopack hook path
+                // fires it while the install is live (a ghost's /x transaction
+                // mid-flight, the hook spawns the verb). Removing the live
+                // registration from the hook path is self-destruction.
+                var location = new StringBuilder(260);
+                uint locationLength = 260;
+                if (MsiGetProductInfoW(code, "InstalledLocation", location, ref locationLength) == 0 &&
+                    string.Equals(location.ToString().TrimEnd('\\'), InstallLayoutRoot,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    Log.Debug("[EngineInstaller] registration {Code} is the live install - left to its own uninstall", code);
+                    continue;
+                }
+
                 Log.Debug("[EngineInstaller] sweeping stale registration {Code}", code);
                 await RunCleanupCommandAsync(
                     "msiexec.exe", "/x " + code + " /qn", TimeSpan.FromSeconds(60)).ConfigureAwait(false);
@@ -555,9 +571,25 @@ namespace UCU.Engine
             }
         }
 
+        /// <summary>
+        /// The install layout root this engine image lives in
+        /// (the verb runs from &lt;root&gt;\current\Service).
+        /// </summary>
+        private static string InstallLayoutRoot =>
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", ".."));
+
         private static void RemoveRegistrationKeys(string productCode)
         {
             string compact = productCode.Trim('{', '}').Replace("-", "");
+
+            // MSI stores registration keys under the COMPRESSED product code
+            // (first three hex groups reversed, last eight bytes nibble-swapped)
+            // - field-proven in the UserData records. Deleting the raw compact
+            // form only (the first implementation) never matched a key, so the
+            // ghosts survived every sweep and Velopack's startup self-repair
+            // kept /x-ing them (their UninstallHookDeferred is what fires this
+            // verb - the ghosts are the loop).
+            string compressed = CompressProductCode(productCode);
 
             var hives = new[]
             {
@@ -569,7 +601,9 @@ namespace UCU.Engine
 
             foreach (var (hive, view) in hives)
             {
+                DeleteInstallerProductKeys(hive, view, "SOFTWARE\\Classes\\Installer\\Products", compressed);
                 DeleteInstallerProductKeys(hive, view, "SOFTWARE\\Classes\\Installer\\Products", compact);
+                DeleteInstallerProductKeys(hive, view, "SOFTWARE\\Microsoft\\Installer\\Products", compressed);
                 DeleteInstallerProductKeys(hive, view, "SOFTWARE\\Microsoft\\Installer\\Products", compact);
             }
 
@@ -577,7 +611,71 @@ namespace UCU.Engine
             // machine registration (HKLM\SOFTWARE\Classes\Installer\... under
             // Wow6432Node); delete it from the 64-bit base view.
             DeleteInstallerProductKeys(
+                RegistryHive.LocalMachine, RegistryView.Registry64, @"Classes\Installer\Products", compressed);
+            DeleteInstallerProductKeys(
                 RegistryHive.LocalMachine, RegistryView.Registry64, @"Classes\Installer\Products", compact);
+
+            // The per-user-context product records live under
+            // HKLM\...\Installer\UserData\<SID>\Products\<compressed> - these
+            // are what MsiEnumProductsW enumerates. The Classes-key surgery
+            // never touched them (field-proven: the S-1-5-18 records survived
+            // a full verb sweep and kept firing Velopack's repair /x passes).
+            try
+            {
+                using RegistryKey baseKey = RegistryKey.OpenBaseKey(
+                    RegistryHive.LocalMachine, RegistryView.Registry64);
+                using RegistryKey? userData = baseKey.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Installer\UserData", writable: true);
+                if (userData != null)
+                {
+                    foreach (string sid in userData.GetSubKeyNames())
+                    {
+                        try
+                        {
+                            using RegistryKey? products = userData.OpenSubKey(sid + "\\Products", writable: true);
+                            products?.DeleteSubKeyTree(compressed, throwOnMissingSubKey: false);
+                            products?.DeleteSubKeyTree(compact, throwOnMissingSubKey: false);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Debug(ex, "[EngineInstaller] UserData record {Sid}\\{Code} not removed", sid, compressed);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "[EngineInstaller] UserData products root not opened");
+            }
+        }
+
+        /// <summary>
+        /// MSI's registration key form of a product GUID: the 8-, 4- and
+        /// 4-character hex groups reversed, the final eight bytes with their
+        /// nibbles swapped (21ABECE1-A692-4EE2-83B7-... → 1ECEBA12296A2EE4387B...).
+        /// </summary>
+        internal static string CompressProductCode(string guid)
+        {
+            string[] parts = guid.Trim('{', '}').Split('-');
+            if (parts.Length != 5)
+                return guid.Trim('{', '}').Replace("-", "");
+
+            char[] head = (ReverseGroup(parts[0]) + ReverseGroup(parts[1]) + ReverseGroup(parts[2])).ToCharArray();
+            var tail = new StringBuilder(16);
+            string rest = parts[3] + parts[4];
+            for (int i = 0; i + 1 < rest.Length; i += 2)
+            {
+                tail.Append(rest[i + 1]);
+                tail.Append(rest[i]);
+            }
+            return new string(head) + tail;
+        }
+
+        private static string ReverseGroup(string hex)
+        {
+            char[] chars = hex.ToCharArray();
+            Array.Reverse(chars);
+            return new string(chars);
         }
 
         private static void DeleteInstallerProductKeys(
