@@ -22,7 +22,7 @@ public sealed class UninstallSentinelTests
         // un-armed sentinel must stay inert forever.
         var sentinel = Create(() => Array.Empty<string>(), () => { });
         for (int i = 0; i < 10; i++)
-            Assert.False(sentinel.Step(found: false));
+            Assert.False(sentinel.Step(registrationFound: false));
     }
 
     [Fact]
@@ -30,12 +30,12 @@ public sealed class UninstallSentinelTests
     {
         var sentinel = Create(() => Array.Empty<string>(), () => { });
 
-        Assert.False(sentinel.Step(found: true)); // arms
+        Assert.False(sentinel.Step(registrationFound: true)); // arms
 
         // One miss is inside the debounce window (registration flickers
         // during transactions); the second consecutive miss fires.
-        Assert.False(sentinel.Step(found: false));
-        Assert.True(sentinel.Step(found: false));
+        Assert.False(sentinel.Step(registrationFound: false));
+        Assert.True(sentinel.Step(registrationFound: false));
     }
 
     [Fact]
@@ -43,12 +43,12 @@ public sealed class UninstallSentinelTests
     {
         var sentinel = Create(() => Array.Empty<string>(), () => { });
 
-        sentinel.Step(found: true);
-        sentinel.Step(found: false); // one miss banked
+        sentinel.Step(registrationFound: true);
+        sentinel.Step(registrationFound: false); // one miss banked
 
-        Assert.False(sentinel.Step(found: true)); // back: misses reset
-        Assert.False(sentinel.Step(found: false));
-        Assert.True(sentinel.Step(found: false));
+        Assert.False(sentinel.Step(registrationFound: true)); // back: misses reset
+        Assert.False(sentinel.Step(registrationFound: false));
+        Assert.True(sentinel.Step(registrationFound: false));
     }
 
     [Fact]
@@ -83,6 +83,47 @@ public sealed class UninstallSentinelTests
     }
 
     [Fact]
+    public async Task RunAsync_RegistrationGoneBeforeArming_LayoutArmsIt()
+    {
+        // The race the thin uninstall wins: /x finishes in ~2 s while the
+        // app's startup takes minutes - the registration is already gone at
+        // the first poll. Running from the installed layout is the same
+        // "installed" fact, so the sentinel arms and fires.
+        int fired = 0;
+        var sentinel = new UninstallSentinel(
+            () => Array.Empty<string>(),
+            () => fired++,
+            _ => { },
+            pollInterval: TimeSpan.FromMilliseconds(10),
+            installedLayoutProbe: () => true);
+
+        var run = sentinel.RunAsync();
+        var winner = await Task.WhenAny(run, Task.Delay(2000));
+        Assert.Same(run, winner); // fired and returned
+        Assert.Equal(1, fired);
+    }
+
+    [Fact]
+    public async Task RunAsync_RegistrationGoneAndNoLayout_StaysInert()
+    {
+        // Dev/portable runs: no registration, no installed layout - the
+        // destructive verb must never run.
+        int fired = 0;
+        var sentinel = new UninstallSentinel(
+            () => Array.Empty<string>(),
+            () => fired++,
+            _ => { },
+            pollInterval: TimeSpan.FromMilliseconds(10),
+            installedLayoutProbe: () => false);
+
+        var run = sentinel.RunAsync();
+        await Task.Delay(300);
+
+        Assert.Equal(0, fired);
+        Assert.False(run.IsCompleted);
+    }
+
+    [Fact]
     public void Registered_MatchesTheProductNameCaseInsensitively()
     {
         Assert.True(UninstallSentinel.Registered(
@@ -107,3 +148,4 @@ public sealed class UninstallSentinelTests
             Assert.True(string.Equals(name, UninstallSentinel.ProductName, StringComparison.OrdinalIgnoreCase)));
     }
 }
+

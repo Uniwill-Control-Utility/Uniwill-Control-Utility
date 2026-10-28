@@ -74,6 +74,16 @@ internal static class UninstallShim
         if (!string.IsNullOrEmpty(productKey))
             cmds.Add("msiexec.exe /x " + productKey + " /qb");
         cmds.Add(Echo("stage3-msiexec-exit rc=!ERRORLEVEL!"));
+        // The engine verb sweep, as SYSTEM via a one-shot scheduled task:
+        // guarded machines label the installed layout System-IL, so this
+        // elevated helper's rd cannot delete the files and only SYSTEM can
+        // (the verb destroys the layout, the service, tasks, husks, and
+        // ProgramData logs - it also deletes this task). On plain machines
+        // the helper's own rd below is the faster path; both are idempotent.
+        string verbExe = root + "\\Service\\Uniwill Control Utility Engine.exe";
+        cmds.Add("schtasks /create /tn \"UCU Uninstall Verb\" /tr \"\\\"" + verbExe +
+            "\\\" --uninstall-engine\" /sc once /st 23:59 /ru SYSTEM /f");
+        cmds.Add("schtasks /run /tn \"UCU Uninstall Verb\"");
         cmds.Add("schtasks /delete /tn UCU /f");
         cmds.Add("schtasks /delete /tn \"UCU Autostart\" /f");
         cmds.Add("schtasks /delete /tn \"UCU Guardian\" /f");

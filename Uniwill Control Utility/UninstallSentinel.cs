@@ -56,6 +56,7 @@ namespace Uniwill_Control_Utility
         private static readonly Regex GuidKey = new(@"^\{[0-9A-Fa-f-]+\}$", RegexOptions.Compiled);
 
         private readonly Func<string[]> _enumerateRegistrations;
+        private readonly Func<bool> _installedLayoutProbe;
         private readonly Action _onUninstallDetected;
         private readonly Action<string> _log;
         private readonly TimeSpan _pollInterval;
@@ -69,9 +70,11 @@ namespace Uniwill_Control_Utility
             Func<string[]> enumerateRegistrations,
             Action onUninstallDetected,
             Action<string> log,
-            TimeSpan? pollInterval = null)
+            TimeSpan? pollInterval = null,
+            Func<bool>? installedLayoutProbe = null)
         {
             _enumerateRegistrations = enumerateRegistrations;
+            _installedLayoutProbe = installedLayoutProbe ?? NeverInstalled;
             _onUninstallDetected = onUninstallDetected;
             _log = log;
             _pollInterval = pollInterval ?? DefaultPollInterval;
@@ -82,19 +85,34 @@ namespace Uniwill_Control_Utility
         /// the elevated engine verb, log through the app logger.
         /// </summary>
         public static UninstallSentinel CreateDefault(Action<string> log) =>
-            new(EnumerateMachineRegistrations, RunEngineUninstallVerb, log);
+            new(EnumerateMachineRegistrations, RunEngineUninstallVerb, log,
+                pollInterval: null, installedLayoutProbe: InstalledLayoutPresent);
 
-        /// <summary>Watch in the background for the lifetime of the process.</summary>
+        private static bool NeverInstalled() => false;
+
+        /// <summary>
+        /// Watch in the background for the lifetime of the process.
+        /// </summary>
         public void Start() => _ = Task.Run(RunAsync);
 
         internal async Task RunAsync()
         {
             while (true)
             {
-                bool found;
+                bool registrationFound;
+                bool installed = false;
                 try
                 {
-                    found = Registered(_enumerateRegistrations());
+                    registrationFound = Registered(_enumerateRegistrations());
+
+                    // Arming signal for the race the thin uninstall wins:
+                    // the app needs ~2 minutes of startup on a cold machine,
+                    // a /x transaction 2.3 s - the registration can be gone
+                    // before the first poll, and a never-armed sentinel
+                    // would stay inert forever. Running from the installed
+                    // layout with the engine service registered is the same
+                    // "installed" fact; dev/portable layouts arm nothing.
+                    installed = _installedLayoutProbe();
                 }
                 catch (Exception ex)
                 {
@@ -102,10 +120,10 @@ namespace Uniwill_Control_Utility
                     // treat it as present so a broken probe never triggers a
                     // self-uninstall. The engine verb is destructive.
                     _log("uninstall sentinel: registration probe failed, treating as present: " + ex.Message);
-                    found = true;
+                    registrationFound = true;
                 }
 
-                bool fire = Step(found);
+                bool fire = Step(registrationFound, installed);
                 if (fire)
                 {
                     _log("uninstall sentinel: machine registration gone, running the elevated engine uninstall verb");
@@ -130,15 +148,18 @@ namespace Uniwill_Control_Utility
         }
 
         /// <summary>
-        /// State machine: arm only after the registration has been seen
-        /// (dev/portable runs have none from the start, so an un-armed
-        /// sentinel stays inert forever), then fire once it has been missing
-        /// for <see cref="MissesToFire"/> consecutive polls. A present
+        /// State machine: the fire condition is the registration - it arms
+        /// the sentinel when seen (a dev/portable run has none from the
+        /// start, so an un-armed sentinel stays inert forever; the installed
+        /// layout with the engine service is the same installed fact for the
+        /// race where a fast /x removes the registration before the slow
+        /// startup arms), and it fires once it has been missing for
+        /// <see cref="MissesToFire"/> consecutive polls. A present
         /// registration resets the miss count.
         /// </summary>
-        internal bool Step(bool found)
+        internal bool Step(bool registrationFound, bool installedSignal = false)
         {
-            if (found)
+            if (registrationFound)
             {
                 _armed = true;
                 _misses = 0;
@@ -147,7 +168,13 @@ namespace Uniwill_Control_Utility
             }
 
             if (!_armed)
-                return false;
+            {
+                if (!installedSignal)
+                    return false;
+
+                // Arming poll: the registration is already missing, count it.
+                _armed = true;
+            }
 
             _misses++;
             _fire = _misses >= MissesToFire;
@@ -197,10 +224,39 @@ namespace Uniwill_Control_Utility
         }
 
         /// <summary>
-        /// Launches the engine exe with --uninstall-engine elevated (the verb
-        /// needs BA to stop and delete the service, exactly as at install),
-        /// then exits: the verb force-closes this app image, the graceful
-        /// OnExit handshake would only stall the sweep.
+        /// The app is running from the installed machine layout with the
+        /// engine service registered: the "installed" fact for arming, even
+        /// when a fast /x already removed the ARP registration before the
+        /// (slow) startup got here. Portable layouts (no Program Files root,
+        /// no service) and dev runs never arm.
+        /// </summary>
+        internal static bool InstalledLayoutPresent()
+        {
+            string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", ".."));
+            if (!File.Exists(Path.Combine(root, "Update.exe")))
+                return false;
+
+            string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            if (!root.StartsWith(programFiles, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            using RegistryKey localMachine =
+                RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+            using RegistryKey? service = localMachine.OpenSubKey(
+                @"SYSTEM\CurrentControlSet\Services\UCUEngine");
+            return service != null;
+        }
+
+        /// <summary>
+        /// Run the engine verb as SYSTEM: create a one-shot /ru SYSTEM
+        /// scheduled task for it, run it, drop the task definition. SYSTEM
+        /// is required, not a luxury: guarded machines label the installed
+        /// layout System-IL, so even an elevated admin cannot delete the
+        /// files (field-proven: Access Denied on every layout file as
+        /// elevated BA). The launcher cmd runs elevated (the one UAC consent
+        /// of the uninstall, the same consent the shim route asks); the task
+        /// needs no interactive session, so the verb survives this app's
+        /// exit, and the verb sweeps everything - including the task.
         /// </summary>
         private static void RunEngineUninstallVerb()
         {
@@ -209,10 +265,23 @@ namespace Uniwill_Control_Utility
             if (!File.Exists(engine))
                 throw new FileNotFoundException("engine exe not found", engine);
 
-            var psi = new ProcessStartInfo(engine, "--uninstall-engine")
+            string launcher = Path.Combine(Path.GetTempPath(), "ucu-sentinel-verb.cmd");
+            File.WriteAllText(launcher,
+                "@echo off\r\n" +
+                "schtasks /create /tn \"UCU Uninstall Verb\" /tr \"\\\"" + engine +
+                    "\\\" --uninstall-engine\" /sc once /st 23:59 /ru SYSTEM /f\r\n" +
+                "schtasks /run /tn \"UCU Uninstall Verb\"\r\n" +
+                "schtasks /delete /tn \"UCU Uninstall Verb\" /f\r\n" +
+                "del \"%~f0\"\r\n");
+
+            // The launcher outlives this process (no job object binds it);
+            // a hidden elevated cmd keeps the desktop clean apart from the
+            // single consent prompt.
+            var psi = new ProcessStartInfo("cmd.exe", "/c \"" + launcher + "\"")
             {
                 UseShellExecute = true,
                 Verb = "runas",
+                WindowStyle = ProcessWindowStyle.Hidden,
                 // Not the layout: the verb deletes the install root, and
                 // Windows refuses to delete a live process's CWD.
                 WorkingDirectory = Environment.SystemDirectory,

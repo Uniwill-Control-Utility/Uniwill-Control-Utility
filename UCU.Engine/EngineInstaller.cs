@@ -322,19 +322,40 @@ namespace UCU.Engine
             }
 
             rc = await RunScAsync("delete", name).ConfigureAwait(false);
+            if (rc != 0 && rc != ErrorServiceDoesNotExist)
+            {
+                // Policy-guarded machines park the delete pending: their
+                // keep-running policy relaunches the service between stop
+                // and delete, and sc.exe blocks behind the SCM. Killing the
+                // live service image completes the pending delete, and a
+                // service already marked for delete cannot be relaunched -
+                // the policy loses. (This process runs the same image:
+                // exclude our own pid.)
+                KillEngineServiceProcess();
+                await Task.Delay(2000).ConfigureAwait(false);
+                rc = await RunScAsync("delete", name).ConfigureAwait(false);
+            }
+
             Log.Information("[EngineInstaller] Engine service removed (rc {Code})", rc);
 
-            // Removal routes launch this verb elevated (the app's
-            // UninstallSentinel after a Control Panel / Settings msiexec /x,
-            // the Uninstall.exe shim, the Velopack uninstall hook), so it also
-            // sweeps everything the MSI's thin removal cannot: the running app
-            // (it locks the layout), the scheduled tasks, every ARP husk that
-            // names the product, the service's ProgramData log directory, and
-            // the install layout itself (Velopack's Update.exe cannot be
-            // launched from the MSI's uninstall context - documented dead
-            // end - so the verb destroys the layout). The Uninstall.exe shim
-            // shares this exact list, so all removal routes converge on the
-            // same end state. All best effort: an uninstall never fails here.
+            // Removal routes launch this verb as SYSTEM (the app's
+            // UninstallSentinel and the Uninstall.exe shim create a one-shot
+            // /ru SYSTEM scheduled task for it; the Velopack uninstall hook
+            // already runs as SYSTEM and spawns it directly). SYSTEM is the
+            // requirement, not a luxury: guarded machines label the installed
+            // layout System-IL (an elevated admin cannot delete the files)
+            // and the engine service's re-secured DACL grants full control
+            // only to SY/BA. The verb sweeps everything the MSI's thin
+            // removal cannot: the running app (it locks the layout), the
+            // scheduled tasks, every ARP husk that names the product
+            // (machine, HKCU, and every loaded user hive), the stale
+            // per-user MSI registrations old broken uninstalls leave, the
+            // service's ProgramData log directory, and the install layout
+            // itself (Velopack's Update.exe cannot be launched from the
+            // MSI's uninstall context - documented dead end). The
+            // Uninstall.exe shim shares this list, so all removal routes
+            // converge on the same end state. All best effort: an uninstall
+            // never fails here.
             KillRunningApp();
             await RunCleanupCommandAsync(
                 "schtasks.exe", "/Delete /TN UCU /F").ConfigureAwait(false);
@@ -342,8 +363,11 @@ namespace UCU.Engine
                 "schtasks.exe", "/Delete /TN \"UCU Autostart\" /F").ConfigureAwait(false);
             await RunCleanupCommandAsync(
                 "schtasks.exe", "/Delete /TN \"UCU Guardian\" /F").ConfigureAwait(false);
+            await RunCleanupCommandAsync(
+                "schtasks.exe", "/Delete /TN \"UCU Uninstall Verb\" /F").ConfigureAwait(false);
             DeleteArpHusks(RegistryHive.LocalMachine);
             DeleteArpHusks(RegistryHive.CurrentUser);
+            DeleteUserHiveArpHusks();
             await SweepStaleUserRegistrations().ConfigureAwait(false);
             DeleteProgramDataLogs();
             DeleteInstallLayout();
@@ -374,6 +398,32 @@ namespace UCU.Engine
                     {
                         running.Dispose();
                     }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Force-close the running engine service process so a parked
+        /// (pending) service delete completes. This verb runs the same
+        /// image, so exclude our own pid.
+        /// </summary>
+        private static void KillEngineServiceProcess()
+        {
+            foreach (Process running in
+                Process.GetProcessesByName("Uniwill Control Utility Engine"))
+            {
+                try
+                {
+                    if (running.Id != Environment.ProcessId)
+                        running.Kill();
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug(ex, "[EngineInstaller] engine service process {Pid} not killed", running.Id);
+                }
+                finally
+                {
+                    running.Dispose();
                 }
             }
         }
@@ -555,15 +605,19 @@ namespace UCU.Engine
         /// <summary>
         /// Destroy the install layout: the thin MSI removal deletes no files
         /// (the layout is deployed by the package's bootstrap custom action,
-        /// so RemoveFiles sees almost nothing), and Velopack's Update.exe
-        /// cannot be launched from the MSI's uninstall context (documented
-        /// dead end), so the verb - the only route that runs elevated with
-        /// full access - removes the root. This exe runs from
-        /// &lt;root&gt;\current\Service\, so the root is two levels up; the
-        /// Update.exe marker proves the layout is a real Velopack root before
-        /// anything is deleted (source/dev layouts are never touched). The
-        /// image files delete fine: Windows opens running exes and loaded
-        /// assemblies for delete (the standard self-update pattern).
+        /// invisible to MSI file records), and Velopack's Update.exe cannot
+        /// be launched from the MSI's uninstall context (documented dead
+        /// end), so the verb - the only route with SYSTEM identity, which
+        /// guarded machines require: their policy labels the installed
+        /// layout System-IL and an elevated admin gets Access Denied -
+        /// removes the root. This exe runs from &lt;root&gt;\current\Service\,
+        /// so the root is two levels up; the Update.exe marker proves the
+        /// layout is a real Velopack root before anything is deleted
+        /// (source/dev layouts are never touched). Everything outside the
+        /// verb's own Service directory deletes in-proc (running exes and
+        /// loaded assemblies open for delete, so the verb image itself
+        /// deletes-pending); a detached tail re-issues the root delete after
+        /// this process exits and releases the last image.
         /// </summary>
         private static void DeleteInstallLayout()
         {
@@ -573,26 +627,144 @@ namespace UCU.Engine
                 if (!Directory.Exists(root) || !File.Exists(Path.Combine(root, "Update.exe")))
                     return;
 
-                for (int attempt = 0; ; attempt++)
+                string selfDirectory = Path.GetFullPath(AppContext.BaseDirectory);
+                for (int attempt = 0; attempt < 3; attempt++)
                 {
                     try
                     {
-                        Directory.Delete(root, recursive: true);
-                        Log.Information("[EngineInstaller] Install layout removed: {Root}", root);
-                        return;
+                        foreach (string directory in Directory.EnumerateDirectories(root))
+                        {
+                            if (string.Equals(
+                                    Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)),
+                                    Path.TrimEndingDirectorySeparator(selfDirectory),
+                                    StringComparison.OrdinalIgnoreCase))
+                            {
+                                // The verb's own image directory: deletes with
+                                // the process, via the tail.
+                                continue;
+                            }
+
+                            try
+                            {
+                                Directory.Delete(directory, recursive: true);
+                            }
+                            catch (Exception ex)
+                            {
+                                Log.Debug(ex, "[EngineInstaller] layout directory {Dir} not removed", directory);
+                            }
+                        }
+
+                        foreach (string file in Directory.EnumerateFiles(root))
+                            File.Delete(file);
+
+                        break;
                     }
-                    catch (Exception ex) when (attempt < 2)
+                    catch (Exception ex)
                     {
                         // The app's just-killed images stay locked for a
-                        // moment while AV scans them; a retry clears them.
+                        // moment while AV scans them; retries clear them.
                         Log.Debug(ex, "[EngineInstaller] layout delete attempt {Attempt}", attempt + 1);
                         Thread.Sleep(1500);
+                    }
+                }
+
+                SpawnLayoutTail(root);
+                Log.Information("[EngineInstaller] Install layout destroyed (tail completes): {Root}", root);
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "[EngineInstaller] install layout not removed");
+            }
+        }
+
+        /// <summary>
+        /// Hidden cmd that retries the root delete after this verb exits
+        /// (its own image is the last lock). Self-cleans: the tail deletes
+        /// its own script file.
+        /// </summary>
+        private static void SpawnLayoutTail(string root)
+        {
+            try
+            {
+                string script = Path.Combine(Path.GetTempPath(), "ucu-verb-tail.cmd");
+                File.WriteAllText(script,
+                    "@echo off\r\n" +
+                    "ping -n 6 127.0.0.1 >nul\r\n" +
+                    "rd /s /q \"" + root + "\"\r\n" +
+                    "ping -n 4 127.0.0.1 >nul\r\n" +
+                    "rd /s /q \"" + root + "\"\r\n" +
+                    "del \"%~f0\"\r\n");
+
+                Process.Start(new ProcessStartInfo("cmd.exe", "/c \"" + script + "\"")
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = Environment.SystemDirectory,
+                });
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "[EngineInstaller] layout tail not spawned");
+            }
+        }
+
+        /// <summary>
+        /// Sweep the ARP husks from every loaded user hive: the verb runs as
+        /// SYSTEM for the sentinel / scheduled-task route, where the per-user
+        /// husk keys (the velopack shim entry among them) live in the users'
+        /// hives, not in SYSTEM's HKCU.
+        /// </summary>
+        private static void DeleteUserHiveArpHusks()
+        {
+            const string UninstallPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+
+            try
+            {
+                using RegistryKey users = RegistryKey.OpenBaseKey(RegistryHive.Users, RegistryView.Registry64);
+                foreach (string sid in users.GetSubKeyNames())
+                {
+                    // _Classes merges the user's HKCU classes; the uninstall
+                    // keys never live there.
+                    if (sid.StartsWith("_", StringComparison.Ordinal))
+                        continue;
+
+                    try
+                    {
+                        using RegistryKey? hive = users.OpenSubKey(sid);
+                        using RegistryKey? uninstall = hive?.OpenSubKey(UninstallPath);
+                        if (uninstall == null)
+                            continue;
+
+                        foreach (string keyName in uninstall.GetSubKeyNames())
+                        {
+                            try
+                            {
+                                using (RegistryKey? entry = uninstall.OpenSubKey(keyName))
+                                {
+                                    if (!string.Equals(entry?.GetValue("DisplayName") as string,
+                                            "Uniwill Control Utility", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        continue;
+                                    }
+                                }
+
+                                uninstall.DeleteSubKeyTree(keyName, throwOnMissingSubKey: false);
+                            }
+                            catch (Exception ex)
+                            {
+                                Log.Debug(ex, "[EngineInstaller] user hive husk {Sid}\\{Key} not removed", sid, keyName);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Debug(ex, "[EngineInstaller] user hive {Sid} not swept", sid);
                     }
                 }
             }
             catch (Exception ex)
             {
-                Log.Debug(ex, "[EngineInstaller] install layout not removed");
+                Log.Debug(ex, "[EngineInstaller] user hives not swept");
             }
         }
 
@@ -643,9 +815,42 @@ namespace UCU.Engine
             if (proc is null)
                 return (-1, string.Empty, string.Empty);
 
-            string output = await proc.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
-            string error = await proc.StandardError.ReadToEndAsync().ConfigureAwait(false);
-            await proc.WaitForExitAsync().ConfigureAwait(false);
+            // The SCM server call behind sc delete can block indefinitely on
+            // machines whose policy keeps services running (the delete parks
+            // pending while a policy restart races us); sc.exe then never
+            // closes its stdout. A dead verb is worse than a slow one, so the
+            // read is capped and the process killed at the cap (the caller
+            // sees rc -1 and takes the force path).
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+
+            string output;
+            string error;
+            bool timedOut = false;
+            try
+            {
+                output = await proc.StandardOutput.ReadToEndAsync(cts.Token).ConfigureAwait(false);
+                error = await proc.StandardError.ReadToEndAsync(cts.Token).ConfigureAwait(false);
+                await proc.WaitForExitAsync(cts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                timedOut = true;
+                output = string.Empty;
+                error = "sc.exe timed out";
+            }
+
+            if (timedOut)
+            {
+                try
+                {
+                    proc.Kill(entireProcessTree: true);
+                }
+                catch
+                {
+                    // Already gone.
+                }
+                return (-1, output, error);
+            }
 
             return (proc.ExitCode, output, error);
         }
