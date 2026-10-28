@@ -38,9 +38,13 @@ namespace Uniwill_Control_Utility
     /// elevated --uninstall-engine verb: the single full-cleanup entry point
     /// shared with the Uninstall.exe shim (service stop+delete, app kill,
     /// tasks, ARP husks, stale per-user MSI registrations, ProgramData logs,
-    /// install layout). One UAC prompt at uninstall, the same consent the
-    /// shim route asks for, and every removal route converges on the same
-    /// end state.
+    /// install layout). The vanish alone is not trusted: AV registry
+    /// protection (field-proven: Emsisoft) can hide the live registration
+    /// from the app's own view, so firing also requires the MsiInstaller
+    /// "Removal completed successfully" event - a machine-wide trace only
+    /// the Windows Installer service writes. One UAC prompt at uninstall,
+    /// the same consent the shim route asks for, and every removal route
+    /// converges on the same end state.
     /// </summary>
     internal sealed class UninstallSentinel
     {
@@ -59,6 +63,7 @@ namespace Uniwill_Control_Utility
 
         private readonly Func<string[]> _enumerateRegistrations;
         private readonly Func<bool> _installedLayoutProbe;
+        private readonly Func<bool> _removalEvidence;
         private readonly Action _onUninstallDetected;
         private readonly Action<string> _log;
         private readonly TimeSpan _pollInterval;
@@ -66,6 +71,7 @@ namespace Uniwill_Control_Utility
         private int _misses;
         private bool _armed;
         private bool _fire;
+        private bool _noEvidenceLogged;
 
         /// <summary>Test seam: inject the probe and the reaction.</summary>
         internal UninstallSentinel(
@@ -73,10 +79,12 @@ namespace Uniwill_Control_Utility
             Action onUninstallDetected,
             Action<string> log,
             TimeSpan? pollInterval = null,
-            Func<bool>? installedLayoutProbe = null)
+            Func<bool>? installedLayoutProbe = null,
+            Func<bool>? removalEvidence = null)
         {
             _enumerateRegistrations = enumerateRegistrations;
             _installedLayoutProbe = installedLayoutProbe ?? NeverInstalled;
+            _removalEvidence = removalEvidence ?? MsiRemovalEvidence;
             _onUninstallDetected = onUninstallDetected;
             _log = log;
             _pollInterval = pollInterval ?? DefaultPollInterval;
@@ -128,7 +136,31 @@ namespace Uniwill_Control_Utility
                 bool fire = Step(registrationFound, installed);
                 if (fire)
                 {
-                    _log("uninstall sentinel: machine registration gone, running the elevated engine uninstall verb");
+                    // A vanished ARP registration in this process's registry
+                    // view is not sufficient for the destructive verb: an AV
+                    // with ARP-key protection (field-proven: Emsisoft) makes
+                    // the fresh registration invisible to the app while
+                    // msiserver and SYSTEM processes see it normally - the
+                    // phantom miss repeats every poll and the sentinel would
+                    // self-delete a live install on every launch. Real
+                    // removals leave a machine-wide trace: the MsiInstaller
+                    // "Removal completed successfully" event. Evidence
+                    // required, phantom ignored.
+                    if (!_removalEvidence())
+                    {
+                        if (!_noEvidenceLogged)
+                        {
+                            _noEvidenceLogged = true;
+                            _log("uninstall sentinel: registration gone in this process's view but no MSI removal " +
+                                 "transaction in the event log - not treating as an uninstall " +
+                                 "(AV registry protection?), staying armed");
+                        }
+                        await Task.Delay(_pollInterval).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    _log("uninstall sentinel: machine registration gone and the MSI removal transaction " +
+                         "confirmed in the event log, running the elevated engine uninstall verb");
                     try
                     {
                         _onUninstallDetected();
@@ -253,16 +285,59 @@ namespace Uniwill_Control_Utility
         /// <summary>
         /// True when the machine is mid-uninstall of this product: the
         /// machine ARP registration is gone while the installed layout and
-        /// the engine service are still present. The uninstall sweep runs a
-        /// few tens of seconds; the engine's supervision relaunches the app
-        /// it sees die, and those relaunches must not open windows, tray
-        /// icons, or sentinel prompts inside that window - they exit
-        /// instantly. Dev/portable layouts (no Program Files root, no
-        /// service) and normal machines (registration present) never match.
+        /// the engine service are still present, and a real MSI removal
+        /// transaction backs that up (the event-log evidence rule of
+        /// <see cref="MsiRemovalEvidence"/>: an AV registry-protection
+        /// phantom must not silence the app on every launch). The uninstall
+        /// sweep runs a few tens of seconds; the engine's supervision
+        /// relaunches the app it sees die, and those relaunches must not
+        /// open windows, tray icons, or sentinel prompts inside that window
+        /// - they exit instantly. Dev/portable layouts (no Program Files
+        /// root, no service) and normal machines never match.
         /// </summary>
         public static bool IsBeingUninstalled()
         {
-            return !Registered(EnumerateMachineRegistrations()) && InstalledLayoutPresent();
+            return !Registered(EnumerateMachineRegistrations())
+                && InstalledLayoutPresent()
+                && MsiRemovalEvidence();
+        }
+
+        /// <summary>
+        /// Machine-wide proof that a real uninstall of this product just ran:
+        /// the MsiInstaller "Removal completed successfully" event (11727)
+        /// naming the product within the last 5 minutes. The event log is
+        /// written by the Windows Installer service itself - an AV registry
+        /// view trick cannot fabricate it - and a ghost registration's
+        /// self-repair /x ends 1603 and never writes this event. Fail-closed:
+        /// an unreadable event log reads as no evidence, and the destructive
+        /// verb stays parked.
+        /// </summary>
+        internal static bool MsiRemovalEvidence()
+        {
+            try
+            {
+                using var application = new EventLog("Application");
+                EventLogEntryCollection entries = application.Entries;
+                DateTime cutoff = DateTime.Now - TimeSpan.FromMinutes(5);
+
+                for (int i = entries.Count - 1; i >= 0; i--)
+                {
+                    EventLogEntry entry = entries[i];
+                    if (entry.TimeGenerated < cutoff)
+                        break;
+                    if (entry.InstanceId != 11727)
+                        continue;
+                    if (entry.Message.IndexOf(ProductName, StringComparison.OrdinalIgnoreCase) < 0)
+                        continue;
+                    return true;
+                }
+
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         /// <summary>

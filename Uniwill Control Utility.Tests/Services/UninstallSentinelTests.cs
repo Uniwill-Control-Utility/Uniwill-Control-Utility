@@ -13,7 +13,8 @@ public sealed class UninstallSentinelTests
         Func<string[]> enumerate,
         Action onDetected,
         TimeSpan? pollInterval = null) =>
-        new(enumerate, onDetected, _ => { }, pollInterval ?? TimeSpan.FromMilliseconds(10));
+        new(enumerate, onDetected, _ => { }, pollInterval ?? TimeSpan.FromMilliseconds(10),
+            removalEvidence: () => true);
 
     [Fact]
     public void Step_NeverArmedProductMissing_DoesNotFire()
@@ -95,7 +96,8 @@ public sealed class UninstallSentinelTests
             () => fired++,
             _ => { },
             pollInterval: TimeSpan.FromMilliseconds(10),
-            installedLayoutProbe: () => true);
+            installedLayoutProbe: () => true,
+            removalEvidence: () => true);
 
         var run = sentinel.RunAsync();
         var winner = await Task.WhenAny(run, Task.Delay(2000));
@@ -114,13 +116,62 @@ public sealed class UninstallSentinelTests
             () => fired++,
             _ => { },
             pollInterval: TimeSpan.FromMilliseconds(10),
-            installedLayoutProbe: () => false);
+            installedLayoutProbe: () => false,
+            removalEvidence: () => true);
 
         var run = sentinel.RunAsync();
         await Task.Delay(300);
 
         Assert.Equal(0, fired);
         Assert.False(run.IsCompleted);
+    }
+
+    [Fact]
+    public async Task RunAsync_RegistrationGoneWithoutRemovalEvidence_NeverFires()
+    {
+        // Field-proven: an AV with ARP-key protection (Emsisoft) hides the
+        // live registration from the app's registry view - the miss is a
+        // phantom that repeats every poll, and the sentinel must not
+        // self-delete a live install. Only the MsiInstaller removal event
+        // licenses the verb.
+        int fired = 0;
+        var sentinel = new UninstallSentinel(
+            () => Array.Empty<string>(),
+            () => fired++,
+            _ => { },
+            pollInterval: TimeSpan.FromMilliseconds(10),
+            installedLayoutProbe: () => true,
+            removalEvidence: () => false);
+
+        var run = sentinel.RunAsync();
+        await Task.Delay(300);
+
+        Assert.Equal(0, fired);
+        Assert.False(run.IsCompleted); // stays armed and polling, verb parked
+    }
+
+    [Fact]
+    public async Task RunAsync_PhantomThenRealRemoval_FiresOnEvidence()
+    {
+        // The phantom clears the moment the real uninstall runs: the state
+        // machine keeps the miss banked, and the event-log evidence arriving
+        // mid-watch must fire on the next poll.
+        bool evidence = false;
+        int fired = 0;
+        var sentinel = new UninstallSentinel(
+            () => Array.Empty<string>(),
+            () => fired++,
+            _ => { },
+            pollInterval: TimeSpan.FromMilliseconds(10),
+            installedLayoutProbe: () => true,
+            removalEvidence: () => evidence);
+
+        var run = sentinel.RunAsync();
+        await Task.Delay(150);          // banked misses, evidence parked it
+        evidence = true;                // the Control Panel /x completes
+        var winner = await Task.WhenAny(run, Task.Delay(2000));
+        Assert.Same(run, winner);
+        Assert.Equal(1, fired);
     }
 
     [Fact]
