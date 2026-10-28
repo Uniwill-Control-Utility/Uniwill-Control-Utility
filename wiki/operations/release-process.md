@@ -111,13 +111,20 @@ The debug (F5) layout is not a release layout: Velopack puts the app under
 is admin-writable, and the engine service is registered from the installed
 path. Each shipped route needs its own pass.
 
-- Payload freshness: pack.ps1 step 2b' fails the pack when the staged engine
+- Payload freshness: pack.ps1 step 2c' fails the pack when the staged engine
   (`artifacts\publish\Service\Uniwill Control Utility Engine.dll/.exe`) is
   older than the app exe, or its file version is not the release version.
   Presence alone is not freshness: the staging target's copy step is the one
   place a stale engine can ride into both the MSI and the portable ZIP (it
   did, before the staging `IntermediateOutputPath` fix), which is why the
   assertion exists.
+- Payload cleanliness: pack.ps1 step 2a deletes `artifacts\publish` before
+  publishing, because `dotnet publish` only writes what the current projects
+  produce — an assembly from a deleted project survives in a reused layout,
+  and the MSI/ZIP templates ship every file in it. The pre-engine service
+  (`Uniwill Control Utility Service.*`) rode in every payload that way after
+  the engine migration. Step 2c'' pins the invariant: the pack fails if a
+  retired service/bridge assembly name appears in the layout.
 - Install the MSI on a clean Windows account (Program Files, elevated).
   The MSI is the shipped installer (Windows Installer auto-elevates on
   double-click). The Velopack `*-Setup.exe` is a 7 MB web-installer
@@ -131,7 +138,7 @@ path. Each shipped route needs its own pass.
   `msiexec /i app.msi VELOPACK_INSTALLDIR="D:\UCU"`, documented in the
   README. The in-app updater follows the exe, so custom roots update fine.
 - Uninstall: Apps & Features (MSI) and the `Uninstall.exe` shim compiled
-  into the layout by pack.ps1 step 2c. Sequence: kill guardian + app in
+  into the layout by pack.ps1 step 2d. Sequence: kill guardian + app in
   the shim itself (`Process.Kill` — `taskkill` costs ~9.5 s per call,
   which was the ~30 s stall before the wizard), run `msiexec /x {GUID} /qb`
   synchronously (the client blocks on the wizard; a `start /wait` wrapper

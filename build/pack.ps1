@@ -35,14 +35,23 @@ $version = (dotnet msbuild $proj -getProperty:Version | Select-Object -Last 1).T
 if (-not $version) { throw "Could not read <Version> from $proj" }
 Write-Host "Packaging UCU v$version" -ForegroundColor Cyan
 
-# --- 2. Publish (framework-dependent, NOT single-file) ---
+# --- 2a. Clean the publish layout ---
+# The publish dir is reused across runs, and `dotnet publish` only writes the files its
+# projects produce: an assembly from a *deleted* project stays in the layout forever, and
+# the MSI/ZIP templates ship every file in the directory. That is how the pre-engine service
+# ("Uniwill Control Utility Service.*", deleted with the engine migration) kept riding into
+# every payload afterwards - privileged code no service entry refers to. Publish into an
+# empty directory so the payload is exactly what the current projects produce.
+if (Test-Path $publishDir) { Remove-Item -LiteralPath $publishDir -Recurse -Force }
+
+# --- 2b. Publish (framework-dependent, NOT single-file) ---
 # PublishSingleFile=false is mandatory: native DLLs (ADLX, Magpie, kernel32,
 # RTSS) are P/Invoked from the exe directory and break under single-file
 # extraction. The MSI ensures the .NET 10 Desktop Runtime via -f below.
 dotnet publish $proj -c Release -r win-x64 --self-contained false -o $publishDir
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 
-# --- 2b. Verify the engine service flowed into the layout ---
+# --- 2c. Verify the engine service flowed into the layout ---
 # The engine ships in the Service\ subfolder (csproj staging target: the
 # engine project is built/published with its output redirected there), so the
 # install root shows a single app exe and the service's full dependency
@@ -57,7 +66,7 @@ foreach ($file in @(
     if (-not (Test-Path (Join-Path $publishDir $file))) { throw "Service payload '$file' missing from publish dir (staging target broken?)" }
 }
 
-# --- 2b'. Freshness: the staged engine must come from this build ---
+# --- 2c'. Freshness: the staged engine must come from this build ---
 # Presence is not freshness. The staging target runs the engine's Build/Publish
 # with its output redirected into Service\, and that copy step is the one place a
 # stale service binary can ride into both the MSI and the portable ZIP: before the
@@ -81,7 +90,25 @@ foreach ($engineFile in @(
     }
 }
 
-# --- 2c. Compile the Uninstall.exe shim into the layout ---
+# --- 2c''. No retired assembly may ride into the payload ---
+# Belt to 2a, so the invariant is pinned rather than assumed: the base names below are the
+# service/bridge assemblies the project layout has retired. Any of them in the layout means
+# stale files (or a revived name), and the installer would ship privileged code that nothing
+# starts. Matched on base name so .dll/.exe/.pdb/.deps.json/.runtimeconfig.json all count.
+$retiredBaseNames = @(
+    "Uniwill Control Utility Service", "Uniwill Control Utility Guardian", "Uniwill Control Utility Bridge",
+    "UCU.Service", "UCU.Guardian", "UCU.Bridge"
+)
+$leaked = @(
+    Get-ChildItem $publishDir -Recurse -File |
+        Where-Object { $retiredBaseNames -contains [IO.Path]::GetFileNameWithoutExtension($_.Name) } |
+        ForEach-Object { $_.FullName.Substring($publishDir.Length + 1) }
+)
+if ($leaked.Count -gt 0) {
+    throw "Retired service assemblies in the publish payload: $($leaked -join ', ') - the layout is stale (step 2a) or a retired name came back"
+}
+
+# --- 2d. Compile the Uninstall.exe shim into the layout ---
 # The MSI template ships every file in the publish dir, so a shim compiled
 # here lands next to the app in MSI installs and portable zips. Built with
 # the always-present .NET Framework csc — no toolchain dependency.
@@ -98,7 +125,7 @@ if (-not (Test-Path $csc)) { throw "csc.exe not found at $csc" }
     (Join-Path $PSScriptRoot "uninstall-shim\UninstallShim.cs")
 if ($LASTEXITCODE -ne 0) { throw "Uninstall.exe shim compile failed" }
 
-# --- 2d. Compile the UCU.Updater.exe shim (elevated update apply) ---
+# --- 2e. Compile the UCU.Updater.exe shim (elevated update apply) ---
 # The per-machine layout needs admin to write, and the running engine service
 # locks the Service\ payload the update replaces. The shim (requireAdministrator,
 # same manifest as Uninstall.exe) stops the engine, runs Uninstall.exe -a
