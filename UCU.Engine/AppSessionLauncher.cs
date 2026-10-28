@@ -101,7 +101,10 @@ namespace UCU.Engine
 
         #region Win32
 
-        [DllImport("wtsapi32.dll")]
+        // WTSGetActiveConsoleSessionId is exported from kernel32, not wtsapi32
+        // (a wtsapi32 import throws EntryPointNotFoundException at the first
+        // supervised relaunch, and unhandled it took the whole engine host down).
+        [DllImport("kernel32.dll")]
         private static extern uint WTSGetActiveConsoleSessionId();
 
         [DllImport("wtsapi32.dll", SetLastError = true)]

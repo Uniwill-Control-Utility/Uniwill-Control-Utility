@@ -108,7 +108,23 @@ namespace UCU.Engine
             try
             {
                 while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
-                    Tick();
+                {
+                    // A supervision tick is never worth the engine. The field
+                    // proof: a broken P/Invoke in the session launcher threw on
+                    // the relaunch path, BackgroundService surfaced it as
+                    // unhandled, and the default BackgroundServiceException
+                    // Behavior stopped the whole host - RPC, watchdog and all.
+                    // The relaunch lost for this tick is retried by the policy
+                    // on the next one.
+                    try
+                    {
+                        Tick();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "[Supervision] Tick failed; supervision survives and retries on the next poll.");
+                    }
+                }
             }
             catch (OperationCanceledException)
             {
