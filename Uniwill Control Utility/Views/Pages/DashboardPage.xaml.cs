@@ -119,15 +119,21 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             if (!string.IsNullOrEmpty(imagePath))
             {
-                try
+                // Decode off the UI thread: a synchronous BitmapImage here
+                // once froze the pre-loader at 92% for the whole session on
+                // a machine whose AV guards system directories (WPF's ICC
+                // color-context open on the dispatcher). See SafeImageSource.
+                _ = Task.Run(async () =>
                 {
-                    var bitmap = new BitmapImage(new Uri(imagePath, UriKind.RelativeOrAbsolute));
-                    _header.SetLaptopImage(bitmap);
-                }
-                catch
-                {
-                    _header.SetLaptopImageVisibility(Visibility.Collapsed);
-                }
+                    var image = await Services.SafeImageSource.DecodeAsync(imagePath);
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        if (image is not null)
+                            _header.SetLaptopImage(image);
+                        else
+                            _header.SetLaptopImageVisibility(Visibility.Collapsed);
+                    });
+                });
             }
             else
             {

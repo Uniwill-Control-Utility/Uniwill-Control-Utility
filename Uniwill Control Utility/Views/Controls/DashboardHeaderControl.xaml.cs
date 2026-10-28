@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -52,19 +53,17 @@ namespace Uniwill_Control_Utility.Views.Controls
 
             _currentWallpaperPath = path;
 
-            try
+            // Same off-thread rule as every other image in the app: the
+            // wallpaper is an arbitrary user file, and a synchronous decode
+            // on the UI thread (WPF ICC open) can be held by a security
+            // product. See SafeImageSource.
+            _ = Task.Run(async () =>
             {
-                var bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.UriSource = new Uri(path, UriKind.Absolute);
-                bitmap.EndInit();
-                HeaderImage.Source = bitmap;
-            }
-            catch
-            {
-                // Fall back to no image — the background border will show through
-            }
+                var image = await Services.SafeImageSource.DecodeAsync(path);
+                if (image is null)
+                    return; // keep the current image / background border
+                await Dispatcher.InvokeAsync(() => HeaderImage.Source = image);
+            });
         }
 
         private void OnImageGridSizeChanged(object sender, SizeChangedEventArgs e)
@@ -189,8 +188,8 @@ namespace Uniwill_Control_Utility.Views.Controls
 
         // --- Public setters for the DashboardPage code-behind ---
 
-        public void SetLaptopImage(BitmapImage bitmap)
-            => LaptopImage.Source = bitmap;
+        public void SetLaptopImage(ImageSource image)
+            => LaptopImage.Source = image;
 
         public void SetLaptopImageVisibility(Visibility visibility)
             => LaptopImage.Visibility = visibility;

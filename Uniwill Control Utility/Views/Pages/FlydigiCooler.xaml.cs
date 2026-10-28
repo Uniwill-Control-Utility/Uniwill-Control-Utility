@@ -134,9 +134,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 // Update device image based on device type
                 if (_isBs1Device)
                 {
-                    var bs1Source = new BitmapImage(new Uri(Bs1ImageUri));
-                    imgDevice.Source = bs1Source;
-                    UpdateGlowOpacityMask("bs1.png");
+                    ApplyDeviceImage(Bs1ImageUri, "bs1.png");
                 }
 
                 // Apply BS1-specific UI restrictions (no RGB, no device settings, no sub-gear)
@@ -1847,21 +1845,42 @@ namespace Uniwill_Control_Utility.Views.Pages
             return Color.FromRgb(0, 0x7A, 0xCC);
         }
 
+        /// <summary>
+        /// Device image + matching glow mask, decoded off the UI thread
+        /// (a synchronous BitmapImage decode can be held indefinitely by an
+        /// AV file guard - WPF's ICC color-context open; see SafeImageSource).
+        /// </summary>
+        private void ApplyDeviceImage(string imageUri, string maskFile)
+        {
+            _ = Task.Run(async () =>
+            {
+                var image = await Services.SafeImageSource.DecodeAsync(imageUri);
+                if (image is null)
+                    return;
+                await Dispatcher.InvokeAsync(() => imgDevice.Source = image);
+            });
+            UpdateGlowOpacityMask(maskFile);
+        }
+
         /// <summary>Updates the glow overlay's OpacityMask to match the device image.</summary>
         private void UpdateGlowOpacityMask(string imageFile)
         {
-            try
+            _ = Task.Run(async () =>
             {
-                var maskBrush = new ImageBrush
+                var mask = await Services.SafeImageSource.DecodeAsync(FlydigiAssetPrefix + imageFile);
+                if (mask is null)
+                    return;
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    ImageSource = new BitmapImage(new Uri(FlydigiAssetPrefix + imageFile, UriKind.Absolute)),
-                    Stretch = Stretch.Uniform,
-                    AlignmentX = AlignmentX.Center,
-                    AlignmentY = AlignmentY.Center,
-                };
-                rectGlowOverlay.OpacityMask = maskBrush;
-            }
-            catch (Exception) { /* Non-critical: element detached during glow mask update */ }
+                    rectGlowOverlay.OpacityMask = new ImageBrush
+                    {
+                        ImageSource = mask,
+                        Stretch = Stretch.Uniform,
+                        AlignmentX = AlignmentX.Center,
+                        AlignmentY = AlignmentY.Center,
+                    };
+                });
+            });
         }
 
         /* ------------------------------------------------------------------ */
@@ -2265,10 +2284,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _ => "bs2-pro.png" // Default fallback
             };
 
-            var source = new BitmapImage(
-                new Uri(FlydigiAssetPrefix + imageFile, UriKind.Absolute));
-            imgDevice.Source = source;
-            UpdateGlowOpacityMask(imageFile);
+            ApplyDeviceImage(FlydigiAssetPrefix + imageFile, imageFile);
         }
 
         /// <summary>
@@ -2276,10 +2292,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void UpdateDeviceImageBs1()
         {
-            var source = new BitmapImage(
-                new Uri(Bs1ImageUri, UriKind.Absolute));
-            imgDevice.Source = source;
-            UpdateGlowOpacityMask("bs1.png");
+            ApplyDeviceImage(Bs1ImageUri, "bs1.png");
         }
 
         /// <summary>
