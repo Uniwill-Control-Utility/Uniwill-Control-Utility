@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Win32;
@@ -257,6 +259,14 @@ namespace Uniwill_Control_Utility
         /// of the uninstall, the same consent the shim route asks); the task
         /// needs no interactive session, so the verb survives this app's
         /// exit, and the verb sweeps everything - including the task.
+        ///
+        /// The quoting is by-the-book because both layers parse quotes their
+        /// own way: schtasks /tr values cannot carry \" escapes (cmd does
+        /// not honor them - the value split at the first space in the field
+        /// test), so the task command is cmd.exe plus the 8.3 short path of
+        /// a script file (short paths have no spaces, so nothing needs
+        /// quoting at the task layer), and that script carries the real
+        /// quoted command line, which cmd parses correctly per line.
         /// </summary>
         private static void RunEngineUninstallVerb()
         {
@@ -265,11 +275,17 @@ namespace Uniwill_Control_Utility
             if (!File.Exists(engine))
                 throw new FileNotFoundException("engine exe not found", engine);
 
+            string verbScript = Path.Combine(Path.GetTempPath(), "ucu-verb-task.cmd");
+            File.WriteAllText(verbScript,
+                "@echo off\r\n" +
+                "\"" + engine + "\" --uninstall-engine\r\n" +
+                "del \"%~f0\"\r\n");
+
             string launcher = Path.Combine(Path.GetTempPath(), "ucu-sentinel-verb.cmd");
             File.WriteAllText(launcher,
                 "@echo off\r\n" +
-                "schtasks /create /tn \"UCU Uninstall Verb\" /tr \"\\\"" + engine +
-                    "\\\" --uninstall-engine\" /sc once /st 23:59 /ru SYSTEM /f\r\n" +
+                "schtasks /create /tn \"UCU Uninstall Verb\" /tr \"cmd.exe /c " +
+                    ShortPath(verbScript) + "\" /sc once /st 23:59 /ru SYSTEM /f\r\n" +
                 "schtasks /run /tn \"UCU Uninstall Verb\"\r\n" +
                 "schtasks /delete /tn \"UCU Uninstall Verb\" /f\r\n" +
                 "del \"%~f0\"\r\n");
@@ -289,5 +305,20 @@ namespace Uniwill_Control_Utility
             Process.Start(psi);
             Environment.Exit(0);
         }
+
+        /// <summary>
+        /// The 8.3 short path of <paramref name="path"/> (space-free, so the
+        /// scheduled task's Target can reference it without quoting), or the
+        /// original when 8.3 generation is disabled on the volume.
+        /// </summary>
+        private static string ShortPath(string path)
+        {
+            var buffer = new StringBuilder(260);
+            int length = GetShortPathNameW(path, buffer, buffer.Capacity);
+            return length > 0 && length < buffer.Capacity ? buffer.ToString() : path;
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern int GetShortPathNameW(string path, StringBuilder shortPath, int capacity);
     }
 }

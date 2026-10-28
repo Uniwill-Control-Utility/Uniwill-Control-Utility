@@ -80,9 +80,15 @@ internal static class UninstallShim
         // (the verb destroys the layout, the service, tasks, husks, and
         // ProgramData logs - it also deletes this task). On plain machines
         // the helper's own rd below is the faster path; both are idempotent.
+        // The task command goes through a script file because schtasks /tr
+        // values cannot carry \" escapes (cmd does not honor them), while a
+        // script line parses its own quotes correctly.
         string verbExe = root + "\\Service\\Uniwill Control Utility Engine.exe";
-        cmds.Add("schtasks /create /tn \"UCU Uninstall Verb\" /tr \"\\\"" + verbExe +
-            "\\\" --uninstall-engine\" /sc once /st 23:59 /ru SYSTEM /f");
+        string verbScript = "%TEMP%\\ucu-verb-task.cmd";
+        cmds.Add("echo @echo off> \"" + verbScript + "\"");
+        cmds.Add("echo \"" + verbExe + "\" --uninstall-engine >> \"" + verbScript + "\"");
+        cmds.Add("schtasks /create /tn \"UCU Uninstall Verb\" /tr \"cmd.exe /c " +
+            verbScript + "\" /sc once /st 23:59 /ru SYSTEM /f");
         cmds.Add("schtasks /run /tn \"UCU Uninstall Verb\"");
         cmds.Add("schtasks /delete /tn UCU /f");
         cmds.Add("schtasks /delete /tn \"UCU Autostart\" /f");

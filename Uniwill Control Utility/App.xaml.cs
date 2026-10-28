@@ -369,6 +369,14 @@ namespace Uniwill_Control_Utility
 
                 Scripts.Misc.DiagnosticLogger.ApplySettingsLevel();
 
+                // Uninstall self-heal (see UninstallSentinel): start it right
+                // here, before anything can block - the post-startup task
+                // queue it lived in first waits behind the PawnIO installer
+                // dialog and the whole window init, and the Control Panel
+                // /x it must react to can land at any moment.
+                UninstallSentinel.CreateDefault(
+                    message => Log.Information("[UninstallSentinel] {Message}", message)).Start();
+
                 // Catch unhandled exceptions from all threads (not just the UI thread)
                 AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
 
@@ -1342,18 +1350,6 @@ namespace Uniwill_Control_Utility
             // behind - the "husk" entry users report after an uninstall. The shim is
             // the complete route; this hive is the user's own, so no elevation.
             SelfHealControlPanelUninstall();
-
-            // Self-heal the Control Panel / Settings route: those run the MSI
-            // by product code, and vpk's thin package unregisters the product
-            // while leaving the service, layout, app, tasks, and husk behind
-            // (its CustomActions cannot launch the installed exes at
-            // uninstall - documented dead end). This app outlives every such
-            // removal, so it watches the product registration and, when it
-            // vanishes, self-runs the elevated engine --uninstall-engine verb:
-            // the single full-cleanup entry point, the same end state as the
-            // shim route. See UninstallSentinel.
-            UninstallSentinel.CreateDefault(
-                message => _logger?.LogInformation("[UninstallSentinel] {Message}", message)).Start();
 
             // Show the prerequisite checklist on first startup.
             if (Settings.Default.ShowPrerequisiteDialog)
