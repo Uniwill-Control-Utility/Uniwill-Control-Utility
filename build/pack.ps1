@@ -174,6 +174,55 @@ dotnet vpk pack -u Uniwill-Control-Utility -v $version -p $publishDir -o $releas
     --msi --instLocation PerMachine
 if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
 
+# --- 5a. Post-configure the MSI: complete Control Panel uninstall ---
+# The Control Panel / Settings uninstall runs the MSI by product code, and
+# vpk's generated removal is a registration-only no-op: the engine service,
+# the layout, the running app, the tasks, and the ARP husk survive it.
+# Inject synchronous exe CustomActions on REMOVE="ALL" that run the proven
+# full-removal route: engine --uninstall-engine (sc stop + delete + app kill
+# + tasks + husk + ProgramData logs - the verb is the single cleanup entry
+# point), and Update.exe --uninstall (Velopack deletes the whole layout).
+# In a per-machine uninstall the execute
+# sequence runs as LocalSystem, which the engine service SD always grants,
+# so the service removal works on policy-guarded machines too. See the
+# script header for the mechanics and the dead ends already eliminated.
+$msi = Get-ChildItem $releasesDir -Filter "*.msi" | Select-Object -First 1
+if (-not $msi) { throw "vpk produced no MSI" }
+
+function Find-MsiFileKey {
+    param($Database, [string]$ExeName)
+    $view = $Database.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $Database, @("SELECT ``File``, ``FileName`` FROM File"))
+    $view.GetType().InvokeMember("Execute", "InvokeMethod", $null, $view, $null) | Out-Null
+    $key = $null
+    while ($null -eq $key) {
+        $record = $view.GetType().InvokeMember("Fetch", "InvokeMethod", $null, $view, $null)
+        if ($null -eq $record) { break }
+        $candidate = $record.GetType().InvokeMember("StringData", "GetProperty", $null, $record, @(1))
+        # FileName is "shortname|longname" when the short name differs.
+        $longName = ($record.GetType().InvokeMember("StringData", "GetProperty", $null, $record, @(2)) -split '\|')[-1]
+        if ($longName -eq $ExeName) { $key = $candidate }
+    }
+    $view.GetType().InvokeMember("Close", "InvokeMethod", $null, $view, $null) | Out-Null
+    return $key
+}
+
+$installerCom = New-Object -ComObject WindowsInstaller.Installer
+$msiDb = $installerCom.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $installerCom, @($msi.FullName, 0))
+$engineKey = Find-MsiFileKey $msiDb "Uniwill Control Utility Engine.exe"
+$updateKey = Find-MsiFileKey $msiDb "Update.exe"
+# The python injector opens the database in direct mode; a live COM handle
+# locks the file, so release COM (and flush the RCW) before invoking it.
+[void][Runtime.InteropServices.Marshal]::ReleaseComObject($msiDb)
+[void][Runtime.InteropServices.Marshal]::ReleaseComObject($installerCom)
+[GC]::Collect()
+[GC]::WaitForPendingFinalizers()
+[GC]::Collect()
+if (-not $engineKey -or -not $updateKey) {
+    throw "MSI File table is missing the engine exe or Update.exe (engineKey=$engineKey updateKey=$updateKey)"
+}
+python (Join-Path $PSScriptRoot "msi-uninstall-ca.py") $msi.FullName $engineKey $updateKey
+if ($LASTEXITCODE -ne 0) { throw "MSI uninstall CustomAction injection failed" }
+
 # --- 5b. Stamp the Setup.exe bootstrapper requireAdministrator ---
 # vpk's bootstrapper template is asInvoker and vpk exposes no manifest flag,
 # so a double-click on a per-machine pack fails mid-install with

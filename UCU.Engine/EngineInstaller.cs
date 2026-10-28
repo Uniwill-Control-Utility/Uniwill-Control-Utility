@@ -321,7 +321,106 @@ namespace UCU.Engine
 
             rc = await RunScAsync("delete", name).ConfigureAwait(false);
             Log.Information("[EngineInstaller] Engine service removed (rc {Code})", rc);
+
+            // The MSI uninstall CustomAction invokes this verb as LocalSystem,
+            // so it also sweeps everything the installer itself cannot: the
+            // running app (it locks the layout the removal deletes), the
+            // scheduled tasks, the ARP husk the registration pass writes, and
+            // the service's ProgramData log directory. The Uninstall.exe shim
+            // shares this exact list, so both removal routes converge on the
+            // same end state. All best effort: an uninstall never fails here.
+            KillRunningApp();
+            await RunCleanupCommandAsync(
+                "schtasks.exe", "/Delete /TN UCU /F").ConfigureAwait(false);
+            await RunCleanupCommandAsync(
+                "schtasks.exe", "/Delete /TN \"UCU Autostart\" /F").ConfigureAwait(false);
+            await RunCleanupCommandAsync(
+                "schtasks.exe", "/Delete /TN \"UCU Guardian\" /F").ConfigureAwait(false);
+            DeleteHklmUninstallHusk();
+            DeleteProgramDataLogs();
+
             return rc;
+        }
+
+        /// <summary>
+        /// Force-closes the app (and the retired guardian) so it stops locking
+        /// the install layout. This process is the engine exe, a distinct image
+        /// name, so no self-exclusion is needed.
+        /// </summary>
+        private static void KillRunningApp()
+        {
+            foreach (string appName in new[] { "Uniwill Control Utility", "UCU Guardian" })
+            {
+                foreach (Process running in Process.GetProcessesByName(appName))
+                {
+                    try
+                    {
+                        running.Kill();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Debug(ex, "[EngineInstaller] {App} process {Pid} not killed", appName, running.Id);
+                    }
+                    finally
+                    {
+                        running.Dispose();
+                    }
+                }
+            }
+        }
+
+        private static async Task RunCleanupCommandAsync(string fileName, string arguments)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo(fileName, arguments)
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                };
+
+                using Process process = Process.Start(psi)!;
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                await process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
+                Log.Debug("[EngineInstaller] cleanup {File} {Args} exited {Code}",
+                    fileName, arguments, process.ExitCode);
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "[EngineInstaller] cleanup {File} {Args} failed", fileName, arguments);
+            }
+        }
+
+        private static void DeleteHklmUninstallHusk()
+        {
+            const string HuskKey =
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MSI:Uniwill-Control-Utility";
+
+            try
+            {
+                using RegistryKey localMachine =
+                    RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+                localMachine.DeleteSubKeyTree(HuskKey, throwOnMissingSubKey: false);
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "[EngineInstaller] HKLM uninstall husk not removed");
+            }
+        }
+
+        private static void DeleteProgramDataLogs()
+        {
+            try
+            {
+                string directory = Path.GetDirectoryName(EnginePaths.ServiceLogDirectory)
+                    ?? EnginePaths.ServiceLogDirectory;
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "[EngineInstaller] ProgramData log directory not removed");
+            }
         }
 
         /// <summary>
