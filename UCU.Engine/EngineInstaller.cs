@@ -369,6 +369,14 @@ namespace UCU.Engine
             DeleteArpHusks(RegistryHive.CurrentUser);
             DeleteUserHiveArpHusks();
             await SweepStaleUserRegistrations().ConfigureAwait(false);
+            // The registration sweep runs "msiexec /x" passes, and a Velopack MSI
+            // uninstall re-creates its shim ARP key ("MSI:..." with our DisplayName,
+            // UninstallString pointing at the product it just removed) - a husk
+            // Control Panel cannot remove (the cached package is gone). Sweep ARP
+            // again after the /x passes, as the final word on the registration.
+            DeleteArpHusks(RegistryHive.LocalMachine);
+            DeleteArpHusks(RegistryHive.CurrentUser);
+            DeleteUserHiveArpHusks();
             DeleteProgramDataLogs();
             DeleteInstallLayout();
 
