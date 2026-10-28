@@ -70,28 +70,33 @@ namespace Uniwill_Control_Utility.Services
 
         public VelopackUpdateService()
         {
-            // Registration-repair self-destruction guard, field-proven necessity.
-            // On a machine whose security product polices the ARP registry keys
-            // (observed: Emsisoft), Velopack's own registration check sees the
-            // live machine registration as missing (the app's registry view is
-            // blind) and its repair logic runs "msiexec /x" on the LIVE product
-            // code - twice proven to fire (19:41 at +4:16, 20:32 at +17 s after
-            // a GUI install), each time removing the live registration and
-            // licensing the uninstall sentinel's sweep: the app dies mid-splash
-            // and the machine is cleaned under it. The repair needs the
-            // UpdateManager, so under the phantom condition the manager stays
-            // un-built: update checks are off (manual installs keep working),
-            // and the install plus the Control Panel entry survive. The
-            // condition is AV-specific and observable: the MSI database shows
-            // the product, the app's own registry view does not.
-            if (RegistrationViewIsPoliced())
+            // Registration-repair self-destruction guard, field-proven to
+            // closure. Velopack's per-machine registration check runs IN
+            // PROCESS: on a machine whose security product polices registry
+            // views (observed: Emsisoft), the check sees the live MSI
+            // registration as missing and the repair logic runs "msiexec /x"
+            // on the LIVE product code. Two field-proven deaths came from
+            // OPPOSITE views: 20:57 with the ARP keys blind (the guard built
+            // on the ARP view caught that one) and 21:37 with ARP VISIBLE
+            // while Velopack's own MSI-classes hive read was the blind one -
+            // no view-based guard can cover every hive an AV can blind, so
+            // the rule is not about the views at all: an app running from
+            // the per-machine layout never builds the UpdateManager. The MSI
+            // is that layout's update mechanism (running a new Setup.msi);
+            // Velopack's managed update flow lives on the per-user portable/
+            // dev layouts, whose root has no MSI registration to destroy.
+            // Update checks stay off on installed machines: the title-bar
+            // card and auto-check no-op, manual MSI installs keep working,
+            // and nothing can ever /x the live product from inside the app.
+            if (RunsFromMachineLayout())
             {
                 State = UpdateState.NotInstalled;
                 Log.Warning(
-                    "[Update] UpdateManager stays un-built: the live MSI registration is invisible in " +
-                    "this process's registry view (security-product registry protection), and Velopack's " +
-                    "registration repair would /x the live install and arm the uninstall sentinel. " +
-                    "Update checks stay off on this machine; installing updates by hand keeps working.");
+                    "[Update] UpdateManager stays un-built: this app runs from the per-machine (MSI) " +
+                    "layout, where Velopack's in-process registration check can be blinded by a " +
+                    "security product and its repair would /x the live install (field-proven from both " +
+                    "registry-view directions). Updates on installed machines arrive by MSI; the " +
+                    "Velopack update flow stays on portable/dev layouts.");
                 return;
             }
 
@@ -303,36 +308,37 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
-        /// Decision rule: skip Velopack when the app runs from the per-machine
-        /// layout (an installed fact, visible without any registry view) while
-        /// the app's ARP registry view shows no registration of ours - the
-        /// state in which Velopack concludes "not registered" and its repair
-        /// logic /x-es the live product code. The other combinations are
-        /// inert: dev/portable layouts have no install to destroy, and a
-        /// visible registration gives the repair nothing to repair.
+        /// Decision rule: an app running from the per-machine (MSI) layout
+        /// never builds the UpdateManager. Velopack's per-machine
+        /// registration check is an in-process registry read, and every
+        /// registry view it consults is one a security product can blind -
+        /// field-proven from BOTH directions: the ARP-blind state at 20:57
+        /// (a guard built on the ARP view caught that class) and the
+        /// ARP-visible / Velopack-classes-blind state at 21:37 (the same
+        /// guard stood aside and the repair /x-ed the live product code,
+        /// arming the sentinel's sweep). No view-based guard can cover a
+        /// policy the app cannot observe, so the rule is about the layout:
+        /// the MSI layout's updates arrive by MSI, and portable/dev layouts'
+        /// Velopack root has no MSI registration to destroy.
         /// </summary>
-        internal static bool ShouldSkipVelopack(bool machineLayoutInstalled, bool registryViewSeesRegistration)
-            => machineLayoutInstalled && !registryViewSeesRegistration;
+        internal static bool ShouldSkipVelopack(bool machineLayoutInstalled)
+            => machineLayoutInstalled;
 
         /// <summary>
-        /// Reads the two halves of <see cref="ShouldSkipVelopack"/> from the
-        /// machine. The MSI-database probe (MsiEnumProductsW) is NOT used:
-        /// it reads the registry in-process, so a registry-guarded product
-        /// blinds it too (field-proven 2026-10-28: the guard built on it
-        /// never fired while the repair /x did). The observable truth is
-        /// local: the app runs from the per-machine layout - an installed
-        /// fact independent of registry views - and the ARP registry view
-        /// shows no registration of ours.
+        /// The layout half of <see cref="ShouldSkipVelopack"/>, read from the
+        /// filesystem probe <see cref="UninstallSentinel.InstalledLayoutPresent"/>:
+        /// running from Program Files\Uniwill-Control-Utility\current is an
+        /// installed fact that needs no registry view at all - which is the
+        /// point, since every registry view on this machine class is a
+        /// potential lie. Fails open: a probe error reads as "not the machine
+        /// layout", which is the pre-guard behaviour on a layout that has no
+        /// MSI registration to destroy.
         /// </summary>
-        private static bool RegistrationViewIsPoliced()
+        private static bool RunsFromMachineLayout()
         {
             try
             {
-                bool machineLayoutInstalled = UninstallSentinel.InstalledLayoutPresent();
-                bool registryViewSeesRegistration =
-                    UninstallSentinel.Registered(UninstallSentinel.EnumerateMachineRegistrations());
-
-                return ShouldSkipVelopack(machineLayoutInstalled, registryViewSeesRegistration);
+                return ShouldSkipVelopack(UninstallSentinel.InstalledLayoutPresent());
             }
             catch
             {

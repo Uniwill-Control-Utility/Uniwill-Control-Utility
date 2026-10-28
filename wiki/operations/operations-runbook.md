@@ -120,6 +120,14 @@ The complete uninstall is an app-side self-heal: Control Panel / Settings runs `
 
 Manual reproduction: run the verb directly with the systemprofile logging visible - `schtasks /create /tn "UCU Uninstall Verb" /tr "cmd.exe /c <short-path script>" /sc ONCE /sd <near-future> /st <time> /ru SYSTEM /rl HIGHEST /f` then `schtasks /run`; the script content is `"<engine exe>" --uninstall-engine >> "<log>" 2>&1`. The MSI's own surface is only the registration and ARP entry - the layout is deployed by the packer's bootstrap custom action, which is why `msiexec /x` alone removes almost no files and why the self-heal, not the MSI, owns uninstall completeness.
 
+### The app self-uninstalls a minute after the dashboard appears (Velopack registration repair)
+
+Signature: fresh GUI install → app launches → dashboard fills → ~15-60 s later the app dies; the Application event log shows the app's own process running `msiexec /x {the live product code}` (MsiInstaller 1040/11724/1042, Client Process Id = the app), and the verb log shows the sentinel's sweep executing that genuine, code-bound removal. The sentinel is innocent: this removal is real, watched, and bound - the app killed itself.
+
+The mechanism: Velopack's per-machine registration check is an IN-PROCESS registry read (MSI classes/Installer hives + ARP). A security product that polices registry keys (observed: Emsisoft) blinds those reads for app processes, inconsistently per hive - field-proven from BOTH directions on one machine: ARP-blind while MSI-classes visible, and ARP-visible while the MSI-classes read blind. In either blinded state Velopack concludes "the install is not registered" and its repair runs `msiexec /x` on the LIVE product code ("re-register"), which arms the sentinel's full sweep.
+
+The rule that closes the class (unit-pinned in `VelopackRegistrationGuardTests`): an app running from the per-machine layout - a filesystem fact, no registry consulted - never builds `UpdateManager`; the app log shows `[Update] UpdateManager stays un-built: ... per-machine (MSI) layout ...`. Consequence: installed machines have no in-app update flow (no title-bar card, no auto-check); **updates on installed machines arrive by running a new Setup.msi** - the thin-MSI layout's real update mechanism. Portable/dev layouts keep the full Velopack flow; their per-user root has no MSI registration for a repair to destroy. Do not "improve" this guard into a registry-view condition again: a v1 guard on `MsiEnumProductsW` and a v2 guard on the ARP view each passed its own machine state and each shipped the death from the opposite side.
+
 ### Flydigi device does not connect
 
 - Confirm whether the device is BS1 (BLE) or BS2+ (HID).

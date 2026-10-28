@@ -3,52 +3,36 @@ using Uniwill_Control_Utility.Services;
 namespace Uniwill_Control_Utility.Tests.Services;
 
 /// <summary>
-/// The registration-repair self-destruction guard. On a machine whose security
-/// product blinds the app's ARP registry view, Velopack concludes the per-machine
-/// install is unregistered and its repair logic runs msiexec /x on the LIVE
-/// product code - field-proven (19:41 at +4:16, 20:57 at +16 s, 20:59 at +39 s
-/// after GUI installs), each time removing the live registration and licensing
-/// the uninstall sentinel's sweep: the app dies at 78 % "Initializing" and
-/// Program Files disappears. The guard skips building the UpdateManager exactly
-/// under that condition; a wrong rule either disables updates on healthy
-/// machines (false positive) or keeps the self-destruction (false negative).
-/// The MSI-database probe must NOT be part of the rule: it reads the registry
-/// in-process, so the same guard blinds it (field-proven: the first version of
-/// this guard, built on MsiEnumProductsW, never fired while the repair /x did).
+/// The registration-repair self-destruction guard, pinned to its closed form.
+/// Velopack's per-machine registration check is an IN-PROCESS registry read:
+/// on a machine whose security product polices registry views, the check sees
+/// the live MSI registration as missing and the repair logic runs
+/// "msiexec /x" on the LIVE product code - arming the uninstall sentinel's
+/// sweep, killing the app at "Initializing" while Program Files vanishes.
+/// Field-proven from OPPOSITE registry-view directions on the same machine:
+/// 20:57 with the ARP keys blind, and 21:37 with ARP VISIBLE while Velopack's
+/// own MSI-classes hive read was the blind one - so a guard that consults any
+/// registry view is whack-a-mole against a policy the app cannot observe.
+/// The rule that closes the class: the per-machine (MSI) layout never builds
+/// the UpdateManager; its updates arrive by MSI. Portable/dev layouts keep
+/// the Velopack flow (their root has no MSI registration to destroy).
 /// </summary>
 public sealed class VelopackRegistrationGuardTests
 {
     [Fact]
-    public void MachineLayoutWithBlindRegistryView_IsThePolicedCondition()
+    public void MachineLayout_NeverBuildsTheUpdateManager()
     {
-        // The guarded machine: the app runs from Program Files (installed),
-        // its ARP view is blind - Velopack would "repair" = /x the live code.
-        Assert.True(VelopackUpdateService.ShouldSkipVelopack(
-            machineLayoutInstalled: true, registryViewSeesRegistration: false));
+        // The MSI layout, every registry-view state (visible, blind,
+        // inconsistent): Velopack's repair is unguardable from in-process,
+        // and the layout probe needs no registry at all.
+        Assert.True(VelopackUpdateService.ShouldSkipVelopack(machineLayoutInstalled: true));
     }
 
     [Fact]
-    public void HealthyInstalledMachine_KeepsTheUpdateFlow()
+    public void PortableOrDevLayout_KeepsTheVelopackFlow()
     {
-        Assert.False(VelopackUpdateService.ShouldSkipVelopack(
-            machineLayoutInstalled: true, registryViewSeesRegistration: true));
-    }
-
-    [Fact]
-    public void PortableOrDevLayout_HasNoInstallToDestroy()
-    {
-        // No machine layout: Velopack's own IsInstalled gate no-ops; the
-        // guard must not touch these layouts' update behaviour.
-        Assert.False(VelopackUpdateService.ShouldSkipVelopack(
-            machineLayoutInstalled: false, registryViewSeesRegistration: false));
-    }
-
-    [Fact]
-    public void VisibleRegistrationWithoutLayout_KeepsVelopack()
-    {
-        // A registration husk visible while the layout is gone (mid-sweep,
-        // interrupted uninstall): no layout to self-destruct, no skip.
-        Assert.False(VelopackUpdateService.ShouldSkipVelopack(
-            machineLayoutInstalled: false, registryViewSeesRegistration: true));
+        // No per-machine layout: no MSI registration for a repair to destroy;
+        // the update flow (feed check, silent download, exit apply) stays on.
+        Assert.False(VelopackUpdateService.ShouldSkipVelopack(machineLayoutInstalled: false));
     }
 }
