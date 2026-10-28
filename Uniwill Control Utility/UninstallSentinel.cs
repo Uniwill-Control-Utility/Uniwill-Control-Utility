@@ -404,17 +404,23 @@ namespace Uniwill_Control_Utility
 
             foreach (string keyName in uninstall.GetSubKeyNames())
             {
-                // The packed MSI suppresses the engine's GUID-keyed entry
-                // (ARPSYSTEMCOMPONENT=1) and publishes its own entry under
-                // the fixed vpk key name, bound to the shim and carrying the
-                // product code in UCUProductCode (build\msi-edit): the
-                // component rows install and uninstall WITH the product, so
-                // this entry IS the machine registration for the sentinel.
-                // The code is NOT the key name here - it comes from the row.
-                bool published = string.Equals(
-                    keyName, PublishedArpKeyName, StringComparison.OrdinalIgnoreCase);
-                if (!published && !GuidKey.IsMatch(keyName))
-                    continue;
+                // The packed MSI (build\msi-edit) ships the product's ONE
+                // visible Control Panel entry: the vpk component-published
+                // row set, bound to the complete-sweep shim and carrying the
+                // product code in UCUProductCode. Windows Installer installs
+                // and removes those rows WITH the product (the component's
+                // KeyPath is the uninstall subkey), so the entry IS the
+                // machine registration for the sentinel. The key name is
+                // vpk's business (the current template publishes a plain
+                // "Uniwill-Control-Utility"; packs from the transitional
+                // window use "MSI:Uniwill-Control-Utility", and appwiz.cpl's
+                // product-code routing of the MSI: prefix is why the pack
+                // step renames it) - identity is the content: our DisplayName
+                // + a GUID-shaped UCUProductCode. GUID-format keys with the
+                // MsiExec UninstallString are the Windows Installer engine's
+                // canonical entry (hidden via SystemComponent=1): watched
+                // too, its key name IS the product code.
+                bool guidKey = GuidKey.IsMatch(keyName);
 
                 using RegistryKey? entry = uninstall.OpenSubKey(keyName);
                 if (entry?.GetValue("DisplayName") is not string displayName)
@@ -423,7 +429,7 @@ namespace Uniwill_Control_Utility
                 if (!string.Equals(displayName, ProductName, StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                if (published)
+                if (!guidKey)
                 {
                     string code = (entry.GetValue("UCUProductCode") as string ?? "").Trim();
                     if (GuidKey.IsMatch(code))
@@ -438,15 +444,6 @@ namespace Uniwill_Control_Utility
 
             return found;
         }
-
-        /// <summary>
-        /// vpk's fixed Add/Remove Programs key name for the per-machine pack
-        /// (the entry the <c>ArpRegistration</c> component publishes), and
-        /// the same key the shim's registry cleanup addresses. Not a GUID:
-        /// only a row carrying our DisplayName and a GUID-shaped
-        /// UCUProductCode counts as the live registration.
-        /// </summary>
-        internal const string PublishedArpKeyName = "MSI:Uniwill-Control-Utility";
 
         /// <summary>
         /// The app is running from the installed machine layout with the

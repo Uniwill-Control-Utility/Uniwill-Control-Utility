@@ -200,6 +200,31 @@ static class MsiEdit
         string key = keyRows[0][0];
         if (!string.IsNullOrEmpty(arpKey)) key = arpKey;
 
+        // Rename the published key away from vpk's `MSI:` prefix. appwiz.cpl
+        // treats Uninstall subkeys named "MSI:<x>" as MSI-managed entries
+        // routed by product code (the documented convention is
+        // `MSI:{product-code}`); vpk uses the app NAME after the prefix, so
+        // Control Panel calls the Windows Installer APIs with
+        // "Uniwill-Control-Utility", gets ERROR_UNKNOWN_PRODUCT, and shows
+        // "An error occurred while trying to uninstall ... It may have
+        // already been uninstalled. Would you like to remove ... from the
+        // Programs and Features list?" - clicking Yes deletes the entry and
+        // leaves the product installed. A plain non-GUID key with no
+        // WindowsInstaller value is shell-executed by the Control Panel:
+        // UninstallString verbatim = the complete-sweep shim.
+        // (Field-proven 2026-10-28: the dialog appeared verbatim on the
+        // published `MSI:Uniwill-Control-Utility` entry.)
+        int lastSep = key.LastIndexOf('\\');
+        string leaf = key.Substring(lastSep + 1);
+        if (leaf.StartsWith("MSI:", StringComparison.OrdinalIgnoreCase))
+        {
+            string plain = key.Substring(0, lastSep + 1) + leaf.Substring(4);
+            Execute(db, "UPDATE `Registry` SET `Key` = '" + plain + "' WHERE `Key` = '" + key + "'");
+            Console.WriteLine("renamed published ARP key " + leaf + " -> " + plain.Substring(lastSep + 1) +
+                " (the MSI: prefix routes Control Panel to the product-code APIs)");
+            key = plain;
+        }
+
         // Rebind the uninstall commands (idempotent: UPDATE to the same value
         // is a no-op, so repacking an already-stamped MSI is safe).
         Execute(db, "UPDATE `Registry` SET `Value` = '" + uninstallTarget + "' WHERE `Key` = '" + key +

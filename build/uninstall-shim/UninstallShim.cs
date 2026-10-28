@@ -270,34 +270,57 @@ internal static class UninstallShim
 
     // The product code carried by the product's own Control Panel entry,
     // both hive views (the entry is machine-scope on installed machines,
-    // and reading the user hive costs nothing). The value is the literal
-    // product code by construction: the MSI row expands [ProductCode].
+    // and reading the user hive costs nothing). Identity is content, not
+    // the key name: the packed entry publishes under vpk's chosen key
+    // (currently the plain "Uniwill-Control-Utility"; packs from the
+    // transitional window use "MSI:Uniwill-Control-Utility"), and only a
+    // row with our DisplayName and a GUID-shaped UCUProductCode is the
+    // live registration - Velopack's per-user shim husks carry no such
+    // row, so they never answer here.
     private static string ReadPublishedProductCode()
     {
-        const string publishedKey =
-            @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MSI:Uniwill-Control-Utility";
-
-        string[] hives = { @"HKLM\" + publishedKey, @"HKCU\" + publishedKey };
-        foreach (string hivePath in hives)
+        string[] hives = { "HKLM", "HKCU" };
+        foreach (string hiveName in hives)
         {
             try
             {
-                RegistryKey baseKey = hivePath.StartsWith("HKLM")
+                RegistryKey baseKey = hiveName == "HKLM"
                     ? RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
                     : Registry.CurrentUser;
 
-                using (RegistryKey entry = baseKey.OpenSubKey(
-                    publishedKey, RegistryKeyPermissionCheck.ReadSubTree))
+                using (RegistryKey uninstall = baseKey.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                    RegistryKeyPermissionCheck.ReadSubTree))
                 {
-                    if (entry == null)
+                    if (uninstall == null)
                         continue;
 
-                    string code = entry.GetValue("UCUProductCode") as string;
-                    if (code != null)
+                    foreach (string keyName in uninstall.GetSubKeyNames())
                     {
-                        code = code.Trim();
-                        if (code.Length == 38 && code[0] == '{' && code[37] == '}')
-                            return code;
+                        // GUID keys are the Windows Installer engine's
+                        // canonical entry: its key name is the code, and
+                        // FindMsiProductKey's scan handles it.
+                        if (keyName.Length == 38 && keyName[0] == '{' && keyName[37] == '}')
+                            continue;
+
+                        using (RegistryKey entry = uninstall.OpenSubKey(
+                            keyName, RegistryKeyPermissionCheck.ReadSubTree))
+                        {
+                            if (entry == null)
+                                continue;
+
+                            string dn = entry.GetValue("DisplayName") as string;
+                            if (dn != "Uniwill Control Utility")
+                                continue;
+
+                            string code = entry.GetValue("UCUProductCode") as string;
+                            if (code == null)
+                                continue;
+
+                            code = code.Trim();
+                            if (code.Length == 38 && code[0] == '{' && code[37] == '}')
+                                return code;
+                        }
                     }
                 }
             }

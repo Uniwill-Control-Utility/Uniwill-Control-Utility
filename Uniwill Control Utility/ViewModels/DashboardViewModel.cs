@@ -28,6 +28,9 @@ namespace Uniwill_Control_Utility.ViewModels
         private readonly HydroUIService _hydroUIService;
         private readonly FlydigiCoolerHidService _flydigiService;
         private readonly FlydigiCoolerBleService _bs1Service;
+        private readonly Services.DashboardFirstFrameSignal _firstFrameSignal;
+        private int _coreFrameSignalled;
+        private int _ecChainDone;
         private readonly DispatcherTimer _refreshTimer;
         private readonly DispatcherTimer _batteryEcTimer;
         private IDisposable? _lease;
@@ -44,7 +47,8 @@ namespace Uniwill_Control_Utility.ViewModels
             IEngineCapability? engine,
             HydroUIService hydroUIService,
             FlydigiCoolerHidService flydigiService,
-            FlydigiCoolerBleService bs1Service)
+            FlydigiCoolerBleService bs1Service,
+            Services.DashboardFirstFrameSignal firstFrameSignal)
         {
             _navigationService = navigationService
                 ?? throw new ArgumentNullException(nameof(navigationService));
@@ -57,6 +61,7 @@ namespace Uniwill_Control_Utility.ViewModels
             _hydroUIService = hydroUIService;
             _flydigiService = flydigiService;
             _bs1Service = bs1Service;
+            _firstFrameSignal = firstFrameSignal;
 
             _refreshTimer = new DispatcherTimer
             {
@@ -104,6 +109,18 @@ namespace Uniwill_Control_Utility.ViewModels
                 };
 
                 MetricsUpdated?.Invoke(this, snapshot);
+
+                // The startup splash's final stage is gated on this frame
+                // (Services.DashboardFirstFrameSignal): the window exists
+                // behind the splash, and the splash releases when the
+                // dashboard has real numbers, not when the window was
+                // created. Only a snapshot with actual readings counts - an
+                // empty warm cache must not release the splash early.
+                if ((snapshot.CpuTemperature > 0 || snapshot.GpuTemperature > 0) &&
+                    Volatile.Read(ref _ecChainDone) == 1)
+                {
+                    _firstFrameSignal.SignalFirstFrame();
+                }
             }
             catch
             {
@@ -338,37 +355,44 @@ namespace Uniwill_Control_Utility.ViewModels
             // so they only fire once at app launch, not on every Dashboard navigation.
             _ = System.Threading.Tasks.Task.Run(async () =>
             {
-                if (_battery is null || _engine is null)
-                    return;
-
                 try
                 {
+                    if (_battery is null || _engine is null)
+                        return;
+
                     // Availability check opens the engine (the RPC gate initialises
                     // lazily, so this is the call that wakes it).
                     await _engine.IsHardwareAvailableAsync().ConfigureAwait(false);
-                }
-                catch { /* EC not available on this hardware */ }
 
-                // Fetch static battery data (health, charge limit) once on navigation.
-                // Temperature is refreshed on the timer below.
-                try
-                {
-                    var telemetry = await _battery.GetTelemetryAsync().ConfigureAwait(false);
-                    if (telemetry is not null)
+                    // Fetch static battery data (health, charge limit) once on navigation.
+                    // Temperature is refreshed on the timer below.
+                    try
                     {
-                        _batteryHealthPercent = telemetry.HealthPercent;
-                        _batteryTemperatureC = telemetry.TemperatureC;
+                        var telemetry = await _battery.GetTelemetryAsync().ConfigureAwait(false);
+                        if (telemetry is not null)
+                        {
+                            _batteryHealthPercent = telemetry.HealthPercent;
+                            _batteryTemperatureC = telemetry.TemperatureC;
+                        }
                     }
-                }
-                catch { /* EC read failed */ }
+                    catch { /* EC read failed */ }
 
-                // Cache the saved battery charge limit for display on the dashboard.
-                // (The actual EC write happens in MainWindow.mainWindow_Loaded.)
-                try
-                {
-                    _batteryChargeLimit = Properties.Settings.Default.BatteryMode;
+                    // Cache the saved battery charge limit for display on the dashboard.
+                    // (The actual EC write happens in MainWindow.mainWindow_Loaded.)
+                    try
+                    {
+                        _batteryChargeLimit = Properties.Settings.Default.BatteryMode;
+                    }
+                    catch { /* settings read failed */ }
                 }
-                catch { /* settings read failed */ }
+                finally
+                {
+                    // The EC chain is over (data landed or every read failed):
+                    // with the first real snapshot frame, this is the dashboard's
+                    // first data frame - the splash's release condition. Machines
+                    // without an EC (no battery/engine) complete here instantly.
+                    Volatile.Write(ref _ecChainDone, 1);
+                }
             });
 
             return Task.CompletedTask;

@@ -422,6 +422,10 @@ namespace Uniwill_Control_Utility
                         services.AddScoped<Views.Pages.HydroUI>();
                         services.AddSingleton<HydroUIService>();
 
+                        // One-shot "dashboard has real data" signal: gates the
+                        // splash's final stage (see StartupProgressWindow use).
+                        services.AddSingleton<Services.DashboardFirstFrameSignal>();
+
                         // Flydigi BS2 Pro cooling pad page and service
                         // Singleton so the host disposes it on shutdown (stops background timers).
                         services.AddSingleton<Views.Pages.FlydigiCooler>();
@@ -738,6 +742,26 @@ namespace Uniwill_Control_Utility
                 await RestoreAdaptiveModeAsync();
 
                 await _host.StartAsync(CancellationToken.None);
+
+                // The splash's last stage ("Opening dashboard") covers the
+                // dashboard's first data frame, not the window's creation:
+                // AcquirePersistent waits the first-snapshot budget inside the
+                // splash (1-2 s healthy), but a guarded machine parks the
+                // sensor probe and the budget expels the splash at 6 s with
+                // the dashboard still empty (the field signature: an empty
+                // window for ~6 s). Release on the first frame with real
+                // readings; bounded, so a wedged probe can never hold the
+                // splash - the dashboard fills from the OS-only path later.
+                if (startupWindow is not null)
+                {
+                    var firstFrame = _host.Services.GetService<Services.DashboardFirstFrameSignal>();
+                    if (firstFrame is not null)
+                    {
+                        await Task.WhenAny(
+                            firstFrame.FirstFrame,
+                            Task.Delay(DashboardFirstFrameBudget));
+                    }
+                }
 
                 await startupProgressReporter.ReportAsync(StartupStage.Complete);
                 if (startupWindow is not null)
@@ -1473,6 +1497,17 @@ namespace Uniwill_Control_Utility
                 _logger?.LogWarning(ex, "Failed to self-heal the {Task} scheduled task", taskName);
             }
         }
+
+        /// <summary>
+        /// How long the splash's final stage waits for the dashboard's first
+        /// data frame. Field-tuned: the first snapshot lands 1-2 s after the
+        /// window exists on a healthy machine, and up to the 6 s
+        /// first-snapshot budget on a guarded one (the sensor probe parks,
+        /// the dashboard fills from the OS-only path) - 10 s keeps margin
+        /// over the observed fill while capping the worst case, and a wedged
+        /// probe releases the splash at the cap.
+        /// </summary>
+        private static readonly TimeSpan DashboardFirstFrameBudget = TimeSpan.FromSeconds(10);
 
         /// <summary>
         /// How long the splash waits for the game-library scan before releasing it.
