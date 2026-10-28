@@ -120,6 +120,31 @@ namespace Uniwill_Control_Utility
             string log = System.IO.Path.Combine(
                 System.IO.Path.GetTempPath(), "ucu_uninstall_log.txt");
 
+            // Close the running app first, exactly as the Uninstall.exe shim does:
+            // it locks the files the MSI is about to delete (a locked exe means
+            // delete-pending files and a reboot prompt), and a live app would
+            // outlive its own uninstall. This process is the installer's launcher
+            // child (same image name), so it is excluded by id.
+            foreach (string appName in new[] { "Uniwill Control Utility", "UCU Guardian" })
+            {
+                foreach (Process running in Process.GetProcessesByName(appName))
+                {
+                    try
+                    {
+                        if (running.Id != System.Environment.ProcessId)
+                            running.Kill();
+                    }
+                    catch
+                    {
+                        // Exiting, already gone, or unkillable: the wizard proceeds.
+                    }
+                    finally
+                    {
+                        running.Dispose();
+                    }
+                }
+            }
+
             int engineRc = -1;
             try
             {
