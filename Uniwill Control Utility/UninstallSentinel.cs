@@ -148,6 +148,31 @@ namespace Uniwill_Control_Utility
                 bool fire = Step(registrationFound, installed);
                 if (fire)
                 {
+                    // Binding precondition, field-proven necessity (2026-10-28
+                    // 20:57/20:59): on a machine whose security product guards
+                    // the ARP keys, this process NEVER sees the registration,
+                    // so no product code was ever watched, and the evidence
+                    // probe degenerates to "any removal transaction in the
+                    // last 3 minutes". Two fresh GUI installs then died 16 s
+                    // and 39 s after launch: the first executed a test /x from
+                    // the 3-minute pool, the second executed the PREVIOUS app
+                    // session's self-repair /x. An unbindable firing is
+                    // unprovable: the verb stays parked for the whole session.
+                    // On such machines the complete uninstall route is the
+                    // app's own uninstall entry (the shim, HKCU-visible, runs
+                    // the full elevated sweep); code signing restores Control
+                    // Panel detection by making the registration visible.
+                    if (_lastSeenCode is null)
+                    {
+                        if (!_noEvidenceLogged)
+                        {
+                            _noEvidenceLogged = true;
+                            _log("uninstall sentinel: this process has never seen the registration (registry-guarded view), so no removal event can be bound to our product code - the destructive verb stays parked for the whole session; the complete uninstall route on this machine is the app's own uninstall entry");
+                        }
+                        await Task.Delay(_pollInterval).ConfigureAwait(false);
+                        continue;
+                    }
+
                     // A vanished ARP registration in this process's registry
                     // view is not sufficient for the destructive verb: an AV
                     // with ARP-key protection (field-proven: Emsisoft) makes

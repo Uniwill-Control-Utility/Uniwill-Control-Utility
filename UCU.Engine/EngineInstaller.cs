@@ -380,6 +380,7 @@ namespace UCU.Engine
             DeleteUserHiveArpHusks();
             DeleteProgramDataLogs();
             DeleteUserVelopackRoots();
+            DeleteVelopackMachineState();
             DeleteInstallLayout();
 
             return rc;
@@ -864,6 +865,36 @@ namespace UCU.Engine
         /// deletes-pending); a detached tail re-issues the root delete after
         /// this process exits and releases the last image.
         /// </summary>
+        /// <summary>
+        /// Remove Velopack's machine-state key (HKLM\SOFTWARE\Uniwill-Control-
+        /// Utility: install markers, shortcut bookkeeping). Setup.exe's old-
+        /// install discovery reads this key to find "prior versions" to /x
+        /// (field-proven: a same-version Setup re-install enumerated the key
+        /// that its own /i had just written, ran msiexec /x on the live
+        /// product code 17 s after the install completed, and the sentinel -
+        /// reading genuine removal events - executed it: the app died at 78 %
+        /// and Program Files vanished). An uninstall that leaves the markers
+        /// arms the next Setup re-install; SYSTEM reaches the hive, and a
+        /// fresh install rewrites everything it needs.
+        /// </summary>
+        private static void DeleteVelopackMachineState()
+        {
+            foreach (RegistryHive hive in new[] { RegistryHive.LocalMachine, RegistryHive.CurrentUser })
+            {
+                try
+                {
+                    using RegistryKey baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
+                    using RegistryKey? software = baseKey.OpenSubKey(@"SOFTWARE", writable: true);
+                    software?.DeleteSubKeyTree("Uniwill-Control-Utility", throwOnMissingSubKey: false);
+                    Log.Debug("[EngineInstaller] Velopack machine-state key removed ({Hive})", hive);
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug(ex, "[EngineInstaller] Velopack machine-state key not removed ({Hive})", hive);
+                }
+            }
+        }
+
         private static void DeleteInstallLayout()
         {
             try

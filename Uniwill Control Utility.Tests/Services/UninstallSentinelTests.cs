@@ -14,7 +14,8 @@ public sealed class UninstallSentinelTests
         Action onDetected,
         TimeSpan? pollInterval = null) =>
         new(enumerate, onDetected, _ => { }, pollInterval ?? TimeSpan.FromMilliseconds(10),
-            removalEvidence: _ => true);
+            removalEvidence: code => code is not null,
+            enumerateCodes: () => ["{TEST-CODE}"]);
 
     [Fact]
     public void Step_NeverArmedProductMissing_DoesNotFire()
@@ -84,12 +85,16 @@ public sealed class UninstallSentinelTests
     }
 
     [Fact]
-    public async Task RunAsync_RegistrationGoneBeforeArming_LayoutArmsIt()
+    public async Task RunAsync_RegistrationGoneBeforeArming_LayoutArmsButBindingParks()
     {
         // The race the thin uninstall wins: /x finishes in ~2 s while the
         // app's startup takes minutes - the registration is already gone at
-        // the first poll. Running from the installed layout is the same
-        // "installed" fact, so the sentinel arms and fires.
+        // the first poll, so no product code was ever watched. The layout
+        // arms the sentinel, but evidence cannot bind to an unwatched code:
+        // the verb stays parked (2026-10-28 field-proven: unbindable
+        // firings executed 3-minute-pool ghosts and killed fresh installs
+        // 16 s after launch). The complete route on such a machine is the
+        // app's own uninstall entry.
         int fired = 0;
         var sentinel = new UninstallSentinel(
             () => Array.Empty<string>(),
@@ -97,12 +102,14 @@ public sealed class UninstallSentinelTests
             _ => { },
             pollInterval: TimeSpan.FromMilliseconds(10),
             installedLayoutProbe: () => true,
-            removalEvidence: _ => true);
+            removalEvidence: code => code is not null,
+            enumerateCodes: () => Array.Empty<string>());
 
         var run = sentinel.RunAsync();
-        var winner = await Task.WhenAny(run, Task.Delay(2000));
-        Assert.Same(run, winner); // fired and returned
-        Assert.Equal(1, fired);
+        await Task.Delay(300);
+
+        Assert.Equal(0, fired);
+        Assert.False(run.IsCompleted); // armed, parked on binding, polling
     }
 
     [Fact]
@@ -151,12 +158,44 @@ public sealed class UninstallSentinelTests
     }
 
     [Fact]
-    public async Task RunAsync_PhantomThenRealRemoval_FiresOnEvidence()
+    public async Task RunAsync_WatchedThenRealRemoval_FiresOnBoundEvidence()
     {
-        // The phantom clears the moment the real uninstall runs: the state
-        // machine keeps the miss banked, and the event-log evidence arriving
-        // mid-watch must fire on the next poll.
+        // The canonical Control Panel route on a machine with a visible
+        // registration: watched code {WATCHED}, the /x lands, evidence naming
+        // that code arrives mid-watch, and the sentinel fires on the next
+        // poll. This is the binding contract the 3-minute event pool alone
+        // cannot provide.
+        bool present = true;
         bool evidence = false;
+        int fired = 0;
+        var sentinel = new UninstallSentinel(
+            () => present ? [UninstallSentinel.ProductName] : Array.Empty<string>(),
+            () => fired++,
+            _ => { },
+            pollInterval: TimeSpan.FromMilliseconds(10),
+            removalEvidence: code => { evidence = code is not null; return evidence; },
+            enumerateCodes: () => present ? ["{WATCHED}"] : Array.Empty<string>());
+
+        var run = sentinel.RunAsync();
+        await Task.Delay(60);              // arms, watches {WATCHED}
+        present = false;                   // the Control Panel /x completes
+        await Task.Delay(60);              // misses bank, evidence parked
+        evidence = true;                   // (flip only keeps the probe true)
+        var winner = await Task.WhenAny(run, Task.Delay(2000));
+        Assert.Same(run, winner);
+        Assert.Equal(1, fired);
+    }
+
+    [Fact]
+    public async Task RunAsync_ProtectedMachineNeverSawCode_EvidenceCannotFireVerb()
+    {
+        // Field-proven death loop (2026-10-28 20:57/20:59): on the Emsisoft
+        // box the app never sees the registration, so _lastSeenCode stays
+        // null; an "any transaction in 3 min" firing executed ghosts - a
+        // test /x from the pool, and the PREVIOUS app session's self-repair
+        // /x - and swept fresh installs 16-39 s after launch. The firing
+        // gate must park the verb for the whole session on an unbindable
+        // watch, with the app's own uninstall entry as the complete route.
         int fired = 0;
         var sentinel = new UninstallSentinel(
             () => Array.Empty<string>(),
@@ -164,14 +203,14 @@ public sealed class UninstallSentinelTests
             _ => { },
             pollInterval: TimeSpan.FromMilliseconds(10),
             installedLayoutProbe: () => true,
-            removalEvidence: _ => evidence);
+            removalEvidence: _ => true,     // perfect removal evidence every poll
+            enumerateCodes: () => Array.Empty<string>()); // view blind from birth
 
         var run = sentinel.RunAsync();
-        await Task.Delay(150);          // banked misses, evidence parked it
-        evidence = true;                // the Control Panel /x completes
-        var winner = await Task.WhenAny(run, Task.Delay(2000));
-        Assert.Same(run, winner);
-        Assert.Equal(1, fired);
+        await Task.Delay(300);
+
+        Assert.Equal(0, fired);
+        Assert.False(run.IsCompleted);
     }
 
     [Fact]

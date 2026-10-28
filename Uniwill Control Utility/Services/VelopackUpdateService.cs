@@ -1,12 +1,7 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Win32;
 using Serilog;
 using Velopack;
 
@@ -308,77 +303,41 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
-        /// Decision rule: skip Velopack when the MSI database knows our product
-        /// (so a repair has a live registration to destroy) while the app's own
-        /// ARP registry view does not (so Velopack concludes it is unregistered
-        /// and repairs it). The other three combinations are inert: no MSI
-        /// product means no repair target, a visible registration means nothing
-        /// to repair.
+        /// Decision rule: skip Velopack when the app runs from the per-machine
+        /// layout (an installed fact, visible without any registry view) while
+        /// the app's ARP registry view shows no registration of ours - the
+        /// state in which Velopack concludes "not registered" and its repair
+        /// logic /x-es the live product code. The other combinations are
+        /// inert: dev/portable layouts have no install to destroy, and a
+        /// visible registration gives the repair nothing to repair.
         /// </summary>
-        internal static bool ShouldSkipVelopack(bool msiDatabaseSeesProduct, bool registryViewSeesProduct)
-            => msiDatabaseSeesProduct && !registryViewSeesProduct;
+        internal static bool ShouldSkipVelopack(bool machineLayoutInstalled, bool registryViewSeesRegistration)
+            => machineLayoutInstalled && !registryViewSeesRegistration;
 
         /// <summary>
         /// Reads the two halves of <see cref="ShouldSkipVelopack"/> from the
-        /// machine. Fails open: any probe error reads as "not policed", so the
-        /// update flow keeps its normal behaviour.
+        /// machine. The MSI-database probe (MsiEnumProductsW) is NOT used:
+        /// it reads the registry in-process, so a registry-guarded product
+        /// blinds it too (field-proven 2026-10-28: the guard built on it
+        /// never fired while the repair /x did). The observable truth is
+        /// local: the app runs from the per-machine layout - an installed
+        /// fact independent of registry views - and the ARP registry view
+        /// shows no registration of ours.
         /// </summary>
         private static bool RegistrationViewIsPoliced()
         {
             try
             {
-                string? code = MsiDatabaseProductCode();
-                if (code is null)
-                    return false;
+                bool machineLayoutInstalled = UninstallSentinel.InstalledLayoutPresent();
+                bool registryViewSeesRegistration =
+                    UninstallSentinel.Registered(UninstallSentinel.EnumerateMachineRegistrations());
 
-                using RegistryKey localMachine =
-                    RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
-                using RegistryKey? entry = localMachine.OpenSubKey(
-                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\" + code);
-
-                return ShouldSkipVelopack(msiDatabaseSeesProduct: true, registryViewSeesProduct: entry != null);
+                return ShouldSkipVelopack(machineLayoutInstalled, registryViewSeesRegistration);
             }
             catch
             {
                 return false;
             }
         }
-
-        /// <summary>
-        /// The product code of our MSI registration as the Windows Installer
-        /// service sees it (MsiEnumProductsW), independent of the ARP registry
-        /// keys a security product can blind. Null when nothing is installed.
-        /// </summary>
-        private static string? MsiDatabaseProductCode()
-        {
-            var code = new StringBuilder(39);
-            for (int index = 0; index < 4096; index++)
-            {
-                code.Clear();
-                if (MsiEnumProductsW(index, code) != 0)
-                    break;
-
-                string candidate = code.ToString();
-                if (candidate.Length == 0)
-                    continue;
-
-                var name = new StringBuilder(256);
-                uint nameLength = (uint)name.Capacity;
-                if (MsiGetProductInfoW(candidate, "ProductName", name, ref nameLength) != 0)
-                    continue;
-
-                if (UninstallSentinel.ProductName.Equals(name.ToString(), StringComparison.OrdinalIgnoreCase))
-                    return candidate;
-            }
-
-            return null;
-        }
-
-        [DllImport("msi.dll", CharSet = CharSet.Unicode)]
-        private static extern int MsiEnumProductsW(int index, StringBuilder productCode);
-
-        [DllImport("msi.dll", CharSet = CharSet.Unicode)]
-        private static extern int MsiGetProductInfoW(
-            string productCode, string attribute, StringBuilder buffer, ref uint bufferLength);
     }
 }
