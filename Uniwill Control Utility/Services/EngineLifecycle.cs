@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Serilog;
 using Uniwill_Control_Utility.Scripts.Misc;
@@ -73,12 +74,36 @@ namespace Uniwill_Control_Utility.Services
             }
         }
 
+        /// <summary>
+        /// One ensure at a time, process-wide. The startup EC task and the
+        /// post-splash chain both call this; racing, the second call pinged an
+        /// engine the first call's elevated pass was still starting, read the
+        /// failed ping as "engine dead", elevated a second time, and burned the
+        /// once-ever repair marker on a pass that was never needed.
+        /// </summary>
+        private static readonly SemaphoreSlim EnsureGate = new(1, 1);
+
         public static async Task<EngineEnsureOutcome> EnsureAsync(
             EngineAvailability availability,
             Func<Task<bool>>? engineReachable = null)
         {
             ArgumentNullException.ThrowIfNull(availability);
 
+            await EnsureGate.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                return await EnsureCoreAsync(availability, engineReachable).ConfigureAwait(false);
+            }
+            finally
+            {
+                EnsureGate.Release();
+            }
+        }
+
+        private static async Task<EngineEnsureOutcome> EnsureCoreAsync(
+            EngineAvailability availability,
+            Func<Task<bool>>? engineReachable)
+        {
             EngineServiceState state = availability.Query();
 
             if (state == EngineServiceState.Running)
