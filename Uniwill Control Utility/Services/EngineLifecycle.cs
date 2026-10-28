@@ -61,6 +61,10 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>The SCM start timeout; the engine reports Running in under a second.</summary>
         private static readonly TimeSpan StartBudget = TimeSpan.FromSeconds(30);
 
+        // Liveness budget for the RPC probe: covers the service's ~20 s EC
+        // activation handshake (see EngineAnswersAsync) with margin.
+        private static readonly TimeSpan LivenessReadinessBudget = TimeSpan.FromSeconds(30);
+
         /// <summary>
         /// The engine executable in the install layout's Service\ subfolder
         /// (staged by the csproj targets), or null in a dev checkout.
@@ -154,7 +158,8 @@ namespace Uniwill_Control_Utility.Services
                 // the SCM cannot describe. An engine that answers is running, the
                 // elevation repairs a descriptor, not the engine, and repairing
                 // what works is how "UAC on every launch" was born.
-                if (engineReachable is not null && await engineReachable().ConfigureAwait(false))
+                if (engineReachable is not null &&
+                    await EngineAnswersAsync(engineReachable).ConfigureAwait(false))
                 {
                     Log.Information("[Engine] The service is not openable by this app, but the engine answers RPC - treating it as running and leaving the descriptor to the service's own assertions.");
                     return EngineEnsureOutcome.Running;
@@ -203,6 +208,32 @@ namespace Uniwill_Control_Utility.Services
             }
 
             return repair ? EngineEnsureOutcome.Repaired : EngineEnsureOutcome.Installed;
+        }
+
+        /// <summary>
+        /// How long a ping is given to get an answer in the state where the SCM
+        /// cannot speak. The service opens its pipe only after the EC activation
+        /// handshake (OEM fan tables, battery parameters, fan curve mode: measured
+        /// ~20 s from start on this hardware), so a short probe declares a
+        /// booting engine dead - and on the guarded machine that false death is
+        /// an elevation spent on a repair of a service that was already coming
+        /// up. A dead engine is still proven dead: by this same budget, not a
+        /// single miss.
+        /// </summary>
+        private static async Task<bool> EngineAnswersAsync(Func<Task<bool>> probe)
+        {
+            DateTime deadline = DateTime.UtcNow + LivenessReadinessBudget;
+
+            while (true)
+            {
+                if (await probe().ConfigureAwait(false))
+                    return true;
+
+                if (DateTime.UtcNow >= deadline)
+                    return false;
+
+                await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+            }
         }
 
         /// <summary>

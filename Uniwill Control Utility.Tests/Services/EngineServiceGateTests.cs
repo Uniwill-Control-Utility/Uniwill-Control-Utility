@@ -13,8 +13,8 @@ namespace Uniwill_Control_Utility.Tests.Services;
 ///
 /// The two "available" states that look unavailable are deliberate: a developer
 /// targets a console-mode engine that has no service at all (there the connect is the
-/// only probe), and a service this process cannot open has an unknown state - guessing
-/// "down" would hide a running engine behind a fake unavailability.
+/// only probe), and access-denied - the guarded-machine state where the SCM is silent -
+/// is answered by the RPC liveness probe, which is the same pipe the verb targets.
 /// </summary>
 public sealed class EngineServiceGateTests
 {
@@ -22,12 +22,47 @@ public sealed class EngineServiceGateTests
     [InlineData(EngineServiceState.Stopped, false)]
     [InlineData(EngineServiceState.Running, true)]
     [InlineData(EngineServiceState.NotInstalled, true)]
-    [InlineData(EngineServiceState.AccessDenied, true)]
     public void OnlyAKnownStoppedServiceIsUnavailable(EngineServiceState state, bool expected)
     {
         var gate = new EngineServiceGate(new EngineAvailability(() => state));
 
         Assert.Equal(expected, gate.IsServiceAvailable());
+    }
+
+    [Fact]
+    public void AccessDenied_IsAvailableOnlyWhenTheProbeIsAlive()
+    {
+        // The SCM cannot speak (security product guarding service descriptors), so
+        // the probe decides: a live probe means the verb lands; a dead one means
+        // the service is down or still inside its ~20 s EC activation handshake,
+        // and allowing the connect costs 5 s per verb on the callers that run many.
+        var up = new EngineServiceGate(new EngineAvailability(
+            () => EngineServiceState.AccessDenied,
+            async () =>
+            {
+                await Task.Delay(10);
+                return true;
+            }));
+        var down = new EngineServiceGate(new EngineAvailability(
+            () => EngineServiceState.AccessDenied,
+            () => Task.FromResult(false)));
+
+        Assert.True(WaitForProbe(() => up.IsServiceAvailable(), TimeSpan.FromSeconds(2)));
+        Assert.False(down.IsServiceAvailable());
+        Assert.False(WaitForProbe(() => down.IsServiceAvailable(), TimeSpan.FromMilliseconds(500)));
+    }
+
+    private static bool WaitForProbe(Func<bool> condition, TimeSpan timeout)
+    {
+        DateTime deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (condition())
+                return true;
+            Thread.Sleep(25);
+        }
+
+        return condition();
     }
 
     [Fact]

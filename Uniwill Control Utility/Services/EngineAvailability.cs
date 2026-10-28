@@ -294,9 +294,12 @@ namespace Uniwill_Control_Utility.Services
     ///
     /// Not installed is "available": a developer points the same proxies at a
     /// console-mode engine (<c>dotnet run --project UCU.Engine -- --console</c>), which
-    /// has no service, so there the connect is the only probe. Access denied is
-    /// "available" too: this process cannot read the state, and guessing "down" would
-    /// hide a running engine behind a fake unavailability.
+    /// has no service, so there the connect is the only probe. Access denied - the
+    /// state on a machine whose security product guards service descriptors - is
+    /// answered by the liveness probe: the SCM is silent there, and the probe is
+    /// the same pipe the verb is about to connect, so a live probe means the verb
+    /// lands and a dead one means the service is down or still inside its EC
+    /// activation handshake (the connect would cost the full timeout).
     /// </summary>
     public sealed class EngineServiceGate : UCU.Contracts.IEngineServiceGate
     {
@@ -308,7 +311,17 @@ namespace Uniwill_Control_Utility.Services
             _availability = availability;
         }
 
-        public bool IsServiceAvailable() =>
-            _availability.Query() != EngineServiceState.Stopped;
+        public bool IsServiceAvailable()
+        {
+            EngineServiceState state = _availability.Query();
+
+            if (state == EngineServiceState.Stopped)
+                return false;
+
+            if (state == EngineServiceState.AccessDenied)
+                return _availability.IsRunning;
+
+            return true;
+        }
     }
 }
