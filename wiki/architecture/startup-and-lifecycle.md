@@ -18,7 +18,7 @@ sequenceDiagram
         App->>UAC: runas "Service\...Engine.exe --install-engine"
         UAC-->>Eng: sc create start= auto, binPath, DACL, failure actions, sc start
     else service stopped
-        App->>SCM: ServiceController.Start (granted by service DACL, no UAC)
+        App->>SCM: ScmNative.StartServiceW (SERVICE_START, granted by service DACL, no UAC)
     else service not openable (access denied)
         App->>UAC: runas "--install-engine" again - sc sdset re-asserts the DACL
     else dev checkout (no Service\ staging)

@@ -20,25 +20,33 @@ namespace UCU.Engine
         /// <summary>
         /// Service DACL. System and Administrators keep full control; Authenticated
         /// Users - the identity the unelevated app runs as - get exactly the four
-        /// rights the product's design needs, decoded per ace (SDDL pairs read
-        /// left-to-right, each two letters is one right):
+        /// rights the product's design needs, decoded per ace (each SDDL service
+        /// right is two letters):
         ///
-        ///   CC  SERVICE_QUERY_CONFIG   (0x0001) - read the registration
+        ///   CC  SERVICE_QUERY_CONFIG    (0x0001) - read the registration
         ///   SW  SERVICE_QUERY_STATUS    (0x0004) - see that the engine is stopped
-        ///   RP  SERVICE_START           (0x0010) - start it, which is what keeps a
+        ///   RP  SERVICE_START           (0x0020) - start it, which is what keeps a
         ///                                       stopped engine from needing UAC
         ///   RC  READ_CONTROL            (0x20000) - read the descriptor (diagnostics)
         ///
         /// <c>RP</c> is the right the whole de-elevation design rests on: without it
-        /// the app's <c>ServiceController.Start</c> answers "Access is denied" and
-        /// the app can never restart the engine it owns. What the ace
+        /// the app can never start the engine it owns. What the ace
         /// deliberately does *not* grant is as important: no
-        /// <c>LC</c>/SERVICE_CHANGE_CONFIG (an AU change-config ace lets any
-        /// authenticated user re-point binPath and get code execution as
-        /// LocalSystem), no <c>DT</c>/delete, no write-DAC. Stopping and removing
+        /// <c>LC</c>/SERVICE_QUERY_INTERROGATE (0x0080: on a LocalSystem service this
+        /// is the token-duplication elevation hole - InterrogateService lets the
+        /// caller open the service process's token), no
+        /// <c>LO</c>/SERVICE_CHANGE_CONFIG (0x0002: re-point binPath, arbitrary code
+        /// as LocalSystem), no <c>DT</c>/delete, no write-DAC. Stopping and removing
         /// the service stay administrator-only: the update shim and the uninstall
         /// shim run requireAdministrator, and the app has no reason to stop the
         /// hardware service.
+        ///
+        /// Consequence the app code must honour: .NET's <c>ServiceController</c>
+        /// read-open requests SERVICE_QUERY_ALL_ACCESS, which includes interrogate
+        /// and enumerate-dependents - rights this descriptor withholds - so every
+        /// ServiceController query fails with Access Denied against a healthy
+        /// install. The app's SCM reads go through <c>ScmNative</c>, which opens
+        /// for exactly the rights granted (SW, RP).
         /// </summary>
         internal const string ServiceSddl = "D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;CCSWRPRC;;;AU)";
 

@@ -1,7 +1,6 @@
 using System;
 using System.ComponentModel;
 using System.IO;
-using System.ServiceProcess;
 using System.Threading.Tasks;
 using Serilog;
 using Uniwill_Control_Utility.Scripts.Misc;
@@ -131,9 +130,10 @@ namespace Uniwill_Control_Utility.Services
         {
             try
             {
-                using var controller = new ServiceController(ServiceName);
-                controller.Start();
-                controller.WaitForStatus(ServiceControllerStatus.Running, StartBudget);
+                // ScmNative opens for SERVICE_START + SERVICE_QUERY_STATUS only -
+                // the rights the install's AU ace grants. ServiceController opens
+                // for its full read set and was access-denied on healthy installs.
+                ScmNative.StartAndWait(ServiceName, StartBudget);
                 availability.Invalidate();
                 Log.Information("[Engine] Engine service started.");
                 return EngineEnsureOutcome.Started;
@@ -153,18 +153,14 @@ namespace Uniwill_Control_Utility.Services
             }
             catch (Win32Exception ex)
             {
+                // Includes 1060: the service stopped existing between the status
+                // query and the start (uninstall raced us).
                 Log.Warning(ex, "[Engine] Could not start the engine service (native code {Code})", ex.NativeErrorCode);
                 return EngineEnsureOutcome.Failed;
             }
-            catch (InvalidOperationException ex)
+            catch (TimeoutException ex)
             {
-                // The service stopped existing between the status query and the start.
-                Log.Warning(ex, "[Engine] The engine service disappeared while it was being started");
-                return EngineEnsureOutcome.Failed;
-            }
-            catch (System.ServiceProcess.TimeoutException)
-            {
-                Log.Warning("[Engine] The engine service did not reach Running within {Budget}s", StartBudget.TotalSeconds);
+                Log.Warning(ex, "[Engine] The engine service did not reach Running within {Budget}s", StartBudget.TotalSeconds);
                 return EngineEnsureOutcome.Failed;
             }
         }

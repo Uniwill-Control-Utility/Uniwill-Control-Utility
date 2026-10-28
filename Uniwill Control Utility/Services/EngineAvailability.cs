@@ -1,6 +1,5 @@
 using System;
 using System.ComponentModel;
-using System.ServiceProcess;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -23,8 +22,9 @@ namespace Uniwill_Control_Utility.Services
 
     /// <summary>
     /// The app's single answer to "is the engine service running", read from the SCM
-    /// (a <see cref="ServiceController"/> status query: sub-millisecond, no pipe, no
-    /// EC, no privilege) and cached briefly so a burst of call sites shares one query.
+    /// (an <see cref="ScmNative"/> status query: sub-millisecond, no pipe, no EC, and
+    /// it opens for only the SERVICE_QUERY_STATUS right the install grants) and cached
+    /// briefly so a burst of call sites shares one query.
     ///
     /// The gate exists because every RPC verb is a pipe connect, and a connect to a
     /// pipe that does not exist costs the whole connect timeout - measured 5.0 s on
@@ -43,9 +43,9 @@ namespace Uniwill_Control_Utility.Services
     {
         public const string ServiceName = "UCUEngine";
 
-        // SCM Win32 codes that separate the repairs. ServiceController wraps every
-        // failure to open a service in InvalidOperationException, so the inner
-        // Win32Exception's code is the only diagnosis available.
+        // SCM Win32 codes that separate the repairs. ScmNative surfaces the failing
+        // open's error code directly (a Win32Exception), so the states stay
+        // diagnosable: 5 is a DACL this process cannot open, 1060 is no registration.
         internal const int ErrorAccessDenied = 5;
         internal const int ErrorServiceDoesNotExist = 1060;
 
@@ -130,26 +130,28 @@ namespace Uniwill_Control_Utility.Services
         {
             try
             {
-                using var controller = new ServiceController(ServiceName);
-                return controller.Status switch
-                {
-                    ServiceControllerStatus.Running => EngineServiceState.Running,
+                // ScmNative, not ServiceController: .NET's read-open requests the
+                // interrogate and enumerate-dependents rights the install DACL
+                // deliberately withholds, so a ServiceController query of a healthy
+                // running service answered Access Denied and made every launch take
+                // the elevated "DACL repair" path.
+                return ScmNative.QueryState(ServiceName) == ScmNative.ServiceRunning
+                    ? EngineServiceState.Running
                     // Paused and the pending states do not answer RPC, so for every
                     // consumer's purpose they are "not running", and the repair is
                     // the same as for Stopped.
-                    _ => EngineServiceState.Stopped
-                };
+                    : EngineServiceState.Stopped;
             }
-            catch (InvalidOperationException ex)
+            catch (Win32Exception ex)
             {
                 return ClassifyScmFailure(ex);
             }
         }
 
         /// <summary>
-        /// Maps a ServiceController failure onto the state that needs the matching
-        /// repair. Access denied is the case the app must never treat as "missing":
-        /// the elevated install re-asserts the DACL, which is the fix.
+        /// Maps a failed SCM open onto the state that needs the matching repair.
+        /// Access denied is the case the app must never treat as "missing": the
+        /// elevated install re-asserts the DACL, which is the fix.
         /// </summary>
         internal static EngineServiceState ClassifyScmFailure(Exception ex)
         {

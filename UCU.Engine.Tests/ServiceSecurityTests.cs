@@ -7,12 +7,20 @@ namespace UCU.Engine.Tests;
 ///
 /// The first shipped SDDL gave Authenticated Users <c>CCLCSWLOCRRC</c>, a mask chosen
 /// by eyeballing SDDL letters. It omitted <c>RP</c>/SERVICE_START, so an installed app
-/// could never start the service it owns (<c>ServiceController.Start</c> answered
-/// "Cannot open 'UCUEngine' service on computer '.'. Access is denied") and silently
-/// lost every EC-fed metric until the user opened services.msc - while granting
-/// <c>LC</c>/SERVICE_CHANGE_CONFIG, which lets any authenticated user re-point binPath
-/// and get code execution as LocalSystem. These assertions pin the two halves of the
-/// contract: the right the app needs, and the rights nobody may have.
+/// could never start the service it owns and silently lost every EC-fed metric until
+/// the user opened services.msc - while granting <c>LO</c>/SERVICE_CHANGE_CONFIG (any
+/// authenticated user re-points binPath and gets code execution as LocalSystem) and
+/// <c>LC</c>/SERVICE_QUERY_INTERROGATE (the token-duplication elevation hole on a
+/// LocalSystem service). These assertions pin the two halves of the contract: the
+/// rights the app needs, and the rights nobody may have.
+///
+/// A second field-incident lesson lives here: .NET's <c>ServiceController</c> cannot
+/// query a service under this descriptor. Its read-open requests
+/// SERVICE_QUERY_ALL_ACCESS, which includes the interrogate and enumerate-dependents
+/// rights the descriptor withholds, so every status query answered Access Denied and
+/// the app's self-heal escalated to the elevated DACL-repair pass on every launch.
+/// The app's SCM access is <c>ScmNative</c> (query-status and start only), which is
+/// why no assertion here widens the mask to satisfy a .NET convenience type.
 /// </summary>
 public sealed class ServiceSecurityTests
 {
@@ -26,6 +34,8 @@ public sealed class ServiceSecurityTests
         // self-heal is an access-denied log line.
         Assert.Contains("RP", RightsOf("AU"));
         // ...and it can see the state it is repairing: query config + query status.
+        // SW/SERVICE_QUERY_STATUS is what ScmNative.QueryState opens for; an app
+        // that cannot read Running takes the elevated repair path on every launch.
         Assert.Contains("CC", RightsOf("AU"));
         Assert.Contains("SW", RightsOf("AU"));
     }
@@ -35,9 +45,12 @@ public sealed class ServiceSecurityTests
     {
         HashSet<string> rights = RightsOf("AU");
 
-        // SERVICE_CHANGE_CONFIG: re-point binPath / start type / dependencies, i.e.
-        // arbitrary code as LocalSystem. Delete, write-DAC and write-owner are the
-        // same class of power.
+        // LO/SERVICE_CHANGE_CONFIG: re-point binPath / start type / dependencies,
+        // i.e. arbitrary code as LocalSystem. LC/SERVICE_QUERY_INTERROGATE is the
+        // same class of power by another route: on a LocalSystem service,
+        // InterrogateService lets the caller open the service process's token.
+        // Delete, write-DAC and write-owner are the same class as well.
+        Assert.DoesNotContain("LO", rights);
         Assert.DoesNotContain("LC", rights);
         Assert.DoesNotContain("DT", rights);
         Assert.DoesNotContain("SD", rights);
@@ -49,7 +62,8 @@ public sealed class ServiceSecurityTests
         // Stopping the service is administrator-only: the update shim and the
         // uninstall shim run requireAdministrator, and the app has no reason to
         // stop the hardware out from under another session.
-        Assert.DoesNotContain("LO", rights);
+        // (DT/SERVICE_STOP is asserted above; the app's SCM access is
+        // query-status + start, nothing else.)
     }
 
     [Fact]
