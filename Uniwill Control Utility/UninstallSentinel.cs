@@ -366,10 +366,18 @@ namespace Uniwill_Control_Utility
                             // - bind to the code the sentinel watched when the
                             // registration was visible, so an older uninstall's
                             // fingerprint cannot license a fresh install's verb.
-                            if (productCode is null)
-                                transactionEnded = entry.Message.IndexOf("}", StringComparison.Ordinal) >= 0;
-                            else
-                                transactionEnded = entry.Message.IndexOf(productCode, StringComparison.OrdinalIgnoreCase) >= 0;
+                            bool codeMatch = productCode is null
+                                ? entry.Message.IndexOf("}", StringComparison.Ordinal) >= 0
+                                : entry.Message.IndexOf(productCode, StringComparison.OrdinalIgnoreCase) >= 0;
+
+                            // A removal this very process initiated is Velopack's
+                            // registration repair, not the Control Panel uninstall
+                            // the sentinel is contracted to execute - field-proven:
+                            // the app's own UpdateManager /x-ed the live code 17 s
+                            // after a GUI install (registry-guarded machine) and the
+                            // sentinel executed it, sweeping the live app mid-splash.
+                            if (codeMatch && !IsSelfIssuedTransaction(entry.Message, Environment.ProcessId))
+                                transactionEnded = true;
                             break;
                     }
 
@@ -383,6 +391,34 @@ namespace Uniwill_Control_Utility
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// "Ending a Windows Installer transaction: {GUID}. Client Process Id: N."
+        /// - the client pid is the process that initiated the MSI session.
+        /// Velopack's registration repair /x-es the live product from inside the
+        /// app process, so that transaction's client pid is this process itself:
+        /// a self-issued removal is a repair, never the Control Panel uninstall
+        /// the sentinel exists for. Control Panel, Settings, the uninstall shim
+        /// and a manual elevated msiexec all initiate as their own process
+        /// (msiexec.exe), never as this pid. A message without the client pid
+        /// is not self-issued (fail open toward the uninstall route).
+        /// </summary>
+        internal static bool IsSelfIssuedTransaction(string message1042, int selfPid)
+        {
+            const string marker = "Client Process Id: ";
+            int at = message1042.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (at < 0)
+                return false;
+
+            int start = at + marker.Length;
+            int length = 0;
+            while (start + length < message1042.Length && char.IsDigit(message1042[start + length]))
+                length++;
+
+            return length > 0 &&
+                int.TryParse(message1042.Substring(start, length), out int clientPid) &&
+                clientPid == selfPid;
         }
 
         /// <summary>

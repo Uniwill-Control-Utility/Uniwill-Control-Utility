@@ -1,7 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Win32;
 using Serilog;
 using Velopack;
 
@@ -70,6 +75,31 @@ namespace Uniwill_Control_Utility.Services
 
         public VelopackUpdateService()
         {
+            // Registration-repair self-destruction guard, field-proven necessity.
+            // On a machine whose security product polices the ARP registry keys
+            // (observed: Emsisoft), Velopack's own registration check sees the
+            // live machine registration as missing (the app's registry view is
+            // blind) and its repair logic runs "msiexec /x" on the LIVE product
+            // code - twice proven to fire (19:41 at +4:16, 20:32 at +17 s after
+            // a GUI install), each time removing the live registration and
+            // licensing the uninstall sentinel's sweep: the app dies mid-splash
+            // and the machine is cleaned under it. The repair needs the
+            // UpdateManager, so under the phantom condition the manager stays
+            // un-built: update checks are off (manual installs keep working),
+            // and the install plus the Control Panel entry survive. The
+            // condition is AV-specific and observable: the MSI database shows
+            // the product, the app's own registry view does not.
+            if (RegistrationViewIsPoliced())
+            {
+                State = UpdateState.NotInstalled;
+                Log.Warning(
+                    "[Update] UpdateManager stays un-built: the live MSI registration is invisible in " +
+                    "this process's registry view (security-product registry protection), and Velopack's " +
+                    "registration repair would /x the live install and arm the uninstall sentinel. " +
+                    "Update checks stay off on this machine; installing updates by hand keeps working.");
+                return;
+            }
+
             var feedOverride = Environment.GetEnvironmentVariable(FeedPathOverrideEnvVar);
             var feed = string.IsNullOrWhiteSpace(feedOverride) ? GitHubFeedUrl : feedOverride;
 
@@ -276,5 +306,79 @@ namespace Uniwill_Control_Utility.Services
             State = state;
             StateChanged?.Invoke(state, progress);
         }
+
+        /// <summary>
+        /// Decision rule: skip Velopack when the MSI database knows our product
+        /// (so a repair has a live registration to destroy) while the app's own
+        /// ARP registry view does not (so Velopack concludes it is unregistered
+        /// and repairs it). The other three combinations are inert: no MSI
+        /// product means no repair target, a visible registration means nothing
+        /// to repair.
+        /// </summary>
+        internal static bool ShouldSkipVelopack(bool msiDatabaseSeesProduct, bool registryViewSeesProduct)
+            => msiDatabaseSeesProduct && !registryViewSeesProduct;
+
+        /// <summary>
+        /// Reads the two halves of <see cref="ShouldSkipVelopack"/> from the
+        /// machine. Fails open: any probe error reads as "not policed", so the
+        /// update flow keeps its normal behaviour.
+        /// </summary>
+        private static bool RegistrationViewIsPoliced()
+        {
+            try
+            {
+                string? code = MsiDatabaseProductCode();
+                if (code is null)
+                    return false;
+
+                using RegistryKey localMachine =
+                    RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+                using RegistryKey? entry = localMachine.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\" + code);
+
+                return ShouldSkipVelopack(msiDatabaseSeesProduct: true, registryViewSeesProduct: entry != null);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// The product code of our MSI registration as the Windows Installer
+        /// service sees it (MsiEnumProductsW), independent of the ARP registry
+        /// keys a security product can blind. Null when nothing is installed.
+        /// </summary>
+        private static string? MsiDatabaseProductCode()
+        {
+            var code = new StringBuilder(39);
+            for (int index = 0; index < 4096; index++)
+            {
+                code.Clear();
+                if (MsiEnumProductsW(index, code) != 0)
+                    break;
+
+                string candidate = code.ToString();
+                if (candidate.Length == 0)
+                    continue;
+
+                var name = new StringBuilder(256);
+                uint nameLength = (uint)name.Capacity;
+                if (MsiGetProductInfoW(candidate, "ProductName", name, ref nameLength) != 0)
+                    continue;
+
+                if (UninstallSentinel.ProductName.Equals(name.ToString(), StringComparison.OrdinalIgnoreCase))
+                    return candidate;
+            }
+
+            return null;
+        }
+
+        [DllImport("msi.dll", CharSet = CharSet.Unicode)]
+        private static extern int MsiEnumProductsW(int index, StringBuilder productCode);
+
+        [DllImport("msi.dll", CharSet = CharSet.Unicode)]
+        private static extern int MsiGetProductInfoW(
+            string productCode, string attribute, StringBuilder buffer, ref uint bufferLength);
     }
 }
