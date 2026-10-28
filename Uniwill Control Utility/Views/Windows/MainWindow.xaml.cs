@@ -891,11 +891,30 @@ namespace Uniwill_Control_Utility.Views.Windows
         }
 
         /// <summary>
-        /// Applies EC fan curve and battery charge limit at app startup.
-        /// Runs once from mainWindow_Loaded — not on every Dashboard navigation.
+        /// Applies EC fan curve and battery charge limit at app startup, as a
+        /// phase-1 startup task (not on every Dashboard navigation). Skipped and
+        /// marked pending when the engine service is not running, then applied once
+        /// when it reaches Running.
         /// </summary>
         internal static void ApplyEcSettingsOnStart()
         {
+            // Availability gate. Every EC call below is a pipe connect, and a connect
+            // to the missing pipe of a stopped engine costs the full 5 s connect
+            // timeout - here on the splash path, where the fan curve, the smart-fan
+            // start and the battery re-read add up to the "Initializing stalls" report.
+            // With the engine down these writes cannot succeed, so the apply is marked
+            // pending and the engine's Running transition performs it (App ensures the
+            // service right after the splash).
+            var availability = App.GetService<Uniwill_Control_Utility.Services.EngineAvailability>();
+            if (availability is not null && !availability.IsRunning)
+            {
+                App.GetService<Uniwill_Control_Utility.Services.EngineStartupApply>()?.MarkPending();
+                Serilog.Log.Debug(
+                    "[Engine] EC startup apply skipped: the engine service is not running (state {State})",
+                    availability.Query());
+                return;
+            }
+
             var fan = App.GetService<IFanCapability>();
             var battery = App.GetService<IBatteryCapability>();
             if (fan is null || battery is null)

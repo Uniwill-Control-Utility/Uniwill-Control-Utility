@@ -377,6 +377,13 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<IEcCpuTemperatureSource>(provider =>
                             provider.GetRequiredService<EcTelemetryService>());
 
+                        // Engine service state: the SCM probe every EC call site gates
+                        // on (a connect to a stopped engine's pipe costs the full 5 s
+                        // connect timeout, and the startup path issues many), plus the
+                        // pending marker for EC writes skipped while it was down.
+                        services.AddSingleton<EngineAvailability>();
+                        services.AddSingleton<EngineStartupApply>();
+
                         // Hardware Performance / Q-key button intercept: polls the EC
                         // TCC offset register for button presses and cycles UCU presets.
                         services.AddSingleton<QKeyButtonService>();
@@ -1003,6 +1010,79 @@ namespace Uniwill_Control_Utility
                 Views.Windows.MainWindow.AsyncApplyKeyboardOnStart());
         }
 
+        /// <summary>
+        /// Ensures the engine service, then applies the EC settings that startup
+        /// skipped because the engine was not running (fan curve, battery charge
+        /// limit - see <see cref="EngineStartupApply"/>).
+        ///
+        /// The order is the point: the service ensure is an SCM operation and is
+        /// cheap, so it runs first; the EC writes need the engine up, so they follow
+        /// it instead of racing it on the splash. A start that needs elevation shows
+        /// its prompt here, after the window is up, not inside the splash.
+        /// </summary>
+        private static async Task EnsureEngineAndApplyDeferredEcSettingsAsync()
+        {
+            var availability = GetService<EngineAvailability>();
+            if (availability is null)
+                return;
+
+            // A service the app cannot start (declined UAC) may be started later by
+            // the SCM at boot, by services.msc, or by a repair pass in this process.
+            // The transition event is what makes the deferred apply survive that.
+            if (!_engineStartedHooked)
+            {
+                _engineStartedHooked = true;
+                availability.Started += () => SafeFireAndForget(ApplyDeferredEcSettingsIfPendingAsync());
+            }
+
+            EngineEnsureOutcome outcome = await EngineLifecycle.EnsureAsync(availability);
+
+            await ApplyDeferredEcSettingsIfPendingAsync(outcome);
+        }
+
+        /// <summary>One subscription per process to the engine's Running transition.</summary>
+        private static bool _engineStartedHooked;
+
+        /// <summary>
+        /// Applies the deferred EC settings when the engine is up and the mark is
+        /// pending. The mark survives an engine that is still down: the EC charge
+        /// limit resets to the BIOS default at every cold boot, so a skipped write
+        /// must stay pending rather than be dropped on the floor.
+        /// </summary>
+        private static async Task ApplyDeferredEcSettingsIfPendingAsync(
+            EngineEnsureOutcome? outcome = null)
+        {
+            var availability = GetService<EngineAvailability>();
+            var deferred = GetService<EngineStartupApply>();
+            if (availability is null || deferred is null || !deferred.IsPending)
+                return;
+
+            if (!availability.IsRunning)
+            {
+                _logger?.LogWarning(
+                    "Engine service is not running{Outcome}; the deferred EC fan curve and battery charge limit stay pending"
+                    + " until the service starts",
+                    outcome is null ? "" : $" ({outcome})");
+                return;
+            }
+
+            if (!deferred.ConsumePending())
+                return;
+
+            _logger?.LogInformation(
+                "Engine service is running{Outcome}; applying the EC settings startup deferred",
+                outcome is null ? "" : $" ({outcome})");
+
+            try
+            {
+                await Task.Run(Views.Windows.MainWindow.ApplyEcSettingsOnStart);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Deferred EC settings apply failed");
+            }
+        }
+
         private static async Task RunPostStartupTasksAsync()
         {
             try
@@ -1027,10 +1107,12 @@ namespace Uniwill_Control_Utility
 
             // Engine service: install when missing (one elevated self-launch,
             // the single UAC prompt of the product), start when stopped (the
-            // service DACL grants the unelevated app SERVICE_START). This
-            // replaces the App Paths auto-elevation shim the retired
-            // requireAdministrator manifest needed: the app is asInvoker now.
-            SafeFireAndForget(EngineLifecycle.EnsureAsync());
+            // service DACL grants the unelevated app SERVICE_START), re-assert
+            // the registration when it is not openable (a DACL from a build
+            // before that grant). This replaces the App Paths auto-elevation
+            // shim the retired requireAdministrator manifest needed: the app is
+            // asInvoker now.
+            SafeFireAndForget(EnsureEngineAndApplyDeferredEcSettingsAsync());
 
             // Migrate the legacy "UCU" autostart task (pre-engine name,
             // registered with highest privileges) to the "UCU Autostart" task.

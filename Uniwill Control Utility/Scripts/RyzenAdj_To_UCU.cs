@@ -60,6 +60,19 @@ namespace Uniwill_Control_Utility.Scripts
                     .ToArray();
 
                 DiagnosticLogger.LogDebug($"Translate string: {normalizedCommands}");
+
+                // The EC verbs in this batch are one pipe connect each. Two facts make
+                // them worth guarding: a connect to the missing pipe of a stopped
+                // engine costs the full 5 s connect timeout, and a wedged EC costs the
+                // engine's 30 s call budget (the client waits up to its 45 s response
+                // budget) - so a preset with seven ec-* writes costs 35 s with the
+                // engine down and minutes with the EC wedged, on the startup path.
+                // Neither state changes part-way through a batch, so: skip the ec-*
+                // commands when the service is not running, and stop sending them at
+                // the first unavailable/timeout. The non-EC commands (SMU, Intel,
+                // NVIDIA, Windows) are app-side and keep running.
+                bool ecBatchStopped = false;
+
                 foreach (string ryzenAdjCommand in ryzenAdjCommands)
                 {
                         try
@@ -135,6 +148,19 @@ namespace Uniwill_Control_Utility.Scripts
                                     continue;
                                 }
 
+                                if (ecBatchStopped)
+                                {
+                                    DiagnosticLogger.LogDebug($"EC command skipped: this batch already lost the engine ({ryzenAdjCommandString})");
+                                    continue;
+                                }
+
+                                var engineState = App.GetService<Uniwill_Control_Utility.Services.EngineAvailability>();
+                                if (engineState is not null && !engineState.IsRunning)
+                                {
+                                    DiagnosticLogger.LogDebug($"EC command skipped: the engine service is not running ({ryzenAdjCommandString})");
+                                    continue;
+                                }
+
                                 // On first EC command in a batch, set OVERBOOST profile.
                                 // This replicates the Linux tuxedo_io driver's uw_set_tdp()
                                 // which calls uw_set_performance_profile_v1(PROFILE_OVERBOOST)
@@ -180,6 +206,24 @@ namespace Uniwill_Control_Utility.Scripts
                                 // 55W default. The original UCU includes this delay.
                                 const int SmuCommandDelayMs = 50;
                                 Thread.Sleep(SmuCommandDelayMs);
+                            }
+                        }
+                        catch (UCU.Contracts.EngineException ex) when (
+                            ex.Code == UCU.Contracts.EngineErrorCode.HardwareUnavailable
+                            || ex.Code == UCU.Contracts.EngineErrorCode.Timeout
+                            || ex.Code == UCU.Contracts.EngineErrorCode.Busy)
+                        {
+                            // The engine answered "hardware unavailable / busy / too slow".
+                            // For an EC write that will not improve while the batch runs,
+                            // so stop sending EC verbs and keep the app-side ones.
+                            if (ryzenAdjCommand.Contains("ec-", StringComparison.Ordinal))
+                            {
+                                ecBatchStopped = true;
+                                DiagnosticLogger.LogDebug($"EC commands stopped for this batch: engine {ex.Code} at {ryzenAdjCommand}");
+                            }
+                            else
+                            {
+                                DiagnosticLogger.LogError(ex, $"Failed to process command: {ryzenAdjCommand}");
                             }
                         }
                         catch (Exception ex)

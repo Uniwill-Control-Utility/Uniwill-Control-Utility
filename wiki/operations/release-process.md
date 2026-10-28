@@ -168,10 +168,18 @@ path. Each shipped route needs its own pass.
 - Engine service state after install: `services.msc` shows **UCU Engine**
   (SCM name `UCUEngine`, `start= auto`, recovery restart x3/min),
   `sc qc UCUEngine` reports a binPath inside the install root's version
-  directory, `sc sdshow UCUEngine` shows the Authenticated Users
-  query/start grant, and every fan/battery/keyboard operation runs with no
+  directory, `sc sdshow UCUEngine` shows
+  `D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;CCSWRPRC;;;AU)` - Authenticated Users with
+  query-config, query-status, **start** (RP) and read-control, and no
+  `LC` (change-config) - and every fan/battery/keyboard operation runs with no
   UAC prompt (the one prompt of the product is the first-launch engine
   install).
+- Engine service across an MSI uninstall/reinstall: the MSI uninstall route
+  (`msiexec /x`) leaves the registration and its DACL behind (only the
+  `Uninstall.exe` shim stops and deletes it). Launching after such a
+  reinstall must self-heal: the app detects that it cannot open the service,
+  shows one elevation, re-asserts the DACL and starts it, and the EC metrics
+  appear without touching `services.msc`.
 - Supervision: kill the app process (Task Manager) and confirm the engine
   relaunches it; a tray exit must stay silent (no relaunch).
 - In-app update (MSI layout only): point the feed at a local `Releases\`

@@ -86,6 +86,12 @@ The CPU's own sensor requires the PawnIO driver, and PawnIO's device ACL admits 
 
 Confirm laptop detection, `ACPIDriverDll.dll` loading, and EC initialization in the log. OEM firmware and register maps differ; do not infer support only from the chassis brand.
 
+### The engine service is installed, stopped, and the app does not start it
+
+The app owns the engine's lifecycle and starts a stopped engine unelevated, because the service DACL grants Authenticated Users `SERVICE_START` (RP). When the app logs `Could not start the engine service` / `not allowed to start it` with native code 5 (`Access is denied`), the registration carries a DACL from a build that predates the grant - typical after an `msiexec /x` uninstall, which leaves the registration (and its DACL) behind, followed by a reinstall.
+
+`sc.exe sdshow UCUEngine` must read `D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;CCSWRPRC;;;AU)`. The app repairs this itself: it re-runs the elevated install (whose `sc sdset` re-asserts the DACL) and starts the service, one prompt. Manually: `"Service\Uniwill Control Utility Engine.exe" --install-engine` elevated, or `sc sdset` with the SDDL above. Reading the state is a `ServiceController` query and never needs privilege; only the DACL repair does.
+
 ### Flydigi device does not connect
 
 - Confirm whether the device is BS1 (BLE) or BS2+ (HID).

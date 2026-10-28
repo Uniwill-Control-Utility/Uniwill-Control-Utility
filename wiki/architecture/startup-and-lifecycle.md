@@ -19,13 +19,15 @@ sequenceDiagram
         UAC-->>Eng: sc create start= auto, binPath, DACL, failure actions, sc start
     else service stopped
         App->>SCM: ServiceController.Start (granted by service DACL, no UAC)
+    else service not openable (access denied)
+        App->>UAC: runas "--install-engine" again - sc sdset re-asserts the DACL
     else dev checkout (no Service\ staging)
         App->>App: silent no-op — dev runs target a console-mode engine
     end
     SCM->>Eng: boot: start= auto starts the service
 ```
 
-- The install pass (`EngineInstaller` in the engine) is idempotent and re-applies binPath and DisplayName (the registration follows the exe through Velopack version directories, and re-applies the user-facing label "UCU Engine"; the SCM service name `UCUEngine` is the stable identity used by sc.exe and the app), the DACL `D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;CCLCSWLOCRRC;;;AU)` (the canonical "query, start" grant for Authenticated Users), the description, and SCM failure actions (restart ×3/min).
+- The install pass (`EngineInstaller` in the engine) is idempotent and re-applies binPath and DisplayName (the registration follows the exe through Velopack version directories, and re-applies the user-facing label "UCU Engine"; the SCM service name `UCUEngine` is the stable identity used by sc.exe and the app), the DACL `D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;CCSWRPRC;;;AU)` (Authenticated Users: query-config, query-status, **start**, read-control - and **not** `SERVICE_CHANGE_CONFIG`, which would let any authenticated user re-point `binPath` and execute as LocalSystem), the description, and SCM failure actions (restart ×3/min).
 - `--console` runs the identical host as a console app with logs under `%LOCALAPPDATA%\UCU\engine`; the installed service logs to `%ProgramData%\UCU\engine\`.
 
 ## App startup sequence
@@ -76,6 +78,20 @@ The deferred tasks probe resources outside the app's control, and each is bounde
 
 - **Update check:** 10 s.
 - **Game-library scan:** 10 s (`SyncGameLibraryWithBudgetAsync`). The scan walks every local volume plus the current user's Store packages, so the splash is released at the budget and the list publishes whenever the scan lands (`PublishGameLibraryScan`); a failed scan keeps the list already published, since `null` reads as "no games" to the FPS overlay and Adaptive Mode. The scan's drive loop also skips `DriveType.Network`: a disconnected mapped drive blocks `Directory.Exists` in the redirector until the redirector times out (measured 21–63 s per process pass against a dead host), which is what the "sluggish 60–71%" report was.
+
+- **EC writes at startup:** gated, not attempted. `EngineAvailability` answers "is the
+  engine service running" from the SCM (sub-millisecond, no pipe); the EC apply
+  (`MainWindow.ApplyEcSettingsOnStart`) and the preset's `ec-*` chain
+  (`RyzenAdj_To_UCU`) skip their writes when it says no, and a preset batch stops
+  sending `ec-*` verbs at the first `HardwareUnavailable`/`Timeout`/`Busy` because
+  that state does not change mid-batch. The gate exists because every engine verb is
+  a pipe connect and a connect to the missing pipe of a stopped engine costs the whole
+  5 s connect timeout (measured): the un-gated path paid it per verb - the EC apply
+  issues 2-3 and a preset up to 7 - which is what froze the splash at 78 %
+  (4 of 6 visible tasks done: `50 + 4/6 × 42`). Writes skipped this way are marked
+  pending (`EngineStartupApply`) and applied once the service reaches `Running`:
+  the EC resets the battery charge limit to the BIOS default at every cold boot, so
+  "skipped" must not become "lost".
 
 Bounded tasks report at `Warning` when they outlive their budget, so the log distinguishes "the app is slow" from "a resource the user has is offline".
 

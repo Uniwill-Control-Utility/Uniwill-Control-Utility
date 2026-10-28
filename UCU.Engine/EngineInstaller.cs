@@ -17,17 +17,29 @@ namespace UCU.Engine
     internal static class EngineInstaller
     {
         /// <summary>
-        /// Service DACL. System and Administrators keep full control;
-        /// Authenticated Users get the canonical SDDL grant for
-        /// "query config, query status, start, interrogate, read control"
-        /// (CCLCSWLOCRRC - rights parse right-to-left in pairs) - exactly
-        /// what the unelevated app needs to keep the engine alive
-        /// (ServiceController status + start), and nothing else gains a
-        /// right. Without the start grant the de-elevated app could never
-        /// restart a stopped engine without a UAC prompt; without the
-        /// status grant it cannot even see that the service is stopped.
+        /// Service DACL. System and Administrators keep full control; Authenticated
+        /// Users - the identity the unelevated app runs as - get exactly the four
+        /// rights the product's design needs, decoded per ace (SDDL pairs read
+        /// left-to-right, each two letters is one right):
+        ///
+        ///   CC  SERVICE_QUERY_CONFIG   (0x0001) - read the registration
+        ///   SW  SERVICE_QUERY_STATUS    (0x0004) - see that the engine is stopped
+        ///   RP  SERVICE_START           (0x0010) - start it, which is what keeps a
+        ///                                       stopped engine from needing UAC
+        ///   RC  READ_CONTROL            (0x20000) - read the descriptor (diagnostics)
+        ///
+        /// <c>RP</c> is the right the whole de-elevation design rests on: without it
+        /// the app's <c>ServiceController.Start</c> answers "Access is denied" and
+        /// the app can never restart the engine it owns. What the ace
+        /// deliberately does *not* grant is as important: no
+        /// <c>LC</c>/SERVICE_CHANGE_CONFIG (an AU change-config ace lets any
+        /// authenticated user re-point binPath and get code execution as
+        /// LocalSystem), no <c>DT</c>/delete, no write-DAC. Stopping and removing
+        /// the service stay administrator-only: the update shim and the uninstall
+        /// shim run requireAdministrator, and the app has no reason to stop the
+        /// hardware service.
         /// </summary>
-        internal const string ServiceSddl = "D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;CCLCSWLOCRRC;;;AU)";
+        internal const string ServiceSddl = "D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;CCSWRPRC;;;AU)";
 
         /// <summary>
         /// What services.msc shows. The SCM service name stays the stable
