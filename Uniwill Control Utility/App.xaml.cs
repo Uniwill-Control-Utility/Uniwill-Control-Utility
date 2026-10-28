@@ -87,19 +87,13 @@ namespace Uniwill_Control_Utility
             if (UninstallSentinel.IsBeingUninstalled())
                 return;
 
-            // Velopack's MSI launches this exe elevated with --velopackuninstall
-            // during the Control Panel / Settings uninstall - and those routes run
-            // the MSI by product code and ignore the ARP UninstallString, so this
-            // is the only in-band place the standard Windows uninstall can remove
-            // the engine service (the app registered it, the MSI never owned it).
-            // The cleanup is bounded by design (field evidence: the first version
-            // ran unbounded SCM + schtasks waits inside the custom action's child
-            // and the wizard stalled >5 minutes): the synchronous part is only the
-            // service stop+delete - the live service locks its exe and the MSI
-            // must not delete files under it (that is a reboot prompt) - capped at
-            // 20 s, and everything slow goes to a detached cmd that outlives the
-            // wizard. The app never launches from this argument: VelopackApp.Run()
-            // handles --velopackuninstall and exits the process.
+            // Velopack's MSI launches this exe with --velopackuninstall during any
+            // /x transaction of the product. Since the sentinel design the handler
+            // is a logged no-op (see the method): a ghost registration's /x fires
+            // the same hook, and the sweep the hook used to run destroyed live
+            // installs. Removal intent belongs to UninstallSentinel; the verb owns
+            // the sweep. The app never launches from this argument:
+            // VelopackApp.Run() handles --velopackuninstall and exits the process.
             if (StartupArgs.Contains("--velopackuninstall", StringComparer.OrdinalIgnoreCase))
                 CleanupEngineOnVelopackUninstall();
 
@@ -115,135 +109,39 @@ namespace Uniwill_Control_Utility
         }
 
         /// <summary>
-        /// Uninstall-time cleanup on the elevated Velopack hook (the Control
-        /// Panel / Settings route). Two-speed by design: the service stop+delete
-        /// is synchronous and capped, because the running service locks its exe
-        /// and the MSI must not delete files under a live service (that is the
-        /// reboot-prompt state); everything slow - tasks, ARP husks, install-root
-        /// leftovers - goes to a detached cmd that outlives the wizard and costs
-        /// the custom action's child-wait nothing. Best effort throughout: an
-        /// uninstall never fails on cleanup. The Uninstall.exe shim remains the
-        /// self-contained route producing the same end state.
+        /// Velopack's uninstall hook is a logged no-op since the sentinel design,
+        /// and this is field-proven necessity. The hook fires during ANY of the
+        /// product's /x transactions - including Velopack's own startup
+        /// self-repair passes over stale per-user ghost registrations, which
+        /// fire on machines that carry them long after nobody uninstalled
+        /// anything. The pre-sentinel hook ran a machine sweep (stop+delete the
+        /// service, kill the app, delete the tasks and the install root), so a
+        /// ghost /x destroyed the LIVE install: the app died ~20 s after every
+        /// launch, the service and layout were removed, and the registration
+        /// /x loop kept re-firing the hook (observed on the dev box: the whole
+        /// install self-destructed at 18:12:35, eighteen seconds after launch).
+        /// Uninstall intent is detected by UninstallSentinel - the vanished
+        /// registration arms the full sweep through the verb's SYSTEM task,
+        /// within ~10 s of a real Control Panel /x - and the thin Velopack MSI
+        /// needs no help inside its own wizard (it removes no locked files:
+        /// /x completes in ~2.3 s, no reboot prompt). This method contributes
+        /// its log line and nothing else.
         /// </summary>
         private static void CleanupEngineOnVelopackUninstall()
         {
             string log = System.IO.Path.Combine(
                 System.IO.Path.GetTempPath(), "ucu_uninstall_log.txt");
 
-            // Close the running app first, exactly as the Uninstall.exe shim does:
-            // it locks the files the MSI is about to delete (a locked exe means
-            // delete-pending files and a reboot prompt), and a live app would
-            // outlive its own uninstall. This process is the installer's launcher
-            // child (same image name), so it is excluded by id.
-            foreach (string appName in new[] { "Uniwill Control Utility", "UCU Guardian" })
-            {
-                foreach (Process running in Process.GetProcessesByName(appName))
-                {
-                    try
-                    {
-                        if (running.Id != System.Environment.ProcessId)
-                            running.Kill();
-                    }
-                    catch
-                    {
-                        // Exiting, already gone, or unkillable: the wizard proceeds.
-                    }
-                    finally
-                    {
-                        running.Dispose();
-                    }
-                }
-            }
-
-            int engineRc = -1;
             try
             {
-                string engine = System.IO.Path.Combine(
-                    AppContext.BaseDirectory, "Service", "Uniwill Control Utility Engine.exe");
-                if (System.IO.File.Exists(engine))
-                {
-                    // The engine's own console verb (sc stop + sc delete, the same
-                    // pass the shim runs), inheriting this process's elevation.
-                    // Console exe, no UI, no WPF: the field stall was a full app
-                    // startup inside the installer's child.
-                    using Process? proc = Process.Start(new ProcessStartInfo(
-                        engine, "--uninstall-engine")
-                    {
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                    });
-                    if (proc is not null)
-                    {
-                        proc.WaitForExit(20_000);
-                        engineRc = proc.HasExited ? proc.ExitCode : -1;
-                    }
-                }
-
                 System.IO.File.AppendAllText(log,
-                    "velopack-hook: engine --uninstall-engine rc=" + engineRc +
-                    " " + DateTime.Now + System.Environment.NewLine);
-            }
-            catch (Exception ex)
-            {
-                try
-                {
-                    System.IO.File.AppendAllText(log,
-                        "velopack-hook: engine cleanup threw: " + ex.Message +
-                        " " + DateTime.Now + System.Environment.NewLine);
-                }
-                catch
-                {
-                    // Logging is a luxury here; the uninstall proceeds.
-                }
-            }
-
-            SpawnDetachedUninstallTail();
-        }
-
-        /// <summary>
-        /// The slow tail of the Control Panel uninstall, in a cmd that survives
-        /// the custom action: the autostart/legacy tasks, the ARP husk entries
-        /// the self-heal writes, and the install root the MSI cannot fully remove
-        /// (runtime logs are not MSI components). Two rd passes with a gap: the
-        /// first catches an already-finished wizard, the second one still
-        /// deleting.
-        /// </summary>
-        private static void SpawnDetachedUninstallTail()
-        {
-            string root = System.IO.Path.GetFullPath(
-                System.IO.Path.Combine(AppContext.BaseDirectory, ".."));
-
-            string bat = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(), "ucu-uninstall-tail.cmd");
-
-            try
-            {
-                System.IO.File.WriteAllText(bat, string.Join(
-                    "\r\n",
-                    "@echo off",
-                    "ping -n 9 127.0.0.1 >nul",
-                    "schtasks /delete /tn \"UCU Autostart\" /f",
-                    "schtasks /delete /tn \"UCU\" /f",
-                    "schtasks /delete /tn \"UCU Guardian\" /f",
-                    "reg delete \"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Uniwill-Control-Utility\" /f",
-                    "reg delete \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MSI:Uniwill-Control-Utility\" /f",
-                    "rd /s /q \"" + root + "\"",
-                    "ping -n 9 127.0.0.1 >nul",
-                    "rd /s /q \"" + root + "\""));
-
-                // Fire and forget: the child of an installer custom action is not
-                // killed with it (no job object), so this cmd runs the tail past
-                // the wizard's own exit.
-                Process.Start(new ProcessStartInfo("cmd.exe", "/c \"" + bat + "\"")
-                {
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                });
+                    "velopack-hook: noop (the sentinel detects removal intent; " +
+                    "the verb sweep owns uninstall completeness) " +
+                    DateTime.Now + System.Environment.NewLine);
             }
             catch
             {
-                // The tail is a convenience for the Control Panel route, never a
-                // reason to fail the uninstall; the shim route removes all of it.
+                // Logging is a luxury here; the uninstall proceeds.
             }
         }
 
