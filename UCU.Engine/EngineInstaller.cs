@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Text;
 using Microsoft.Win32;
 using Serilog;
 
@@ -340,7 +342,9 @@ namespace UCU.Engine
                 "schtasks.exe", "/Delete /TN \"UCU Autostart\" /F").ConfigureAwait(false);
             await RunCleanupCommandAsync(
                 "schtasks.exe", "/Delete /TN \"UCU Guardian\" /F").ConfigureAwait(false);
-            DeleteArpHusks();
+            DeleteArpHusks(RegistryHive.LocalMachine);
+            DeleteArpHusks(RegistryHive.CurrentUser);
+            await SweepStaleUserRegistrations().ConfigureAwait(false);
             DeleteProgramDataLogs();
             DeleteInstallLayout();
 
@@ -374,7 +378,8 @@ namespace UCU.Engine
             }
         }
 
-        private static async Task RunCleanupCommandAsync(string fileName, string arguments)
+        private static async Task RunCleanupCommandAsync(
+            string fileName, string arguments, TimeSpan? timeout = null)
         {
             try
             {
@@ -385,7 +390,7 @@ namespace UCU.Engine
                 };
 
                 using Process process = Process.Start(psi)!;
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                using var cts = new CancellationTokenSource(timeout ?? TimeSpan.FromSeconds(15));
                 await process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
                 Log.Debug("[EngineInstaller] cleanup {File} {Args} exited {Code}",
                     fileName, arguments, process.ExitCode);
@@ -401,18 +406,18 @@ namespace UCU.Engine
         /// "MSI:Uniwill-Control-Utility" husk the registration pass leaves
         /// when the thin MSI removal unregisters the product, Velopack's GUID
         /// husk (its HKLM entry, plus the orphaned product-key entry when the
-        /// MSI's display pass orphans it), and the legacy plain-name key.
-        /// Matching is by DisplayName so no key name is hardcoded.
+        /// MSI's display pass orphans it), the per-user shim key, and the
+        /// legacy plain-name key. Matching is by DisplayName so no key name
+        /// is hardcoded.
         /// </summary>
-        private static void DeleteArpHusks()
+        private static void DeleteArpHusks(RegistryHive hive)
         {
             const string UninstallPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
 
             try
             {
-                using RegistryKey localMachine =
-                    RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
-                using RegistryKey? uninstall = localMachine.OpenSubKey(UninstallPath);
+                using RegistryKey baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Registry64);
+                using RegistryKey? uninstall = baseKey.OpenSubKey(UninstallPath);
                 if (uninstall == null)
                     return;
 
@@ -431,17 +436,104 @@ namespace UCU.Engine
                         }
 
                         uninstall.DeleteSubKeyTree(keyName, throwOnMissingSubKey: false);
-                        Log.Debug("[EngineInstaller] ARP husk removed: {Key}", keyName);
+                        Log.Debug("[EngineInstaller] ARP husk removed: {Hive}\\{Key}", hive, keyName);
                     }
                     catch (Exception ex)
                     {
-                        Log.Debug(ex, "[EngineInstaller] ARP husk {Key} not removed", keyName);
+                        Log.Debug(ex, "[EngineInstaller] ARP husk {Hive}\\{Key} not removed", hive, keyName);
                     }
                 }
             }
             catch (Exception ex)
             {
-                Log.Debug(ex, "[EngineInstaller] ARP husks not swept");
+                Log.Debug(ex, "[EngineInstaller] ARP husks ({Hive}) not swept", hive);
+            }
+        }
+
+        /// <summary>
+        /// Remove the stale per-user MSI registrations old broken uninstalls
+        /// leave behind (the thin package unregisters the machine context;
+        /// the user-context assignment survives, and every surviving
+        /// registration is a Control Panel husk entry naming the product).
+        /// The key surgery has two passes: the MSI's own removal where its
+        /// cached package still resolves (msiexec /x), and for the husks
+        /// whose package is gone, the registration keys themselves -
+        /// HKLM\SOFTWARE\Classes\Installer\Products (both views), the
+        /// 64-bit-resolved HKCR\Installer\Products key (Wow6432Node alias),
+        /// and HKCU\Installer\Products: a full user removal is a complete
+        /// removal. Machine-scope entries are skipped: the /x transaction
+        /// that triggered this verb owns those.
+        /// </summary>
+        private static async Task SweepStaleUserRegistrations()
+        {
+            var codes = new List<string>();
+            var product = new StringBuilder(39);
+            for (int index = 0; index < 4096; index++)
+            {
+                if (MsiEnumProductsW(index, product) != 0)
+                    break;
+
+                var name = new StringBuilder(256);
+                uint nameLength = 256;
+                if (MsiGetProductInfoW(product.ToString(), "ProductName", name, ref nameLength) == 0 &&
+                    string.Equals(name.ToString(), "Uniwill Control Utility", StringComparison.OrdinalIgnoreCase))
+                {
+                    codes.Add(product.ToString());
+                }
+
+                product.Clear();
+            }
+
+            foreach (string code in codes)
+            {
+                Log.Debug("[EngineInstaller] sweeping stale registration {Code}", code);
+                await RunCleanupCommandAsync(
+                    "msiexec.exe", "/x " + code + " /qn", TimeSpan.FromSeconds(60)).ConfigureAwait(false);
+                RemoveRegistrationKeys(code);
+            }
+        }
+
+        private static void RemoveRegistrationKeys(string productCode)
+        {
+            string compact = productCode.Trim('{', '}').Replace("-", "");
+
+            var hives = new[]
+            {
+                (RegistryHive.LocalMachine, RegistryView.Registry64),
+                (RegistryHive.LocalMachine, RegistryView.Registry32),
+                (RegistryHive.CurrentUser, RegistryView.Registry64),
+                (RegistryHive.CurrentUser, RegistryView.Registry32),
+            };
+
+            foreach (var (hive, view) in hives)
+            {
+                DeleteInstallerProductKeys(hive, view, "SOFTWARE\\Classes\\Installer\\Products", compact);
+                DeleteInstallerProductKeys(hive, view, "SOFTWARE\\Microsoft\\Installer\\Products", compact);
+            }
+
+            // HKCR\Installer\Products is the 64-bit resolved view of the
+            // machine registration (HKLM\SOFTWARE\Classes\Installer\... under
+            // Wow6432Node); delete it from the 64-bit base view.
+            DeleteInstallerProductKeys(
+                RegistryHive.LocalMachine, RegistryView.Registry64, @"Classes\Installer\Products", compact);
+        }
+
+        private static void DeleteInstallerProductKeys(
+            RegistryHive hive, RegistryView view, string productsPath, string compactCode)
+        {
+            foreach (string suffix in new[] { "", "x", "X" })
+            {
+                string key = productsPath + "\\" + compactCode + suffix;
+                try
+                {
+                    using RegistryKey baseKey = RegistryKey.OpenBaseKey(hive, view);
+                    baseKey.DeleteSubKeyTree(key, throwOnMissingSubKey: false);
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug(ex, "[EngineInstaller] registration key {Hive}\\{View}\\{Key} not removed",
+                        hive, view, key);
+                }
             }
         }
 
@@ -503,6 +595,13 @@ namespace UCU.Engine
                 Log.Debug(ex, "[EngineInstaller] install layout not removed");
             }
         }
+
+        [DllImport("msi.dll", CharSet = CharSet.Unicode, EntryPoint = "MsiEnumProductsW")]
+        private static extern int MsiEnumProductsW(int index, StringBuilder productCode);
+
+        [DllImport("msi.dll", CharSet = CharSet.Unicode, EntryPoint = "MsiGetProductInfoW")]
+        private static extern int MsiGetProductInfoW(
+            string productCode, string attribute, StringBuilder value, ref uint valueLength);
 
         /// <summary>
         /// The install runs elevated from the user's session, so the log lands

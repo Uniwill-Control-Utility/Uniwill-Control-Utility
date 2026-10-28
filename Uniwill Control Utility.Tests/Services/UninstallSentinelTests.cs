@@ -83,14 +83,27 @@ public sealed class UninstallSentinelTests
     }
 
     [Fact]
-    public void ProductRegistered_MatchesTheVpkProductNameCaseInsensitively()
+    public void Registered_MatchesTheProductNameCaseInsensitively()
     {
-        Assert.True(UninstallSentinel.ProductRegistered(
+        Assert.True(UninstallSentinel.Registered(
             ["Some App", "Uniwill Control Utility"]));
-        Assert.True(UninstallSentinel.ProductRegistered(
+        Assert.True(UninstallSentinel.Registered(
             ["uniwill control utility"]));
-        Assert.False(UninstallSentinel.ProductRegistered(
+        Assert.False(UninstallSentinel.Registered(
             ["Some App", "Uniwill Control Utility Pro"]));
-        Assert.False(UninstallSentinel.ProductRegistered([]));
+        Assert.False(UninstallSentinel.Registered([]));
+    }
+
+    [Fact]
+    public void EnumerateMachineRegistrations_ProbeIsHiveSafe()
+    {
+        // A dev-box run has no machine registration: the probe must be
+        // callable and must not throw. (The MsiExec UninstallString rule and
+        // the HKLM-64 scoping are the field-proven contract: husk entries -
+        // the velopack shim, old broken-uninstall keys - carry no MsiExec
+        // string, and per-user registrations live in other hives.)
+        string[] names = UninstallSentinel.EnumerateMachineRegistrations();
+        Assert.All(names, name =>
+            Assert.True(string.Equals(name, UninstallSentinel.ProductName, StringComparison.OrdinalIgnoreCase)));
     }
 }

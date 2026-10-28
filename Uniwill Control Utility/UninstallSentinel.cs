@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Microsoft.Win32;
 
 namespace Uniwill_Control_Utility
 {
@@ -22,36 +21,41 @@ namespace Uniwill_Control_Utility
     /// that launch the installed exes at uninstall is a proven dead end in
     /// this package: every exe-CustomAction encoding fails to CreateProcess
     /// a .NET apphost from the msiserver service session (1721 empty source
-    /// location / 1338 at process creation), and Velopack's own uninstall
+    /// location / process-creation failures), and Velopack's own uninstall
     /// hook is a per-user-temp design that no-ops in the SYSTEM execute
     /// context of a per-machine install.
     ///
     /// What is guaranteed present during every such uninstall is the app
     /// itself: the removal never kills it, so it outlives the transaction.
-    /// This sentinel watches the MSI product registration (the one fact the
-    /// thin uninstall does change); when the product vanishes, the app
-    /// self-executes the engine's elevated --uninstall-engine verb - the
-    /// single full-cleanup entry point shared with the Uninstall.exe shim
-    /// (service stop+delete, app kill, tasks, ARP husks, ProgramData logs,
-    /// install layout) - and exits. One UAC prompt at uninstall, the same
-    /// consent the shim route asks for, and every removal route converges
-    /// on the same end state.
+    /// This sentinel watches the one fact the thin uninstall does change -
+    /// the machine's Add/Remove Programs registration for the product (the
+    /// HKLM GUID entry whose UninstallString is the MsiExec call the Control
+    /// Panel is running; watching MSI product enumeration instead is
+    /// poisoned by stale per-user registrations old broken uninstalls
+    /// leave) - and when it vanishes, the app self-executes the engine's
+    /// elevated --uninstall-engine verb: the single full-cleanup entry point
+    /// shared with the Uninstall.exe shim (service stop+delete, app kill,
+    /// tasks, ARP husks, stale per-user MSI registrations, ProgramData logs,
+    /// install layout). One UAC prompt at uninstall, the same consent the
+    /// shim route asks for, and every removal route converges on the same
+    /// end state.
     /// </summary>
     internal sealed class UninstallSentinel
     {
-        /// <summary>The MSI ProductName written by vpk's generated package.</summary>
+        /// <summary>The ARP DisplayName vpk's generated package registers.</summary>
         internal const string ProductName = "Uniwill Control Utility";
 
         /// <summary>
-        /// Consecutive polls without the product before acting. The /x
+        /// Consecutive polls without the registration before acting. The /x
         /// transaction is over in ~2 s; two misses debounce a transient
-        /// enumeration failure, at a cost of ~10 s of detection latency.
+        /// registry failure, at a cost of ~10 s of detection latency.
         /// </summary>
         internal const int MissesToFire = 2;
 
         private static readonly TimeSpan DefaultPollInterval = TimeSpan.FromSeconds(5);
+        private static readonly Regex GuidKey = new(@"^\{[0-9A-Fa-f-]+\}$", RegexOptions.Compiled);
 
-        private readonly Func<string[]> _enumerateProductNames;
+        private readonly Func<string[]> _enumerateRegistrations;
         private readonly Action _onUninstallDetected;
         private readonly Action<string> _log;
         private readonly TimeSpan _pollInterval;
@@ -60,25 +64,25 @@ namespace Uniwill_Control_Utility
         private bool _armed;
         private bool _fire;
 
-        /// <summary>Test seam: inject the enumeration and the reaction.</summary>
+        /// <summary>Test seam: inject the probe and the reaction.</summary>
         internal UninstallSentinel(
-            Func<string[]> enumerateProductNames,
+            Func<string[]> enumerateRegistrations,
             Action onUninstallDetected,
             Action<string> log,
             TimeSpan? pollInterval = null)
         {
-            _enumerateProductNames = enumerateProductNames;
+            _enumerateRegistrations = enumerateRegistrations;
             _onUninstallDetected = onUninstallDetected;
             _log = log;
             _pollInterval = pollInterval ?? DefaultPollInterval;
         }
 
         /// <summary>
-        /// Production wiring: watch the real MSI registry, run the elevated
-        /// engine verb, log through the app logger.
+        /// Production wiring: watch the real machine ARP registration, run
+        /// the elevated engine verb, log through the app logger.
         /// </summary>
         public static UninstallSentinel CreateDefault(Action<string> log) =>
-            new(EnumerateMsiProductNames, RunEngineUninstallVerb, log);
+            new(EnumerateMachineRegistrations, RunEngineUninstallVerb, log);
 
         /// <summary>Watch in the background for the lifetime of the process.</summary>
         public void Start() => _ = Task.Run(RunAsync);
@@ -90,21 +94,21 @@ namespace Uniwill_Control_Utility
                 bool found;
                 try
                 {
-                    found = ProductRegistered(_enumerateProductNames());
+                    found = Registered(_enumerateRegistrations());
                 }
                 catch (Exception ex)
                 {
-                    // An enumeration failure says nothing about the product;
+                    // A probe failure says nothing about the registration;
                     // treat it as present so a broken probe never triggers a
                     // self-uninstall. The engine verb is destructive.
-                    _log("uninstall sentinel: product enumeration failed, treating as present: " + ex.Message);
+                    _log("uninstall sentinel: registration probe failed, treating as present: " + ex.Message);
                     found = true;
                 }
 
                 bool fire = Step(found);
                 if (fire)
                 {
-                    _log("uninstall sentinel: MSI registration gone, running the elevated engine uninstall verb");
+                    _log("uninstall sentinel: machine registration gone, running the elevated engine uninstall verb");
                     try
                     {
                         _onUninstallDetected();
@@ -126,11 +130,11 @@ namespace Uniwill_Control_Utility
         }
 
         /// <summary>
-        /// State machine: arm only after the product has been seen (dev runs
-        /// from a source layout with no registration stay inert), then fire
-        /// once it has been missing for <see cref="MissesToFire"/> consecutive
-        /// polls. A found product resets the miss count. Returns the new fire
-        /// decision.
+        /// State machine: arm only after the registration has been seen
+        /// (dev/portable runs have none from the start, so an un-armed
+        /// sentinel stays inert forever), then fire once it has been missing
+        /// for <see cref="MissesToFire"/> consecutive polls. A present
+        /// registration resets the miss count.
         /// </summary>
         internal bool Step(bool found)
         {
@@ -150,8 +154,47 @@ namespace Uniwill_Control_Utility
             return _fire;
         }
 
-        internal static bool ProductRegistered(string[] productNames) =>
-            productNames.Any(name => ProductName.Equals(name, StringComparison.OrdinalIgnoreCase));
+        internal static bool Registered(string[] registrationNames) =>
+            registrationNames.Any(name => ProductName.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>
+        /// The DisplayName of every HKLM (64-bit view) ARP entry that is a
+        /// live MSI machine registration for the product: GUID-format key,
+        /// our DisplayName, and the MsiExec UninstallString the Control Panel
+        /// invokes. Velopack's shim husk (UninstallString=Uninstall.exe) and
+        /// the old broken-uninstall husks never match the MsiExec rule, so
+        /// husks do not keep the sentinel armed, and per-user registrations
+        /// live in other hives, so old ones cannot poison the probe.
+        /// </summary>
+        internal static string[] EnumerateMachineRegistrations()
+        {
+            using RegistryKey localMachine =
+                RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+            using RegistryKey? uninstall = localMachine.OpenSubKey(
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
+            if (uninstall == null)
+                return Array.Empty<string>();
+
+            var names = new List<string>();
+            foreach (string keyName in uninstall.GetSubKeyNames())
+            {
+                if (!GuidKey.IsMatch(keyName))
+                    continue;
+
+                using RegistryKey? entry = uninstall.OpenSubKey(keyName);
+                if (entry?.GetValue("DisplayName") is not string displayName)
+                    continue;
+
+                if (!string.Equals(displayName, ProductName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string uninstallString = entry.GetValue("UninstallString") as string ?? "";
+                if (uninstallString.Contains("MsiExec", StringComparison.OrdinalIgnoreCase))
+                    names.Add(displayName);
+            }
+
+            return names.ToArray();
+        }
 
         /// <summary>
         /// Launches the engine exe with --uninstall-engine elevated (the verb
@@ -177,37 +220,5 @@ namespace Uniwill_Control_Utility
             Process.Start(psi);
             Environment.Exit(0);
         }
-
-        /// <summary>
-        /// Every MSI ProductName registered for this user and machine
-        /// (MsiEnumProducts covers per-user + per-machine products).
-        /// </summary>
-        internal static string[] EnumerateMsiProductNames()
-        {
-            var names = new List<string>();
-            var productCode = new StringBuilder(39);
-
-            for (int index = 0; index < 4096; index++)
-            {
-                if (MsiEnumProductsW(index, productCode) != 0)
-                    break;
-
-                var name = new StringBuilder(256);
-                uint nameLength = 256;
-                if (MsiGetProductInfoW(productCode.ToString(), "ProductName", name, ref nameLength) == 0)
-                    names.Add(name.ToString());
-
-                productCode.Clear();
-            }
-
-            return names.ToArray();
-        }
-
-        [DllImport("msi.dll", CharSet = CharSet.Unicode, EntryPoint = "MsiEnumProductsW")]
-        private static extern int MsiEnumProductsW(int index, StringBuilder productCode);
-
-        [DllImport("msi.dll", CharSet = CharSet.Unicode, EntryPoint = "MsiGetProductInfoW")]
-        private static extern int MsiGetProductInfoW(
-            string productCode, string attribute, StringBuilder value, ref uint valueLength);
     }
 }
