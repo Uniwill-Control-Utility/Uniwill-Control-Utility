@@ -70,6 +70,15 @@ Detailed stages:
 5. **Main-window initialization.** `MainWindow.Loaded` applies persisted profile/keyboard/light-bar/EC-fan/battery state — through the capability proxies, so an engine that is missing mid-startup degrades those pages instead of crashing. When relaunched by the supervisor (`--from-guardian`) the startup overlay is suppressed and the window opens minimized to the tray.
 6. **Deferred tasks.** `EngineLifecycle.EnsureAsync`, legacy scheduled-task migration (below), device auto-connect, Adaptive override flags, update/PawnIO checks, game scan, prerequisite dialog.
 
+### Startup budgets
+
+The deferred tasks probe resources outside the app's control, and each is bounded so the splash cannot be held by one slow resource:
+
+- **Update check:** 10 s.
+- **Game-library scan:** 10 s (`SyncGameLibraryWithBudgetAsync`). The scan walks every local volume plus the current user's Store packages, so the splash is released at the budget and the list publishes whenever the scan lands (`PublishGameLibraryScan`); a failed scan keeps the list already published, since `null` reads as "no games" to the FPS overlay and Adaptive Mode. The scan's drive loop also skips `DriveType.Network`: a disconnected mapped drive blocks `Directory.Exists` in the redirector until the redirector times out (measured 21–63 s per process pass against a dead host), which is what the "sluggish 60–71%" report was.
+
+Bounded tasks report at `Warning` when they outlive their budget, so the log distinguishes "the app is slow" from "a resource the user has is offline".
+
 ## Autostart and scheduled tasks
 
 - The logon task is **"UCU Autostart"**, registered with **limited** privileges (`TaskRunLevel.LUA`): the app is unelevated, and a standard user can register/run a limited task without UAC. The action's working directory is the exe folder.

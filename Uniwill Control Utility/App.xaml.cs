@@ -562,21 +562,13 @@ namespace Uniwill_Control_Utility
                 }));
 
                 // Load game library so the FPS overlay and Adaptive Mode have the
-                // installed games list ready immediately.
-                phase1Tasks.Add(Task.Run(() =>
+                // installed games list ready immediately. The scan is bounded by a
+                // startup budget (see SyncGameLibraryWithBudgetAsync) so a volume the
+                // user is not using cannot hold the splash.
+                phase1Tasks.Add(Task.Run(async () =>
                 {
-                    try
-                    {
-                        Game_Manager.installedGames = Game_Manager.syncGame_Library();
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Logger.Error(ex, "Failed to sync game library during startup");
-                    }
-                    finally
-                    {
-                        _ = startupWindow?.Dispatcher.InvokeAsync(() => tracker?.TaskCompleted(4));
-                    }
+                    await SyncGameLibraryWithBudgetAsync();
+                    _ = startupWindow?.Dispatcher.InvokeAsync(() => tracker?.TaskCompleted(4));
                 }));
 
                 // Check the GitHub Releases feed for a new Velopack package. The
@@ -1156,6 +1148,71 @@ namespace Uniwill_Control_Utility
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "Failed to self-heal the {Task} scheduled task", taskName);
+            }
+        }
+
+        /// <summary>
+        /// How long the splash waits for the game-library scan before releasing it.
+        /// Mirrors the update check's 10 s gate: both probe resources outside the app's
+        /// control (a feed, every volume on the machine) on the startup path.
+        /// </summary>
+        private static readonly TimeSpan GameLibraryStartupBudget = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// Scans the game library under a startup budget. The scan walks every local
+        /// volume, and one the user is not using can block a directory probe for tens of
+        /// seconds - a disconnected mapped network drive measured 21-63 s in the
+        /// redirector - so the splash is released at the budget and the list publishes
+        /// when the scan finishes. The scan's own drive loop skips network drives, so
+        /// reaching this budget means something else is slow; the budget is the guard for
+        /// the class, not for one device.
+        /// </summary>
+        private static async Task SyncGameLibraryWithBudgetAsync()
+        {
+            Task<List<Game_Manager.GameLauncherItem>?> scan =
+                Task.Run(() => Game_Manager.syncGame_Library());
+
+            bool finishedInBudget;
+            try
+            {
+                finishedInBudget = scan.Wait(GameLibraryStartupBudget);
+            }
+            catch (AggregateException)
+            {
+                // Faulted inside the budget: PublishGameLibraryScan logs it.
+                finishedInBudget = true;
+            }
+
+            if (finishedInBudget)
+            {
+                PublishGameLibraryScan(scan);
+                return;
+            }
+
+            _logger?.LogWarning(
+                "Game library scan outlived the {Budget}s startup budget; the list publishes when the scan finishes",
+                GameLibraryStartupBudget.TotalSeconds);
+            _ = scan.ContinueWith(t => PublishGameLibraryScan(t), TaskScheduler.Default);
+        }
+
+        /// <summary>
+        /// Publishes a completed scan. A failed or empty scan keeps the list that is
+        /// already published: null means "no games" to the FPS overlay and Adaptive Mode,
+        /// so a late failure must not wipe a list the UI is showing.
+        /// </summary>
+        private static void PublishGameLibraryScan(Task<List<Game_Manager.GameLauncherItem>?> scan)
+        {
+            try
+            {
+                if (scan.IsCompletedSuccessfully && scan.Result is not null)
+                    Game_Manager.installedGames = scan.Result;
+                else if (scan.IsFaulted || scan.IsCanceled)
+                    Log.Logger.Error(scan.Exception?.GetBaseException(),
+                        "Failed to sync game library during startup");
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "Failed to sync game library during startup");
             }
         }
 

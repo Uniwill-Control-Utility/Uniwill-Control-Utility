@@ -183,6 +183,14 @@ namespace Uniwill_Control_Utility.Scripts
 
                 foreach (DriveInfo d in allDrives)
                 {
+                    // Xbox Games live on local volumes. A disconnected mapped network
+                    // drive makes Directory.Exists block in the redirector until it times
+                    // out - measured 21-63 s per process pass on a dead host - and this
+                    // loop runs on the startup path, so that is the startup stall this
+                    // skip removes. A network share never carries an Xbox Games library.
+                    if (d.DriveType == DriveType.Network)
+                        continue;
+
                     try
                     {
                         string xboxGameDirectory = Path.Combine(d.Name, "XboxGames");

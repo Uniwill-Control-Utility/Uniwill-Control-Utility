@@ -66,6 +66,12 @@ If the saved language is `zh-CN`, the current source catalogue contains invalid 
 
 The first instance should receive `UniwillControlUtility.Show`. Check whether an existing process is hidden in the notification area. If the process is present but cannot surface, collect its log before terminating it.
 
+### Startup stalls in the "Initializing" phase (60–71 %)
+
+The phase progress reflects deferred tasks, and the game-library scan walks every local volume. A **disconnected mapped network drive** blocks the directory probe in the redirector until it times out (21–63 s measured against a dead host), which is the classic long stall. The scan now skips `DriveType.Network` and the splash releases at a 10 s budget, so the list appears shortly after the window.
+
+Check the app log for "Game library scan outlived the ... startup budget": it names the resource class. `net use` shows mapped drives and their `Disconnected` state. A second machine, or the same drive connected, confirms the environment rather than the app.
+
 ### PawnIO-backed controls are unavailable
 
 Open the prerequisite flow and verify PawnIO is installed and its device path exists. Confirm the correct AMD or Intel module files were copied into the application output. Restart UCU after driver installation.
