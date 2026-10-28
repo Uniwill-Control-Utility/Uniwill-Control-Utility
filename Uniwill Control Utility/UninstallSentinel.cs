@@ -229,12 +229,13 @@ namespace Uniwill_Control_Utility
         /// The app is running from the installed machine layout with the
         /// engine service registered: the "installed" fact for arming, even
         /// when a fast /x already removed the ARP registration before the
-        /// (slow) startup got here. Portable layouts (no Program Files root,
-        /// no service) and dev runs never arm.
+        /// (slow) startup got here. The app sits at &lt;root&gt;\current\, so
+        /// the layout root is the first parent. Portable layouts (no Program
+        /// Files root, no service) and dev runs never arm.
         /// </summary>
         internal static bool InstalledLayoutPresent()
         {
-            string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", ".."));
+            string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, ".."));
             if (!File.Exists(Path.Combine(root, "Update.exe")))
                 return false;
 
@@ -247,6 +248,21 @@ namespace Uniwill_Control_Utility
             using RegistryKey? service = localMachine.OpenSubKey(
                 @"SYSTEM\CurrentControlSet\Services\UCUEngine");
             return service != null;
+        }
+
+        /// <summary>
+        /// True when the machine is mid-uninstall of this product: the
+        /// machine ARP registration is gone while the installed layout and
+        /// the engine service are still present. The uninstall sweep runs a
+        /// few tens of seconds; the engine's supervision relaunches the app
+        /// it sees die, and those relaunches must not open windows, tray
+        /// icons, or sentinel prompts inside that window - they exit
+        /// instantly. Dev/portable layouts (no Program Files root, no
+        /// service) and normal machines (registration present) never match.
+        /// </summary>
+        public static bool IsBeingUninstalled()
+        {
+            return !Registered(EnumerateMachineRegistrations()) && InstalledLayoutPresent();
         }
 
         /// <summary>

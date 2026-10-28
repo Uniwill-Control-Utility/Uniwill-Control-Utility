@@ -77,6 +77,16 @@ namespace Uniwill_Control_Utility
             StartupArgs = args ?? Array.Empty<string>();
             GuardianRestart = StartupArgs.Contains("--from-guardian");
 
+            // The uninstall sweep window: the Control Panel /x removes the
+            // registration in ~2 s, then the sentinel's verb sweep (service,
+            // layout, husks) runs for a few tens of seconds. The engine's
+            // supervision relaunches the app it sees die during that window,
+            // and a relaunch that opened windows, the tray, or its own
+            // sentinel elevation prompt is the "UCU in task manager with no
+            // window" + repeated-prompt state users report. Silent exit.
+            if (UninstallSentinel.IsBeingUninstalled())
+                return;
+
             // Velopack's MSI launches this exe elevated with --velopackuninstall
             // during the Control Panel / Settings uninstall - and those routes run
             // the MSI by product code and ignore the ARP UninstallString, so this
