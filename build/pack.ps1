@@ -220,9 +220,13 @@ if (-not (Test-Path $wiInterop)) {
     & $tiPath "$env:WINDIR\System32\msi.dll" "/out:$wiInterop" "/namespace:WindowsInstaller" /silent
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path $wiInterop)) { throw "TlbImp interop of msi.dll failed" }
 }
+$msiEditSrc = Join-Path $PSScriptRoot "msi-edit\MsiEdit.cs"
 $msiEdit = Join-Path $msiEditDir "msi-edit.exe"
-if (-not (Test-Path $msiEdit)) {
-    & $csc /nologo /target:exe "/out:$msiEdit" "/reference:$wiInterop" (Join-Path $PSScriptRoot "msi-edit\MsiEdit.cs")
+# Rebuild when the exe is missing OR stale (source edited after the last
+# compile: a cached older tool silently packs an older policy).
+if (-not (Test-Path $msiEdit) -or
+    (Get-Item $msiEditSrc).LastWriteTime -gt (Get-Item $msiEdit).LastWriteTime) {
+    & $csc /nologo /target:exe "/out:$msiEdit" "/reference:$wiInterop" $msiEditSrc
     if ($LASTEXITCODE -ne 0) { throw "msi-edit compile failed" }
 }
 $packedMsi = Get-ChildItem $releasesDir -Filter "*.msi" | Select-Object -First 1
