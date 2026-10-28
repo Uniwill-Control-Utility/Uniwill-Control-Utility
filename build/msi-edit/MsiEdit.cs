@@ -208,6 +208,20 @@ static class MsiEdit
                     "' AND `Name` = 'QuietUninstallString'");
         Console.WriteLine("ARP key " + key + ": UninstallString/QuietUninstallString -> " + uninstallTarget);
 
+        // The product code INSIDE the ARP entry. Guarded machines (field-
+        // proven: Emsisoft box) hide the Windows Installer registration tree
+        // from in-process readers — MsiEnumProductsW enumerates every other
+        // product on the machine and never ours, elevated included — while
+        // the component-published ARP entry stays visible (Control Panel
+        // reads it). The shim and the sentinel therefore take the code from
+        // this row: [ProductCode] expands at install time, the row is
+        // deleted with the product by Windows Installer. appwiz.cpl ignores
+        // unknown ARP values; NoModify/NoRepair hide Modify/Repair.
+        Execute(db, "DELETE FROM `Registry` WHERE `Key` = '" + key + "' AND `Name` = 'UCUProductCode'");
+        Execute(db, "INSERT INTO `Registry` (`Registry`, `Root`, `Key`, `Name`, `Value`, `Component_`) " +
+                    "VALUES ('ARPUCCode', 2, '" + key + "', 'UCUProductCode', '[ProductCode]', 'ArpRegistration')");
+        Console.WriteLine("ARP row UCUProductCode = [ProductCode] (the code inside the visible entry)");
+
         // Ensure the metadata rows the Control Panel surfaces. Component_ =
         // ArpRegistration: the same component gates the published rows.
         var publisher = Query(db, "SELECT `Value` FROM `Registry` WHERE `Key` = '" + key + "' AND `Name` = 'Publisher'");

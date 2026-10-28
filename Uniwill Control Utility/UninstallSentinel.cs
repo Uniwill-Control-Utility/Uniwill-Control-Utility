@@ -265,35 +265,37 @@ namespace Uniwill_Control_Utility
             registrationNames.Any(name => ProductName.Equals(name, StringComparison.OrdinalIgnoreCase));
 
         /// <summary>
-        /// The DisplayName of every HKLM (64-bit view) ARP entry that is a
-        /// live MSI machine registration for the product: GUID-format key,
-        /// our DisplayName, and the MsiExec UninstallString the Control Panel
-        /// invokes. Velopack's shim husk (UninstallString=Uninstall.exe) and
-        /// the old broken-uninstall husks never match the MsiExec rule, so
-        /// husks do not keep the sentinel armed, and per-user registrations
-        /// live in other hives, so old ones cannot poison the probe.
+        /// The DisplayName of every live machine registration for the product
+        /// visible in the HKLM (64-bit view) ARP tree: the published vpk
+        /// entry (fixed key <c>MSI:Uniwill-Control-Utility</c>, our
+        /// DisplayName, GUID-shaped <c>UCUProductCode</c> row shipped by
+        /// build\msi-edit — the component publishes and removes it with the
+        /// product), and GUID-format keys carrying the MsiExec UninstallString
+        /// (packs from before the ARP suppression). Velopack's shim husk
+        /// (no UCUProductCode row) and the old broken-uninstall husks never
+        /// match, so husks do not keep the sentinel armed, and per-user
+        /// registrations live in other hives, so old ones cannot poison the
+        /// probe.
         /// </summary>
         internal static string[] EnumerateMachineRegistrations() =>
             MachineRegistrations().Select(pair => pair.DisplayName).ToArray();
 
         /// <summary>
-        /// The registration probe for the production sentinel: the ARP GUID
-        /// entry when the MSI publishes one, and the MSI database enumeration
-        /// when it does not. The packed MSI suppresses its own ARP entry
-        /// (ARPSYSTEMCOMPONENT=1) and ships the Control Panel entry as our
-        /// shim-keyed row (Uninstall.exe, the complete sweep), so the
-        /// canonical Control Panel route no longer produces a thin /x and
-        /// the GUID-ARP probe would never arm the sentinel. MsiEnumProductsW
-        /// sees the live product registration itself - the same installed
-        /// fact, one level below the display entry. Same degradation
-        /// contract as the ARP probe: a registry-guarded product blinds the
-        /// enumeration too (field-proven: Velopack's in-process check on the
-        /// Emsisoft box), the probe then reports "not installed", and the
-        /// binding gate parks the verb; the removal evidence rule plus the
-        /// process-start floor stay the firing gate either way. Stale
-        /// per-user ghost registrations enumerate as User context and are
-        /// filtered out: they would keep the probe "installed" through a
-        /// real machine-scope removal.
+        /// The registration probe for the production sentinel: the ARP tree
+        /// first — the published vpk entry is the normal signal on the packed
+        /// MSI (the engine's GUID entry is suppressed via ARPSYSTEMCOMPONENT=1
+        /// and the canonical Control Panel route runs the bound shim, not a
+        /// thin /x) — and the MSI database enumeration via MsiEnumProductsW
+        /// as the fallback for ARP-blind views. Field-proven degradation on
+        /// the guarded box: the enumeration is phantom to in-process readers
+        /// there (421 other products enumerate, ours never, elevated
+        /// included), so when the ARP view is ALSO blind the probe reports
+        /// "not installed" and the binding gate parks the verb — the safe
+        /// direction; the removal-evidence rule plus the process-start floor
+        /// stay the firing gate either way. Stale per-user ghost
+        /// registrations enumerate as User context and are filtered out: they
+        /// would keep the probe "installed" through a real machine-scope
+        /// removal.
         /// </summary>
         internal static string[] EnumerateRegistrations()
         {
@@ -302,11 +304,13 @@ namespace Uniwill_Control_Utility
         }
 
         /// <summary>
-        /// Product codes for the probe union: ARP GUID key names when visible
-        /// (they ARE the product codes the evidence names), MSI enumeration
-        /// otherwise. ARP-first because a visible ARP entry is the trustworthy
-        /// in-process view; the enumeration is the fallback the ARP
-        /// suppression makes the norm.
+        /// Product codes for the probe union: ARP-view codes when visible —
+        /// the UCUProductCode row of the published entry, GUID key names for
+        /// pre-suppression packs (the key IS the code) — MSI enumeration
+        /// otherwise. These are the codes the MsiInstaller evidence names, so
+        /// the sentinel watches them while installed and the removal event
+        /// must name one; a previous uninstall's event never licenses the
+        /// verb for a fresh install.
         /// </summary>
         internal static string[] EnumerateRegistrationCodes()
         {
@@ -378,8 +382,9 @@ namespace Uniwill_Control_Utility
             string szProduct, string szAttribute, StringBuilder lpValueBuf, ref int pcchValueBuf);
 
         /// <summary>
-        /// The product codes (ARP GUID key names) of the live machine
-        /// registrations, same rule as EnumerateMachineRegistrations: the
+        /// The product codes of the live machine registrations, same rule as
+        /// EnumerateMachineRegistrations: the <c>UCUProductCode</c> row for
+        /// the published entry, the key name for GUID-format entries. The
         /// sentinel remembers the code while the registration is visible, and
         /// the removal evidence must name that same code - a previous
         /// uninstall's event must never license the verb for a fresh install.
@@ -399,7 +404,16 @@ namespace Uniwill_Control_Utility
 
             foreach (string keyName in uninstall.GetSubKeyNames())
             {
-                if (!GuidKey.IsMatch(keyName))
+                // The packed MSI suppresses the engine's GUID-keyed entry
+                // (ARPSYSTEMCOMPONENT=1) and publishes its own entry under
+                // the fixed vpk key name, bound to the shim and carrying the
+                // product code in UCUProductCode (build\msi-edit): the
+                // component rows install and uninstall WITH the product, so
+                // this entry IS the machine registration for the sentinel.
+                // The code is NOT the key name here - it comes from the row.
+                bool published = string.Equals(
+                    keyName, PublishedArpKeyName, StringComparison.OrdinalIgnoreCase);
+                if (!published && !GuidKey.IsMatch(keyName))
                     continue;
 
                 using RegistryKey? entry = uninstall.OpenSubKey(keyName);
@@ -409,6 +423,14 @@ namespace Uniwill_Control_Utility
                 if (!string.Equals(displayName, ProductName, StringComparison.OrdinalIgnoreCase))
                     continue;
 
+                if (published)
+                {
+                    string code = (entry.GetValue("UCUProductCode") as string ?? "").Trim();
+                    if (GuidKey.IsMatch(code))
+                        found.Add((code, displayName));
+                    continue;
+                }
+
                 string uninstallString = entry.GetValue("UninstallString") as string ?? "";
                 if (uninstallString.Contains("MsiExec", StringComparison.OrdinalIgnoreCase))
                     found.Add((keyName, displayName));
@@ -416,6 +438,15 @@ namespace Uniwill_Control_Utility
 
             return found;
         }
+
+        /// <summary>
+        /// vpk's fixed Add/Remove Programs key name for the per-machine pack
+        /// (the entry the <c>ArpRegistration</c> component publishes), and
+        /// the same key the shim's registry cleanup addresses. Not a GUID:
+        /// only a row carrying our DisplayName and a GUID-shaped
+        /// UCUProductCode counts as the live registration.
+        /// </summary>
+        internal const string PublishedArpKeyName = "MSI:Uniwill-Control-Utility";
 
         /// <summary>
         /// The app is running from the installed machine layout with the

@@ -211,20 +211,28 @@ internal static class UninstallShim
         }
     }
 
-    // The MSI product code (a GUID) for this product. Two sources, in order:
-    // the ARP GUID key whose DisplayName matches (what shipped before), and
-    // the MSI database itself via MsiEnumProductsW. The second source is why
-    // this exists: the packed MSI suppresses its ARP display entry
-    // (ARPSYSTEMCOMPONENT=1), so FindMsiProductKey alone finds nothing on a
-    // fresh install and the shim would skip "msiexec /x" - leaving the
-    // registration, the cached package and the service behind. The shim runs
-    // elevated, so the MSI enumeration reads the unobstructed machine view
-    // (the guarded-box field evidence: only unelevated processes get the
-    // registry blinded). Match is by ProductName, and the install-location
-    // attribute prefers the registration that owns THIS layout, so a stale
-    // per-user ghost of the same name is never the one we /x.
+    // The MSI product code (a GUID) for this product. Three sources, in
+    // order of trustworthiness on a guarded machine:
+    //   1. the UCUProductCode value of the product's published ARP entry
+    //      (the packed MSI ships the code INSIDE the Add/Remove Programs
+    //      row: build\msi-edit inserts the row, Windows Installer expands
+    //      [ProductCode] at install and deletes the row with the product),
+    //   2. the GUID-named ARP key whose DisplayName matches (packs from
+    //      before the ARP suppression),
+    //   3. the MSI database itself via MsiEnumProductsW.
+    // Source 1 is first because of the field-proven guarded-box signature:
+    // the Windows Installer registration tree is phantom to in-process
+    // readers (MsiEnumProductsW enumerates every OTHER product and never
+    // ours, elevated included) while the component-published ARP entry
+    // stays visible - the Control Panel reads it. Source 3's location
+    // preference still keeps a stale per-user ghost of the same name from
+    // becoming the registration we /x.
     private static string FindMsiProductCode(string displayName, string root)
     {
+        string fromEntry = ReadPublishedProductCode();
+        if (!string.IsNullOrEmpty(fromEntry))
+            return fromEntry;
+
         string fromArp = FindMsiProductKey(displayName);
         if (!string.IsNullOrEmpty(fromArp))
             return fromArp;
@@ -258,6 +266,47 @@ internal static class UninstallShim
         }
 
         return first;
+    }
+
+    // The product code carried by the product's own Control Panel entry,
+    // both hive views (the entry is machine-scope on installed machines,
+    // and reading the user hive costs nothing). The value is the literal
+    // product code by construction: the MSI row expands [ProductCode].
+    private static string ReadPublishedProductCode()
+    {
+        const string publishedKey =
+            @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MSI:Uniwill-Control-Utility";
+
+        string[] hives = { @"HKLM\" + publishedKey, @"HKCU\" + publishedKey };
+        foreach (string hivePath in hives)
+        {
+            try
+            {
+                RegistryKey baseKey = hivePath.StartsWith("HKLM")
+                    ? RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                    : Registry.CurrentUser;
+
+                using (RegistryKey entry = baseKey.OpenSubKey(
+                    publishedKey, RegistryKeyPermissionCheck.ReadSubTree))
+                {
+                    if (entry == null)
+                        continue;
+
+                    string code = entry.GetValue("UCUProductCode") as string;
+                    if (code != null)
+                    {
+                        code = code.Trim();
+                        if (code.Length == 38 && code[0] == '{' && code[37] == '}')
+                            return code;
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        return null;
     }
 
     [System.Runtime.InteropServices.DllImport("msi.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
