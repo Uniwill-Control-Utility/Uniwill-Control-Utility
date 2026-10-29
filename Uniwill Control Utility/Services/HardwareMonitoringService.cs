@@ -155,6 +155,30 @@ namespace Uniwill_Control_Utility.Services
         private static readonly TimeSpan SnapshotMaxAge = TimeSpan.FromSeconds(1);
 
         /// <summary>
+        /// Producer staleness budget: how long a completed snapshot may be
+        /// served as live before the probe must complete a new pass. Healthy
+        /// cadence is fast - the cache expires at <see cref="SnapshotMaxAge"/>,
+        /// every consumer read renews the refresh, a healthy pass completes in
+        /// ~the 1 s cadence - so 5 s of no completed pass means the single-
+        /// flight refresh is PARKED: the pass is stuck inside the LHM gate
+        /// (field report 2026-10-29: in-game the pass parks behind the
+        /// foreground title that owns the GPU - NVAPI/storage calls under AV
+        /// filter drivers; alt-tab unblocks it for 1-2 s, refocusing wedges it
+        /// again). The cache's single-flight contract then queues no further
+        /// pass, and serving the last completed state past the budget paints
+        /// frozen numbers as live on every consumer (the RTSS OSD froze
+        /// mid-game, updating only around focus changes). Same statue class the
+        /// engine-metrics gate closed at its source, closed the same way: past
+        /// the budget the LHM-only fields are no readings ("--"), and the
+        /// fresh sources - OS, EC, engine - keep answering through the OS-only
+        /// path beside them.
+        /// </summary>
+        private static readonly TimeSpan ProbeStalenessBudget = TimeSpan.FromSeconds(5);
+
+        internal static bool ProducerIsStale(TimeSpan producerAge) =>
+            producerAge > ProbeStalenessBudget;
+
+        /// <summary>
         /// Lease bookkeeping only (leases, lease ids, disposed flag). Never
         /// held across hardware I/O, so Acquire/Release from a UI thread are
         /// bounded by dictionary work.
@@ -340,18 +364,30 @@ namespace Uniwill_Control_Utility.Services
         public HardwareMetricsSnapshot ReadSnapshot()
         {
             HardwareMonitoringState state = _stateCache.Read();
-            if (!ReferenceEquals(state, HardwareMonitoringState.Empty))
-                return state.Metrics;
+            bool producerStale = ProducerIsStale(_stateCache.Age);
 
-            // No probe has completed (the first pass is slow, parked on the
-            // gate, or hung in a filter driver): serve the OS-only snapshot
-            // so the dashboard fills battery/memory/EC-CPU numbers anyway.
-            return BuildOsOnlySnapshot();
+            // Two faces of "the producer is not answering": never completed
+            // (startup, first pass parked on the gate) and completed-then-
+            // wedged (the refresh is parked, no pass completes - see
+            // ProbeStalenessBudget). Both take the fresh path: OS numbers
+            // rebuilt now, EC temperature, engine sensor readings; the LHM-
+            // only fields of a wedged producer are no readings, not statues.
+            if (ReferenceEquals(state, HardwareMonitoringState.Empty) || producerStale)
+                return BuildOsOnlySnapshot(state.Metrics, producerStale);
+
+            return state.Metrics;
         }
 
         public float ReadSensor(HardwareType hardwareType, SensorType sensorType, string sensorName)
         {
             HardwareMonitoringState state = _stateCache.Read();
+
+            // Same freshness rule as ReadSnapshot, and harsher consumers: the
+            // adaptive fan loop feeds on these readings, and a frozen fan RPM
+            // is worse than the 0 a missing reading already means.
+            if (ProducerIsStale(_stateCache.Age))
+                return 0;
+
             if (ReferenceEquals(state, HardwareMonitoringState.Empty))
                 state = Volatile.Read(ref _lastState);
 
@@ -574,18 +610,21 @@ namespace Uniwill_Control_Utility.Services
         /// CPU temperature from the engine's EC telemetry - all cheap,
         /// filter-driver-free sources. The LHM-only fields (CPU usage/clock,
         /// GPU, battery watts, DIMM/storage temperatures) carry the last
-        /// completed probe's values, and stay 0 (UI renders "--") when the
-        /// probe has never finished. This is what keeps the dashboard alive
-        /// while a hardware probe hangs in a filter driver.
+        /// completed probe's values while the producer is alive, and stay 0
+        /// (UI renders "--") when the probe has never finished - or when it
+        /// has WEDGED (<paramref name="producerStale"/>), where carrying the
+        /// values is painting a frozen frame. This is what keeps the dashboard
+        /// alive while a hardware probe hangs in a filter driver.
         /// </summary>
-        private HardwareMetricsSnapshot BuildOsOnlySnapshot()
+        private HardwareMetricsSnapshot BuildOsOnlySnapshot(
+            HardwareMetricsSnapshot last, bool producerStale)
         {
-            HardwareMetricsSnapshot last = Volatile.Read(ref _lastState).Metrics;
+            HardwareMetricsSnapshot carried = producerStale ? ClearStaleSensorFields(last) : last;
 
             GetSystemPowerStatus(out SystemPowerStatus powerStatus);
             (double memoryUsed, double memoryTotal, double memoryCommitted, double pagefileTotal) = ReadPhysicalMemory();
 
-            HardwareMetricsSnapshot metrics = last with
+            HardwareMetricsSnapshot metrics = carried with
             {
                 SystemMemoryUsedGb = memoryUsed,
                 SystemMemoryTotalGb = memoryTotal,
@@ -602,6 +641,40 @@ namespace Uniwill_Control_Utility.Services
                 ApplyCpuTemperatureSource(metrics, _ecCpuTemperature?.ReadCpuTemperature() ?? 0),
                 _ecEngineMetrics?.ReadEngineMetrics() ?? EngineMetricsSnapshot.Empty);
         }
+
+        /// <summary>
+        /// Zeroes every reading only the LHM probe can feed, for the wedged-
+        /// producer path: a parked pass keeps the values in the last state,
+        /// and repainting them is a statue. Zero is the snapshot's
+        /// "unavailable" convention, so the UI renders "--"/skips the cell,
+        /// and the fresh sources refill what they can beside it: the EC CPU
+        /// temperature and the engine's Ring0 power/clock and SPD/DIMM values
+        /// merge right back (ApplyCpuTemperatureSource /
+        /// ApplyEngineSensorSource run after this), the OS-fed fields are
+        /// rebuilt there anyway. Kept: ActiveGpuType (a selection, not a
+        /// reading), the battery flags (OS state), and the EC-fed fields
+        /// (fan speeds, battery health/temperature - the EC cache answers
+        /// those fresh on its own cadence).
+        /// </summary>
+        internal static HardwareMetricsSnapshot ClearStaleSensorFields(HardwareMetricsSnapshot last) =>
+            last with
+            {
+                CpuTemperature = 0,
+                CpuTemperatureSource = CpuTemperatureSource.None,
+                CpuUsage = 0,
+                CpuPowerWatts = 0,
+                CpuClockMhz = 0,
+                GpuTemperature = 0,
+                GpuUsage = 0,
+                GpuPowerWatts = 0,
+                GpuClockMhz = 0,
+                GpuMemoryUsedGb = 0,
+                GpuMemoryTotalGb = 0,
+                MemoryTemperature0 = 0,
+                MemoryTemperature1 = 0,
+                StorageTemperatureCelsius = 0,
+                BatteryPowerWatts = 0,
+            };
 
         /// <summary>Must be called while holding _probeGate.</summary>
         private IReadOnlyList<HardwareSensorReading> CaptureSensorReadings()
