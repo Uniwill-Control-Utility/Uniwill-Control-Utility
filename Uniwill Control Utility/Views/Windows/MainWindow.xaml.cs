@@ -1664,32 +1664,50 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// </summary>
         public static bool GateFirstShowWindow { get; set; }
 
+        private double _gatedLeft;
+        private double _gatedTop;
+
         public void ShowWindow()
         {
             if (GateFirstShowWindow)
             {
-                // Build the window WITHOUT showing it: EnsureHandle creates
-                // the HwndSource (SourceInitialized, chrome, layout, page
-                // templates - everything the navigation and timers need)
-                // while Visibility=Hidden keeps every frame offscreen.
-                // Show() is the wrong shape at any prefix: it forces the
-                // window on screen (field progression: 2s empty window,
-                // then Show+Hide blip, then Hidden+Show long blip). App
-                // flips Visibility + Activates on the dashboard's first
-                // data frame.
-                Visibility = Visibility.Hidden;
-                new System.Windows.Interop.WindowInteropHelper(this).EnsureHandle();
-
-                // The host Navigates right after this call, and NavigationView
-                // needs its template applied (content presenter created) -
-                // Show() forces that layout inline, EnsureHandle does not,
-                // so run it here: field-proven NullReferenceException in
-                // NavigationView.UpdateContent without it.
-                UpdateLayout();
+                // Show exactly as the baseline (the host navigates right
+                // after this call and NavigationView's template only applies
+                // through a real Show - the EnsureHandle/hidden-window
+                // variants threw NavigationView NREs, field-proven), then
+                // park the window offscreen at zero opacity: the empty
+                // dashboard paints on a surface nobody can see. App calls
+                // ReleaseStartupGate when the dashboard's first data frame
+                // lands - the window's first visible presentation is
+                // populated. (Opacity 0 makes the whole window - DWM
+                // backdrop included - invisible, and -32000 is off every
+                // monitor edge, so even the paint itself never shows.)
+                Opacity = 0;
+                Show();
+                _gatedLeft = Left;
+                _gatedTop = Top;
+                Left = -32000;
+                Top = -32000;
                 return;
             }
 
             Show();
+        }
+
+        /// <summary>
+        /// Undo the ShowWindow gate: back to the pre-park position, opaque,
+        /// activated. Called by App on the dashboard's first data frame.
+        /// </summary>
+        public void ReleaseStartupGate()
+        {
+            if (Opacity < 1)
+            {
+                Opacity = 1;
+                Left = _gatedLeft;
+                Top = _gatedTop;
+            }
+
+            Activate();
         }
 
         public void CloseWindow() => Close();

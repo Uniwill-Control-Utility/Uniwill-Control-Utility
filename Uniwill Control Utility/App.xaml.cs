@@ -767,7 +767,7 @@ namespace Uniwill_Control_Utility
                 }
 
                 Views.Windows.MainWindow.GateFirstShowWindow = false;
-                Views.Windows.MainWindow.Instance?.Show();
+                Views.Windows.MainWindow.Instance?.ReleaseStartupGate();
 
                 await startupProgressReporter.ReportAsync(StartupStage.Complete);
                 if (startupWindow is not null)
