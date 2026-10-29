@@ -1668,13 +1668,14 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             if (GateFirstShowWindow)
             {
-                // Create + initialize (navigation, pages, timers) without a
-                // visible frame; the synchronous Hide lands inside the same
-                // call the host made, so no render pass ever shows it.
-                ShowActivated = false;
+                // Create + initialize (HWND, navigation, pages, timers) with
+                // the window hidden: WPF honors Visibility=Hidden at Show,
+                // so the HWND is built and content renders offscreen, and no
+                // frame ever reaches the screen. (Show() + synchronous Hide()
+                // is the wrong shape: Show() paints a first frame before
+                // Hide() runs - the field-reported 92% "blip".)
+                Visibility = Visibility.Hidden;
                 Show();
-                Hide();
-                ShowActivated = true;
                 return;
             }
 
