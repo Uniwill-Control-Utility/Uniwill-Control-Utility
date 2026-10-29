@@ -1,6 +1,7 @@
 using Gma.System.MouseKeyHook;
 using Microsoft.Extensions.Hosting;
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
@@ -60,6 +61,18 @@ namespace Uniwill_Control_Utility.Services
         /// frozen ones.
         /// </summary>
         private static readonly TimeSpan OsdHeartbeatInterval = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// Tick duration that earns a stage-time line (see the tick's
+        /// finally). Healthy ticks run sub-millisecond work every
+        /// RefreshIntervalMs; 2 s means something parked - name the stage.
+        /// </summary>
+        private const long SlowTickMs = 2000;
+
+        /// <summary>Stage segment for the slow-tick line: "-" when the tick
+        /// never reached that stage (it is parked inside the previous one).</summary>
+        private static string Seg(long end, long start) =>
+            end < 0 || start < 0 ? "-" : (end - start).ToString();
 
         /// <summary>
         /// OSD diagnostics at Warning severity - the app log's field level.
@@ -538,10 +551,13 @@ namespace Uniwill_Control_Utility.Services
         {
             lock (_rtssOsdLock)
             {
+                Stopwatch sw = Stopwatch.StartNew();
+                long tSettings = -1, tFocus = -1, tEnrich = -1, tWrite = -1;
                 try
                 {
                     FpsMetricsSnapshot fps = _fps.Latest;
                     OverlayOptions options = _settingsStore.Current;
+                    tSettings = sw.ElapsedMilliseconds;
 
                 // Determine whether the target game is currently in focus.
                 // The OSD should only render when the game window is foreground.
@@ -575,6 +591,8 @@ namespace Uniwill_Control_Utility.Services
                     }
                 }
 
+                tFocus = sw.ElapsedMilliseconds;
+
                 // If the game is not in focus, write a single-space OSD to hide
                 // the metrics while keeping the slot claimed. RTSS renders this
                 // as a blank line, effectively hiding the overlay. The slot stays
@@ -594,6 +612,7 @@ namespace Uniwill_Control_Utility.Services
                     // the buffer change before the slot goes unowned.
                     RtssOsdWriter.Update(" ");
                     RtssOsdWriter.Release();
+                    tWrite = sw.ElapsedMilliseconds;
                     _rtssOsdWasShowing = false;
                     return;
                 }
@@ -633,11 +652,14 @@ namespace Uniwill_Control_Utility.Services
                     flydigi = new FlydigiSnapshot(fanData.CurrentRpm, model);
                 }
 
+                tEnrich = sw.ElapsedMilliseconds;
+
                 string? osdText = RtssOsdFormatter.Build(hardware, fps, options, hydroUi, flydigi);
                 if (osdText is null)
                 {
                     if (_rtssOsdWasShowing)
                         LogOsd("formatter produced no text (no rows enabled)");
+                    tWrite = tEnrich;
                     _rtssOsdWasShowing = false;
                     return;
                 }
@@ -665,11 +687,36 @@ namespace Uniwill_Control_Utility.Services
                         LogOsd("writer failed: no slot/mapping (RTSS gone, slot table full, owner dropped)");
                     _rtssOsdWasShowing = false;
                 }
+
+                tWrite = sw.ElapsedMilliseconds;
             }
             catch (Exception ex)
             {
                 // Transient read failure must not crash the timer loop.
                 try { Serilog.Log.Warning(ex, "[Overlay] RtssOsdTick failed"); } catch { }
+            }
+            finally
+            {
+                // Stage breadcrumbs for the in-game freeze (field report: the
+                // OSD string stops updating 1-2 s after the game takes the
+                // foreground; the heartbeat gaps prove the tick handler parks
+                // while in focus - the focus-OFF line fires at the alt-tab
+                // moment, which is the blocked tick unblocking). A parked
+                // tick never logs; the tick that unblocks reports the stage
+                // times, and the stage names the blocking call: fps+settings
+                // (_fps.Latest lock, settings store), focus-detect
+                // (GetForegroundProcessId, RtssReader.TryRead shared memory),
+                // read+enrich (ReadSnapshot, EC fan cache, Hydro UI, Flydigi
+                // HID), format+write (RtssOsdWriter shared memory).
+                if (sw.ElapsedMilliseconds >= SlowTickMs)
+                {
+                    LogOsd(
+                        $"slow tick {sw.ElapsedMilliseconds}ms: " +
+                        $"fps+settings {Seg(tSettings, 0)}ms, " +
+                        $"focus-detect {Seg(tFocus, tSettings)}ms, " +
+                        $"read+enrich {Seg(tEnrich, tFocus)}ms, " +
+                        $"format+write {Seg(tWrite, tEnrich)}ms");
+                }
             }
             }
         }
