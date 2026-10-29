@@ -1668,14 +1668,17 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             if (GateFirstShowWindow)
             {
-                // Create + initialize (HWND, navigation, pages, timers) with
-                // the window hidden: WPF honors Visibility=Hidden at Show,
-                // so the HWND is built and content renders offscreen, and no
-                // frame ever reaches the screen. (Show() + synchronous Hide()
-                // is the wrong shape: Show() paints a first frame before
-                // Hide() runs - the field-reported 92% "blip".)
+                // Build the window WITHOUT showing it: EnsureHandle creates
+                // the HwndSource (SourceInitialized, chrome, layout, page
+                // templates - everything the navigation and timers need)
+                // while Visibility=Hidden keeps every frame offscreen.
+                // Show() is the wrong shape at any prefix: it forces the
+                // window on screen (field progression: 2s empty window,
+                // then Show+Hide blip, then Hidden+Show long blip). App
+                // flips Visibility + Activates on the dashboard's first
+                // data frame.
                 Visibility = Visibility.Hidden;
-                Show();
+                new System.Windows.Interop.WindowInteropHelper(this).EnsureHandle();
                 return;
             }
 
