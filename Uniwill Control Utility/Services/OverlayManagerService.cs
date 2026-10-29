@@ -65,9 +65,14 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>
         /// Tick duration that earns a stage-time line (see the tick's
         /// finally). Healthy ticks run sub-millisecond work every
-        /// RefreshIntervalMs; 2 s means something parked - name the stage.
+        /// RefreshIntervalMs; 500 ms is ~2 refresh intervals - the field
+        /// hiccup report (the OSD skips an update every ~3 ticks) lives
+        /// there, and the stage times name the slow call. Debounced to one
+        /// line per 5 s so a persistently slow chain stays readable.
         /// </summary>
-        private const long SlowTickMs = 2000;
+        private const long SlowTickMs = 500;
+
+        private DateTime _rtssOsdLastSlowLogUtc;
 
         /// <summary>Stage segment for the slow-tick line: "-" when the tick
         /// never reached that stage (it is parked inside the previous one).</summary>
@@ -667,18 +672,20 @@ namespace Uniwill_Control_Utility.Services
                 int slot = RtssOsdWriter.Update(osdText);
                 if (slot >= 0)
                 {
+                    DateTime nowUtc = DateTime.UtcNow;
                     if (!_rtssOsdWasShowing)
                     {
                         LogOsd(
                             $"focus ON: game pid={foregroundPid}, " +
                             $"source={(fps.IsAvailable ? "fps-service" : "rtss-fallback")}, slot {slot}, fps {fps.Fps}");
+                        _rtssOsdLastBeatUtc = nowUtc;
                     }
-                    else if (DateTime.UtcNow - _rtssOsdLastBeatUtc >= OsdHeartbeatInterval)
+                    else if (nowUtc - _rtssOsdLastBeatUtc >= OsdHeartbeatInterval)
                     {
                         LogOsd(BuildHeartbeat(slot, hardware, fps));
+                        _rtssOsdLastBeatUtc = nowUtc;
                     }
 
-                    _rtssOsdLastBeatUtc = DateTime.UtcNow;
                     _rtssOsdWasShowing = true;
                 }
                 else
@@ -697,19 +704,19 @@ namespace Uniwill_Control_Utility.Services
             }
             finally
             {
-                // Stage breadcrumbs for the in-game freeze (field report: the
-                // OSD string stops updating 1-2 s after the game takes the
-                // foreground; the heartbeat gaps prove the tick handler parks
-                // while in focus - the focus-OFF line fires at the alt-tab
-                // moment, which is the blocked tick unblocking). A parked
-                // tick never logs; the tick that unblocks reports the stage
-                // times, and the stage names the blocking call: fps+settings
+                // Stage breadcrumbs (field report 2026-10-29: the OSD skips
+                // an update every ~3 ticks). Each stage is timed; a tick over
+                // SlowTickMs names where the time went: fps+settings
                 // (_fps.Latest lock, settings store), focus-detect
                 // (GetForegroundProcessId, RtssReader.TryRead shared memory),
                 // read+enrich (ReadSnapshot, EC fan cache, Hydro UI, Flydigi
-                // HID), format+write (RtssOsdWriter shared memory).
-                if (sw.ElapsedMilliseconds >= SlowTickMs)
+                // HID), format+write (RtssOsdWriter shared memory). If the
+                // stages stay fast while the visible OSD hiccups, the cadence
+                // is RTSS's own render/update side, not this chain.
+                if (sw.ElapsedMilliseconds >= SlowTickMs &&
+                    DateTime.UtcNow - _rtssOsdLastSlowLogUtc >= TimeSpan.FromSeconds(5))
                 {
+                    _rtssOsdLastSlowLogUtc = DateTime.UtcNow;
                     LogOsd(
                         $"slow tick {sw.ElapsedMilliseconds}ms: " +
                         $"fps+settings {Seg(tSettings, 0)}ms, " +
