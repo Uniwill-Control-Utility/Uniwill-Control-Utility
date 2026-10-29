@@ -52,6 +52,48 @@ public sealed class UninstallChainTests
     }
 
     [Fact]
+    public void ShimPlacementTarget_PlacesTheShimOnlyWhereThePackedEntryPoints()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "ucu-shim-placement-" + Guid.NewGuid().ToString("N"));
+        string appDir = Path.Combine(dir, "current");
+        string serviceDir = Path.Combine(appDir, "Service");
+        Directory.CreateDirectory(serviceDir);
+
+        try
+        {
+            string shim = Path.Combine(appDir, EngineInstaller.ShimFileName);
+            File.WriteAllText(shim, string.Empty);
+
+            // The per-machine install signature: the packed entry expands to
+            // the layout root, the shim ships inside current\ - placement.
+            string rootTarget = Path.Combine(dir, EngineInstaller.ShimFileName);
+            Assert.Equal(rootTarget,
+                EngineInstaller.ShimPlacementTarget("\"" + rootTarget + "\"", dir, shim));
+
+            // Target already valid (a layout where INSTALLFOLDER expands to
+            // the app dir): nothing to do.
+            Assert.Null(EngineInstaller.ShimPlacementTarget("\"" + shim + "\"", dir, shim));
+
+            // Never write outside the layout tree, follow nothing, name nothing else.
+            Assert.Null(EngineInstaller.ShimPlacementTarget(
+                "\"C:\\Windows\\Temp\\Uninstall.exe\"", dir, shim));
+            Assert.Null(EngineInstaller.ShimPlacementTarget(
+                "\"" + Path.Combine(dir, "Uninstall.bat") + "\"", dir, shim));
+            Assert.Null(EngineInstaller.ShimPlacementTarget(null, dir, shim));
+            Assert.Null(EngineInstaller.ShimPlacementTarget("   ", dir, shim));
+            Assert.Null(EngineInstaller.ShimPlacementTarget(
+                "\"" + rootTarget + "\"", null, shim));
+
+            // Malformed paths die quietly: the belt never throws at install.
+            Assert.Null(EngineInstaller.ShimPlacementTarget("|x|Uninstall.exe", dir, shim));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void MsiProductKey_IsOnlySearchedAmongGuidShapedKeys()
     {
         // The scan reads a display name out of HKLM\...\Uninstall; the shape filter is

@@ -85,13 +85,24 @@ internal static class UninstallShim
         // The task command goes through a script file because schtasks /tr
         // values cannot carry \" escapes (cmd does not honor them), while a
         // script line parses its own quotes correctly.
+        // The engine exe for the SYSTEM verb sweep: the dev layout keeps
+        // Service\ next to the shim, the per-machine MSI layout nests the
+        // app under current\ (the shim ships there, the engine under
+        // current\Service\). Take whichever exists; with neither, the
+        // elevated helper's own task/sc/rd sweep below is the path
+        // (idempotent - just not the System-IL-strong one on guarded boxes).
         string verbExe = root + "\\Service\\Uniwill Control Utility Engine.exe";
+        if (!File.Exists(verbExe))
+            verbExe = root + "\\current\\Service\\Uniwill Control Utility Engine.exe";
         string verbScript = "%TEMP%\\ucu-verb-task.cmd";
-        cmds.Add("echo @echo off> \"" + verbScript + "\"");
-        cmds.Add("echo \"" + verbExe + "\" --uninstall-engine >> \"" + verbScript + "\"");
-        cmds.Add("schtasks /create /tn \"UCU Uninstall Verb\" /tr \"cmd.exe /c " +
-            verbScript + "\" /sc once /st 23:59 /ru SYSTEM /f");
-        cmds.Add("schtasks /run /tn \"UCU Uninstall Verb\"");
+        if (File.Exists(verbExe))
+        {
+            cmds.Add("echo @echo off> \"" + verbScript + "\"");
+            cmds.Add("echo \"" + verbExe + "\" --uninstall-engine >> \"" + verbScript + "\"");
+            cmds.Add("schtasks /create /tn \"UCU Uninstall Verb\" /tr \"cmd.exe /c " +
+                verbScript + "\" /sc once /st 23:59 /ru SYSTEM /f");
+            cmds.Add("schtasks /run /tn \"UCU Uninstall Verb\"");
+        }
         cmds.Add("schtasks /delete /tn UCU /f");
         cmds.Add("schtasks /delete /tn \"UCU Autostart\" /f");
         cmds.Add("schtasks /delete /tn \"UCU Guardian\" /f");

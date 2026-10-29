@@ -219,6 +219,121 @@ namespace UCU.Engine
         }
 
         /// <summary>
+        /// The path the packed Control Panel entry's <c>UninstallString</c>
+        /// names, when the shim must be placed there: a quoted
+        /// <c>...\Uninstall.exe</c> inside the engine's own layout tree whose
+        /// file does not exist, and is not the layout shim itself. Null means
+        /// nothing to do (target already valid, path outside the layout,
+        /// malformed, or the entry authored straight at the shipped shim).
+        /// Pure so the safety rules are unit-testable without a registry.
+        /// </summary>
+        internal static string? ShimPlacementTarget(string? uninstallString, string? layoutRoot, string shimPath)
+        {
+            string target = (uninstallString ?? string.Empty).Trim().Trim('"');
+            if (target.Length == 0 ||
+                !target.EndsWith(ShimFileName, StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            if (string.IsNullOrEmpty(layoutRoot))
+                return null;
+
+            string full;
+            try
+            {
+                full = Path.GetFullPath(target);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+
+            // Never write outside the engine's own layout tree.
+            if (!full.StartsWith(Path.GetFullPath(layoutRoot), StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            if (File.Exists(full))
+                return null;
+
+            if (string.Equals(full, Path.GetFullPath(shimPath), StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            return full;
+        }
+
+        /// <summary>
+        /// Places the layout's uninstall shim at the path the packed Control
+        /// Panel entry points at, when that file is missing. The packed
+        /// UninstallString is authored as "[INSTALLFOLDER]Uninstall.exe", and
+        /// [INSTALLFOLDER] expands to the layout ROOT (where vpk's Update.exe
+        /// lives) on a per-machine install, while the MSI ships the shim
+        /// inside the app dir (current\, packed from publishDir): the Control
+        /// Panel's shell route then launches a file the product never
+        /// installed. Identity of the entry is content - our DisplayName plus
+        /// a GUID-shaped UCUProductCode under a non-GUID key (build\msi-edit's
+        /// published shape), never the engine's canonical GUID entry. Runs
+        /// elevated as SYSTEM at engine install: a write inside the layout
+        /// the install owns. The product-code route (the one an ARP
+        /// anti-hijack enforcer forces on guarded boxes) resolves by key name
+        /// and needs nothing here; this closes the shell route.
+        /// </summary>
+        internal static void EnsureShimAtPublishedArpTarget(string engineExePath)
+        {
+            try
+            {
+                string? shim = UninstallShimPath(engineExePath);
+                if (shim is null)
+                    return;
+
+                string? serviceDir = Path.GetDirectoryName(engineExePath);
+                string? appDir = serviceDir is null ? null : Path.GetDirectoryName(serviceDir);
+                string? layoutRoot = appDir is null ? null : Path.GetDirectoryName(appDir);
+
+                using RegistryKey baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+                using RegistryKey? uninstall = baseKey.OpenSubKey(
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
+                if (uninstall is null)
+                    return;
+
+                foreach (string keyName in uninstall.GetSubKeyNames())
+                {
+                    // The packed entry is the non-GUID key (MSI:{product-code},
+                    // transitional plain names); the GUID-keyed entry is the
+                    // Windows Installer engine's canonical one, handled by the
+                    // redirect below.
+                    if (keyName.Length == 38 && keyName[0] == '{' && keyName[^1] == '}')
+                        continue;
+
+                    using RegistryKey? entry = uninstall.OpenSubKey(keyName);
+                    if (entry is null ||
+                        entry.GetValue("DisplayName") as string != MsiDisplayName)
+                        continue;
+
+                    string code = (entry.GetValue("UCUProductCode") as string ?? string.Empty).Trim();
+                    if (code.Length != 38 || code[0] != '{' || code[^1] != '}')
+                        continue;
+
+                    string? target = ShimPlacementTarget(
+                        entry.GetValue("UninstallString") as string, layoutRoot, shim);
+                    if (target is null)
+                        return;
+
+                    string? targetDir = Path.GetDirectoryName(target);
+                    if (targetDir is null || !Directory.Exists(targetDir))
+                        return;
+
+                    File.Copy(shim, target, overwrite: true);
+                    Log.Information(
+                        "[EngineInstaller] Placed the uninstall shim at Control Panel's target {Target}", target);
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "[EngineInstaller] Uninstall shim placement skipped");
+            }
+        }
+
+        /// <summary>
         /// Points the Control Panel's uninstall entry at <c>Uninstall.exe</c>.
         ///
         /// The MSI's own entry runs <c>msiexec /x {GUID}</c>, which is incomplete for
@@ -238,6 +353,15 @@ namespace UCU.Engine
         {
             try
             {
+                // The packed entry's shell-route target first: it is authored
+                // as "[INSTALLFOLDER]Uninstall.exe" and [INSTALLFOLDER] expands
+                // to the layout ROOT, while the MSI ships the shim inside the
+                // app dir (current\) - a Control Panel shell-execute of a
+                // missing file is the "It may have already been uninstalled.
+                // Would you like to remove ... from the Programs and Features
+                // list?" dialog (field-proven 2026-10-29).
+                EnsureShimAtPublishedArpTarget(engineExePath);
+
                 string? shim = UninstallShimPath(engineExePath);
                 if (shim is null)
                 {
