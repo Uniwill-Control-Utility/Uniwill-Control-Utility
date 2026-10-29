@@ -1,6 +1,7 @@
 using LibreHardwareMonitor.Hardware;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -177,6 +178,35 @@ namespace Uniwill_Control_Utility.Services
 
         internal static bool ProducerIsStale(TimeSpan producerAge) =>
             producerAge > ProbeStalenessBudget;
+
+        /// <summary>
+        /// Producer stage breadcrumbs (field report 2026-10-29: the LHM-fed
+        /// fields - CPU utilization, GPU temp/usage/clock/power - appeared
+        /// only ~50 s after launch; everything the OS/EC/engine feeds filled
+        /// in seconds, so the first full probe pass is the gate, and its
+        /// Open() serializes every driver touch: NVAPI init, the Ring0/PawnIO
+        /// attempt, SMART per drive, SuperIO, under the security product's
+        /// driver guard). Which touch holds the 50 s is measured, not
+        /// guessed: a slow open names the enabled set, a slow device update
+        /// names the device, a slow pass carries the build/capture split.
+        /// Warning severity (the app log's field level), debounced so a
+        /// persistently slow chain stays one line per minute.
+        /// </summary>
+        private const long SlowProbeStageMs = 2000;
+        private const long SlowProbePassMs = 5000;
+        private static readonly TimeSpan ProbeSlowLogDebounce = TimeSpan.FromSeconds(60);
+
+        private DateTime _lastProbeSlowLogUtc = DateTime.MinValue;
+
+        private void LogProbeSlow(string message)
+        {
+            DateTime now = DateTime.UtcNow;
+            if (now - _lastProbeSlowLogUtc < ProbeSlowLogDebounce)
+                return;
+
+            _lastProbeSlowLogUtc = now;
+            try { Serilog.Log.Warning("[LHM] probe: " + message); } catch { }
+        }
 
         /// <summary>
         /// Lease bookkeeping only (leases, lease ids, disposed flag). Never
@@ -467,14 +497,22 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private HardwareMonitoringState ProbeOnce()
         {
+            Stopwatch passSw = Stopwatch.StartNew();
             Monitor.Enter(_probeGate);
             try
             {
                 ApplyPendingReset();
                 UpdateHardware();
 
+                Stopwatch buildSw = Stopwatch.StartNew();
                 var state = new HardwareMonitoringState(BuildMetricsSnapshot(), CaptureSensorReadings());
+                buildSw.Stop();
+
                 Volatile.Write(ref _lastState, state);
+
+                if (passSw.ElapsedMilliseconds >= SlowProbePassMs)
+                    LogProbeSlow($"full pass {passSw.ElapsedMilliseconds}ms (build+capture {buildSw.ElapsedMilliseconds}ms)");
+
                 return state;
             }
             finally
@@ -755,8 +793,22 @@ namespace Uniwill_Control_Utility.Services
                     // Open on this pool thread under the gate: it probes drivers,
                     // takes 1-2 s on healthy machines, and can be held by a
                     // filter driver on guarded ones - the gate absorbs all of it.
+                    // The stage breadcrumb names the enabled set on a slow open:
+                    // the field 50 s gate on the LHM-fed fields must say which
+                    // driver touch the guard holds, not guess.
+                    Stopwatch openSw = Stopwatch.StartNew();
                     computer.Open();
                     _computer = computer;
+                    if (openSw.ElapsedMilliseconds >= SlowProbeStageMs)
+                    {
+                        LogProbeSlow(
+                            $"Computer.Open {openSw.ElapsedMilliseconds}ms " +
+                            $"(cpu={_configuredCategories.HasFlag(HardwareMonitoringCategory.Cpu)}, " +
+                            $"mem={_configuredCategories.HasFlag(HardwareMonitoringCategory.Memory)}, " +
+                            $"gpu={_configuredCategories.HasFlag(HardwareMonitoringCategory.Gpu)}, " +
+                            $"battery={_configuredCategories.HasFlag(HardwareMonitoringCategory.Battery)}, " +
+                            "motherboard/storage/controller=true)");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -779,7 +831,12 @@ namespace Uniwill_Control_Utility.Services
             try
             {
                 foreach (IHardware hardware in _computer.Hardware)
+                {
+                    Stopwatch devSw = Stopwatch.StartNew();
                     UpdateHardwareTree(hardware);
+                    if (devSw.ElapsedMilliseconds >= SlowProbeStageMs)
+                        LogProbeSlow($"device update {hardware.HardwareType} \"{hardware.Name}\" {devSw.ElapsedMilliseconds}ms");
+                }
 
                 _lastUpdateUtc = DateTime.UtcNow;
                 _updateFailureCount = 0;
