@@ -743,15 +743,21 @@ namespace Uniwill_Control_Utility
 
                 await _host.StartAsync(CancellationToken.None);
 
-                // The splash's last stage ("Opening dashboard") covers the
-                // dashboard's first data frame, not the window's creation:
-                // AcquirePersistent waits the first-snapshot budget inside the
-                // splash (1-2 s healthy), but a guarded machine parks the
-                // sensor probe and the budget expels the splash at 6 s with
-                // the dashboard still empty (the field signature: an empty
-                // window for ~6 s). Release on the first frame with real
-                // readings; bounded, so a wedged probe can never hold the
-                // splash - the dashboard fills from the OS-only path later.
+                // The dashboard window must be shown for its navigation to
+                // start the metrics timers, and the first tick fills it 1-2 s
+                // (healthy) up to ~6 s (guarded: the sensor probe parks and
+                // the first-snapshot budget runs out) after Show - the field
+                // signature is the window appearing EMPTY for seconds.
+                // Bridge: the splash's last stage ("Opening dashboard") now
+                // gates on the dashboard's first frame with real data
+                // (Services.DashboardFirstFrameSignal - OS-path readings,
+                // bounded), and the window created by StartAsync is hidden
+                // again until that frame lands, so it appears populated.
+                // Machines without the overlay keep today's behaviour.
+                Window? startupMainWindow =
+                    startupWindow is null ? null : Application.Current.MainWindow;
+                startupMainWindow?.Hide();
+
                 if (startupWindow is not null)
                 {
                     var firstFrame = _host.Services.GetService<Services.DashboardFirstFrameSignal>();
@@ -762,6 +768,8 @@ namespace Uniwill_Control_Utility
                             Task.Delay(DashboardFirstFrameBudget));
                     }
                 }
+
+                startupMainWindow?.Show();
 
                 await startupProgressReporter.ReportAsync(StartupStage.Complete);
                 if (startupWindow is not null)

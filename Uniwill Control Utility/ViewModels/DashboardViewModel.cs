@@ -114,9 +114,15 @@ namespace Uniwill_Control_Utility.ViewModels
                 // (Services.DashboardFirstFrameSignal): the window exists
                 // behind the splash, and the splash releases when the
                 // dashboard has real numbers, not when the window was
-                // created. Only a snapshot with actual readings counts - an
-                // empty warm cache must not release the splash early.
-                if ((snapshot.CpuTemperature > 0 || snapshot.GpuTemperature > 0) &&
+                // created. The condition is the OS-path data (memory is
+                // always readable; CpuUsage too) - NOT the LHM temperatures:
+                // on a guarded machine the probe parks, temperatures stay 0
+                // for as long as it is wedged, and a temps-gated splash
+                // expels at its budget with the window still empty
+                // (field-proven 2026-10-29: the empty-window report
+                // persisted under a temps-gated gate). The temperatures
+                // stream in on later ticks when the probe opens.
+                if ((snapshot.SystemMemoryTotalGb > 0 || snapshot.CpuTemperature > 0) &&
                     Volatile.Read(ref _ecChainDone) == 1)
                 {
                     _firstFrameSignal.SignalFirstFrame();
