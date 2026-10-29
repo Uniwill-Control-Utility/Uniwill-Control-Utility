@@ -200,9 +200,19 @@ namespace Uniwill_Control_Utility.Services
         internal static bool StorageUpdateDue(DateTime now, DateTime lastCompleted) =>
             now - lastCompleted >= StorageUpdateInterval;
 
-        /// <summary>Storage SMART cadence clock (see StorageUpdateInterval);
-        /// starts at construction time so the first update is deferred.</summary>
-        private DateTime _lastStorageUpdateUtc = DateTime.UtcNow;
+        /// <summary>Bit the slow group uses for its always-on system devices
+        /// (motherboard/storage/controller) - the public lease enum has no flag
+        /// for them. Group-internal mask bit only, never leaves the service.</summary>
+        private const HardwareMonitoringCategory SystemDevicesMask = (HardwareMonitoringCategory)16;
+
+        /// <summary>What the FAST group serves: the subsystems feeding the
+        /// fields the user watches (CPU usage, GPU temp/usage/clock/power,
+        /// battery watts). Measured open cost on the field box, standalone and
+        /// unelevated: cpu 97 ms, gpu 1123 ms, battery 33 ms - the visible
+        /// metrics are a ~1.2 s open, and the split is what keeps the 21 s
+        /// SMART park and the cold-open cost out of their way.</summary>
+        internal const HardwareMonitoringCategory FastCategories =
+            HardwareMonitoringCategory.Cpu | HardwareMonitoringCategory.Gpu | HardwareMonitoringCategory.Battery;
 
         /// <summary>
         /// Producer stage breadcrumbs (field report 2026-10-29: the LHM-fed
@@ -217,19 +227,15 @@ namespace Uniwill_Control_Utility.Services
         /// Warning severity (the app log's field level), debounced so a
         /// persistently slow chain stays one line per minute.
         /// </summary>
-        private const long SlowProbeStageMs = 2000;
-        private const long SlowProbePassMs = 5000;
+        internal const long SlowProbeStageMs = 2000;
+        internal const long SlowProbePassMs = 5000;
         private static readonly TimeSpan ProbeSlowLogDebounce = TimeSpan.FromSeconds(60);
 
-        private DateTime _lastProbeSlowLogUtc = DateTime.MinValue;
-
+        /// <summary>Breadcrumb sink: severity Warning (the app log's field
+        /// level), prefixed with the group's name. The debounce clock is per
+        /// group, so one group parked does not hide the other's breadcrumb.</summary>
         private void LogProbeSlow(string message)
         {
-            DateTime now = DateTime.UtcNow;
-            if (now - _lastProbeSlowLogUtc < ProbeSlowLogDebounce)
-                return;
-
-            _lastProbeSlowLogUtc = now;
             try { Serilog.Log.Warning("[LHM] probe: " + message); } catch { }
         }
 
@@ -241,19 +247,42 @@ namespace Uniwill_Control_Utility.Services
         private readonly object _sync = new();
 
         /// <summary>
-        /// Exclusive right to touch the LibreHardwareMonitor Computer
+        /// The two probe groups. One LibreHardwareMonitor Computer serializes
+        /// EVERY subsystem behind ONE gate, which gave the whole producer ONE
+        /// age: the measured 21 s SMART park behind the AV storage filter
+        /// (field breadcrumb 2026-10-29, `device update Storage 21044ms`)
+        /// blanked the CPU/GPU fields on every consumer, and the in-app open
+        /// cost (64.6 s first launch of a fresh pack, 22.3 s the next, 1.4 s
+        /// for the identical config in a standalone harness - the security
+        /// product on the app process, not the subsystems) delayed the
+        /// CPU/GPU cards by the whole sum. The split puts the subsystems that
+        /// feed the watched fields (CPU usage, GPU temp/usage/clock/power,
+        /// battery watts: ~1.2 s to open, measured) in the FAST group with its
+        /// own gate, cadence and age, and the slow system touches (DIMM SPD,
+        /// SMART per drive, SuperIO motherboard/controller) in the SLOW group.
+        /// Each group serves and goes stale on its own, so a parked SMART read
+        /// is now two "--" cells instead of the whole dashboard.
+        ///
+        /// Each group owns the exclusive right to touch ITS Computer
         /// (Open/Update/Close/sensor reads). A storage DeviceIoControl inside
-        /// the update pass can be held indefinitely by a filter driver
+        /// an update pass can be held indefinitely by a filter driver
         /// (field-proven on an AV-guarded machine: the disk open hung, the
         /// pass held the update lock, the UI thread's Acquire waited on it,
         /// the whole app froze with the dashboard up). Pool threads may block
-        /// on this gate; every app-thread consumer uses Monitor.TryEnter with
-        /// a zero/bounded timeout and degrades instead.
+        /// on a group gate; no app thread ever does - every consumer reads
+        /// the published state and degrades (see the freshness rule).
         /// </summary>
-        private readonly object _probeGate = new();
+        private readonly ProbeGroup _fast;
+        private readonly ProbeGroup _slow;
+
+        private readonly StaleWhileRevalidateCache<HardwareMonitoringState> _fastCache;
+        private readonly StaleWhileRevalidateCache<HardwareMonitoringState> _slowCache;
 
         private readonly Dictionary<long, HardwareMonitoringCategory> _leases = new();
-        private readonly StaleWhileRevalidateCache<HardwareMonitoringState> _stateCache;
+
+        /// <summary>Category union the leases ask for, published to both groups
+        /// (UI writes under _sync, group gates read it volatile).</summary>
+        private volatile HardwareMonitoringCategory _requestedCategories;
 
         /// <summary>EC CPU temperature source; null = no engine (dev/test composition).</summary>
         private readonly IEcCpuTemperatureSource? _ecCpuTemperature;
@@ -262,20 +291,7 @@ namespace Uniwill_Control_Utility.Services
         /// engine. Merged into every produced snapshot at the zero fields (see ctor).</summary>
         private readonly IEcEngineMetricsSource? _ecEngineMetrics;
 
-        /// <summary>Last published state; read by the OS-only fallback path (volatile).</summary>
-        private HardwareMonitoringState _lastState = HardwareMonitoringState.Empty;
-
-        /// <summary>Categories requested by leases (UI writes under _sync, pool reads).</summary>
-        private volatile HardwareMonitoringCategory _requestedCategories;
-
-        /// <summary>Categories the Computer instance was built for (gate-owned).</summary>
-        private HardwareMonitoringCategory _configuredCategories;
-
-        /// <summary>A ResetComputer() the gate owner must apply on its next pass.</summary>
-        private int _resetPending;
-
-        private Computer? _computer;
-        private DateTime _lastUpdateUtc = DateTime.MinValue;
+        /// <summary>Lease ids: monotonic under _sync.</summary>
         private long _nextLeaseId;
         private bool _disposed;
 
@@ -297,16 +313,9 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         private static readonly TimeSpan ShutdownGateBudget = TimeSpan.FromSeconds(3);
 
-        /// <summary>Consecutive UpdateHardware failures (reset on success).</summary>
-        private int _updateFailureCount;
-
-        /// <summary>When the last UpdateHardware failure occurred.</summary>
-        private DateTime _lastUpdateFailureUtc = DateTime.MinValue;
-
-        /// <summary>When ResetComputer() was last called — used to enforce a cooldown before reopening.</summary>
-        private DateTime _lastResetUtc = DateTime.MinValue;
-
-        /// <summary>How long to wait after ResetComputer() before attempting to reopen (gives GPU driver time to settle).</summary>
+        /// <summary>How long a group waits after ResetComputer() before
+        /// reopening its Computer (gives the GPU driver time to settle).
+        /// The per-group clocks (failure count, last reset) live in ProbeGroup.</summary>
         private static readonly TimeSpan ResetCooldown = TimeSpan.FromSeconds(3);
 
         /// <param name="ecCpuTemperature">
@@ -340,16 +349,30 @@ namespace Uniwill_Control_Utility.Services
             _ecCpuTemperature = ecCpuTemperature;
             _ecEngineMetrics = engineMetrics;
 
-            _stateCache = new StaleWhileRevalidateCache<HardwareMonitoringState>(
+            _fast = new ProbeGroup("fast", systemDevices: false, this);
+            _slow = new ProbeGroup("slow", systemDevices: true, this);
+
+            _fastCache = NewGroupCache(_fast, "fast");
+            _slowCache = NewGroupCache(_slow, "slow");
+        }
+
+        /// <summary>
+        /// A group's stale-while-revalidate cache: the gate-serialized pass
+        /// runs on the pool, and the cache's single-flight contract keeps at
+        /// most one pass queued PER GROUP - a hung driver parks one group's
+        /// pass while the other group keeps answering, which is the whole
+        /// point of the split.
+        /// </summary>
+        private static StaleWhileRevalidateCache<HardwareMonitoringState> NewGroupCache(ProbeGroup group, string name) =>
+            new(
                 HardwareMonitoringState.Empty,
                 SnapshotMaxAge,
-                _ => Task.Run(ProbeOnce),
+                _ => Task.Run(group.Probe),
                 onRefreshError: ex =>
                 {
-                    try { Serilog.Log.Warning(ex, "[LHM] Background snapshot refresh failed"); }
+                    try { Serilog.Log.Warning(ex, $"[LHM] Background snapshot refresh failed ({name} group)"); }
                     catch { /* Serilog may not be ready */ }
                 });
-        }
 
         /// <summary>
         /// Acquires a persistent lease that is never automatically released.
@@ -370,17 +393,21 @@ namespace Uniwill_Control_Utility.Services
             }
 
             if (categoriesChanged)
-                _stateCache.Invalidate();
+                InvalidateCaches();
 
-            // The probe runs on the pool under the gate; the startup worker
-            // waits for the first snapshot with a bounded budget. A hung
-            // driver probe parks the gate, not the splash: the dashboard
-            // fills from the OS-only path and completes later.
+            KickRefreshes();
+
+            // The probe runs on the pool under the group's gate; the startup
+            // worker waits for the FAST group's first snapshot with a bounded
+            // budget - that is the group feeding CPU usage and the GPU row. A
+            // hung driver parks that group's gate, not the splash: the
+            // dashboard fills from the OS/EC/engine sources and the group's
+            // fields land when its pass ever returns.
             try
             {
-                if (!_stateCache.RefreshAsync().Wait(StartupSnapshotBudget))
+                if (!_fastCache.RefreshAsync().Wait(StartupSnapshotBudget))
                 {
-                    try { Serilog.Log.Warning("[LHM] First snapshot not ready within the startup budget; the probe is hung or slow, metrics fill as it completes"); } catch { }
+                    try { Serilog.Log.Warning("[LHM] First fast-group snapshot not ready within the startup budget; the probe is hung or slow, metrics fill as it completes"); } catch { }
                 }
             }
             catch
@@ -408,46 +435,88 @@ namespace Uniwill_Control_Utility.Services
             // Bookkeeping only up to here: the UI thread must never wait on
             // hardware I/O (field-proven freeze: a storage probe inside the
             // update pass held the old single lock forever). The kick is
-            // fire-and-forget; the probe serializes on the gate on the pool.
+            // fire-and-forget; each group serializes on its own gate on the pool.
             if (categoriesChanged)
-                _stateCache.Invalidate();
+                InvalidateCaches();
 
-            _ = _stateCache.RefreshAsync();
+            KickRefreshes();
             return lease;
         }
 
+        /// <summary>
+        /// The merged snapshot every consumer reads (dashboard cards, tray
+        /// flyout, FanControl cards, the RTSS OSD). Each group contributes the
+        /// fields its own subsystems feed, on its OWN freshness: a group past
+        /// the staleness budget has no readings (its fields render "--", never
+        /// a frozen frame), and the fresh sources - OS, EC, engine - refill
+        /// their fields beside them in <see cref="ApplyOsSources"/>. That is
+        /// what makes a parked SMART read two cells instead of a statue of a
+        /// dashboard.
+        /// </summary>
         public HardwareMetricsSnapshot ReadSnapshot()
         {
-            HardwareMonitoringState state = _stateCache.Read();
-            bool producerStale = ProducerIsStale(_stateCache.Age);
+            HardwareMonitoringState fast = _fastCache.Read();
+            HardwareMonitoringState slow = _slowCache.Read();
 
-            // Two faces of "the producer is not answering": never completed
-            // (startup, first pass parked on the gate) and completed-then-
-            // wedged (the refresh is parked, no pass completes - see
-            // ProbeStalenessBudget). Both take the fresh path: OS numbers
-            // rebuilt now, EC temperature, engine sensor readings; the LHM-
-            // only fields of a wedged producer are no readings, not statues.
-            if (ReferenceEquals(state, HardwareMonitoringState.Empty) || producerStale)
-                return BuildOsOnlySnapshot(state.Metrics, producerStale);
+            return ApplyOsSources(MergeGroupSnapshots(
+                fast.Metrics, ProducerIsStale(_fastCache.Age),
+                slow.Metrics, ProducerIsStale(_slowCache.Age)));
+        }
 
-            return state.Metrics;
+        /// <summary>
+        /// The group merge, split by ownership: the fast group's fields (CPU
+        /// usage/temperature/power/clock, the GPU row, battery watts) and the
+        /// slow group's (DIMM temperatures, storage temperature) clear
+        /// independently. A group that has never completed a pass carries the
+        /// zeros that "unavailable" already means.
+        /// </summary>
+        internal static HardwareMetricsSnapshot MergeGroupSnapshots(
+            HardwareMetricsSnapshot fast, bool fastStale,
+            HardwareMetricsSnapshot slow, bool slowStale)
+        {
+            HardwareMetricsSnapshot merged = fastStale ? ClearFastStaleFields(fast) : fast;
+            if (slowStale)
+                return ClearSlowStaleFields(merged);
+
+            return merged with
+            {
+                MemoryTemperature0 = slow.MemoryTemperature0,
+                MemoryTemperature1 = slow.MemoryTemperature1,
+                StorageTemperatureCelsius = slow.StorageTemperatureCelsius,
+            };
         }
 
         public float ReadSensor(HardwareType hardwareType, SensorType sensorType, string sensorName)
         {
-            HardwareMonitoringState state = _stateCache.Read();
+            // Route the read to the group that owns the hardware and apply
+            // THAT group's freshness, and harsher consumers: the adaptive fan
+            // loop feeds on these readings, and a frozen fan RPM is worse than
+            // the 0 a missing reading already means.
+            (ProbeGroup group, StaleWhileRevalidateCache<HardwareMonitoringState> cache) =
+                GroupFor(hardwareType);
 
-            // Same freshness rule as ReadSnapshot, and harsher consumers: the
-            // adaptive fan loop feeds on these readings, and a frozen fan RPM
-            // is worse than the 0 a missing reading already means.
-            if (ProducerIsStale(_stateCache.Age))
+            if (ProducerIsStale(cache.Age))
                 return 0;
 
+            HardwareMonitoringState state = cache.Read();
             if (ReferenceEquals(state, HardwareMonitoringState.Empty))
-                state = Volatile.Read(ref _lastState);
+                state = group.LastState;
 
             return state.ReadSensor(hardwareType, sensorType, sensorName);
         }
+
+        /// <summary>Which group owns a hardware type's sensors: CPU/GPU/battery
+        /// in the fast group, everything else (motherboard and controller
+        /// SuperIO fans, storage, DIMM) in the slow group.</summary>
+        internal static bool IsFastHardware(HardwareType type) =>
+            type is HardwareType.Cpu
+                or HardwareType.GpuNvidia
+                or HardwareType.GpuAmd
+                or HardwareType.GpuIntel
+                or HardwareType.Battery;
+
+        private (ProbeGroup Group, StaleWhileRevalidateCache<HardwareMonitoringState> Cache) GroupFor(HardwareType type) =>
+            IsFastHardware(type) ? (_fast, _fastCache) : (_slow, _slowCache);
 
         /// <summary>
         /// Closes the LibreHardwareMonitor Computer to release stale GPU driver handles.
@@ -469,11 +538,13 @@ namespace Uniwill_Control_Utility.Services
             try { Serilog.Log.Information("[LHM] ResetComputer called — releasing stale handles, reopening deferred to next refresh"); }
             catch { /* Serilog may not be ready */ }
 
-            Interlocked.Exchange(ref _resetPending, 1);
-
-            // Invalidate cache so the next ReadSnapshot() triggers a background
-            // refresh which will reopen the Computer with fresh handles.
-            _stateCache.Invalidate();
+            // Both groups release their driver handles (the GPU ones are the
+            // reason for the reset; the slow group's SuperIO/SMART handles are
+            // cheap to recreate) and the next read renews both refreshes.
+            _fast.RequestReset();
+            _slow.RequestReset();
+            InvalidateCaches();
+            KickRefreshes();
         }
 
         private void Release(long id)
@@ -488,16 +559,21 @@ namespace Uniwill_Control_Utility.Services
             }
 
             if (categoriesChanged)
-                _stateCache.Invalidate();
+                InvalidateCaches();
+
+            KickRefreshes();
         }
 
         /// <summary>
         /// Must be called while holding _sync. Bookkeeping only: recompute the
-        /// union of the lease categories and publish it for the gate owner.
-        /// Rebuilding the Computer is the probe's job (UpdateHardware): the
-        /// old version closed and reopened drivers here, under the same lock
-        /// the UI thread's Acquire took, which is how one hung storage open
-        /// froze the whole app.
+        /// union of the lease categories and publish it to BOTH groups - each
+        /// group derives its own enablement mask from it (the fast group drops
+        /// the lease it does not serve, the slow group keeps its always-on
+        /// system devices while any lease is live). Rebuilding a Computer is
+        /// the group's probe job (ProbeGroup.UpdateHardware): the old version
+        /// closed and reopened drivers here, under the same lock the UI
+        /// thread's Acquire took, which is how one hung storage open froze the
+        /// whole app.
         /// </summary>
         private bool RequestRequestedCategoriesLocked()
         {
@@ -509,75 +585,68 @@ namespace Uniwill_Control_Utility.Services
                 return false;
 
             _requestedCategories = requested;
+            _fast.RequestCategories(requested);
+            _slow.RequestCategories(requested);
             return true;
         }
 
-        /// <summary>
-        /// The probe pass: one serialized touch of the Computer, on a pool
-        /// thread (the cache factory's Task.Run). Blocking on the gate here
-        /// is safe and is the whole point: the cache's single-flight contract
-        /// keeps at most one pass queued, a hung driver parks only that pass,
-        /// and every app-thread consumer keeps reading the last state plus
-        /// the OS-only snapshot.
-        /// </summary>
-        private HardwareMonitoringState ProbeOnce()
+        /// <summary>Drop both groups' published snapshots (category set
+        /// changed, driver handles invalidated): the next read re-serves the
+        /// fresh-source view and renews both refreshes.</summary>
+        private void InvalidateCaches()
         {
-            Stopwatch passSw = Stopwatch.StartNew();
-            Monitor.Enter(_probeGate);
-            try
-            {
-                ApplyPendingReset();
-                UpdateHardware();
-
-                Stopwatch buildSw = Stopwatch.StartNew();
-                var state = new HardwareMonitoringState(BuildMetricsSnapshot(), CaptureSensorReadings());
-                buildSw.Stop();
-
-                Volatile.Write(ref _lastState, state);
-
-                if (passSw.ElapsedMilliseconds >= SlowProbePassMs)
-                    LogProbeSlow($"full pass {passSw.ElapsedMilliseconds}ms (build+capture {buildSw.ElapsedMilliseconds}ms)");
-
-                return state;
-            }
-            finally
-            {
-                Monitor.Exit(_probeGate);
-            }
+            _fastCache.Invalidate();
+            _slowCache.Invalidate();
         }
 
         /// <summary>
-        /// Gate-owned: performs the Close() that ResetComputer() deferred,
-        /// then starts the settle cooldown from this moment (the driver gets
-        /// its window after the handles are actually released).
+        /// Kick both groups' refresh, FAST FIRST: the fast group's Open() is
+        /// the one that fills CPU usage and the GPU row, so it wins the
+        /// driver/security-product race at startup; the slow group's open
+        /// starts when the fast pass settles. A parked pass delays only the
+        /// fields its own group feeds.
         /// </summary>
-        private void ApplyPendingReset()
+        private void KickRefreshes()
         {
-            if (Interlocked.Exchange(ref _resetPending, 0) == 0)
+            Task fast = _fastCache.RefreshAsync();
+            if (fast.IsCompleted)
+            {
+                SafeRefresh(_slowCache);
                 return;
+            }
 
-            _computer?.Close();
-            _computer = null;
-            _lastUpdateUtc = DateTime.MinValue;
-            _updateFailureCount = 0;
-            _lastResetUtc = DateTime.UtcNow;
+            _ = fast.ContinueWith(
+                _ => SafeRefresh(_slowCache),
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Default);
         }
 
-        /// <summary>Must be called while holding _probeGate.</summary>
-        private HardwareMetricsSnapshot BuildMetricsSnapshot()
+        private static void SafeRefresh(StaleWhileRevalidateCache<HardwareMonitoringState> cache)
         {
-            IHardware? cpu = FindHardware(HardwareType.Cpu);
-            (IHardware? gpu, ActiveGpuType gpuType) = FindPreferredGpuWithFallback();
-            IHardware? battery = FindHardware(HardwareType.Battery);
-            GetSystemPowerStatus(out SystemPowerStatus powerStatus);
+            try { _ = cache.RefreshAsync(); }
+            catch (ObjectDisposedException) { /* shutdown already started */ }
+            catch { /* a metrics kick is never a failure */ }
+        }
+
+        /// <summary>
+        /// The fast group's contribution: every field the CPU/GPU/battery
+        /// subsystems feed. Field ownership is the split's contract - this
+        /// builder must never read DIMM/storage fields, and
+        /// <see cref="BuildSlowSnapshot"/> must never touch the GPU row, so
+        /// each group's staleness can clear exactly its own cells.
+        /// Must be called while holding the group's gate.
+        /// </summary>
+        internal static HardwareMetricsSnapshot BuildFastSnapshot(Computer? computer)
+        {
+            IHardware? cpu = FindHardware(computer, HardwareType.Cpu);
+            (IHardware? gpu, ActiveGpuType gpuType) = FindPreferredGpuWithFallback(computer);
+            IHardware? battery = FindHardware(computer, HardwareType.Battery);
 
             double gpuMemoryUsedMb = ReadFirstValue(gpu, SensorType.SmallData, "GPU Memory Used", "D3D Dedicated Memory Used");
             double gpuMemoryTotalMb = ReadFirstValue(gpu, SensorType.SmallData, "GPU Memory Total", "D3D Dedicated Memory Total");
-            var (memoryUsed, memoryTotal, memoryCommitted, pagefileTotal) = ReadPhysicalMemory();
-            (int memTemp0, int memTemp1) = ReadMemoryTemperatures();
-            int storageTemp = ReadStorageTemperature();
 
-            var metrics = new HardwareMetricsSnapshot
+            return new HardwareMetricsSnapshot
             {
                 CpuTemperature = Round(ReadFirstValue(cpu, SensorType.Temperature, "Core Average", "CPU Package", "Core")),
                 CpuUsage = Round(ReadFirstValue(cpu, SensorType.Load, "CPU Total", "Total")),
@@ -590,23 +659,57 @@ namespace Uniwill_Control_Utility.Services
                 GpuMemoryUsedGb = gpuMemoryUsedMb / 1024d,
                 GpuMemoryTotalGb = gpuMemoryTotalMb / 1024d,
                 ActiveGpuType = gpuType,
+                BatteryPowerWatts = Math.Abs(ReadFirstValue(battery, SensorType.Power, "Charge Rate", "Discharge Rate", "Power"))
+            };
+        }
+
+        /// <summary>
+        /// The slow group's contribution: DIMM temperatures (SPD/SMBIOS) and
+        /// the SMART storage temperature - the touches the storage-filter and
+        /// cold-open parks live in, and the reason they are not in the fast
+        /// builder. Must be called while holding the group's gate.
+        /// </summary>
+        internal static HardwareMetricsSnapshot BuildSlowSnapshot(Computer? computer)
+        {
+            (int memTemp0, int memTemp1) = ReadMemoryTemperatures(computer);
+
+            return new HardwareMetricsSnapshot
+            {
+                MemoryTemperature0 = memTemp0,
+                MemoryTemperature1 = memTemp1,
+                StorageTemperatureCelsius = ReadStorageTemperature(computer)
+            };
+        }
+
+        /// <summary>
+        /// The sources that never wait on a filter driver, applied to every
+        /// served snapshot: memory from GlobalMemoryStatusEx, battery state
+        /// from kernel32 GetSystemPowerStatus, the EC's CPU temperature, and
+        /// the engine's Ring0 power/clock and SPD/DIMM readings. Applied last,
+        /// so it refills the cells a stale group just cleared (the engine
+        /// overlay fills only zeros) and the OS-fed numbers are always current
+        /// - which is what keeps the dashboard live while a group is parked.
+        /// </summary>
+        private HardwareMetricsSnapshot ApplyOsSources(HardwareMetricsSnapshot metrics)
+        {
+            GetSystemPowerStatus(out SystemPowerStatus powerStatus);
+            (double memoryUsed, double memoryTotal, double memoryCommitted, double pagefileTotal) = ReadPhysicalMemory();
+
+            HardwareMetricsSnapshot filled = metrics with
+            {
                 SystemMemoryUsedGb = memoryUsed,
                 SystemMemoryTotalGb = memoryTotal,
                 SystemMemoryCommittedGb = memoryCommitted,
                 SystemMemoryPagefileTotalGb = pagefileTotal,
-                MemoryTemperature0 = memTemp0,
-                MemoryTemperature1 = memTemp1,
-                StorageTemperatureCelsius = storageTemp,
                 HasBattery = powerStatus.BatteryFlag != 128 && powerStatus.BatteryLifePercent <= 100,
                 BatteryPercent = powerStatus.BatteryLifePercent <= 100 ? powerStatus.BatteryLifePercent : 0,
                 IsBatteryCharging = (powerStatus.BatteryFlag & 8) != 0,
                 IsBatteryFullyCharged = powerStatus.BatteryLifePercent == 100 && powerStatus.ACLineStatus == 1,
-                BatteryPowerWatts = Math.Abs(ReadFirstValue(battery, SensorType.Power, "Charge Rate", "Discharge Rate", "Power")),
                 BatteryTimeRemainingMinutes = powerStatus.BatteryLifeTime > 0 ? powerStatus.BatteryLifeTime / 60 : 0
             };
 
             return ApplyEngineSensorSource(
-                ApplyCpuTemperatureSource(metrics, _ecCpuTemperature?.ReadCpuTemperature() ?? 0),
+                ApplyCpuTemperatureSource(filled, _ecCpuTemperature?.ReadCpuTemperature() ?? 0),
                 _ecEngineMetrics?.ReadEngineMetrics() ?? EngineMetricsSnapshot.Empty);
         }
 
@@ -668,58 +771,17 @@ namespace Uniwill_Control_Utility.Services
         private static int FillMissing(int own, int engine) => own > 0 ? own : engine;
 
         /// <summary>
-        /// Snapshot with no LibreHardwareMonitor touch: battery state from
-        /// kernel32 GetSystemPowerStatus, memory from GlobalMemoryStatusEx,
-        /// CPU temperature from the engine's EC telemetry - all cheap,
-        /// filter-driver-free sources. The LHM-only fields (CPU usage/clock,
-        /// GPU, battery watts, DIMM/storage temperatures) carry the last
-        /// completed probe's values while the producer is alive, and stay 0
-        /// (UI renders "--") when the probe has never finished - or when it
-        /// has WEDGED (<paramref name="producerStale"/>), where carrying the
-        /// values is painting a frozen frame. This is what keeps the dashboard
-        /// alive while a hardware probe hangs in a filter driver.
-        /// </summary>
-        private HardwareMetricsSnapshot BuildOsOnlySnapshot(
-            HardwareMetricsSnapshot last, bool producerStale)
-        {
-            HardwareMetricsSnapshot carried = producerStale ? ClearStaleSensorFields(last) : last;
-
-            GetSystemPowerStatus(out SystemPowerStatus powerStatus);
-            (double memoryUsed, double memoryTotal, double memoryCommitted, double pagefileTotal) = ReadPhysicalMemory();
-
-            HardwareMetricsSnapshot metrics = carried with
-            {
-                SystemMemoryUsedGb = memoryUsed,
-                SystemMemoryTotalGb = memoryTotal,
-                SystemMemoryCommittedGb = memoryCommitted,
-                SystemMemoryPagefileTotalGb = pagefileTotal,
-                HasBattery = powerStatus.BatteryFlag != 128 && powerStatus.BatteryLifePercent <= 100,
-                BatteryPercent = powerStatus.BatteryLifePercent <= 100 ? powerStatus.BatteryLifePercent : 0,
-                IsBatteryCharging = (powerStatus.BatteryFlag & 8) != 0,
-                IsBatteryFullyCharged = powerStatus.BatteryLifePercent == 100 && powerStatus.ACLineStatus == 1,
-                BatteryTimeRemainingMinutes = powerStatus.BatteryLifeTime > 0 ? powerStatus.BatteryLifeTime / 60 : 0
-            };
-
-            return ApplyEngineSensorSource(
-                ApplyCpuTemperatureSource(metrics, _ecCpuTemperature?.ReadCpuTemperature() ?? 0),
-                _ecEngineMetrics?.ReadEngineMetrics() ?? EngineMetricsSnapshot.Empty);
-        }
-
-        /// <summary>
-        /// Zeroes every reading only the LHM probe can feed, for the wedged-
-        /// producer path: a parked pass keeps the values in the last state,
-        /// and repainting them is a statue. Zero is the snapshot's
+        /// Zeroes every reading only the FAST group's subsystems feed, for the
+        /// wedged-fast-group path: a parked pass keeps the values in the last
+        /// state, and repainting them is a statue. Zero is the snapshot's
         /// "unavailable" convention, so the UI renders "--"/skips the cell,
         /// and the fresh sources refill what they can beside it: the EC CPU
-        /// temperature and the engine's Ring0 power/clock and SPD/DIMM values
-        /// merge right back (ApplyCpuTemperatureSource /
-        /// ApplyEngineSensorSource run after this), the OS-fed fields are
-        /// rebuilt there anyway. Kept: ActiveGpuType (a selection, not a
-        /// reading), the battery flags (OS state), and the EC-fed fields
-        /// (fan speeds, battery health/temperature - the EC cache answers
-        /// those fresh on its own cadence).
+        /// temperature and the engine's Ring0 power/clock merge right back in
+        /// ApplyOsSources. Kept: ActiveGpuType (a selection, not a reading)
+        /// and the EC-fed fields (fan speeds, battery health/temperature - the
+        /// EC cache answers those fresh on its own cadence).
         /// </summary>
-        internal static HardwareMetricsSnapshot ClearStaleSensorFields(HardwareMetricsSnapshot last) =>
+        internal static HardwareMetricsSnapshot ClearFastStaleFields(HardwareMetricsSnapshot last) =>
             last with
             {
                 CpuTemperature = 0,
@@ -733,17 +795,224 @@ namespace Uniwill_Control_Utility.Services
                 GpuClockMhz = 0,
                 GpuMemoryUsedGb = 0,
                 GpuMemoryTotalGb = 0,
-                MemoryTemperature0 = 0,
-                MemoryTemperature1 = 0,
-                StorageTemperatureCelsius = 0,
                 BatteryPowerWatts = 0,
             };
 
-        /// <summary>Must be called while holding _probeGate.</summary>
-        private IReadOnlyList<HardwareSensorReading> CaptureSensorReadings()
+        /// <summary>
+        /// Zeroes the readings only the SLOW group's subsystems feed (DIMM
+        /// temperatures from SPD/SMBIOS, the SMART storage temperature).
+        /// Independent of the fast group on purpose: the measured 21 s SMART
+        /// park parks THIS group, and the two cells it feeds are what go to
+        /// "--" - the CPU usage and GPU row keep streaming from the fast
+        /// group beside them. The engine's live DIMM readings merge right back
+        /// (ApplyEngineSensorSource fills only zeros), the storage card has no
+        /// second source and stays "--" until the group answers.
+        /// </summary>
+        internal static HardwareMetricsSnapshot ClearSlowStaleFields(HardwareMetricsSnapshot last) =>
+            last with
+            {
+                MemoryTemperature0 = 0,
+                MemoryTemperature1 = 0,
+                StorageTemperatureCelsius = 0,
+            };
+
+        /// <summary>
+        /// One LibreHardwareMonitor Computer with its own gate, its own
+        /// open/update cadence, its own deferred SMART clock, its own reset
+        /// cooldown and its own completed-pass clock (the age the freshness
+        /// rule gates on). The service pairs two of these - the fast group
+        /// (CPU/GPU/battery, the watched fields) and the slow group (DIMM SPD,
+        /// SMART, SuperIO system devices) - and merges what they publish, so a
+        /// driver park is confined to the fields its own group feeds.
+        ///
+        /// LHM's kernel side (WinRing0/PawnIO) is process-global, so a group's
+        /// Close() releases the shared handle for the whole process; group
+        /// rebuilds are therefore driven by the group's OWN effective mask
+        /// (a lease change the group does not serve never rebuilds it), and
+        /// the persistent lease keeps the visible set open for the session.
+        /// </summary>
+        private sealed class ProbeGroup
         {
-            if (_computer is null)
-                return Array.Empty<HardwareSensorReading>();
+            private readonly string _name;
+
+            /// <summary>True for the system-device group (motherboard/storage/
+            /// controller always on, plus DIMM when leased); false for the
+            /// CPU/GPU/battery group.</summary>
+            private readonly bool _systemDevices;
+
+            private readonly HardwareMonitoringService _owner;
+            private readonly object _gate = new();
+
+            /// <summary>Lease union published by the lease paths (UI writes
+            /// under _sync, the gate owner reads it volatile).</summary>
+            private volatile HardwareMonitoringCategory _requested;
+
+            /// <summary>The enablement mask the current Computer was built for
+            /// (gate-owned). A change here is the ONLY trigger for a rebuild.</summary>
+            private HardwareMonitoringCategory _configured;
+
+            private Computer? _computer;
+            private DateTime _lastUpdateUtc = DateTime.MinValue;
+
+            /// <summary>Storage SMART cadence clock (see StorageUpdateInterval);
+            /// starts at construction so the first update is deferred.</summary>
+            private DateTime _lastStorageUpdateUtc = DateTime.UtcNow;
+
+            /// <summary>Consecutive update failures (reset on success) and when
+            /// the last one happened: rate-limits reopen attempts on a broken
+            /// driver so the pass never becomes a tight loop.</summary>
+            private int _updateFailureCount;
+            private DateTime _lastUpdateFailureUtc = DateTime.MinValue;
+
+            /// <summary>When this group's Close() ran (settle window for the
+            /// GPU driver before a reopen).</summary>
+            private DateTime _lastResetUtc = DateTime.MinValue;
+
+            /// <summary>A ResetComputer() this group's gate owner applies on its next pass.</summary>
+            private int _resetPending;
+
+            /// <summary>Per-group breadcrumb debounce clock, so one group
+            /// parked never hides the other group's breadcrumb.</summary>
+            private DateTime _lastSlowLogUtc = DateTime.MinValue;
+
+            /// <summary>Last published state for this group (volatile).</summary>
+            private HardwareMonitoringState _lastState = HardwareMonitoringState.Empty;
+
+            public ProbeGroup(string name, bool systemDevices, HardwareMonitoringService owner)
+            {
+                _name = name;
+                _systemDevices = systemDevices;
+                _owner = owner;
+            }
+
+            /// <summary>The last snapshot this group published, for the read
+            /// path when its cache never completed.</summary>
+            public HardwareMonitoringState LastState => Volatile.Read(ref _lastState);
+
+            /// <summary>Publish the lease union; the gate owner reconciles the
+            /// Computer with it on the next pass (no driver I/O here).</summary>
+            public void RequestCategories(HardwareMonitoringCategory requested) =>
+                _requested = requested;
+
+            /// <summary>Defer a Close() to this group's gate owner: Close is
+            /// driver I/O a filter driver can hold, and no app thread may ever
+            /// wait behind it.</summary>
+            public void RequestReset() => Interlocked.Exchange(ref _resetPending, 1);
+
+            /// <summary>What the group's Computer is built for, derived from
+            /// the lease union: the fast group takes only the CPU/GPU/battery
+            /// flags, the slow group its system-device bit plus DIMM when
+            /// leased. The system devices ride whenever ANY lease is live
+            /// (parity with the single instance: FanControl's SuperIO fans are
+            /// not something a category lease asks for).</summary>
+            private HardwareMonitoringCategory EffectiveMask(HardwareMonitoringCategory requested)
+            {
+                if (!_systemDevices)
+                    return requested & FastCategories;
+
+                if (requested == HardwareMonitoringCategory.None)
+                    return HardwareMonitoringCategory.None;
+
+                HardwareMonitoringCategory mask = SystemDevicesMask;
+                if (requested.HasFlag(HardwareMonitoringCategory.Memory))
+                    mask |= HardwareMonitoringCategory.Memory;
+
+                return mask;
+            }
+
+            /// <summary>
+            /// The group's probe pass: one serialized touch of ITS Computer, on
+            /// a pool thread (its cache's Task.Run). Blocking on the gate here
+            /// is safe and is the point: the cache's single-flight contract
+            /// keeps at most one pass queued for this group, a hung driver
+            /// parks only that pass, and every app-thread consumer keeps
+            /// reading this group's last state through the merge.
+            /// </summary>
+            public HardwareMonitoringState Probe()
+            {
+                Stopwatch passSw = Stopwatch.StartNew();
+                Monitor.Enter(_gate);
+                try
+                {
+                    ApplyPendingReset();
+                    UpdateHardware();
+
+                    Stopwatch buildSw = Stopwatch.StartNew();
+                    HardwareMetricsSnapshot partial = _systemDevices
+                        ? BuildSlowSnapshot(_computer)
+                        : BuildFastSnapshot(_computer);
+                    var state = new HardwareMonitoringState(partial, CaptureSensorReadings());
+                    buildSw.Stop();
+
+                    Volatile.Write(ref _lastState, state);
+
+                    if (passSw.ElapsedMilliseconds >= SlowProbePassMs)
+                        LogSlow($"full pass {passSw.ElapsedMilliseconds}ms (build+capture {buildSw.ElapsedMilliseconds}ms)");
+
+                    return state;
+                }
+                finally
+                {
+                    Monitor.Exit(_gate);
+                }
+            }
+
+            /// <summary>Gate-owned: performs the Close() that ResetComputer()
+            /// deferred, then starts the settle cooldown from this moment (the
+            /// driver gets its window after the handles are actually released).
+            /// </summary>
+            private void ApplyPendingReset()
+            {
+                if (Interlocked.Exchange(ref _resetPending, 0) == 0)
+                    return;
+
+                _computer?.Close();
+                _computer = null;
+                _lastUpdateUtc = DateTime.MinValue;
+                _updateFailureCount = 0;
+                _lastResetUtc = DateTime.UtcNow;
+            }
+
+            /// <summary>Breadcrumb for this group, debounced on its own
+            /// clock: a persistently slow chain stays one line per minute.</summary>
+            private void LogSlow(string message)
+            {
+                DateTime now = DateTime.UtcNow;
+                if (now - _lastSlowLogUtc < ProbeSlowLogDebounce)
+                    return;
+
+                _lastSlowLogUtc = now;
+                _owner.LogProbeSlow($"[{_name}] {message}");
+            }
+
+            /// <summary>Shutdown: close this group's Computer if the gate is
+            /// free; a probe parked in a filter driver forever must not block
+            /// app exit (process exit releases the handles regardless).</summary>
+            public void Close(TimeSpan budget)
+            {
+                if (Monitor.TryEnter(_gate, budget))
+                {
+                    try
+                    {
+                        _computer?.Close();
+                        _computer = null;
+                    }
+                    finally
+                    {
+                        Monitor.Exit(_gate);
+                    }
+                }
+                else
+                {
+                    try { Serilog.Log.Warning($"[LHM] Dispose: {_name} group probe is parked, skipping Computer.Close at shutdown"); } catch { }
+                }
+            }
+
+            /// <summary>Must be called while holding this group's gate.</summary>
+            private IReadOnlyList<HardwareSensorReading> CaptureSensorReadings()
+            {
+                if (_computer is null)
+                    return Array.Empty<HardwareSensorReading>();
 
             var readings = new List<HardwareSensorReading>();
             foreach (IHardware hardware in _computer.Hardware)
@@ -767,25 +1036,29 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>Must be called while holding _probeGate.</summary>
         private void UpdateHardware()
         {
-            // Reconcile the Computer with what the leases ask for. This was
-            // the lease path's job under _sync; it lives here now because
-            // Open/Close is driver I/O a filter driver can hold forever, and
-            // no app thread may ever wait behind it.
-            HardwareMonitoringCategory requested = _requestedCategories;
-            if (requested != _configuredCategories)
+            // Reconcile the Computer with what the leases ask for, through
+            // THIS group's own mask: a lease change the group does not serve
+            // must never rebuild it (LHM's kernel side is process-global, so
+            // a rebuild also releases the shared handle the other group is
+            // using). This was the lease path's job under _sync; it lives here
+            // now because Open/Close is driver I/O a filter driver can hold
+            // forever, and no app thread may ever wait behind it.
+            HardwareMonitoringCategory mask = EffectiveMask(_requested);
+            if (mask != _configured)
             {
                 _computer?.Close();
                 _computer = null;
-                _configuredCategories = requested;
+                _configured = mask;
                 _lastUpdateUtc = DateTime.MinValue;
                 _updateFailureCount = 0;
             }
 
-            // If _computer is null but categories are requested, attempt to reopen.
-            // This can happen after ResetComputer() releases stale handles, or after
-            // a previous failure cleared the computer. We only reopen if enough time
-            // has passed since the last failure to avoid tight loops on broken drivers.
-            if (_computer is null && _configuredCategories != HardwareMonitoringCategory.None)
+            // If _computer is null but the mask asks for devices, attempt to
+            // reopen. This can happen after ResetComputer() releases stale
+            // handles, or after a previous failure cleared the computer. We
+            // only reopen if enough time has passed since the last failure to
+            // avoid tight loops on broken drivers.
+            if (_computer is null && _configured != HardwareMonitoringCategory.None)
             {
                 // Enforce cooldown after ResetComputer() — give the GPU driver time to
                 // settle after display topology changes before probing with fresh handles.
@@ -806,33 +1079,37 @@ namespace Uniwill_Control_Utility.Services
                 {
                     computer = new Computer
                     {
-                        IsCpuEnabled = _configuredCategories.HasFlag(HardwareMonitoringCategory.Cpu),
-                        IsMemoryEnabled = _configuredCategories.HasFlag(HardwareMonitoringCategory.Memory),
-                        IsGpuEnabled = _configuredCategories.HasFlag(HardwareMonitoringCategory.Gpu),
-                        IsBatteryEnabled = _configuredCategories.HasFlag(HardwareMonitoringCategory.Battery),
-                        IsMotherboardEnabled = true,
-                        IsStorageEnabled = true,
-                        IsControllerEnabled = true
+                        IsCpuEnabled = _configured.HasFlag(HardwareMonitoringCategory.Cpu),
+                        IsMemoryEnabled = _configured.HasFlag(HardwareMonitoringCategory.Memory),
+                        IsGpuEnabled = _configured.HasFlag(HardwareMonitoringCategory.Gpu),
+                        IsBatteryEnabled = _configured.HasFlag(HardwareMonitoringCategory.Battery),
+                        IsMotherboardEnabled = _configured.HasFlag(SystemDevicesMask),
+                        IsStorageEnabled = _configured.HasFlag(SystemDevicesMask),
+                        IsControllerEnabled = _configured.HasFlag(SystemDevicesMask)
                     };
 
-                    // Open on this pool thread under the gate: it probes drivers,
-                    // takes 1-2 s on healthy machines, and can be held by a
-                    // filter driver on guarded ones - the gate absorbs all of it.
-                    // The stage breadcrumb names the enabled set on a slow open:
-                    // the field 50 s gate on the LHM-fed fields must say which
-                    // driver touch the guard holds, not guess.
+                    // Open on this pool thread under the group's gate: it
+                    // probes drivers, takes 1-2 s on healthy machines, and can
+                    // be held by a filter driver on guarded ones - the gate
+                    // absorbs all of it, and the split keeps it out of the
+                    // other group's way. The stage breadcrumb names the
+                    // enabled set on a slow open, so the field "metrics filled
+                    // late" report says WHICH group's touch the guard holds
+                    // (measured: 64619 ms on a fresh pack's first launch,
+                    // 22256 ms the next, 1458 ms for the same set in a
+                    // standalone process - the guard on the app process).
                     Stopwatch openSw = Stopwatch.StartNew();
                     computer.Open();
                     _computer = computer;
                     if (openSw.ElapsedMilliseconds >= SlowProbeStageMs)
                     {
-                        LogProbeSlow(
+                        LogSlow(
                             $"Computer.Open {openSw.ElapsedMilliseconds}ms " +
-                            $"(cpu={_configuredCategories.HasFlag(HardwareMonitoringCategory.Cpu)}, " +
-                            $"mem={_configuredCategories.HasFlag(HardwareMonitoringCategory.Memory)}, " +
-                            $"gpu={_configuredCategories.HasFlag(HardwareMonitoringCategory.Gpu)}, " +
-                            $"battery={_configuredCategories.HasFlag(HardwareMonitoringCategory.Battery)}, " +
-                            "motherboard/storage/controller=true)");
+                            $"(cpu={_configured.HasFlag(HardwareMonitoringCategory.Cpu)}, " +
+                            $"mem={_configured.HasFlag(HardwareMonitoringCategory.Memory)}, " +
+                            $"gpu={_configured.HasFlag(HardwareMonitoringCategory.Gpu)}, " +
+                            $"battery={_configured.HasFlag(HardwareMonitoringCategory.Battery)}, " +
+                            $"systemDevices={_configured.HasFlag(SystemDevicesMask)})");
                     }
                 }
                 catch (Exception ex)
@@ -857,11 +1134,15 @@ namespace Uniwill_Control_Utility.Services
             {
                 foreach (IHardware hardware in _computer.Hardware)
                 {
-                    bool storage = hardware.HardwareType == HardwareType.Storage;
+                    // Storage SMART exists only in the system-device group.
+                    bool storage = _systemDevices && hardware.HardwareType == HardwareType.Storage;
 
                     // Storage SMART on its own cadence (see StorageUpdateInterval):
-                    // one 21 s SMART park behind the AV storage filter must not
-                    // serialize the whole producer behind a quasi-static value.
+                    // the field breadcrumb measured the park - 21 s of SMART
+                    // DeviceIoControl behind the AV storage filter. Inside this
+                    // group's gate it serializes the group's own fields (DIMM
+                    // temperatures, storage temperature: both quasi-static), and
+                    // the split is what keeps it off the CPU/GPU fields.
                     if (storage && !StorageUpdateDue(DateTime.UtcNow, _lastStorageUpdateUtc))
                         continue;
 
@@ -872,7 +1153,7 @@ namespace Uniwill_Control_Utility.Services
                         _lastStorageUpdateUtc = DateTime.UtcNow;
 
                     if (devSw.ElapsedMilliseconds >= SlowProbeStageMs)
-                        LogProbeSlow($"device update {hardware.HardwareType} \"{hardware.Name}\" {devSw.ElapsedMilliseconds}ms");
+                        LogSlow($"device update {hardware.HardwareType} \"{hardware.Name}\" {devSw.ElapsedMilliseconds}ms");
                 }
 
                 _lastUpdateUtc = DateTime.UtcNow;
@@ -899,15 +1180,16 @@ namespace Uniwill_Control_Utility.Services
             }
         }
 
-        private static void UpdateHardwareTree(IHardware hardware)
-        {
-            hardware.Update();
-            foreach (IHardware child in hardware.SubHardware)
-                UpdateHardwareTree(child);
+            private static void UpdateHardwareTree(IHardware hardware)
+            {
+                hardware.Update();
+                foreach (IHardware child in hardware.SubHardware)
+                    UpdateHardwareTree(child);
+            }
         }
 
-        private IHardware? FindHardware(HardwareType type) =>
-            _computer?.Hardware.FirstOrDefault(hardware => hardware.HardwareType == type);
+        private static IHardware? FindHardware(Computer? computer, HardwareType type) =>
+            computer?.Hardware.FirstOrDefault(hardware => hardware.HardwareType == type);
 
         /// <summary>
         /// Finds the best GPU that has valid sensors.
@@ -915,23 +1197,23 @@ namespace Uniwill_Control_Utility.Services
         /// zero values (e.g., dGPU disabled by MUX switch or PnP hotswap),
         /// falls through to the next candidate.
         /// </summary>
-        private (IHardware? hardware, ActiveGpuType type) FindPreferredGpuWithFallback()
+        private static (IHardware? hardware, ActiveGpuType type) FindPreferredGpuWithFallback(Computer? computer)
         {
-            if (_computer is null)
+            if (computer is null)
                 return (null, ActiveGpuType.None);
 
             // Try NVIDIA first
-            IHardware? nvidia = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.GpuNvidia);
+            IHardware? nvidia = computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.GpuNvidia);
             if (nvidia is not null && HasValidSensors(nvidia))
                 return (nvidia, ActiveGpuType.Nvidia);
 
             // Try AMD second (covers both dGPU Radeon RX and iGPU Radeon 610M)
-            IHardware? amd = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.GpuAmd);
+            IHardware? amd = computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.GpuAmd);
             if (amd is not null && HasValidSensors(amd))
                 return (amd, ActiveGpuType.Amd);
 
             // Try Intel third
-            IHardware? intel = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.GpuIntel);
+            IHardware? intel = computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.GpuIntel);
             if (intel is not null && HasValidSensors(intel))
                 return (intel, ActiveGpuType.Intel);
 
@@ -1039,27 +1321,14 @@ namespace Uniwill_Control_Utility.Services
                 _leases.Clear();
             }
 
-            _stateCache.Dispose();
+            _fastCache.Dispose();
+            _slowCache.Dispose();
 
-            // Close is LHM driver I/O and the gate owner may be parked in a
-            // filter driver forever; app exit must not wait on it. Bounded:
-            // process exit releases the handles regardless.
-            if (Monitor.TryEnter(_probeGate, ShutdownGateBudget))
-            {
-                try
-                {
-                    _computer?.Close();
-                    _computer = null;
-                }
-                finally
-                {
-                    Monitor.Exit(_probeGate);
-                }
-            }
-            else
-            {
-                try { Serilog.Log.Warning("[LHM] Dispose: hardware probe is parked, skipping Computer.Close at shutdown"); } catch { }
-            }
+            // Close is LHM driver I/O and a group's gate owner may be parked
+            // in a filter driver forever; app exit must not wait on it.
+            // Bounded per group: process exit releases the handles regardless.
+            _fast.Close(ShutdownGateBudget);
+            _slow.Close(ShutdownGateBudget);
         }
 
         private sealed class MonitoringLease : IDisposable
@@ -1113,9 +1382,9 @@ namespace Uniwill_Control_Utility.Services
             public ulong AvailableExtendedVirtual;
         }
 
-        private (int temp0, int temp1) ReadMemoryTemperatures()
+        private static (int temp0, int temp1) ReadMemoryTemperatures(Computer? computer)
         {
-            if (_computer is null)
+            if (computer is null)
                 return (0, 0);
 
             // DIMMs appear as top-level hardware items with HardwareType.Memory.
@@ -1126,7 +1395,7 @@ namespace Uniwill_Control_Utility.Services
             int temp1 = 0;
             int index = 0;
 
-            foreach (IHardware hardware in _computer.Hardware)
+            foreach (IHardware hardware in computer.Hardware)
             {
                 if (hardware.HardwareType != HardwareType.Memory)
                     continue;
@@ -1159,15 +1428,15 @@ namespace Uniwill_Control_Utility.Services
             return (temp0, temp1);
         }
 
-        private int ReadStorageTemperature()
+        private static int ReadStorageTemperature(Computer? computer)
         {
-            if (_computer is null)
+            if (computer is null)
                 return 0;
 
             // Storage hardware contains individual drives (HardwareType.Storage).
             // Each drive may have a "Temperature" sensor. We return the maximum across all drives.
             int maxTemp = 0;
-            foreach (IHardware storage in _computer.Hardware)
+            foreach (IHardware storage in computer.Hardware)
             {
                 if (storage.HardwareType != HardwareType.Storage)
                     continue;
