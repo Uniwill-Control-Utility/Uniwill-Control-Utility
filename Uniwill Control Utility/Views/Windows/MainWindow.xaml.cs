@@ -1653,7 +1653,33 @@ namespace Uniwill_Control_Utility.Views.Windows
                 SetPageService(pageProvider);
         }
 
-        public void ShowWindow() => Show();
+        /// <summary>
+        /// Startup splash gate: while set, the host's first ShowWindow()
+        /// initializes the window without letting it paint (the dashboard's
+        /// metrics timers need a shown window to start, and the first tick
+        /// fills it 1-2 s healthy / up to ~6 s guarded after that - showing
+        /// it then is the empty-dashboard flash the splash exists to cover).
+        /// App clears the gate and Shows when the first data frame lands
+        /// (Services.DashboardFirstFrameSignal).
+        /// </summary>
+        public static bool GateFirstShowWindow { get; set; }
+
+        public void ShowWindow()
+        {
+            if (GateFirstShowWindow)
+            {
+                // Create + initialize (navigation, pages, timers) without a
+                // visible frame; the synchronous Hide lands inside the same
+                // call the host made, so no render pass ever shows it.
+                ShowActivated = false;
+                Show();
+                Hide();
+                ShowActivated = true;
+                return;
+            }
+
+            Show();
+        }
 
         public void CloseWindow() => Close();
 

@@ -741,23 +741,20 @@ namespace Uniwill_Control_Utility
                 }
                 await RestoreAdaptiveModeAsync();
 
+                if (startupWindow is not null)
+                    Views.Windows.MainWindow.GateFirstShowWindow = true;
+
                 await _host.StartAsync(CancellationToken.None);
 
                 // The dashboard window must be shown for its navigation to
                 // start the metrics timers, and the first tick fills it 1-2 s
                 // (healthy) up to ~6 s (guarded: the sensor probe parks and
-                // the first-snapshot budget runs out) after Show - the field
-                // signature is the window appearing EMPTY for seconds.
-                // Bridge: the splash's last stage ("Opening dashboard") now
-                // gates on the dashboard's first frame with real data
-                // (Services.DashboardFirstFrameSignal - OS-path readings,
-                // bounded), and the window created by StartAsync is hidden
-                // again until that frame lands, so it appears populated.
-                // Machines without the overlay keep today's behaviour.
-                Window? startupMainWindow =
-                    startupWindow is null ? null : Application.Current.MainWindow;
-                startupMainWindow?.Hide();
-
+                // the first-snapshot budget runs out). MainWindow.ShowWindow
+                // (gate above) initializes it hidden; release on the first
+                // frame with real OS-path data (bounded), then show it
+                // populated - the splash card is a small centered card, so
+                // "window hidden until data" is what removes the empty-
+                // window field signature.
                 if (startupWindow is not null)
                 {
                     var firstFrame = _host.Services.GetService<Services.DashboardFirstFrameSignal>();
@@ -769,7 +766,8 @@ namespace Uniwill_Control_Utility
                     }
                 }
 
-                startupMainWindow?.Show();
+                Views.Windows.MainWindow.GateFirstShowWindow = false;
+                Views.Windows.MainWindow.Instance?.Show();
 
                 await startupProgressReporter.ReportAsync(StartupStage.Complete);
                 if (startupWindow is not null)
