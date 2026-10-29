@@ -26,6 +26,28 @@ namespace Uniwill_Control_Utility.Services
     }
 
     /// <summary>
+    /// The engine's kernel-side sensor readings (CPU Ring0 package power and core
+    /// clock via the sensor driver, DIMM SPD speed/temps via the SMBus), cached
+    /// and non-blocking. These are the fields the in-process probe cannot read
+    /// unelevated: the sensor drivers' device ACLs admit System + Administrators
+    /// (PawnIO's INF ships D:P(A;;GA;;;SY)(A;;GA;;;BA)), so an asInvoker app
+    /// installed per-machine gets access denied - the LocalSystem engine opens
+    /// them through the same RPC channel as the EC reads.
+    ///
+    /// Implementations answer <see cref="EngineMetricsSnapshot.Empty"/> for
+    /// anything that is not fresh: an open probe, a recent probe cycle, and a
+    /// live RPC chain, or no reading at all. Frozen numbers are worse than
+    /// "--" (field audit 2026-10-29: a wedged engine probe loop, which
+    /// deliberately runs outside the engine watchdog, kept serving its last
+    /// reading as if live; the app's stale-while-revalidate cache keeps the
+    /// last DTO forever when the engine dies, age-stamp included).
+    /// </summary>
+    public interface IEcEngineMetricsSource
+    {
+        EngineMetricsSnapshot ReadEngineMetrics();
+    }
+
+    /// <summary>
     /// Shares one demand-driven EC telemetry sample between UI consumers. Reads
     /// return immediately while stale data is refreshed on a worker thread.
     ///
@@ -36,7 +58,7 @@ namespace Uniwill_Control_Utility.Services
     /// app starts alongside the engine service, and a startup probe that raced the
     /// service starting must not latch the UI into a permanently degraded state.
     /// </summary>
-    public sealed class EcTelemetryService : IDisposable, IEcCpuTemperatureSource
+    public sealed class EcTelemetryService : IDisposable, IEcCpuTemperatureSource, IEcEngineMetricsSource
     {
         private static readonly TimeSpan DefaultMaxAge = TimeSpan.FromSeconds(1);
 
@@ -47,6 +69,16 @@ namespace Uniwill_Control_Utility.Services
         /// nothing and double the pipe traffic.
         /// </summary>
         private static readonly TimeSpan MetricsMaxAge = TimeSpan.FromSeconds(5);
+
+        /// <summary>
+        /// The whole chain's freshness budget for the engine sensor readings:
+        /// the engine's probe cycle is 5 s, so an entry older than ~6 cycles is
+        /// a wedged probe loop (engine side) or a dead RPC chain whose
+        /// stale-while-revalidate entry must never be repainted as live. Both
+        /// failure faces the same frozen-number defect (field audit 2026-10-29),
+        /// and both end in Empty, which the UI renders "--".
+        /// </summary>
+        private static readonly TimeSpan MetricsFreshBudget = TimeSpan.FromSeconds(30);
 
         private readonly StaleWhileRevalidateCache<EcFanDutySnapshot> _fanDutyCache;
         private readonly StaleWhileRevalidateCache<int> _mainFanRpmCache;
@@ -164,12 +196,25 @@ namespace Uniwill_Control_Utility.Services
 
         /// <summary>
         /// The engine's kernel-side sensor readings (CPU Ring0 power/clocks, DIMM SPD).
-        /// Cached and non-blocking like the other reads. These are the fields the
-        /// in-process LHM probe cannot read unelevated - the dashboard merges them
-        /// into the zero fields its own probe left (see
-        /// <see cref="Models.EngineMetricsSnapshot"/>).
+        /// Cached and non-blocking like the other reads; freshness-gated per
+        /// <see cref="IEcEngineMetricsSource"/>: an entry the cache has not
+        /// refreshed within <see cref="MetricsFreshBudget"/> (dead engine), or a
+        /// reading the engine stamped older than the budget (wedged probe loop),
+        /// answers Empty so the UI shows "--" instead of frozen numbers.
         /// </summary>
-        public EngineMetricsSnapshot ReadEngineMetrics() => _engineMetricsCache.Read();
+        public EngineMetricsSnapshot ReadEngineMetrics()
+        {
+            EngineMetricsSnapshot entry = _engineMetricsCache.Read();
+
+            if (!entry.ProbeOpen
+                || _engineMetricsCache.Age > MetricsFreshBudget
+                || entry.ReadingAgeSeconds > (int)MetricsFreshBudget.TotalSeconds)
+            {
+                return EngineMetricsSnapshot.Empty;
+            }
+
+            return entry;
+        }
 
         public void Dispose()
         {
@@ -275,6 +320,7 @@ namespace Uniwill_Control_Utility.Services
                             MemoryTemperature0 = dto.MemoryTemperature0,
                             MemoryTemperature1 = dto.MemoryTemperature1,
                             ProbeOpen = dto.ProbeOpen,
+                            ReadingAgeSeconds = dto.ReadingAgeSeconds,
                         };
                     }
                     catch (Exception ex)

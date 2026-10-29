@@ -271,9 +271,9 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             // CPU segmented bars
             CpuPowerBar.Value = s.CpuPowerWatts;
-            CpuPowerText.Text = $"{s.CpuPowerWatts} W";
+            CpuPowerText.Text = FormatWatts(s.CpuPowerWatts);
             CpuClockBar.Value = s.CpuClockMhz;
-            CpuClockText.Text = $"{s.CpuClockMhz / 1000.0:F1} GHz";
+            CpuClockText.Text = FormatGhz(s.CpuClockMhz);
             CpuFanBar.Value = s.CpuFanPercent;
             CpuFanText.Text = $"{s.CpuFanPercent}%";
 
@@ -283,12 +283,23 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             // GPU segmented bars
             GpuPowerBar.Value = s.GpuPowerWatts;
-            GpuPowerText.Text = $"{s.GpuPowerWatts} W";
+            GpuPowerText.Text = FormatWatts(s.GpuPowerWatts);
             GpuClockBar.Value = s.GpuClockMhz;
-            GpuClockText.Text = $"{s.GpuClockMhz / 1000.0:F1} GHz";
+            GpuClockText.Text = FormatGhz(s.GpuClockMhz);
             GpuFanBar.Value = s.GpuFanPercent;
             GpuFanText.Text = $"{s.GpuFanPercent}%";
         }
+
+        /// <summary>
+        /// Zero is the snapshot's "no reading" convention: render "--", never the
+        /// fake "0 W"/"0.0 GHz" the flyout showed while the sensor drivers were
+        /// closed to the unelevated app (audit 2026-10-29; the dashboard cards
+        /// already render "--" the same way).
+        /// </summary>
+        private static string FormatWatts(int watts) => watts > 0 ? $"{watts} W" : "--";
+
+        private static string FormatGhz(int megahertz) =>
+            megahertz > 0 ? $"{megahertz / 1000.0:F1} GHz" : "--";
 
         private void PositionNearTray()
         {

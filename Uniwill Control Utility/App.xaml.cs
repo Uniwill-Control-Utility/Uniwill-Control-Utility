@@ -380,7 +380,9 @@ namespace Uniwill_Control_Utility
                         // of a per-machine install has no CPU sensor at all. The source is
                         // EcTelemetryService (engine RPC, cached, non-blocking).
                         services.AddSingleton<IHardwareMonitoringService>(provider =>
-                            new HardwareMonitoringService(provider.GetService<IEcCpuTemperatureSource>()));
+                            new HardwareMonitoringService(
+                                provider.GetService<IEcCpuTemperatureSource>(),
+                                provider.GetService<IEcEngineMetricsSource>()));
                         services.AddSingleton<GpuInventoryService>();
                         services.AddSingleton<IFpsMonitoringService, FpsMonitoringService>();
                         services.AddSingleton<OverlaySettingsStore>();
@@ -449,6 +451,13 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<IEngineCapability, EngineCapability>();
                         services.AddSingleton<EcTelemetryService>();
                         services.AddSingleton<IEcCpuTemperatureSource>(provider =>
+                            provider.GetRequiredService<EcTelemetryService>());
+                        // The engine's kernel-side sensor snapshot travels on the same
+                        // cached-read pattern as the EC temperature: injected into the
+                        // snapshot producer and merged into every snapshot, so the tray
+                        // flyout, FanControl cards, the RTSS OSD and the dashboard all
+                        // get the Ring0/SPD fields from one merge point.
+                        services.AddSingleton<IEcEngineMetricsSource>(provider =>
                             provider.GetRequiredService<EcTelemetryService>());
 
                         // Engine service state: the SCM probe every EC call site gates

@@ -173,6 +173,63 @@ public sealed class EcTelemetryServiceTests
         Assert.Equal(EngineMetricsSnapshot.Empty, service.ReadEngineMetrics());
     }
 
+    [Fact]
+    public async Task EngineMetrics_DeadEngineChain_AnswersEmptyNotFrozenNumbers()
+    {
+        // Stale-while-revalidate keeps the LAST entry across refresh failures -
+        // right for fan duty (a momentary blip must not blank the gauge), wrong
+        // for the sensor snapshot: an engine that died an hour ago must not keep
+        // painting 104 W as if live (field audit 2026-10-29). The freshness gate
+        // turns the un-refreshable entry into Empty, the "--" value.
+        var clock = new ManualTimeProvider(DateTimeOffset.Parse("2026-10-29T00:00:00Z"));
+        bool engineDown = false;
+
+        using var service = new EcTelemetryService(
+            fanDutyCapture: () => Task.FromResult(EcFanDutySnapshot.Empty),
+            mainFanRpmCapture: () => Task.FromResult(0),
+            maxAge: TimeSpan.FromMinutes(1),
+            timeProvider: clock,
+            engineMetricsCapture: () => engineDown
+                ? Task.FromException<EngineMetricsSnapshot>(new InvalidOperationException("engine down"))
+                : Task.FromResult(new EngineMetricsSnapshot { CpuPowerWatts = 104, ProbeOpen = true }));
+
+        engineDown = false;
+        EngineMetricsSnapshot live = await WaitForEngineMetricsAsync(service);
+        Assert.Equal(104, live.CpuPowerWatts);
+
+        engineDown = true;
+        clock.Advance(TimeSpan.FromSeconds(31));
+
+        Assert.Equal(EngineMetricsSnapshot.Empty, service.ReadEngineMetrics());
+    }
+
+    [Fact]
+    public async Task EngineMetrics_WedgedEngineProbeLoop_ReadsPastTheBudgetAreNoReadings()
+    {
+        // The engine's probe loop is outside the watchdog: a wedged open keeps
+        // the LAST published DTO forever, and the verb stamps its serve-time
+        // age. Past the freshness budget the app treats the DTO as no reading,
+        // so a frozen 5298 MHz renders "--" instead of a fake live clock.
+        using var service = new EcTelemetryService(
+            fanDutyCapture: () => Task.FromResult(EcFanDutySnapshot.Empty),
+            mainFanRpmCapture: () => Task.FromResult(0),
+            maxAge: TimeSpan.FromMinutes(1),
+            engineMetricsCapture: () => Task.FromResult(new EngineMetricsSnapshot
+            {
+                CpuClockMhz = 5298,
+                ProbeOpen = true,
+                ReadingAgeSeconds = 31,
+            }));
+
+        // The gate answers Empty, so the assertion keys on the capture having run
+        // (the first Read() kicks the background publish, which completes at
+        // once): after a moment, the gated answer is stable.
+        _ = service.ReadEngineMetrics();
+        await Task.Delay(250);
+
+        Assert.Equal(EngineMetricsSnapshot.Empty, service.ReadEngineMetrics());
+    }
+
     private static async Task<EcFanDutySnapshot> WaitForSnapshotAsync(
         EcTelemetryService service)
     {

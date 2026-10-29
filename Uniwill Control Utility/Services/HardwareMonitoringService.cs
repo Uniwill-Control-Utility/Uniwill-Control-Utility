@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Uniwill_Control_Utility.Models;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -178,6 +179,10 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>EC CPU temperature source; null = no engine (dev/test composition).</summary>
         private readonly IEcCpuTemperatureSource? _ecCpuTemperature;
 
+        /// <summary>Engine kernel-side sensor source (power/clocks/SPD); null = no
+        /// engine. Merged into every produced snapshot at the zero fields (see ctor).</summary>
+        private readonly IEcEngineMetricsSource? _ecEngineMetrics;
+
         /// <summary>Last published state; read by the OS-only fallback path (volatile).</summary>
         private HardwareMonitoringState _lastState = HardwareMonitoringState.Empty;
 
@@ -232,9 +237,29 @@ namespace Uniwill_Control_Utility.Services
         /// no CPU sensor. Optional, so a composition without an engine keeps the
         /// single-source behaviour.
         /// </param>
-        public HardwareMonitoringService(IEcCpuTemperatureSource? ecCpuTemperature = null)
+        /// <param name="engineMetrics">
+        /// The engine's kernel-side sensor readings (Ring0 power/clocks, SPD speed
+        /// and DIMM temps), merged into every snapshot the service produces for
+        /// the fields the in-process probe left zero - the same ACL rule as the
+        /// EC temperature, and the reason the field dashboard showed "--" on CPU
+        /// Power, Clock Speed and RAM speed for the whole session. Merged HERE,
+        /// at the single snapshot producer (not at a page's timer), so every
+        /// consumer - dashboard cards, tray flyout, FanControl cards, the RTSS
+        /// OSD - gets the engine-fed fields through the same
+        /// <see cref="ReadSnapshot"/>; a per-page merge left all the others
+        /// showing zeros (field report: the OSD stayed missing what the
+        /// dashboard showed, 2026-10-29). Freshness is gated at the source
+        /// (<see cref="IEcEngineMetricsSource"/>): a wedged engine probe answers
+        /// Empty, the fields stay "--", never a frozen number.
+        /// Optional: a composition without an engine keeps the single-source
+        /// behaviour.
+        /// </param>
+        public HardwareMonitoringService(
+            IEcCpuTemperatureSource? ecCpuTemperature = null,
+            IEcEngineMetricsSource? engineMetrics = null)
         {
             _ecCpuTemperature = ecCpuTemperature;
+            _ecEngineMetrics = engineMetrics;
 
             _stateCache = new StaleWhileRevalidateCache<HardwareMonitoringState>(
                 HardwareMonitoringState.Empty,
@@ -481,7 +506,9 @@ namespace Uniwill_Control_Utility.Services
                 BatteryTimeRemainingMinutes = powerStatus.BatteryLifeTime > 0 ? powerStatus.BatteryLifeTime / 60 : 0
             };
 
-            return ApplyCpuTemperatureSource(metrics, _ecCpuTemperature?.ReadCpuTemperature() ?? 0);
+            return ApplyEngineSensorSource(
+                ApplyCpuTemperatureSource(metrics, _ecCpuTemperature?.ReadCpuTemperature() ?? 0),
+                _ecEngineMetrics?.ReadEngineMetrics() ?? EngineMetricsSnapshot.Empty);
         }
 
         /// <summary>
@@ -510,6 +537,36 @@ namespace Uniwill_Control_Utility.Services
 
             return metrics with { CpuTemperatureSource = CpuTemperatureSource.None };
         }
+
+        /// <summary>
+        /// Engine sensor overlay at the producer: the kernel-side readings fill
+        /// ONLY the fields the in-process probe left at 0 (zero is the snapshot's
+        /// "unavailable" convention, and a live in-process reading always beats
+        /// the engine's cache - the dev app runs elevated, opens the sensor
+        /// drivers itself, and its numbers are the fresher ones). GPU
+        /// power/clock are deliberately untouched: the GPU stays app-side (NVAPI
+        /// decision), there is no engine reading to overlay. RAM speed is not a
+        /// snapshot field (the memory card reads the system-info cache): the
+        /// engine's SPD value is published there when the WMI prefetch delivered
+        /// nothing, an idempotent 0-to-value transition that fires the card's
+        /// repaint exactly once.
+        /// </summary>
+        internal static HardwareMetricsSnapshot ApplyEngineSensorSource(
+            HardwareMetricsSnapshot metrics, EngineMetricsSnapshot engine)
+        {
+            if (engine.MemorySpeedMts > 0)
+                Scripts.Misc.CachedSystemInfo.PublishRamSpeedIfMissing(engine.MemorySpeedMts);
+
+            return metrics with
+            {
+                CpuPowerWatts = FillMissing(metrics.CpuPowerWatts, engine.CpuPowerWatts),
+                CpuClockMhz = FillMissing(metrics.CpuClockMhz, engine.CpuClockMhz),
+                MemoryTemperature0 = FillMissing(metrics.MemoryTemperature0, engine.MemoryTemperature0),
+                MemoryTemperature1 = FillMissing(metrics.MemoryTemperature1, engine.MemoryTemperature1),
+            };
+        }
+
+        private static int FillMissing(int own, int engine) => own > 0 ? own : engine;
 
         /// <summary>
         /// Snapshot with no LibreHardwareMonitor touch: battery state from
@@ -541,7 +598,9 @@ namespace Uniwill_Control_Utility.Services
                 BatteryTimeRemainingMinutes = powerStatus.BatteryLifeTime > 0 ? powerStatus.BatteryLifeTime / 60 : 0
             };
 
-            return ApplyCpuTemperatureSource(metrics, _ecCpuTemperature?.ReadCpuTemperature() ?? 0);
+            return ApplyEngineSensorSource(
+                ApplyCpuTemperatureSource(metrics, _ecCpuTemperature?.ReadCpuTemperature() ?? 0),
+                _ecEngineMetrics?.ReadEngineMetrics() ?? EngineMetricsSnapshot.Empty);
         }
 
         /// <summary>Must be called while holding _probeGate.</summary>

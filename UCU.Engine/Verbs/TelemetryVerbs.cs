@@ -69,10 +69,11 @@ namespace UCU.Engine
             add(EngineVerbs.Telemetry.GetMetricsSnapshot, (p, ct) =>
                 // The cached kernel-side readings (CPU Ring0 power/clocks, DIMM SPD).
                 // Zero hardware access, zero EC: the probe loop published it, the
-                // verb answers from memory, and the inline queue route (see
-                // EngineDomainQueues) keeps the answer available when an EC queue
-                // is parked.
-                Task.FromResult<object?>(metrics.Current));
+                // verb answers from memory stamped with its serve-time age (the
+                // probe loop is outside the watchdog; freshness travels with the
+                // data), and the inline queue route (see EngineDomainQueues)
+                // keeps the answer available when an EC queue is parked.
+                Task.FromResult<object?>(metrics.Served()));
         }
     }
 }

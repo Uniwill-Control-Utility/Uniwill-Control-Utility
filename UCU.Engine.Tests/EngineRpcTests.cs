@@ -106,6 +106,11 @@ public sealed class EngineRpcTests
         Assert.Equal(5602, dto.MemorySpeedMts);
         Assert.Equal(41, dto.MemoryTemperature0);
         Assert.Equal(39, dto.MemoryTemperature1);
+
+        // Freshness travels with the answer: the verb stamps the serve-time age,
+        // and a freshly published reading must arrive young (the app budgets 30 s
+        // - a wedged probe loop ages the cache past it and the UI shows "--").
+        Assert.InRange(dto.ReadingAgeSeconds, 0, 10);
     }
 
     [Fact]

@@ -9,16 +9,30 @@ namespace UCU.Engine
     /// zero hardware I/O by construction, so the sensor probe - the thing that
     /// parks on a guarded machine (the app's own LHM probe parks at startup in
     /// the field) - can never queue behind, delay, or wedge a pipe call.
+    ///
+    /// Freshness travels with the answer, not with the cache: the probe loop is
+    /// deliberately OUTSIDE the watchdog (a wedged sensor open must not FailFast
+    /// an engine whose EC queues are healthy, and the watchdog only sees serial
+    /// queues), so a wedged loop keeps publishing NOTHING and the only way the
+    /// app can tell a live reading from a frozen one is the age the verb stamps
+    /// at serve time. The app budgets ~6 cycles; older is rendered "--".
     /// </summary>
     public sealed class EngineMetricsSnapshotSource
     {
-        private volatile MetricsSnapshotDto? _current;
+        /// <summary>Serves "no reading ever taken": ProbeOpen false, age beyond
+        /// any budget the app can have.</summary>
+        public static MetricsSnapshotDto NeverPublished { get; } = new()
+        {
+            ProbeOpen = false,
+            ReadingAgeSeconds = int.MaxValue,
+        };
 
-        /// <summary>The latest published reading, or the all-zero/ProbeOpen=false
-        /// default while the probe has not produced one. The verb never returns
-        /// null: an app that asks gets the shape, with zeros meaning "no
-        /// reading", the same convention the dashboard's own snapshot uses.</summary>
-        public MetricsSnapshotDto Current => _current ?? Default;
+        private volatile MetricsSnapshotDto? _current;
+        private DateTime _publishedUtc = DateTime.MinValue;
+
+        /// <summary>The latest published reading, age unstamped. Verb callers
+        /// must use <see cref="Served"/>; this is the raw cache view.</summary>
+        public MetricsSnapshotDto Current => _current ?? NeverPublished;
 
         public void Publish(SensorProbeReading reading)
         {
@@ -31,8 +45,23 @@ namespace UCU.Engine
                 MemoryTemperature1 = reading.MemoryTemperature1,
                 ProbeOpen = reading.ProbeOpen,
             };
+            _publishedUtc = DateTime.UtcNow;
         }
 
-        private static MetricsSnapshotDto Default { get; } = new();
+        /// <summary>The cache stamped with its serve-time age: seconds since the
+        /// probe last published. A wedged loop (publishing nothing) produces a
+        /// monotonically rising age, which is the app's "--" signal.</summary>
+        public MetricsSnapshotDto Served()
+        {
+            MetricsSnapshotDto current = Current;
+            if (ReferenceEquals(current, NeverPublished))
+                return current;
+
+            long ageSeconds = (long)(DateTime.UtcNow - _publishedUtc).TotalSeconds;
+            return current with
+            {
+                ReadingAgeSeconds = (int)Math.Min(ageSeconds, int.MaxValue),
+            };
+        }
     }
 }

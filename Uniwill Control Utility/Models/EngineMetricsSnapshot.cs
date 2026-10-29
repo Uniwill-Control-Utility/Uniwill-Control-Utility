@@ -31,5 +31,15 @@ namespace Uniwill_Control_Utility.Models
 
         /// <summary>The engine's sensor probe is open and answering.</summary>
         public bool ProbeOpen { get; init; }
+
+        /// <summary>
+        /// Seconds between the engine's probe publishing the reading and the
+        /// verb serving it. The engine's probe loop runs outside the watchdog
+        /// on purpose, so freshness travels with the data; the service gate
+        /// (<see cref="Services.IEcEngineMetricsSource"/>) turns over-budget
+        /// readings into Empty, and consumers never see this field as a
+        /// number they must judge.
+        /// </summary>
+        public int ReadingAgeSeconds { get; init; }
     }
 }

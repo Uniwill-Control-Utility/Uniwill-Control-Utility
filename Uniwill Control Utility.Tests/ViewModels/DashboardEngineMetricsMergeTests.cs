@@ -1,22 +1,23 @@
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Services;
 using Uniwill_Control_Utility.Scripts.Misc;
-using Uniwill_Control_Utility.ViewModels;
 
 namespace Uniwill_Control_Utility.Tests.ViewModels;
 
 /// <summary>
-/// The dashboard's merge of the engine's kernel-side readings (field report
+/// The producer-level merge of the engine's kernel-side readings (field report
 /// 2026-10-29: CPU power, CPU clock and RAM speed never appeared on an
 /// unelevated install - the sensor drivers' ACLs admit System + Administrators
-/// and the WMI speed source was late/zero). The merge fills only the fields the
-/// app's own probe left at 0, and the RAM-speed cache publishes the SPD value
-/// for a repaint exactly once.
+/// and the WMI speed source was late/zero - and the first fix merged at the
+/// dashboard timer, which left the tray flyout, FanControl cards and the RTSS
+/// OSD showing zeros, because they read the raw service snapshot). The merge
+/// fills only the fields the app's own probe left at 0, and the RAM-speed cache
+/// publishes the SPD value exactly once.
 /// </summary>
 public sealed class DashboardEngineMetricsMergeTests
 {
     [Fact]
-    public void ApplyEngineMetrics_FillsZeroFields_KeepsOwnReadings()
+    public void ApplyEngineSensorSource_FillsZeroFields_KeepsOwnReadings()
     {
         var app = new HardwareMetricsSnapshot
         {
@@ -36,7 +37,7 @@ public sealed class DashboardEngineMetricsMergeTests
             ProbeOpen = true,
         };
 
-        HardwareMetricsSnapshot merged = DashboardViewModel.ApplyEngineMetrics(app, engine);
+        HardwareMetricsSnapshot merged = HardwareMonitoringService.ApplyEngineSensorSource(app, engine);
 
         Assert.Equal(104, merged.CpuPowerWatts);
         Assert.Equal(5298, merged.CpuClockMhz);
@@ -45,17 +46,31 @@ public sealed class DashboardEngineMetricsMergeTests
     }
 
     [Fact]
-    public void ApplyEngineMetrics_LeavesTheGpuFieldsAlone()
+    public void ApplyEngineSensorSource_LeavesTheGpuFieldsAlone()
     {
         // GPU power/clock stay app-side (NVAPI decision): the engine has no GPU
         // reading, so the merge must not touch them even when they are 0.
         var app = new HardwareMetricsSnapshot { GpuPowerWatts = 0, GpuClockMhz = 0 };
         var engine = new EngineMetricsSnapshot { CpuPowerWatts = 88, ProbeOpen = true };
 
-        HardwareMetricsSnapshot merged = DashboardViewModel.ApplyEngineMetrics(app, engine);
+        HardwareMetricsSnapshot merged = HardwareMonitoringService.ApplyEngineSensorSource(app, engine);
 
         Assert.Equal(0, merged.GpuPowerWatts);
         Assert.Equal(0, merged.GpuClockMhz);
+    }
+
+    [Fact]
+    public void ApplyEngineSensorSource_EmptyEngine_IsIdentity()
+    {
+        // The freshness gate answers Empty for wedged/stale sources: the merge
+        // must leave the snapshot exactly as produced (no frozen-number paint).
+        var app = new HardwareMetricsSnapshot { CpuPowerWatts = 0, CpuClockMhz = 0 };
+
+        HardwareMetricsSnapshot merged = HardwareMonitoringService.ApplyEngineSensorSource(
+            app, EngineMetricsSnapshot.Empty);
+
+        Assert.Equal(0, merged.CpuPowerWatts);
+        Assert.Equal(0, merged.CpuClockMhz);
     }
 
     [Fact]

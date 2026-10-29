@@ -265,6 +265,17 @@ namespace UCU.Contracts
 
         /// <summary>The engine's sensor probe is open and updating.</summary>
         public bool ProbeOpen { get; init; }
+
+        /// <summary>
+        /// Seconds between the probe publishing this reading and the verb serving
+        /// it. The probe loop is deliberately outside the watchdog (a wedged
+        /// sensor open must not FailFast an engine whose EC queues are healthy),
+        /// so freshness is carried with the data: a wedged loop keeps publishing
+        /// nothing, and the age tells the app to render "--" instead of trusting
+        /// frozen numbers. App-side budget: readings older than ~6 cycles are no
+        /// readings.
+        /// </summary>
+        public int ReadingAgeSeconds { get; init; }
     }
 
     public sealed record PowerLimitsDto
