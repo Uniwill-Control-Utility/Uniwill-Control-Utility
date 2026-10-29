@@ -477,7 +477,29 @@ namespace Uniwill_Control_Utility.Views.Pages
         private static void ResetDebounceTimer(ref System.Threading.Timer? timer, int delayMs, Action callback)
         {
             timer?.Dispose();
-            timer = new System.Threading.Timer(_ => Application.Current.Dispatcher.Invoke(callback), null, delayMs, System.Threading.Timeout.Infinite);
+            timer = new System.Threading.Timer(_ =>
+            {
+                // The debounce can fire while the app is closing: Invoke on
+                // a shutting-down dispatcher aborts the operation and throws
+                // (TaskCanceledException) on this timer thread - field-proven
+                // FTL "Unhandled exception on non-UI thread" on window close.
+                // A debounced hardware write whose UI is gone is moot; drop
+                // it quietly.
+                var dispatcher = Application.Current?.Dispatcher;
+                if (dispatcher is null || dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
+                    return;
+
+                try
+                {
+                    dispatcher.Invoke(callback);
+                }
+                catch (TaskCanceledException)
+                {
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }, null, delayMs, System.Threading.Timeout.Infinite);
         }
 
         private async void ApplyRpmAsync()
