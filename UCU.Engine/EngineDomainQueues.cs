@@ -43,13 +43,25 @@ namespace UCU.Engine
         /// telemetry queue rather than being dropped: an unregistered verb is already
         /// rejected by the dispatcher's verb table, so reaching here with a new prefix
         /// means a read, which is the safe guess.
+        ///
+        /// The cached sensor snapshot joins the inline set: it touches no hardware,
+        /// and a client must be able to read the temperature/power history when a
+        /// hardware queue is parked on a stuck call - which is the whole point of
+        /// serving it from a cache on a machine whose sensor probes park.
         /// </summary>
         public SerialExecutor? QueueFor(string verb)
         {
             int dot = verb.IndexOf('.');
             string domain = dot > 0 ? verb[..dot] : verb;
 
-            return domain == EngineDomain ? null : _queues[domain];
+            // The engine domain (identity/health) and the cached sensor snapshot
+            // run inline: they touch no hardware, and the app must be able to
+            // read them when every hardware queue is parked on a stuck call -
+            // which is exactly when the sensor readings matter most.
+            if (domain == EngineDomain || verb == EngineVerbs.Telemetry.GetMetricsSnapshot)
+                return null;
+
+            return _queues[domain];
         }
 
         public async ValueTask DisposeAsync()

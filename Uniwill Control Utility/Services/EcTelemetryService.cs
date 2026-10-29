@@ -39,9 +39,19 @@ namespace Uniwill_Control_Utility.Services
     public sealed class EcTelemetryService : IDisposable, IEcCpuTemperatureSource
     {
         private static readonly TimeSpan DefaultMaxAge = TimeSpan.FromSeconds(1);
+
+        /// <summary>
+        /// The engine's sensor cache ages slower than the EC reads: the snapshot
+        /// feeds power/clock/SPD cards, not a fan PID loop, and the engine's probe
+        /// cycle is 5 s - refreshing a 5-second-old cache every UI tick would buy
+        /// nothing and double the pipe traffic.
+        /// </summary>
+        private static readonly TimeSpan MetricsMaxAge = TimeSpan.FromSeconds(5);
+
         private readonly StaleWhileRevalidateCache<EcFanDutySnapshot> _fanDutyCache;
         private readonly StaleWhileRevalidateCache<int> _mainFanRpmCache;
         private readonly StaleWhileRevalidateCache<int> _cpuTemperatureCache;
+        private readonly StaleWhileRevalidateCache<EngineMetricsSnapshot> _engineMetricsCache;
 
         // Consecutive failure counter — reset on success, incremented on failure.
         // Exposed so callers can detect persistent EC access loss.
@@ -63,7 +73,8 @@ namespace Uniwill_Control_Utility.Services
             Func<Task<int>> mainFanRpmCapture,
             TimeSpan maxAge,
             TimeProvider? timeProvider = null,
-            Func<Task<int>>? cpuTemperatureCapture = null)
+            Func<Task<int>>? cpuTemperatureCapture = null,
+            Func<Task<EngineMetricsSnapshot>>? engineMetricsCapture = null)
         {
             ArgumentNullException.ThrowIfNull(fanDutyCapture);
             ArgumentNullException.ThrowIfNull(mainFanRpmCapture);
@@ -83,14 +94,32 @@ namespace Uniwill_Control_Utility.Services
             _cpuTemperatureCache = CreateCache(0, cpuTemperatureCapture ?? ZeroCapture, maxAge, timeProvider,
                 onRefreshError: ex => OnRefreshFailed(ex, "CPU temperature (EC)"),
                 onRefreshSuccess: () => OnRefreshSucceeded());
+
+            // Engine sensor snapshot: null capture (no engine capability at all)
+            // keeps every field 0, i.e. the pre-engine dashboard, unchanged.
+            _engineMetricsCache = CreateCache(
+                EngineMetricsSnapshot.Empty,
+                engineMetricsCapture ?? EmptyMetricsCapture,
+                MetricsMaxAge,
+                timeProvider,
+                onRefreshError: ex => OnRefreshFailed(ex, "Engine metrics"),
+                onRefreshSuccess: () => OnRefreshSucceeded());
         }
 
         private static Task<int> ZeroCapture() => Task.FromResult(0);
 
+        private static Task<EngineMetricsSnapshot> EmptyMetricsCapture() => Task.FromResult(EngineMetricsSnapshot.Empty);
+
         private EcTelemetryService(
-            (Func<Task<EcFanDutySnapshot>> fanDuty, Func<Task<int>> mainFanRpm, Func<Task<int>> cpuTemperature) captures,
+            (Func<Task<EcFanDutySnapshot>> fanDuty, Func<Task<int>> mainFanRpm, Func<Task<int>> cpuTemperature,
+                Func<Task<EngineMetricsSnapshot>> engineMetrics) captures,
             TimeSpan maxAge)
-            : this(captures.fanDuty, captures.mainFanRpm, maxAge, cpuTemperatureCapture: captures.cpuTemperature)
+            : this(
+                captures.fanDuty,
+                captures.mainFanRpm,
+                maxAge,
+                cpuTemperatureCapture: captures.cpuTemperature,
+                engineMetricsCapture: captures.engineMetrics)
         {
         }
 
@@ -133,11 +162,21 @@ namespace Uniwill_Control_Utility.Services
         /// </summary>
         public int ReadCpuTemperature() => _cpuTemperatureCache.Read();
 
+        /// <summary>
+        /// The engine's kernel-side sensor readings (CPU Ring0 power/clocks, DIMM SPD).
+        /// Cached and non-blocking like the other reads. These are the fields the
+        /// in-process LHM probe cannot read unelevated - the dashboard merges them
+        /// into the zero fields its own probe left (see
+        /// <see cref="Models.EngineMetricsSnapshot"/>).
+        /// </summary>
+        public EngineMetricsSnapshot ReadEngineMetrics() => _engineMetricsCache.Read();
+
         public void Dispose()
         {
             _fanDutyCache.Dispose();
             _mainFanRpmCache.Dispose();
             _cpuTemperatureCache.Dispose();
+            _engineMetricsCache.Dispose();
         }
 
         private static StaleWhileRevalidateCache<T> CreateCache<T>(
@@ -158,7 +197,8 @@ namespace Uniwill_Control_Utility.Services
         }
 
         private static (Func<Task<EcFanDutySnapshot>> fanDuty, Func<Task<int>> mainFanRpm,
-            Func<Task<int>> cpuTemperature) CreateCaptures(IEcTelemetryCapability telemetry, IEngineCapability engine)
+            Func<Task<int>> cpuTemperature, Func<Task<EngineMetricsSnapshot>> engineMetrics) CreateCaptures(
+            IEcTelemetryCapability telemetry, IEngineCapability engine)
         {
             ArgumentNullException.ThrowIfNull(telemetry);
             ArgumentNullException.ThrowIfNull(engine);
@@ -211,6 +251,35 @@ namespace Uniwill_Control_Utility.Services
                     catch (Exception ex)
                     {
                         try { Serilog.Log.Debug(ex, "[EC] CPU temperature read threw"); }
+                        catch { /* Serilog may not be ready */ }
+                        throw;
+                    }
+                },
+                async () =>
+                {
+                    // Deliberately NOT gated on IsHardwareAvailableAsync: that
+                    // probe is the EC driver, and the sensor snapshot needs no
+                    // EC - the two hardware stacks are independent, and a machine
+                    // whose EC is unavailable must still get its power/clock/SPD
+                    // numbers.
+                    try
+                    {
+                        UCU.Contracts.MetricsSnapshotDto dto =
+                            await telemetry.GetMetricsSnapshotAsync().ConfigureAwait(false);
+
+                        return new EngineMetricsSnapshot
+                        {
+                            CpuPowerWatts = dto.CpuPowerWatts,
+                            CpuClockMhz = dto.CpuClockMhz,
+                            MemorySpeedMts = dto.MemorySpeedMts,
+                            MemoryTemperature0 = dto.MemoryTemperature0,
+                            MemoryTemperature1 = dto.MemoryTemperature1,
+                            ProbeOpen = dto.ProbeOpen,
+                        };
+                    }
+                    catch (Exception ex)
+                    {
+                        try { Serilog.Log.Debug(ex, "[EC] Engine metrics read threw"); }
                         catch { /* Serilog may not be ready */ }
                         throw;
                     }

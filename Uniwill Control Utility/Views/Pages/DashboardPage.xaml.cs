@@ -104,8 +104,23 @@ namespace Uniwill_Control_Utility.Views.Pages
             // re-run or called from a different path).
             App.HardwareDetectionCompleted += OnHardwareDetectionCompleted;
 
+            // The RAM speed card can lag the page: its WMI source is late under a
+            // busy WMI and 0 on some platforms, and the engine's SPD reading can
+            // land seconds after the page painted "Not available". Repaint when
+            // the merged value arrives (page lives for the app's lifetime, same
+            // subscription pattern as the detection event above).
+            CachedSystemInfo.RamSpeedChanged += OnRamSpeedChanged;
+
             if (!string.IsNullOrEmpty(Family.CPUName))
                 OnHardwareDetectionCompleted();
+        }
+
+        private void OnRamSpeedChanged()
+        {
+            Dispatcher.InvokeAsync(() => _memory.UpdateModuleInfo(
+                CachedSystemInfo.RamProducer,
+                CachedSystemInfo.RamModel,
+                CachedSystemInfo.RamSpeed));
         }
 
         private void OnHardwareDetectionCompleted()

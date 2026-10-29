@@ -41,6 +41,18 @@ namespace UCU.Engine
             services.AddSingleton<AppExitSignal>();
                 services.AddSingleton<EngineDomainQueues>();
                 services.AddSingleton<EngineDispatcher>();
+
+                // The cached kernel-side sensor readings (see MetricsProbeService):
+                // LocalSystem opens the sensor drivers the asInvoker app cannot, the
+                // verb serves the cache. Console mode gets it too, so the dev F5
+                // engine answers the same verb as the service. Tests run a scripted
+                // probe through the override, as with the EC transport: the real
+                // probe opens sensor drivers, which has no place in a test process.
+                services.AddSingleton<EngineMetricsSnapshotSource>();
+                services.AddSingleton<UCU.Hardware.Metrics.ISensorProbe>(
+                    options.SensorProbeOverride ?? new UCU.Hardware.Metrics.LhmSensorProbe());
+                services.AddHostedService<MetricsProbeService>();
+
                 services.AddHostedService<EnginePipeServer>();
                 services.AddHostedService<EngineWatchdog>();
                 services.AddHostedService<AppSupervision>();

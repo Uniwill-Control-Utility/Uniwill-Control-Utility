@@ -238,6 +238,35 @@ namespace UCU.Contracts
         public int GpuFanDuty { get; init; }
     }
 
+    /// <summary>
+    /// The kernel-side sensor readings the LocalSystem engine can take and an
+    /// asInvoker app cannot: CPU package power and average core clock (Ring0 MSRs
+    /// via PawnIO) and the DIMM SPD data rate (SMBus). 0 means the engine's probe
+    /// has no reading for that field - the UI shows "--", per the snapshot's
+    /// zero-is-unavailable convention. ProbeOpen distinguishes "the sensor stack
+    /// is not up yet" from "the stack is up and this field is silent".
+    /// </summary>
+    public sealed record MetricsSnapshotDto
+    {
+        /// <summary>CPU package power in watts.</summary>
+        public int CpuPowerWatts { get; init; }
+
+        /// <summary>Average CPU core clock in MHz.</summary>
+        public int CpuClockMhz { get; init; }
+
+        /// <summary>Memory module data rate in MT/s (SPD).</summary>
+        public int MemorySpeedMts { get; init; }
+
+        /// <summary>DIMM 0 temperature in Celsius (SPD thermal sensor).</summary>
+        public int MemoryTemperature0 { get; init; }
+
+        /// <summary>DIMM 1 temperature in Celsius (SPD thermal sensor).</summary>
+        public int MemoryTemperature1 { get; init; }
+
+        /// <summary>The engine's sensor probe is open and updating.</summary>
+        public bool ProbeOpen { get; init; }
+    }
+
     public sealed record PowerLimitsDto
     {
         public int Pl1 { get; init; }

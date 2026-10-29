@@ -254,6 +254,9 @@ namespace UCU.Client
         public Task<int> GetProjectIdAsync(CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<int>(EngineVerbs.Telemetry.GetProjectId, cancellationToken);
 
+        public Task<MetricsSnapshotDto> GetMetricsSnapshotAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<MetricsSnapshotDto>(EngineVerbs.Telemetry.GetMetricsSnapshot, cancellationToken);
+
         public async Task<byte> ReadRegisterAsync(ushort address, CancellationToken cancellationToken = default)
         {
             // The wire carries the byte as an int (System.Text.Json has no byte in the

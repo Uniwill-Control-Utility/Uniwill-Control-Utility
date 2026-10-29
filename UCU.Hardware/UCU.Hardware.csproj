@@ -18,6 +18,10 @@
 
   <ItemGroup>
     <PackageReference Include="Serilog" Version="4.2.0" />
+    <!-- The engine-side sensor probe (Metrics/). The app keeps its own LHM copy for
+         the GPU (NVAPI decision) and never loads this assembly, so the
+         sensor-driver dependency stays on the LocalSystem side of the boundary. -->
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.7-pre744" />
   </ItemGroup>
 
   <ItemGroup>

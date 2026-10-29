@@ -57,6 +57,9 @@ public sealed class EngineHostFixture : IAsyncDisposable
             RestrictPipeAccess = false,
             TransportOverride = transport ?? new FakeEcTransport(),
             PlatformOverride = platform,
+            // Hermetic default: the production probe opens sensor drivers (Ring0,
+            // SMBus); tests opt into a scripted reading through configure.
+            SensorProbeOverride = new FakeSensorProbe(),
             LogDirectory = Path.Combine(Path.GetTempPath(), "ucu-engine-tests", pipeName),
         };
 

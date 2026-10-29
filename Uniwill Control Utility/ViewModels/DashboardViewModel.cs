@@ -100,6 +100,11 @@ namespace Uniwill_Control_Utility.ViewModels
                     };
                 }
 
+                // Enrich with the engine's kernel-side readings (see ApplyEngineMetrics).
+                EngineMetricsSnapshot engineMetrics = _ecTelemetry.ReadEngineMetrics();
+                snapshot = ApplyEngineMetrics(snapshot, engineMetrics);
+                Scripts.Misc.CachedSystemInfo.PublishRamSpeedIfMissing(engineMetrics.MemorySpeedMts);
+
                 // Enrich with cached battery EC data (refreshed every 10s)
                 snapshot = snapshot with
                 {
@@ -143,6 +148,29 @@ namespace Uniwill_Control_Utility.ViewModels
                 // Silently ignore transient device reading errors
             }
         }
+
+        /// <summary>
+        /// Overlay of the engine's kernel-side readings onto the app's snapshot,
+        /// filling only fields the app's own probe left at 0 (zero is the
+        /// snapshot's "unavailable" convention, and a live in-process reading
+        /// always beats the engine's cache - the dev app runs elevated, opens the
+        /// sensor drivers itself, and its numbers are the fresher ones). GPU
+        /// power/clock are deliberately absent: the GPU stays app-side (NVAPI
+        /// decision), no engine reading exists to overlay.
+        /// </summary>
+        internal static HardwareMetricsSnapshot ApplyEngineMetrics(
+            HardwareMetricsSnapshot snapshot, EngineMetricsSnapshot engine)
+        {
+            return snapshot with
+            {
+                CpuPowerWatts = FillMissing(snapshot.CpuPowerWatts, engine.CpuPowerWatts),
+                CpuClockMhz = FillMissing(snapshot.CpuClockMhz, engine.CpuClockMhz),
+                MemoryTemperature0 = FillMissing(snapshot.MemoryTemperature0, engine.MemoryTemperature0),
+                MemoryTemperature1 = FillMissing(snapshot.MemoryTemperature1, engine.MemoryTemperature1),
+            };
+        }
+
+        private static int FillMissing(int own, int engine) => own > 0 ? own : engine;
 
         private async void OnBatteryEcTimerTick(object? sender, EventArgs e)
         {

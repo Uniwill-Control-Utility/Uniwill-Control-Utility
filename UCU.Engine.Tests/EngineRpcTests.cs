@@ -66,6 +66,78 @@ public sealed class EngineRpcTests
     }
 
     [Fact]
+    public async Task GetMetricsSnapshot_ServesTheProbeReadingOverTheWire()
+    {
+        // The kernel-side metrics verb end to end: scripted probe -> probe loop
+        // publishes the cache -> verb answers from the cache. The numbers are the
+        // field machine's elevated-probe ground truth (package power 104 W,
+        // cores-average clock 5298 MHz, SPD tCKAVGmin 0.357 ns = 5602 MT/s,
+        // DIMM temps 41/39 C).
+        var probe = new FakeSensorProbe(new UCU.Hardware.Metrics.SensorProbeReading
+        {
+            CpuPowerWatts = 104,
+            CpuClockMhz = 5298,
+            MemorySpeedMts = 5602,
+            MemoryTemperature0 = 41,
+            MemoryTemperature1 = 39,
+            ProbeOpen = true,
+        });
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { SensorProbeOverride = probe });
+
+        // The probe loop publishes on its first cycle right after host start;
+        // give the loop a moment to beat the client's first connect.
+        MetricsSnapshotDto dto = default!;
+        DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        do
+        {
+            dto = await host.Telemetry.GetMetricsSnapshotAsync();
+            if (dto.ProbeOpen)
+                break;
+
+            await Task.Delay(50);
+        }
+        while (DateTime.UtcNow < deadline);
+
+        Assert.True(dto.ProbeOpen);
+        Assert.Equal(104, dto.CpuPowerWatts);
+        Assert.Equal(5298, dto.CpuClockMhz);
+        Assert.Equal(5602, dto.MemorySpeedMts);
+        Assert.Equal(41, dto.MemoryTemperature0);
+        Assert.Equal(39, dto.MemoryTemperature1);
+    }
+
+    [Fact]
+    public async Task GetMetricsSnapshot_BeforeAnyReading_IsTheZeroShapeNotAnError()
+    {
+        // A machine whose sensor stack never opens (no sensor driver, an
+        // asInvoker engine - the dev F5 case): the verb answers the zero shape,
+        // ProbeOpen false, and the app renders "--". No EngineException: "no
+        // reading" is a value, not a fault, matching the snapshot convention.
+        await using var host = await EngineHostFixture.StartAsync();
+
+        MetricsSnapshotDto dto = await host.Telemetry.GetMetricsSnapshotAsync();
+
+        Assert.False(dto.ProbeOpen);
+        Assert.Equal(0, dto.CpuPowerWatts);
+        Assert.Equal(0, dto.CpuClockMhz);
+        Assert.Equal(0, dto.MemorySpeedMts);
+    }
+
+    [Fact]
+    public async Task GetMetricsSnapshot_RunsInline_NotBehindTheHardwareQueues()
+    {
+        // The cache verb must be readable while every hardware queue is parked
+        // on a stuck call: that is the exact field scenario (EC wedged, sensor
+        // probe parked) when the readings matter most.
+        await using var queues = new EngineDomainQueues(new EngineRuntimeOptions());
+
+        Assert.Null(queues.QueueFor(EngineVerbs.Telemetry.GetMetricsSnapshot));
+        Assert.NotNull(queues.QueueFor(EngineVerbs.Telemetry.GetFanDuty));
+    }
+
+    [Fact]
     public async Task GetInfo_ReportsProtocolPlatformAndAvailability()
     {
         await using var host = await EngineHostFixture.StartAsync();

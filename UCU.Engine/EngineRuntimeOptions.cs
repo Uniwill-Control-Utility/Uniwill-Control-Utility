@@ -65,6 +65,13 @@ namespace UCU.Engine
         /// </summary>
         public IEcTransport? TransportOverride { get; init; }
 
+        /// <summary>
+        /// Sensor probe override, same test seam as the transport: the production
+        /// probe opens real sensor drivers (Ring0 MSR access, SMBus SPD), which has
+        /// no place in a test process. Tests inject a scripted probe.
+        /// </summary>
+        public UCU.Hardware.Metrics.ISensorProbe? SensorProbeOverride { get; init; }
+
         /// <summary>Engine build identity reported in <c>engine.get_info</c>.</summary>
         public string EngineVersion { get; init; } = ReadEngineVersion();
 

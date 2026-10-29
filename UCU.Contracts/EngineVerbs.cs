@@ -90,6 +90,22 @@ namespace UCU.Contracts
             public const string ReadRegister = "telemetry.read_register";
             public const string ReadRegisters = "telemetry.read_registers";
             public const string WriteRegister = "telemetry.write_register";
+
+            /// <summary>
+            /// The engine's cached kernel-side sensor readings (CPU package power and
+            /// core clock via Ring0 MSRs, DIMM SPD speed via the SMBus). These need the
+            /// sensor drivers, whose device ACLs admit System + Administrators
+            /// (PawnIO's INF ships D:P(A;;GA;;;SY)(A;;GA;;;BA)), so the asInvoker app
+            /// installed per-machine gets access denied and no reading at all; the
+            /// LocalSystem engine gets both. This is the ONLY sensor-reading verb: the
+            /// verb surface stays EC-semantics by decision, the field metrics gap
+            /// (dashboard CPU power/clock and RAM speed never appearing unelevated,
+            /// 2026-10-29) is closed by one cached read, not by moving the LHM tree
+            /// behind the pipe. GPU power/clock stay app-side (NVAPI decision).
+            /// The answer is a cache, never a live probe: the verb never queues behind
+            /// sensor I/O.
+            /// </summary>
+            public const string GetMetricsSnapshot = "telemetry.get_metrics_snapshot";
         }
 
         public static class Engine

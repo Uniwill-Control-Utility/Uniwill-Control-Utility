@@ -160,6 +160,14 @@ namespace UCU.Contracts.Capabilities
 
         Task<int> GetProjectIdAsync(CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// The engine's cached kernel-side sensor readings (CPU power/core clock,
+        /// DIMM SPD speed) - the fields the app's own sensor probe cannot read
+        /// unelevated (device ACLs admit System + Administrators). See
+        /// <see cref="EngineVerbs.Telemetry.GetMetricsSnapshot"/>.
+        /// </summary>
+        Task<MetricsSnapshotDto> GetMetricsSnapshotAsync(CancellationToken cancellationToken = default);
+
         Task<byte> ReadRegisterAsync(ushort address, CancellationToken cancellationToken = default);
 
         Task<byte[]> ReadRegistersAsync(ushort address, int count, CancellationToken cancellationToken = default);

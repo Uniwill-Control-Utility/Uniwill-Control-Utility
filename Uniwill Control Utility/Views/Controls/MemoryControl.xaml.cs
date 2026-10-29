@@ -18,7 +18,6 @@ namespace Uniwill_Control_Utility.Views.Controls
             _moduleModel.ToolTip = fullIdentity;
             _moduleSpeed.Text = DashboardMemoryInfoFormatter.FormatSpeed(speed);
         }
-
         public void UpdateMetrics(HardwareMetricsSnapshot snapshot)
         {
             double totalMem = snapshot.SystemMemoryTotalGb;

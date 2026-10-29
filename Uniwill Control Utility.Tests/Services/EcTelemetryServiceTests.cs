@@ -133,6 +133,46 @@ public sealed class EcTelemetryServiceTests
         Assert.Equal(0, service.ReadCpuTemperature());
     }
 
+    [Fact]
+    public async Task EngineMetrics_PublishesTheKernelSideReadings()
+    {
+        // The kernel-side readings (CPU Ring0 power/clock, SPD) are the fields the
+        // unelevated app's own probe cannot read; the cached read has to reach the
+        // dashboard's merge exactly like the fan duty does.
+        using var service = new EcTelemetryService(
+            fanDutyCapture: () => Task.FromResult(EcFanDutySnapshot.Empty),
+            mainFanRpmCapture: () => Task.FromResult(0),
+            maxAge: TimeSpan.FromMinutes(1),
+            engineMetricsCapture: () => Task.FromResult(new EngineMetricsSnapshot
+            {
+                CpuPowerWatts = 104,
+                CpuClockMhz = 5298,
+                MemorySpeedMts = 5602,
+                ProbeOpen = true,
+            }));
+
+        EngineMetricsSnapshot metrics = await WaitForEngineMetricsAsync(service);
+
+        Assert.Equal(104, metrics.CpuPowerWatts);
+        Assert.Equal(5298, metrics.CpuClockMhz);
+        Assert.Equal(5602, metrics.MemorySpeedMts);
+    }
+
+    [Fact]
+    public void EngineMetrics_WithoutAnEngine_IsEmptyNotThrown()
+    {
+        // No engine capability (the ctor's default): every field stays 0, which the
+        // dashboard merge treats as "no reading" - the pre-engine dashboard, unchanged.
+        using var service = new EcTelemetryService(
+            fanDutyCapture: () => Task.FromResult(EcFanDutySnapshot.Empty),
+            mainFanRpmCapture: () => Task.FromResult(0),
+            maxAge: TimeSpan.FromMinutes(1));
+
+        _ = service.ReadEngineMetrics();
+
+        Assert.Equal(EngineMetricsSnapshot.Empty, service.ReadEngineMetrics());
+    }
+
     private static async Task<EcFanDutySnapshot> WaitForSnapshotAsync(
         EcTelemetryService service)
     {
@@ -162,5 +202,20 @@ public sealed class EcTelemetryServiceTests
         }
 
         throw new TimeoutException("The EC telemetry cache did not publish the CPU temperature.");
+    }
+
+    private static async Task<EngineMetricsSnapshot> WaitForEngineMetricsAsync(EcTelemetryService service)
+    {
+        DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            EngineMetricsSnapshot metrics = service.ReadEngineMetrics();
+            if (metrics.ProbeOpen)
+                return metrics;
+
+            await Task.Delay(10);
+        }
+
+        throw new TimeoutException("The EC telemetry cache did not publish the engine metrics.");
     }
 }
