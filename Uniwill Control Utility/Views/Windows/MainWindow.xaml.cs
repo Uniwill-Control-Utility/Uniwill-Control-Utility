@@ -1679,6 +1679,13 @@ namespace Uniwill_Control_Utility.Views.Windows
                 // data frame.
                 Visibility = Visibility.Hidden;
                 new System.Windows.Interop.WindowInteropHelper(this).EnsureHandle();
+
+                // The host Navigates right after this call, and NavigationView
+                // needs its template applied (content presenter created) -
+                // Show() forces that layout inline, EnsureHandle does not,
+                // so run it here: field-proven NullReferenceException in
+                // NavigationView.UpdateContent without it.
+                UpdateLayout();
                 return;
             }
 
