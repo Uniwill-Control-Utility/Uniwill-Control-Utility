@@ -180,6 +180,31 @@ namespace Uniwill_Control_Utility.Services
             producerAge > ProbeStalenessBudget;
 
         /// <summary>
+        /// SMART temperature cadence for Storage devices. The field breadcrumb
+        /// (2026-10-29) measured the park: a SMART DeviceIoControl to
+        /// "CT2000P310SSD8" sat 21044 ms behind the AV storage filter driver -
+        /// inside the probe gate, which serializes the WHOLE producer, so
+        /// every fast source (the full Computer open is 1.4 s steady-state on
+        /// this machine, measured) queued behind a quasi-static temperature,
+        /// the producer aged past the staleness budget, and the LHM-fed
+        /// fields blanked on every consumer (dashboard, tray, FanControl,
+        /// OSD). Storage temperature moves on a minutes scale: update it once
+        /// a minute, and initialize the clock to construction so the FIRST
+        /// snapshot never queues behind SMART (the storage card shows "--"
+        /// for the first minute while every faster field fills in seconds).
+        /// The clock moves AFTER the update completes, so a park restarts the
+        /// window instead of retrying into the same filter-driver storm.
+        /// </summary>
+        private static readonly TimeSpan StorageUpdateInterval = TimeSpan.FromMinutes(1);
+
+        internal static bool StorageUpdateDue(DateTime now, DateTime lastCompleted) =>
+            now - lastCompleted >= StorageUpdateInterval;
+
+        /// <summary>Storage SMART cadence clock (see StorageUpdateInterval);
+        /// starts at construction time so the first update is deferred.</summary>
+        private DateTime _lastStorageUpdateUtc = DateTime.UtcNow;
+
+        /// <summary>
         /// Producer stage breadcrumbs (field report 2026-10-29: the LHM-fed
         /// fields - CPU utilization, GPU temp/usage/clock/power - appeared
         /// only ~50 s after launch; everything the OS/EC/engine feeds filled
@@ -832,8 +857,20 @@ namespace Uniwill_Control_Utility.Services
             {
                 foreach (IHardware hardware in _computer.Hardware)
                 {
+                    bool storage = hardware.HardwareType == HardwareType.Storage;
+
+                    // Storage SMART on its own cadence (see StorageUpdateInterval):
+                    // one 21 s SMART park behind the AV storage filter must not
+                    // serialize the whole producer behind a quasi-static value.
+                    if (storage && !StorageUpdateDue(DateTime.UtcNow, _lastStorageUpdateUtc))
+                        continue;
+
                     Stopwatch devSw = Stopwatch.StartNew();
                     UpdateHardwareTree(hardware);
+
+                    if (storage)
+                        _lastStorageUpdateUtc = DateTime.UtcNow;
+
                     if (devSw.ElapsedMilliseconds >= SlowProbeStageMs)
                         LogProbeSlow($"device update {hardware.HardwareType} \"{hardware.Name}\" {devSw.ElapsedMilliseconds}ms");
                 }

@@ -109,8 +109,7 @@ public sealed class HardwareMonitoringServiceServingTests
     }
 
     [Fact]
-    public void WedgedProducer_FreshSourcesRefillTheirFields_NothingFrozenRemains()
-    {
+    public void WedgedProducer_FreshSourcesRefillTheirFields_NothingFrozenRemains()    {
         // The full serve chain for a wedged producer: clear, then the EC CPU
         // temperature and the engine's live Ring0/SPD readings merge beside
         // the rebuilt OS fields. The GPU keeps no source (app-side decision)
@@ -145,5 +144,23 @@ public sealed class HardwareMonitoringServiceServingTests
         Assert.Equal(43, served.MemoryTemperature0);
         Assert.Equal(0, served.GpuPowerWatts);
         Assert.Equal(0, served.GpuClockMhz);
+    }
+
+    [Fact]
+    public void StorageUpdateDue_DefersTheFirstUpdateAndThenRunsOnceAMinute()
+    {
+        // The field park (21 s SMART behind the AV storage filter, inside the
+        // serializing probe gate) must not run on the 250 ms pass cadence:
+        // the clock starts at construction, so the first update is a minute
+        // out and the first snapshot never queues behind SMART.
+        DateTime construction = new(2026, 10, 29, 21, 0, 0, DateTimeKind.Utc);
+
+        Assert.False(HardwareMonitoringService.StorageUpdateDue(construction, construction));
+        Assert.False(HardwareMonitoringService.StorageUpdateDue(
+            construction.AddSeconds(59), construction));
+        Assert.True(HardwareMonitoringService.StorageUpdateDue(
+            construction.AddSeconds(60), construction));
+        Assert.True(HardwareMonitoringService.StorageUpdateDue(
+            construction.AddMinutes(30), construction));
     }
 }
