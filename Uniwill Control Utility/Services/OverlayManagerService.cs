@@ -51,6 +51,39 @@ namespace Uniwill_Control_Utility.Services
         private IDisposable? _rtssOsdHardwareLease;
         private IDisposable? _rtssOsdFpsLease;
         private bool _rtssOsdWasShowing; // tracks if OSD was last showing for focus-loss detection
+        private DateTime _rtssOsdLastBeatUtc;
+
+        /// <summary>
+        /// In-focus heartbeat cadence for the field diagnostics (see
+        /// OnRtssOsdTick). 10 s: a 2-minute field repro yields ~12 lines, and
+        /// the fingerprint resolution is plenty to tell streaming values from
+        /// frozen ones.
+        /// </summary>
+        private static readonly TimeSpan OsdHeartbeatInterval = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// OSD diagnostics at Warning severity - the app log's field level.
+        /// Transitions and failures only, plus one bounded heartbeat line per
+        /// <see cref="OsdHeartbeatInterval"/> while in focus. The whole OSD
+        /// chain was invisible on guarded boxes (the writer logs at
+        /// Information, the reader debounces into Debug, both filtered), and
+        /// the freeze report (values stop 1-2 s after the game takes the
+        /// foreground) cannot be closed without field evidence. The
+        /// fingerprints separate the faces: heartbeat lines STOP = the tick
+        /// thread is blocked; fingerprint stops CHANGING = the serving path
+        /// froze; fingerprint streams while the render stays frozen = the
+        /// writes land and RTSS rendering is the frozen side; the slot NUMBER
+        /// changes every line = the claimed owner keeps getting dropped.
+        /// </summary>
+        private static void LogOsd(string message)
+        {
+            try { Serilog.Log.Warning("[Overlay] OSD " + message); } catch { }
+        }
+
+        private static string BuildHeartbeat(int slot, HardwareMetricsSnapshot h, FpsMetricsSnapshot f) =>
+            $"in-game slot {slot}: fps {f.Fps} cpu {h.CpuTemperature}C {h.CpuUsage}% {h.CpuPowerWatts}W {h.CpuClockMhz}MHz " +
+            $"gpu {h.GpuTemperature}C {(int)h.GpuUsage}% {h.GpuPowerWatts}W {h.GpuClockMhz}MHz " +
+            $"mem {h.SystemMemoryUsedGb:F1}/{h.SystemMemoryTotalGb:F1}GB";
         private readonly object _rtssOsdLock = new(); // prevents concurrent ticks from System.Timers.Timer thread-pool dispatch
 
         public OverlayOptions CurrentOptions =>
@@ -520,10 +553,10 @@ namespace Uniwill_Control_Utility.Services
                 // still shows hardware metrics for hooked processes outside the
                 // game library.
                 bool gameInFocus = false;
+                int foregroundPid = GetForegroundProcessId();
 
                 if (fps.IsAvailable && fps.ProcessId > 0)
                 {
-                    int foregroundPid = GetForegroundProcessId();
                     gameInFocus = foregroundPid == fps.ProcessId;
                 }
                 else
@@ -535,7 +568,6 @@ namespace Uniwill_Control_Utility.Services
                     // FPS > 0, which would make gameInFocus always true when any
                     // game is running. We verify the returned PID matches the
                     // foreground to avoid that.
-                    int foregroundPid = GetForegroundProcessId();
                     if (foregroundPid > 0 && RtssReader.TryRead(foregroundPid, out RtssFpsData fallbackData) && fallbackData.Fps > 0
                         && fallbackData.ProcessId == foregroundPid)
                     {
@@ -550,6 +582,13 @@ namespace Uniwill_Control_Utility.Services
                 // After hiding, also call Release() to fully clear the slot.
                 if (!gameInFocus)
                 {
+                    if (_rtssOsdWasShowing)
+                    {
+                        LogOsd(
+                            $"focus OFF: foreground pid={foregroundPid}, " +
+                            $"fps-service pid={fps.ProcessId} available={fps.IsAvailable}");
+                    }
+
                     // First write a space so RTSS renders a blank frame, then
                     // release the slot. The two-step approach ensures RTSS sees
                     // the buffer change before the slot goes unowned.
@@ -595,14 +634,35 @@ namespace Uniwill_Control_Utility.Services
                 }
 
                 string? osdText = RtssOsdFormatter.Build(hardware, fps, options, hydroUi, flydigi);
-                if (osdText is not null)
+                if (osdText is null)
                 {
-                    bool wrote = RtssOsdWriter.Update(osdText);
-                    if (wrote)
-                        _rtssOsdWasShowing = true;
+                    if (_rtssOsdWasShowing)
+                        LogOsd("formatter produced no text (no rows enabled)");
+                    _rtssOsdWasShowing = false;
+                    return;
+                }
+
+                int slot = RtssOsdWriter.Update(osdText);
+                if (slot >= 0)
+                {
+                    if (!_rtssOsdWasShowing)
+                    {
+                        LogOsd(
+                            $"focus ON: game pid={foregroundPid}, " +
+                            $"source={(fps.IsAvailable ? "fps-service" : "rtss-fallback")}, slot {slot}, fps {fps.Fps}");
+                    }
+                    else if (DateTime.UtcNow - _rtssOsdLastBeatUtc >= OsdHeartbeatInterval)
+                    {
+                        LogOsd(BuildHeartbeat(slot, hardware, fps));
+                    }
+
+                    _rtssOsdLastBeatUtc = DateTime.UtcNow;
+                    _rtssOsdWasShowing = true;
                 }
                 else
                 {
+                    if (_rtssOsdWasShowing)
+                        LogOsd("writer failed: no slot/mapping (RTSS gone, slot table full, owner dropped)");
                     _rtssOsdWasShowing = false;
                 }
             }

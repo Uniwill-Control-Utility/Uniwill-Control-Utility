@@ -33,20 +33,26 @@ namespace Uniwill_Control_Utility.Services.Performance
 
         /// <summary>
         /// Write an OSD string into RTSS shared memory.
-        /// Returns true if the write succeeded (RTSS running, slot claimed, data written).
+        /// Returns the claimed slot (>= 0) on success; -1 when the write did
+        /// not land (RTSS not running / mapping lost, header invalid, no slot
+        /// available). The slot number travels to the caller's field
+        /// diagnostics: the OSD tick logs its in-focus heartbeat (slot +
+        /// values) at Warning severity, and a slot that changes every write
+        /// means the slot keep being released and re-claimed - RTSS dropping
+        /// the owner - which is a distinct failure face from frozen values.
         /// </summary>
-        internal static bool Update(string osdText)
+        internal static int Update(string osdText)
         {
             if (!AcquireMapping(out IntPtr viewPtr, out uint version))
             {
                 try { Log.Information("[RTSS] Update: AcquireMapping failed"); } catch { }
-                return false;
+                return -1;
             }
 
             if (!TryGetHeader(viewPtr, out RtssHeader header))
             {
                 try { Log.Information("[RTSS] Update: TryGetHeader failed"); } catch { }
-                return false;
+                return -1;
             }
 
             // Find or claim a slot.
@@ -54,7 +60,7 @@ namespace Uniwill_Control_Utility.Services.Performance
             if (slot < 0)
             {
                 try { Log.Information("[RTSS] Update: FindOrClaimSlot failed — no slot available"); } catch { }
-                return false;
+                return -1;
             }
 
             _claimedSlot = slot;
@@ -103,7 +109,7 @@ namespace Uniwill_Control_Utility.Services.Performance
             }
 
             try { Log.Information("[RTSS] Update: wrote slot {Slot}, text {TextLength} chars", slot, osdText.Length); } catch { }
-            return true;
+            return slot;
         }
 
         /// <summary>
