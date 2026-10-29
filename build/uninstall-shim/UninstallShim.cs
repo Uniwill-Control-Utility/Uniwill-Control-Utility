@@ -101,7 +101,14 @@ internal static class UninstallShim
         cmds.Add("reg delete " + hklmUninstall + " /f");
         cmds.Add("reg delete " + hklmShimEntry + " /f");
         if (!string.IsNullOrEmpty(productKey))
+        {
+            // The packed entry's current key name (build\msi-edit): MSI: +
+            // the real product code, the documented Control Panel convention
+            // (the msiexec /x above deletes it component-clean; this is the
+            // belt for an orphaned husk).
+            cmds.Add("reg delete \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MSI:" + productKey + "\" /f");
             cmds.Add("reg delete \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\" + productKey + "\" /f");
+        }
         cmds.Add(Echo("stage4-cleanup-done"));
         cmds.Add("rd /s /q \"%ProgramData%\\UCU\"");
         cmds.Add("rd /s /q \"" + root + "\"");

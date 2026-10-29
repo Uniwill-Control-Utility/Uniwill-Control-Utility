@@ -237,6 +237,15 @@ $arpEcho = & $msiEdit inspect $packedMsi.FullName 2>&1 | Out-String
 if ($arpEcho -notmatch "UninstallString\s*\|\s*""\[INSTALLFOLDER\]Uninstall\.exe""") {
     throw "post-edit verification: no ARP row rebound to the shim visible in the MSI"
 }
+# The published key must carry the documented MSI:{product-code} name: the
+# product-code route appwiz takes when an enforcer re-adds WindowsInstaller=1
+# resolves the name as the code (a non-code name yields the "may have already
+# been uninstalled" dialog - twice field-proven).
+$arpCode = if ($arpEcho -match "ProductCode\s*=\s*(\{[A-F0-9-]+\})") { $Matches[1] } else { $null }
+if (-not $arpCode) { throw "post-edit verification: product code not readable from the packed MSI" }
+if ($arpEcho -notmatch [regex]::Escape("Uninstall\MSI:$arpCode")) {
+    throw "post-edit verification: published ARP key is not named MSI:$arpCode"
+}
 Write-Host "Rebound $($packedMsi.Name): the single Control Panel entry now runs Uninstall.exe" -ForegroundColor Cyan
 
 # --- 5b. Stamp the Setup.exe bootstrapper requireAdministrator ---
@@ -255,9 +264,18 @@ if ($setupExe) {
     if (-not $mt) {
         Write-Warning "mt.exe not found in the Windows SDK — Setup.exe stays asInvoker; run it elevated."
     } else {
-        & $mt.FullName -manifest (Join-Path $PSScriptRoot "setup-elevation.manifest") `
-            "-outputresource:$($setupExe.FullName);#1"
-        if ($LASTEXITCODE -ne 0) { throw "mt.exe failed to stamp $($setupExe.Name)" }
+        # The fresh Setup.exe is transiently locked by real-time AV scanning
+        # (field-proven: mt c101008d "cannot open the device or file" right
+        # after vpk writes it). A short bounded retry rides out the scan;
+        # persistent failure stays loud.
+        $stamped = $false
+        for ($try = 1; $try -le 5; $try++) {
+            & $mt.FullName -manifest (Join-Path $PSScriptRoot "setup-elevation.manifest") `
+                "-outputresource:$($setupExe.FullName);#1"
+            if ($LASTEXITCODE -eq 0) { $stamped = $true; break }
+            Start-Sleep -Seconds (5 * $try)
+        }
+        if (-not $stamped) { throw "mt.exe failed to stamp $($setupExe.Name)" }
         Write-Host "Stamped $($setupExe.Name) requireAdministrator" -ForegroundColor Cyan
     }
 }

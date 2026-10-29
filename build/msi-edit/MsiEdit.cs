@@ -200,29 +200,41 @@ static class MsiEdit
         string key = keyRows[0][0];
         if (!string.IsNullOrEmpty(arpKey)) key = arpKey;
 
-        // Rename the published key away from vpk's `MSI:` prefix. appwiz.cpl
-        // treats Uninstall subkeys named "MSI:<x>" as MSI-managed entries
-        // routed by product code (the documented convention is
-        // `MSI:{product-code}`); vpk uses the app NAME after the prefix, so
-        // Control Panel calls the Windows Installer APIs with
-        // "Uniwill-Control-Utility", gets ERROR_UNKNOWN_PRODUCT, and shows
-        // "An error occurred while trying to uninstall ... It may have
-        // already been uninstalled. Would you like to remove ... from the
-        // Programs and Features list?" - clicking Yes deletes the entry and
-        // leaves the product installed. A plain non-GUID key with no
-        // WindowsInstaller value is shell-executed by the Control Panel:
-        // UninstallString verbatim = the complete-sweep shim.
-        // (Field-proven 2026-10-28: the dialog appeared verbatim on the
-        // published `MSI:Uniwill-Control-Utility` entry.)
+        // Name the published key with the documented Control Panel MSI
+        // convention: `MSI:{product-code}`, the REAL code (the Control Panel
+        // routes Uninstall subkeys named "MSI:<x>" to the Windows Installer
+        // APIs using the suffix as the product code, and an ARP anti-hijack
+        // enforcer re-adds WindowsInstaller=1 - the value that selects that
+        // route - to any plain key on guarded boxes, so the name cannot be
+        // avoided, it must satisfy the rule. Field-proven through both
+        // failures of the alternatives:
+        //   vpk's `MSI:Uniwill-Control-Utility` (2026-10-28) and the renamed
+        // plain `Uniwill-Control-Utility` (2026-10-29, enforcer-forced route)
+        // both made the code lookup use a NON-code, producing ERROR_UNKNOWN_
+        // PRODUCT and "An error occurred while trying to uninstall ... It
+        // may have already been uninstalled. Would you like to remove ...
+        // from the Programs and Features list?" - Yes deletes the entry and
+        // leaves the product installed. With name = real code BOTH routes
+        // complete: the shell route (no WindowsInstaller value, clean boxes)
+        // ignores the key name and shell-executes UninstallString verbatim -
+        // the requireAdministrator sweep shim, UAC consent included; the
+        // product-code route (WindowsInstaller re-added by the enforcer)
+        // resolves the registered code, runs the genuine MSI uninstall, and
+        // its vanishing registration trips the sentinel's SYSTEM sweep verb.
+        var codeRows = Query(db, "SELECT `Value` FROM `Property` WHERE `Property` = 'ProductCode'");
+        if (codeRows.Count == 0)
+            throw new Exception("ProductCode property missing: template drift, refusing to patch blindly");
+        string code = codeRows[0][0].Trim();
         int lastSep = key.LastIndexOf('\\');
         string leaf = key.Substring(lastSep + 1);
-        if (leaf.StartsWith("MSI:", StringComparison.OrdinalIgnoreCase))
+        string targetLeaf = "MSI:" + code;
+        if (!string.Equals(leaf, targetLeaf, StringComparison.OrdinalIgnoreCase))
         {
-            string plain = key.Substring(0, lastSep + 1) + leaf.Substring(4);
-            Execute(db, "UPDATE `Registry` SET `Key` = '" + plain + "' WHERE `Key` = '" + key + "'");
-            Console.WriteLine("renamed published ARP key " + leaf + " -> " + plain.Substring(lastSep + 1) +
-                " (the MSI: prefix routes Control Panel to the product-code APIs)");
-            key = plain;
+            string target = key.Substring(0, lastSep + 1) + targetLeaf;
+            Execute(db, "UPDATE `Registry` SET `Key` = '" + target + "' WHERE `Key` = '" + key + "'");
+            Console.WriteLine("renamed published ARP key " + leaf + " -> " + targetLeaf +
+                " (MSI: + REAL product code: the product-code route resolves, the shell route ignores the name)");
+            key = target;
         }
 
         // Rebind the uninstall commands (idempotent: UPDATE to the same value

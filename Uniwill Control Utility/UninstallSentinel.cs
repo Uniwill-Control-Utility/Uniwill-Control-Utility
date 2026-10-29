@@ -411,15 +411,16 @@ namespace Uniwill_Control_Utility
                 // and removes those rows WITH the product (the component's
                 // KeyPath is the uninstall subkey), so the entry IS the
                 // machine registration for the sentinel. The key name is
-                // vpk's business (the current template publishes a plain
-                // "Uniwill-Control-Utility"; packs from the transitional
-                // window use "MSI:Uniwill-Control-Utility", and appwiz.cpl's
-                // product-code routing of the MSI: prefix is why the pack
-                // step renames it) - identity is the content: our DisplayName
-                // + a GUID-shaped UCUProductCode. GUID-format keys with the
-                // MsiExec UninstallString are the Windows Installer engine's
-                // canonical entry (hidden via SystemComponent=1): watched
-                // too, its key name IS the product code.
+                // vpk's business (the current template names it
+                // `MSI:{product-code}` - the documented convention that
+                // satisfies appwiz.cpl's product-code routing when an ARP
+                // anti-hijack enforcer re-adds WindowsInstaller=1; installs
+                // from the transitional window carry vpk's app-name key or
+                // the plain renamed one) - identity is the content: our
+                // DisplayName + a GUID-shaped UCUProductCode. GUID-format
+                // keys with the MsiExec UninstallString are the Windows
+                // Installer engine's canonical entry (hidden via
+                // SystemComponent=1): watched too, its key name IS the code.
                 bool guidKey = GuidKey.IsMatch(keyName);
 
                 using RegistryKey? entry = uninstall.OpenSubKey(keyName);
