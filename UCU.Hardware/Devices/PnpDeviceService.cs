@@ -75,14 +75,16 @@ namespace UCU.Hardware.Devices
     /// Win32_PnPEntity rows, SetupAPI, and the CM per-node calls all work on
     /// the same box; this service runs on exactly those.
     ///
-    /// Status semantics mirror the retired PowerShell queries one-for-one, so
-    /// the rows' verified behaviour is unchanged: "OK" is DF_RUNNING with no
-    /// problem code; a disabled node is "Disable" (DF_DNE_0); present-but-not
-    /// running is "Unknown"; a devnode the system cannot open is "Unknown
-    /// Device". Mutations act only on PRESENT devices (DF_PRESENT) whose state
-    /// differs from the target, so already-in-state is a silent no-op, and the
-    /// verification re-read answers the verb - the same verify-by-re-read the
-    /// elevated path's callers did by hand.
+    /// Status semantics mirror the retired PowerShell queries' status strings,
+    /// derived from the devnode's problem code: 0 = "OK" (running), 
+    /// CM_PROB_DISABLED = "Disable", CM_PROB_PHANTOM = not present ("Unknown"),
+    /// any other problem = "Error"; a devnode the system cannot open is
+    /// "Unknown Device". (The legacy DF_PRESENT/DF_RUNNING/DF_DNE_0 status
+    /// bits that the mapping was originally written on are dead on modern
+    /// Windows - see Describe.) Mutations act only on present devices whose
+    /// running state differs from the target, so already-in-state is a silent
+    /// no-op, and the verification re-read answers the verb - the same
+    /// verify-by-re-read the elevated path's callers did by hand.
     /// </summary>
     public sealed class PnpDeviceService : IPnpDeviceService
     {
@@ -230,13 +232,16 @@ namespace UCU.Hardware.Devices
         }
 
         /// <summary>
-        /// The PnP status string, in the retired query's vocabulary: present +
-        /// running + no problem = OK; the DNE flag = Disable; present, not
-        /// running, no DNE = Unknown; a devnode that cannot be located or
-        /// opened = Unknown Device. The identity arrived as an instance id
-        /// from the WMI row; CM_Locate + CM_Get_DevNode_Status are the per-node
-        /// calls, which the field evidence says work on the boxes where the CM
-        /// enumerator does not.
+        /// The PnP status string, in the retired query's vocabulary, derived
+        /// from the problem code. Field evidence (guarded dev box, 2026-10-30)
+        /// says the legacy DF_PRESENT/DF_RUNNING/DF_DNE_0 status BITS do not
+        /// reflect state on current Windows: a running, enabled dGPU and camera
+        /// answer 0x0180600A - no DF_PRESENT, no DF_RUNNING, the DNE bit set.
+        /// The problem code is the live signal, and disabling/re-enabling the
+        /// webcam on that box verified its mapping one-for-one with the
+        /// Get-PnpDevice status the rows used to consume: 0 = OK,
+        /// CM_PROB_DISABLED (22) = "Disable", CM_PROB_PHANTOM (45) = not
+        /// present ("Unknown"), any other problem = "Error".
         /// </summary>
         private static MatchedDevice Describe(string instanceId)
         {
@@ -251,17 +256,20 @@ namespace UCU.Hardware.Devices
             if (code != Native.CR_SUCCESS)
                 return new MatchedDevice(devInst, instanceId, "Unknown", Present: false, Running: false);
 
-            bool present = (status & Native.DF_PRESENT) != 0;
-            bool running = (status & Native.DF_RUNNING) != 0;
-            bool disabled = (status & Native.DF_DNE_0) != 0;
+            // The status flags carry no trustworthy presence/run bit on this
+            // Windows (see the doc); the problem code is the witness.
+            _ = status;
 
-            string text = disabled
-                ? "Disable"
-                : running && problem == 0
-                    ? "OK"
-                    : running
-                        ? "Error"
-                        : "Unknown";
+            bool present = problem != Native.CM_PROB_PHANTOM;
+            bool running = problem == 0;
+
+            string text = problem switch
+            {
+                0 => "OK",
+                Native.CM_PROB_DISABLED => "Disable",
+                Native.CM_PROB_PHANTOM => "Unknown",
+                _ => "Error",
+            };
 
             return new MatchedDevice(devInst, instanceId, text, present, running);
         }
