@@ -36,9 +36,15 @@ namespace UCU.Hardware.Devices
         /// present (Get-PnpDevice reports these as "Unknown").</summary>
         public const uint CM_PROB_PHANTOM = 45;
 
-        /// <summary>Disable visible to all (new) processes - the flag Device Manager's
-        /// "disable this device" checkbox sets, the same one Disable-PnpDevice passes.</summary>
-        public const uint DICS_DISABLE_GLOBAL_W = 0x02000000;
+        /// <summary>Apply the enable/disable to the base hardware store - the
+        /// shape Disable-PnpDevice lands with on the field box. Verified by
+        /// call-shape probe (2026-10-30): CM_Disable_DevNode(inst, 0,
+        /// DICS_FLAG_GLOBAL) returns CR_SUCCESS and the node answers
+        /// CM_PROB_DISABLED, and CM_Enable_DevNode(inst, 0) restores it.
+        /// DICS_DISABLE_GLOBAL_W as ulDisableFlags is REJECTED on this
+        /// Windows - CR_FAIL (0x4) from every caller, admin shell included;
+        /// the engine's webcam row returned verified=false because of it.</summary>
+        public const uint DICS_FLAG_GLOBAL = 0x1;
 
         [DllImport("CfgMgr32.dll", CharSet = CharSet.Unicode)]
         public static extern uint CM_Locate_DevNode(out uint pdwDevInst, string pDeviceID, uint ulFlags);

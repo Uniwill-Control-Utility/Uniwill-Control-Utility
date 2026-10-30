@@ -161,6 +161,16 @@ public sealed class DeviceElevationRelocationTests
         Assert.Contains("CM_Enable_DevNode", native, StringComparison.Ordinal);
         Assert.Contains("CM_Disable_DevNode", native, StringComparison.Ordinal);
         Assert.Contains("CM_Get_DevNode_Status", native, StringComparison.Ordinal);
+
+        // The disable call shape, pinned by the 2026-10-30 probe matrix: the
+        // GLOBAL_W disable flag answers CR_FAIL from every caller on the
+        // field box; the legacy (0, DICS_FLAG_GLOBAL) call lands the node in
+        // CM_PROB_DISABLED, and that is what Disable-PnpDevice does there.
+        Assert.Contains(
+            "CM_Disable_DevNode(device.DevInst, 0, Native.DICS_FLAG_GLOBAL)",
+            service,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("CM_Disable_DevNode(device.DevInst, Native.", service, StringComparison.Ordinal);
     }
 
     private static string MethodBody(string source, string signature)

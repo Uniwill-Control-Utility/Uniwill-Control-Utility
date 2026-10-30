@@ -125,9 +125,13 @@ namespace UCU.Hardware.Devices
 
                 foreach (MatchedDevice device in targets)
                 {
+                    // The probe-verified shape: ulDisableFlags stays 0
+                    // (DICS_DISABLE_GLOBAL_W is CR_FAIL on the field boxes,
+                    // see Native.DICS_FLAG_GLOBAL) and the mutation goes to
+                    // the base hardware store.
                     uint code = enabled
                         ? Native.CM_Enable_DevNode(device.DevInst, 0)
-                        : Native.CM_Disable_DevNode(device.DevInst, Native.DICS_DISABLE_GLOBAL_W, 0);
+                        : Native.CM_Disable_DevNode(device.DevInst, 0, Native.DICS_FLAG_GLOBAL);
 
                     Log.Information("[PnpDevice] {Action} {Instance} returned {Code}",
                         enabled ? "enable" : "disable", device.InstanceId, $"0x{code:X8}");
