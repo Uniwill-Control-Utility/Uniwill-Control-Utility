@@ -65,6 +65,31 @@ For NVIDIA custom profiles with curve offsets:
 
 The ordinary NVIDIA power command is omitted from the translated command when a V-F curve is active, preventing two competing application paths.
 
+## Preset arbiter
+
+Every preset-power-mode **intent** — startup restore, sleep-resume re-apply, tray selection, the physical Performance/Q-key button, and the AC/battery automations — routes through `PresetArbiter` (app service) in front of `PresetProfileApplier`. The arbiter is one serialized execution gate plus the pure `UCU.Core\Supervision\PresetArbiterPolicy` (the OpenRevo power-arbiter rules, adapted to UCU's app-side preset composition; the engine stays preset-illiterate).
+
+```mermaid
+flowchart TD
+    UI[Tray / Q-key / automation / boot / resume] -->|RequestAsync source+profile| Gate[Serialized gate]
+    Gate --> Eval[Evaluate against live state]
+    Eval -->|Boot grace: automation edge within 10 s| Drop1[Suppress]
+    Eval -->|Adaptive running: edges + button yield| Drop2[Suppress]
+    Eval -->|Same profile within 600 ms| Drop3[Suppress]
+    Eval -->|Apply| Pipe[PresetProfileApplier.ApplyProfileAsync]
+    Pipe -->|success| Last[Record last-applied + persist selection per source]
+    Pipe -->|failure| Retry[Keep retry open: last-applied unchanged]
+```
+
+Rules, in evaluation order at the moment the gate is taken (a queued intent re-checks live uptime, the Adaptive flag, and last-applied state, so late-arriving startup noise is judged against the current clock):
+
+1. **Boot grace (10 s):** AC/battery automation edges are dropped during the first seconds after app start — Windows emits uncalibrated power-status events while the WMI battery probe settles, and those used to race the startup restore. UI clicks, the Q-key button, boot restore, resume, and Adaptive are never grace-suppressed.
+2. **Adaptive ownership:** while `isAdaptiveModeRunning`, the AC/DC edges and the physical button yield to Adaptive (the rule `QKeyButtonService` enforced locally, centralized so no writer can forget it). A UI click passes: it is the documented way to take control back.
+3. **Duplicate debounce (600 ms):** the same profile applied twice within the window applies once; a **failed** apply does not poison the state, so a retry of the same profile stays open.
+4. **Persistence:** UI, Q-key, and automation intents persist the selection to `presetProfile`; boot-restore and resume intents re-apply without overwriting the saved choice, and the Adaptive engine never writes it.
+
+Direct-apply paths that cannot route through the pipeline — the Presets page's slot-aware apply (page-local sliders, fan-slot bookkeeping), the tray's custom-slot legacy path, and the startup custom-slot restore — call `RecordApply` after applying so the debounce state stays honest against racing automation edges. Boot-time AC/DC restores are tagged `BootRestore` (grace never swallows them); only runtime power-status edges carry the automation tags, and their toasts fire only when `Applied` is true, so suppressed edges stay silent.
+
 ## Adaptive Mode
 
 Adaptive Mode associates discovered games/applications with `AdaptivePreset` records. A profile can independently enable or disable each domain:
@@ -129,8 +154,9 @@ Manual pages subscribe to these events so their controls reflect the active prof
 
 ## AC/DC and resume interaction
 
-- AC/DC automations are skipped while Adaptive Mode is running.
-- Resume always reapplies the current profile and invalidates Adaptive diff tracking.
+- AC/DC automations and the Q-key button are suppressed while Adaptive Mode is running (the preset arbiter enforces this ownership rule for every source).
+- AC/DC automation edges within the 10 s startup grace window are dropped by the arbiter; the startup restore itself is a `BootRestore` intent and always applies.
+- Resume re-applies the current profile through the arbiter (serialized against racing applies) and invalidates Adaptive diff tracking.
 - Adaptive device domains then reapply on their next cycle.
 - Device pages and tray menu read active override state to avoid presenting stale ownership.
 

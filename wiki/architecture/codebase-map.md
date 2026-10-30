@@ -9,7 +9,8 @@
 ├── docs/                     Protocol research (ACPI dumps, EC notes)
 ├── screenshots/              README screenshots
 ├── wiki/                     Maintainer and contributor documentation
-├── UCU.Core/                 Pure domain: EC encodings, validation, GuardianPolicy
+├── UCU.Core/                 Pure domain: EC encodings, validation, GuardianPolicy,
+│                             PresetArbiterPolicy
 ├── UCU.Contracts/            Verbs, envelope, DTOs, frame codec, capability interfaces, JSON context
 ├── UCU.Client/               EngineClient RPC + capability proxies (the app's only EC path)
 ├── UCU.Hardware/             EcEngine + IEcTransport (\\.\ACPIDriver); engine-only assembly
@@ -72,7 +73,7 @@
 | Platform hardware | `HardwareMonitoringService`, `GpuInventoryService`, `SkuResolver`, `LaptopDetector` | Telemetry leases and identity (app-side). |
 | Peripheral sessions | `KeyboardHidService`, `FlydigiCoolerHidService`, `FlydigiCoolerBleService`, `WaterCoolerService`/`HydroUIService` | Transport lifecycle and commands. |
 | Smart control | `EcSmartFanControl`, `FlydigiSmartControl`, `FlydigiBs1SmartControl` | Temperature-driven periodic control. |
-| Profiles | `PresetProfileApplier`, `AdaptivePresetManager`, `PresetBackupService`, `DeviceApplier` | Profile storage, translation, application, override, import/export. |
+| Profiles | `PresetArbiter`, `PresetProfileApplier`, `AdaptivePresetManager`, `PresetBackupService`, `DeviceApplier` | Intent arbitration (serialization, boot grace, Adaptive ownership, debounce), profile storage, translation, application, override, import/export. |
 | Overlay/performance | `OverlayManagerService`, `OverlaySettingsStore`, `Performance/*` | Overlay lifecycle, telemetry and FPS sources. |
 | App support | `LocalizationService`, `VelopackUpdateService`, `PawnIoDetectionService`, `ScheduledTaskService`, `LastAppliedSettingsService`, `Scripts/Misc/ElevatedProcess` | Translation, updates, prerequisites, autostart task, last-applied state, per-operation elevation. |
 

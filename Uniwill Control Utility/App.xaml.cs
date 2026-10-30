@@ -480,6 +480,14 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<UCU.Contracts.IEngineServiceGate>(provider =>
                             new EngineServiceGate(provider.GetRequiredService<EngineAvailability>()));
 
+                        // The single execution pipeline for preset power-mode intents
+                        // (OpenRevo's power-arbiter pattern): startup restore, resume,
+                        // tray, Q-key, and the AC/DC automations all send intents here;
+                        // the pure PresetArbiterPolicy rules boot-grace, Adaptive
+                        // ownership, and duplicate debounce. Registered before the
+                        // Q-key service that consumes it.
+                        services.AddSingleton<PresetArbiter>();
+
                         // Hardware Performance / Q-key button intercept: polls the EC
                         // TCC offset register for button presses and cycles UCU presets.
                         services.AddSingleton<QKeyButtonService>();

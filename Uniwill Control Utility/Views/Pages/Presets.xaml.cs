@@ -16,6 +16,7 @@ using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Uniwill_Control_Utility.Scripts.Intel_Backend;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
+using UCU.Core.Supervision;
 using Wpf.Ui.Abstractions.Controls;
 namespace Uniwill_Control_Utility.Views.Pages
 {
@@ -1076,6 +1077,12 @@ namespace Uniwill_Control_Utility.Views.Pages
                 }
 
                 _ = applyProfileAsync();
+
+                // The page's slot-aware apply runs outside the arbiter's pipeline
+                // (sliders, fan-slot bookkeeping, V-F state are page-local); record it
+                // so the arbiter's debounce and priority bookkeeping stays honest and
+                // automation edges racing a user click see the click as the last truth.
+                App.GetService<PresetArbiter>()?.RecordApply(PresetIntentSource.UserInterface, profile);
             }
             else
             {
