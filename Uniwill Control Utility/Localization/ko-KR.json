@@ -324,7 +324,7 @@
   "Enable NVIDIA Dynamic Boost": "NVIDIA 다이내믹 부스트 활성화",
   "Enable or disable hardware features at the Windows level": "Windows 수준에서 하드웨어 기능을 활성화하거나 비활성화합니다",
   "Enable or disable MiniLED local dimming on the display": "디스플레이의 MiniLED 로컬 디밍을 활성화하거나 비활성화합니다",
-  "Enable or disable the camera device in Device Manager (PnP hotswap)": "장치 관리자에서 카메라 장치를 활성화하거나 비활성화합니다 (PnP 핫스왑)",
+  "Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)": "끄면 FHD 카메라와 IR 카메라가 모두 비활성화됩니다 (IR 카메라는 Windows Hello에 사용됩니다)",
   "Enable or disable the touchpad via the Windows Settings admin flow": "Windows 설정 관리 흐름을 통해 터치패드를 활성화하거나 비활성화합니다",
   "Enable overlay": "오버레이 활성화",
   "Enable per-key color control instead of animation effects": "애니메이션 효과 대신 키별 색상 제어 활성화",

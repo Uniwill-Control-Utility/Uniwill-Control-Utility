@@ -324,7 +324,7 @@
   "Enable NVIDIA Dynamic Boost": "Activer NVIDIA Dynamic Boost",
   "Enable or disable hardware features at the Windows level": "Activer ou désactiver les fonctionnalités matérielles au niveau Windows",
   "Enable or disable MiniLED local dimming on the display": "Activer ou désactiver la gradation locale MiniLED sur l'écran",
-  "Enable or disable the camera device in Device Manager (PnP hotswap)": "Activer ou désactiver le périphérique caméra dans le Gestionnaire de périphériques (réinsertion à chaud PnP)",
+  "Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)": "L'extinction désactive les deux caméras, FHD et IR (la caméra IR est utilisée pour Windows Hello)",
   "Enable or disable the touchpad via the Windows Settings admin flow": "Activer ou désactiver le pavé tactile via le flux d'administration des Paramètres Windows",
   "Enable overlay": "Activer la superposition",
   "Enable per-key color control instead of animation effects": "Activer le contrôle des couleurs touche par touche au lieu des effets d'animation",

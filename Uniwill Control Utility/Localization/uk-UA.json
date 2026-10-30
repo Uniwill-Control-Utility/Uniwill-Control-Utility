@@ -324,7 +324,7 @@
   "Enable NVIDIA Dynamic Boost": "Увімкнути NVIDIA Dynamic Boost",
   "Enable or disable hardware features at the Windows level": "Вмикає або вимикає апаратні функції на рівні Windows",
   "Enable or disable MiniLED local dimming on the display": "Увімкнення або вимкнення локального затемнення MiniLED на екрані",
-  "Enable or disable the camera device in Device Manager (PnP hotswap)": "Вмикання або вимикання камери в диспетчері пристроїв (PnP hotswap)",
+  "Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)": "При вимиканні вимикаються обидві камери: FHD та ІЧ (ІЧ-камера використовується для Windows Hello)",
   "Enable or disable the touchpad via the Windows Settings admin flow": "Вмикає або вимикає сенсорну панель через параметри Windows (від імені адміністратора)",
   "Enable overlay": "Увімкнути оверлей",
   "Enable per-key color control instead of animation effects": "Увімкнути індивідуальне керування кольором клавіш замість ефектів анімації",

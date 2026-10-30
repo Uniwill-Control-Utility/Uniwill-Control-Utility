@@ -324,7 +324,7 @@
   "Enable NVIDIA Dynamic Boost": "Omogući NVIDIA Dynamic Boost",
   "Enable or disable hardware features at the Windows level": "Omogućite ili onemogućite hardverske značajke na razini Windowsa",
   "Enable or disable MiniLED local dimming on the display": "Omogući ili onemogući MiniLED lokalno zatamnjenje na zaslonu",
-  "Enable or disable the camera device in Device Manager (PnP hotswap)": "Omogućite ili onemogućite uređaj kamere u Upravitelju uređaja (PnP hotswap)",
+  "Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)": "Isključivanjem se onemogućuju obje kamere: FHD i IR (IR kamera se koristi za Windows Hello)",
   "Enable or disable the touchpad via the Windows Settings admin flow": "Omogućite ili onemogućite dodirnu ploču putem administratorskog toka u Windows postavkama",
   "Enable overlay": "Omogući overlay",
   "Enable per-key color control instead of animation effects": "Omogući kontrolu boje po tipki umjesto animacijskih efekata",

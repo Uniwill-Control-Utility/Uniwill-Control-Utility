@@ -324,7 +324,7 @@
   "Enable NVIDIA Dynamic Boost": "NVIDIA Dynamic Boost'u etkinleştir",
   "Enable or disable hardware features at the Windows level": "Donanım özelliklerini Windows düzeyinde etkinleştirin veya devre dışı bırakın",
   "Enable or disable MiniLED local dimming on the display": "Ekranda MiniLED yerel karartmayı etkinleştirin veya devre dışı bırakın",
-  "Enable or disable the camera device in Device Manager (PnP hotswap)": "Aygıt Yöneticisi'nde kamera aygıtını etkinleştirin veya devre dışı bırakın (PnP sıcak değiştirme)",
+  "Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)": "Kapatıldığında hem FHD hem de IR kameraları devre dışı bırakılır (IR kamera Windows Hello için kullanılır)",
   "Enable or disable the touchpad via the Windows Settings admin flow": "Dokunmatik yüzeyi Windows Ayarları yönetici akışı üzerinden etkinleştirin veya devre dışı bırakın",
   "Enable overlay": "Katmanı etkinleştir",
   "Enable per-key color control instead of animation effects": "Animasyon efektleri yerine tuş başına renk kontrolünü etkinleştirin",

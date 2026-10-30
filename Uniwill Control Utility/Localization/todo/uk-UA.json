@@ -91,7 +91,7 @@
   "Effect colors": "Effect colors",
   "Effect palette": "Effect palette",
   "Enable or disable hardware features at the Windows level": "Enable or disable hardware features at the Windows level",
-  "Enable or disable the camera device in Device Manager (PnP hotswap)": "Enable or disable the camera device in Device Manager (PnP hotswap)",
+  "Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)": "Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)",
   "Enable or disable the touchpad via the Windows Settings admin flow": "Enable or disable the touchpad via the Windows Settings admin flow",
   "Enable the in-game overlay and global shortcuts": "Enable the in-game overlay and global shortcuts",
   "Enabling it lets the physical key (next to the power button) switch between power presets when pressed": "Enabling it lets the physical key (next to the power button) switch between power presets when pressed",

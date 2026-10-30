@@ -324,7 +324,7 @@
   "Enable NVIDIA Dynamic Boost": "เปิดใช้งาน NVIDIA Dynamic Boost",
   "Enable or disable hardware features at the Windows level": "เปิดหรือปิดใช้งานฟีเจอร์ฮาร์ดแวร์ในระดับ Windows",
   "Enable or disable MiniLED local dimming on the display": "เปิดหรือปิดใช้งานการหรี่แสงเฉพาะจุด (Local Dimming) MiniLED บนหน้าจอ",
-  "Enable or disable the camera device in Device Manager (PnP hotswap)": "เปิดหรือปิดใช้งานอุปกรณ์กล้องใน Device Manager (PnP hotswap)",
+  "Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)": "เมื่อปิดจะปิดใช้งานทั้งกล้อง FHD และ IR (กล้อง IR ถูกใช้สำหรับ Windows Hello)",
   "Enable or disable the touchpad via the Windows Settings admin flow": "เปิดหรือปิดใช้งานทัชแพดผ่านกระบวนการผู้ดูแลระบบของการตั้งค่า Windows",
   "Enable overlay": "เปิดใช้งานโอเวอร์เลย์",
   "Enable per-key color control instead of animation effects": "เปิดใช้งานการควบคุมสีแยกตามปุ่มแทนเอฟเฟกต์แอนิเมชัน",

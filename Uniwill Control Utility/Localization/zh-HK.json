@@ -324,7 +324,7 @@
   "Enable NVIDIA Dynamic Boost": "啟用 NVIDIA Dynamic Boost",
   "Enable or disable hardware features at the Windows level": "在 Windows 層面啟用或禁用硬件功能",
   "Enable or disable MiniLED local dimming on the display": "在顯示器上啟用或禁用 MiniLED 局部調光",
-  "Enable or disable the camera device in Device Manager (PnP hotswap)": "在設備管理器中啟用或禁用相機設備 (PnP 熱插拔)",
+  "Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)": "關閉會同時停用 FHD 相機和 IR 相機（IR 相機用於 Windows Hello）",
   "Enable or disable the touchpad via the Windows Settings admin flow": "通過 Windows 設置的管理流程啟用或禁用觸摸板",
   "Enable overlay": "啟用疊加層",
   "Enable per-key color control instead of animation effects": "啟用單鍵顏色控制而非動畫效果",
