@@ -42,6 +42,7 @@ using Application = System.Windows.Application;
 using MessageBox = System.Windows.Forms.MessageBox;
 using Settings = Uniwill_Control_Utility.Properties.Settings;
 using UCU.Contracts.Capabilities;
+using UCU.Core.Supervision;
 
 namespace Uniwill_Control_Utility.Views.Windows
 {
@@ -330,8 +331,16 @@ namespace Uniwill_Control_Utility.Views.Windows
                 {
                     await Task.Run(() => GetBatteryStatus());
 
+                    // Route through the arbiter as BootRestore: the startup restore is
+                    // never suppressed, and taking the arbiter's gate here marks the
+                    // pipeline busy so a startup automation edge queues behind it
+                    // instead of racing it.
                     string profileName = Settings.Default.presetProfile;
-                    await PresetProfileApplier.ApplyProfileAsync(profileName, PresetProfileApplier.DisplayName(profileName));
+                    var bootArbiter = App.GetService<PresetArbiter>();
+                    if (bootArbiter is not null)
+                        await bootArbiter.RequestAsync(PresetIntentSource.BootRestore, profileName);
+                    else
+                        await PresetProfileApplier.ApplyProfileAsync(profileName, PresetProfileApplier.DisplayName(profileName));
                     ToastNotification.ShowToastNotification(LocalizationService.Format("{0} Applied", profileName), accent: profileName);
                     return;
                 }
@@ -374,6 +383,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                             if (!string.IsNullOrWhiteSpace(command))
                             {
                                 await ApplyCustomOnStart(command, p);
+                                // Direct apply outside the pipeline: keep the arbiter's
+                                // debounce state honest so a startup automation edge for
+                                // the same selection is recognized as a duplicate.
+                                App.GetService<PresetArbiter>()?.RecordApply(
+                                    PresetIntentSource.BootRestore,
+                                    PresetProfileApplier.CustomProfileKey(slot, mode));
                                 string customTemplate = mode == Models.PresetMode.Boost
                                     ? "Custom {0} (Boost) Applied"
                                     : "Custom {0} Applied";
@@ -399,7 +414,10 @@ namespace Uniwill_Control_Utility.Views.Windows
                                     ResolveAutomationProfile(Settings.Default.acPreset));
                                 Settings.Default.CommandString = Settings.Default.acCommandString;
                                 Settings.Default.Save();
-                                await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset);
+                                // Startup restore of the AC selection: BootRestore, not an
+                                // automation edge — the boot grace must not swallow it.
+                                await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset,
+                                    PresetIntentSource.BootRestore);
                                 ToastNotification.ShowToastNotification("Charge Applied");
                             }
                             else
@@ -417,7 +435,9 @@ namespace Uniwill_Control_Utility.Views.Windows
                                     ResolveAutomationProfile(Settings.Default.dcPreset));
                                 Settings.Default.CommandString = Settings.Default.dcCommandString;
                                 Settings.Default.Save();
-                                await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset);
+                                // Startup restore of the DC selection — BootRestore (see AC branch).
+                                await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset,
+                                    PresetIntentSource.BootRestore);
                                 ToastNotification.ShowToastNotification("Discharge Applied");
                             }
                             else
@@ -1128,9 +1148,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 ResolveAutomationProfile(Settings.Default.acPreset));
                             Settings.Default.CommandString = Settings.Default.acCommandString;
                             Settings.Default.Save();
-                            await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset);
+                            var acResult = await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset,
+                                PresetIntentSource.AutomationAc);
 
-                            if (lastAppliedState != "ac") ToastNotification.ShowToastNotification("Charge Applied");
+                            // Silence on suppression: a boot-grace drop of an uncalibrated
+                            // startup edge must not announce "Charge Applied".
+                            if (acResult.Applied && lastAppliedState != "ac") ToastNotification.ShowToastNotification("Charge Applied");
                             lastAppliedState = "ac";
                         }
                     }
@@ -1143,9 +1166,11 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 ResolveAutomationProfile(Settings.Default.dcPreset));
                             Settings.Default.CommandString = Settings.Default.dcCommandString;
                             Settings.Default.Save();
-                            await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset);
+                            var dcResult = await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset,
+                                PresetIntentSource.AutomationBattery);
 
-                            if (lastAppliedState != "dc") ToastNotification.ShowToastNotification("Discharge Applied");
+                            // Silence on suppression — see the AC branch.
+                            if (dcResult.Applied && lastAppliedState != "dc") ToastNotification.ShowToastNotification("Discharge Applied");
                             lastAppliedState = "dc";
                         }
 
@@ -1294,9 +1319,28 @@ namespace Uniwill_Control_Utility.Views.Windows
                             {
                                 try
                                 {
-                                    await PresetProfileApplier.ApplyProfileAsync(activeProfile, PresetProfileApplier.DisplayName(activeProfile));
-                                    Debug.WriteLine($"[Resume] Preset '{activeProfile}' re-applied");
-                                    ToastNotification.ShowToastNotification("Resume Applied");
+                                    // Resume is an intent like any other: the arbiter's gate
+                                    // serializes it against a user apply that raced the wake,
+                                    // and its debounce drops a re-apply of a profile that was
+                                    // just applied by hand seconds before the wake.
+                                    bool resumeApplied;
+                                    var resumeArbiter = App.GetService<PresetArbiter>();
+                                    if (resumeArbiter is not null)
+                                    {
+                                        var r = await resumeArbiter.RequestAsync(PresetIntentSource.ResumeFromSleep, activeProfile);
+                                        resumeApplied = r.Applied;
+                                    }
+                                    else
+                                    {
+                                        await PresetProfileApplier.ApplyProfileAsync(activeProfile, PresetProfileApplier.DisplayName(activeProfile));
+                                        resumeApplied = true;
+                                    }
+
+                                    if (resumeApplied)
+                                    {
+                                        Debug.WriteLine($"[Resume] Preset '{activeProfile}' re-applied");
+                                        ToastNotification.ShowToastNotification("Resume Applied");
+                                    }
                                 }
                                 catch (Exception ex)
                                 {
@@ -1780,13 +1824,29 @@ namespace Uniwill_Control_Utility.Views.Windows
                 string command = PresetProfileApplier.BuildCommandString(profileName);
                 string displayName = PresetProfileApplier.DisplayName(profileName);
 
-                await PresetProfileApplier.ApplyProfileAsync(profileName, displayName);
+                // A tray click is an explicit user intent: the arbiter never suppresses
+                // it; it serializes it (gate) and persists the selection (policy rule).
+                var trayArbiter = App.GetService<PresetArbiter>();
+                bool trayApplied;
+                if (trayArbiter is not null)
+                {
+                    var r = await trayArbiter.RequestAsync(PresetIntentSource.UserInterface, profileName);
+                    trayApplied = r.Applied;
+                }
+                else
+                {
+                    await PresetProfileApplier.ApplyProfileAsync(profileName, displayName);
+                    Settings.Default.presetProfile = profileName;
+                    trayApplied = true;
+                }
 
-                Settings.Default.presetProfile = profileName;
-                Settings.Default.CommandString = command;
-                Settings.Default.Save();
+                if (trayApplied)
+                {
+                    Settings.Default.CommandString = command;
+                    Settings.Default.Save();
 
-                ToastNotification.ShowToastNotification(LocalizationService.Format("{0} Applied", displayName), accent: displayName);
+                    ToastNotification.ShowToastNotification(LocalizationService.Format("{0} Applied", displayName), accent: displayName);
+                }
             }
             catch (Exception ex)
             {
@@ -1892,6 +1952,13 @@ namespace Uniwill_Control_Utility.Views.Windows
                     return;
 
                 await ApplyCustomOnStart(command, p);
+                // Direct apply outside the pipeline (slot-aware legacy path): keep the
+                // arbiter's debounce/priority bookkeeping honest. The slot-qualified key
+                // matches the Q-key cycle vocabulary so a press-cycle back to this slot
+                // within the debounce window is seen as the same target.
+                App.GetService<PresetArbiter>()?.RecordApply(
+                    PresetIntentSource.UserInterface,
+                    PresetProfileApplier.CustomProfileKey(slot, mode));
                 string titleTemplate = mode == Models.PresetMode.Boost
                     ? "Custom {0} (Boost) Applied"
                     : "Custom {0} Applied";
@@ -1918,18 +1985,24 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
         }
 
-        private static async Task TranslatePresetAsync(string commands, string? configuredName)
+        private static async Task<PresetArbiterResult> TranslatePresetAsync(string commands, string? configuredName, PresetIntentSource source)
         {
             string profileName = ResolveAutomationProfile(configuredName);
             if (string.IsNullOrEmpty(profileName))
             {
                 // Unknown profile ? fall back to raw command execution
                 await RyzenAdj_To_UCU.TranslateAsync(commands, appliedName: configuredName, localizeAppliedName: false);
-                return;
+                return new PresetArbiterResult(true, PresetArbiterAction.Apply, "raw command fallback");
             }
 
-            // Full apply: RyzenAdj + V-F curve (Custom) + EC limits (AMD)
+            // Full apply through the arbiter's single pipeline: arbitration (boot grace,
+            // Adaptive ownership, debounce) then RyzenAdj + V-F curve (Custom) + EC limits.
+            var arbiter = App.GetService<PresetArbiter>();
+            if (arbiter is not null)
+                return await arbiter.RequestAsync(source, profileName);
+
             await PresetProfileApplier.ApplyProfileAsync(profileName, PresetProfileApplier.DisplayName(profileName));
+            return new PresetArbiterResult(true, PresetArbiterAction.Apply, "applied (no arbiter)");
         }
 
         /// <summary>
