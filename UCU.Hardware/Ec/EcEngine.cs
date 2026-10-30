@@ -2093,6 +2093,64 @@ namespace UCU.Hardware.Ec
             DebugLog($"[Battery] SetBatteryMode: mode={mode} (raw=0x{val:X2})");
         }
 
+        /// <summary>Charge-gate status register (bit 4 = gate active; multiplexed byte).</summary>
+        public const ushort REG_BATTERY_GATE_STATUS = 0x0742;
+
+        /// <summary>Platform-override register (0xFF = no override; the tools pin 5).</summary>
+        public const ushort REG_BATTERY_PLATFORM_OVERRIDE = 0x0770;
+
+        // The open-revo chassis family carries an explicit threshold pair here;
+        // the lab box read 0x07C9=0 / 0x07D0=95 — NOT a percent pair — so on
+        // THIS family these bytes are not thresholds and nothing writes them
+        // (U-103 field probe 2026-10-30, docs\acpi\BatteryDiagnostic). They are
+        // kept as named constants for the next probe, not as a write surface.
+        public const ushort REG_BATTERY_LIMIT_UP = 0x07C9;
+        public const ushort REG_BATTERY_LIMIT_DOWN = 0x07D0;
+
+        /// <summary>
+        /// Live charge-gate state: true while the EC gates charging (the battery
+        /// sits at/above its ceiling). Read-only status row — 0x0742!bit4; the
+        /// same bit is the fan-turbo support flag on fan rows (the EC byte is
+        /// feature-multiplexed, and each row reads its own meaning).
+        /// </summary>
+        public bool GetBatteryGateStatus()
+        {
+            EnsureInitialized();
+            byte val = ReadECRegister(REG_BATTERY_GATE_STATUS);
+            bool active = EcBatteryCodec.IsChargeGateActive(val);
+            DebugLog($"[Battery] GetBatteryGateStatus: raw=0x{val:X2}, gate={active}");
+            return active;
+        }
+
+        /// <summary>
+        /// True while a platform override is pinned on 0x0770 (anything but the
+        /// documented reset 0xFF). Read-only awareness row: a firmware-side or
+        /// third-party pin changes how the EC applies charge modes, and the
+        /// charge-limit UI must say when the EC is not answering naively.
+        /// </summary>
+        public bool GetBatteryPlatformOverride()
+        {
+            EnsureInitialized();
+            byte val = ReadECRegister(REG_BATTERY_PLATFORM_OVERRIDE);
+            bool active = EcBatteryCodec.IsPlatformOverrideActive(val);
+            DebugLog($"[Battery] GetBatteryPlatformOverride: raw=0x{val:X2}, override={active}");
+            return active;
+        }
+
+        /// <summary>
+        /// The charge-threshold pair the current mode implies (ceiling +
+        /// hysteresis). Derived from the verified mode register — this chassis
+        /// exposes no threshold registers (see REG_BATTERY_LIMIT_UP above), so
+        /// there is no threshold write path, only an honest read-back view.
+        /// </summary>
+        public (int UpPercent, int DownPercent) GetBatteryThresholds()
+        {
+            int mode = GetBatteryMode();
+            var pair = EcBatteryCodec.ThresholdsForMode(mode);
+            EcBatteryCodec.ValidateThresholds(pair.UpPercent, pair.DownPercent);
+            return pair;
+        }
+
       // Battery telemetry EC registers (from MechControl decompiled analysis)
         // All multi-byte values are little-endian uint16
         public const ushort REG_BATTERY_POWER_SOURCE = 0x0490;  // bit 0 = AC connected

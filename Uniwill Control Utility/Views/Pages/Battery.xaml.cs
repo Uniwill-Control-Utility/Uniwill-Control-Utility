@@ -31,6 +31,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool _isEcAvailable;
         private bool _isLoaded;
 
+        // The gate/threshold/override verbs are the U-103 additions; an engine
+        // installed before them answers UnsupportedVerb, and the rows hide for
+        // the page's lifetime (the legacy charge-limit path is untouched).
+        private bool _statusRowsSupported = true;
+
         // Delayed refresh timer created after each user change. Tracked as a field
         // so it can be stopped on Page_Unloaded — the NavigationView caches the page,
         // so a leaked timer would fire on the hidden page and overwrite state.
@@ -234,7 +239,56 @@ namespace Uniwill_Control_Utility.Views.Pages
                 Debug.WriteLine($"[Battery] Failed to read charge limit from EC: {ex.Message}");
             }
 
+            RefreshStatusRows();
             RefreshTelemetry();
+        }
+
+        /// <summary>
+        /// Live state rows (U-103): the charge gate (the EC's own gating bit,
+        /// 0x0742!bit4), the threshold pair the current mode implies (derived —
+        /// this chassis family exposes no threshold registers, field probe
+        /// 2026-10-30), and the platform-override notice (0x0770 != 0xFF).
+        /// Rides the page's 5-second poll. A pre-U-103 engine answers the new
+        /// verbs with UnsupportedVerb; the rows then hide for the session —
+        /// the legacy charging-limit path keeps working untouched.
+        /// </summary>
+        private void RefreshStatusRows()
+        {
+            if (_battery is null || !_statusRowsSupported)
+                return;
+
+            try
+            {
+                bool gateActive = _battery.GetGateStatusAsync().GetAwaiter().GetResult();
+                BatteryThresholdsDto thresholds = _battery.GetThresholdsAsync().GetAwaiter().GetResult();
+                bool overrideActive = _battery.GetPlatformOverrideAsync().GetAwaiter().GetResult();
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    tbChargeGate.Text = gateActive
+                        ? LocalizationService.Get("Active")
+                        : LocalizationService.Get("Idle");
+                    tbChargeThresholds.Text = LocalizationService.Format(
+                        "up to {0} %, restart at {1} %", thresholds.UpPercent, thresholds.DownPercent);
+                    PlatformOverrideNotice.Visibility = overrideActive ? Visibility.Visible : Visibility.Collapsed;
+                });
+            }
+            catch (EngineException ex) when (ex.Code == EngineErrorCode.UnsupportedVerb)
+            {
+                // Engine older than the status verbs: hide the rows, keep the page.
+                _statusRowsSupported = false;
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    ChargeThresholdsRow.Visibility = Visibility.Collapsed;
+                    ChargeGateRow.Visibility = Visibility.Collapsed;
+                    PlatformOverrideNotice.Visibility = Visibility.Collapsed;
+                });
+                Debug.WriteLine("[Battery] Engine lacks the battery status verbs; status rows hidden");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Battery] Failed to read battery status rows: {ex.Message}");
+            }
         }
 
         private void RefreshTelemetry()

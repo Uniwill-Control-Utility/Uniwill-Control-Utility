@@ -6,7 +6,8 @@
 .
 ├── .github/                  CI (workflow validating build/pack)
 ├── build/                    pack.ps1, uninstall-shim/, updater-shim/ (framework-csc shims)
-├── docs/                     Protocol research (ACPI dumps, EC notes)
+├── docs/                     Protocol research (ACPI dumps, EC notes) + EC probe tools
+│                             (FanDiagnostic, BatteryDiagnostic: read-only, run elevated)
 ├── screenshots/              README screenshots
 ├── wiki/                     Maintainer and contributor documentation
 ├── UCU.Core/                 Pure domain: EC encodings, validation, GuardianPolicy,

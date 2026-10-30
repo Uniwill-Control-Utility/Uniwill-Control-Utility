@@ -138,6 +138,15 @@ namespace UCU.Contracts.Capabilities
         Task<int> GetModeAsync(CancellationToken cancellationToken = default);
 
         Task SetModeAsync(int mode, CancellationToken cancellationToken = default);
+
+        /// <summary>Live charge-gate state: true while the EC gates charging (battery at its ceiling).</summary>
+        Task<bool> GetGateStatusAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>The charge thresholds the current mode implies (read-only derived view, U-103).</summary>
+        Task<BatteryThresholdsDto> GetThresholdsAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>True while a platform override is pinned on the EC (a tool spoofs the platform; modes apply non-naively).</summary>
+        Task<bool> GetPlatformOverrideAsync(CancellationToken cancellationToken = default);
     }
 
     /// <summary>

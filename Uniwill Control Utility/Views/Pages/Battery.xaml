@@ -104,6 +104,26 @@
                             </ComboBox>
                         </ui:CardControl>
 
+                        <!-- Platform-override notice: visible only when the EC answers 0x0770 != 0xFF
+                             (U-103). A firmware-side or third-party pin changes how the EC applies
+                             charge modes, so the page must disclose it instead of showing a setting
+                             that silently does not own the behavior. -->
+                        <ui:CardControl x:Name="PlatformOverrideNotice" Visibility="Collapsed" Margin="0,0,0,8">
+                            <ui:CardControl.Icon>
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BA;" FontSize="20" Margin="4,0,6,0" />
+                            </ui:CardControl.Icon>
+                            <ui:CardControl.Header>
+                                <StackPanel>
+                                    <ui:TextBlock FontTypography="Body" Text="Platform Override Active" />
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="A firmware-side or third-party tool has pinned the EC platform override. The EC may apply charging modes differently than this page shows."
+                                                   TextWrapping="Wrap" />
+                                </StackPanel>
+                            </ui:CardControl.Header>
+                        </ui:CardControl>
+
                         <!-- Battery Telemetry CardExpander -->
                         <ui:CardExpander Margin="0,0,0,8"
                                          IsExpanded="True">
@@ -141,6 +161,57 @@
                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                                Text="{Binding SelectedIndex, ElementName=cbChargingLimit,
                                                       Converter={StaticResource BatteryModeConverter}}" />
+                                </Grid>
+
+                                <!-- Divider -->
+                                <Border Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                                <!-- Charge Thresholds (read-only derived view, U-103: this chassis
+                             exposes no threshold registers — the pair is the mode's ceiling) -->
+                                <Grid x:Name="ChargeThresholdsRow">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Charge Thresholds" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Charge-up and re-charge points implied by the charging mode" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="tbChargeThresholds"
+                                               Grid.Column="1"
+                                               VerticalAlignment="Center"
+                                               FontSize="13"
+                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                               Text="--" />
+                                </Grid>
+
+                                <!-- Divider -->
+                                <Border Height="1" Margin="-58,12,-46,12"
+                                        Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                                <!-- Charge Gate (live EC state, 5 s poll) -->
+                                <Grid x:Name="ChargeGateRow">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <ui:TextBlock FontTypography="Body" Text="Charge Gate" />
+                                        <ui:TextBlock Margin="0,2,0,0"
+                                                       FontTypography="Caption"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       Text="Live EC state: Active means charging is gated at the ceiling" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="tbChargeGate"
+                                               Grid.Column="1"
+                                               VerticalAlignment="Center"
+                                               FontSize="13"
+                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                               Text="--" />
                                 </Grid>
 
                                 <!-- Divider -->
