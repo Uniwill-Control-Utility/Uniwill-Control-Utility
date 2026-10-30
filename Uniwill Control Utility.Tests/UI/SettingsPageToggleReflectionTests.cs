@@ -39,62 +39,106 @@ public sealed class SettingsPageToggleReflectionTests
     }
 
     [Theory]
-    [InlineData("cbWifiToggle_Checked", "SetWifiAsync", "cbWifiToggle", "_wifiOn", "true")]
-    [InlineData("cbWifiToggle_Unchecked", "SetWifiAsync", "cbWifiToggle", "_wifiOn", "false")]
-    [InlineData("cbBluetoothToggle_Checked", "SetBluetoothAsync", "cbBluetoothToggle", "_bluetoothOn", "true")]
-    [InlineData("cbBluetoothToggle_Unchecked", "SetBluetoothAsync", "cbBluetoothToggle", "_bluetoothOn", "false")]
-    [InlineData("cbWebcamToggle_Checked", "SetWebcamAsync", "cbWebcamToggle", "_webcamOn", "true")]
-    [InlineData("cbWebcamToggle_Unchecked", "SetWebcamAsync", "cbWebcamToggle", "_webcamOn", "false")]
-    [InlineData("cbTouchpadToggle_Checked", "SetTouchpadAsync", "cbTouchpadToggle", "_touchpadOn", "true")]
-    [InlineData("cbTouchpadToggle_Unchecked", "SetTouchpadAsync", "cbTouchpadToggle", "_touchpadOn", "false")]
-    [InlineData("cbStartBoot_Checked", "UpdateScheduledTask", "cbStartBoot", "_startOnBoot", "true")]
-    [InlineData("cbStartBoot_Unchecked", "ScheduledTaskService.Unregister", "cbStartBoot", "_startOnBoot", "false")]
-    [InlineData("cbCpuAdvancedPerformanceMenu_Checked", "WriteCpuApMenuUnlock", "cbCpuAdvancedPerformanceMenu", "_apMenuUnlocked", "true")]
-    [InlineData("cbCpuAdvancedPerformanceMenu_Unchecked", "WriteCpuApMenuUnlock", "cbCpuAdvancedPerformanceMenu", "_apMenuUnlocked", "false")]
-    [InlineData("cbPowerBoostMode_Checked", "InvalidateBoostDependentPages", "cbPowerBoostMode", "_powerBoost", "true")]
-    [InlineData("cbPowerBoostMode_Unchecked", "InvalidateBoostDependentPages", "cbPowerBoostMode", "_powerBoost", "false")]
-    [InlineData("cbHideFlydigi_Checked", "RefreshNavigationItems", "cbHideFlydigi", "_flydigiEnabled", "true")]
-    [InlineData("cbHideFlydigi_Unchecked", "RefreshNavigationItems", "cbHideFlydigi", "_flydigiEnabled", "false")]
+    [InlineData("cbWifiToggle_Checked", "SetWifiAsync", "cbWifiToggle", "_wifiOn")]
+    [InlineData("cbWifiToggle_Unchecked", "SetWifiAsync", "cbWifiToggle", "_wifiOn")]
+    [InlineData("cbBluetoothToggle_Checked", "SetBluetoothAsync", "cbBluetoothToggle", "_bluetoothOn")]
+    [InlineData("cbBluetoothToggle_Unchecked", "SetBluetoothAsync", "cbBluetoothToggle", "_bluetoothOn")]
+    [InlineData("cbWebcamToggle_Checked", "SetWebcamAsync", "cbWebcamToggle", "_webcamOn")]
+    [InlineData("cbWebcamToggle_Unchecked", "SetWebcamAsync", "cbWebcamToggle", "_webcamOn")]
+    [InlineData("cbTouchpadToggle_Checked", "SetTouchpadAsync", "cbTouchpadToggle", "_touchpadOn")]
+    [InlineData("cbTouchpadToggle_Unchecked", "SetTouchpadAsync", "cbTouchpadToggle", "_touchpadOn")]
+    [InlineData("cbStartBoot_Checked", "UpdateScheduledTask", "cbStartBoot", "_startOnBoot")]
+    [InlineData("cbStartBoot_Unchecked", "ScheduledTaskService.Unregister", "cbStartBoot", "_startOnBoot")]
+    [InlineData("cbCpuAdvancedPerformanceMenu_Checked", "WriteCpuApMenuUnlock", "cbCpuAdvancedPerformanceMenu", "_apMenuUnlocked")]
+    [InlineData("cbCpuAdvancedPerformanceMenu_Unchecked", "WriteCpuApMenuUnlock", "cbCpuAdvancedPerformanceMenu", "_apMenuUnlocked")]
+    [InlineData("cbPowerBoostMode_Checked", "InvalidateBoostDependentPages", "cbPowerBoostMode", "_powerBoost")]
+    [InlineData("cbPowerBoostMode_Unchecked", "InvalidateBoostDependentPages", "cbPowerBoostMode", "_powerBoost")]
+    [InlineData("cbHideFlydigi_Checked", "RefreshNavigationItems", "cbHideFlydigi", "_flydigiEnabled")]
+    [InlineData("cbHideFlydigi_Unchecked", "RefreshNavigationItems", "cbHideFlydigi", "_flydigiEnabled")]
     public void ActuatingHandlers_ActuateOnlyOnUserIntent(
-        string handler, string actuation, string toggle, string belief, string to)
+        string handler, string actuation, string toggle, string belief)
     {
         string body = MethodBody(ReadSettingsPage(), $"private void {handler}");
 
-        int guard = body.IndexOf($"if (!UserIntent({toggle}, {belief}))", StringComparison.Ordinal);
-        int beliefSet = body.IndexOf($"{belief} = {to};", StringComparison.Ordinal);
+        int guard = body.IndexOf($"if (!UserIntent({toggle}, ref {belief},", StringComparison.Ordinal);
         int acts = body.IndexOf(actuation, StringComparison.Ordinal);
 
         Assert.True(acts >= 0, $"{handler} must still actuate for the user ({actuation}).");
         Assert.True(guard >= 0 && guard < acts,
             $"{handler} must return when the toggle state equals the row's belief: that is a reflected write, and the user did not ask for {actuation}.");
-        Assert.True(beliefSet >= 0 && beliefSet < acts,
-            $"{handler} must move the belief to the commanded state before actuating, so a re-raised event is not a second device operation.");
     }
 
     [Fact]
-    public void SavedSettingsInit_MovesEachActuatingBelief_WithTheValueItWrites()
+    public void UserIntentRule_LivesInOneHelper_AndLogsBothDirections()
+    {
+        string source = ReadSettingsPage();
+        string body = MethodBody(source, "private bool UserIntent(");
+
+        // The rule is a state comparison; the belief moves to the commanded state
+        // so a re-raised event is not a second device operation; and both
+        // directions are logged, because this defect class hides in dispatcher
+        // timing and the field report named no row.
+        // The rule is a state comparison over a KNOWN state: a row whose belief is
+        // still null has never been observed, so nothing moved and nothing was
+        // asked for. p48 proved the necessity: at startup the four device rows all
+        // logged "toggle=true belief=null" (WPF-UI applies the XAML IsChecked value
+        // in the template pass and raises from there), and the plain comparison
+        // read that as intent - Wi-Fi, Bluetooth, webcam and touchpad all actuated
+        // on app start.
+        Assert.Contains("belief.HasValue && toggle.IsChecked != belief", body, StringComparison.Ordinal);
+        Assert.Contains("belief = toggle.IsChecked;", body, StringComparison.Ordinal);
+        Assert.Contains("actuating: toggle=", body, StringComparison.Ordinal);
+        Assert.Contains("reflection, not intent: toggle=", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EveryActuatingRow_BeliefStartsAsTheTogglesConstructedState()
     {
         string source = ReadSettingsPage();
 
-        (string Belief, string Setting)[] rows =
+        (string Toggle, string Belief)[] rows =
         [
-            ("_startOnBoot", "Settings.Default.StartOnBoot"),
-            ("_powerBoost", "Settings.Default.EnablePowerBoostMode"),
-            ("_flydigiEnabled", "Settings.Default.EnableFlydigi"),
-            ("_apMenuUnlocked", "Settings.Default.EnableCpuAdvancedPerformanceMenu"),
-            ("_touchpadOn", "Settings.Default.TouchpadEnabled"),
+            ("cbWifiToggle", "_wifiOn"),
+            ("cbBluetoothToggle", "_bluetoothOn"),
+            ("cbWebcamToggle", "_webcamOn"),
+            ("cbTouchpadToggle", "_touchpadOn"),
+            ("cbStartBoot", "_startOnBoot"),
+            ("cbPowerBoostMode", "_powerBoost"),
+            ("cbHideFlydigi", "_flydigiEnabled"),
+            ("cbCpuAdvancedPerformanceMenu", "_apMenuUnlocked"),
         ];
 
-        foreach ((string belief, string setting) in rows)
+        foreach ((string toggle, string belief) in rows)
         {
-            int beliefSet = source.IndexOf($"{belief} = {setting};", StringComparison.Ordinal);
-            Assert.True(beliefSet >= 0, $"The constructor must set {belief} from {setting}.");
+            // A belief of null means "unknown", and the XAML initial value's
+            // queued raise (true != null) would read as user intent - that is how
+            // p45 shipped an elevated webcam command 1 ms before the page's
+            // status query.
+            Assert.Contains($"{belief} = {toggle}.IsChecked;", source, StringComparison.Ordinal);
+        }
+    }
 
-            // The toggle the row writes must be the same row's control, and the
-            // belief must be in place before that write.
-            Assert.True(beliefSet < source.IndexOf(".IsChecked =", beliefSet, StringComparison.Ordinal) ||
-                !source.Contains(".IsChecked =", StringComparison.Ordinal),
-                $"{belief} must be set before the page writes its toggle.");
+    [Fact]
+    public void SavedSettingsInit_ReflectsEveryActuatingRow_WithItsBelief()
+    {
+        string source = ReadSettingsPage();
+
+        (string Toggle, string Setting, string Belief)[] rows =
+        [
+            ("cbStartBoot", "Settings.Default.StartOnBoot", "_startOnBoot"),
+            ("cbPowerBoostMode", "Settings.Default.EnablePowerBoostMode", "_powerBoost"),
+            ("cbHideFlydigi", "Settings.Default.EnableFlydigi", "_flydigiEnabled"),
+            ("cbCpuAdvancedPerformanceMenu", "Settings.Default.EnableCpuAdvancedPerformanceMenu", "_apMenuUnlocked"),
+            ("cbTouchpadToggle", "Settings.Default.TouchpadEnabled", "_touchpadOn"),
+        ];
+
+        foreach ((string toggle, string setting, string belief) in rows)
+        {
+            // Writing the saved value into an actuating toggle directly would
+            // raise a Checked/Unchecked event that reads as user intent in a
+            // later dispatcher pass.
+            Assert.DoesNotContain($"{toggle}.IsChecked = {setting};", source, StringComparison.Ordinal);
+            Assert.Contains($"ReflectToggleState({toggle}, {setting}, ref {belief});", source, StringComparison.Ordinal);
         }
     }
 

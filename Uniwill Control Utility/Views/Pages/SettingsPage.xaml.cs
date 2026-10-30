@@ -200,21 +200,31 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbxLanguage.SelectedItem = LocalizationService.SupportedLanguages.First(language => language.CultureName == LocalizationService.CurrentCultureName);
             _languageSelectionReady = true;
 
+            // Each actuating row's belief starts as the state its toggle was
+            // CONSTRUCTED with (the XAML initial value), so "unknown" can never
+            // read as user intent. Field-proven 2026-10-30 on p45: the webcam
+            // toggle's XAML IsChecked="True" queues a raise that lands in the
+            // page's first dispatcher pass - with _webcamOn still null,
+            // "IsChecked=true != null" read as intent and SetWebcamAsync ran
+            // elevated PowerShell 1 ms before the page's own status query.
+            _wifiOn = cbWifiToggle.IsChecked;
+            _bluetoothOn = cbBluetoothToggle.IsChecked;
+            _webcamOn = cbWebcamToggle.IsChecked;
+            _touchpadOn = cbTouchpadToggle.IsChecked;
+            _startOnBoot = cbStartBoot.IsChecked;
+            _powerBoost = cbPowerBoostMode.IsChecked;
+            _flydigiEnabled = cbHideFlydigi.IsChecked;
+            _apMenuUnlocked = cbCpuAdvancedPerformanceMenu.IsChecked;
+
             // Every write below REFLECTS the saved settings into the toggles.
-            // For each row that ACTUATES, the belief is set from the same saved
-            // value first, so the Checked/Unchecked event the write raises -
-            // which WPF-UI's ToggleSwitch delivers in a later dispatcher pass,
-            // not synchronously - sees equality: the scheduled task is not
+            // For each row that ACTUATES, the reflection writer moves the belief
+            // with the toggle, so the Checked/Unchecked event it raises - which
+            // WPF-UI's ToggleSwitch delivers in a LATER dispatcher pass, not
+            // synchronously - sees equality: the scheduled task is not
             // re-registered (or unregistered), the CPU Advanced Performance
             // Menu does not write NVRAM, the Flydigi services are not
             // resumed/suspended, and the touchpad admin flow does not run.
-            _startOnBoot = Settings.Default.StartOnBoot;
-            _powerBoost = Settings.Default.EnablePowerBoostMode;
-            _flydigiEnabled = Settings.Default.EnableFlydigi;
-            _apMenuUnlocked = Settings.Default.EnableCpuAdvancedPerformanceMenu;
-            _touchpadOn = Settings.Default.TouchpadEnabled;
-
-            cbStartBoot.IsChecked = Settings.Default.StartOnBoot;
+            ReflectToggleState(cbStartBoot, Settings.Default.StartOnBoot, ref _startOnBoot);
             nbStartupDelay.Value = Settings.Default.StartupDelaySeconds;
             bool bootEnabled = Settings.Default.StartOnBoot;
             StartupDelayDivider.Visibility = bootEnabled ? Visibility.Visible : Visibility.Collapsed;
@@ -226,8 +236,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbAutoCheck.IsChecked = Settings.Default.UpdateCheck;
             cbAutoUpdate.IsChecked = Settings.Default.AutoUpdateApply;
             cbAdaptive.IsChecked = Settings.Default.isStartAdpative;
-            cbPowerBoostMode.IsChecked = Settings.Default.EnablePowerBoostMode;
-            cbHideFlydigi.IsChecked = Settings.Default.EnableFlydigi;
+            ReflectToggleState(cbPowerBoostMode, Settings.Default.EnablePowerBoostMode, ref _powerBoost);
+            ReflectToggleState(cbHideFlydigi, Settings.Default.EnableFlydigi, ref _flydigiEnabled);
             cbDisableCpuVoltageControl.IsChecked = Settings.Default.EnableCpuVoltageControl;
             // CPU voltage control (Curve Optimizer) is AMD-only — hide the row on Intel scenarios
             bool cpuVoltageRowVisible = Family.TYPE != Family.ProcessorType.Intel;
@@ -240,7 +250,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbShowOverlayNavigation.IsChecked = Settings.Default.EnableOverlayNavigation;
             cbShowAutoNavigation.IsChecked = Settings.Default.EnableAutoNavigation;
             cbQKeyIntercept.IsChecked = Settings.Default.EnableQKeyButtonIntercept;
-            cbCpuAdvancedPerformanceMenu.IsChecked = Settings.Default.EnableCpuAdvancedPerformanceMenu;
+            ReflectToggleState(cbCpuAdvancedPerformanceMenu, Settings.Default.EnableCpuAdvancedPerformanceMenu, ref _apMenuUnlocked);
+            // The touchpad row is persisted, so its saved state is reflected too;
+            // the admin flow runs only when the user moves the toggle.
+            ReflectToggleState(cbTouchpadToggle, Settings.Default.TouchpadEnabled, ref _touchpadOn);
             EnableNvramPrivilege();
             bool apMenuSupported = Family.TYPE == Family.ProcessorType.Intel && CpuApMenuSupported();
             _isNvramAvailable = apMenuSupported;
@@ -405,10 +418,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbStartBoot_Checked(object sender, RoutedEventArgs e)
         {
-            if (!UserIntent(cbStartBoot, _startOnBoot))
+            if (!UserIntent(cbStartBoot, ref _startOnBoot, "start on boot"))
                 return;
 
-            _startOnBoot = true;
             StartupDelayDivider.Visibility = Visibility.Visible;
             StartupDelayRow.Visibility = Visibility.Visible;
             UpdateScheduledTask();
@@ -419,10 +431,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbStartBoot_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (!UserIntent(cbStartBoot, _startOnBoot))
+            if (!UserIntent(cbStartBoot, ref _startOnBoot, "start on boot"))
                 return;
 
-            _startOnBoot = false;
             StartupDelayDivider.Visibility = Visibility.Collapsed;
             StartupDelayRow.Visibility = Visibility.Collapsed;
 
@@ -542,10 +553,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
       private void cbPowerBoostMode_Checked(object sender, RoutedEventArgs e)
         {
-            if (!UserIntent(cbPowerBoostMode, _powerBoost))
+            if (!UserIntent(cbPowerBoostMode, ref _powerBoost, "PowerBoost mode"))
                 return;
 
-            _powerBoost = true;
             Settings.Default.EnablePowerBoostMode = true;
             Settings.Default.Save();
 
@@ -557,10 +567,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbPowerBoostMode_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (!UserIntent(cbPowerBoostMode, _powerBoost))
+            if (!UserIntent(cbPowerBoostMode, ref _powerBoost, "PowerBoost mode"))
                 return;
 
-            _powerBoost = false;
             Settings.Default.EnablePowerBoostMode = false;
             Settings.Default.Save();
 
@@ -582,10 +591,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbCpuAdvancedPerformanceMenu_Checked(object sender, RoutedEventArgs e)
         {
-            if (!UserIntent(cbCpuAdvancedPerformanceMenu, _apMenuUnlocked))
+            if (!UserIntent(cbCpuAdvancedPerformanceMenu, ref _apMenuUnlocked, "CPU Advanced Performance Menu"))
                 return;
 
-            _apMenuUnlocked = true;
             Settings.Default.EnableCpuAdvancedPerformanceMenu = true;
             Settings.Default.Save();
             if (_isNvramAvailable && WriteCpuApMenuUnlock(true))
@@ -594,10 +602,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbCpuAdvancedPerformanceMenu_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (!UserIntent(cbCpuAdvancedPerformanceMenu, _apMenuUnlocked))
+            if (!UserIntent(cbCpuAdvancedPerformanceMenu, ref _apMenuUnlocked, "CPU Advanced Performance Menu"))
                 return;
 
-            _apMenuUnlocked = false;
             Settings.Default.EnableCpuAdvancedPerformanceMenu = false;
             Settings.Default.Save();
             if (_isNvramAvailable && WriteCpuApMenuUnlock(false))
@@ -613,6 +620,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// observed state (the constructor's saved-settings init, the load-time
         /// hardware sync, a radio StateChanged event) moves the belief together
         /// with the toggle, so its event sees equality and no actuation follows.
+        /// Each belief is initialized to the state its toggle was constructed
+        /// with, and a belief that is still null (never observed) is never intent,
+        /// because WPF-UI's ToggleSwitch applies its XAML IsChecked value during
+        /// the TEMPLATE pass and raises the event from there.
         ///
         /// This replaces a temporal guard (a flag set around the write), which
         /// leaked: WPF-UI's ToggleSwitch raises Checked/Unchecked in a LATER
@@ -646,72 +657,102 @@ namespace Uniwill_Control_Utility.Views.Pages
                 toggle.IsChecked = on;
         }
 
-        /// <summary>True when a Checked/Unchecked event carries real user intent:
-        /// the toggle moved to a state the page does not believe the device is in.
-        /// A reflected write sets both, so its event returns false.</summary>
-        private bool UserIntent(Wpf.Ui.Controls.ToggleSwitch toggle, bool? belief) =>
-            toggle is not null && toggle.IsChecked != belief;
+        /// <summary>
+        /// The actuation rule, in one place: a Checked/Unchecked event carries
+        /// user intent only when the toggle's state differs from what the page
+        /// believes the device is in. On intent the belief moves to the commanded
+        /// state first (so a re-raised event is not a second device operation)
+        /// and the actuation is logged; a refusal is logged at Debug. Both
+        /// breadcrumbs exist because this defect class hides in dispatcher timing:
+        /// the field reports named no row, and the elevated PowerShell command
+        /// line was the only witness.
+        /// </summary>
+        private bool UserIntent(Wpf.Ui.Controls.ToggleSwitch? toggle, ref bool? belief, string row)
+        {
+            if (toggle is null)
+                return false;
+
+            // "Unknown" is never intent. The page can only have been asked for a
+            // change it knows the current state of: a row whose belief is still
+            // null has never been observed, so nothing moved. Field-proven 2026-10-30
+            // (p48, Information severity): at startup all four device rows logged
+            // "toggle=true belief=null" - WPF-UI's ToggleSwitch applies the XAML
+            // IsChecked="True" during its TEMPLATE pass and raises the event from
+            // there, long after the constructor initialized the belief from the
+            // (then null) value, and the comparison read that as user intent:
+            // Wi-Fi, Bluetooth, webcam and touchpad all actuated on app start, the
+            // webcam through elevated PowerShell and the touchpad through the
+            // elevated admin flow.
+            bool intent = belief.HasValue && toggle.IsChecked != belief;
+
+            if (intent)
+            {
+                _logger.LogInformation("[Settings] {Row} actuating: toggle={Toggle} belief={Belief}",
+                    row, toggle.IsChecked, belief);
+                belief = toggle.IsChecked;
+            }
+            else
+            {
+                _logger.LogDebug("[Settings] {Row} reflection, not intent: toggle={Toggle} belief={Belief}",
+                    row, toggle.IsChecked, belief);
+            }
+
+            return intent;
+        }
 
         private void cbWifiToggle_Checked(object sender, RoutedEventArgs e)
         {
-            if (!UserIntent(cbWifiToggle, _wifiOn))
+            if (!UserIntent(cbWifiToggle, ref _wifiOn, "Wi-Fi"))
                 return;
 
-            _wifiOn = true;
             _ = HardwareManagement.SetWifiAsync(true);
         }
 
         private void cbWifiToggle_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (!UserIntent(cbWifiToggle, _wifiOn))
+            if (!UserIntent(cbWifiToggle, ref _wifiOn, "Wi-Fi"))
                 return;
 
-            _wifiOn = false;
             _ = HardwareManagement.SetWifiAsync(false);
         }
 
         private void cbBluetoothToggle_Checked(object sender, RoutedEventArgs e)
         {
-            if (!UserIntent(cbBluetoothToggle, _bluetoothOn))
+            if (!UserIntent(cbBluetoothToggle, ref _bluetoothOn, "Bluetooth"))
                 return;
 
-            _bluetoothOn = true;
             _ = HardwareManagement.SetBluetoothAsync(true);
         }
 
         private void cbBluetoothToggle_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (!UserIntent(cbBluetoothToggle, _bluetoothOn))
+            if (!UserIntent(cbBluetoothToggle, ref _bluetoothOn, "Bluetooth"))
                 return;
 
-            _bluetoothOn = false;
             _ = HardwareManagement.SetBluetoothAsync(false);
         }
 
         private void cbWebcamToggle_Checked(object sender, RoutedEventArgs e)
         {
-            if (!UserIntent(cbWebcamToggle, _webcamOn))
+            if (!UserIntent(cbWebcamToggle, ref _webcamOn, "webcam"))
                 return;
 
-            _webcamOn = true;
             _ = HardwareManagement.SetWebcamAsync(true);
         }
 
         private void cbWebcamToggle_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (!UserIntent(cbWebcamToggle, _webcamOn))
+            if (!UserIntent(cbWebcamToggle, ref _webcamOn, "webcam"))
                 return;
 
-            _webcamOn = false;
             _ = HardwareManagement.SetWebcamAsync(false);
         }
 
         private void cbTouchpadToggle_Checked(object sender, RoutedEventArgs e)
         {
-            if (!UserIntent(cbTouchpadToggle, _touchpadOn))
+            if (!UserIntent(cbTouchpadToggle, ref _touchpadOn, "touchpad"))
                 return;
 
-            _touchpadOn = true;
             Settings.Default.TouchpadEnabled = true;
             Settings.Default.Save();
             _ = HardwareManagement.SetTouchpadAsync(true);
@@ -719,10 +760,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbTouchpadToggle_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (!UserIntent(cbTouchpadToggle, _touchpadOn))
+            if (!UserIntent(cbTouchpadToggle, ref _touchpadOn, "touchpad"))
                 return;
 
-            _touchpadOn = false;
             Settings.Default.TouchpadEnabled = false;
             Settings.Default.Save();
             _ = HardwareManagement.SetTouchpadAsync(false);
@@ -803,10 +843,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbHideFlydigi_Checked(object sender, RoutedEventArgs e)
         {
-            if (!UserIntent(cbHideFlydigi, _flydigiEnabled))
+            if (!UserIntent(cbHideFlydigi, ref _flydigiEnabled, "Flydigi enabled"))
                 return;
 
-            _flydigiEnabled = true;
             Settings.Default.EnableFlydigi = true;
             Settings.Default.Save();
 
@@ -830,10 +869,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbHideFlydigi_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (!UserIntent(cbHideFlydigi, _flydigiEnabled))
+            if (!UserIntent(cbHideFlydigi, ref _flydigiEnabled, "Flydigi enabled"))
                 return;
 
-            _flydigiEnabled = false;
             Settings.Default.EnableFlydigi = false;
             Settings.Default.Save();
 
