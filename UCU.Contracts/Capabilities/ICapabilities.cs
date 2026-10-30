@@ -216,6 +216,9 @@ namespace UCU.Contracts.Capabilities
         /// </summary>
         Task<byte[]?> GetNvramValueAsync(string name, string guid, CancellationToken cancellationToken = default);
 
+        /// <summary>True when the write landed. Writing the OEM entry rides
+        /// the engine's 50-series gatekeeper handshake (unlock OemMagicDoor
+        /// first); a refused door answers false with the entry untouched.</summary>
         Task<bool> SetNvramValueAsync(string name, string guid, byte[] data, CancellationToken cancellationToken = default);
 
         /// <summary>The CPU Advanced Performance Menu row's gate (firmware

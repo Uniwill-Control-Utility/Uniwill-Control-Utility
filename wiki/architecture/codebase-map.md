@@ -85,7 +85,7 @@
 - `Scripts/AMD Backend/` — PawnIO modules + Ryzen SMU mailbox.
 - `Scripts/Intel Backend/` — PawnIO modules, MSR/MCHBAR tuning.
 - `Scripts/GPUs/NVIDIA/` — MUX detection, NVAPI/NVML, power/clock and V-F curve logic.
-- `Scripts/Misc/` — logging, cached system data, WMI discovery, display operations, `HardwareManagement` (elevated PnP flows), notifications.
+- `Scripts/Misc/` — logging, cached system data, WMI discovery, display operations, `HardwareManagement` (elevated PnP flows), `NvramAccess` (NVRAM routes: engine-first, local fallback with the 50-series door handshake), notifications.
 - `RyzenAdj_To_UCU.cs` — shared command interpreter for AMD/Intel/NVIDIA/display/Windows-power options.
 
 ## Presentation surfaces

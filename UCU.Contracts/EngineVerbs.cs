@@ -121,6 +121,12 @@ namespace UCU.Contracts
             /// mode the mux.set_mode verb already writes, so reading and
             /// writing this entry is at the capability level the pipe DACL
             /// already grants.
+            ///
+            /// The write verb lands the 50-series gatekeeper handshake: the
+            /// service unlocks OemMagicDoor (one byte, 0x01) immediately
+            /// before writing the OEM entry — the unlock the reference needs
+            /// for the write to stick across reboot — and a door write that
+            /// fails answers false with the entry untouched (no blind write).
             /// </summary>
             public const string GetNvramValue = "device.get_nvram_value";
             public const string SetNvramValue = "device.set_nvram_value";
