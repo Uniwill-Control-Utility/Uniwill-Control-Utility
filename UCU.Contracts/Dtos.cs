@@ -203,6 +203,23 @@ namespace UCU.Contracts
         public bool Enabled { get; init; }
     }
 
+    /// <summary>
+    /// One UEFI firmware environment variable. As a verb parameter it addresses
+    /// the variable (Name + Guid; Data unset) for a read, and carries the whole
+    /// buffer for a write. As a result it answers a read with the buffer the
+    /// firmware reported, or null data when the variable does not exist.
+    /// Bytes ride base64 by System.Text.Json convention, which keeps the wire
+    /// text-safe for a 4 KB buffer.
+    /// </summary>
+    public sealed record NvramValueDto
+    {
+        public string Name { get; init; } = string.Empty;
+
+        public string Guid { get; init; } = string.Empty;
+
+        public byte[]? Data { get; init; }
+    }
+
     // ---------------------------------------------------------------- results
 
     public sealed record FanStatusDto

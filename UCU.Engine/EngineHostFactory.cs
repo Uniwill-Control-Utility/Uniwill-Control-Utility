@@ -58,6 +58,12 @@ namespace UCU.Engine
                 services.AddSingleton<UCU.Hardware.Devices.IPnpDeviceService>(
                     options.PnpDeviceOverride ?? new UCU.Hardware.Devices.PnpDeviceService());
 
+                // The NVRAM rows (AP-menu, mux mirror): LocalSystem enables
+                // SeSystemEnvironmentPrivilege, which an unelevated app never can;
+                // tests script a variable store.
+                services.AddSingleton<UCU.Hardware.Firmware.IFwNvramService>(
+                    options.FwNvramOverride ?? new UCU.Hardware.Firmware.FwNvramService());
+
                 services.AddHostedService<EnginePipeServer>();
                 services.AddHostedService<EngineWatchdog>();
                 services.AddHostedService<AppSupervision>();

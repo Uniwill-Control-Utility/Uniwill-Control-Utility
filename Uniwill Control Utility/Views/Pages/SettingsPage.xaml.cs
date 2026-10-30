@@ -57,126 +57,34 @@ namespace Uniwill_Control_Utility.Views.Pages
         // The checkbox drives two bytes in lockstep (tester-confirmed on Intel NB02):
         // CPUPerformanceAndOverClockMenuSwitch at 111 and MemoryOverClockSwitch at 51.
         // Support is firmware-reported at 110 (Intel NB02 = 1, AMD = 0).
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern uint GetFirmwareEnvironmentVariable(
-            string lpName, string lpGuid, [Out] byte[] lpBuffer, uint nSize);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool SetFirmwareEnvironmentVariable(
-            string lpName, string lpGuid, [In] byte[] lpValue, uint nSize);
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool OpenProcessToken(IntPtr h, uint d, out IntPtr t);
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool LookupPrivilegeValue(string? s, string n, ref LUID l);
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool AdjustTokenPrivileges(IntPtr t, bool d, ref TP n, uint b, IntPtr p, IntPtr r);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool CloseHandle(IntPtr h);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct LUID { public uint Low; public int High; }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct TP { public int Count; public LUID Luid; public uint Attr; }
-
-        private const uint TOKEN_ADJUST_PRIVILEGES = 0x0020;
-        private const uint SE_PRIVILEGE_ENABLED = 0x00000002;
-
-        private const string NvramGuidStr = "{9F33F85C-13CA-4FD1-9C4A-96217722C593}";
-        private const int OffsetMemOcSwitch = 51;
-        private const int OffsetCpuApMenuSupport = 110;
-        private const int OffsetCpuApMenuSwitch = 111;
+        //
+        // The reads, the writes, and the support probe go through NvramAccess: the
+        // engine's device.nvram verbs are the FIRST route (writing firmware
+        // variables demands SeSystemEnvironmentPrivilege, which an unelevated
+        // process can never enable — the direct calls this page used carried were
+        // silently dead in the field: the probe found nothing, the write failed
+        // with access denied, and no prompt ever appeared to explain). The page's
+        // original direct P/Invoke survives in NvramAccess as the fallback for a
+        // machine whose engine is not answering.
 
         private bool _isNvramAvailable;
 
         /// <summary>
-        /// Enables SeSystemEnvironmentPrivilege on the current process token (required for NVRAM access).
+        /// Firmware-reported support byte for the CPU Advanced Performance Menu
+        /// (offset 110). Non-zero on Intel NB02, zero on AMD — gates the
+        /// Settings row. Routed through NvramAccess: the engine probe first,
+        /// the page's own read as the fallback.
         /// </summary>
-        private static void EnableNvramPrivilege()
-        {
-            IntPtr token;
-            if (!OpenProcessToken(Process.GetCurrentProcess().Handle, TOKEN_ADJUST_PRIVILEGES, out token))
-            {
-                Debug.WriteLine($"[Settings] OpenProcessToken failed: {Marshal.GetLastWin32Error()}");
-                return;
-            }
-
-            try
-            {
-                var tp = new TP { Count = 1, Attr = SE_PRIVILEGE_ENABLED };
-                if (!LookupPrivilegeValue(null, "SeSystemEnvironmentPrivilege", ref tp.Luid))
-                {
-                    Debug.WriteLine($"[Settings] LookupPrivilegeValue failed: {Marshal.GetLastWin32Error()}");
-                    return;
-                }
-
-                if (!AdjustTokenPrivileges(token, false, ref tp, (uint)Marshal.SizeOf(tp), IntPtr.Zero, IntPtr.Zero))
-                {
-                    Debug.WriteLine($"[Settings] AdjustTokenPrivileges failed: {Marshal.GetLastWin32Error()}");
-                }
-            }
-            finally
-            {
-                CloseHandle(token);
-            }
-        }
+        private static bool CpuApMenuSupported() => NvramAccess.SupportsCpuApMenu();
 
         /// <summary>
-        /// Reads the OemMagicVariable NVRAM buffer, or null when unavailable.
+        /// Writes the Advanced Performance Menu unlock: offsets 111 (CPU menu
+        /// switch) and 51 (memory OC switch) in lockstep. Through the engine
+        /// this is one atomic read-patch-write verb on the device queue,
+        /// verified by re-read; NvramAccess falls back to the page's original
+        /// whole-buffer rewrite for a machine whose engine is not answering.
         /// </summary>
-        private static byte[]? ReadNvramBuffer()
-        {
-            byte[] buf = new byte[4096];
-            uint len = GetFirmwareEnvironmentVariable("OemMagicVariable", NvramGuidStr, buf, (uint)buf.Length);
-            if (len == 0 || len > buf.Length)
-                return null;
-            var result = new byte[len];
-            Array.Copy(buf, result, len);
-            return result;
-        }
-
-        /// <summary>
-        /// Firmware-reported support byte for the CPU Advanced Performance Menu (offset 110).
-        /// Non-zero on Intel NB02, zero on AMD — gates the Settings row.
-        /// </summary>
-        private static bool CpuApMenuSupported()
-        {
-            var nvram = ReadNvramBuffer();
-            return nvram != null && nvram.Length > OffsetCpuApMenuSupport && nvram[OffsetCpuApMenuSupport] != 0;
-        }
-
-        /// <summary>
-        /// Writes the Advanced Performance Menu unlock: sets offsets 111 (CPU menu switch)
-        /// and 51 (memory OC switch) to the same boolean, whole-buffer rewrite.
-        /// </summary>
-        private static bool WriteCpuApMenuUnlock(bool enabled)
-        {
-            var nvram = ReadNvramBuffer();
-            if (nvram == null || nvram.Length <= OffsetCpuApMenuSwitch)
-            {
-                Debug.WriteLine($"[Settings] NVRAM OemMagicVariable unavailable for AP menu write");
-                return false;
-            }
-
-            var modified = (byte[])nvram.Clone();
-            modified[OffsetCpuApMenuSwitch] = (byte)(enabled ? 1 : 0);
-            modified[OffsetMemOcSwitch] = (byte)(enabled ? 1 : 0);
-
-            if (!SetFirmwareEnvironmentVariable("OemMagicVariable", NvramGuidStr, modified, (uint)modified.Length))
-            {
-                Debug.WriteLine($"[Settings] NVRAM AP menu write failed: {Marshal.GetLastWin32Error()}");
-                return false;
-            }
-
-            Debug.WriteLine($"[Settings] NVRAM AP menu switch set to {(enabled ? 1 : 0)} at offsets {OffsetCpuApMenuSwitch}/{OffsetMemOcSwitch}");
-            return true;
-        }
+        private static bool WriteCpuApMenuUnlock(bool enabled) => NvramAccess.SetCpuApMenuUnlock(enabled);
 
         #endregion
 
@@ -196,10 +104,15 @@ namespace Uniwill_Control_Utility.Views.Pages
             _logger = logger;
 
             // The webcam/touchpad rows actuate through the engine's device
-            // capability (no consent prompt); App phase 1 wires the same singleton,
-            // this keeps the page self-sufficient whatever construction order is.
+            // capability (no consent prompt), and the AP-menu row's NVRAM
+            // reads/writes route through it for the privilege it cannot grant
+            // itself; App phase 1 wires the same singleton, this keeps the page
+            // self-sufficient whatever construction order is.
             if (devices != null)
+            {
                 HardwareManagement.Devices = devices;
+                NvramAccess.Devices = devices;
+            }
 
             InitializeComponent();
 
@@ -261,7 +174,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             // The touchpad row is persisted, so its saved state is reflected too;
             // the admin flow runs only when the user moves the toggle.
             ReflectToggleState(cbTouchpadToggle, Settings.Default.TouchpadEnabled, ref _touchpadOn);
-            EnableNvramPrivilege();
+            // The AP-menu gate probes NVRAM through the engine (the page
+            // constructor runs on the UI thread; the support probe is one pipe
+            // call, and the route's own fallback is local). The token privilege
+            // the old direct probe adjusted is the engine's to enable.
             bool apMenuSupported = Family.TYPE == Family.ProcessorType.Intel && CpuApMenuSupported();
             _isNvramAvailable = apMenuSupported;
             ApMenuDivider.Visibility = apMenuSupported ? Visibility.Visible : Visibility.Collapsed;

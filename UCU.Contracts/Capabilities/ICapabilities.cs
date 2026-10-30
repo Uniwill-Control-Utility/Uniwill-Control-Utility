@@ -197,6 +197,24 @@ namespace UCU.Contracts.Capabilities
         Task<PnpDeviceStateDto?> GetDgpuStateAsync(CancellationToken cancellationToken = default);
 
         Task<bool> SetDgpuEnabledAsync(bool enabled, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// UEFI firmware environment variable access (OemMagicVariable and its
+        /// offsets). Null when the variable does not exist — on an unelevated
+        /// app the read returned null for every variable because
+        /// SeSystemEnvironmentPrivilege cannot be enabled there; through the
+        /// engine it answers with the firmware's bytes.
+        /// </summary>
+        Task<byte[]?> GetNvramValueAsync(string name, string guid, CancellationToken cancellationToken = default);
+
+        Task<bool> SetNvramValueAsync(string name, string guid, byte[] data, CancellationToken cancellationToken = default);
+
+        /// <summary>The CPU Advanced Performance Menu row's gate (firmware
+        /// support byte), answered by the engine because the probe needs the
+        /// same privilege as the write.</summary>
+        Task<bool> GetSupportsCpuApMenuAsync(CancellationToken cancellationToken = default);
+
+        Task<bool> SetCpuApMenuUnlockAsync(bool enabled, CancellationToken cancellationToken = default);
     }
 
     /// <summary>Engine identity and health; the app uses this for its status display
