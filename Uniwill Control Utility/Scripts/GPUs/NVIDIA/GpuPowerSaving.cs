@@ -50,6 +50,19 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
     /// </summary>
     internal static class GpuPowerSaving
     {
+        /// <summary>
+        /// The engine's device capability (webcam/dGPU PnP). Set from DI at startup
+        /// (App phase 1, before any startup apply) and by MainWindowViewModel.
+        /// The dGPU mutation reaches this class from AUTOMATIC applies - startup,
+        /// charger transitions, resume, tray, Automations - and an automatic apply
+        /// must never raise a consent prompt: as LocalSystem the engine performs
+        /// the PnP hotswap with no prompt and verifies it by re-reading the node.
+        /// The elevated PowerShell path below stays as the fallback for a machine
+        /// whose engine is not running; declining THAT is visible in the logs, and
+        /// ApplyAsync reports the PnP verification honestly either way.
+        /// </summary>
+        internal static UCU.Contracts.Capabilities.IDeviceCapability? Devices { get; set; }
+
         #region Windows GPU Preference Registry
 
         private const string WindowsGpuPrefKey = @"Software\Microsoft\DirectX\UserGpuPreferences";
@@ -189,8 +202,10 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
         /// <summary>
         /// Disables the NVIDIA dGPU via PnP device hotswap to save maximum power.
         /// This is the mechanism XMG CC uses to "stop giving power to the dGPU".
-        /// Uses InstanceId-based targeting with Present filtering to find the active device.
-        /// Requires administrator privileges.
+        /// The mutation is the engine's device verb (LocalSystem, no consent, CM API,
+        /// verification re-read in the engine); the elevated PowerShell path remains
+        /// for a machine whose engine is not running. The PnP status re-read after
+        /// the mutation is the verification in both routes.
         /// </summary>
         public static async Task<bool> DisableDgpuAsync()
         {
@@ -202,11 +217,34 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 var statusBefore = GetDgpuPnpStatus();
                 Log.Information("[GpuPowerSaving] Disabling dGPU, current PnP status: {Status}", statusBefore);
 
+                if (Devices != null)
+                {
+                    try
+                    {
+                        bool verified = await Devices.SetDgpuEnabledAsync(false).ConfigureAwait(false);
+
+                        var statusAfterEngine = GetDgpuPnpStatus();
+                        Log.Information("[GpuPowerSaving] dGPU disable via engine: verified={Verified}, status now: {Status}",
+                            verified, statusAfterEngine);
+
+                        if (verified)
+                        {
+                            // Trigger the interop guard - the GPU driver is now in a transitional state
+                            GpuInteropGuard.Reset();
+                            return true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Information("[GpuPowerSaving] Engine dGPU disable unavailable ({Message}) - using the elevated fallback", ex.Message);
+                    }
+                }
+
                 // Target the NVIDIA device that is physically present (Present=$true).
                 // Blackwell GPUs may show as "Unknown" status after disable (not "Error" like older GPUs),
                 // so we filter by Present=$true to always hit the active device.
-                // The app is unelevated: the mutation runs consented-elevated, and
-                // the PnP status re-read is the verification.
+                // Fallback route, engine not answering: the mutation runs consented-elevated
+                // (a declined prompt is visible here), and the PnP status re-read verifies.
                 int exitCode = await ElevatedProcess.RunPowershellAsync(
                     "Disable-PnpDevice -InstanceId (Get-PnpDevice -FriendlyName '*NVIDIA*' -Class Display | Where-Object { $_.Present -eq $true }).InstanceId -Confirm:$false",
                     "dGPU PnP disable").ConfigureAwait(false);
@@ -234,8 +272,9 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
         /// <summary>
         /// Re-enables the NVIDIA dGPU via PnP device hotswap after it was disabled.
-        /// Uses InstanceId-based targeting with status filtering to find disabled devices.
-        /// Requires administrator privileges.
+        /// The mutation is the engine's device verb (LocalSystem, no consent, CM API,
+        /// verification re-read in the engine); the elevated PowerShell path remains
+        /// for a machine whose engine is not running.
         /// </summary>
         public static async Task<bool> EnableDgpuAsync()
         {
@@ -247,10 +286,34 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 var statusBefore = GetDgpuPnpStatus();
                 Log.Information("[GpuPowerSaving] Enabling dGPU, current PnP status: {Status}", statusBefore);
 
+                if (Devices != null)
+                {
+                    try
+                    {
+                        bool verified = await Devices.SetDgpuEnabledAsync(true).ConfigureAwait(false);
+
+                        var statusAfterEngine = GetDgpuPnpStatus();
+                        Log.Information("[GpuPowerSaving] dGPU enable via engine: verified={Verified}, status now: {Status}",
+                            verified, statusAfterEngine);
+
+                        if (verified)
+                        {
+                            // GPU driver just re-initialized, need a cooldown
+                            GpuInteropGuard.Reset();
+                            return true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Information("[GpuPowerSaving] Engine dGPU enable unavailable ({Message}) - using the elevated fallback", ex.Message);
+                    }
+                }
+
                 // After PnP disable, Blackwell GPUs show status "Unknown" (not "Error" like older Turing/Ampere).
                 // We target physically present devices that are NOT in OK state - this catches both
                 // Error (older GPUs) and Unknown (Blackwell) disabled states, while ignoring ghost replicas.
-                // Elevated per-operation (the app is unelevated); status re-read verifies.
+                // Fallback route, engine not answering: elevated per-operation (a declined
+                // prompt is visible in the log); the status re-read verifies.
                 int exitCode = await ElevatedProcess.RunPowershellAsync(
                     "Enable-PnpDevice -InstanceId (Get-PnpDevice -FriendlyName '*NVIDIA*' -Class Display | Where-Object { $_.Present -eq $true -and $_.Status -ne 'OK' }).InstanceId -Confirm:$false",
                     "dGPU PnP enable").ConfigureAwait(false);
@@ -353,15 +416,20 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
 
             // Step 3: PnP hotswap — skip if dGPU is already in the desired state
             string currentStatus = GetDgpuPnpStatus();
+            bool pnpVerified;
+
             if (mode == GpuPowerSavingMode.Enable)
             {
                 // Need to disable dGPU — skip if already disabled (not OK)
                 if (currentStatus == "OK")
                 {
                     await DisableDgpuAsync();
+                    currentStatus = GetDgpuPnpStatus();
+                    pnpVerified = currentStatus != "OK";
                 }
                 else
                 {
+                    pnpVerified = true;
                     Log.Information("[GpuPowerSaving] dGPU already disabled (status: {Status}), skipping PnP disable", currentStatus);
                 }
             }
@@ -371,14 +439,23 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 if (currentStatus != "OK")
                 {
                     await EnableDgpuAsync();
+                    currentStatus = GetDgpuPnpStatus();
+                    pnpVerified = currentStatus == "OK";
                 }
                 else
                 {
+                    pnpVerified = true;
                     Log.Information("[GpuPowerSaving] dGPU already enabled (status: OK), skipping PnP enable");
                 }
             }
 
-            Log.Information("[GpuPowerSaving] Mode {Mode} applied successfully", mode);
+            // The honest signal: what the machine's PnP state says the apply
+            // achieved, not an unqualified success word. A declined consent on the
+            // elevated fallback, a failed CM call, and an engine that verified the
+            // mutation all land in this one line, and the status string rides with
+            // it - the field's question is always which status the dGPU ended in.
+            Log.Information("[GpuPowerSaving] Mode {Mode} applied, PnP verified: {Verified} (status: {Status})",
+                mode, pnpVerified, currentStatus);
 
             // Repaint the open Display page and the live tray page (buttons + cooldown
             // countdown) so the Automations engine's charger plug/unplug transitions

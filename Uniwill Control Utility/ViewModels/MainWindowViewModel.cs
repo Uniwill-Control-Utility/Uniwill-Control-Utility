@@ -36,11 +36,15 @@ namespace Uniwill_Control_Utility.ViewModels
 
         private readonly IBatteryCapability? _battery;
 
-        public MainWindowViewModel(INavigationService navigationService, IPowerCapability? power = null, IFanCapability? fan = null, IBatteryCapability? battery = null)
+        public MainWindowViewModel(INavigationService navigationService, IPowerCapability? power = null, IFanCapability? fan = null, IBatteryCapability? battery = null, IDeviceCapability? devices = null)
         {
             _battery = battery;
             RyzenAdj_To_UCU.EcService = power;
             RyzenAdj_To_UCU.FanService = fan;
+            // The dGPU PnP mutation (GPU power saving) runs as the engine's device
+            // verb: LocalSystem, no consent prompt. Idempotent with App phase 1's
+            // wiring - same singleton instance.
+            Scripts.GPUs.NVIDIA.GpuPowerSaving.Devices = devices;
             InitializeViewModel();
             LocalizationService.CultureChanged += OnCultureChanged;
             LastAppliedSettingsService.Changed += OnLastAppliedSettingsChanged;

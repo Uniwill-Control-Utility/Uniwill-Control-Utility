@@ -30,6 +30,7 @@ public sealed class EngineHostFixture : IAsyncDisposable
         Battery = new BatteryCapability(Client);
         Telemetry = new EcTelemetryCapability(Client);
         Engine = new EngineCapability(Client);
+        Device = new DeviceCapability(Client);
     }
 
     public EngineRuntimeOptions Options { get; }
@@ -41,6 +42,7 @@ public sealed class EngineHostFixture : IAsyncDisposable
     public GpuMuxCapability Mux { get; }
     public KeyboardCapability Keyboard { get; }
     public BatteryCapability Battery { get; }
+    public DeviceCapability Device { get; }
     public EcTelemetryCapability Telemetry { get; }
     public EngineCapability Engine { get; }
 
@@ -60,6 +62,9 @@ public sealed class EngineHostFixture : IAsyncDisposable
             // Hermetic default: the production probe opens sensor drivers (Ring0,
             // SMBus); tests opt into a scripted reading through configure.
             SensorProbeOverride = new FakeSensorProbe(),
+            // Hermetic default, same reasoning: the production service enables and
+            // disables REAL device nodes. Tests script a device tree through configure.
+            PnpDeviceOverride = new FakePnpDeviceService(),
             LogDirectory = Path.Combine(Path.GetTempPath(), "ucu-engine-tests", pipeName),
         };
 

@@ -106,7 +106,7 @@ public sealed class ContractShapeTests
         {
             string[] parts = verb.Split('.');
             Assert.Equal(2, parts.Length);
-            Assert.Contains(parts[0], new[] { "fan", "power", "mux", "keyboard", "battery", "telemetry", "engine" });
+            Assert.Contains(parts[0], new[] { "fan", "power", "mux", "keyboard", "battery", "device", "telemetry", "engine" });
             Assert.Equal(verb, verb.ToLowerInvariant());
             Assert.Matches("^[a-z_]+$", parts[1]);
         }
@@ -125,6 +125,7 @@ public sealed class ContractShapeTests
             + typeof(IGpuMuxCapability).GetMethods().Length
             + typeof(IKeyboardCapability).GetMethods().Length
             + typeof(IBatteryCapability).GetMethods().Length
+            + typeof(IDeviceCapability).GetMethods().Length
             + typeof(IEcTelemetryCapability).GetMethods().Length
             + typeof(IEngineCapability).GetMethods().Length;
 
@@ -164,7 +165,7 @@ public sealed class ContractShapeTests
         Type[] interfaces =
         {
             typeof(IFanCapability), typeof(IPowerCapability), typeof(IGpuMuxCapability),
-            typeof(IKeyboardCapability), typeof(IBatteryCapability),
+            typeof(IKeyboardCapability), typeof(IBatteryCapability), typeof(IDeviceCapability),
             typeof(IEcTelemetryCapability), typeof(IEngineCapability),
         };
 
@@ -209,7 +210,8 @@ public sealed class ContractShapeTests
             new FanStatusDto(), new FanCurveTablesDto(), new FanDutySnapshotDto(),
             new MetricsSnapshotDto(),
             new PowerLimitsDto(), new MuxModeDto(), new MuxStateDto(),
-            new BatteryTelemetryDto(), new RegisterValueDto(), new RegisterBytesDto(),
+            new BatteryTelemetryDto(), new PnpDeviceStateDto(),
+            new RegisterValueDto(), new RegisterBytesDto(),
             new EngineInfoDto(),
         };
 

@@ -197,6 +197,12 @@ namespace UCU.Contracts
         public int Mode { get; init; }
     }
 
+    /// <summary>Device enable/disable parameter for the <c>device.*</c> verbs.</summary>
+    public sealed record DeviceToggleDto
+    {
+        public bool Enabled { get; init; }
+    }
+
     // ---------------------------------------------------------------- results
 
     public sealed record FanStatusDto
@@ -333,6 +339,25 @@ namespace UCU.Contracts
         public ushort Address { get; init; }
 
         public byte[] Data { get; init; } = Array.Empty<byte>();
+    }
+
+    /// <summary>
+    /// The PnP state of one device row (webcam, dGPU), mirroring what
+    /// Get-PnpDevice reported when these rows shelled out to PowerShell:
+    /// Status is the PnP status string ("OK" = running and enabled, "Disable",
+    /// "Error", "Unknown", ...; "Unknown Device" for an invalid device id), and
+    /// Present distinguishes "the row's device is not in the system" (the UI
+    /// shows nothing to toggle) from "present and disabled" (the toggle's off
+    /// state). The status string travels for the logs: the field's question is
+    /// always which status the device ended in.
+    /// </summary>
+    public sealed record PnpDeviceStateDto
+    {
+        public string InstanceId { get; init; } = string.Empty;
+
+        public string Status { get; init; } = string.Empty;
+
+        public bool Present { get; init; }
     }
 
     /// <summary>What the engine is, so the app can show a version-skew error clearly.</summary>

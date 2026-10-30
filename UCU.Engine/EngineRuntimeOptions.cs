@@ -72,6 +72,13 @@ namespace UCU.Engine
         /// </summary>
         public UCU.Hardware.Metrics.ISensorProbe? SensorProbeOverride { get; init; }
 
+        /// <summary>
+        /// PnP device service override, same test seam: the production service
+        /// enables and disables real device nodes (the camera, the dGPU), which has
+        /// no place in a test process. Tests inject a scripted device tree.
+        /// </summary>
+        public UCU.Hardware.Devices.IPnpDeviceService? PnpDeviceOverride { get; init; }
+
         /// <summary>Engine build identity reported in <c>engine.get_info</c>.</summary>
         public string EngineVersion { get; init; } = ReadEngineVersion();
 

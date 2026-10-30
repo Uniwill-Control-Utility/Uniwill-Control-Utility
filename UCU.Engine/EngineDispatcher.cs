@@ -1,5 +1,6 @@
 using System.Text.Json;
 using UCU.Contracts;
+using UCU.Hardware.Devices;
 
 namespace UCU.Engine
 {
@@ -22,12 +23,13 @@ namespace UCU.Engine
         private readonly AppExitSignal _appExit;
 
         public EngineDispatcher(
-            EcEngineGate gate, EngineDomainQueues queues, AppExitSignal appExit, EngineMetricsSnapshotSource metrics)
+            EcEngineGate gate, EngineDomainQueues queues, AppExitSignal appExit,
+            EngineMetricsSnapshotSource metrics, IPnpDeviceService devices)
         {
             _gate = gate;
             _queues = queues;
             _appExit = appExit;
-            _handlers = BuildHandlers(gate, appExit, metrics);
+            _handlers = BuildHandlers(gate, appExit, metrics, devices);
         }
 
         public IReadOnlyCollection<string> Verbs => _handlers.Keys;
@@ -95,7 +97,7 @@ namespace UCU.Engine
         };
 
         private static Dictionary<string, VerbHandler> BuildHandlers(
-            EcEngineGate gate, AppExitSignal appExit, EngineMetricsSnapshotSource metrics)
+            EcEngineGate gate, AppExitSignal appExit, EngineMetricsSnapshotSource metrics, IPnpDeviceService devices)
         {
             var handlers = new Dictionary<string, VerbHandler>(StringComparer.Ordinal);
 
@@ -106,6 +108,7 @@ namespace UCU.Engine
             MuxVerbs.Register(Add, gate);
             KeyboardVerbs.Register(Add, gate);
             BatteryVerbs.Register(Add, gate);
+            DeviceVerbs.Register(Add, devices);
             TelemetryVerbs.Register(Add, gate, metrics);
             EngineVerbsImpl.Register(Add, gate, appExit);
 
