@@ -324,7 +324,7 @@
   "Enable NVIDIA Dynamic Boost": "NVIDIA डायनामिक बूस्ट सक्षम करें",
   "Enable or disable hardware features at the Windows level": "Windows स्तर पर हार्डवेयर सुविधाओं को सक्षम या अक्षम करें",
   "Enable or disable MiniLED local dimming on the display": "डिस्प्ले पर MiniLED लोकल डिमिंग सक्षम या अक्षम करें",
-  "Enable or disable the camera device in Device Manager (PnP hotswap)": "Device Manager में कैमरा डिवाइस को सक्षम या अक्षम करें (PnP हॉटस्वैप)",
+  "Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)": "बंद करने पर FHD और IR दोनों कैमरे अक्षम हो जाते हैं (IR कैमरा Windows Hello के लिए उपयोग होता है)",
   "Enable or disable the touchpad via the Windows Settings admin flow": "Windows सेटिंग्स एडमिन फ़्लो के माध्यम से टचपैड को सक्षम या अक्षम करें",
   "Enable overlay": "ओवरले (Overlay) सक्षम करें",
   "Enable per-key color control instead of animation effects": "एनीमेशन प्रभावों के बजाय प्रति-कुंजी (per-key) रंग नियंत्रण सक्षम करें",

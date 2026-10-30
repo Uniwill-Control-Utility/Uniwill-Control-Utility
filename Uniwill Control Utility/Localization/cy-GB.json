@@ -324,7 +324,7 @@
   "Enable NVIDIA Dynamic Boost": "Galluogi Hwb Deinamig NVIDIA",
   "Enable or disable hardware features at the Windows level": "Galluogi neu analluogi nodweddion caledwedd ar lefel Windows",
   "Enable or disable MiniLED local dimming on the display": "Galluogi neu analluogi pylu lleol MiniLED ar yr arddangosfa",
-  "Enable or disable the camera device in Device Manager (PnP hotswap)": "Galluogi neu analluogi'r ddyfais camera yn Rheolydd Dyfais (cyfnewid poeth PnP)",
+  "Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)": "Mae diffodd yn analluogi'r ddwy camera, FHD ac IR (defnyddir y camera IR ar gyfer Windows Hello)",
   "Enable or disable the touchpad via the Windows Settings admin flow": "Galluogi neu analluogi'r pad cyffwrdd trwy lif gweinyddol Gosodiadau Windows",
   "Enable overlay": "Galluogi'r droshaen",
   "Enable per-key color control instead of animation effects": "Galluogi rheolaeth lliw fesul bysell yn hytrach nag effeithiau animeiddio",

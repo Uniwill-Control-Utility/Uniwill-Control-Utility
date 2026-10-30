@@ -324,7 +324,7 @@
   "Enable NVIDIA Dynamic Boost": "Paganahin ang NVIDIA Dynamic Boost",
   "Enable or disable hardware features at the Windows level": "Paganahin o i-disable ang mga feature ng hardware sa antas ng Windows",
   "Enable or disable MiniLED local dimming on the display": "Paganahin o i-disable ang MiniLED local dimming sa display",
-  "Enable or disable the camera device in Device Manager (PnP hotswap)": "Paganahin o i-disable ang camera device sa Device Manager (PnP hotswap)",
+  "Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)": "Ang pagpapatay ay nagde-deactivate ng parehong FHD at IR camera (ginagamit ang IR camera para sa Windows Hello)",
   "Enable or disable the touchpad via the Windows Settings admin flow": "Paganahin o i-disable ang touchpad sa pamamagitan ng admin flow ng Windows Settings",
   "Enable overlay": "Paganahin ang overlay",
   "Enable per-key color control instead of animation effects": "Paganahin ang kontrol ng kulay bawat key sa halip na mga animation effect",

@@ -324,7 +324,7 @@
   "Enable NVIDIA Dynamic Boost": "Schakel NVIDIA Dynamic Boost in",
   "Enable or disable hardware features at the Windows level": "Schakel hardwarefuncties op Windows-niveau in of uit",
   "Enable or disable MiniLED local dimming on the display": "Schakel MiniLED local dimming in of uit op het beeldscherm",
-  "Enable or disable the camera device in Device Manager (PnP hotswap)": "Schakel de camera in Device Manager in of uit (PnP-hotswap)",
+  "Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)": "Uitschakelen schakelt zowel de FHD- als de IR-camera uit (de IR-camera wordt gebruikt voor Windows Hello)",
   "Enable or disable the touchpad via the Windows Settings admin flow": "Schakel het touchpad in of uit via het beheerproces van Windows-instellingen",
   "Enable overlay": "Overlay inschakelen",
   "Enable per-key color control instead of animation effects": "Schakel per-toets kleurregeling in in plaats van animatie-effecten",

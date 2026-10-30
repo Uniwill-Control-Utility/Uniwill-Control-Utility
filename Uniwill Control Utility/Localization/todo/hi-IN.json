@@ -136,7 +136,7 @@
   "Enable Adaptive Mode tuning on application launch": "Enable Adaptive Mode tuning on application launch",
   "Enable or disable hardware features at the Windows level": "Enable or disable hardware features at the Windows level",
   "Enable or disable MiniLED local dimming on the display": "Enable or disable MiniLED local dimming on the display",
-  "Enable or disable the camera device in Device Manager (PnP hotswap)": "Enable or disable the camera device in Device Manager (PnP hotswap)",
+  "Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)": "Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)",
   "Enable or disable the touchpad via the Windows Settings admin flow": "Enable or disable the touchpad via the Windows Settings admin flow",
   "Enable per-key color control instead of animation effects": "Enable per-key color control instead of animation effects",
   "Enable the in-game overlay and global shortcuts": "Enable the in-game overlay and global shortcuts",

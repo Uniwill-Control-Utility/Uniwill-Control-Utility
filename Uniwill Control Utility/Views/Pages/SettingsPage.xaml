@@ -752,7 +752,7 @@
                                     <ui:TextBlock Margin="0,2,0,2"
                                                    FontTypography="Caption"
                                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Enable or disable the camera device in Device Manager (PnP hotswap)" />
+                                                   Text="Off disables both the FHD and IR cameras (the IR camera is used for Windows Hello)" />
                                 </StackPanel>
                                 <ui:ToggleSwitch x:Name="cbWebcamToggle"
                                                  Grid.Column="1"
