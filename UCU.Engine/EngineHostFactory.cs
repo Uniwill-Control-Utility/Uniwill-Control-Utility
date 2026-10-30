@@ -38,6 +38,7 @@ namespace UCU.Engine
             {
                 services.AddSingleton(options);
                 services.AddSingleton<EcEngineGate>();
+                services.AddSingleton<EcRawWriteGuard>();
             services.AddSingleton<AppExitSignal>();
                 services.AddSingleton<EngineDomainQueues>();
                 services.AddSingleton<EngineDispatcher>();
@@ -125,6 +126,11 @@ namespace UCU.Engine
                     case "--no-supervision":
                         // Dev/test hook: the console host must not spawn UI processes.
                         options = options with { SupervisionEnabled = false };
+                        break;
+                    case "--gate=report-only":
+                        // Field-debug hook for the raw-write gate: log allowlist
+                        // refusals, do not enforce them. Never set by the installer.
+                        options = options with { RawWriteGate = RawWriteGateMode.ReportOnly };
                         break;
                 }
             }

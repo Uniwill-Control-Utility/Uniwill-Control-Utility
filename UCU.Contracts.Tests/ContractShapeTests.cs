@@ -87,6 +87,53 @@ public sealed class ContractShapeTests
     }
 
     [Fact]
+    public void RawVerbParamsPinTheCallerChosenShape()
+    {
+        // The raw-write verbs (fan.write_register_blocks, telemetry.write_register,
+        // device.set_nvram_value) carry caller-chosen addresses/GUIDs on the wire:
+        // the param shape is pinned so the surface cannot silently widen (new free
+        // fields must be a deliberate contract change), and the engine's
+        // EcRawWriteGuard is what constrains the VALUES (see RawWriteGateTests).
+        RegisterBlocksDto blocks = EngineSerializer.BindParams<RegisterBlocksDto>(
+            EngineSerializer.ToParams(new RegisterBlocksDto
+            {
+                Blocks = new[]
+                {
+                    new EcRegisterBlockDto { Address = EcFanRegisters.CpuFanSpeedTable, Data = new byte[] { 0xC8, 0xC8 } },
+                },
+            }));
+
+        Assert.Single(blocks.Blocks);
+        Assert.Equal(EcFanRegisters.CpuFanSpeedTable, blocks.Blocks[0].Address);
+        Assert.Equal(new byte[] { 0xC8, 0xC8 }, blocks.Blocks[0].Data);
+
+        RegisterWriteDto write = EngineSerializer.BindParams<RegisterWriteDto>(
+            EngineSerializer.ToParams(new RegisterWriteDto { Address = 0x07A6, Value = 0x18 }));
+        Assert.Equal((ushort)0x07A6, write.Address);
+        Assert.Equal((byte)0x18, write.Value);
+
+        NvramValueDto nvram = EngineSerializer.BindParams<NvramValueDto>(
+            EngineSerializer.ToParams(new NvramValueDto
+            {
+                Name = EcWriteGatePolicy.OemMagicVariableGuid,
+                Guid = EcWriteGatePolicy.OemMagicVariableGuid,
+                Data = new byte[] { 1, 2, 3 },
+            }));
+        Assert.Equal(new byte[] { 1, 2, 3 }, nvram.Data);
+    }
+
+    [Fact]
+    public void RawWriteGatePolicyGuidConstantIsTheNvramAllowlist()
+    {
+        // The contract assembly carries the OEM GUID constant the engine's NVRAM
+        // gate allows, and the hardware service writes the same GUID (parity so
+        // the gate and the rows cannot drift).
+        Assert.Equal(
+            UCU.Core.Ec.EcWriteGatePolicy.OemMagicVariableGuid,
+            "{9F33F85C-13CA-4FD1-9C4A-96217722C593}");
+    }
+
+    [Fact]
     public void SerializerRefusesTypesThatAreNotInTheContext()
     {
         // The resolver is the source-generated context and nothing else. A type that

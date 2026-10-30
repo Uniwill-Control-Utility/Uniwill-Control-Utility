@@ -10,12 +10,13 @@
 ├── screenshots/              README screenshots
 ├── wiki/                     Maintainer and contributor documentation
 ├── UCU.Core/                 Pure domain: EC encodings, validation, GuardianPolicy,
-│                             PresetArbiterPolicy
+│                             PresetArbiterPolicy, EcWriteGatePolicy
 ├── UCU.Contracts/            Verbs, envelope, DTOs, frame codec, capability interfaces, JSON context
 ├── UCU.Client/               EngineClient RPC + capability proxies (the app's only EC path)
 ├── UCU.Hardware/             EcEngine + IEcTransport (\\.\ACPIDriver); engine-only assembly
 ├── UCU.Engine/               The UCUEngine service (pipe server, dispatcher, queues, gate,
-│                             watchdog, AppSupervision, AppSessionLauncher, EngineInstaller)
+│                             raw-write guard, watchdog, AppSupervision, AppSessionLauncher,
+│                             EngineInstaller)
 ├── UCU.*.Tests/              Core/Contracts/Hardware/Engine test projects
 ├── Uniwill Control Utility/  WPF UI (asInvoker)
 │   ├── Assets/               Images, PawnIO modules, RTSS and stress-test payloads
@@ -58,6 +59,7 @@
 | `EngineDispatcher.cs` | Verb lookup, protocol-version check, exception→error-code mapping. |
 | `EngineDomainQueues.cs`, `SerialExecutor.cs` | Per-domain FIFO executors, depth/timeout limits. |
 | `EcEngineGate.cs` | EC engine init/availability, `\\.\ACPIDriver` handle lifetime. |
+| `EcRawWriteGuard.cs` | Raw-verb chokepoint: address/GUID allowlist over the raw register + NVRAM write verbs (`EcWriteGatePolicy`). |
 | `Verbs/*.cs` | The verb handlers per domain (fan, power, mux, keyboard, battery, telemetry, engine). |
 | `EngineWatchdog.cs` | Fail-fast on wedged queues. |
 | `AppSupervision.cs`, `AppSessionLauncher.cs` | Crash relaunch of the app into the user session. |

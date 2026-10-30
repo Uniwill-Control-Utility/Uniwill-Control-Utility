@@ -544,10 +544,20 @@ namespace UCU.Hardware.Ec
         public void ActivateGpuPowerControl(int ctgpOffset, int dbOffset)
         {
             EnsureInitialized();
+
+            // Report, don't clamp: cTGP is the register byte (0-255) and Dynamic
+            // Boost is the documented 0-25 W borrow; out-of-range offsets are
+            // refused before the custom-profile enable / enable-bits sequence.
+            if (ctgpOffset < 0 || ctgpOffset > 255)
+                throw new ArgumentOutOfRangeException(nameof(ctgpOffset),
+                    $"cTGP offset must be 0-255, got {ctgpOffset}.");
+            if (dbOffset < 0 || dbOffset > 25)
+                throw new ArgumentOutOfRangeException(nameof(dbOffset),
+                    $"Dynamic Boost offset must be 0-25, got {dbOffset}.");
+
             lock (_lock)
             {
-                ctgpOffset = Math.Clamp(ctgpOffset, 0, 255);
-                byte dbClamped = (byte)Math.Clamp(dbOffset, 0, 25);
+                byte dbClamped = (byte)dbOffset;
                 DebugLog($"ActivateGpuPowerControl(ctgpOffset={ctgpOffset}, dbOffset={dbOffset}, dbClamped={dbClamped})");
 
                 // Prerequisite: enable CUSTOM_PROFILE mode so the EC accepts GPU power writes.
@@ -668,7 +678,8 @@ namespace UCU.Hardware.Ec
         /// </summary>
         public void SetTccOffset(int value)
         {
-            WriteECRegister(REG_TCC_OFFSET, (byte)Math.Clamp(value, 0, 255));
+            EcPowerCodec.ValidateTccOffset(value);
+            WriteECRegister(REG_TCC_OFFSET, (byte)value);
         }
 
         #endregion
@@ -853,7 +864,12 @@ namespace UCU.Hardware.Ec
         /// </summary>
         public void SetFanSpeedPercent(int percent)
         {
-            percent = Math.Clamp(percent, 0, 100);
+            // Report, don't clamp: the codec validator is the engine's seam (the
+            // envelope contract), so a 150 % preset is refused with a reason and
+            // the EC keeps its previous tables, instead of silently running the
+            // fans at a clamped speed. Runs BEFORE the handshake so a rejected
+            // call touches no hardware at all.
+            EcDutyCodec.ValidateDutyPercent(percent);
             byte targetDuty = (byte)(percent * 2); // EC uses 0-200 scale
 
             // Run the EC activation handshake (idempotent — only runs once).
@@ -1116,20 +1132,25 @@ namespace UCU.Hardware.Ec
             if (tempUp.Length != 16 || tempDown.Length != 16 || duty.Length != 16)
                 throw new ArgumentException("Fan curve tables must have 16 entries.");
 
+            // Report, don't clamp: out-of-range zones are refused with the zone
+            // named (the EC scale here is the raw 0-255 zone byte for temps and
+            // 0-200 for duty; the fan page's editor owns the table shape).
+            for (int i = 0; i < 16; i++)
+            {
+                if (tempUp[i] < 0 || tempUp[i] > 255)
+                    throw new ArgumentOutOfRangeException(nameof(tempUp), $"tempUp zone {i} = {tempUp[i]} is outside 0-255.");
+                if (tempDown[i] < 0 || tempDown[i] > 255)
+                    throw new ArgumentOutOfRangeException(nameof(tempDown), $"tempDown zone {i} = {tempDown[i]} is outside 0-255.");
+                if (duty[i] < 0 || duty[i] > EcDutyCodec.MaxEcDuty)
+                    throw new ArgumentOutOfRangeException(nameof(duty), $"duty zone {i} = {duty[i]} is outside 0-{EcDutyCodec.MaxEcDuty}.");
+            }
+
             ushort baseAddr = source switch
             {
                 EcFanCurveSource.Cpu => REG_CPU_TEMP_END_TABLE,
                 EcFanCurveSource.Gpu => REG_GPU_TEMP_END_TABLE,
                 _ => throw new ArgumentOutOfRangeException(nameof(source))
             };
-
-            // Clamp values
-            for (int i = 0; i < 16; i++)
-            {
-                tempUp[i] = Math.Clamp(tempUp[i], 0, 255);
-                tempDown[i] = Math.Clamp(tempDown[i], 0, 255);
-                duty[i] = Math.Clamp(duty[i], 0, 200);
-            }
 
             // Write temp_up table
             byte[] tempUpBytes = Array.ConvertAll(tempUp, b => (byte)b);
@@ -1176,6 +1197,15 @@ namespace UCU.Hardware.Ec
             EcFanCurveSpec gpuCurve,
             int[]? cpuTemps = null, int[]? gpuTemps = null)
         {
+            // Report, don't clamp: the temperature steps are validated (OFF zone 0,
+            // strictly ascending, 0-255) before the handshake, so a rejected curve
+            // leaves the EC tables exactly as they were. Duty tables are validated
+            // by BuildDutyTable's contract below.
+            if (cpuTemps != null)
+                EcTemperatureCodec.ValidateTemperatureSteps(cpuTemps);
+            if (gpuTemps != null)
+                EcTemperatureCodec.ValidateTemperatureSteps(gpuTemps);
+
             InitializeEc();
 
             // Custom tables are only honored while 0x741 bit0 is set.
@@ -1272,7 +1302,12 @@ namespace UCU.Hardware.Ec
         /// </summary>
         public bool SetFanPwmDirect(int fanIndex, int duty)
         {
-            duty = Math.Clamp(duty, 0, 200);
+            // Report, don't clamp (the EC duty scale is 0-200; this is the raw
+            // PWM register, so the EC scale, not the UI percent scale).
+            if (duty < 0 || duty > EcDutyCodec.MaxEcDuty)
+                throw new ArgumentOutOfRangeException(nameof(duty),
+                    $"PWM duty must be 0-{EcDutyCodec.MaxEcDuty}, got {duty}.");
+
             ushort reg = fanIndex == 0 ? REG_PWM_1 : REG_PWM_2;
 
             EnsureInitialized();
@@ -1311,7 +1346,11 @@ namespace UCU.Hardware.Ec
         /// </summary>
         public void SetFanPwmBothDirect(int duty)
         {
-            duty = Math.Clamp(duty, 0, 200);
+            // Validate once up front so a rejected value cannot leave one fan
+            // moved and the other not (SetFanPwmDirect re-validates; harmless).
+            if (duty < 0 || duty > EcDutyCodec.MaxEcDuty)
+                throw new ArgumentOutOfRangeException(nameof(duty),
+                    $"PWM duty must be 0-{EcDutyCodec.MaxEcDuty}, got {duty}.");
 
             // Set USER mode (bit 7) to tell the EC to stop its auto fan loop
             // and respect the values we write to 0x75B/0x75C.
@@ -1332,7 +1371,12 @@ namespace UCU.Hardware.Ec
         /// </summary>
         public void SetFanSwitchSpeed(int rpm)
         {
-            rpm = Math.Clamp(rpm, 100, 12700);
+            // Report, don't clamp: the encoding's documented range (MechControl
+            // fan_switch_speed); an out-of-range RPM is refused, the register pair
+            // untouched.
+            if (rpm < 100 || rpm > 12700)
+                throw new ArgumentOutOfRangeException(nameof(rpm),
+                    $"Fan switch speed must be 100-12700 RPM, got {rpm}.");
 
             // fanSwitchSpeed is a u16 — write low byte then high byte
             byte lo = (byte)(rpm & 0xFF);
@@ -1361,6 +1405,19 @@ namespace UCU.Hardware.Ec
         public void ApplySmartFanCurve(byte[] cpuTempUp, byte[] cpuTempDown, byte[] cpuDuty,
             byte[] gpuTempUp, byte[] gpuTempDown, byte[] gpuDuty)
         {
+            // Report, don't clamp: the duty tables must be the EC-shaped 16-byte,
+            // non-decreasing tables the firmware documents (the app's planner
+            // produces exactly that; a plan that is not this shape is a planner
+            // bug and is refused here, at the last point before hardware).
+            ValidateFanTable(cpuTempUp, nameof(cpuTempUp));
+            ValidateFanTable(cpuTempDown, nameof(cpuTempDown));
+            ValidateFanTable(gpuTempUp, nameof(gpuTempUp));
+            ValidateFanTable(gpuTempDown, nameof(gpuTempDown));
+            EcDutyCodec.ValidateDutyTable(cpuDuty);
+            EcDutyCodec.ValidateDutyTable(gpuDuty);
+            ValidateFanTable(cpuDuty, nameof(cpuDuty));
+            ValidateFanTable(gpuDuty, nameof(gpuDuty));
+
             // Ensure the EC activation handshake is complete before writing tables.
             // InitializeEc() is idempotent — it only runs once per service lifetime.
             InitializeEc();
@@ -1419,6 +1476,13 @@ namespace UCU.Hardware.Ec
         /// </summary>
         public void ApplySmartFanDuty(byte[] cpuDuty, byte[] gpuDuty)
         {
+            // Same table-shape contract as ApplySmartFanCurve (the planner primes
+            // the tables once; every recurring update must keep that shape).
+            EcDutyCodec.ValidateDutyTable(cpuDuty);
+            EcDutyCodec.ValidateDutyTable(gpuDuty);
+            ValidateFanTable(cpuDuty, nameof(cpuDuty));
+            ValidateFanTable(gpuDuty, nameof(gpuDuty));
+
             // Only write the duty tables — temp tables are already primed.
             WriteECRegisters(REG_CPU_FAN_SPEED_TABLE, cpuDuty);
 
@@ -1427,6 +1491,18 @@ namespace UCU.Hardware.Ec
             WriteECRegisters(REG_GPU_FAN_SPEED_TABLE, gpuDuty);
 
             DebugLog($"[DIAG] EcEngine: Updated smart fan duty only - CPU: [{string.Join(", ", cpuDuty[1..11])}] | GPU: [{string.Join(", ", gpuDuty[1..11])}]");
+        }
+
+        /// <summary>
+        /// A smart-fan table must be exactly the 16 bytes the EC region is: a short
+        /// array would throw mid-sequence (fans pinned at a partial update), a long
+        /// one would write past the table. Refused before any hardware move.
+        /// </summary>
+        private static void ValidateFanTable(byte[] table, string name)
+        {
+            if (table == null || table.Length != EcDutyCodec.TableLength)
+                throw new ArgumentOutOfRangeException(
+                    name, $"Table must be {EcDutyCodec.TableLength} bytes, got {table?.Length.ToString() ?? "null"}.");
         }
 
         #endregion
@@ -1440,12 +1516,11 @@ namespace UCU.Hardware.Ec
         /// </summary>
         public void SetKeyboardColor(byte red, byte green, byte blue)
         {
-            // Clamp to EC range (0-50)
-            red = (byte)Math.Clamp((int)red, 0, 50);
-            green = (byte)Math.Clamp((int)green, 0, 50);
-            blue = (byte)Math.Clamp((int)blue, 0, 50);
+            // Report, don't clamp: channels outside the EC 0-50 scale are refused.
+            // The all-zero-to-0x010101 rule below is EC semantics (0x000000 is
+            // "restore default"), so it stays a transform, not a validation.
+            EcKeyboardCodec.ValidateColor(red, green, blue);
 
-            // Clamp to avoid all-zero (EC interprets as "restore default")
             if (red == 0 && green == 0 && blue == 0)
             {
                 red = 1;
@@ -1470,7 +1545,7 @@ namespace UCU.Hardware.Ec
         /// </summary>
         public void SetKeyboardBrightness(int brightness)
         {
-            brightness = Math.Clamp(brightness, 0, 7);
+            EcKeyboardCodec.ValidateBrightness(brightness);
             byte kbdStatus = ReadECRegister(REG_KBD_STATUS);
 
             // Clear brightness bits and apply bit
@@ -1592,7 +1667,7 @@ namespace UCU.Hardware.Ec
         /// </summary>
         public void SetPerformanceMode(int mode)
         {
-            mode = Math.Clamp(mode, 0, 3);
+            EcPowerCodec.ValidatePerformanceMode(mode);
             byte prev = ReadECRegister(REG_MODE_INDEX);
             byte value = (byte)((prev & 0xE0) | mode | MODE_INDEX_ARM);
             WriteECRegister(REG_MODE_INDEX, value);
@@ -1630,6 +1705,8 @@ namespace UCU.Hardware.Ec
         /// </summary>
         public void ApplyOemStockMode(int modeCase)
         {
+            EcPowerCodec.ValidateStockMode(modeCase);
+
             EnsureInitialized();
             lock (_lock)
             {
@@ -1701,7 +1778,8 @@ namespace UCU.Hardware.Ec
         /// </summary>
         public void SetPl1(int watts)
         {
-            WriteECRegister(REG_PL1_SETTING, (byte)Math.Clamp(watts, 0, 255));
+            EcPowerCodec.ValidatePowerLimit(watts);
+            WriteECRegister(REG_PL1_SETTING, (byte)watts);
         }
 
         /// <summary>
@@ -1709,7 +1787,8 @@ namespace UCU.Hardware.Ec
         /// </summary>
         public void SetPl2(int watts)
         {
-            WriteECRegister(REG_PL2_SETTING, (byte)Math.Clamp(watts, 0, 255));
+            EcPowerCodec.ValidatePowerLimit(watts);
+            WriteECRegister(REG_PL2_SETTING, (byte)watts);
         }
 
         /// <summary>
@@ -1717,7 +1796,8 @@ namespace UCU.Hardware.Ec
         /// </summary>
         public void SetPl4(int watts)
         {
-            WriteECRegister(REG_PL4_SETTING, (byte)Math.Clamp(watts, 0, 255));
+            EcPowerCodec.ValidatePowerLimit(watts);
+            WriteECRegister(REG_PL4_SETTING, (byte)watts);
         }
 
         /// <summary>
@@ -1735,7 +1815,8 @@ namespace UCU.Hardware.Ec
         /// </summary>
         public void SetPl5(int watts)
         {
-            WriteECRegister(REG_PL5_SETTING, (byte)Math.Clamp(watts, 0, 255));
+            EcPowerCodec.ValidatePowerLimit(watts);
+            WriteECRegister(REG_PL5_SETTING, (byte)watts);
         }
 
         /// <summary>
@@ -1839,6 +1920,11 @@ namespace UCU.Hardware.Ec
         /// <param name="pl2Watts">Boost power limit in watts (PL2)</param>
         public void ApplyCpuPowerLimits(int pl1Watts, int pl2Watts)
         {
+            // Report, don't clamp: an out-of-range PL is refused before the
+            // activation sequence, so a bad preset never reaches the CPU ceiling.
+            EcPowerCodec.ValidatePowerLimit(pl1Watts);
+            EcPowerCodec.ValidatePowerLimit(pl2Watts);
+
             EnsureInitialized();
 
             // PL4 (peak/clamp) should be at least as high as PL2 to avoid capping boost.
@@ -1859,15 +1945,15 @@ namespace UCU.Hardware.Ec
                 }
 
                 // Step 2: Write PL1 (0x0783) — sustained power limit
-                WriteECRaw(REG_PL1_SETTING, (byte)Math.Clamp(pl1Watts, 0, 255));
+                WriteECRaw(REG_PL1_SETTING, (byte)pl1Watts);
                 Thread.Sleep(50);
 
                 // Step 3: Write PL2 (0x0784) — boost power limit
-                WriteECRaw(REG_PL2_SETTING, (byte)Math.Clamp(pl2Watts, 0, 255));
+                WriteECRaw(REG_PL2_SETTING, (byte)pl2Watts);
                 Thread.Sleep(50);
 
                 // Step 4: Write PL4 (0x0785) — peak/clamp power limit
-                WriteECRaw(REG_PL4_SETTING, (byte)Math.Clamp(pl4Watts, 0, 255));
+                WriteECRaw(REG_PL4_SETTING, (byte)pl4Watts);
                 Thread.Sleep(100);
 
                 // Verify by reading back

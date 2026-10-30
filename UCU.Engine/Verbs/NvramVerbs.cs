@@ -22,7 +22,7 @@ namespace UCU.Engine
     /// </summary>
     internal static class NvramVerbs
     {
-        public static void Register(Action<string, VerbHandler> add, IFwNvramService nvram)
+        public static void Register(Action<string, VerbHandler> add, IFwNvramService nvram, EcRawWriteGuard rawWriteGuard)
         {
             add(EngineVerbs.Device.GetNvramValue, (p, ct) =>
             {
@@ -40,6 +40,14 @@ namespace UCU.Engine
             add(EngineVerbs.Device.SetNvramValue, (p, ct) =>
             {
                 NvramValueDto dto = EngineSerializer.BindParams<NvramValueDto>(p);
+
+                // The pair name+guid is caller-chosen and the engine holds
+                // SeSystemEnvironmentPrivilege, so the GUID is policy-gated: only
+                // the OEM entry the rows own may be written (the AP menu lives in
+                // it); writing a foreign firmware variable is how a board bricks
+                // its boot, and no row of this app needs it.
+                rawWriteGuard.GateNvramWrite(dto.Guid);
+
                 return Task.FromResult<object?>(nvram.Write(dto.Name, dto.Guid, dto.Data ?? Array.Empty<byte>()));
             });
 
