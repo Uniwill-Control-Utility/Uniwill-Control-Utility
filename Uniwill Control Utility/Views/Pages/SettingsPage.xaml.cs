@@ -200,41 +200,53 @@ namespace Uniwill_Control_Utility.Views.Pages
             cbxLanguage.SelectedItem = LocalizationService.SupportedLanguages.First(language => language.CultureName == LocalizationService.CurrentCultureName);
             _languageSelectionReady = true;
 
-            cbStartBoot.IsChecked = Settings.Default.StartOnBoot;
-            nbStartupDelay.Value = Settings.Default.StartupDelaySeconds;
-            bool bootEnabled = Settings.Default.StartOnBoot;
-            StartupDelayDivider.Visibility = bootEnabled ? Visibility.Visible : Visibility.Collapsed;
-            StartupDelayRow.Visibility = bootEnabled ? Visibility.Visible : Visibility.Collapsed;
-            cbShowStartupProgress.IsChecked = Settings.Default.ShowStartupProgressOverlay;
-            cbStartMini.IsChecked = Settings.Default.StartMini;
-            cbMinimizeClose.IsChecked = Settings.Default.MinimizeClose;
-            cbDisableToastPopups.IsChecked = Settings.Default.DisableToastPopups;
-            cbAutoCheck.IsChecked = Settings.Default.UpdateCheck;
-            cbAutoUpdate.IsChecked = Settings.Default.AutoUpdateApply;
-            cbAdaptive.IsChecked = Settings.Default.isStartAdpative;
-            cbPowerBoostMode.IsChecked = Settings.Default.EnablePowerBoostMode;
-            cbHideFlydigi.IsChecked = Settings.Default.EnableFlydigi;
-            cbDisableCpuVoltageControl.IsChecked = Settings.Default.EnableCpuVoltageControl;
-            // CPU voltage control (Curve Optimizer) is AMD-only — hide the row on Intel scenarios
-            bool cpuVoltageRowVisible = Family.TYPE != Family.ProcessorType.Intel;
-            CpuVoltageControlDivider.Visibility = cpuVoltageRowVisible ? Visibility.Visible : Visibility.Collapsed;
-            CpuVoltageControlRow.Visibility = cpuVoltageRowVisible ? Visibility.Visible : Visibility.Collapsed;
-            cbDisableGpuClockControl.IsChecked = Settings.Default.EnableGpuClockControl;
-            cbShowAdaptiveNavigation.IsChecked = Settings.Default.EnableAdaptiveNavigation;
-            cbShowHydroUiNavigation.IsChecked = Settings.Default.EnableHydroUiNavigation;
-            cbShowLightBarNavigation.IsChecked = Settings.Default.EnableLightBarNavigation;
-            cbShowOverlayNavigation.IsChecked = Settings.Default.EnableOverlayNavigation;
-            cbShowAutoNavigation.IsChecked = Settings.Default.EnableAutoNavigation;
-            cbQKeyIntercept.IsChecked = Settings.Default.EnableQKeyButtonIntercept;
-            cbCpuAdvancedPerformanceMenu.IsChecked = Settings.Default.EnableCpuAdvancedPerformanceMenu;
-            EnableNvramPrivilege();
-            bool apMenuSupported = Family.TYPE == Family.ProcessorType.Intel && CpuApMenuSupported();
-            _isNvramAvailable = apMenuSupported;
-            ApMenuDivider.Visibility = apMenuSupported ? Visibility.Visible : Visibility.Collapsed;
-            ApMenuRow.Visibility = apMenuSupported ? Visibility.Visible : Visibility.Collapsed;
-            _featureNavigationControlsReady = true;
+            // Every write below REFLECTS the saved settings into the toggles;
+            // raising a Checked/Unchecked handler from them would actuate on
+            // page open (the scheduled task re-registers - or unregisters -
+            // and the CPU Advanced Performance Menu writes NVRAM).
+            _reflectingToggleState = true;
+            try
+            {
+                cbStartBoot.IsChecked = Settings.Default.StartOnBoot;
+                nbStartupDelay.Value = Settings.Default.StartupDelaySeconds;
+                bool bootEnabled = Settings.Default.StartOnBoot;
+                StartupDelayDivider.Visibility = bootEnabled ? Visibility.Visible : Visibility.Collapsed;
+                StartupDelayRow.Visibility = bootEnabled ? Visibility.Visible : Visibility.Collapsed;
+                cbShowStartupProgress.IsChecked = Settings.Default.ShowStartupProgressOverlay;
+                cbStartMini.IsChecked = Settings.Default.StartMini;
+                cbMinimizeClose.IsChecked = Settings.Default.MinimizeClose;
+                cbDisableToastPopups.IsChecked = Settings.Default.DisableToastPopups;
+                cbAutoCheck.IsChecked = Settings.Default.UpdateCheck;
+                cbAutoUpdate.IsChecked = Settings.Default.AutoUpdateApply;
+                cbAdaptive.IsChecked = Settings.Default.isStartAdpative;
+                cbPowerBoostMode.IsChecked = Settings.Default.EnablePowerBoostMode;
+                cbHideFlydigi.IsChecked = Settings.Default.EnableFlydigi;
+                cbDisableCpuVoltageControl.IsChecked = Settings.Default.EnableCpuVoltageControl;
+                // CPU voltage control (Curve Optimizer) is AMD-only — hide the row on Intel scenarios
+                bool cpuVoltageRowVisible = Family.TYPE != Family.ProcessorType.Intel;
+                CpuVoltageControlDivider.Visibility = cpuVoltageRowVisible ? Visibility.Visible : Visibility.Collapsed;
+                CpuVoltageControlRow.Visibility = cpuVoltageRowVisible ? Visibility.Visible : Visibility.Collapsed;
+                cbDisableGpuClockControl.IsChecked = Settings.Default.EnableGpuClockControl;
+                cbShowAdaptiveNavigation.IsChecked = Settings.Default.EnableAdaptiveNavigation;
+                cbShowHydroUiNavigation.IsChecked = Settings.Default.EnableHydroUiNavigation;
+                cbShowLightBarNavigation.IsChecked = Settings.Default.EnableLightBarNavigation;
+                cbShowOverlayNavigation.IsChecked = Settings.Default.EnableOverlayNavigation;
+                cbShowAutoNavigation.IsChecked = Settings.Default.EnableAutoNavigation;
+                cbQKeyIntercept.IsChecked = Settings.Default.EnableQKeyButtonIntercept;
+                cbCpuAdvancedPerformanceMenu.IsChecked = Settings.Default.EnableCpuAdvancedPerformanceMenu;
+                EnableNvramPrivilege();
+                bool apMenuSupported = Family.TYPE == Family.ProcessorType.Intel && CpuApMenuSupported();
+                _isNvramAvailable = apMenuSupported;
+                ApMenuDivider.Visibility = apMenuSupported ? Visibility.Visible : Visibility.Collapsed;
+                ApMenuRow.Visibility = apMenuSupported ? Visibility.Visible : Visibility.Collapsed;
+                _featureNavigationControlsReady = true;
 
-            cbxLogLevel.SelectedIndex = Settings.Default.DiagnosticLogLevel;
+                cbxLogLevel.SelectedIndex = Settings.Default.DiagnosticLogLevel;
+            }
+            finally
+            {
+                _reflectingToggleState = false;
+            }
         }
 
         #region System Info
@@ -391,6 +403,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbStartBoot_Checked(object sender, RoutedEventArgs e)
         {
+            if (ReflectionInProgress())
+                return;
+
             StartupDelayDivider.Visibility = Visibility.Visible;
             StartupDelayRow.Visibility = Visibility.Visible;
             UpdateScheduledTask();
@@ -401,6 +416,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbStartBoot_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (ReflectionInProgress())
+                return;
+
             StartupDelayDivider.Visibility = Visibility.Collapsed;
             StartupDelayRow.Visibility = Visibility.Collapsed;
 
@@ -520,6 +538,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
       private void cbPowerBoostMode_Checked(object sender, RoutedEventArgs e)
         {
+            if (ReflectionInProgress())
+                return;
+
             Settings.Default.EnablePowerBoostMode = true;
             Settings.Default.Save();
 
@@ -531,6 +552,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbPowerBoostMode_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (ReflectionInProgress())
+                return;
+
             Settings.Default.EnablePowerBoostMode = false;
             Settings.Default.Save();
 
@@ -552,6 +576,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbCpuAdvancedPerformanceMenu_Checked(object sender, RoutedEventArgs e)
         {
+            if (ReflectionInProgress())
+                return;
+
             Settings.Default.EnableCpuAdvancedPerformanceMenu = true;
             Settings.Default.Save();
             if (_isNvramAvailable && WriteCpuApMenuUnlock(true))
@@ -560,6 +587,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbCpuAdvancedPerformanceMenu_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (ReflectionInProgress())
+                return;
+
             Settings.Default.EnableCpuAdvancedPerformanceMenu = false;
             Settings.Default.Save();
             if (_isNvramAvailable && WriteCpuApMenuUnlock(false))
@@ -568,38 +598,102 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         #region Hardware Management (Device Manager-style toggles)
 
+        /// <summary>
+        /// True while the page writes state it OBSERVED into a toggle: the
+        /// constructor's saved-settings init, the load-time hardware sync, and
+        /// the radio StateChanged listeners. Those writes REFLECT; the
+        /// Checked/Unchecked handlers ACTUATE, and actuating a reflection is a
+        /// device operation the user never asked for (field report 2026-10-30:
+        /// clicking the Settings nav item raised a PowerShell UAC prompt before
+        /// the page appeared - the hardware sync wrote the live webcam state
+        /// into the toggle, its Unchecked handler fired, and SetWebcamAsync
+        /// runs PowerShell elevated; the touchpad row elevates the same way, a
+        /// saved "start on boot" reflection re-registers - or UNREGISTERS -
+        /// the scheduled task, and the CPU Advanced Performance Menu
+        /// reflection writes NVRAM). Handlers that reach outside the settings
+        /// store return early while this is set.
+        /// </summary>
+        private bool _reflectingToggleState;
+
+        /// <summary>
+        /// Write a reflected state into a toggle without actuating its
+        /// Checked/Unchecked handler.
+        /// </summary>
+        private void ReflectToggleState(Wpf.Ui.Controls.ToggleSwitch toggle, bool? on)
+        {
+            if (toggle is null || on is null)
+                return;
+
+            bool previous = _reflectingToggleState;
+            _reflectingToggleState = true;
+            try
+            {
+                toggle.IsChecked = on.Value;
+            }
+            finally
+            {
+                _reflectingToggleState = previous;
+            }
+        }
+
+        /// <summary>True when a handler call came from a reflected write rather
+        /// than the user: the state is already what the device/settings say, so
+        /// actuating it would be work the user did not ask for.</summary>
+        private bool ReflectionInProgress() => _reflectingToggleState;
+
         private void cbWifiToggle_Checked(object sender, RoutedEventArgs e)
         {
+            if (ReflectionInProgress())
+                return;
+
             _ = HardwareManagement.SetWifiAsync(true);
         }
 
         private void cbWifiToggle_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (ReflectionInProgress())
+                return;
+
             _ = HardwareManagement.SetWifiAsync(false);
         }
 
         private void cbBluetoothToggle_Checked(object sender, RoutedEventArgs e)
         {
+            if (ReflectionInProgress())
+                return;
+
             _ = HardwareManagement.SetBluetoothAsync(true);
         }
 
         private void cbBluetoothToggle_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (ReflectionInProgress())
+                return;
+
             _ = HardwareManagement.SetBluetoothAsync(false);
         }
 
         private void cbWebcamToggle_Checked(object sender, RoutedEventArgs e)
         {
+            if (ReflectionInProgress())
+                return;
+
             _ = HardwareManagement.SetWebcamAsync(true);
         }
 
         private void cbWebcamToggle_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (ReflectionInProgress())
+                return;
+
             _ = HardwareManagement.SetWebcamAsync(false);
         }
 
         private void cbTouchpadToggle_Checked(object sender, RoutedEventArgs e)
         {
+            if (ReflectionInProgress())
+                return;
+
             Settings.Default.TouchpadEnabled = true;
             Settings.Default.Save();
             _ = HardwareManagement.SetTouchpadAsync(true);
@@ -607,6 +701,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbTouchpadToggle_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (ReflectionInProgress())
+                return;
+
             Settings.Default.TouchpadEnabled = false;
             Settings.Default.Save();
             _ = HardwareManagement.SetTouchpadAsync(false);
@@ -631,13 +728,15 @@ namespace Uniwill_Control_Utility.Views.Pages
 
                 await this.Dispatcher.InvokeAsync(() =>
                 {
-                    if (wifiOn != null)
-                        cbWifiToggle.IsChecked = wifiOn;
-                    if (btOn != null)
-                        cbBluetoothToggle.IsChecked = btOn;
-                    if (camOn != null)
-                        cbWebcamToggle.IsChecked = camOn;
-                    cbTouchpadToggle.IsChecked = touchpadOn;
+                    // Reflection, never actuation: writing the live state raises
+                    // Checked/Unchecked, whose handlers mutate the device - the
+                    // webcam one through elevated PowerShell (the field's UAC
+                    // prompt on opening Settings) and the touchpad one through
+                    // the elevated admin flow.
+                    ReflectToggleState(cbWifiToggle, wifiOn);
+                    ReflectToggleState(cbBluetoothToggle, btOn);
+                    ReflectToggleState(cbWebcamToggle, camOn);
+                    ReflectToggleState(cbTouchpadToggle, touchpadOn);
 
                     AttachRadioStateListeners();
                 });
@@ -669,7 +768,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             _ = this.Dispatcher.InvokeAsync(() =>
             {
-                cbWifiToggle.IsChecked = HardwareManagementRadioIsOn(sender);
+                // The device moved externally (Settings app, Fn key): reflect it,
+                // do not actuate the radio back.
+                ReflectToggleState(cbWifiToggle, HardwareManagementRadioIsOn(sender));
             });
         }
 
@@ -677,7 +778,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             _ = this.Dispatcher.InvokeAsync(() =>
             {
-                cbBluetoothToggle.IsChecked = HardwareManagementRadioIsOn(sender);
+                ReflectToggleState(cbBluetoothToggle, HardwareManagementRadioIsOn(sender));
             });
         }
 
@@ -685,6 +786,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbHideFlydigi_Checked(object sender, RoutedEventArgs e)
         {
+            if (ReflectionInProgress())
+                return;
+
             Settings.Default.EnableFlydigi = true;
             Settings.Default.Save();
 
@@ -708,6 +812,9 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbHideFlydigi_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (ReflectionInProgress())
+                return;
+
             Settings.Default.EnableFlydigi = false;
             Settings.Default.Save();
 
