@@ -141,8 +141,15 @@ public sealed class EcCoreParityTests
             "Uniwill Control Utility", "PresentationFramework", "PresentationCore",
             "WindowsBase", "ControlzEx", "ModernWpf", "CommunityToolkit",
             "MahApps", "System.Windows.Interactivity", "Microsoft.Xaml",
-            "Serilog.Sinks.File", "Velopack", "System.Management",
+            "Serilog.Sinks.File", "Velopack",
         };
+
+        // System.Management is NOT on the forbidden list any more: the MiniLED
+        // local-dimming handshake is an OEM root\WMI method whose execution
+        // demands namespace write access an unelevated process does not have,
+        // so the WMI call moved to the engine (the privileged side) on
+        // purpose. The panel handshake is the only WMI in this assembly;
+        // event reads (QKey) stay app-side, where they are standard-user acts.
 
         string[] referenced = Assembly.Load("UCU.Hardware")
             .GetReferencedAssemblies()

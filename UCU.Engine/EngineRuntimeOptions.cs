@@ -86,6 +86,28 @@ namespace UCU.Engine
         /// </summary>
         public UCU.Hardware.Firmware.IFwNvramService? FwNvramOverride { get; init; }
 
+        /// <summary>
+        /// AMD SMU service override, same test seam: the production service drives
+        /// real CPU power telemetry registers through PawnIO, which has no place in
+        /// a test process. Tests inject a scripted command table.
+        /// </summary>
+        public UCU.Hardware.Cpu.IAmdSmuService? AmdSmuOverride { get; init; }
+
+        /// <summary>
+        /// Intel MSR service override, same test seam: the production service
+        /// writes real CPU power MSRs through PawnIO, which has no place in a test
+        /// process. Tests inject a scripted register file.
+        /// </summary>
+        public UCU.Hardware.Cpu.Intel.IIntelMsrService? IntelMsrOverride { get; init; }
+
+        /// <summary>
+        /// MiniLED service override, same test seam: the production service
+        /// executes the OEM ACPI WMI handshake that switches a real panel's
+        /// local dimming, which has no place in a test process. Tests inject a
+        /// scripted handshake.
+        /// </summary>
+        public UCU.Hardware.Devices.IMiniLedService? MiniLedOverride { get; init; }
+
         /// <summary>Engine build identity reported in <c>engine.get_info</c>.</summary>
         public string EngineVersion { get; init; } = ReadEngineVersion();
 

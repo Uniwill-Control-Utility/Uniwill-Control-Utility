@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+using System.Management;
 using System.Threading;
 using System.Threading.Tasks;
 using Serilog;
@@ -8,10 +8,11 @@ namespace UCU.Hardware.Devices
     /// <summary>
     /// Selects the device node a <c>device.*</c> verb actuates, mirroring exactly
     /// what the retired PowerShell commands targeted: the present device of a PnP
-    /// class whose friendly name matches one of the patterns. The patterns are
-    /// data because the field's machines name their camera "Webcam", "Camera" or
-    /// the OEM variant; the class filter keeps a display adapter out of the
-    /// webcam row's reach.
+    /// class whose friendly name (the Win32_PnPEntity Name, the string
+    /// Get-PnpDevice -FriendlyName matched) matches one of the patterns. The
+    /// patterns are data because the field's machines name their camera
+    /// "Webcam", "Camera" or the OEM variant; the class filter keeps a display
+    /// adapter out of the webcam row's reach.
     /// </summary>
     public sealed record PnpDeviceFilter
     {
@@ -52,21 +53,36 @@ namespace UCU.Hardware.Devices
     }
 
     /// <summary>
-    /// PnP enable/disable through the Configuration Manager API (CfgMgr32). This is
-    /// what <c>Enable-PnpDevice</c>/<c>Disable-PnpDevice</c> call internally; the
-    /// app used to shell them out elevated, which meant a UAC prompt on every
-    /// webcam/dGPU act - including on the AUTOMATIC GPU-power-saving applies, where
-    /// consent is not an acceptable answer. The engine needs no prompt: it runs as
-    /// LocalSystem, which holds <c>SeLoadDriverPrivilege</c> by definition.
+    /// PnP enable/disable. Device identity resolves through WMI
+    /// <c>Win32_PnPEntity</c> - the rows <c>Get-PnpDevice</c> rides, which the
+    /// app's elevated fallback queried by name on every field machine and
+    /// always found - and the mutation runs on the Configuration Manager
+    /// per-node calls (<c>CM_Enable_DevNode</c>/<c>CM_Disable_DevNode</c>, what
+    /// <c>Enable-PnpDevice</c>/<c>Disable-PnpDevice</c> call internally). The
+    /// app used to shell those out elevated, which meant a UAC prompt on every
+    /// webcam/dGPU act - including on the AUTOMATIC GPU-power-saving applies,
+    /// where consent is not an acceptable answer. The engine needs no prompt:
+    /// it runs as LocalSystem, which holds <c>SeLoadDriverPrivilege</c> by
+    /// definition.
     ///
-    /// Status semantics mirror the retired PowerShell queries one-for-one, so the
-    /// rows' verified behaviour is unchanged: "OK" is DF_RUNNING with no problem
-    /// code; a disabled node is "Disable" (DF_DNE_0); present-but-not-running is
-    /// "Unknown"; a devnode the system cannot open is "Unknown Device". Mutations
-    /// act only on PRESENT devices (DF_PRESENT) whose state differs from the
-    /// target, so already-in-state is a silent no-op, and the verification re-read
-    /// answers the verb - the same verify-by-re-read the elevated path's callers
-    /// did by hand.
+    /// Why identity is WMI and not the CM enumerator: on the field's boxes
+    /// (guarded dev box, 2026-10-30) every CM_Get_Device_ID_List call - W and
+    /// A, every filter, every documented PMCL flag set - answers CR_FAIL or
+    /// CR_NO_MORE_HANDLES, and the FriendlyName/Class devprops answer
+    /// CR_NO_SUCH_VALUE even on nodes whose status and mutation calls work.
+    /// A service built on that enumerator sees an empty machine: the webcam
+    /// row reported "already disabled" and never touched the devnode. The
+    /// Win32_PnPEntity rows, SetupAPI, and the CM per-node calls all work on
+    /// the same box; this service runs on exactly those.
+    ///
+    /// Status semantics mirror the retired PowerShell queries one-for-one, so
+    /// the rows' verified behaviour is unchanged: "OK" is DF_RUNNING with no
+    /// problem code; a disabled node is "Disable" (DF_DNE_0); present-but-not
+    /// running is "Unknown"; a devnode the system cannot open is "Unknown
+    /// Device". Mutations act only on PRESENT devices (DF_PRESENT) whose state
+    /// differs from the target, so already-in-state is a silent no-op, and the
+    /// verification re-read answers the verb - the same verify-by-re-read the
+    /// elevated path's callers did by hand.
     /// </summary>
     public sealed class PnpDeviceService : IPnpDeviceService
     {
@@ -165,43 +181,69 @@ namespace UCU.Hardware.Devices
         private static PnpDeviceState ToState(MatchedDevice device) => device.ToState();
 
         /// <summary>
-        /// Every devnode whose class equals the filter's and whose friendly name
-        /// (falling back to the device description, the same value the retired
-        /// Get-PnpDevice -FriendlyName matched on Camera/Display) matches one of
-        /// the patterns.
+        /// Every device whose PnP class equals the filter's and whose friendly
+        /// name (the Win32_PnPEntity Name, exactly the string the retired
+        /// Get-PnpDevice -FriendlyName matched on Camera/Display) matches one
+        /// of the patterns. The DeviceClass values are code constants from the
+        /// verb layer ("Camera", "Display"), so the WQL string interpolation
+        /// carries no user data.
         /// </summary>
         private static IEnumerable<MatchedDevice> EnumerateMatching(PnpDeviceFilter filter)
         {
-            uint[] ids = GetDeviceIdList();
+            using var searcher = new ManagementObjectSearcher(
+                "root\\cimv2",
+                $"SELECT Name, DeviceID FROM Win32_PnPEntity WHERE PNPClass = '{filter.DeviceClass}'");
 
-            foreach (uint devInst in ids)
+            ManagementObjectCollection rows;
+            try
             {
-                string deviceClass = ReadStringProperty(devInst, Native.DEVPKEY_Device_Class);
-                if (!string.Equals(deviceClass, filter.DeviceClass, System.StringComparison.OrdinalIgnoreCase))
-                    continue;
+                rows = searcher.Get();
+            }
+            catch (System.Exception ex)
+            {
+                // The witness shape: a WMI failure reads here as the empty
+                // machine it is; the verb answers verified=false and the
+                // reason is on the log, never a silent no-op.
+                Log.Information("[PnpDevice] WMI enumeration of class {Class} failed: {Message}",
+                    filter.DeviceClass, ex.Message);
+                yield break;
+            }
 
-                string name = ReadStringProperty(devInst, Native.DEVPKEY_Device_FriendlyName);
-                if (string.IsNullOrEmpty(name))
-                    name = ReadStringProperty(devInst, Native.DEVPKEY_Device_DeviceDesc);
+            using (rows)
+            {
+                foreach (ManagementObject row in rows)
+                {
+                    using (row)
+                    {
+                        string name = row["Name"] as string ?? string.Empty;
+                        if (!filter.FriendlyNamePatterns.Any(p => MatchesWildcard(name, p)))
+                            continue;
 
-                if (!filter.FriendlyNamePatterns.Any(p => MatchesWildcard(name, p)))
-                    continue;
+                        string instanceId = row["DeviceID"] as string ?? string.Empty;
+                        if (instanceId.Length == 0)
+                            continue;
 
-                string instanceId = GetDeviceId(devInst);
-                if (instanceId.Length == 0)
-                    continue;
-
-                yield return Describe(devInst, instanceId);
+                        yield return Describe(instanceId);
+                    }
+                }
             }
         }
 
         /// <summary>
         /// The PnP status string, in the retired query's vocabulary: present +
-        /// running + no problem = OK; the DNE flag = Disable; present, not running,
-        /// no DNE = Unknown; an unopenable node = Unknown Device.
+        /// running + no problem = OK; the DNE flag = Disable; present, not
+        /// running, no DNE = Unknown; a devnode that cannot be located or
+        /// opened = Unknown Device. The identity arrived as an instance id
+        /// from the WMI row; CM_Locate + CM_Get_DevNode_Status are the per-node
+        /// calls, which the field evidence says work on the boxes where the CM
+        /// enumerator does not.
         /// </summary>
-        private static MatchedDevice Describe(uint devInst, string instanceId)
+        private static MatchedDevice Describe(string instanceId)
         {
+            uint locate = Native.CM_Locate_DevNode(out uint devInst, instanceId, 0);
+            if (locate != Native.CR_SUCCESS)
+                return new MatchedDevice(devInst, instanceId, "Unknown Device", Present: false, Running: false);
+
             uint code = Native.CM_Get_DevNode_Status(out uint status, out uint problem, devInst, 0);
             if (code == Native.CR_NO_SUCH_DEVNODE)
                 return new MatchedDevice(devInst, instanceId, "Unknown Device", Present: false, Running: false);
@@ -222,75 +264,6 @@ namespace UCU.Hardware.Devices
                         : "Unknown";
 
             return new MatchedDevice(devInst, instanceId, text, present, running);
-        }
-
-        private static uint[] GetDeviceIdList()
-        {
-            uint listSize = 0;
-            uint code = Native.CM_Get_Device_ID_List(
-                null, System.Array.Empty<byte>(), ref listSize, Native.PROFILE_ALL_PROBLEMS);
-
-            if (code == Native.CR_SUCCESS && listSize > 2)
-            {
-                byte[] buffer = new byte[listSize];
-                code = Native.CM_Get_Device_ID_List(null, buffer, ref listSize, Native.PROFILE_ALL_PROBLEMS);
-                if (code == Native.CR_SUCCESS)
-                    return ParseDoubleZ(buffer);
-            }
-
-            Log.Information("[PnpDevice] CM_Get_Device_ID_List failed: 0x{Code:X8}", code);
-            return System.Array.Empty<uint>();
-        }
-
-        /// <summary>The double-z-delimited id list, the same shape pnputil prints.</summary>
-        private static uint[] ParseDoubleZ(byte[] buffer)
-        {
-            var ids = new System.Collections.Generic.List<uint>();
-            int offset = 0;
-            while (offset < buffer.Length - 2)
-            {
-                int end = offset;
-                while (end < buffer.Length - 1 && (buffer[end] != 0 || buffer[end + 1] != 0))
-                    end += 2;
-
-                string id = System.Text.Encoding.Unicode.GetString(buffer, offset, end - offset);
-                if (id.Length > 0)
-                {
-                    if (Native.CM_Locate_DevNode(out uint devInst, id, Native.CLDIGSR_FLAGS_NONE) == Native.CR_SUCCESS)
-                        ids.Add(devInst);
-                }
-
-                offset = end + 4;
-            }
-
-            return ids.ToArray();
-        }
-
-        private static string GetDeviceId(uint devInst)
-        {
-            byte[] buffer = new byte[Native.MAX_DEVICE_ID_LEN * 2 + 2];
-            if (Native.CM_Get_Device_ID(devInst, buffer, (uint)buffer.Length, 0) != Native.CR_SUCCESS)
-                return string.Empty;
-
-            return System.Text.Encoding.Unicode.GetString(buffer).Split('\0')[0];
-        }
-
-        private static string ReadStringProperty(uint devInst, Native.DEVPROPKEY key)
-        {
-            Native.DEVPROPKEY local = key; // the native call wants a mutable ref to the key
-
-            uint type = 0;
-            uint size = 0;
-            uint code = Native.CM_Get_DevNode_Property(devInst, ref local, ref type, System.Array.Empty<byte>(), ref size, 0);
-            if ((code != Native.CR_SUCCESS && code != Native.CR_BUFFER_SMALL) || size == 0 || size > 32 * 1024)
-                return string.Empty;
-
-            byte[] buffer = new byte[size];
-            code = Native.CM_Get_DevNode_Property(devInst, ref local, ref type, buffer, ref size, 0);
-            if (code != Native.CR_SUCCESS)
-                return string.Empty;
-
-            return System.Text.Encoding.Unicode.GetString(buffer).Split('\0')[0];
         }
 
         /// <summary>Case-insensitive wildcard match over '*' only - the retired

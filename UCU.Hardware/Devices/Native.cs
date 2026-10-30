@@ -3,17 +3,29 @@ using System.Runtime.InteropServices;
 namespace UCU.Hardware.Devices
 {
     /// <summary>
-    /// The Configuration Manager (CfgMgr32) calls the PnP verbs need. These are the
-    /// APIs <c>Enable-PnpDevice</c>/<c>Disable-PnpDevice</c> are built on, documented
-    /// as administrator operations: LocalSystem satisfies them unconditionally, which
-    /// is the reason the device verbs run in the engine and the unelevated app never
-    /// prompts again. Only the six calls the device rows use are declared - the
-    /// surface stays reviewable, which the PowerShell string it replaced never was.
+    /// The Configuration Manager (CfgMgr32) calls the PnP verbs need: locate,
+    /// status, enable, disable. These are the APIs <c>Enable-PnpDevice</c>/
+    /// <c>Disable-PnpDevice</c> are built on, documented as administrator
+    /// operations: LocalSystem satisfies them unconditionally, which is the
+    /// reason the device verbs run in the engine and the unelevated app never
+    /// prompts again.
+    ///
+    /// What is deliberately NOT declared: CM_Get_Device_ID_List and
+    /// CM_Get_DevNode_Property - the CM *enumerator* and CM property reads.
+    /// Field evidence (guarded dev box, 2026-10-30): every CM_Get_Device_ID_List
+    /// call - W and A, every filter, every documented PMCL flag set, size probe
+    /// and full call - answers CR_FAIL (0x4) or CR_NO_MORE_HANDLES (0x1F), and
+    /// the FriendlyName/Class devprops answer CR_NO_SUCH_VALUE (0x25) on the
+    /// very nodes whose status and mutation calls work. A service built on the
+    /// enumerator therefore sees an empty machine on the field's boxes: the
+    /// webcam row reported "already disabled" and never touched the devnode.
+    /// Device identity moved to WMI Win32_PnPEntity (the source the app's
+    /// Get-PnpDevice fallback rides, proven on the same box); the per-node
+    /// calls below work there and stay.
     /// </summary>
     internal static class Native
     {
         public const uint CR_SUCCESS = 0x00000000;
-        public const uint CR_BUFFER_SMALL = 0x0000001A;
         public const uint CR_NO_SUCH_DEVNODE = 0x0000000D;
 
         /// <summary>Devnode is physically present in the system.</summary>
@@ -29,53 +41,11 @@ namespace UCU.Hardware.Devices
         /// "disable this device" checkbox sets, the same one Disable-PnpDevice passes.</summary>
         public const uint DICS_DISABLE_GLOBAL_W = 0x02000000;
 
-        public const uint PROFILE_ALL_PROBLEMS = 0xFFFFFFFF;
-        public const uint CLDIGSR_FLAGS_NONE = 0;
-        public const int MAX_DEVICE_ID_LEN = 200;
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct DEVPROPKEY
-        {
-            public System.Guid Fmtid;
-            public uint Pid;
-
-            public DEVPROPKEY(System.Guid fmtid, uint pid)
-            {
-                Fmtid = fmtid;
-                Pid = pid;
-            }
-        }
-
-        // DEVPKEY_Device_Class / _FriendlyName / _DeviceDesc, from the published
-        // devpkey.h values; the device rows' identity properties. Properties, not
-        // fields: the P/Invoke takes a mutable ref, and a static field the marshaller
-        // pins would be shared state between concurrent enumeration threads.
-        public static DEVPROPKEY DEVPKEY_Device_Class =>
-            new(new System.Guid("dd52e150-1921-4157-9a0b-3b5b40f3f882"), 1);
-
-        public static DEVPROPKEY DEVPKEY_Device_FriendlyName =>
-            new(new System.Guid("b725f130-47ef-101a-a5f1-02608c9e8f60"), 15);
-
-        public static DEVPROPKEY DEVPKEY_Device_DeviceDesc =>
-            new(new System.Guid("a45c254e-df1c-4efd-8020-67d146a850e0"), 2);
-
-        [DllImport("CfgMgr32.dll", CharSet = CharSet.Unicode)]
-        public static extern uint CM_Get_Device_ID_List(
-            string? pszFilter, byte[] Buffer, ref uint ulBufferLen, uint ulFlags);
-
         [DllImport("CfgMgr32.dll", CharSet = CharSet.Unicode)]
         public static extern uint CM_Locate_DevNode(out uint pdwDevInst, string pDeviceID, uint ulFlags);
 
-        [DllImport("CfgMgr32.dll", CharSet = CharSet.Unicode)]
-        public static extern uint CM_Get_Device_ID(uint dnDevInst, byte[] Buffer, uint ulBufferLen, uint ulFlags);
-
         [DllImport("CfgMgr32.dll")]
         public static extern uint CM_Get_DevNode_Status(out uint pulStatus, out uint pulProblemNumber, uint dnDevInst, uint ulFlags);
-
-        [DllImport("CfgMgr32.dll", CharSet = CharSet.Unicode)]
-        public static extern uint CM_Get_DevNode_Property(
-            uint dnDevInst, ref DEVPROPKEY pPropertyKey, ref uint pulPropertyType,
-            byte[] pBuffer, ref uint pulBufferSize, uint ulFlags);
 
         [DllImport("CfgMgr32.dll")]
         public static extern uint CM_Enable_DevNode(uint dnDevInst, uint ulFlags);

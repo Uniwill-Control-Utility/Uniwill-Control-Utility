@@ -220,6 +220,40 @@ namespace UCU.Contracts
         public byte[]? Data { get; init; }
     }
 
+    /// <summary>
+    /// One AMD SMU mailbox command: the preset's command name (the vocabulary
+    /// the per-socket address tables key on: "set-coper", "ppt-limit", ...)
+    /// and the packed argument value. The value is uint because the packed
+    /// forms (Curve Optimizer signs in the high bits: 0xE0000004) exceed the
+    /// int range; the verb answers with the SMU's status code (0x01 = OK).
+    /// </summary>
+    public sealed record SmuCommandDto
+    {
+        public string Name { get; init; } = string.Empty;
+
+        public uint Value { get; init; }
+    }
+
+    /// <summary>The TDP MSR pair: PL1 (low dword) and PL2 (high dword), watts.</summary>
+    public sealed record IntelTdpDto
+    {
+        public int Pl1 { get; init; }
+
+        public int Pl2 { get; init; }
+    }
+
+    /// <summary>An int value addressed to a hardware plane: the Intel power
+    /// balance (plane 0 cpu / 1 gpu) and the Intel voltage offset (plane 0 cpu
+    /// / 1 gpu / 2 cache / 3 sa). The plane is an int because that is the
+    /// preset's vocabulary; the engine's ported stack validates it (an unknown
+    /// plane is the stack's silent no-op, answered true).</summary>
+    public sealed record PlaneValueDto
+    {
+        public int Value { get; init; }
+
+        public int Plane { get; init; }
+    }
+
     // ---------------------------------------------------------------- results
 
     public sealed record FanStatusDto

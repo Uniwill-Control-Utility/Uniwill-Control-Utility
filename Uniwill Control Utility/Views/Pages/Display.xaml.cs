@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Management;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Threading;
@@ -58,16 +57,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         // Delayed refresh timer created after each user change.
 
         // --- MiniLED Local Dimming ---
-        private const string WmiClassName = "AcpiTest_MULong";
-        private const string DefaultInstanceName = @"ACPI\PNP0C14\1_1";
-        private const ulong CmdEnableStep1 = 0x50000000002;
-        private const ulong CmdEnableStep2 = 0x5000000000E;
-        private const ulong CmdDisableStep1 = 0x50000000001;
-        private const ulong CmdDisableStep2 = 0x5000000000D;
-        private const byte ExpectedEnableStep1 = 0xBB;
-        private const byte ExpectedEnableStep2 = 0x0E;
-        private const byte ExpectedDisableStep1 = 0xAA;
-        private const byte ExpectedDisableStep2 = 0x0D;
+        // The WMI handshake (class, instance, command words, expected reply
+        // bytes) lives in MiniLedAccess now: the engine's device verb runs it
+        // as LocalSystem, the app's WMI code as that route's fallback. The
+        // page keeps only the EC readback pair (0x72B bit 0x02), which rides
+        // the telemetry verb.
         private const ushort EcLocalDimmingRegister = 0x072B;
         private const byte EcLocalDimmingBit = 0x02;
         private DispatcherTimer? _delayTimer;
@@ -853,8 +847,10 @@ namespace Uniwill_Control_Utility.Views.Pages
                 {
                     FileName = "shutdown",
                     Arguments = "/r /t 0",
-                    UseShellExecute = true,
-                    Verb = "runas" // Request elevation
+                    // No "runas" verb: the console user already holds
+                    // SeShutdownPrivilege, so the verb bought nothing except
+                    // the UAC prompt on the user's own restart click.
+                    UseShellExecute = true
                 });
             }
             catch (Exception ex)
@@ -1019,17 +1015,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         #region MiniLED Local Dimming
 
         /// <summary>
-        /// Calls GetSetULong via WMI using the correct GetMethodParameters pattern.
+        /// The row's toggle: the handshake actuates through MiniLedAccess
+        /// (engine verb first, the page's original WMI as that route's
+        /// fallback), then the EC 0x72B readback verifies; the toggle flips
+        /// back on the firmware's answer, never on the call's.
         /// </summary>
-        private static byte WmiCall(ManagementObject mo, ulong data)
-        {
-            using var input = mo.GetMethodParameters("GetSetULong");
-            input["Data"] = data;
-
-            using var output = (ManagementBaseObject)mo.InvokeMethod("GetSetULong", input, null);
-            return (byte)(uint)output["Return"];
-        }
-
         private void TsLocalDimming_Toggled(object sender, RoutedEventArgs e)
         {
             if (_localDimmingToggling)
@@ -1040,7 +1030,8 @@ namespace Uniwill_Control_Utility.Views.Pages
             _localDimmingToggling = true;
             tsLocalDimming.IsEnabled = false;
 
-            // WMI ManagementObject has apartment threading affinity — must be called on a dedicated thread.
+            // WMI calls carry COM apartment affinity - they must run on a
+            // dedicated thread (the route's local fallback does too).
             _ = Task.Run(() =>
             {
                 try
@@ -1080,68 +1071,33 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private bool SetLocalDimming(bool enable)
         {
-            try
-            {
-                var instancePath = $@"{WmiClassName}.InstanceName='{DefaultInstanceName}'";
-                using var mo = new ManagementObject(@"root\WMI", instancePath, null);
-
-                if (enable)
-                {
-                    byte result1 = WmiCall(mo, CmdEnableStep1);
-                    if (result1 != ExpectedEnableStep1)
-                    {
-                        Debug.WriteLine($"[Display] Enable step 1 returned 0x{result1:X2} (expected 0x{ExpectedEnableStep1:X2})");
-                        return false;
-                    }
-
-                    byte result2 = WmiCall(mo, CmdEnableStep2);
-                    if (result2 != ExpectedEnableStep2)
-                    {
-                        Debug.WriteLine($"[Display] Enable step 2 returned 0x{result2:X2} (expected 0x{ExpectedEnableStep2:X2})");
-                        return false;
-                    }
-                }
-                else
-                {
-                    byte result1 = WmiCall(mo, CmdDisableStep1);
-                    if (result1 != ExpectedDisableStep1)
-                    {
-                        Debug.WriteLine($"[Display] Disable step 1 returned 0x{result1:X2} (expected 0x{ExpectedDisableStep1:X2})");
-                        return false;
-                    }
-
-                    byte result2 = WmiCall(mo, CmdDisableStep2);
-                    if (result2 != ExpectedDisableStep2)
-                    {
-                        Debug.WriteLine($"[Display] Disable step 2 returned 0x{result2:X2} (expected 0x{ExpectedDisableStep2:X2})");
-                        return false;
-                    }
-                }
-
-                Thread.Sleep(100);
-
-                // Verify via EC readback.
-                if (_telemetry != null && _isEcAvailable)
-                {
-                    byte ecValue = _telemetry.ReadRegisterAsync(EcLocalDimmingRegister).GetAwaiter().GetResult();
-                    bool actualState = (ecValue & EcLocalDimmingBit) != 0;
-
-                    if (actualState != enable)
-                    {
-                        Debug.WriteLine($"[Display] EC 0x72B readback 0x{ecValue:X2} shows {(actualState ? "ON" : "OFF")}, expected {(enable ? "ON" : "OFF")} — mismatch");
-                        return false;
-                    }
-
-                    Debug.WriteLine($"[Display] EC 0x72B readback 0x{ecValue:X2} confirms Local Dimming {(enable ? "ON" : "OFF")}");
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[Display] WMI/ACPI call failed: {ex.Message}");
+            // The WMI handshake routes through MiniLedAccess: the engine's
+            // device verb performs the OEM ACPI two-step pair as LocalSystem
+            // (executing a custom root\WMI method needs write access an
+            // unelevated process does not have — the row was silently dead
+            // in that state), and the page's original WMI code survives in
+            // MiniLedAccess as the fallback.
+            if (!MiniLedAccess.SetLocalDimming(enable))
                 return false;
+
+            Thread.Sleep(100);
+
+            // Verify via EC readback (the telemetry verb, already engine-routed).
+            if (_telemetry != null && _isEcAvailable)
+            {
+                byte ecValue = _telemetry.ReadRegisterAsync(EcLocalDimmingRegister).GetAwaiter().GetResult();
+                bool actualState = (ecValue & EcLocalDimmingBit) != 0;
+
+                if (actualState != enable)
+                {
+                    Debug.WriteLine($"[Display] EC 0x72B readback 0x{ecValue:X2} shows {(actualState ? "ON" : "OFF")}, expected {(enable ? "ON" : "OFF")} — mismatch");
+                    return false;
+                }
+
+                Debug.WriteLine($"[Display] EC 0x72B readback 0x{ecValue:X2} confirms Local Dimming {(enable ? "ON" : "OFF")}");
             }
+
+            return true;
         }
 
         #endregion

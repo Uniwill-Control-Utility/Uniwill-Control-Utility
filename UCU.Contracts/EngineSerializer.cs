@@ -49,6 +49,9 @@ namespace UCU.Contracts
     [JsonSerializable(typeof(BatteryModeDto))]
     [JsonSerializable(typeof(DeviceToggleDto))]
     [JsonSerializable(typeof(NvramValueDto))]
+    [JsonSerializable(typeof(SmuCommandDto))]
+    [JsonSerializable(typeof(IntelTdpDto))]
+    [JsonSerializable(typeof(PlaneValueDto))]
     [JsonSerializable(typeof(string))]
     [JsonSerializable(typeof(FanStatusDto))]
     [JsonSerializable(typeof(FanCurveTablesDto))]
@@ -97,6 +100,7 @@ namespace UCU.Contracts
             bool v => ToParams(v),
             string v => ToParams(v),
             byte[] v => ToParams(v),
+            int[] v => ToParams(v),
             FanStatusDto v => ToParams(v),
             FanCurveTablesDto v => ToParams(v),
             FanDutySnapshotDto v => ToParams(v),
@@ -124,6 +128,21 @@ namespace UCU.Contracts
                 return new T();
 
             return element.Value.Deserialize(TypeInfo<T>()) ?? new T();
+        }
+
+        /// <summary>
+        /// The array-shaped parameter binding (the verb payload is a JSON array
+        /// of ints, e.g. the clock ratio bytes). The generic's new() constraint
+        /// cannot express arrays, so the wire type is named directly; a type
+        /// missing from the context fails at the first call like every other
+        /// type in the contract.
+        /// </summary>
+        public static int[] BindParamsInts(JsonElement? element)
+        {
+            if (element == null)
+                return Array.Empty<int>();
+
+            return element.Value.Deserialize(TypeInfo<int[]>()) ?? Array.Empty<int>();
         }
 
         public static byte[] SerializeToUtf8Bytes<T>(T value) => JsonSerializer.SerializeToUtf8Bytes(value, TypeInfo<T>());

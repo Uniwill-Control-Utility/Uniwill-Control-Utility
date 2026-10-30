@@ -1,5 +1,7 @@
 using System.Text.Json;
 using UCU.Contracts;
+using UCU.Hardware.Cpu;
+using UCU.Hardware.Cpu.Intel;
 using UCU.Hardware.Devices;
 using UCU.Hardware.Firmware;
 
@@ -25,12 +27,13 @@ namespace UCU.Engine
 
         public EngineDispatcher(
             EcEngineGate gate, EngineDomainQueues queues, AppExitSignal appExit,
-            EngineMetricsSnapshotSource metrics, IPnpDeviceService devices, IFwNvramService nvram)
+            EngineMetricsSnapshotSource metrics, IPnpDeviceService devices, IFwNvramService nvram,
+            IAmdSmuService smu, IIntelMsrService msr, IMiniLedService miniLed)
         {
             _gate = gate;
             _queues = queues;
             _appExit = appExit;
-            _handlers = BuildHandlers(gate, appExit, metrics, devices, nvram);
+            _handlers = BuildHandlers(gate, appExit, metrics, devices, nvram, smu, msr, miniLed);
         }
 
         public IReadOnlyCollection<string> Verbs => _handlers.Keys;
@@ -99,7 +102,8 @@ namespace UCU.Engine
 
         private static Dictionary<string, VerbHandler> BuildHandlers(
             EcEngineGate gate, AppExitSignal appExit, EngineMetricsSnapshotSource metrics,
-            IPnpDeviceService devices, IFwNvramService nvram)
+            IPnpDeviceService devices, IFwNvramService nvram, IAmdSmuService smu, IIntelMsrService msr,
+            IMiniLedService miniLed)
         {
             var handlers = new Dictionary<string, VerbHandler>(StringComparer.Ordinal);
 
@@ -110,8 +114,9 @@ namespace UCU.Engine
             MuxVerbs.Register(Add, gate);
             KeyboardVerbs.Register(Add, gate);
             BatteryVerbs.Register(Add, gate);
-            DeviceVerbs.Register(Add, devices);
+            DeviceVerbs.Register(Add, devices, miniLed);
             NvramVerbs.Register(Add, nvram);
+            CpuVerbs.Register(Add, smu, msr);
             TelemetryVerbs.Register(Add, gate, metrics);
             EngineVerbsImpl.Register(Add, gate, appExit);
 

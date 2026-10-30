@@ -135,6 +135,55 @@ namespace UCU.Contracts
             /// reads, patches, and rewrites the whole entry atomically on the
             /// device queue.</summary>
             public const string SetCpuApMenuUnlock = "device.set_cpu_ap_menu_unlock";
+
+            /// <summary>MiniLED local dimming: the OEM ACPI WMI method
+            /// (AcpiTest_MULong.GetSetULong on ACPI\PNP0C14\1_1) that runs the
+            /// enable/disable two-step handshake, each step verified against
+            /// the firmware's expected reply byte (0xBB/0x0E enable,
+            /// 0xAA/0x0D disable). Executing a custom root\WMI method on the
+            /// OEM namespace needs the write access an unelevated process does
+            /// not have, so the tray and display rows were silently dead on
+            /// the guarded field machines (the InvokeMethod threw access
+            /// denied into a catch that returned a bare false). The engine
+            /// performs the handshake as LocalSystem and the verb answers
+            /// "the handshake verified". The EC 0x72B bit-0x02 readback stays
+            /// app-side on the existing telemetry verb.</summary>
+            public const string SetMiniLedDimming = "device.set_mini_led_dimming";
+        }
+
+        /// <summary>
+        /// CPU register accesses that demand a privileged token: the AMD SMU
+        /// mailboxes (PawnIO's device ACL admits System and Administrators, so
+        /// an unelevated app's opens are access-denied and every Curve
+        /// Optimizer / SMU preset apply on a field machine was silently dead —
+        /// the row saved, the register never moved). The engine runs
+        /// LocalSystem: the same PawnIO module loads there, the mailbox
+        /// protocol runs there, and the verb answers with the SMU's own status
+        /// code - the honest witness the app route never had. The command
+        /// names are the preset vocabulary (data), the per-socket address
+        /// tables and the mailbox protocol are engine-side, and the pipe DACL
+        /// is the boundary: the console user may already write the EC's power
+        /// limits, so the CPU's own limits register set is at the level the
+        /// boundary already grants.
+        /// </summary>
+        public static class Cpu
+        {
+            public const string ExecuteAmdSmuCommand = "cpu.execute_amd_smu_command";
+
+            /// <summary>
+            /// Intel MSRs ride the same PawnIO device as the SMU mailboxes
+            /// (ACL: System and Administrators), so the app-side TDP / voltage
+            /// / ratio applies were the same silent death on Intel machines.
+            /// The verbs are per-register-set (not one raw read/write MSR
+            /// verb): writing ANY MSR by address would widen what the console
+            /// user can reach, while these four register sets are the same
+            /// power-limit authority the EC power verbs already grant.
+            /// </summary>
+            public const string IntelSetTdp = "cpu.intel_set_tdp";
+            public const string IntelSetPowerBalance = "cpu.intel_set_power_balance";
+            public const string IntelSetVoltageOffset = "cpu.intel_set_voltage_offset";
+            public const string IntelSetClockRatio = "cpu.intel_set_clock_ratio";
+            public const string IntelGetClockRatios = "cpu.intel_get_clock_ratios";
         }
 
         public static class Telemetry

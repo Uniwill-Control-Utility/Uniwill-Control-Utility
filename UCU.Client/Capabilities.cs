@@ -218,6 +218,48 @@ namespace UCU.Client
 
         public Task<bool> SetCpuApMenuUnlockAsync(bool enabled, CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<bool>(EngineVerbs.Device.SetCpuApMenuUnlock, EngineSerializer.ToParams(new BoolValueDto { Value = enabled }), cancellationToken);
+
+        public Task<bool> SetMiniLedDimmingAsync(bool enabled, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Device.SetMiniLedDimming, EngineSerializer.ToParams(new BoolValueDto { Value = enabled }), cancellationToken);
+    }
+
+    /// <summary>AMD SMU verb proxy.</summary>
+    public sealed class AmdSmuCapability : IAmdSmuCapability
+    {
+        private readonly EngineClient _client;
+
+        public AmdSmuCapability(EngineClient client) => _client = client;
+
+        public Task<int> ExecuteCommandAsync(string name, uint value, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<int>(EngineVerbs.Cpu.ExecuteAmdSmuCommand,
+                EngineSerializer.ToParams(new SmuCommandDto { Name = name, Value = value }), cancellationToken);
+    }
+
+    /// <summary>Intel MSR verb proxies.</summary>
+    public sealed class IntelMsrCapability : IIntelMsrCapability
+    {
+        private readonly EngineClient _client;
+
+        public IntelMsrCapability(EngineClient client) => _client = client;
+
+        public Task<bool> SetTdpAsync(int pl1, int pl2, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Cpu.IntelSetTdp,
+                EngineSerializer.ToParams(new IntelTdpDto { Pl1 = pl1, Pl2 = pl2 }), cancellationToken);
+
+        public Task<bool> SetPowerBalanceAsync(int value, int cpuOrGpu, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Cpu.IntelSetPowerBalance,
+                EngineSerializer.ToParams(new PlaneValueDto { Value = value, Plane = cpuOrGpu }), cancellationToken);
+
+        public Task<bool> SetVoltageOffsetAsync(int value, int plane, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Cpu.IntelSetVoltageOffset,
+                EngineSerializer.ToParams(new PlaneValueDto { Value = value, Plane = plane }), cancellationToken);
+
+        public Task<bool> SetClockRatiosAsync(int[] clockRatios, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Cpu.IntelSetClockRatio,
+                EngineSerializer.ToParams(clockRatios), cancellationToken);
+
+        public Task<int[]> GetClockRatiosAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<int[]>(EngineVerbs.Cpu.IntelGetClockRatios, cancellationToken);
     }
 
     /// <summary>Keyboard verb proxies.</summary>

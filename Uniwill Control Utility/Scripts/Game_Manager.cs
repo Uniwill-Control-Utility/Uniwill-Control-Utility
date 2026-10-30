@@ -364,18 +364,18 @@ namespace Uniwill_Control_Utility.Scripts
                         string battlenetfile = Path.Combine(pf86, "Battle.net\\Battle.net.exe");
                         if (BattleNetRunning())
                         {
-                            Run_CLI.RunCommand(" --exec=\"launch " + gameID.ToUpper() + "\"", false, battlenetfile, 3000, true);
+                            RunGame(battlenetfile, " --exec=\"launch " + gameID.ToUpper() + "\"");
                         }
                         else
                         {
                             RunGame(battlenetfile);
                             Thread.Sleep(15000);
-                            Run_CLI.RunCommand(" --exec=\"launch " + gameID.ToUpper() + "\"", false, battlenetfile, 3000, true);
+                            RunGame(battlenetfile, " --exec=\"launch " + gameID.ToUpper() + "\"");
                         }
                         break;
                     case "GOG Galaxy":
                         string pfGog = Environment.GetEnvironmentVariable("ProgramFiles(x86)") ?? "C:\\Program Files (x86)";
-                        Run_CLI.RunCommand(" /command=runGame /gameId=" + gameID, false, Path.Combine(pfGog, "GOG Galaxy", "GalaxyClient.exe"));
+                        RunGame(Path.Combine(pfGog, "GOG Galaxy", "GalaxyClient.exe"), " /command=runGame /gameId=" + gameID);
                         break;
                     case "Microsoft Store":
                         LaunchStoreApp(gameID);
@@ -386,6 +386,16 @@ namespace Uniwill_Control_Utility.Scripts
 
         private static void RunGame(string command)
         {
+            RunGame(command, string.Empty);
+        }
+
+        private static void RunGame(string command, string arguments)
+        {
+            // Shell-execute launch with arguments. This replaced Run_CLI's
+            // RunCommand for the game-client CLI launches: Run_CLI set
+            // Verb="runas" under UseShellExecute=false, where the verb is
+            // inert (no elevation, no prompt) - the decoration is gone, the
+            // launch shape is what it always effectively was.
             try
             {
                 if (File.Exists(command))
@@ -394,6 +404,7 @@ namespace Uniwill_Control_Utility.Scripts
                     {
                         UseShellExecute = true,
                         FileName = Path.GetFullPath(command),
+                        Arguments = arguments,
                         WorkingDirectory = Path.GetDirectoryName(command)
                     });
                 }

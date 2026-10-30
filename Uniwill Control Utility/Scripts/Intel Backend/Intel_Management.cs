@@ -1,4 +1,3 @@
-using Microsoft.Win32;
 using System;
 using System.IO;
 using System.Linq;
@@ -9,6 +8,20 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
 {
     public static class IntelManagement
     {
+        /// <summary>
+        /// The engine's Intel MSR capability (cpu.intel_* verbs). Set from DI at
+        /// startup (App phase 1), the same static-singleton idiom as
+        /// SmuAccess.Cpu. The Intel MSRs ride the same PawnIO device the SMU
+        /// mailboxes do, whose ACL admits System and Administrators: an
+        /// unelevated app's driver open is access-denied, so every Intel TDP /
+        /// voltage / ratio preset apply on the field machines was silently dead
+        /// (the methods below swallowed it into a log line). The engine verb is
+        /// the FIRST route and answers "the write landed"; the app's own MSR
+        /// stack survives as the fallback for a machine whose engine is not
+        /// answering (where it works exactly as before: the dev box elevated).
+        /// </summary>
+        internal static UCU.Contracts.Capabilities.IIntelMsrCapability? Msr { get; set; }
+
         private static readonly object objLock = new object();
         private static readonly object initializationLock = new object();
 
@@ -43,10 +56,6 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
         private const int MaxClockRatios = 8;
         private const byte ClockRatioMin = 0;
         private const byte ClockRatioMax = 255;
-
-        // Registry paths
-        private const string DriverBlockRegistryPath = @"SYSTEM\CurrentControlSet\Control\CI\Config";
-        private const string DriverBlockRegistryValue = "VulnerableDriverBlocklistEnable";
 
         private static string _baseDir = Settings.Default.Path;
 
@@ -126,6 +135,20 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
 
         public static void changeTDPAll(int pl)
         {
+            if (Msr != null)
+            {
+                try
+                {
+                    bool landed = Msr.SetTdpAsync(pl, pl).GetAwaiter().GetResult();
+                    Misc.DiagnosticLogger.LogInfo($"Intel TDP MSR via engine: landed={landed} (pl={pl})");
+                    return;
+                }
+                catch (UCU.Contracts.EngineException ex) when (EngineNotAnswering(ex))
+                {
+                    Misc.DiagnosticLogger.LogInfo($"Intel MSR engine not answering ({ex.Code}) - using the local route");
+                }
+            }
+
             try
             {
                 EnsureInitialised();
@@ -139,6 +162,20 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
 
         public static void changeTDP(int pl1, int pl2)
         {
+            if (Msr != null)
+            {
+                try
+                {
+                    bool landed = Msr.SetTdpAsync(pl1, pl2).GetAwaiter().GetResult();
+                    Misc.DiagnosticLogger.LogInfo($"Intel TDP MSR via engine: landed={landed} (pl1={pl1}, pl2={pl2})");
+                    return;
+                }
+                catch (UCU.Contracts.EngineException ex) when (EngineNotAnswering(ex))
+                {
+                    Misc.DiagnosticLogger.LogInfo($"Intel MSR engine not answering ({ex.Code}) - using the local route");
+                }
+            }
+
             try
             {
                 EnsureInitialised();
@@ -154,6 +191,20 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
         {
             if (value < 0 || value > 31)
                 return;
+
+            if (Msr != null)
+            {
+                try
+                {
+                    bool landed = Msr.SetPowerBalanceAsync(value, cpuOrGpu).GetAwaiter().GetResult();
+                    Misc.DiagnosticLogger.LogInfo($"Intel power balance MSR via engine: landed={landed} (value={value}, plane={cpuOrGpu})");
+                    return;
+                }
+                catch (UCU.Contracts.EngineException ex) when (EngineNotAnswering(ex))
+                {
+                    Misc.DiagnosticLogger.LogInfo($"Intel MSR engine not answering ({ex.Code}) - using the local route");
+                }
+            }
 
             try
             {
@@ -172,6 +223,20 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
 
         public static void changeVoltageOffset(int value, int voltagePlane)
         {
+            if (Msr != null)
+            {
+                try
+                {
+                    bool landed = Msr.SetVoltageOffsetAsync(value, voltagePlane).GetAwaiter().GetResult();
+                    Misc.DiagnosticLogger.LogInfo($"Intel voltage offset MSR via engine: landed={landed} (value={value}, plane={voltagePlane})");
+                    return;
+                }
+                catch (UCU.Contracts.EngineException ex) when (EngineNotAnswering(ex))
+                {
+                    Misc.DiagnosticLogger.LogInfo($"Intel MSR engine not answering ({ex.Code}) - using the local route");
+                }
+            }
+
             try
             {
                 EnsureInitialised();
@@ -203,6 +268,20 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
 
         public static void changeClockRatioOffset(int[] clockRatios)
         {
+            if (Msr != null)
+            {
+                try
+                {
+                    bool landed = Msr.SetClockRatiosAsync(clockRatios ?? Array.Empty<int>()).GetAwaiter().GetResult();
+                    Misc.DiagnosticLogger.LogInfo($"Intel clock ratio MSR via engine: landed={landed} ({clockRatios?.Length ?? 0} ratios)");
+                    return;
+                }
+                catch (UCU.Contracts.EngineException ex) when (EngineNotAnswering(ex))
+                {
+                    Misc.DiagnosticLogger.LogInfo($"Intel MSR engine not answering ({ex.Code}) - using the local route");
+                }
+            }
+
             try
             {
                 EnsureInitialised();
@@ -227,6 +306,26 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
 
         public static int[] readClockRatios()
         {
+            if (Msr != null)
+            {
+                try
+                {
+                    int[] ratios = Msr.GetClockRatiosAsync().GetAwaiter().GetResult();
+                    if (ratios.Length > 0)
+                        return ratios;
+
+                    // The engine read failed (its log carries why). The local
+                    // route is the last resort, not an improvement on an
+                    // asInvoker token - the point of trying it is the elevated
+                    // dev box, where the whole local path works.
+                    Misc.DiagnosticLogger.LogInfo("Intel clock ratios: engine read empty - using the local route");
+                }
+                catch (UCU.Contracts.EngineException ex)
+                {
+                    Misc.DiagnosticLogger.LogInfo($"Intel clock ratio engine read unavailable ({ex.Code}) - using the local route");
+                }
+            }
+
             try
             {
                 EnsureInitialised();
@@ -298,38 +397,28 @@ namespace Uniwill_Control_Utility.Scripts.Intel_Backend
             }
         }
 
-        public static void checkDriverBlockRegistry()
-        {
-            try
-            {
-                RegistryKey? myKey = Registry.LocalMachine.OpenSubKey(
-                    DriverBlockRegistryPath,
-                    true);
+        /// <summary>
+        /// Codes that mean "the engine did not speak" (service stopped, no
+        /// pipe, queue parked) - the fallback-first condition. A reply of
+        /// HardwareFault means the MSR write failed ON A TOKEN THAT CAN TOUCH
+        /// IT: that is the truth, and falling back to an unelevated PawnIO
+        /// open would reproduce the silent death this routing exists to fix.
+        /// </summary>
+        private static bool EngineNotAnswering(UCU.Contracts.EngineException ex) =>
+            ex.Code is UCU.Contracts.EngineErrorCode.HardwareUnavailable
+                or UCU.Contracts.EngineErrorCode.Timeout
+                or UCU.Contracts.EngineErrorCode.Busy;
 
-                if (myKey != null)
-                {
-                    object? value = myKey.GetValue(DriverBlockRegistryValue);
+        #region Engine routing notes (approved dead-code removal)
 
-                    if (value?.ToString() == "1")
-                    {
-                        myKey.SetValue(
-                            DriverBlockRegistryValue,
-                            "0",
-                            RegistryValueKind.String);
-                    }
+        // The app used to carry checkDriverBlockRegistry (the HKLM CI\Config
+        // VulnerableDriverBlocklistEnable write, which disabled Windows'
+        // vulnerable-driver blocklist so unsigned drivers could load) and a
+        // determineCPU wrapper around it. Both removed: they had no callers,
+        // and a LocalSystem service must not weaken the driver blocklist -
+        // the write is NOT relocated to the engine, it is retired.
 
-                    myKey.Close();
-                }
-            }
-            catch { /* Registry key close failed; key may already be closed */ }
-        }
-
-        public static void determineCPU()
-        {
-            checkDriverBlockRegistry();
-            EnsureInitialised();
-            DetermineIntelMCHBAR();
-        }
+        #endregion
 
         private static void DetermineIntelMCHBAR()
         {

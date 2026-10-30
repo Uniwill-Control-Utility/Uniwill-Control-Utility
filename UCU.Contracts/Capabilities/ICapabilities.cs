@@ -215,6 +215,62 @@ namespace UCU.Contracts.Capabilities
         Task<bool> GetSupportsCpuApMenuAsync(CancellationToken cancellationToken = default);
 
         Task<bool> SetCpuApMenuUnlockAsync(bool enabled, CancellationToken cancellationToken = default);
+
+        /// <summary>MiniLED local dimming: the engine performs the OEM ACPI
+        /// WMI two-step handshake (executing the custom root\WMI method needs
+        /// write access an unelevated process lacks — the app-side InvokeMethod
+        /// was the silent death). True when both steps answered the firmware's
+        /// expected reply byte; the EC 0x72B readback verify stays app-side on
+        /// the telemetry verb.</summary>
+        Task<bool> SetMiniLedDimmingAsync(bool enabled, CancellationToken cancellationToken = default);
+    }
+
+    /// <summary>
+    /// AMD SMU mailbox access (Curve Optimizer, PBO, preset power commands).
+    /// PawnIO's device ACL admits System and Administrators only, so an
+    /// unelevated app's opens are access-denied and every SMU apply on the
+    /// field machines was silently dead: the preset row saved, the register
+    /// never moved, no prompt and no error. The engine performs the mailbox
+    /// protocol as LocalSystem and the verb answers with the SMU's own status
+    /// code, so the row reports the register set's verdict.
+    ///
+    /// Command names are the preset vocabulary; the per-socket address tables
+    /// and the mailbox protocol are engine-side (encoding rules live with the
+    /// hardware, so the UI and the service cannot diverge on behaviour).
+    /// </summary>
+    public interface IAmdSmuCapability
+    {
+        /// <summary>The SMU status code (0x01 = OK). Throws on engine-side
+        /// faults mapped to error codes: unknown command (InvalidValue),
+        /// PawnIO init failure / SMU refusal (HardwareFault), no engine
+        /// (HardwareUnavailable).</summary>
+        Task<int> ExecuteCommandAsync(string name, uint value, CancellationToken cancellationToken = default);
+    }
+
+    /// <summary>
+    /// Intel MSR power registers (TDP 0x610, voltage offset 0x150, clock
+    /// ratio 0x1AD, power balance 0x63A/0x642). Same PawnIO ACL as the SMU:
+    /// an unelevated app's driver open is access-denied, so the Intel TDP /
+    /// voltage / ratio presets were silently dead on the field machines. The
+    /// engine performs the MSR writes as LocalSystem, and each call answers
+    /// "the write landed" — the methods keep the ported stack's catch-and-log
+    /// semantics, so the engine log carries the reason for a false.
+    ///
+    /// The verbs are per-register-set, not raw MSR access: the four sets are
+    /// the same power-limit authority the EC power verbs already grant the
+    /// console user; a raw write-MSR-by-address verb would not be.
+    /// </summary>
+    public interface IIntelMsrCapability
+    {
+        Task<bool> SetTdpAsync(int pl1, int pl2, CancellationToken cancellationToken = default);
+
+        Task<bool> SetPowerBalanceAsync(int value, int cpuOrGpu, CancellationToken cancellationToken = default);
+
+        Task<bool> SetVoltageOffsetAsync(int value, int plane, CancellationToken cancellationToken = default);
+
+        Task<bool> SetClockRatiosAsync(int[] clockRatios, CancellationToken cancellationToken = default);
+
+        Task<int[]> GetClockRatiosAsync(CancellationToken cancellationToken = default);
     }
 
     /// <summary>Engine identity and health; the app uses this for its status display

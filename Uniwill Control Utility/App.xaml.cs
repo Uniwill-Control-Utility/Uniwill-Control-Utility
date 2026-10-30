@@ -448,7 +448,9 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<IKeyboardCapability, KeyboardCapability>();
                         services.AddSingleton<IBatteryCapability, BatteryCapability>();
                         services.AddSingleton<IEcTelemetryCapability, EcTelemetryCapability>();
-        services.AddSingleton<IDeviceCapability, DeviceCapability>();
+                        services.AddSingleton<IDeviceCapability, DeviceCapability>();
+                        services.AddSingleton<IAmdSmuCapability, AmdSmuCapability>();
+                        services.AddSingleton<IIntelMsrCapability, IntelMsrCapability>();
                         services.AddSingleton<IEngineCapability, EngineCapability>();
                         services.AddSingleton<EcTelemetryService>();
                         services.AddSingleton<IEcCpuTemperatureSource>(provider =>
@@ -579,7 +581,24 @@ namespace Uniwill_Control_Utility
                     Scripts.GPUs.NVIDIA.GpuPowerSaving.Devices = deviceCapability;
                     Scripts.Misc.HardwareManagement.Devices = deviceCapability;
                     Scripts.Misc.NvramAccess.Devices = deviceCapability;
+                    Scripts.Misc.MiniLedAccess.Devices = deviceCapability;
                 }
+
+                // The SMU rows (Curve Optimizer, preset power commands) actuate
+                // through the engine's cpu capability: PawnIO's device ACL admits
+                // System/Administrators, so the app's own driver open is
+                // access-denied unelevated. The RyzenAdj interpreter routes
+                // engine-first through this static.
+                var smuCapability = _host.Services.GetService<IAmdSmuCapability>();
+                if (smuCapability != null)
+                    Scripts.Misc.SmuAccess.Cpu = smuCapability;
+
+                // The Intel MSR rows (TDP, voltage, ratio, power balance) ride
+                // the same PawnIO ACL as the SMU; the interpreter's Intel
+                // commands route engine-first through IntelManagement.Msr.
+                var intelMsrCapability = _host.Services.GetService<IIntelMsrCapability>();
+                if (intelMsrCapability != null)
+                    Scripts.Intel_Backend.IntelManagement.Msr = intelMsrCapability;
 
                 var updateService = _host.Services.GetRequiredService<VelopackUpdateService>();
 
