@@ -47,6 +47,8 @@ namespace UCU.Contracts
     [JsonSerializable(typeof(KeyboardColorDto))]
     [JsonSerializable(typeof(KeyboardBrightnessDto))]
     [JsonSerializable(typeof(BatteryModeDto))]
+    [JsonSerializable(typeof(DeviceToggleDto))]
+    [JsonSerializable(typeof(string))]
     [JsonSerializable(typeof(FanStatusDto))]
     [JsonSerializable(typeof(FanCurveTablesDto))]
     [JsonSerializable(typeof(FanDutySnapshotDto))]
@@ -54,6 +56,7 @@ namespace UCU.Contracts
     [JsonSerializable(typeof(PowerLimitsDto))]
     [JsonSerializable(typeof(MuxStateDto))]
     [JsonSerializable(typeof(BatteryTelemetryDto))]
+    [JsonSerializable(typeof(PnpDeviceStateDto))]
     [JsonSerializable(typeof(RegisterValueDto))]
     [JsonSerializable(typeof(RegisterBytesDto))]
     [JsonSerializable(typeof(EngineInfoDto))]
@@ -101,6 +104,7 @@ namespace UCU.Contracts
             MuxModeDto v => ToParams(v),
             MuxStateDto v => ToParams(v),
             BatteryTelemetryDto v => ToParams(v),
+            PnpDeviceStateDto v => ToParams(v),
             RegisterValueDto v => ToParams(v),
             RegisterBytesDto v => ToParams(v),
             EngineInfoDto v => ToParams(v),

@@ -76,6 +76,95 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
+        /// The elevation-free route to an action that demands a full administrator
+        /// token AND the interactive user session - today only the touchpad's
+        /// SystemSettingsAdminFlows.exe, which the Windows Settings app itself
+        /// launches through this exact mechanism (its UAC consent is answered by a
+        /// scheduled task, not by a prompt). Registered for the current user at
+        /// Highest privileges with an on-demand S4U logon, the task is created,
+        /// run, and deleted by the unelevated app's owner; the Task Scheduler
+        /// service (SYSTEM) supplies the elevation, so no consent dialog appears.
+        /// This is the same pattern the uninstall verb's SYSTEM task uses, aimed at
+        /// the interactive session instead of SYSTEM.
+        ///
+        /// Returns the action's exit code, or null when the task could not be
+        /// created/run (the caller's fallback path). The task is always deleted.
+        /// </summary>
+        public static int? RunOneShotHighestPrivileges(string name, string description, string exePath, string? arguments)
+        {
+            using var ts = new TaskService();
+
+            try
+            {
+                if (ts.RootFolder.AllTasks.Any(t => t.Name == name))
+                    ts.RootFolder.DeleteTask(name);
+
+                TaskDefinition td = ts.NewTask();
+
+                // Highest, not LUA: this is the route for actions whose whole point
+                // is the full admin token. Registration by the user who owns the
+                // task needs no elevation; the elevation is granted at run time by
+                // the Task Scheduler service.
+                td.Principal.RunLevel = TaskRunLevel.Highest;
+                td.RegistrationInfo.Description = description;
+                td.Settings.DisallowStartIfOnBatteries = false;
+                td.Settings.StopIfGoingOnBatteries = false;
+                td.Settings.MultipleInstances = TaskInstancesPolicy.IgnoreNew;
+                td.Settings.Enabled = true;
+
+                // A trigger one second ahead: Task Scheduler fires it on time, which
+                // is strictly more reliable than Run() racing the registration
+                // commit (the field bug pattern for one-shot tasks is a Run that
+                // silently lands before the task exists).
+                td.Triggers.Add(new TimeTrigger(DateTime.Now + TimeSpan.FromSeconds(1)));
+                td.Actions.Add(new ExecAction(exePath, arguments));
+
+                ts.RootFolder.RegisterTaskDefinition(
+                    name, td, Microsoft.Win32.TaskScheduler.TaskCreation.CreateOrUpdate,
+                    System.Environment.UserDomainName + "\\" + System.Environment.UserName,
+                    null, Microsoft.Win32.TaskScheduler.TaskLogonType.S4U, null);
+
+                // The fire is asynchronous: watch it finish. A machine whose
+                // scheduler is wedged costs the caller one fallback, not a hang.
+                DateTime deadline = DateTime.Now + TimeSpan.FromSeconds(15);
+                while (DateTime.Now < deadline)
+                {
+                    var task = ts.RootFolder.AllTasks.FirstOrDefault(t => t.Name == name);
+                    if (task == null)
+                        break;
+
+                    if (task.State != TaskState.Running && task.State != TaskState.Queued)
+                        break;
+
+                    System.Threading.Thread.Sleep(250);
+                }
+
+                var finished = ts.RootFolder.AllTasks.FirstOrDefault(t => t.Name == name);
+                int? result = finished?.LastTaskResult;
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Information("[ScheduledTask] One-shot task {Name} failed: {Message}", name, ex.Message);
+                return null;
+            }
+            finally
+            {
+                try
+                {
+                    var task = ts.RootFolder.AllTasks.FirstOrDefault(t => t.Name == name);
+                    if (task != null)
+                        ts.RootFolder.DeleteTask(name);
+                }
+                catch
+                {
+                    // A task left behind by a wedged scheduler: the next one-shot
+                    // registration for the same name deletes it first.
+                }
+            }
+        }
+
+        /// <summary>
         /// The executable path the task's action points at, or null when the
         /// task is not registered. Used by the post-migration self-heal.
         /// </summary>

@@ -175,6 +175,30 @@ namespace UCU.Contracts.Capabilities
         Task WriteRegisterAsync(ushort address, byte value, CancellationToken cancellationToken = default);
     }
 
+    /// <summary>
+    /// PnP device enable/disable for the Device Manager-style rows (webcam, dGPU).
+    /// These rows used to elevate per-operation from the unelevated app - webcam on
+    /// a user click, dGPU additionally from AUTOMATIC applies (startup, charger
+    /// transitions, tray, Automations), where a consent prompt is not an acceptable
+    /// answer. The engine performs the CM API mutation as LocalSystem and verifies
+    /// it by re-reading the device node, so the app learns the truth without any
+    /// prompt and without a powershell.exe child.
+    /// </summary>
+    public interface IDeviceCapability
+    {
+        /// <summary>Null when the engine cannot reach the device node (no camera
+        /// present is a Present=false DTO, not null).</summary>
+        Task<PnpDeviceStateDto?> GetWebcamStateAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>True when the mutation ran and the verification re-read sees
+        /// the device running (enable) or not running (disable).</summary>
+        Task<bool> SetWebcamEnabledAsync(bool enabled, CancellationToken cancellationToken = default);
+
+        Task<PnpDeviceStateDto?> GetDgpuStateAsync(CancellationToken cancellationToken = default);
+
+        Task<bool> SetDgpuEnabledAsync(bool enabled, CancellationToken cancellationToken = default);
+    }
+
     /// <summary>Engine identity and health; the app uses this for its status display
     /// and to detect a version-skewed install.</summary>
     public interface IEngineCapability

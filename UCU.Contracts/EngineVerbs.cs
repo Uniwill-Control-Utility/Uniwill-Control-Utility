@@ -79,6 +79,27 @@ namespace UCU.Contracts
             public const string SetMode = "battery.set_mode";
         }
 
+        /// <summary>
+        /// PnP device enable/disable (the Device Manager-style rows). These were the
+        /// app's remaining per-operation UAC prompts, and two of them were reachable
+        /// from AUTOMATIC paths (GPU power saving applies at startup, on charger
+        /// transitions, from the tray, and from Automations) - a consent prompt a
+        /// machine-global LocalSystem service simply never needs. The state
+        /// mutations run on the engine's CM_/SetupDi APIs directly: no
+        /// powershell.exe child, no consent, and the verification re-read happens
+        /// in-process. The boundary is the pipe DACL, unchanged: the console user
+        /// may already write fan curves, power limits, overboost and the GPU mux,
+        /// so enabling a camera-class or display-class device is strictly below the
+        /// capability that boundary already grants.
+        /// </summary>
+        public static class Device
+        {
+            public const string GetWebcamStatus = "device.get_webcam_status";
+            public const string SetWebcamEnabled = "device.set_webcam_enabled";
+            public const string GetDgpuStatus = "device.get_dgpu_status";
+            public const string SetDgpuEnabled = "device.set_dgpu_enabled";
+        }
+
         public static class Telemetry
         {
             public const string GetFanDuty = "telemetry.get_fan_duty";

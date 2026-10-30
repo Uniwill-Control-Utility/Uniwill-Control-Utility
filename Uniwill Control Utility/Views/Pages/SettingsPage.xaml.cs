@@ -188,11 +188,18 @@ namespace Uniwill_Control_Utility.Views.Pages
         public SettingsPage(
             ViewModels.SettingsViewModel viewModel,
             ViewModels.MainWindowViewModel mainWindowViewModel,
-            ILogger<SettingsPage> logger)
+            ILogger<SettingsPage> logger,
+            UCU.Contracts.Capabilities.IDeviceCapability? devices = null)
         {
             ViewModel = viewModel;
             _mainWindowViewModel = mainWindowViewModel;
             _logger = logger;
+
+            // The webcam/touchpad rows actuate through the engine's device
+            // capability (no consent prompt); App phase 1 wires the same singleton,
+            // this keeps the page self-sufficient whatever construction order is.
+            if (devices != null)
+                HardwareManagement.Devices = devices;
 
             InitializeComponent();
 

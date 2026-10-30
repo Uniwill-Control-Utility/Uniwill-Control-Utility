@@ -174,6 +174,29 @@ namespace UCU.Client
         }
     }
 
+    /// <summary>Device-row verb proxies (webcam/dGPU PnP).</summary>
+    public sealed class DeviceCapability : IDeviceCapability
+    {
+        private readonly EngineClient _client;
+
+        public DeviceCapability(EngineClient client) => _client = client;
+
+        // The DTO is registered non-nullably (the wire's shape); the T?=nullable
+        // instantiation is what accepts the engine's "no matching device node"
+        // answer (an absent Result element) as null, per the interface contract.
+        public Task<PnpDeviceStateDto?> GetWebcamStateAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<PnpDeviceStateDto?>(EngineVerbs.Device.GetWebcamStatus, cancellationToken);
+
+        public Task<bool> SetWebcamEnabledAsync(bool enabled, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Device.SetWebcamEnabled, EngineSerializer.ToParams(new DeviceToggleDto { Enabled = enabled }), cancellationToken);
+
+        public Task<PnpDeviceStateDto?> GetDgpuStateAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<PnpDeviceStateDto?>(EngineVerbs.Device.GetDgpuStatus, cancellationToken);
+
+        public Task<bool> SetDgpuEnabledAsync(bool enabled, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Device.SetDgpuEnabled, EngineSerializer.ToParams(new DeviceToggleDto { Enabled = enabled }), cancellationToken);
+    }
+
     /// <summary>Keyboard verb proxies.</summary>
     public sealed class KeyboardCapability : IKeyboardCapability
     {

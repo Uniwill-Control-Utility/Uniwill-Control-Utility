@@ -448,6 +448,7 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<IKeyboardCapability, KeyboardCapability>();
                         services.AddSingleton<IBatteryCapability, BatteryCapability>();
                         services.AddSingleton<IEcTelemetryCapability, EcTelemetryCapability>();
+        services.AddSingleton<IDeviceCapability, DeviceCapability>();
                         services.AddSingleton<IEngineCapability, EngineCapability>();
                         services.AddSingleton<EcTelemetryService>();
                         services.AddSingleton<IEcCpuTemperatureSource>(provider =>
@@ -565,6 +566,18 @@ namespace Uniwill_Control_Utility
                 if (fanCapability != null)
                 {
                     Scripts.RyzenAdj_To_UCU.FanService = fanCapability;
+                }
+
+                // Wire the device capability (webcam/dGPU PnP rows) to the two
+                // statics that actuate them, before any startup apply can reach
+                // the GPU power saving chain. Same idempotent-singleton idiom as
+                // the power/fan capabilities above; the engine answers these with
+                // no consent prompt, which is what retires the automatic-path UAC.
+                var deviceCapability = _host.Services.GetService<IDeviceCapability>();
+                if (deviceCapability != null)
+                {
+                    Scripts.GPUs.NVIDIA.GpuPowerSaving.Devices = deviceCapability;
+                    Scripts.Misc.HardwareManagement.Devices = deviceCapability;
                 }
 
                 var updateService = _host.Services.GetRequiredService<VelopackUpdateService>();

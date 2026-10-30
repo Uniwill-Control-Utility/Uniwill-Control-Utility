@@ -18,6 +18,7 @@ namespace UCU.Engine
         public const string MuxDomain = "mux";
         public const string KeyboardDomain = "keyboard";
         public const string BatteryDomain = "battery";
+        public const string DeviceDomain = "device";
         public const string TelemetryDomain = "telemetry";
         public const string EngineDomain = "engine";
 
@@ -32,6 +33,7 @@ namespace UCU.Engine
                 [MuxDomain] = new SerialExecutor("mux", options),
                 [KeyboardDomain] = new SerialExecutor("keyboard", options),
                 [BatteryDomain] = new SerialExecutor("battery", options),
+                [DeviceDomain] = new SerialExecutor("device", options),
                 [TelemetryDomain] = new SerialExecutor("telemetry", options),
             };
         }

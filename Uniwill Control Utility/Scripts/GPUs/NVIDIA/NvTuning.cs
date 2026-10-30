@@ -157,9 +157,23 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 };
 
                 var overclock = new PerformanceStates20InfoV1(performanceStates, 2, 0);
+
+                // The honest signal: the native SetPerformanceStates20 is a
+                // fire-and-forget call whose only witness is the capability's
+                // read-only flag - the driver's declaration that it refuses
+                // performance-state modification. GeForce drivers set it (the
+                // clock writes never land), and a success-shaped return after a
+                // refused write is how a preset page keeps showing offsets that
+                // are not in the GPU. The flag is the stable, public signal; 0 is
+                // reserved for the out-of-range early return, so the caller can
+                // tell "refused" from "invalid input".
+                bool readOnly = internalGpu.PerformanceStatesInfo.IsReadOnly;
+                if (readOnly)
+                    DiagnosticLogger.LogInfo("SetClocks: driver reports performance states read-only - clock offsets are not applied by this GPU");
+
                 GPUApi.SetPerformanceStates20(internalGpu.Handle, overclock);
 
-                return 1;
+                return readOnly ? -1 : 1;
             }
             catch (Exception ex)
             {

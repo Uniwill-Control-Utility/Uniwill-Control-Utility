@@ -53,6 +53,11 @@ namespace UCU.Engine
                     options.SensorProbeOverride ?? new UCU.Hardware.Metrics.LhmSensorProbe());
                 services.AddHostedService<MetricsProbeService>();
 
+                // The PnP device rows (webcam/dGPU): LocalSystem performs the CM API
+                // mutation with no consent prompt; tests script the device tree.
+                services.AddSingleton<UCU.Hardware.Devices.IPnpDeviceService>(
+                    options.PnpDeviceOverride ?? new UCU.Hardware.Devices.PnpDeviceService());
+
                 services.AddHostedService<EnginePipeServer>();
                 services.AddHostedService<EngineWatchdog>();
                 services.AddHostedService<AppSupervision>();
