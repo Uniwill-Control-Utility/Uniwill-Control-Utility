@@ -65,6 +65,8 @@ public sealed class EngineHostFixture : IAsyncDisposable
             // Hermetic default, same reasoning: the production service enables and
             // disables REAL device nodes. Tests script a device tree through configure.
             PnpDeviceOverride = new FakePnpDeviceService(),
+            // Hermetic default: the production service writes REAL UEFI variables.
+            FwNvramOverride = new FakeFwNvramService(),
             LogDirectory = Path.Combine(Path.GetTempPath(), "ucu-engine-tests", pipeName),
         };
 

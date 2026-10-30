@@ -195,6 +195,29 @@ namespace UCU.Client
 
         public Task<bool> SetDgpuEnabledAsync(bool enabled, CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<bool>(EngineVerbs.Device.SetDgpuEnabled, EngineSerializer.ToParams(new DeviceToggleDto { Enabled = enabled }), cancellationToken);
+
+        public async Task<byte[]?> GetNvramValueAsync(string name, string guid, CancellationToken cancellationToken = default)
+        {
+            // The result DTO carries the bytes; null data is the firmware's
+            // "no such variable" answer, which the interface contract renders
+            // as a null buffer.
+            NvramValueDto result = await _client.InvokeAsync<NvramValueDto>(
+                EngineVerbs.Device.GetNvramValue,
+                EngineSerializer.ToParams(new NvramValueDto { Name = name, Guid = guid }),
+                cancellationToken).ConfigureAwait(false);
+
+            return result.Data;
+        }
+
+        public Task<bool> SetNvramValueAsync(string name, string guid, byte[] data, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Device.SetNvramValue,
+                EngineSerializer.ToParams(new NvramValueDto { Name = name, Guid = guid, Data = data }), cancellationToken);
+
+        public Task<bool> GetSupportsCpuApMenuAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Device.GetSupportsCpuApMenu, cancellationToken);
+
+        public Task<bool> SetCpuApMenuUnlockAsync(bool enabled, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Device.SetCpuApMenuUnlock, EngineSerializer.ToParams(new BoolValueDto { Value = enabled }), cancellationToken);
     }
 
     /// <summary>Keyboard verb proxies.</summary>

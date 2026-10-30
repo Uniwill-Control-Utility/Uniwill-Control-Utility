@@ -578,6 +578,7 @@ namespace Uniwill_Control_Utility
                 {
                     Scripts.GPUs.NVIDIA.GpuPowerSaving.Devices = deviceCapability;
                     Scripts.Misc.HardwareManagement.Devices = deviceCapability;
+                    Scripts.Misc.NvramAccess.Devices = deviceCapability;
                 }
 
                 var updateService = _host.Services.GetRequiredService<VelopackUpdateService>();

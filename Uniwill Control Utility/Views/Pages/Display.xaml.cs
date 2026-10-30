@@ -13,6 +13,7 @@ using Serilog;
 using System.Windows.Threading;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
+using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
 using Wpf.Ui.Abstractions.Controls;
 using UCU.Contracts.Capabilities;
@@ -28,8 +29,8 @@ namespace Uniwill_Control_Utility.Views.Pages
         // milliseconds to avoid reading back the stale value before the EC commits.
         private const int ApplyGraceMs = 10000; // 10 seconds
 
-        // NVRAM GUID for OemMagicVariable
-        private const string NvramGuidStr = "{9F33F85C-13CA-4FD1-9C4A-96217722C593}";
+        // NVRAM GUID for OemMagicVariable (the variable NvramAccess routes; the
+        // page keeps only its own offset).
         private const int OffsetOemDisplayMode = 98; // OpenRevo probe confirmed offset 98 (not 99)
 
         private readonly IGpuMuxCapability? _mux;
@@ -83,38 +84,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         // The power saving mode the buttons currently show (gates the live notify overlay).
         private int _displayedPowerSavingMode = 2; // Auto
 
-        // NVRAM P/Invoke
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern uint GetFirmwareEnvironmentVariable(
-            string lpName, string lpGuid, [Out] byte[] lpBuffer, uint nSize);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool SetFirmwareEnvironmentVariable(
-            string lpName, string lpGuid, [In] byte[] lpValue, uint nSize);
-
-        // Token privilege P/Invoke (required for NVRAM access)
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool OpenProcessToken(IntPtr h, uint d, out IntPtr t);
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool LookupPrivilegeValue(string? s, string n, ref LUID l);
-
-        [DllImport("advapi32.dll", SetLastError = true)]
-        private static extern bool AdjustTokenPrivileges(IntPtr t, bool d, ref TP n, uint b, IntPtr p, IntPtr r);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool CloseHandle(IntPtr h);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct LUID { public uint Low; public int High; }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct TP { public int Count; public LUID Luid; public uint Attr; }
-
-        private const uint TOKEN_ADJUST_PRIVILEGES = 0x0020;
-        private const uint SE_PRIVILEGE_ENABLED = 0x00000002;
+        // The NVRAM P/Invokes this page used to carry (firmware-variable read/
+        // write and the token-privilege adjust) live in NvramAccess now, as
+        // that route's local fallback; the page calls the route.
 
         public Display()
         {
@@ -149,13 +121,13 @@ namespace Uniwill_Control_Utility.Views.Pages
                 _isAdministrator = false;
             }
 
-            // Enable SeSystemEnvironmentPrivilege and probe NVRAM access
-            if (_isAdministrator)
-            {
-                EnablePrivilege("SeSystemEnvironmentPrivilege");
-                _isNvramAvailable = ReadNvram("OemMagicVariable") is not null;
-                Debug.WriteLine($"[Display] NVRAM available: {_isNvramAvailable}");
-            }
+            // NVRAM availability is probed through NvramAccess, not gated on
+            // this process being administrator: the engine route answers from
+            // its LocalSystem token, so an unelevated app has NVRAM whenever
+            // the engine does. (The token-adjust the elevated probe used to do
+            // survives inside NvramAccess's local fallback.)
+            _isNvramAvailable = NvramAccess.ReadOemMagic() is not null;
+            Debug.WriteLine($"[Display] NVRAM available: {_isNvramAvailable}");
 
             // Show MiniLED card only on MiniLED panels
             CardLocalDimming.Visibility = App.HasMiniLEDPanel ? Visibility.Visible : Visibility.Collapsed;
@@ -989,52 +961,23 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.Save();
         }
 
-        #region NVRAM Access
+        #region NVRAM Access (GPU-mode firmware mirror via NvramAccess)
 
-        /// <summary>
-        /// Enables a privilege on the current process token (e.g., SeSystemEnvironmentPrivilege for NVRAM access).
-        /// </summary>
-        private static void EnablePrivilege(string privilegeName)
-        {
-            IntPtr token;
-            if (!OpenProcessToken(Process.GetCurrentProcess().Handle, TOKEN_ADJUST_PRIVILEGES, out token))
-            {
-                Debug.WriteLine($"[Display] OpenProcessToken failed: {Marshal.GetLastWin32Error()}");
-                return;
-            }
-
-            try
-            {
-                var tp = new TP { Count = 1, Attr = SE_PRIVILEGE_ENABLED };
-                if (!LookupPrivilegeValue(null, privilegeName, ref tp.Luid))
-                {
-                    Debug.WriteLine($"[Display] LookupPrivilegeValue failed: {Marshal.GetLastWin32Error()}");
-                    return;
-                }
-
-                if (!AdjustTokenPrivileges(token, false, ref tp, (uint)Marshal.SizeOf(tp), IntPtr.Zero, IntPtr.Zero))
-                {
-                    Debug.WriteLine($"[Display] AdjustTokenPrivileges failed: {Marshal.GetLastWin32Error()}");
-                }
-                else
-                {
-                    Debug.WriteLine($"[Display] Enabled privilege: {privilegeName}");
-                }
-            }
-            finally
-            {
-                CloseHandle(token);
-            }
-        }
+        // The NVRAM reads and writes route through NvramAccess: the engine's
+        // device.nvram verbs answer from its LocalSystem token (writing
+        // firmware variables demands SeSystemEnvironmentPrivilege, which an
+        // unelevated process can never enable — the page's own P/Invokes were
+        // silently dead in the field), and the page's original direct calls
+        // survive in NvramAccess as the fallback. The offset-98 encoding stays
+        // page-side: the mux codec and the platform the engine reports decode
+        // the raw byte, exactly as the factory write encoded it.
 
         /// <summary>
         /// Reads the OemDisplayMode byte from the OemMagicVariable NVRAM entry (offset 98).
         /// </summary>
         private byte? ReadNvramMode()
         {
-            if (!_isNvramAvailable) return null;
-
-            byte[]? nvram = ReadNvram("OemMagicVariable");
+            byte[]? nvram = NvramAccess.ReadOemMagic();
             if (nvram == null || nvram.Length <= OffsetOemDisplayMode)
                 return null;
 
@@ -1050,12 +993,7 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// </summary>
         private void WriteNvramMode(byte mode)
         {
-            if (!_isNvramAvailable)
-            {
-                throw new InvalidOperationException("NVRAM access is not available");
-            }
-
-            byte[]? nvram = ReadNvram("OemMagicVariable");
+            byte[]? nvram = NvramAccess.ReadOemMagic();
             if (nvram == null)
             {
                 throw new InvalidOperationException("Cannot read OemMagicVariable for NVRAM write");
@@ -1068,30 +1006,12 @@ namespace Uniwill_Control_Utility.Views.Pages
             byte[] modified = (byte[])nvram.Clone();
             modified[OffsetOemDisplayMode] = raw;
 
-            bool ok = SetFirmwareEnvironmentVariable("OemMagicVariable", NvramGuidStr, modified, (uint)modified.Length);
-            if (!ok)
+            if (!NvramAccess.WriteOemMagic(modified))
             {
-                int error = Marshal.GetLastWin32Error();
-                throw new InvalidOperationException($"NVRAM OemMagicVariable write failed with error {error}");
+                throw new InvalidOperationException("NVRAM OemMagicVariable write failed (see [Nvram] log)");
             }
 
             Debug.WriteLine($"[Display] NVRAM OemDisplayMode set to {raw} (mode {mode}) at offset {OffsetOemDisplayMode}");
-        }
-
-        /// <summary>
-        /// Reads an NVRAM variable by name using the string-GUID API.
-        /// </summary>
-        private byte[]? ReadNvram(string name)
-        {
-            byte[] buf = new byte[256];
-            uint len = GetFirmwareEnvironmentVariable(name, NvramGuidStr, buf, (uint)buf.Length);
-            if (len > 0 && len <= buf.Length)
-            {
-                byte[] result = new byte[len];
-                Array.Copy(buf, result, len);
-                return result;
-            }
-            return null;
         }
 
         #endregion

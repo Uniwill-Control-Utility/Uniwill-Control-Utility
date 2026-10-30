@@ -79,6 +79,13 @@ namespace UCU.Engine
         /// </summary>
         public UCU.Hardware.Devices.IPnpDeviceService? PnpDeviceOverride { get; init; }
 
+        /// <summary>
+        /// Firmware NVRAM service override, same test seam: the production service
+        /// writes real UEFI variables, which has no place in a test process. Tests
+        /// inject a scripted variable store.
+        /// </summary>
+        public UCU.Hardware.Firmware.IFwNvramService? FwNvramOverride { get; init; }
+
         /// <summary>Engine build identity reported in <c>engine.get_info</c>.</summary>
         public string EngineVersion { get; init; } = ReadEngineVersion();
 

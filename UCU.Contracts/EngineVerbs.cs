@@ -98,6 +98,43 @@ namespace UCU.Contracts
             public const string SetWebcamEnabled = "device.set_webcam_enabled";
             public const string GetDgpuStatus = "device.get_dgpu_status";
             public const string SetDgpuEnabled = "device.set_dgpu_enabled";
+
+            /// <summary>
+            /// UEFI firmware environment variables (the OemMagicVariable NVRAM
+            /// entry and its offsets). Reading and writing them demands
+            /// SeSystemEnvironmentPrivilege, which an unelevated process cannot
+            /// enable — so on the guarded field machines every app-side use of
+            /// these (the CPU Advanced Performance Menu row, the GPU mux's
+            /// firmware-visible mirror) was silently dead: the reads returned
+            /// nothing, the writes failed with access denied, and no prompt ever
+            /// appeared to explain. The engine enables the privilege on its
+            /// LocalSystem token, so the same rows work as designed.
+            ///
+            /// The surface is deliberately this raw — the OEM variable's layout
+            /// (which offset is which feature) is machine data the app already
+            /// owns, and the engine stays a privilege broker here rather than
+            /// growing firmware knowledge per feature. The boundary argument is
+            /// the mux one: the OemMagicVariable byte at offset 98 IS the GPU
+            /// mode the mux.set_mode verb already writes, so reading and
+            /// writing this entry is at the capability level the pipe DACL
+            /// already grants.
+            /// </summary>
+            public const string GetNvramValue = "device.get_nvram_value";
+            public const string SetNvramValue = "device.set_nvram_value";
+
+            /// <summary>Firmware-reported support byte for the CPU Advanced
+            /// Performance Menu (OemMagicVariable offset 110, non-zero = the
+            /// BIOS exposes the menu). A verb, not a client-side read, because
+            /// the row's support probe needs the same privilege as its write.</summary>
+            public const string GetSupportsCpuApMenu = "device.get_supports_cpu_ap_menu";
+
+            /// <summary>Unlocks/locks the BIOS CPU Advanced Performance Menu:
+            /// offsets 111 (CPU menu switch) and 51 (memory OC switch) set in
+            /// lockstep, tester-confirmed on Intel NB02. The pair-write lives
+            /// engine-side so the two offsets can never half-update: the verb
+            /// reads, patches, and rewrites the whole entry atomically on the
+            /// device queue.</summary>
+            public const string SetCpuApMenuUnlock = "device.set_cpu_ap_menu_unlock";
         }
 
         public static class Telemetry
