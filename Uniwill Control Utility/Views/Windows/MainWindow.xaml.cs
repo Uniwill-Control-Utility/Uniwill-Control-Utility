@@ -1655,39 +1655,49 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         /// <summary>
         /// Startup splash gate: while set, the host's first ShowWindow()
-        /// initializes the window without letting it paint (the dashboard's
-        /// metrics timers need a shown window to start, and the first tick
-        /// fills it 1-2 s healthy / up to ~6 s guarded after that - showing
-        /// it then is the empty-dashboard flash the splash exists to cover).
-        /// App clears the gate and Shows when the first data frame lands
-        /// (Services.DashboardFirstFrameSignal).
+        /// initializes the window without it EVER painting on-screen (the
+        /// dashboard's metrics timers need a shown window to start, and the
+        /// first tick fills it 1-2 s healthy / up to ~6 s guarded after that -
+        /// showing it then is the empty-dashboard flash the splash exists to
+        /// cover). App clears the gate, closes the splash, and Shows when the
+        /// first data frame lands (Services.DashboardFirstFrameSignal).
         /// </summary>
         public static bool GateFirstShowWindow { get; set; }
 
-        private double _gatedLeft;
-        private double _gatedTop;
+        /// <summary>The park used while gated: WPF accepts offsets far outside
+        /// every monitor's bounds, so the window composites off-screen.</summary>
+        private const double GatedParkOffset = -32000;
+
+        /// <summary>True while the window is parked off-screen waiting for the
+        /// dashboard's first data frame (gate active, splash still up).</summary>
+        private bool _startupGateParked;
 
         public void ShowWindow()
         {
             if (GateFirstShowWindow)
             {
-                // Show exactly as the baseline (the host navigates right
-                // after this call and NavigationView's template only applies
-                // through a real Show - the EnsureHandle/hidden-window
-                // variants threw NavigationView NREs, field-proven), then
-                // park the window offscreen at zero opacity: the empty
-                // dashboard paints on a surface nobody can see. App calls
-                // ReleaseStartupGate when the dashboard's first data frame
-                // lands - the window's first visible presentation is
-                // populated. (Opacity 0 makes the whole window - DWM
-                // backdrop included - invisible, and -32000 is off every
-                // monitor edge, so even the paint itself never shows.)
+                // Park BEFORE the first Show, then Show. The order is the fix:
+                // the baseline sequence (Show at the CenterScreen position,
+                // park afterwards) painted one visible frame of the window at
+                // screen center. WPF's Opacity=0 hides the WPF-composited
+                // content, but this window's backdrop (WindowBackdropType=Mica)
+                // is composited by DWM, so a 1080x1080 rounded panel appeared
+                // for exactly one frame behind the splash - the splash is a
+                // 320x290 card, so the whole screen around it is exposed (field
+                // report: "the main window blips at 92% of the pre-loader").
+                // Manual startup location + an off-screen Left/Top before Show
+                // means the window's very first composition is off every
+                // monitor edge. Show is still required: the host navigates
+                // right after this call, and NavigationView's template only
+                // applies through a real Show (the EnsureHandle/hidden-window
+                // variants threw NavigationView NREs, field-proven). The
+                // CenterScreen landing position is computed on release.
+                _startupGateParked = true;
+                WindowStartupLocation = WindowStartupLocation.Manual;
+                Left = GatedParkOffset;
+                Top = GatedParkOffset;
                 Opacity = 0;
                 Show();
-                _gatedLeft = Left;
-                _gatedTop = Top;
-                Left = -32000;
-                Top = -32000;
                 return;
             }
 
@@ -1695,18 +1705,30 @@ namespace Uniwill_Control_Utility.Views.Windows
         }
 
         /// <summary>
-        /// Undo the ShowWindow gate: back to the pre-park position, opaque,
-        /// activated. Called by App on the dashboard's first data frame.
+        /// Undo the startup gate: land at the work-area center (the primary
+        /// screen's, in DIPs - the same place WindowStartupLocation=CenterScreen
+        /// puts it), become opaque, then apply the app's work-area fit and
+        /// activate. Called by App after the splash has closed and the
+        /// dashboard's first data frame has landed, so the window's first
+        /// visible presentation is populated and nothing is ever painted
+        /// beside the splash card.
         /// </summary>
         public void ReleaseStartupGate()
         {
-            if (Opacity < 1)
+            if (_startupGateParked)
             {
+                _startupGateParked = false;
+
+                // Position BEFORE raising the opacity: the first composited
+                // frame on-screen is the final one (a move and an opacity
+                // raise in the same dispatcher turn paint once).
+                Rect workArea = SystemParameters.WorkArea;
+                Left = workArea.Left + (workArea.Width - Width) / 2.0;
+                Top = workArea.Top + (workArea.Height - Height) / 2.0;
                 Opacity = 1;
-                Left = _gatedLeft;
-                Top = _gatedTop;
             }
 
+            App.FitWindowToWorkArea(this);
             Activate();
         }
 
@@ -1990,7 +2012,14 @@ namespace Uniwill_Control_Utility.Views.Windows
             // never spills above the top screen edge. On the 2560x1600 internal
             // panel at 150% scale, 1080 DIP = 1620 physical px — taller than the
             // screen — so CenterScreen splits the overflow off the top.
-            App.FitWindowToWorkArea(this);
+            // Skipped while the startup gate parks the window off-screen:
+            // Screen.FromHandle resolves a parked window to the NEAREST monitor,
+            // and the fit's re-center would drag it back on-screen - where the
+            // Mica backdrop composites a frame even at Opacity 0 (that frame is
+            // the splash-phase blip). ReleaseStartupGate applies the same fit at
+            // the landing position instead.
+            if (!_startupGateParked)
+                App.FitWindowToWorkArea(this);
 
             _ = Task.Run(PremadePresets.SetPremadePresets);
 

@@ -776,8 +776,14 @@ namespace Uniwill_Control_Utility
                 }
 
                 Views.Windows.MainWindow.GateFirstShowWindow = false;
-                Views.Windows.MainWindow.Instance?.ReleaseStartupGate();
 
+                // Play the splash out and close it BEFORE the window lands.
+                // Releasing the gate while the 320x290 card is up exposes the
+                // 1080x1080 dashboard on the rest of the screen (the field's
+                // "the main window blips at 92% of the pre-loader" signature),
+                // and the window's first visible presentation should be the
+                // populated dashboard, not a frame beside the splash. The
+                // window stays parked off-screen through the whole playback.
                 await startupProgressReporter.ReportAsync(StartupStage.Complete);
                 if (startupWindow is not null)
                 {
@@ -786,6 +792,8 @@ namespace Uniwill_Control_Utility
                     startupWindow = null;
                 }
                 startupProgressReporter.Detach();
+
+                Views.Windows.MainWindow.Instance?.ReleaseStartupGate();
 
                 SafeFireAndForget(RunPostStartupTasksAsync());
             }
