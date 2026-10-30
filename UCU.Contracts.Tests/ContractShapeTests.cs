@@ -106,7 +106,7 @@ public sealed class ContractShapeTests
         {
             string[] parts = verb.Split('.');
             Assert.Equal(2, parts.Length);
-            Assert.Contains(parts[0], new[] { "fan", "power", "mux", "keyboard", "battery", "device", "telemetry", "engine" });
+            Assert.Contains(parts[0], new[] { "fan", "power", "mux", "keyboard", "battery", "device", "cpu", "telemetry", "engine" });
             Assert.Equal(verb, verb.ToLowerInvariant());
             Assert.Matches("^[a-z_]+$", parts[1]);
         }
@@ -126,6 +126,8 @@ public sealed class ContractShapeTests
             + typeof(IKeyboardCapability).GetMethods().Length
             + typeof(IBatteryCapability).GetMethods().Length
             + typeof(IDeviceCapability).GetMethods().Length
+            + typeof(IAmdSmuCapability).GetMethods().Length
+            + typeof(IIntelMsrCapability).GetMethods().Length
             + typeof(IEcTelemetryCapability).GetMethods().Length
             + typeof(IEngineCapability).GetMethods().Length;
 
@@ -166,6 +168,7 @@ public sealed class ContractShapeTests
         {
             typeof(IFanCapability), typeof(IPowerCapability), typeof(IGpuMuxCapability),
             typeof(IKeyboardCapability), typeof(IBatteryCapability), typeof(IDeviceCapability),
+            typeof(IAmdSmuCapability), typeof(IIntelMsrCapability),
             typeof(IEcTelemetryCapability), typeof(IEngineCapability),
         };
 

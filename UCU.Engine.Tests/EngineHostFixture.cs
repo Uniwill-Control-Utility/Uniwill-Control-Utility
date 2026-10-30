@@ -31,6 +31,8 @@ public sealed class EngineHostFixture : IAsyncDisposable
         Telemetry = new EcTelemetryCapability(Client);
         Engine = new EngineCapability(Client);
         Device = new DeviceCapability(Client);
+        Smu = new AmdSmuCapability(Client);
+        IntelMsr = new IntelMsrCapability(Client);
     }
 
     public EngineRuntimeOptions Options { get; }
@@ -43,6 +45,8 @@ public sealed class EngineHostFixture : IAsyncDisposable
     public KeyboardCapability Keyboard { get; }
     public BatteryCapability Battery { get; }
     public DeviceCapability Device { get; }
+    public AmdSmuCapability Smu { get; }
+    public IntelMsrCapability IntelMsr { get; }
     public EcTelemetryCapability Telemetry { get; }
     public EngineCapability Engine { get; }
 
@@ -67,6 +71,14 @@ public sealed class EngineHostFixture : IAsyncDisposable
             PnpDeviceOverride = new FakePnpDeviceService(),
             // Hermetic default: the production service writes REAL UEFI variables.
             FwNvramOverride = new FakeFwNvramService(),
+            // Hermetic default: the production service drives REAL power telemetry
+            // registers through PawnIO. Tests script a command table through configure.
+            AmdSmuOverride = new FakeAmdSmuService(),
+            // Hermetic default: the production service writes REAL power MSRs.
+            IntelMsrOverride = new FakeIntelMsrService(),
+            // Hermetic default: the production service executes the REAL OEM
+            // ACPI WMI handshake. Tests script the handshake through configure.
+            MiniLedOverride = new FakeMiniLedService(),
             LogDirectory = Path.Combine(Path.GetTempPath(), "ucu-engine-tests", pipeName),
         };
 

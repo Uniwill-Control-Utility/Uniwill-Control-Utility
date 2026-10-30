@@ -64,6 +64,23 @@ namespace UCU.Engine
                 services.AddSingleton<UCU.Hardware.Firmware.IFwNvramService>(
                     options.FwNvramOverride ?? new UCU.Hardware.Firmware.FwNvramService());
 
+                // The SMU rows (Curve Optimizer, preset power commands): PawnIO's
+                // device ACL admits System/Administrators, so the mailbox protocol
+                // runs on LocalSystem's token; tests script a command table.
+                services.AddSingleton<UCU.Hardware.Cpu.IAmdSmuService>(
+                    options.AmdSmuOverride ?? new UCU.Hardware.Cpu.AmdSmuService());
+
+                // The Intel MSR rows (TDP, voltage offset, ratio, power balance):
+                // same PawnIO ACL as the SMU; tests script a register file.
+                services.AddSingleton<UCU.Hardware.Cpu.Intel.IIntelMsrService>(
+                    options.IntelMsrOverride ?? new UCU.Hardware.Cpu.Intel.IntelMsrService());
+
+                // The MiniLED local-dimming row: executing the OEM root\WMI
+                // method is a privileged act the unelevated app cannot do;
+                // tests script the handshake.
+                services.AddSingleton<UCU.Hardware.Devices.IMiniLedService>(
+                    options.MiniLedOverride ?? new UCU.Hardware.Devices.MiniLedWmiService());
+
                 services.AddHostedService<EnginePipeServer>();
                 services.AddHostedService<EngineWatchdog>();
                 services.AddHostedService<AppSupervision>();

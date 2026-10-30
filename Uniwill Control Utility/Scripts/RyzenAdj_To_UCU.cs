@@ -89,10 +89,38 @@ namespace Uniwill_Control_Utility.Scripts
                             }
                             else if (ryzenAdjCommandString.Contains("Win-Power"))
                             {
-                                // ignore return value - fire and forget system calls
-                                if (ryzenAdjCommandValueString == WinPowerValueSaver) _ = PowerSetActiveOverlayScheme(PowerSaverPowerSchemeGuid);
-                                else if (ryzenAdjCommandValueString == WinPowerValueBalanced) _ = PowerSetActiveOverlayScheme(BalancedPowerSchemeGuid);
-                                else if (ryzenAdjCommandValueString == WinPowerValueHighPerformance) _ = PowerSetActiveOverlayScheme(HighPerformancePowerSchemeGuid);
+                                // The active overlay scheme is a standard-user
+                                // powrprof act (Settings' power-mode toggle uses
+                                // it) - no elevation to route, so the engine is
+                                // not needed here. What WAS missing is the
+                                // witness: the calls discarded the status code,
+                                // so a failed scheme switch left no trace. Log
+                                // the answer for each apply.
+                                string overlayScheme;
+                                uint overlayStatus;
+
+                                if (ryzenAdjCommandValueString == WinPowerValueSaver)
+                                {
+                                    overlayStatus = PowerSetActiveOverlayScheme(PowerSaverPowerSchemeGuid);
+                                    overlayScheme = "saver";
+                                }
+                                else if (ryzenAdjCommandValueString == WinPowerValueBalanced)
+                                {
+                                    overlayStatus = PowerSetActiveOverlayScheme(BalancedPowerSchemeGuid);
+                                    overlayScheme = "balanced";
+                                }
+                                else if (ryzenAdjCommandValueString == WinPowerValueHighPerformance)
+                                {
+                                    overlayStatus = PowerSetActiveOverlayScheme(HighPerformancePowerSchemeGuid);
+                                    overlayScheme = "high-performance";
+                                }
+                                else
+                                {
+                                    overlayStatus = 0;
+                                    overlayScheme = "none";
+                                }
+
+                                DiagnosticLogger.LogDebug($"Win power overlay -> {overlayScheme}: status=0x{overlayStatus:X}");
                             }
                             else if (ryzenAdjCommandString.Contains("Win-CPU"))
                             {
@@ -197,8 +225,13 @@ namespace Uniwill_Control_Utility.Scripts
 
                                 DiagnosticLogger.LogInfo($"SMU sending: {ryzenAdjCommandString} = 0x{ryzenAdjCommandValue:X} ({ryzenAdjCommandValue})");
 
-                                if (ryzenAdjCommandValue <= 0 && !ryzenAdjCommandString.Contains("co")) SMUCommands.applySettings(ryzenAdjCommandString, 0x0);
-                                else SMUCommands.applySettings(ryzenAdjCommandString, ryzenAdjCommandValue);
+                                // Engine SMU verb FIRST (PawnIO's device ACL admits
+                                // System/Administrators, so the app's own driver open
+                                // is access-denied unelevated — the silent death the
+                                // field saw); the app's SMU stack stays as SmuAccess's
+                                // fallback for a machine whose engine is not answering.
+                                if (ryzenAdjCommandValue <= 0 && !ryzenAdjCommandString.Contains("co")) SmuAccess.Execute(ryzenAdjCommandString, 0x0);
+                                else SmuAccess.Execute(ryzenAdjCommandString, ryzenAdjCommandValue);
 
                                 // CRITICAL: 50ms delay between SMU commands. The SMU firmware
                                 // needs time to process each command. Without this delay,

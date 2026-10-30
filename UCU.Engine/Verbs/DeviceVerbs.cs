@@ -9,8 +9,10 @@ namespace UCU.Engine
     /// power-saving apply reaches this mutation from automatic paths (startup,
     /// charger transitions, tray, Automations), and an automatic apply that needs
     /// UAC is a prompt the user cannot anticipate. The filters carry the device
-    /// identity (Camera class / NVIDIA display), so the verbs stay semantic and
-    /// the CM API stays engine-side.
+    /// identity (Camera class / NVIDIA display): identity resolves engine-side
+    /// through WMI Win32_PnPEntity (the Get-PnpDevice source; the CM enumerator
+    /// is dead on the field's boxes, see PnpDeviceService), and the CM API
+    /// mutation runs engine-side on the located devnode.
     /// </summary>
     internal static class DeviceVerbs
     {
@@ -26,7 +28,7 @@ namespace UCU.Engine
             FriendlyNamePatterns = new[] { "*NVIDIA*" },
         };
 
-        public static void Register(Action<string, VerbHandler> add, IPnpDeviceService devices)
+        public static void Register(Action<string, VerbHandler> add, IPnpDeviceService devices, IMiniLedService miniLed)
         {
             add(EngineVerbs.Device.GetWebcamStatus, (p, ct) =>
                 Task.FromResult<object?>(ToResult(devices.GetStateAsync(Webcam, ct))));
@@ -44,6 +46,12 @@ namespace UCU.Engine
             {
                 DeviceToggleDto dto = EngineSerializer.BindParams<DeviceToggleDto>(p);
                 return Task.FromResult<object?>(devices.SetEnabledAsync(Dgpu, dto.Enabled, ct).GetAwaiter().GetResult());
+            });
+
+            add(EngineVerbs.Device.SetMiniLedDimming, (p, ct) =>
+            {
+                BoolValueDto dto = EngineSerializer.BindParams<BoolValueDto>(p);
+                return Task.FromResult<object?>(miniLed.SetLocalDimming(dto.Value));
             });
         }
 

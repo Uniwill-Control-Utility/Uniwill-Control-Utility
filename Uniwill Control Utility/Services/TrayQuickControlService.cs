@@ -609,71 +609,23 @@ namespace Uniwill_Control_Utility.Services
         /// </remarks>
         private bool SettingsPage_SetLocalDimming(bool enable)
         {
-            // Use the same WMI approach as SettingsPage.
-            // The constants match SettingsPage.xaml.cs
-            const string WmiClassName = "AcpiTest_MULong";
-            const string DefaultInstanceName = @"ACPI\PNP0C14\1_1";
-            const ulong CmdEnableStep1 = 0x50000000002;
-            const ulong CmdEnableStep2 = 0x5000000000E;
-            const ulong CmdDisableStep1 = 0x50000000001;
-            const ulong CmdDisableStep2 = 0x5000000000D;
-            const byte ExpectedEnableStep1 = 0xBB;
-            const byte ExpectedEnableStep2 = 0x0E;
-            const byte ExpectedDisableStep1 = 0xAA;
-            const byte ExpectedDisableStep2 = 0x0D;
-
-            try
-            {
-                var instancePath = $@"{WmiClassName}.InstanceName='{DefaultInstanceName}'";
-                using var mo = new System.Management.ManagementObject(
-                    @"root\WMI", instancePath, null);
-
-                if (enable)
-                {
-                    byte result1 = WmiCall(mo, CmdEnableStep1);
-                    if (result1 != ExpectedEnableStep1)
-                        return false;
-
-                    byte result2 = WmiCall(mo, CmdEnableStep2);
-                    if (result2 != ExpectedEnableStep2)
-                        return false;
-                }
-                else
-                {
-                    byte result1 = WmiCall(mo, CmdDisableStep1);
-                    if (result1 != ExpectedDisableStep1)
-                        return false;
-
-                    byte result2 = WmiCall(mo, CmdDisableStep2);
-                    if (result2 != ExpectedDisableStep2)
-                        return false;
-                }
-
-                // Give the EC time to process the WMI command.
-                Thread.Sleep(100);
-
-                Settings.Default.DisplayLocalDimming = enable;
-                Settings.Default.Save();
-                return true;
-            }
-            catch
-            {
+            // The handshake routes through MiniLedAccess: the engine's device
+            // verb runs the OEM ACPI WMI two-step pair as LocalSystem
+            // (executing a custom root\WMI method needs write access an
+            // unelevated process does not have — this tray row was silently
+            // dead in that state), and this copy's WMI code survives in
+            // MiniLedAccess as the route's fallback. The EC readback verify
+            // lives on the Display page; the tray keeps its proven shape
+            // (handshake, then save).
+            if (!MiniLedAccess.SetLocalDimming(enable))
                 return false;
-            }
-        }
 
-        /// <summary>
-        /// Calls GetSetULong via WMI using the correct GetMethodParameters pattern.
-        /// Matches the pattern used by MechControl (Heavyfail fork) on Uniwill IDY/Tongfang X6 laptops.
-        /// </summary>
-        private static byte WmiCall(
-            System.Management.ManagementObject mo, ulong data)
-        {
-            using var input = mo.GetMethodParameters("GetSetULong");
-            input["Data"] = data;
+            // Give the EC time to process the WMI command.
+            Thread.Sleep(100);
 
-            using var output = (System.Management.ManagementBaseObject)mo.InvokeMethod("GetSetULong", input, null);
-            return (byte)(uint)output["Return"];
+            Settings.Default.DisplayLocalDimming = enable;
+            Settings.Default.Save();
+            return true;
         }
 
         /// <summary>Toggles Performance Overlay on/off.</summary>

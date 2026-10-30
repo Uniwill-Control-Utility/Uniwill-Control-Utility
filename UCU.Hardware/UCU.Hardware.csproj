@@ -7,6 +7,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>10.0</LangVersion>
     <Platforms>AnyCPU;x64</Platforms>
@@ -18,6 +19,10 @@
 
   <ItemGroup>
     <PackageReference Include="Serilog" Version="4.2.0" />
+    <!-- The MiniLED local-dimming WMI handshake (Devices/). Executing the OEM
+         root\WMI method is a privileged act the unelevated app cannot do, so
+         the WMI dependency rides the LocalSystem side of the boundary. -->
+    <PackageReference Include="System.Management" Version="10.0.13" />
     <!-- The engine-side sensor probe (Metrics/). The app keeps its own LHM copy for
          the GPU (NVAPI decision) and never loads this assembly, so the
          sensor-driver dependency stays on the LocalSystem side of the boundary. -->

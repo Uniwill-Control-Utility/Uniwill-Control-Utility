@@ -129,6 +129,40 @@ public sealed class DeviceElevationRelocationTests
         Assert.DoesNotContain("LogonTrigger", body, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void EnginePnpIdentity_RidesWmi_TheDeadCmEnumeratorStaysRetired()
+    {
+        // Field defect (2026-10-30, guarded dev box): the webcam toggle OFF
+        // answered verified=false without touching the devnode. The engine's
+        // enumeration had used CM_Get_Device_ID_List, and on that machine
+        // EVERY call to it - W and A, every filter, every documented PMCL flag
+        // set - answers CR_FAIL/CR_NO_MORE_HANDLES, and the FriendlyName/Class
+        // devprops answer CR_NO_SUCH_VALUE on nodes whose status/mutation
+        // calls work. A service on that enumerator sees an empty machine and
+        // reports every row "already disabled". Identity moved to WMI
+        // Win32_PnPEntity - the rows Get-PnpDevice rides, the same source the
+        // app's elevated fallback proves on every field box - with the CM
+        // per-node calls for status and mutation.
+        string service = ReadEngine("Devices", "PnpDeviceService.cs");
+        string native = ReadEngine("Devices", "Native.cs");
+
+        Assert.Contains("Win32_PnPEntity", service, StringComparison.Ordinal);
+        Assert.Contains("PNPClass", service, StringComparison.Ordinal);
+        Assert.Contains("CM_Locate_DevNode", service, StringComparison.Ordinal);
+
+        // The dead enumerator and the dead property reads stay retired on both
+        // sides (call sites; the prose may name them to explain why): a
+        // resurrection re-breaks the device rows on field machines.
+        Assert.DoesNotContain("CM_Get_Device_ID_List(", service, StringComparison.Ordinal);
+        Assert.DoesNotContain("CM_Get_Device_ID_List(", native, StringComparison.Ordinal);
+        Assert.DoesNotContain("CM_Get_DevNode_Property(", native, StringComparison.Ordinal);
+
+        // The mutation and the verify-by-re-read stay CM per-node (proven working).
+        Assert.Contains("CM_Enable_DevNode", native, StringComparison.Ordinal);
+        Assert.Contains("CM_Disable_DevNode", native, StringComparison.Ordinal);
+        Assert.Contains("CM_Get_DevNode_Status", native, StringComparison.Ordinal);
+    }
+
     private static string MethodBody(string source, string signature)
     {
         int start = source.IndexOf(signature, StringComparison.Ordinal);
@@ -142,6 +176,9 @@ public sealed class DeviceElevationRelocationTests
 
     private static string Read(params string[] parts) =>
         File.ReadAllText(Path.Combine(new[] { RepositoryRoot(), "Uniwill Control Utility" }.Concat(parts).ToArray()));
+
+    private static string ReadEngine(params string[] parts) =>
+        File.ReadAllText(Path.Combine(new[] { RepositoryRoot(), "UCU.Hardware" }.Concat(parts).ToArray()));
 
     private static string RepositoryRoot()
     {
