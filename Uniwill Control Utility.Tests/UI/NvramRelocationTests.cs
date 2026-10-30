@@ -94,6 +94,46 @@ public sealed class NvramRelocationTests
     }
 
     [Fact]
+    public void NvramAccess_DoorConstant_MatchesTheEngineService()
+    {
+        // The 50-series gatekeeper: the fallback's door must be the SAME
+        // variable the engine's FwNvramService handshake unlocks.
+        Assert.Equal(
+            UCU.Hardware.Firmware.FwNvramService.OemMagicDoor,
+            Scripts.Misc.NvramAccess.OemMagicDoorName);
+    }
+
+    [Fact]
+    public void LocalWrite_PerformsTheMagicDoorHandshake_BeforeTheEntryWrite()
+    {
+        // The parity rule (U-106): on this chassis generation an
+        // OemMagicVariable write lands (and sticks across reboot) only after
+        // OemMagicDoor is unlocked, and a failed door write refuses the
+        // entry — the fallback obeys it exactly as the engine's
+        // FwNvramService.Write does.
+        string source = Read("Scripts", "Misc", "NvramAccess.cs");
+
+        string? body = MethodBody(source, "private static bool LocalWrite");
+        Assert.NotNull(body);
+
+        int door = body.IndexOf("UnlockMagicDoorLocal()", StringComparison.Ordinal);
+        int entry = body.IndexOf("SetFirmwareEnvironmentVariable(name,", StringComparison.Ordinal);
+
+        Assert.True(door >= 0, "the local route must perform the gatekeeper handshake.");
+        Assert.True(entry >= 0);
+        Assert.True(door < entry, "the door is unlocked BEFORE the entry write, and a failed door returns false (no blind write).");
+        Assert.Contains("return false", body, StringComparison.Ordinal);
+
+        // The handshake never CREATES a door on a firmware that has none:
+        // NOT_FOUND answers "write the entry directly", not "fabricate a
+        // firmware variable".
+        string? doorBody = MethodBody(source, "private static bool UnlockMagicDoorLocal");
+        Assert.NotNull(doorBody);
+        Assert.Contains("ERROR_ENVVAR_NOT_FOUND", doorBody, StringComparison.Ordinal);
+        Assert.Contains("OemMagicDoorName", doorBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void App_WiresTheNvramStatic_BeforeTheWindowOpens()
     {
         string source = Read("App.xaml.cs");

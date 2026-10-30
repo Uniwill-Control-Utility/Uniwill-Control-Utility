@@ -24,6 +24,11 @@ namespace Uniwill_Control_Utility.Scripts.Misc
     /// engine is not answering — where it works, it works exactly as the old
     /// code did (the app is run elevated, e.g. the dev box). Every switch of
     /// routes logs the reason, so the field can tell which route answered.
+    ///
+    /// Both routes perform the 50-series gatekeeper handshake before writing
+    /// the OEM entry: unlock OemMagicDoor (0x01) first, refuse the entry
+    /// write when the door refuses (the engine's rule, pinned as parity in
+    /// tests).
     /// </summary>
     internal static class NvramAccess
     {
@@ -39,6 +44,12 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         // parity is pinned in tests so the routes cannot drift.
         public const string OemMagicName = "OemMagicVariable";
         public const string OemMagicGuid = "{9F33F85C-13CA-4FD1-9C4A-96217722C593}";
+
+        // The 50-series gatekeeper: on this chassis generation a firmware
+        // write of the OEM entry lands only after the OemMagicDoor variable
+        // is unlocked (written 0x01) first. The parity with the engine's
+        // FwNvramService constants is pinned in tests.
+        public const string OemMagicDoorName = "OemMagicDoor";
 
         public const int OffsetCpuApMenuSupport = 110;
         public const int OffsetCpuApMenuSwitch = 111;
@@ -200,6 +211,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
 
         private const uint TOKEN_ADJUST_PRIVILEGES = 0x20;
         private const uint SE_PRIVILEGE_ENABLED = 0x00000002;
+        private const uint ERROR_ENVVAR_NOT_FOUND = 203;
 
         /// <summary>
         /// Enables SeSystemEnvironmentPrivilege on this process token, the
@@ -250,12 +262,58 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         {
             EnableLocalNvramPrivilege();
 
+            // The 50-series gatekeeper handshake, in step with the engine's
+            // FwNvramService.Write: unlocking OemMagicDoor before the OEM
+            // entry write is what makes the write land (and stick across
+            // reboot) on this chassis generation. A failed door write means
+            // no blind variable write.
+            if (string.Equals(name, OemMagicName, StringComparison.OrdinalIgnoreCase)
+                && !UnlockMagicDoorLocal())
+                return false;
+
             if (!SetFirmwareEnvironmentVariable(name, guid, data, (uint)data.Length))
             {
                 Debug.WriteLine($"[Nvram] local write failed: {Marshal.GetLastWin32Error()}");
                 return false;
             }
 
+            return true;
+        }
+
+        /// <summary>
+        /// Writes the OemMagicDoor key (0x01) before an OEM-entry write —
+        /// the same handshake the engine performs, on this process's token.
+        /// A firmware WITHOUT the door variable (the read says NOT_FOUND) is
+        /// not a 50-series gatekeeper board: the entry is written directly,
+        /// the door is never CREATED (fabricating firmware variables is a
+        /// board-bricking act). A door write that fails refuses the entry
+        /// write; the variable is never written blind.
+        /// </summary>
+        private static bool UnlockMagicDoorLocal()
+        {
+            EnableLocalNvramPrivilege();
+
+            byte[] probe = new byte[16];
+            uint len = GetFirmwareEnvironmentVariable(OemMagicDoorName, OemMagicGuid, probe, (uint)probe.Length);
+            if (len == 0)
+            {
+                uint readError = (uint)Marshal.GetLastWin32Error();
+                if (readError == ERROR_ENVVAR_NOT_FOUND)
+                {
+                    Debug.WriteLine("[Nvram] OemMagicDoor absent - no gatekeeper on this firmware; writing the entry directly");
+                    return true;
+                }
+
+                Debug.WriteLine($"[Nvram] OemMagicDoor probe failed: {readError} - attempting the unlock anyway");
+            }
+
+            if (!SetFirmwareEnvironmentVariable(OemMagicDoorName, OemMagicGuid, new byte[] { 0x01 }, 1))
+            {
+                Debug.WriteLine($"[Nvram] OemMagicDoor unlock failed: {Marshal.GetLastWin32Error()} - refusing the local entry write");
+                return false;
+            }
+
+            Debug.WriteLine("[Nvram] OemMagicDoor unlocked (local route)");
             return true;
         }
 
