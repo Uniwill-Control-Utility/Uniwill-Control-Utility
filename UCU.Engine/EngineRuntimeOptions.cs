@@ -52,6 +52,16 @@ namespace UCU.Engine
         /// </summary>
         public bool SupervisionEnabled { get; init; } = true;
 
+        /// <summary>
+        /// Enforcement mode for the raw-write gate (<see cref="EcWriteGatePolicy"/>):
+        /// the address allowlist on the raw register verbs and the NVRAM GUID
+        /// allowlist. The service default is <see cref="RawWriteGateMode.Enforce"/>;
+        /// <c>--gate=report-only</c> logs the violation and lets the write through,
+        /// for field debugging of an allowlist that is too strict (the codec
+        /// Validate* range checks are not gated — a bad value is always reported).
+        /// </summary>
+        public RawWriteGateMode RawWriteGate { get; init; } = RawWriteGateMode.Enforce;
+
         /// <summary>Log directory. Null selects ProgramData for the service, LocalAppData for --console.</summary>
         public string? LogDirectory { get; init; }
 

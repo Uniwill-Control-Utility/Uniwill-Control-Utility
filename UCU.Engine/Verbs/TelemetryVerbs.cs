@@ -17,7 +17,7 @@ namespace UCU.Engine
     /// </summary>
     internal static class TelemetryVerbs
     {
-        public static void Register(Action<string, VerbHandler> add, EcEngineGate gate, EngineMetricsSnapshotSource metrics)
+        public static void Register(Action<string, VerbHandler> add, EcEngineGate gate, EngineMetricsSnapshotSource metrics, EcRawWriteGuard rawWriteGuard)
         {
             add(EngineVerbs.Telemetry.GetFanDuty, (p, ct) =>
             {
@@ -61,7 +61,12 @@ namespace UCU.Engine
                 // The escape hatch for decoders that write (the display page's NVRAM
                 // mirror). Kept deliberately: the pages that need it are SKU-specific,
                 // and a semantic verb per layout would be the same door with more keys.
+                // The door has a lock now: the raw-write gate refuses the power,
+                // mode-index, magic and mux registers (the addresses this hatch was
+                // never meant to reach), so a caller on the pipe cannot write PL1
+                // around the semantic verb's validation.
                 RegisterWriteDto dto = EngineSerializer.BindParams<RegisterWriteDto>(p);
+                rawWriteGuard.GateRegisterWrite(dto.Address);
                 gate.Acquire().WriteECRegister(dto.Address, dto.Value);
                 return Task.FromResult<object?>(null);
             });

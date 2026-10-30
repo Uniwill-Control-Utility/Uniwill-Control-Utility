@@ -6,7 +6,7 @@ namespace UCU.Engine
     /// <summary>Fan-domain verbs: curves, duty, turbo and the smart-fan table blocks.</summary>
     internal static class FanVerbs
     {
-        public static void Register(Action<string, VerbHandler> add, EcEngineGate gate)
+        public static void Register(Action<string, VerbHandler> add, EcEngineGate gate, EcRawWriteGuard rawWriteGuard)
         {
             add(EngineVerbs.Fan.GetStatus, (p, ct) =>
             {
@@ -149,8 +149,14 @@ namespace UCU.Engine
             {
                 // The smart-fan planner builds raw register blocks in the app; the
                 // engine writes them in the order given. Splitting them across verbs
-                // would reorder the plan, so they stay one call.
+                // would reorder the plan, so they stay one call. The addresses are
+                // caller-chosen, so the raw-write gate decides the domains before
+                // the first byte moves (fan tables and PWM blocks are allowed;
+                // power/mux/magic addresses are refused, EC untouched).
                 RegisterBlocksDto dto = EngineSerializer.BindParams<RegisterBlocksDto>(p);
+
+                foreach (EcRegisterBlockDto block in dto.Blocks)
+                    rawWriteGuard.GateRegisterBlockWrite(block.Address, block.Data.Length);
 
                 EcEngine ec = gate.Acquire();
                 foreach (EcRegisterBlockDto block in dto.Blocks)

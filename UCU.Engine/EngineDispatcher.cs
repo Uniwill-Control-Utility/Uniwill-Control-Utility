@@ -28,12 +28,13 @@ namespace UCU.Engine
         public EngineDispatcher(
             EcEngineGate gate, EngineDomainQueues queues, AppExitSignal appExit,
             EngineMetricsSnapshotSource metrics, IPnpDeviceService devices, IFwNvramService nvram,
-            IAmdSmuService smu, IIntelMsrService msr, IMiniLedService miniLed)
+            IAmdSmuService smu, IIntelMsrService msr, IMiniLedService miniLed,
+            EcRawWriteGuard rawWriteGuard)
         {
             _gate = gate;
             _queues = queues;
             _appExit = appExit;
-            _handlers = BuildHandlers(gate, appExit, metrics, devices, nvram, smu, msr, miniLed);
+            _handlers = BuildHandlers(gate, appExit, metrics, devices, nvram, smu, msr, miniLed, rawWriteGuard);
         }
 
         public IReadOnlyCollection<string> Verbs => _handlers.Keys;
@@ -103,21 +104,21 @@ namespace UCU.Engine
         private static Dictionary<string, VerbHandler> BuildHandlers(
             EcEngineGate gate, AppExitSignal appExit, EngineMetricsSnapshotSource metrics,
             IPnpDeviceService devices, IFwNvramService nvram, IAmdSmuService smu, IIntelMsrService msr,
-            IMiniLedService miniLed)
+            IMiniLedService miniLed, EcRawWriteGuard rawWriteGuard)
         {
             var handlers = new Dictionary<string, VerbHandler>(StringComparer.Ordinal);
 
             void Add(string verb, VerbHandler handler) => handlers.Add(verb, handler);
 
-            FanVerbs.Register(Add, gate);
+            FanVerbs.Register(Add, gate, rawWriteGuard);
             PowerVerbs.Register(Add, gate);
             MuxVerbs.Register(Add, gate);
             KeyboardVerbs.Register(Add, gate);
             BatteryVerbs.Register(Add, gate);
             DeviceVerbs.Register(Add, devices, miniLed);
-            NvramVerbs.Register(Add, nvram);
+            NvramVerbs.Register(Add, nvram, rawWriteGuard);
             CpuVerbs.Register(Add, smu, msr);
-            TelemetryVerbs.Register(Add, gate, metrics);
+            TelemetryVerbs.Register(Add, gate, metrics, rawWriteGuard);
             EngineVerbsImpl.Register(Add, gate, appExit);
 
             return handlers;

@@ -190,10 +190,15 @@ public sealed class EngineRpcTests
         await using var host = await EngineHostFixture.StartAsync();
 
         // Two sequential planner calls: the queue must preserve the callers' order.
-        await host.Fan.WriteRegisterBlocksAsync(new[] { new EcRegisterBlockDto { Address = 0x0600, Data = new byte[] { 0xAA } } });
-        await host.Fan.WriteRegisterBlocksAsync(new[] { new EcRegisterBlockDto { Address = 0x0600, Data = new byte[] { 0xBB } } });
+        // The planner writes the duty tables (0x0F20/0x0F50) — the raw-write gate
+        // admits exactly this domain, so the planner's addresses are the legal ones.
+        await host.Fan.GetStatusAsync(); // trigger the gate handshake, then judge only the plan
+        host.Fake.ClearLog();
 
-        Assert.Equal(new byte[] { 0xAA, 0xBB }, host.Fake.WritesAt(0x0600).ToArray());
+        await host.Fan.WriteRegisterBlocksAsync(new[] { new EcRegisterBlockDto { Address = EcFanRegisters.CpuFanSpeedTable, Data = new byte[] { 0xAA } } });
+        await host.Fan.WriteRegisterBlocksAsync(new[] { new EcRegisterBlockDto { Address = EcFanRegisters.CpuFanSpeedTable, Data = new byte[] { 0xBB } } });
+
+        Assert.Equal(new byte[] { 0xAA, 0xBB }, host.Fake.WritesAt(EcFanRegisters.CpuFanSpeedTable).ToArray());
     }
 
     [Fact]
@@ -225,9 +230,11 @@ public sealed class EngineRpcTests
     {
         await using var host = await EngineHostFixture.StartAsync();
 
-        await host.Telemetry.WriteRegisterAsync(0x07FF, 0x5A);
+        // 0x07A6 (battery charge mode) is on the raw-write allowlist; the
+        // power/mux/magic registers are not (see RawWriteGateTests).
+        await host.Telemetry.WriteRegisterAsync(EcEngine.REG_BATTERY_MODE, 0x08);
 
-        Assert.Equal((byte)0x5A, host.Fake.LastWriteAt(0x07FF)!.Value);
+        Assert.Equal((byte)0x08, host.Fake.LastWriteAt(EcEngine.REG_BATTERY_MODE)!.Value);
     }
 
     [Theory]

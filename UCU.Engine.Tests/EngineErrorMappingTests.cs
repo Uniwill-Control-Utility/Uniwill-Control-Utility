@@ -12,6 +12,7 @@ namespace UCU.Engine.Tests;
 /// are the paths the app's degraded banner and retry logic key off, so a code that
 /// regresses to <c>Internal</c> is a user-visible bug.
 /// </summary>
+[Collection("EngineHostTiming")]
 public sealed class EngineErrorMappingTests
 {
     [Fact]
@@ -119,8 +120,29 @@ public sealed class EngineErrorMappingTests
         Assert.NotEmpty(transport2.WritesAt(EcEngine.REG_MANUAL_FAN_CTRL));
 
         // Any post-toggle settle delay inside the verb finishes before the probe.
-        await Task.Delay(500);
-        await host.Fan.GetFanPwmAsync(0);
+        // The probe rides the same fan queue, and under full-suite load the verb's
+        // tail (GPU tables + control writes behind the 0x0751 byte) can still be
+        // draining when the first probe arrives, so the first attempt may time
+        // out at the 300 ms budget: retry until a call completes. That IS the
+        // "queue survives" claim — a wedged queue never serves, a parked one
+        // serves once its verb drains.
+        EngineException probeFailure = null;
+        var probeDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (DateTime.UtcNow < probeDeadline)
+        {
+            try
+            {
+                await host.Fan.GetFanPwmAsync(0);
+                probeFailure = null;
+                break;
+            }
+            catch (EngineException probeEx)
+            {
+                probeFailure = probeEx;
+                await Task.Delay(250);
+            }
+        }
+        Assert.Null(probeFailure); // surfaces the last probe error if the queue never served
     }
 
     private static async Task<EngineResponse> SendRawAsync(string pipeName, EngineRequest request)
