@@ -28,14 +28,13 @@ namespace UCU.Hardware.Devices
         public const uint CR_SUCCESS = 0x00000000;
         public const uint CR_NO_SUCH_DEVNODE = 0x0000000D;
 
-        /// <summary>Devnode is physically present in the system.</summary>
-        public const uint DF_PRESENT = 0x1;
+        /// <summary>Problem code: the devnode is disabled (Device Manager's
+        /// "disable this device"; what Disable-PnpDevice leaves behind).</summary>
+        public const uint CM_PROB_DISABLED = 22;
 
-        /// <summary>Devnode is disabled (the DNE flag; PowerShell reports "Disable").</summary>
-        public const uint DF_DNE_0 = 0x2;
-
-        /// <summary>Devnode is running.</summary>
-        public const uint DF_RUNNING = 0x4;
+        /// <summary>Problem code: phantom devnode - registered, not physically
+        /// present (Get-PnpDevice reports these as "Unknown").</summary>
+        public const uint CM_PROB_PHANTOM = 45;
 
         /// <summary>Disable visible to all (new) processes - the flag Device Manager's
         /// "disable this device" checkbox sets, the same one Disable-PnpDevice passes.</summary>
