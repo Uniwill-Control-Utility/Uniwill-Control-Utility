@@ -197,6 +197,23 @@ namespace UCU.Contracts
         public int Mode { get; init; }
     }
 
+    /// <summary>
+    /// The charge-threshold pair the current charging mode implies (U-103). A
+    /// READ-ONLY view: the lab-box probe (2026-10-30, docs\acpi\BatteryDiagnostic)
+    /// refuted the open-revo chassis' explicit threshold registers on this family
+    /// (0x07C9/0x07D0 do not read as a percent pair), so the thresholds ARE the
+    /// mode's capacity ceiling plus hysteresis, derived in the codec. There is
+    /// no threshold write verb, by that evidence.
+    /// </summary>
+    public sealed record BatteryThresholdsDto
+    {
+        /// <summary>Charge-up threshold (the mode's capacity ceiling), in percent.</summary>
+        public int UpPercent { get; init; }
+
+        /// <summary>Re-charge restart point, in percent (below the up threshold).</summary>
+        public int DownPercent { get; init; }
+    }
+
     /// <summary>Device enable/disable parameter for the <c>device.*</c> verbs.</summary>
     public sealed record DeviceToggleDto
     {

@@ -315,6 +315,15 @@ namespace UCU.Client
 
         public Task SetModeAsync(int mode, CancellationToken cancellationToken = default) =>
             _client.InvokeAsync(EngineVerbs.Battery.SetMode, new BatteryModeDto { Mode = mode }, cancellationToken);
+
+        public Task<bool> GetGateStatusAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Battery.GetGateStatus, cancellationToken);
+
+        public Task<BatteryThresholdsDto> GetThresholdsAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<BatteryThresholdsDto>(EngineVerbs.Battery.GetThresholds, cancellationToken);
+
+        public Task<bool> GetPlatformOverrideAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Battery.GetPlatformOverride, cancellationToken);
     }
 
     /// <summary>Telemetry verb proxies, including raw register access.</summary>

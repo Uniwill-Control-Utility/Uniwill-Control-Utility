@@ -298,6 +298,49 @@ public sealed class EngineRpcTests
     }
 
     [Fact]
+    public async Task BatteryStatusVerbs_SurfaceGateThresholdsAndOverrideThroughTheWire()
+    {
+        // U-103: three READ verbs over the live EC bytes. The threshold pair is
+        // the mode's derived view (this chassis exposes no threshold registers —
+        // lab probe 2026-10-30), and the reads touch nothing.
+        var transport = new FakeEcTransport();
+        transport.Preset(EcEngine.REG_BATTERY_MODE, 0x28);              // Stationary (the lab box's live value)
+        transport.Preset(EcEngine.REG_BATTERY_GATE_STATUS, 0x12);       // gate bit set beside other flags
+        transport.Preset(EcEngine.REG_BATTERY_PLATFORM_OVERRIDE, 0xFF); // reset = no override (lab idle)
+        await using var host = await EngineHostFixture.StartAsync(transport: transport);
+
+        Assert.True(await host.Battery.GetGateStatusAsync());
+
+        BatteryThresholdsDto thresholds = await host.Battery.GetThresholdsAsync();
+        Assert.Equal(60, thresholds.UpPercent);
+        Assert.Equal(55, thresholds.DownPercent);
+
+        Assert.False(await host.Battery.GetPlatformOverrideAsync());
+
+        // Nothing wrote: the prime's handshake is cleared, and the battery reads
+        // after it add no writes of their own.
+        host.Fake.ClearLog();
+        Assert.True(await host.Battery.GetGateStatusAsync());
+        await host.Battery.GetThresholdsAsync();
+        await host.Battery.GetPlatformOverrideAsync();
+        Assert.Empty(host.Fake.Writes);
+    }
+
+    [Fact]
+    public async Task BatteryPlatformOverride_PinnedValueSurfacesAsAnOverride()
+    {
+        var transport = new FakeEcTransport();
+        transport.Preset(EcEngine.REG_BATTERY_PLATFORM_OVERRIDE, 0x05); // a tool pinned the platform
+        await using var host = await EngineHostFixture.StartAsync(transport: transport);
+
+        Assert.True(await host.Battery.GetPlatformOverrideAsync());
+
+        host.Fake.ClearLog();
+        Assert.True(await host.Battery.GetPlatformOverrideAsync());
+        Assert.Empty(host.Fake.Writes);
+    }
+
+    [Fact]
     public async Task FanStatus_AggregatesOneConsistentSnapshot()
     {
         var transport = new FakeEcTransport();

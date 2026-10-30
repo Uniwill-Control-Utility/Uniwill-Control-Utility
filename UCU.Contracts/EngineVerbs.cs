@@ -77,6 +77,9 @@ namespace UCU.Contracts
             public const string GetTemperature = "battery.get_temperature";
             public const string GetMode = "battery.get_mode";
             public const string SetMode = "battery.set_mode";
+            public const string GetGateStatus = "battery.get_gate_status";
+            public const string GetThresholds = "battery.get_thresholds";
+            public const string GetPlatformOverride = "battery.get_platform_override";
         }
 
         /// <summary>

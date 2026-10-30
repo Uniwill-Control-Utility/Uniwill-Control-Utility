@@ -120,6 +120,58 @@ public sealed class EcEngineBatteryTests
         Assert.Equal(24, engine.ReadBatteryTemperatureC());
     }
 
+    // ---- U-103 status reads: gate bit, derived thresholds, platform override ----
+
+    [Theory]
+    [InlineData(0x12, true)]  // gate bit set beside other flags of the multiplexed byte
+    [InlineData(0x02, false)] // the lab box's idle reading (probe 2026-10-30)
+    public void BatteryGateStatus_DecodesBit4OfTheGateRegister(byte raw, bool expectedActive)
+    {
+        var transport = new FakeEcTransport();
+        transport.Preset(EcEngine.REG_BATTERY_GATE_STATUS, raw);
+        using var engine = new EcEngine(transport, EcPlatform.Amd);
+        engine.Initialize();
+
+        Assert.Equal(expectedActive, engine.GetBatteryGateStatus());
+        Assert.Empty(transport.Writes); // a status row never writes
+    }
+
+    [Theory]
+    [InlineData(0x08, 100, 95)] // High Capacity
+    [InlineData(0x18, 80, 75)]  // Balanced
+    [InlineData(0x28, 60, 55)]  // Stationary (the lab box's live reading)
+    public void BatteryThresholds_AreDerivedFromTheModeRegister(byte modeRaw, int up, int down)
+    {
+        var transport = new FakeEcTransport();
+        transport.Preset(EcEngine.REG_BATTERY_MODE, modeRaw);
+        using var engine = new EcEngine(transport, EcPlatform.Amd);
+        engine.Initialize();
+
+        (int upPercent, int downPercent) = engine.GetBatteryThresholds();
+
+        Assert.Equal(up, upPercent);
+        Assert.Equal(down, downPercent);
+        // No threshold registers exist on this chassis family — the read must
+        // not go near 0x07C9/0x07D0 (the refuted open-revo layout, probe 2026-10-30).
+        Assert.Empty(transport.Writes);
+        Assert.Empty(transport.WritesAt(EcEngine.REG_BATTERY_LIMIT_UP));
+        Assert.Empty(transport.WritesAt(EcEngine.REG_BATTERY_LIMIT_DOWN));
+    }
+
+    [Theory]
+    [InlineData(0xFF, false)] // the documented reset (the lab box idles here)
+    [InlineData(0x05, true)]  // the tools' pin value
+    public void BatteryPlatformOverride_DecodesTheOverrideRegister(byte raw, bool expectedActive)
+    {
+        var transport = new FakeEcTransport();
+        transport.Preset(EcEngine.REG_BATTERY_PLATFORM_OVERRIDE, raw);
+        using var engine = new EcEngine(transport, EcPlatform.Amd);
+        engine.Initialize();
+
+        Assert.Equal(expectedActive, engine.GetBatteryPlatformOverride());
+        Assert.Empty(transport.Writes);
+    }
+
     /// <summary>Serves <paramref name="goodReads"/> reads, then reports the EC unresponsive.</summary>
     private sealed class LimitedGoodReadTransport : IEcTransport
     {

@@ -53,7 +53,9 @@ Every EC write passes a server-side check before the transport moves a byte, at 
 
 CPU platform (AMD vs Intel) matters for the GPU-mux byte encodings: the engine reads the boot processor's vendor identifier from `HARDWARE\DESCRIPTION\System\CentralProcessor\0`, the app resolves the same fact from `Family.TYPE` (CPUID + WMI) for its own encodings.
 
-Register and table formats are documented in [Uniwill EC fan control](../protocols/uniwill-ec-fan-control.md) and [NVIDIA GPU power control](../protocols/nvidia-gpu-power-control.md).
+Register and table formats are documented in [Uniwill EC fan control](../protocols/uniwill-ec-fan-control.md), [Uniwill EC battery charge control](../protocols/uniwill-ec-battery-control.md) and [NVIDIA GPU power control](../protocols/nvidia-gpu-power-control.md).
+
+The battery rows are read-mostly by evidence: the chassis' charge mode (`0x07A6`, field bits 3-5) is writable through `battery.set_mode` with the codec validator in front; the charge-gate bit (`0x0742!bit4`, multiplexed with the fan-turbo support flag), the platform-override byte (`0x0770`) and the charge thresholds (**derived from the mode**, because the field probe refuted the sibling chassis' threshold registers on this family) surface through read verbs and the Battery page's 5 s poll. A pre-U-103 engine answers the new verbs with `UnsupportedVerb` and the rows hide; nothing writes an address whose semantics this chassis has not demonstrated.
 
 ## AMD CPU path (app-side)
 
