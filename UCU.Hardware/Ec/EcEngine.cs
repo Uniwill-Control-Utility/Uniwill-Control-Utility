@@ -82,6 +82,13 @@ namespace UCU.Hardware.Ec
         public const ushort REG_RGB_GREEN = 0x076A;
         public const ushort REG_RGB_BLUE = 0x076B;
         public const ushort REG_TRIGGER = 0x0767;
+
+        /// <summary>Win-key lock STATUS byte (read-only truth; the SET rides
+        /// REG_TRIGGER's bit 0 as a toggle). Field-verified U-108.</summary>
+        public const ushort REG_WINLOCK_STATUS = 0x0768;
+
+        /// <summary>Fn-key lock register: bit 4 = locked (0x11/0x01).</summary>
+        public const ushort REG_FN_LOCK = 0x074E;
         public const ushort REG_KBD_STATUS = 0x078C;
 
         // --- Project ID (hardware revision) ---
@@ -1644,6 +1651,126 @@ namespace UCU.Hardware.Ec
         }
 
         /// <summary>
+        /// Fn-key lock truth (U-108): 0x074E bit 4 (0x11 locked / 0x01
+        /// unlocked, the open-revo encoding; field-verified on the lab box).
+        /// </summary>
+        public bool GetFnLockLocked()
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                return EcSwitchCodec.IsFnLockLocked(ReadECInternal(REG_FN_LOCK));
+            }
+        }
+
+        /// <summary>
+        /// Commands the Fn-key lock by a bit-scoped RMW (the codec returns
+        /// every other bit of 0x074E unchanged). The result is what the EC
+        /// READS BACK, not what was asked: the caller reflects firmware
+        /// truth, not intent.
+        /// </summary>
+        public bool SetFnLockLocked(bool locked)
+        {
+            EnsureInitialized();
+
+            byte before, after;
+            lock (_lock)
+            {
+                before = ReadECInternal(REG_FN_LOCK);
+                byte want = EcSwitchCodec.FnLockByte(before, locked);
+                if (before == want)
+                {
+                    after = before;
+                }
+                else
+                {
+                    WriteECInternal(REG_FN_LOCK, want);
+                    after = ReadECInternal(REG_FN_LOCK);
+                }
+            }
+
+            bool observed = EcSwitchCodec.IsFnLockLocked(after) == locked;
+            DebugLog($"[KBD] EcEngine: Fn lock -> {locked}: 0x{before:X2} -> 0x{after:X2}, observed={observed}");
+            return observed;
+        }
+
+        /// <summary>
+        /// Win-key lock truth (U-108): the EC status byte 0x0768 bit 0. The
+        /// state lives in the EC, so it survives app restarts (acceptance a)
+        /// — the app never re-applies it, it re-reads it.
+        /// </summary>
+        public bool GetWinLockLocked()
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                return EcSwitchCodec.IsWinLockLocked(ReadECInternal(REG_WINLOCK_STATUS));
+            }
+        }
+
+        /// <summary>
+        /// Commands the Win-key lock. The EC register is a STATUS byte —
+        /// there is no "write the state" primitive: the act FIRES the
+        /// trigger byte (0x0767 bit 0, self-consuming) which TOGGLES the
+        /// lock. The lab-box probe fixed the honest shape: a fire flips the
+        /// status within ~0.1 s, and a fire inside the firmware's debounce
+        /// window is swallowed. So: fire ONLY on truth mismatch, exactly
+        /// once per command, and verify by re-read. The result is the lock
+        /// state the EC reports after the act.
+        /// </summary>
+        public bool SetWinLockLocked(bool locked)
+        {
+            EnsureInitialized();
+
+            bool before;
+            lock (_lock)
+            {
+                before = EcSwitchCodec.IsWinLockLocked(ReadECInternal(REG_WINLOCK_STATUS));
+            }
+
+            if (before == locked)
+            {
+                // Truth already agrees: no fire. Re-firing would toggle away
+                // from the desired state — the trigger is a TOGGLE.
+                return true;
+            }
+
+            lock (_lock)
+            {
+                byte trigger = ReadECInternal(REG_TRIGGER);
+                WriteECInternal(REG_TRIGGER, EcSwitchCodec.WinLockTriggerByte(trigger));
+            }
+
+            // Verify by re-read: the queue is serial and the fire is once
+            // per command, so no self-debounce; the poll only waits for the
+            // firmware's own reaction (~0.1 s observed). The 2 s budget is
+            // WALL-CLOCK, not an iteration count: a loaded machine stretches
+            // each sleep, and a verb that overshot its budget would push the
+            // caller's RPC timeout — the watchdog clock, not the scheduler,
+            // bounds the wait.
+            var budget = Stopwatch.StartNew();
+            while (budget.ElapsedMilliseconds < 2000)
+            {
+                Thread.Sleep(200);
+
+                bool now;
+                lock (_lock)
+                {
+                    now = EcSwitchCodec.IsWinLockLocked(ReadECInternal(REG_WINLOCK_STATUS));
+                }
+
+                if (now == locked)
+                {
+                    DebugLog($"[KBD] EcEngine: Win lock -> {locked}: fired trigger 0x{REG_TRIGGER:X4}, status verified");
+                    return true;
+                }
+            }
+
+            DebugLog($"[KBD] EcEngine: Win lock -> {locked}: fired trigger 0x{REG_TRIGGER:X4}, status 0x{REG_WINLOCK_STATUS:X4} NOT verified");
+            return GetWinLockLocked() == locked;
+        }
+
+        /// <summary>
         /// Turns off the keyboard backlight by setting the KBD_POWER_OFF bit.
         /// </summary>
         public void TurnOffKeyboard()
@@ -1872,6 +1999,54 @@ namespace UCU.Hardware.Ec
             {
                 DebugLog($"[DIAG] EcEngine: Failed to set overboost profile: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// AC power recovery truth (U-108): 0x0726 bit 3 — "turn the machine
+        /// on when AC power is restored". The register is SHARED: bit 7 is
+        /// the power-management gate the activation handshake RMWs, and the
+        /// open-revo registry names bit 7's neighborhood for the Q-key LED;
+        /// the EC multiplexes, so every writer on this address is bit-scoped
+        /// (the field probe watched a bit-3 toggle leave bit 7 and every
+        /// other bit untouched).
+        /// </summary>
+        public bool GetAcRecoveryEnabled()
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                return EcSwitchCodec.IsAcRecoveryEnabled(ReadECInternal(REG_POWER_MGMT_726));
+            }
+        }
+
+        /// <summary>
+        /// Commands AC power recovery via the bit-scoped RMW (the codec's
+        /// preserve-every-other-bit rule is the handshake coexistence
+        /// guarantee). The result is what the EC reads back.
+        /// </summary>
+        public bool SetAcRecoveryEnabled(bool enabled)
+        {
+            EnsureInitialized();
+
+            byte before, after;
+            lock (_lock)
+            {
+                before = ReadECInternal(REG_POWER_MGMT_726);
+                byte want = EcSwitchCodec.AcRecoveryByte(before, enabled);
+                if (before == want)
+                {
+                    after = before;
+                }
+                else
+                {
+                    WriteECInternal(REG_POWER_MGMT_726, want);
+                    after = ReadECInternal(REG_POWER_MGMT_726);
+                }
+            }
+
+            bool observed = EcSwitchCodec.IsAcRecoveryEnabled(after) == enabled;
+            DebugLog($"EcEngine: AC recovery -> {enabled}: 0x{REG_POWER_MGMT_726:X4} 0x{before:X2} -> 0x{after:X2}, observed={observed}");
+            return observed;
         }
 
         /// <summary>

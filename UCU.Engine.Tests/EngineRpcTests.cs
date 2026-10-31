@@ -10,7 +10,13 @@ namespace UCU.Engine.Tests;
 /// EcEngine → fake transport. The byte-level expectations are the same golden
 /// sequences UCU.Hardware.Tests pins for the in-process engine, so a phase-2
 /// regression can only be in the transport layer, never in the EC logic.
+///
+/// Serialized into the host-timing collection: every test boots a full engine,
+/// and a wave of concurrently booting hosts (the verb suites each boot one per
+/// test) was measured starving ApplyCurve past the client's 30 s call budget
+/// (40 s duration at the Timeout throw, 2026-10-31 suite run).
 /// </summary>
+[Collection("EngineHostTiming")]
 public sealed class EngineRpcTests
 {
     private static readonly int[] BalancedDuties = { 0, 30, 32, 36, 40, 47, 55, 62, 72, 84, 100 };

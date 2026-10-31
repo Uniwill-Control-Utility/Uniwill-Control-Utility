@@ -144,6 +144,12 @@ namespace UCU.Client
 
         public Task<bool> IsCustomProfileActiveAsync(CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<bool>(EngineVerbs.Power.IsCustomProfileActive, cancellationToken);
+
+        public Task<bool> GetAcRecoveryAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Power.GetAcRecovery, cancellationToken);
+
+        public Task<bool> SetAcRecoveryAsync(bool enabled, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Power.SetAcRecovery, EngineSerializer.ToParams(new DeviceToggleDto { Enabled = enabled }), cancellationToken);
     }
 
     /// <summary>MUX verb proxies; <see cref="GetStateAsync"/> composes three reads.</summary>
@@ -301,6 +307,18 @@ namespace UCU.Client
 
         public Task<bool> IsWhiteOnlyAsync(CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<bool>(EngineVerbs.Keyboard.IsWhiteOnlyKeyboard, cancellationToken);
+
+        public Task<bool> GetWinLockAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Keyboard.GetWinLock, cancellationToken);
+
+        public Task<bool> SetWinLockAsync(bool locked, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Keyboard.SetWinLock, EngineSerializer.ToParams(new DeviceToggleDto { Enabled = locked }), cancellationToken);
+
+        public Task<bool> GetFnLockAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Keyboard.GetFnLock, cancellationToken);
+
+        public Task<bool> SetFnLockAsync(bool locked, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Keyboard.SetFnLock, EngineSerializer.ToParams(new DeviceToggleDto { Enabled = locked }), cancellationToken);
     }
 
     /// <summary>Battery verb proxies.</summary>

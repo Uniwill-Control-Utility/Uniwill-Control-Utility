@@ -953,5 +953,11 @@
   "CPU power limits (PL1 / PL2)": "Batas daya CPU (PL1 / PL2)",
   "Restore the preset\u0027s CPU power limits when the firmware reports they were changed": "Pulihkan batas daya CPU preset saat firmware melaporkan mereka diubah",
   "Power limits restored": "Batas daya dipulihkan",
-  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "Batas daya GPU/CPU diubah oleh program lain. UCU menerapkan ulang penyetelan Anda."
+  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "Batas daya GPU/CPU diubah oleh program lain. UCU menerapkan ulang penyetelan Anda.",
+  "Windows Key Lock": "Kunci Tombol Windows",
+  "Blocks the Windows key; the lock lives in the firmware, so it stays active after UCU closes": "Memblokir tombol Windows; kunci tersimpan di firmware, sehingga tetap aktif setelah UCU ditutup",
+  "Fn Key Lock": "Kunci Tombol Fn",
+  "Locks the Fn layer, like the keyboard\u0027s own Fn lock shortcut; the state lives in the firmware": "Mengunci lapisan Fn, seperti pintasan kunci Fn bawaan keyboard; status tersimpan di firmware",
+  "AC Power Recovery": "Pemulihan Daya AC",
+  "Turn the laptop on automatically when AC power is restored, e.g. after a power outage": "Menyalakan laptop secara otomatis saat daya AC dipulihkan, mis. setelah pemadaman listrik"
 }

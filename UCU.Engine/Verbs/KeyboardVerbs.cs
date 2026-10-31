@@ -56,6 +56,29 @@ namespace UCU.Engine
 
             add(EngineVerbs.Keyboard.IsWhiteOnlyKeyboard, (p, ct) =>
                 Task.FromResult<object?>(gate.Acquire().IsWhiteOnlyKeyboard()));
+
+            // Device locks (U-108). Win-lock rides the trigger byte, so the
+            // handler runs on this domain: the fire's RMW of 0x0767 is
+            // ordered against the effect writes, and the status byte is the
+            // truth the UI reflects (it survives app restarts in the EC —
+            // the app re-reads it, never re-applies it).
+            add(EngineVerbs.Keyboard.GetWinLock, (p, ct) =>
+                Task.FromResult<object?>(gate.Acquire().GetWinLockLocked()));
+
+            add(EngineVerbs.Keyboard.SetWinLock, (p, ct) =>
+            {
+                DeviceToggleDto dto = EngineSerializer.BindParams<DeviceToggleDto>(p);
+                return Task.FromResult<object?>(gate.Acquire().SetWinLockLocked(dto.Enabled));
+            });
+
+            add(EngineVerbs.Keyboard.GetFnLock, (p, ct) =>
+                Task.FromResult<object?>(gate.Acquire().GetFnLockLocked()));
+
+            add(EngineVerbs.Keyboard.SetFnLock, (p, ct) =>
+            {
+                DeviceToggleDto dto = EngineSerializer.BindParams<DeviceToggleDto>(p);
+                return Task.FromResult<object?>(gate.Acquire().SetFnLockLocked(dto.Enabled));
+            });
         }
     }
 }

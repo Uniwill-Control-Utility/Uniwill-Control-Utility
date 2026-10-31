@@ -17,6 +17,8 @@ using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Scripts.Misc;
 using Uniwill_Control_Utility.Services;
+using UCU.Contracts;
+using UCU.Contracts.Capabilities;
 using Wpf.Ui.Abstractions.Controls;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
@@ -182,6 +184,14 @@ namespace Uniwill_Control_Utility.Views.Pages
             _isNvramAvailable = apMenuSupported;
             ApMenuDivider.Visibility = apMenuSupported ? Visibility.Visible : Visibility.Collapsed;
             ApMenuRow.Visibility = apMenuSupported ? Visibility.Visible : Visibility.Collapsed;
+            // Hardware-management EC rows (U-108): the Windows-key lock, Fn-key
+            // lock and AC power recovery have NO app setting — the state lives
+            // in the firmware, so the rows reflect the EC's truth (the same
+            // one-pipe-call-in-the-constructor pattern as the AP-menu probe
+            // above) and stay hidden when the engine has no truth to report:
+            // a pre-U-108 engine answers UnsupportedVerb, an EC-less engine
+            // answers HardwareUnavailable, a failed read shows no toggle.
+            InitDeviceSwitchRows();
             _featureNavigationControlsReady = true;
 
             cbxLogLevel.SelectedIndex = Settings.Default.DiagnosticLogLevel;
@@ -568,6 +578,21 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool? _powerBoost;
         private bool? _flydigiEnabled;
 
+        // Hardware-management EC truth rows (U-108). Same belief discipline:
+        // the belief starts from the EC's READ truth (never from the XAML
+        // value — these rows have no saved setting), and the actuation
+        // reflects the OBSERVED state the engine reports, because the
+        // firmware owns the outcome (the win-lock trigger is a toggle whose
+        // fire can be swallowed by the firmware's debounce; the EC register
+        // is the only word).
+        private bool? _winLockOn;
+        private bool? _fnLockOn;
+        private bool? _acRecoveryOn;
+
+        private IKeyboardCapability? _keyboard;
+        private IPowerCapability? _power;
+        private IEngineCapability? _engineCaps;
+
         /// <summary>
         /// Write a reflected state into a toggle, moving the row's belief with it
         /// so the event that write raises is recognized as a reflection.
@@ -690,6 +715,157 @@ namespace Uniwill_Control_Utility.Views.Pages
             Settings.Default.Save();
             _ = HardwareManagement.SetTouchpadAsync(false);
         }
+
+        #region Hardware-management EC switch rows (U-108)
+
+        /// <summary>
+        /// Probes the three EC truth rows at construction, one pipe call each
+        /// behind the EC-availability gate (the AP-menu row above established
+        /// the synchronous-probe shape). A row is shown ONLY when its truth
+        /// read succeeded; UnsupportedVerb (an engine installed before the
+        /// switch verbs), HardwareUnavailable and any read failure leave the
+        /// row collapsed — the page never shows a toggle it cannot back with
+        /// the firmware's word.
+        /// </summary>
+        private void InitDeviceSwitchRows()
+        {
+            _keyboard = App.GetService<IKeyboardCapability>();
+            _power = App.GetService<IPowerCapability>();
+            _engineCaps = App.GetService<IEngineCapability>();
+
+            bool ecAvailable = false;
+            if (_keyboard is not null && _power is not null && _engineCaps is not null)
+            {
+                try
+                {
+                    ecAvailable = _engineCaps.IsHardwareAvailableAsync().GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "[Settings] EC availability probe failed for the device-switch rows");
+                }
+            }
+
+            if (!ecAvailable)
+                return;
+
+            ReadSwitchTruth(() => _keyboard!.GetWinLockAsync(), WinLockRow, WinLockDivider,
+                cbWinLockToggle, ref _winLockOn, "Windows-key lock");
+            ReadSwitchTruth(() => _keyboard!.GetFnLockAsync(), FnLockRow, FnLockDivider,
+                cbFnLockToggle, ref _fnLockOn, "Fn-key lock");
+            ReadSwitchTruth(() => _power!.GetAcRecoveryAsync(), AcRecoveryRow, AcRecoveryDivider,
+                cbAcRecoveryToggle, ref _acRecoveryOn, "AC power recovery");
+        }
+
+        private void ReadSwitchTruth(Func<System.Threading.Tasks.Task<bool>> read, UIElement row,
+            System.Windows.Controls.Border divider, Wpf.Ui.Controls.ToggleSwitch toggle, ref bool? belief, string rowName)
+        {
+            try
+            {
+                bool truth = read().GetAwaiter().GetResult();
+
+                row.Visibility = Visibility.Visible;
+                divider.Visibility = Visibility.Visible;
+                ReflectToggleState(toggle, truth, ref belief);
+            }
+            catch (EngineException ex) when (ex.Code == EngineErrorCode.UnsupportedVerb)
+            {
+                _logger.LogInformation("[Settings] {Row} hidden: the installed engine predates the switch verbs", rowName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "[Settings] {Row} hidden: the EC truth could not be read", rowName);
+            }
+        }
+
+        private void HideDeviceSwitchRow(UIElement row, System.Windows.Controls.Border divider)
+        {
+            row.Visibility = Visibility.Collapsed;
+            divider.Visibility = Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Commands one EC switch and reflects the OBSERVED state: the SET
+        /// verbs answer with what the EC reports after the act, not with the
+        /// request (the win-lock trigger is a toggle — the engine fires it
+        /// once on truth mismatch, so a swallowed fire means the lock did
+        /// not move and the toggle must show that). A failed actuation
+        /// reverts the toggle to the complement of the command: the page's
+        /// last observed truth.
+        /// </summary>
+        private async System.Threading.Tasks.Task ActuateSwitchAsync(bool commanded,
+            Func<System.Threading.Tasks.Task<bool>> actuate,
+            System.Action<bool> reflect, System.Action hide, string rowName)
+        {
+            bool observed;
+            try
+            {
+                observed = await actuate();
+            }
+            catch (EngineException ex) when (ex.Code == EngineErrorCode.UnsupportedVerb)
+            {
+                _logger.LogInformation("[Settings] {Row} hidden: the engine no longer answers the switch verb", rowName);
+                hide();
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[Settings] {Row} actuation failed; reverting to the last observed state", rowName);
+                observed = !commanded;
+            }
+
+            await Dispatcher.InvokeAsync(() => reflect(observed));
+        }
+
+        private void cbWinLockToggle_Checked(object sender, RoutedEventArgs e) => ActuateWinLock(true);
+
+        private void cbWinLockToggle_Unchecked(object sender, RoutedEventArgs e) => ActuateWinLock(false);
+
+        private void ActuateWinLock(bool locked)
+        {
+            if (!UserIntent(cbWinLockToggle, ref _winLockOn, "Windows-key lock"))
+                return;
+
+            _ = ActuateSwitchAsync(locked,
+                () => _keyboard!.SetWinLockAsync(locked),
+                observed => ReflectToggleState(cbWinLockToggle, observed, ref _winLockOn),
+                () => HideDeviceSwitchRow(WinLockRow, WinLockDivider),
+                "Windows-key lock");
+        }
+
+        private void cbFnLockToggle_Checked(object sender, RoutedEventArgs e) => ActuateFnLock(true);
+
+        private void cbFnLockToggle_Unchecked(object sender, RoutedEventArgs e) => ActuateFnLock(false);
+
+        private void ActuateFnLock(bool locked)
+        {
+            if (!UserIntent(cbFnLockToggle, ref _fnLockOn, "Fn-key lock"))
+                return;
+
+            _ = ActuateSwitchAsync(locked,
+                () => _keyboard!.SetFnLockAsync(locked),
+                observed => ReflectToggleState(cbFnLockToggle, observed, ref _fnLockOn),
+                () => HideDeviceSwitchRow(FnLockRow, FnLockDivider),
+                "Fn-key lock");
+        }
+
+        private void cbAcRecoveryToggle_Checked(object sender, RoutedEventArgs e) => ActuateAcRecovery(true);
+
+        private void cbAcRecoveryToggle_Unchecked(object sender, RoutedEventArgs e) => ActuateAcRecovery(false);
+
+        private void ActuateAcRecovery(bool enabled)
+        {
+            if (!UserIntent(cbAcRecoveryToggle, ref _acRecoveryOn, "AC power recovery"))
+                return;
+
+            _ = ActuateSwitchAsync(enabled,
+                () => _power!.SetAcRecoveryAsync(enabled),
+                observed => ReflectToggleState(cbAcRecoveryToggle, observed, ref _acRecoveryOn),
+                () => HideDeviceSwitchRow(AcRecoveryRow, AcRecoveryDivider),
+                "AC power recovery");
+        }
+
+        #endregion
 
         /// <summary>
         /// Pulls the live Wi-Fi/Bluetooth/webcam states (and the persisted touchpad state)

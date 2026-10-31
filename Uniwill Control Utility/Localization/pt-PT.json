@@ -953,5 +953,11 @@
   "CPU power limits (PL1 / PL2)": "Limites de energia da CPU (PL1 / PL2)",
   "Restore the preset\u0027s CPU power limits when the firmware reports they were changed": "Rep\u00F5e os limites de energia da CPU do predefinido quando o firmware informa que foram alterados",
   "Power limits restored": "Limites de energia repostos",
-  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "Os limites de energia da GPU/CPU foram alterados por outro programa. O UCU voltou a aplicar o seu ajuste."
+  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "Os limites de energia da GPU/CPU foram alterados por outro programa. O UCU voltou a aplicar o seu ajuste.",
+  "Windows Key Lock": "Bloqueio da tecla Windows",
+  "Blocks the Windows key; the lock lives in the firmware, so it stays active after UCU closes": "Bloqueia a tecla Windows; o bloqueio reside no firmware, pelo que continua ativo ap\u00F3s encerrar o UCU",
+  "Fn Key Lock": "Bloqueio da tecla Fn",
+  "Locks the Fn layer, like the keyboard\u0027s own Fn lock shortcut; the state lives in the firmware": "Bloqueia a camada Fn, como o pr\u00F3prio atalho de bloqueio Fn do teclado; o estado reside no firmware",
+  "AC Power Recovery": "Recupera\u00E7\u00E3o de alimenta\u00E7\u00E3o CA",
+  "Turn the laptop on automatically when AC power is restored, e.g. after a power outage": "Liga automaticamente o port\u00E1til quando a alimenta\u00E7\u00E3o CA \u00E9 reposta, p. ex. ap\u00F3s uma falha de energia"
 }

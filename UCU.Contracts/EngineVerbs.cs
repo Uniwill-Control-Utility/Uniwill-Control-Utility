@@ -67,6 +67,17 @@ namespace UCU.Contracts
             /// policy).
             /// </summary>
             public const string HealContract = "power.heal_contract";
+
+            /// <summary>
+            /// AC power recovery (U-108): "turn the machine on when AC power is
+            /// restored" (EC 0x0726 bit 3, field-probed on the lab box:
+            /// bit-scoped RMW preserves every other bit of the register,
+            /// including the power-management gate bit 7 the engine's
+            /// activation handshake owns — one shared RMW discipline, never a
+            /// second writer that stomps).
+            /// </summary>
+            public const string GetAcRecovery = "power.get_ac_recovery";
+            public const string SetAcRecovery = "power.set_ac_recovery";
         }
 
         public static class Mux
@@ -88,6 +99,27 @@ namespace UCU.Contracts
             public const string TriggerRainbowEffect = "keyboard.trigger_rainbow_effect";
             public const string IsRgbKeyboard = "keyboard.is_rgb";
             public const string IsWhiteOnlyKeyboard = "keyboard.is_white_only";
+
+            /// <summary>
+            /// Win-key lock (U-108): the truth is the EC status byte 0x0768
+            /// bit 0; the SET fires the trigger byte 0x0767 (bit 0,
+            /// self-consuming) which TOGGLES the lock — the engine fires only
+            /// on truth mismatch and verifies the flip by re-read (the lab
+            /// box: trigger honored, debounce swallows rapid re-fires, lock
+            /// state persists across app restarts in the EC). Fires ride the
+            /// keyboard domain so trigger-byte RMWs are ordered against the
+            /// effect writes.
+            /// </summary>
+            public const string GetWinLock = "keyboard.get_win_lock";
+            public const string SetWinLock = "keyboard.set_win_lock";
+
+            /// <summary>
+            /// Fn-key lock (U-108): EC 0x074E bit 4 (0x10 locked, 0x01
+            /// unlocked — open-revo encoding, field-verified writable with
+            /// every other bit preserved). Plain bit-scoped RMW.
+            /// </summary>
+            public const string GetFnLock = "keyboard.get_fn_lock";
+            public const string SetFnLock = "keyboard.set_fn_lock";
         }
 
         public static class Battery

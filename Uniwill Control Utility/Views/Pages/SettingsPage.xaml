@@ -791,6 +791,90 @@
                                                  Unchecked="cbTouchpadToggle_Unchecked" />
                             </Grid>
 
+                            <!-- Divider -->
+                            <Border x:Name="WinLockDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Row: Windows key lock (EC truth, U-108) -->
+                            <Grid x:Name="WinLockRow" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Windows Key Lock" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Blocks the Windows key; the lock lives in the firmware, so it stays active after UCU closes" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbWinLockToggle"
+                                                 Grid.Column="1"
+                                                 IsChecked="False"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbWinLockToggle_Checked"
+                                                 Unchecked="cbWinLockToggle_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border x:Name="FnLockDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Row: Fn key lock (EC truth, U-108) -->
+                            <Grid x:Name="FnLockRow" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="Fn Key Lock" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Locks the Fn layer, like the keyboard's own Fn lock shortcut; the state lives in the firmware" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbFnLockToggle"
+                                                 Grid.Column="1"
+                                                 IsChecked="False"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbFnLockToggle_Checked"
+                                                 Unchecked="cbFnLockToggle_Unchecked" />
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border x:Name="AcRecoveryDivider" Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Row: AC power recovery (EC truth, U-108) -->
+                            <Grid x:Name="AcRecoveryRow" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <ui:TextBlock FontTypography="Body" Text="AC Power Recovery" />
+                                    <ui:TextBlock Margin="0,2,0,2"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Turn the laptop on automatically when AC power is restored, e.g. after a power outage" />
+                                </StackPanel>
+                                <ui:ToggleSwitch x:Name="cbAcRecoveryToggle"
+                                                 Grid.Column="1"
+                                                 IsChecked="False"
+                                                 LabelPosition="Left"
+                                                 OnContent="On"
+                                                 OffContent="Off"
+                                                 Checked="cbAcRecoveryToggle_Checked"
+                                                 Unchecked="cbAcRecoveryToggle_Unchecked" />
+                            </Grid>
+
                         </StackPanel>
                     </ui:CardExpander>
 
