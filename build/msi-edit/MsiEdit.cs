@@ -31,7 +31,7 @@ static class MsiEdit
 
         if (string.IsNullOrEmpty(msi))
         {
-            Console.Error.WriteLine("usage: msi-edit inspect|suppress <msi> [uninstallTarget [arpKey]]");
+            Console.Error.WriteLine("usage: msi-edit inspect|suppress|export <msi> [uninstallTarget [arpKey]]  (export: 3rd = table, 4th = folder)");
             Environment.Exit(2);
         }
 
@@ -45,6 +45,17 @@ static class MsiEdit
             if (mode == "inspect")
             {
                 Inspect(db);
+            }
+            else if (mode == "export")
+            {
+                // db.Export(table, folder, file): MSI's own ISTG text form of
+                // a table (column-name / type / key lines + tab-separated
+                // rows). Ground truth for any authoring discussion; U-111's
+                // service-table plan was retired with the evidence recorded
+                // in pack.ps1.
+                if (args.Length < 4) throw new Exception("export mode needs table and folder");
+                db.Export(args[2], args[3], args[2] + ".idt");
+                Console.WriteLine("exported " + args[2]);
             }
             else if (mode == "suppress")
             {
@@ -133,7 +144,11 @@ static class MsiEdit
     static List<List<string>> Query(Database db, string sql)
     {
         var result = new List<List<string>>();
-        View view = db.OpenView(sql);
+        // MSI's SQL failure is terse ("OpenView,Sql"); name the statement, so
+        // a pack-time failure is diagnosable from the log alone.
+        View view;
+        try { view = db.OpenView(sql); }
+        catch (Exception e) { throw new Exception("SELECT rejected [" + sql + "]: " + e.Message, e); }
         try
         {
             view.Execute(null);
@@ -308,7 +323,9 @@ static class MsiEdit
 
     static void Execute(Database db, string sql)
     {
-        var view = db.OpenView(sql);
+        View view;
+        try { view = db.OpenView(sql); }
+        catch (Exception e) { throw new Exception("SQL rejected [" + sql + "]: " + e.Message, e); }
         try { view.Execute(null); }
         finally { view.Close(); Marshal.ReleaseComObject(view); }
     }
