@@ -27,7 +27,8 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Grid.Row="0"
+        <ui:TitleBar x:Name="titleBar"
+                     Grid.Row="0"
                      Title="PawnIO Driver Setup"
                      Icon="pack://application:,,,/Assets/applicationIcon-256.png"
                      CanMaximize="False"
@@ -48,7 +49,8 @@
 
                 <StackPanel Orientation="Horizontal">
                     <ui:SymbolIcon Symbol="Info20" FontSize="28" Margin="0,0,12,0" />
-                    <TextBlock FontSize="23"
+                    <TextBlock x:Name="headerText"
+                               FontSize="23"
                                FontWeight="Medium"
                                VerticalAlignment="Center"
                                Text="PawnIO Driver Required" />
@@ -91,6 +93,18 @@
                                Height="38"
                                Click="btn2_Click"
                                Content="Cancel" />
+                    <!-- U-110: shown only when a failed install decodes to a
+                         Core Isolation (Memory Integrity) block; opens
+                         Windows Security so the user can see the policy.
+                         The copy states the app does NOT ask to disable it. -->
+                    <ui:Button x:Name="SecurityButton"
+                               Width="200"
+                               Height="38"
+                               Margin="10,0,0,0"
+                               Appearance="Primary"
+                               Click="SecurityButton_Click"
+                               Content="Open Windows Security"
+                               Visibility="Collapsed" />
                     <ui:Button x:Name="ToggleButton"
                                Width="160"
                                Height="38"

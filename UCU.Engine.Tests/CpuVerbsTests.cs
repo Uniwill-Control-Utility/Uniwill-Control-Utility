@@ -81,6 +81,28 @@ public sealed class CpuVerbsTests
     }
 
     [Fact]
+    public async Task ExecuteAmdSmuCommand_PawnIoInitFailure_CarriesTheWin32BlockCodeInThePayload()
+    {
+        // U-110: the init-failure message embeds the Win32 open code (1275
+        // names Core Isolation as the blocker — the code OpenRevo recognizes
+        // from StartService), and the dispatcher propagates the
+        // InvalidOperationException message verbatim, so the app explains
+        // the block with the code in hand, not a bare "failed to initialise".
+        var smu = new FakeAmdSmuService().Fails("set-coper",
+            new InvalidOperationException(
+                "AMD PawnIO failed to initialise. (Win32 1275 opening \\\\?\\GLOBALROOT\\Device\\PawnIO)"));
+
+        await using var host = await EngineHostFixture.StartAsync(
+            configure: o => o with { AmdSmuOverride = smu });
+
+        EngineException ex = await Assert.ThrowsAsync<EngineException>(
+            () => host.Smu.ExecuteCommandAsync("set-coper", 3));
+
+        Assert.Equal(EngineErrorCode.HardwareFault, ex.Code);
+        Assert.Contains("Win32 1275", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ExecuteAmdSmuCommand_RunsOnTheCpuQueue_InOrder()
     {
         // Two applies for one preset batch must not interleave on the shared

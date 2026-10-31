@@ -1,6 +1,8 @@
+using Microsoft.Win32;
 using Microsoft.Win32.SafeHandles;
 using System;
 using System.Runtime.InteropServices;
+using UCU.Core.Supervision;
 
 namespace Uniwill_Control_Utility.Services
 {
@@ -8,6 +10,17 @@ namespace Uniwill_Control_Utility.Services
     {
         private static readonly string OldDevicePath = @"\\.\PawnIO";
         private static readonly string DevicePath = @"\\?\GLOBALROOT\Device\PawnIO";
+
+        // HVCI truth (U-110): the DeviceGuard scenario key Memory Integrity
+        // writes; Enabled = 1 means the policy is ON. Standard users can read
+        // it — the diagnostic never needs elevation.
+        private const string DeviceGuardKeyPath =
+            @"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity";
+
+        // PawnIO's own uninstall entry — the "driver is installed" witness
+        // (the same key the AMD/Intel PawnIO helpers read for the version).
+        private const string PawnIoUninstallKeyPath =
+            @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PawnIO";
 
         private const uint GENERIC_READ = 0x80000000;
         private const uint FILE_SHARE_READ = 0x00000001;
@@ -67,6 +80,67 @@ namespace Uniwill_Control_Utility.Services
         public static bool ShouldOpenInstaller()
         {
             return !IsInstalled();
+        }
+
+        /// <summary>
+        /// The U-110 diagnostic: why the device is absent. A device that
+        /// EXISTS (openable, or access-denied to this token) is not blocked —
+        /// only a missing device is explained. UCU installs through the
+        /// vendor installer, so there is usually no StartService code to
+        /// read: the installed-driver + Memory-Integrity-ON + device-absent
+        /// inference is the honest shape (policy:
+        /// <see cref="PawnIoDriverBlockPolicy"/>; OpenRevo's driver manager
+        /// names the hard 1275 the same way).
+        /// </summary>
+        public static PawnIoBlockReason GetBlockReason()
+        {
+            PawnIoDetectionResult status = GetStatus();
+
+            if (status == PawnIoDetectionResult.Available ||
+                status == PawnIoDetectionResult.AccessDenied)
+            {
+                return PawnIoBlockReason.None;
+            }
+
+            return PawnIoDriverBlockPolicy.Diagnose(
+                startWin32Code: null,
+                memoryIntegrityOn: MemoryIntegrityEnabled(),
+                driverEntryInstalled: DriverEntryInstalled());
+        }
+
+        /// <summary>True when Windows Core Isolation / Memory Integrity is ON (DeviceGuard scenario Enabled = 1).</summary>
+        public static bool MemoryIntegrityEnabled()
+        {
+            try
+            {
+                using RegistryKey? key = RegistryKey
+                    .OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                    .OpenSubKey(DeviceGuardKeyPath);
+
+                return key?.GetValue("Enabled") is int enabled && enabled == 1;
+            }
+            catch (Exception)
+            {
+                // A diagnostic must never outlive its registry read.
+                return false;
+            }
+        }
+
+        /// <summary>True when PawnIO's uninstall entry exists (the driver is installed, running is a separate question).</summary>
+        public static bool DriverEntryInstalled()
+        {
+            try
+            {
+                using RegistryKey? key = RegistryKey
+                    .OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)
+                    .OpenSubKey(PawnIoUninstallKeyPath);
+
+                return key != null;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         private static PawnIoDetectionResult CheckDevicePath(string path)
