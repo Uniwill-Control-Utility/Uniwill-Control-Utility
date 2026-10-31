@@ -153,7 +153,7 @@ public sealed class ContractShapeTests
         {
             string[] parts = verb.Split('.');
             Assert.Equal(2, parts.Length);
-            Assert.Contains(parts[0], new[] { "fan", "power", "mux", "keyboard", "battery", "device", "cpu", "telemetry", "engine" });
+            Assert.Contains(parts[0], new[] { "fan", "power", "mux", "keyboard", "battery", "device", "cpu", "telemetry", "engine", "rtss" });
             Assert.Equal(verb, verb.ToLowerInvariant());
             Assert.Matches("^[a-z_]+$", parts[1]);
         }
@@ -176,7 +176,8 @@ public sealed class ContractShapeTests
             + typeof(IAmdSmuCapability).GetMethods().Length
             + typeof(IIntelMsrCapability).GetMethods().Length
             + typeof(IEcTelemetryCapability).GetMethods().Length
-            + typeof(IEngineCapability).GetMethods().Length;
+            + typeof(IEngineCapability).GetMethods().Length
+            + typeof(IRtssCapability).GetMethods().Length;
 
         // Not one-to-one (GetStateAsync covers three mux verbs), so the assertion is a
         // band: capabilities must stay close to the verb count, not drift 3x past it.

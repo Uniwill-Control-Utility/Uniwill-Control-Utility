@@ -17,11 +17,12 @@ public sealed class EngineHostFixture : IAsyncDisposable
 {
     private readonly IHost _host;
 
-    private EngineHostFixture(IHost host, EngineRuntimeOptions options, IEcTransport transport)
+    private EngineHostFixture(IHost host, EngineRuntimeOptions options, IEcTransport transport, List<string> rtssLaunches)
     {
         _host = host;
         Options = options;
         Transport = transport;
+        RtssLaunches = rtssLaunches;
         Client = new EngineClient(options.PipeName);
         Fan = new FanCapability(Client);
         Power = new PowerCapability(Client);
@@ -33,6 +34,7 @@ public sealed class EngineHostFixture : IAsyncDisposable
         Device = new DeviceCapability(Client);
         Smu = new AmdSmuCapability(Client);
         IntelMsr = new IntelMsrCapability(Client);
+        Rtss = new RtssCapability(Client);
     }
 
     public EngineRuntimeOptions Options { get; }
@@ -49,6 +51,10 @@ public sealed class EngineHostFixture : IAsyncDisposable
     public IntelMsrCapability IntelMsr { get; }
     public EcTelemetryCapability Telemetry { get; }
     public EngineCapability Engine { get; }
+    public RtssCapability Rtss { get; }
+
+    /// <summary>Images the rtss.start verb asked the (overridden) session launcher to start.</summary>
+    public IReadOnlyList<string> RtssLaunches { get; }
 
     public static async Task<EngineHostFixture> StartAsync(
         Func<EngineRuntimeOptions, EngineRuntimeOptions>? configure = null,
@@ -56,6 +62,8 @@ public sealed class EngineHostFixture : IAsyncDisposable
         EcPlatform platform = EcPlatform.Amd)
     {
         string pipeName = $"UCUEngineTest.{Guid.NewGuid():N}";
+
+        var rtssLaunches = new List<string>();
 
         var overrides = new EngineRuntimeOptions
         {
@@ -79,6 +87,18 @@ public sealed class EngineHostFixture : IAsyncDisposable
             // Hermetic default: the production service executes the REAL OEM
             // ACPI WMI handshake. Tests script the handshake through configure.
             MiniLedOverride = new FakeMiniLedService(),
+            // Hermetic default: the production verb starts a REAL process in the
+            // active user's session with the console user's linked (elevated)
+            // token. Tests record the requested image and answer the launch.
+            RtssLaunchOverride = image =>
+            {
+                lock (rtssLaunches)
+                {
+                    rtssLaunches.Add(image);
+                }
+
+                return true;
+            },
             LogDirectory = Path.Combine(Path.GetTempPath(), "ucu-engine-tests", pipeName),
         };
 
@@ -87,7 +107,7 @@ public sealed class EngineHostFixture : IAsyncDisposable
         IHost host = EngineHostFactory.CreateHost(Array.Empty<string>(), isService: false, overrides);
         await host.StartAsync().ConfigureAwait(false);
 
-        return new EngineHostFixture(host, overrides, overrides.TransportOverride!);
+        return new EngineHostFixture(host, overrides, overrides.TransportOverride!, rtssLaunches);
     }
 
     public FakeEcTransport Fake => (FakeEcTransport)Transport;

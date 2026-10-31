@@ -336,4 +336,18 @@ namespace UCU.Contracts.Capabilities
         /// </summary>
         Task<bool> NotifyAppExitAsync(CancellationToken cancellationToken = default);
     }
+
+    /// <summary>
+    /// RTSS (the overlay's frame source). The start is the engine's job: RTSS
+    /// must land in the ACTIVE user session with the privileges its launch
+    /// flags demand, which an unelevated app can only get by asking the user
+    /// (consent prompt) and a scheduled task gets by landing in session 0
+    /// (invisible). See <c>EngineVerbs.Rtss</c>.
+    /// </summary>
+    public interface IRtssCapability
+    {
+        /// <summary>Starts RTSS in the active session. True when the engine
+        /// reports the process started.</summary>
+        Task<bool> StartAsync(CancellationToken cancellationToken = default);
+    }
 }

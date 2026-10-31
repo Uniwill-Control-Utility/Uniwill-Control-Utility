@@ -118,6 +118,14 @@ namespace UCU.Engine
         /// </summary>
         public UCU.Hardware.Devices.IMiniLedService? MiniLedOverride { get; init; }
 
+        /// <summary>
+        /// RTSS session-launch override, same test seam: the production route
+        /// starts a REAL process in the active user's session with the console
+        /// user's linked (elevated) token, which has no place in a test
+        /// process. Tests inject a recorder that answers the launch result.
+        /// </summary>
+        public Func<string, bool>? RtssLaunchOverride { get; init; }
+
         /// <summary>Engine build identity reported in <c>engine.get_info</c>.</summary>
         public string EngineVersion { get; init; } = ReadEngineVersion();
 
