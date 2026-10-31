@@ -200,10 +200,13 @@ if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
 # entry suppressed there is no GUID-keyed registration to watch, so the
 # sentinel's probe unions the ARP view with MsiEnumProductsW.
 #
-# Exe-CustomActions that launch the shim at uninstall stay a field-proven
+# Exe-CustomActions that launch the SHIM at uninstall stay a field-proven
 # dead end in this package (verbose-log forensics in the git history: every
-# exe-CA encoding fails 1721/2715/2723/2727 or a CreateProcess failure under
-# the msiserver session) — this table edit needs no CustomAction at all.
+# encoding tried at the time failed 1721/2715/2723/2727 or a CreateProcess
+# failure under the msiserver session) — the ARP rebinding needs no CA at
+# all. (Step 5c later found the working exe-CA encoding — type 18 File
+# source + deferred + NoImpersonate — for the engine verbs; the shim route
+# remains unproven and is NOT what 5c authors.)
 #
 # msi-edit is compiled on demand: the IDatabase interface is vtable-only
 # (no late-bound route), so the step needs a TlbImp interop of msi.dll;
@@ -269,10 +272,35 @@ Write-Host "Rebound $($packedMsi.Name): the single Control Panel entry now runs 
 #     and the control docfile created moments earlier by the same API.
 #     This is the OS guard against non-MSI writers; routing around it is
 #     not on the table.
-# The engine therefore stays registered by the app: the documented,
-# shipped, field-proven elevated `--install-engine` pass (one UAC on a
-# fresh machine). msi-edit's `export` mode keeps MSI's ISTG format
-# inspectable if a future Windows gives msi.dll its DDL back.
+# The engine is registered at INSTALL time by U-111b (step 5c below): a
+# deferred exe CustomAction running the engine's own --install-engine verb
+# as SYSTEM — pure DML on the existing CustomAction/InstallExecuteSequence
+# tables, no service tables, no DDL. The documented, elevated app-side
+# `--install-engine` pass REMAINS as the self-heal route (dev layouts,
+# hand-installed packages, Velopack update moves the exe). msi-edit's
+# `export` mode keeps MSI's ISTG format inspectable if a future Windows
+# gives msi.dll its DDL back.
+
+# --- 5c. U-111b: author the engine-service CustomActions -----------------
+# Fresh installs pay ZERO UAC at first launch: the MSI's deferred
+# CustomActions (SYSTEM, NoImpersonate) run --install-engine inside the
+# install, --remove-service inside the uninstall. Encoding, sequencing,
+# and the --remove-service-only rule: documented in msi-edit
+# AddServiceCustomActions; field-proven 2026-10-31 (full /i->/x->/i->/x
+# cycle exit 0, service created/destroyed by the CAs, forced rollback fired
+# the 3346 row cleanly, registration self-cleaned, no ghost).
+& $msiEdit addca $packedMsi.FullName
+if ($LASTEXITCODE -ne 0) { throw "msi-edit addca failed: engine service CustomActions not authored" }
+$caEcho = & $msiEdit inspect $packedMsi.FullName 2>&1 | Out-String
+foreach ($want in @('UcuEngineInstallDeferred\s*\|\s*3090', 'UcuEngineInstallRollback\s*\|\s*3346', 'UcuEngineRemoveDeferred\s*\|\s*3090')) {
+    if ($caEcho -notmatch $want) { throw "post-edit verification: CustomAction row missing in the packed MSI ($want)" }
+}
+if ($caEcho -notmatch "--uninstall-engine") {
+    # Belt: the sweep verb must never appear as a CA target inside the MSI.
+    Write-Host "Engine service CustomActions authored (3090/3346, engine verbs only)" -ForegroundColor Cyan
+} else {
+    throw "post-edit verification: the sweep verb --uninstall-engine appears in a CA target (must be --remove-service)"
+}
 
 # --- 5b. Stamp the Setup.exe bootstrapper requireAdministrator ---
 # vpk's bootstrapper template is asInvoker and vpk exposes no manifest flag,
