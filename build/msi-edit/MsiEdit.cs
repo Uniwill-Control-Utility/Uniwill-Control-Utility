@@ -314,11 +314,9 @@ static class MsiEdit
     /// Pure DML on the existing CustomAction + InstallExecuteSequence tables
     /// (MSI's SQL has no DDL, and no new tables are needed for exe CAs).
     /// Encoding pinned from the SDK and field-proven on this package 2026-10-31
-    /// (full /i -> /x -> /i -> /x cycle, exit 0 at every pass, plus a forced
-    /// rollback where the 3346 row fired cleanly):
+    /// (full /i -> /x -> /i -> /x cycle, exit 0 at every pass):
     ///   3090 = 18 (EXE installed with the package; Source = File-table key)
     ///        + 1024 (InScript/deferred) + 2048 (NoImpersonate = runs as SYSTEM)
-    ///   3346 = 3090 + 256 (Rollback: runs on the rollback pass)
     /// The Source is the engine exe's File row under current\Service\ -
     /// resolved at pack time (File keys are content-derived: every pack
     /// re-keys them), never hardcoded. Targets are the engine's own verbs:
@@ -328,14 +326,33 @@ static class MsiEdit
     /// passes and destroys the layout the script is unwinding (1603 cascade,
     /// field-proven the hard way).
     ///
-    /// Sequencing follows the SDK rules for type-18 sources: the install-side
-    /// CA runs after InstallFiles (files must exist on disk), the remove-side
-    /// CA before RemoveFiles, and both after/around Velopack's own hooks:
-    /// install rollback 4098 (paired, MSI runs it in reverse order), install
-    /// deferred 4099, remove deferred 3498 (before UninstallHookDeferred 3499,
-    /// so the Velopack hook's sweep verb sees an already-removed service -
-    /// it tolerates 1060). Conditions mirror the package's own convention:
-    /// NOT REMOVE on the install side, REMOVE="ALL" on the remove side.
+    /// SEQUENCING is load-bearing, and the field taught it (pack #7
+    /// 2026-10-31: Control Panel "already been uninstalled" regression): a
+    /// deferred CA sequenced at 4099 executes INSIDE InstallFinalize's commit
+    /// script, interleaved after InstallFiles' FileCopy ops but BEFORE the
+    /// Registry-table ARP rows are written (verbose log: registry ops
+    /// 26 ms after the belt ran) and before the SCM commits the service's
+    /// security descriptor (every sc sdset lands in the create-commit window
+    /// and the transaction restores the create template at finalize). So:
+    ///   - Install side: deferred CA at 6000 with its rollback pair at 5999.
+    ///     A deferred CA may only schedule between InstallInitialize and
+    ///     InstallFinalize (proven: 6601 -> error 2762), and the script runs
+    ///     queued deferred CAs concurrently with the remaining component ops,
+    ///     so 4099 launched the belt BEFORE the ARP registry rows were
+    ///     written. 6000 launches after the registry batch and RegisterProduct
+    ///     (files, registry, ARP entries all on disk/registry by then): the
+    ///     belt places the root shim and applies the WindowsInstaller redirect
+    ///     IN-SCRIPT, and the SCM create-commit restore (field-proven six
+    ///     seconds after sc create inside a script) lands while the
+    ///     twenty-attempt sdset convergence loop is still running. No mid-
+    ///     script rollback gap: 5999 (3346 = 3090 + 256 Rollback,
+    ///     --remove-service) unwinds the service if anything after it fails
+    ///     (field-proven: the rollback row fires cleanly, registration
+    ///     self-cleans, no ghost).
+    ///   - Remove side: 3498 - before RemoveFiles (3500: the CA launches the
+    ///     installed image, so files must still exist) and before Velopack's
+    ///     UninstallHookDeferred (3499, whose sweep verb then sees the
+    ///     service gone and tolerates 1060). Condition REMOVE="ALL".
     /// </summary>
     static void AddServiceCustomActions(Database db)
     {
@@ -373,12 +390,16 @@ static class MsiEdit
                                 engineFiles.Count + ": template drift, refusing to author CAs");
         string fk = engineFiles[0];
 
-        // Sequence anchors (absent rows mean the standard MSISequiSheets
-        // defaults the template uses: InstallFiles 4000, RemoveFiles 3500).
-        int installFiles = SeqOf(db, "InstallFiles", 4000);
+        // Sequence anchors (absent rows mean the standard template defaults).
+        // The install CA (6000) and its rollback pair (5999) must sit BELOW
+        // InstallFinalize (deferred CAs cannot schedule past it: 2762), and
+        // the remove CA (3498) below RemoveFiles (the CA launches the
+        // installed image).
+        int installFinalize = SeqOf(db, "InstallFinalize", 6600);
         int removeFiles = SeqOf(db, "RemoveFiles", 3500);
-        if (installFiles >= 4098)
-            throw new Exception("InstallFiles is sequenced at " + installFiles + ": the install CA (4099) must run after it");
+        if (installFinalize <= 6000)
+            throw new Exception("InstallFinalize is sequenced at " + installFinalize +
+                                ": the install CA (6000) must run before it and after the registry batch");
         if (removeFiles <= 3498)
             throw new Exception("RemoveFiles is sequenced at " + removeFiles + ": the remove CA (3498) must run before it");
 
@@ -396,15 +417,15 @@ static class MsiEdit
                     "VALUES ('UcuEngineRemoveDeferred', 3090, '" + fk + "', '--remove-service')");
 
         Execute(db, "INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) " +
-                    "VALUES ('UcuEngineInstallRollback', 'NOT REMOVE', 4098)");
+                    "VALUES ('UcuEngineInstallRollback', 'NOT REMOVE', 5999)");
         Execute(db, "INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) " +
-                    "VALUES ('UcuEngineInstallDeferred', 'NOT REMOVE', 4099)");
+                    "VALUES ('UcuEngineInstallDeferred', 'NOT REMOVE', 6000)");
         Execute(db, "INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) " +
                     "VALUES ('UcuEngineRemoveDeferred', 'REMOVE=\"ALL\"', 3498)");
 
         Console.WriteLine("engine service CustomActions authored (File key " + fk +
-                          "): 3090 --install-engine @4099, 3346 --remove-service rollback @4098, " +
-                          "3090 --remove-service @3498 (InstallFiles=" + installFiles + ", RemoveFiles=" + removeFiles + ")");
+                          "): 3090 --install-engine @6000, 3346 --remove-service rollback @5999, " +
+                          "3090 --remove-service @3498 (InstallFinalize=" + installFinalize + ", RemoveFiles=" + removeFiles + ")");
     }
 
     static int SeqOf(Database db, string action, int standardDefault)

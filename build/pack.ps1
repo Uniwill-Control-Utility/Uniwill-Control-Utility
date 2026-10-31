@@ -286,9 +286,12 @@ Write-Host "Rebound $($packedMsi.Name): the single Control Panel entry now runs 
 # CustomActions (SYSTEM, NoImpersonate) run --install-engine inside the
 # install, --remove-service inside the uninstall. Encoding, sequencing,
 # and the --remove-service-only rule: documented in msi-edit
-# AddServiceCustomActions; field-proven 2026-10-31 (full /i->/x->/i->/x
-# cycle exit 0, service created/destroyed by the CAs, forced rollback fired
-# the 3346 row cleanly, registration self-cleaned, no ghost).
+# AddServiceCustomActions; field-proven 2026-10-31 (the 4099-row cycle ran
+# full /i->/x->/i->/x exit 0 and forced rollback fired the 3346 row
+# cleanly, but the belt ran BEFORE the ARP registry rows committed - the
+# Control Panel regression - so the install CA moved to 6000, after the
+# registry batch and RegisterProduct, and the sdset convergence budget to
+# twenty attempts to outlast the SCM create-commit restore).
 & $msiEdit addca $packedMsi.FullName
 if ($LASTEXITCODE -ne 0) { throw "msi-edit addca failed: engine service CustomActions not authored" }
 $caEcho = & $msiEdit inspect $packedMsi.FullName 2>&1 | Out-String
@@ -297,7 +300,7 @@ foreach ($want in @('UcuEngineInstallDeferred\s*\|\s*3090', 'UcuEngineInstallRol
 }
 if ($caEcho -notmatch "--uninstall-engine") {
     # Belt: the sweep verb must never appear as a CA target inside the MSI.
-    Write-Host "Engine service CustomActions authored (3090/3346, engine verbs only)" -ForegroundColor Cyan
+    Write-Host "Engine service CustomActions authored (install @6000 + rollback @5999, remove @3498, engine verbs only)" -ForegroundColor Cyan
 } else {
     throw "post-edit verification: the sweep verb --uninstall-engine appears in a CA target (must be --remove-service)"
 }
