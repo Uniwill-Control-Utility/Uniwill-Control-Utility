@@ -172,6 +172,15 @@ namespace Uniwill_Control_Utility
         private const string AutostartTaskName = "UCU Autostart";
         private const string LegacyAutostartTaskName = "UCU";
 
+        /// <summary>
+        /// The RTSS verb proxy, resolved from the running host: the callers are
+        /// paths that DI does not construct (the prerequisite dialog is created
+        /// with new). Null before the host exists (the splash path) - and
+        /// RtssLauncher's fallback covers that, as it covers an engine that is
+        /// not there.
+        /// </summary>
+        internal static IRtssCapability? RtssCapability => _host?.Services.GetService<IRtssCapability>();
+
         internal static readonly string SCALE_MODELS_JSON_PATH = ".\\ScaleModels.json";
 
         // Logs live with the app's other per-user state, not beside the exe: a
@@ -452,6 +461,7 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<IAmdSmuCapability, AmdSmuCapability>();
                         services.AddSingleton<IIntelMsrCapability, IntelMsrCapability>();
                         services.AddSingleton<IEngineCapability, EngineCapability>();
+                        services.AddSingleton<IRtssCapability, RtssCapability>();
                         services.AddSingleton<EcTelemetryService>();
                         services.AddSingleton<IEcCpuTemperatureSource>(provider =>
                             provider.GetRequiredService<EcTelemetryService>());

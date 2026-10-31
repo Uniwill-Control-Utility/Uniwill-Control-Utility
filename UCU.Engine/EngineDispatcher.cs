@@ -29,12 +29,12 @@ namespace UCU.Engine
             EcEngineGate gate, EngineDomainQueues queues, AppExitSignal appExit,
             EngineMetricsSnapshotSource metrics, IPnpDeviceService devices, IFwNvramService nvram,
             IAmdSmuService smu, IIntelMsrService msr, IMiniLedService miniLed,
-            EcRawWriteGuard rawWriteGuard)
+            EcRawWriteGuard rawWriteGuard, EngineRuntimeOptions options)
         {
             _gate = gate;
             _queues = queues;
             _appExit = appExit;
-            _handlers = BuildHandlers(gate, appExit, metrics, devices, nvram, smu, msr, miniLed, rawWriteGuard);
+            _handlers = BuildHandlers(gate, appExit, metrics, devices, nvram, smu, msr, miniLed, rawWriteGuard, options.RtssLaunchOverride);
         }
 
         public IReadOnlyCollection<string> Verbs => _handlers.Keys;
@@ -104,7 +104,7 @@ namespace UCU.Engine
         private static Dictionary<string, VerbHandler> BuildHandlers(
             EcEngineGate gate, AppExitSignal appExit, EngineMetricsSnapshotSource metrics,
             IPnpDeviceService devices, IFwNvramService nvram, IAmdSmuService smu, IIntelMsrService msr,
-            IMiniLedService miniLed, EcRawWriteGuard rawWriteGuard)
+            IMiniLedService miniLed, EcRawWriteGuard rawWriteGuard, Func<string, bool>? rtssLaunch)
         {
             var handlers = new Dictionary<string, VerbHandler>(StringComparer.Ordinal);
 
@@ -120,6 +120,11 @@ namespace UCU.Engine
             CpuVerbs.Register(Add, smu, msr);
             TelemetryVerbs.Register(Add, gate, metrics, rawWriteGuard);
             EngineVerbsImpl.Register(Add, gate, appExit);
+
+            // Runs inline: RtssDomain is declared inline in EngineDomainQueues
+            // (a user-session process launch has nothing to order against on
+            // the EC queues).
+            RtssVerbs.Register(Add, rtssLaunch);
 
             return handlers;
         }

@@ -289,5 +289,30 @@ namespace UCU.Contracts
             /// </summary>
             public const string NotifyAppExit = "engine.notify_app_exit";
         }
+
+        /// <summary>
+        /// RTSS — the game overlay's frame source. RTSS is a user-session
+        /// tray/injection process, so it must be started IN THE ACTIVE SESSION:
+        /// the unelevated app cannot do it silently on machines where RTSS
+        /// carries the "Run as administrator" launch flag (a consent prompt
+        /// every time — field-reported), and a scheduled-task route places a
+        /// GUI process in session 0, where it is invisible, injects nothing,
+        /// and still satisfies the app's global shared-memory witness
+        /// (field-proven). The LocalSystem engine reads the console user's
+        /// LINKED (full) token and starts the image as that token: the
+        /// session, the privileges the flags demand, and no dialog.
+        ///
+        /// The verb takes no parameters on purpose: the engine locates RTSS
+        /// from the registry/process witnesses itself and refuses any image
+        /// not named RTSS.exe, so a service handle is never an
+        /// arbitrary-execution surface.
+        /// </summary>
+        public static class Rtss
+        {
+            /// <summary>Starts RTSS in the active console session. Answers the
+            /// observed launch (true = the process started), never an
+            /// assumption.</summary>
+            public const string Start = "rtss.start";
+        }
     }
 }

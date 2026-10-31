@@ -20,9 +20,19 @@ namespace UCU.Engine
         private const uint AllAccess = 0x000F003F; // STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0x3F (token maximum access)
         private const int SecurityImpersonation = 2;
         private const int TokenPrimary = 1;
+        private const int TokenLinkedToken = 19;
         private const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
         private const uint LOGON_WITH_PROFILE = 0x00000001;
         private const uint WTSConsoleSession = 0xFFFFFFFF;
+
+        /// <summary>
+        /// Starts <paramref name="exePath"/> in the active console user's
+        /// session at the session user's filtered (normal, unelevated) token.
+        /// </summary>
+        public static bool Launch(string exePath, string arguments, ILogger? logger)
+        {
+            return Launch(exePath, arguments, elevate: false, logger);
+        }
 
         /// <summary>
         /// Starts <paramref name="exePath"/> in the active console user's
@@ -30,31 +40,53 @@ namespace UCU.Engine
         /// the login screen), the token cannot be duplicated, or the process
         /// cannot start — every failure is logged, the caller (the supervisor)
         /// keeps its crash budget.
+        ///
+        /// <paramref name="elevate"/> selects the user's LINKED token (the full
+        /// administrator token behind a UAC-filtered one). It is required for
+        /// an image whose launch flags demand elevation: a "Run as
+        /// administrator" compat flag against a filtered token fails the
+        /// CreateProcess with ERROR_ELEVATION_REQUIRED — no process, and no
+        /// consent dialog for a service to answer. SYSTEM reading the linked
+        /// token is the documented elevation-the-user-already-consented-to
+        /// route; a standard user has no linked token, so the filtered token
+        /// is the fallback.
         /// </summary>
-        public static bool Launch(string exePath, string arguments, ILogger logger)
+        public static bool Launch(string exePath, string arguments, bool elevate, ILogger? logger)
         {
             uint sessionId = WTSGetActiveConsoleSessionId();
             if (sessionId == WTSConsoleSession)
             {
-                logger.LogInformation("[Supervision] No active console session — nothing to launch into.");
+                logger?.LogInformation("[Supervision] No active console session — nothing to launch into.");
                 return false;
             }
 
             if (!WTSQueryUserToken(sessionId, out IntPtr userToken) || userToken == IntPtr.Zero)
             {
-                logger.LogWarning("[Supervision] WTSQueryUserToken(session {Session}) failed: {Error}",
+                logger?.LogWarning("[Supervision] WTSQueryUserToken(session {Session}) failed: {Error}",
                     sessionId, Marshal.GetLastWin32Error());
                 return false;
+            }
+
+            IntPtr linked = IntPtr.Zero;
+            IntPtr launchToken = userToken;
+
+            if (elevate)
+            {
+                linked = LinkedTokenOf(userToken);
+                if (linked != IntPtr.Zero)
+                    launchToken = linked;
+                else
+                    logger?.LogInformation("[Supervision] No linked (elevated) token for session {Session} - launching filtered.", sessionId);
             }
 
             IntPtr primary = IntPtr.Zero;
             IntPtr environment = IntPtr.Zero;
             try
             {
-                if (!DuplicateTokenEx(userToken, AllAccess, IntPtr.Zero,
+                if (!DuplicateTokenEx(launchToken, AllAccess, IntPtr.Zero,
                         SecurityImpersonation, TokenPrimary, out primary))
                 {
-                    logger.LogWarning("[Supervision] DuplicateTokenEx failed: {Error}", Marshal.GetLastWin32Error());
+                    logger?.LogWarning("[Supervision] DuplicateTokenEx failed: {Error}", Marshal.GetLastWin32Error());
                     return false;
                 }
 
@@ -79,14 +111,15 @@ namespace UCU.Engine
 
                 if (!started)
                 {
-                    logger.LogWarning("[Supervision] CreateProcessAsUser('{Exe}') failed: {Error}",
+                    logger?.LogWarning("[Supervision] CreateProcessAsUser('{Exe}') failed: {Error}",
                         exePath, Marshal.GetLastWin32Error());
                     return false;
                 }
 
                 CloseHandle(pi.hProcess);
                 CloseHandle(pi.hThread);
-                logger.LogInformation("[Supervision] Launched the app in session {Session}: {Exe}", sessionId, exePath);
+                logger?.LogInformation("[Supervision] Launched {Exe} in session {Session}{Elevation}",
+                    exePath, sessionId, elevate ? " (elevated)" : string.Empty);
                 return true;
             }
             finally
@@ -95,7 +128,35 @@ namespace UCU.Engine
                     DestroyEnvironmentBlock(environment);
                 if (primary != IntPtr.Zero)
                     CloseHandle(primary);
+                if (linked != IntPtr.Zero)
+                    CloseHandle(linked);
                 CloseHandle(userToken);
+            }
+        }
+
+        /// <summary>
+        /// The full (unfiltered) token behind a UAC-filtered one, or
+        /// IntPtr.Zero when there is none (standard user, UAC off). The
+        /// information buffer for TokenLinkedToken IS a token HANDLE, so it is
+        /// sized as a pointer and closed with CloseHandle, not LocalFree.
+        /// </summary>
+        private static IntPtr LinkedTokenOf(IntPtr token)
+        {
+            IntPtr buffer = Marshal.AllocHGlobal(IntPtr.Size);
+
+            try
+            {
+                if (!GetTokenInformation(token, TokenLinkedToken, buffer, (uint)IntPtr.Size, out _)
+                    || Marshal.ReadIntPtr(buffer) == IntPtr.Zero)
+                {
+                    return IntPtr.Zero;
+                }
+
+                return Marshal.ReadIntPtr(buffer);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
             }
         }
 
@@ -114,6 +175,11 @@ namespace UCU.Engine
         private static extern bool DuplicateTokenEx(
             IntPtr existingToken, uint desiredAccess, IntPtr tokenAttributes,
             int impersonationLevel, int tokenType, out IntPtr primaryToken);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool GetTokenInformation(
+            IntPtr token, int tokenInformationClass, IntPtr tokenInformation,
+            uint tokenInformationLength, out uint returnLength);
 
         [DllImport("userenv.dll", SetLastError = true)]
         private static extern bool CreateEnvironmentBlock(out IntPtr environment, IntPtr token, bool inherit);

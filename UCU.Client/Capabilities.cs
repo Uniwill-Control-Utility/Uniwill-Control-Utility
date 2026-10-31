@@ -412,4 +412,18 @@ namespace UCU.Client
         public Task<bool> NotifyAppExitAsync(CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<bool>(EngineVerbs.Engine.NotifyAppExit, cancellationToken);
     }
+
+    /// <summary>
+    /// RTSS start proxy. One verb, no parameters: the engine locates the image
+    /// and places it in the active session, so the client sends no path.
+    /// </summary>
+    public sealed class RtssCapability : IRtssCapability
+    {
+        private readonly EngineClient _client;
+
+        public RtssCapability(EngineClient client) => _client = client;
+
+        public Task<bool> StartAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<bool>(EngineVerbs.Rtss.Start, cancellationToken);
+    }
 }

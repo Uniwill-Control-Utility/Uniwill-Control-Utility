@@ -23,6 +23,14 @@ namespace UCU.Engine
         public const string TelemetryDomain = "telemetry";
         public const string EngineDomain = "engine";
 
+        /// <summary>
+        /// RTSS verbs run inline, like the engine domain: starting a
+        /// user-session process touches no EC hardware, and the WTS/token/
+        /// CreateProcess round trip has no business queueing behind a parked
+        /// fan-curve upload.
+        /// </summary>
+        public const string RtssDomain = "rtss";
+
         private readonly Dictionary<string, SerialExecutor> _queues;
 
         public EngineDomainQueues(EngineRuntimeOptions options)
@@ -62,10 +70,23 @@ namespace UCU.Engine
             // run inline: they touch no hardware, and the app must be able to
             // read them when every hardware queue is parked on a stuck call -
             // which is exactly when the sensor readings matter most.
-            if (domain == EngineDomain || verb == EngineVerbs.Telemetry.GetMetricsSnapshot)
+            // The engine domain (identity/health), the RTSS domain (a
+            // user-session process launch, no hardware), and the cached sensor
+            // snapshot run inline: they touch no hardware, and the app must be
+            // able to read them when every hardware queue is parked on a stuck
+            // call - which is exactly when the sensor readings matter most.
+            if (domain == EngineDomain || domain == RtssDomain || verb == EngineVerbs.Telemetry.GetMetricsSnapshot)
                 return null;
 
-            return _queues[domain];
+            // The documented fallback, as a lookup that cannot throw: the
+            // dispatcher's verb table has already rejected unknown verbs, so a
+            // prefix with no queue of its own is a read, and telemetry is the
+            // safe guess. A bare indexer here threw KeyNotFoundException, which
+            // the client saw as "unexpected engine fault", for the first verb
+            // that added a new domain.
+            return _queues.TryGetValue(domain, out SerialExecutor? queue)
+                ? queue
+                : _queues[TelemetryDomain];
         }
 
         public async ValueTask DisposeAsync()

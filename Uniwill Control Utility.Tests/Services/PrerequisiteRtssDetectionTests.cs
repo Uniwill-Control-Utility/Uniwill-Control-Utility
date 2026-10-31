@@ -5,15 +5,16 @@ using System.Linq;
 namespace Uniwill_Control_Utility.Tests.Services;
 
 /// <summary>
-/// The prerequisite dialog must ask "is RTSS INSTALLED", not "is RTSS running"
-/// (field-reported on a fresh laptop: RTSS installed, not in the boot set, and
-/// UCU popped the Required Software warning at it). The witness is RTSS's own
-/// uninstall entry, read in BOTH registry views - the RTSS installer is 32-bit,
-/// so on 64-bit Windows the key lands under WOW6432Node. Liveness stays
-/// informational (the button label), never the prerequisite - and installed
-/// with RTSS not running offers Start, through the elevation-free route (the
-/// field box runs RTSS with the "Run as administrator" flag: double-clicking
-/// it prompts UAC, so the start must not be a plain Process.Start).
+/// The RTSS prerequisite row and its start routes, field-shaped. Two field
+/// findings drive the pins: (1) the row judged RTSS by LIVENESS, so an
+/// installed RTSS outside the boot set was reported as "Required Software";
+/// (2) on the user's machines RTSS carries the "Run as administrator" launch
+/// flag (double-clicking prompts UAC), and the elevation-free scheduled-task
+/// route lands a GUI process in SESSION 0 - invisible, injecting nothing,
+/// while the global shared-memory segment still answers "running". So: the row
+/// judges installation, liveness is SESSION-SCOPED, and the start goes through
+/// the engine (which places RTSS in the active session with the privileges its
+/// flags demand).
 /// </summary>
 public sealed class PrerequisiteRtssDetectionTests
 {
@@ -42,90 +43,91 @@ public sealed class PrerequisiteRtssDetectionTests
 
         string click = MethodBody(dialog, "private async void RtssButton_Click");
 
-        // Installed: the elevation-free start. Absent: the download page.
+        // Installed: the engine-routed start. Absent: the download page.
         Assert.Contains("RtssLauncher.StartAsync()", click, StringComparison.Ordinal);
         Assert.Contains("if (!RtssDetectionService.IsInstalled())", click, StringComparison.Ordinal);
         Assert.Contains("Process.Start(new ProcessStartInfo(RtssUrl)", click, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void TheDetectionReadsBothRegistryViewsAndSelfEvidencesWhenRunning()
+    public void LivenessIsScopedToTheSessionBecauseTheSharedMemorySegmentIsGlobal()
     {
         string service = ReadAppSource("Services", "RtssDetectionService.cs");
+
+        string running = MethodBody(service, "public static bool IsRunning()");
+
+        // A session-0 RTSS satisfies the global segment and serves no overlay.
+        Assert.Contains("RtssLocation.RunningSessions()", running, StringComparison.Ordinal);
+        Assert.Contains("SafeSessionId()", running, StringComparison.Ordinal);
+
+        // The segment is the witness only when no RTSS process can be seen.
+        Assert.Contains("sessions.Length == 0", running, StringComparison.Ordinal);
+        Assert.Contains("RtssReader.IsRunning()", running, StringComparison.Ordinal);
+
+        // Installation and location are the shared Core witnesses (engine too).
+        Assert.Contains("RtssLocation.IsInstalled()", service, StringComparison.Ordinal);
+        Assert.Contains("RtssLocation.Locate()", service, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheSharedLocatorReadsBothViewsAndRefusesTheIconBoobyTrap()
+    {
+        string locator = ReadCoreSource("Rtss", "RtssLocation.cs");
 
         // The RTSS installer is 32-bit: the 64-bit view alone would miss it.
-        Assert.Contains("RegistryView.Registry64", service, StringComparison.Ordinal);
-        Assert.Contains("RegistryView.Registry32", service, StringComparison.Ordinal);
-        Assert.Contains(@"Uninstall\RTSS", service, StringComparison.Ordinal);
+        Assert.Contains("RegistryView.Registry64", locator, StringComparison.Ordinal);
+        Assert.Contains("RegistryView.Registry32", locator, StringComparison.Ordinal);
+        Assert.Contains(@"Uninstall\RTSS", locator, StringComparison.Ordinal);
 
-        // A live process or shared-memory segment is self-evidencing.
-        Assert.Contains("Process.GetProcessesByName(\"RTSS\")", service, StringComparison.Ordinal);
-        Assert.Contains("RtssReader.IsRunning()", service, StringComparison.Ordinal);
+        // The probed install names uninstall.exe as its icon, so the icon is
+        // accepted only as an image named RTSS.exe, and only when it exists.
+        Assert.Contains("IsLaunchableImage", locator, StringComparison.Ordinal);
+        Assert.Contains("IsLaunchableFile", locator, StringComparison.Ordinal);
+        Assert.Contains("File.Exists", locator, StringComparison.Ordinal);
 
-        // Detection never outlives its read (the PawnIO detection rule).
-        string[] catchBlocks = service.Split("catch");
-        Assert.True(catchBlocks.Length >= 2, "the registry reads must be guarded");
+        // A running RTSS names its own image (the truth witness), and the
+        // module read plus the snapshot are individually guarded.
+        Assert.Contains("RunningPaths()", locator, StringComparison.Ordinal);
+        Assert.True(locator.Split("catch").Length >= 5, "the OS witnesses must be guarded");
     }
 
     [Fact]
-    public void TheExeLocationRefusesTheUninstallEntryBoobyTrapAndVerifiesFiles()
-    {
-        string service = ReadAppSource("Services", "RtssDetectionService.cs");
-
-        string locate = MethodBody(service, "public static string? LocateExe()");
-
-        // The uninstall entry is a location witness, read in both views.
-        Assert.Contains("InstallLocation", locate, StringComparison.Ordinal);
-        Assert.Contains("DisplayIcon", locate, StringComparison.Ordinal);
-        Assert.Contains("RegistryView.Registry64", locate, StringComparison.Ordinal);
-        Assert.Contains("RegistryView.Registry32", locate, StringComparison.Ordinal);
-
-        // Field probe of a real 7.3.7 install: DisplayIcon names uninstall.exe
-        // and InstallLocation is empty. An unguarded DisplayIcon would make
-        // the Start button launch RTSS's own uninstaller - the icon is
-        // accepted only when it names RTSS.exe.
-        Assert.Contains("Path.GetFileName(icon), \"RTSS.exe\"", locate, StringComparison.Ordinal);
-
-        // A path is returned only when the file exists - launchable by contract.
-        Assert.Contains("File.Exists", locate, StringComparison.Ordinal);
-        Assert.DoesNotContain("Process.Start", locate, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void TheRunningRtssProcessIsTheFirstLocationWitness()
-    {
-        string service = ReadAppSource("Services", "RtssDetectionService.cs");
-
-        string locate = MethodBody(service, "public static string? LocateExe()");
-        Assert.Contains("RunningExePath()", locate, StringComparison.Ordinal);
-
-        string witness = MethodBody(service, "private static string? RunningExePath()");
-
-        // The running image path is the truth (field-proven: a 64-bit reader
-        // can name a 32-bit RTSS's image), and a denied module read is not fatal.
-        Assert.Contains("process.MainModule?.FileName", witness, StringComparison.Ordinal);
-        Assert.Contains("File.Exists", witness, StringComparison.Ordinal);
-        Assert.True(witness.Split("catch").Length >= 3, "the module read and the snapshot must both be guarded");
-    }
-
-    [Fact]
-    public void StartingRtssGoesThroughTheElevationFreeTaskRoute()
+    public void TheStartGoesThroughTheEngineAndNeverTheSessionZeroTaskRoute()
     {
         string launcher = ReadAppSource("Services", "RtssLauncher.cs");
 
-        // The proven pattern (touchpad settings flow, uninstall verb): a
-        // one-shot Highest-privileges task supplies the full token that RTSS's
-        // "Run as administrator" flag demands, with no consent dialog.
-        Assert.Contains("ScheduledTaskService.RunOneShotHighestPrivileges", launcher, StringComparison.Ordinal);
+        // The engine places RTSS in the ACTIVE session with the linked token;
+        // no consent dialog, and the process is visible to the user.
+        Assert.Contains("App.RtssCapability", launcher, StringComparison.Ordinal);
+        Assert.Contains("StartThroughEngineAsync", launcher, StringComparison.Ordinal);
+        Assert.Contains("rtss.StartAsync()", launcher, StringComparison.Ordinal);
 
-        // The fallback behaves like double-clicking (one prompt), and success
-        // is the verified process, not the task's exit code.
+        // Field-proven: the one-shot Highest task puts a GUI process in session
+        // 0. It must not come back as the RTSS route.
+        Assert.DoesNotContain("RunOneShotHighestPrivileges", launcher, StringComparison.Ordinal);
+
+        // Without an engine, the fallback is the user's own double-click.
         Assert.Contains("UseShellExecute = true", launcher, StringComparison.Ordinal);
+
+        // Success is the observed process in this session, not the verb's word.
         Assert.Contains("RtssDetectionService.IsRunning()", launcher, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void TheAppStartsRtssOnlyForTheBootStartedAppAndNeverTheEngine()
+    public void TheEngineCapabilityIsRegisteredAndReachableFromTheNonDiPaths()
+    {
+        string app = ReadAppSource("App.xaml.cs");
+
+        // One verb proxy, in the same capability family as the rest of the engine surface.
+        Assert.Contains("services.AddSingleton<IRtssCapability, RtssCapability>();", app, StringComparison.Ordinal);
+
+        // The prerequisite dialog is created with new, so the proxy resolves
+        // from the host; null before the host exists is covered by the fallback.
+        Assert.Contains("_host?.Services.GetService<IRtssCapability>()", app, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheAppStartsRtssOnlyForTheBootStartedApp()
     {
         string app = ReadAppSource("App.xaml.cs");
 
@@ -145,6 +147,9 @@ public sealed class PrerequisiteRtssDetectionTests
 
     private static string ReadAppSource(params string[] parts) =>
         File.ReadAllText(Path.Combine(new[] { RepositoryRoot(), "Uniwill Control Utility" }.Concat(parts).ToArray()));
+
+    private static string ReadCoreSource(params string[] parts) =>
+        File.ReadAllText(Path.Combine(new[] { RepositoryRoot(), "UCU.Core" }.Concat(parts).ToArray()));
 
     private static string MethodBody(string source, string signature)
     {

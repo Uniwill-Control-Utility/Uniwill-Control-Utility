@@ -1,63 +1,64 @@
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using UCU.Contracts.Capabilities;
+using UCU.Core.Rtss;
 
 namespace Uniwill_Control_Utility.Services
 {
     /// <summary>
-    /// Starts RTSS without a consent dialog. On machines where RTSS carries
-    /// the "Run as administrator" AppCompat flag (the common overlay setup for
-    /// elevated games - field-reported: double-clicking RTSS prompts UAC),
-    /// a plain Process.Start from the asInvoker app pops that prompt. The
-    /// elevation-free route is the one-shot highest-privileges scheduled task
-    /// (ScheduledTaskService.RunOneShotHighestPrivileges - the touchpad
-    /// settings flow and the uninstall verb's proven pattern): the Task
-    /// Scheduler service supplies the full token, the process lands in the
-    /// INTERACTIVE session (the tray icon and overlay work; the SYSTEM engine
-    /// must not be the starter - session 0 would render RTSS invisible), and
-    /// no dialog appears.
+    /// Starts RTSS. RTSS is a user-session tray/injection process, and on
+    /// machines where it carries the "Run as administrator" launch flag
+    /// (field-reported: double-clicking it prompts UAC) the app cannot start it
+    /// silently: a plain Process.Start pops consent, and the elevation-free
+    /// scheduled-task route places it in session 0 - invisible, injecting
+    /// nothing, while the global shared-memory segment still reports "running"
+    /// (field-proven). The engine is the starter: LocalSystem places the image
+    /// in the ACTIVE session with the privileges its flags demand (the console
+    /// user's linked token), and no dialog appears.
     ///
-    /// The task route failing falls back to Process.Start, which behaves like
-    /// double-clicking (one consent prompt, honoured on unguarded machines
-    /// without one).
+    /// Without an engine (portable layout, engine not installed) the app falls
+    /// back to Process.Start, which behaves exactly like double-clicking: one
+    /// consent prompt on a flagged machine, none on an unflagged one.
     /// </summary>
     public static class RtssLauncher
     {
-        private const string TaskName = "UCU RTSS Launcher";
-        private const string TaskDescription = "Start RTSS with the privileges its launch flags demand";
-
-        /// <summary>True when the start route is available: RTSS installed, not running, exe located.</summary>
+        /// <summary>True when the start route is available: RTSS installed, not
+        /// running in this session, image located.</summary>
         public static bool CanStart()
         {
             return RtssDetectionService.IsInstalled()
                 && !RtssDetectionService.IsRunning()
-                && RtssDetectionService.LocateExe() != null;
+                && RtssLocation.Locate() != null;
         }
 
         /// <summary>
-        /// Starts RTSS and reports whether it came up within the poll window.
-        /// Never throws: a refused or unavailable start is a false answer.
+        /// Starts RTSS and reports whether it came up in this session within
+        /// the poll window. Never throws: a refused or unavailable start is a
+        /// false answer.
         /// </summary>
         public static async Task<bool> StartAsync()
         {
-            string? exe = RtssDetectionService.LocateExe();
-            if (exe == null)
+            if (RtssLocation.Locate() == null)
                 return false;
 
-            int? taskResult = await Task.Run(() =>
-                ScheduledTaskService.RunOneShotHighestPrivileges(
-                    TaskName, TaskDescription, exe, null));
+            bool? engineAnswer = await StartThroughEngineAsync();
 
-            if (taskResult == null)
+            if (engineAnswer == null)
             {
-                // Task route unavailable - the double-click fallback.
+                // No engine to ask (portable layout, engine down): the
+                // double-click fallback, which the user's own launch does.
                 try
                 {
+                    string? exe = RtssLocation.Locate();
+                    if (exe == null)
+                        return false;
+
                     Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true });
                 }
                 catch (Exception)
                 {
-                    // Consent refused or the launch failed: the caller's false.
+                    // Consent refused, or the launch failed: the caller's false.
                     return false;
                 }
             }
@@ -66,6 +67,25 @@ namespace Uniwill_Control_Utility.Services
                 await Task.Delay(500);
 
             return RtssDetectionService.IsRunning();
+        }
+
+        /// <summary>The engine's answer, or null when there is no engine to ask.</summary>
+        private static async Task<bool?> StartThroughEngineAsync()
+        {
+            IRtssCapability? rtss = App.RtssCapability;
+            if (rtss == null)
+                return null;
+
+            try
+            {
+                return await rtss.StartAsync().ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // EngineException (not openable, older engine without the
+                // verb), timeout, pipe gone: the caller's fallback decides.
+                return null;
+            }
         }
     }
 }
