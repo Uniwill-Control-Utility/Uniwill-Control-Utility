@@ -74,12 +74,16 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private void UpdateRtssStatus()
         {
-            bool running = RtssReader.IsRunning();
+            // The prerequisite is INSTALLED, not running: RTSS installed but
+            // not in the boot set is satisfied, not missing (the running-only
+            // check warned real installs). Liveness shows on the button.
+            bool installed = RtssDetectionService.IsInstalled();
+            bool running = RtssDetectionService.IsRunning();
 
-            RtssStatusIcon.Symbol = running ? SymbolRegular.CheckmarkCircle20 : SymbolRegular.Warning20;
-            RtssStatusIcon.Foreground = FindResource("SystemFillColor" + (running ? "Success" : "Caution") + "Brush") as Brush;
+            RtssStatusIcon.Symbol = installed ? SymbolRegular.CheckmarkCircle20 : SymbolRegular.Warning20;
+            RtssStatusIcon.Foreground = FindResource("SystemFillColor" + (installed ? "Success" : "Caution") + "Brush") as Brush;
 
-            UpdateButtonContent(RtssButton, running, "Running", "Download");
+            UpdateButtonContent(RtssButton, installed, running ? "Running" : "Installed", "Download");
         }
 
       private static void UpdateButtonContent(Wpf.Ui.Controls.Button button, bool isReady, string readyText, string actionText)
