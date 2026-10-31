@@ -377,6 +377,21 @@ RTSS is required for the **Game Overlay**. UCU writes its metrics into RTSS's on
 
 The portable layout has no installer, so automatic updates are unavailable there (Settings will tell you). If you previously ran UCU from an extracted zip, install the MSI and delete the old folder — the app re-points your "Start on system boot" task at the new location automatically.
 
+### Antivirus & SmartScreen (security-product-guarded machines)
+
+UCU is a free tool and ships **unsigned** — publisher certificates cost money, and this project doesn't have one. Two practical consequences:
+
+- **SmartScreen:** on the first run of `Setup`/`Uniwill Control Utility.exe` you may see "Windows protected your PC". That's the reputation check on an unsigned download — click **More info → Run**.
+- **Aggressive security suites:** UCU registers one Windows service (**UCUEngine**) that owns the hardware control, so the app itself can run unelevated. Products with a service-protection module (observed: Emsisoft Anti-Malware) police the app's access to that service, which shows up as a **UAC prompt for "Uniwill Control Utility Engine" on every launch**, a dashboard that never fills, or `The engine service is not openable` in the app log (`%LOCALAPPDATA%\UCU\logs`).
+
+The fix on such machines is an **application-level allowlist** for both images in your security product — an install-folder exclusion is not enough, because the file scanner is not what's policing the service:
+
+- `C:\Program Files\Uniwill-Control-Utility\current\Uniwill Control Utility.exe`
+- `C:\Program Files\Uniwill-Control-Utility\current\Service\Uniwill Control Utility Engine.exe`
+- (Portable layout: the two images inside your extracted folder.)
+
+This is the same allowlist commercial control centers rely on — theirs ride on a paid publisher certificate instead, which UCU deliberately doesn't buy.
+
 ## Building & packaging (maintainers)
 
 ```powershell
