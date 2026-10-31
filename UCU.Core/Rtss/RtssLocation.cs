@@ -84,15 +84,25 @@ namespace UCU.Core.Rtss
             return IsLaunchableFile(DefaultPath) ? DefaultPath : null;
         }
 
-        /// <summary>Session ids of every running RTSS. RTSS is a per-session
-        /// overlay, so a caller in the user's session must not read a
-        /// session-0 instance as its own (the shared-memory segment is
-        /// global and lies: field-proven).</summary>
-        public static int[] RunningSessions()
+        /// <summary>Session ids of every running RTSS, and false when the
+        /// snapshot ITSELF is unavailable (a security product refused it) -
+        /// the caller needs to know that an empty list means "no RTSS", not
+        /// "no information".</summary>
+        public static bool TryRunningSessions(out int[] sessions)
         {
-            int[] sessions = Array.Empty<int>();
+            sessions = Array.Empty<int>();
 
-            foreach (Process process in SafeProcesses())
+            Process[] processes;
+            try
+            {
+                processes = Process.GetProcessesByName("RTSS");
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
+            foreach (Process process in processes)
             {
                 using (process)
                 {
@@ -100,7 +110,7 @@ namespace UCU.Core.Rtss
                     {
                         int session = process.SessionId;
                         Array.Resize(ref sessions, sessions.Length + 1);
-                        sessions[sessions.Length - 1] = session;
+                        sessions[^1] = session;
                     }
                     catch (Exception)
                     {
@@ -109,7 +119,14 @@ namespace UCU.Core.Rtss
                 }
             }
 
-            return sessions;
+            return true;
+        }
+
+        /// <summary>Session ids of every running RTSS; empty when the snapshot
+        /// is unavailable (see <see cref="TryRunningSessions"/>).</summary>
+        public static int[] RunningSessions()
+        {
+            return TryRunningSessions(out int[] sessions) ? sessions : Array.Empty<int>();
         }
 
         /// <summary>Images of every running RTSS, best-effort (a security

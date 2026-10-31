@@ -14,8 +14,11 @@ namespace Uniwill_Control_Utility.Services
     /// Liveness is a process in the caller's session, not the shared-memory
     /// segment: the segment name is global, so a RTSS started in session 0 (the
     /// scheduled-task route's field-proven failure) answers "running" to a user
-    /// who has no tray icon and no overlay. The segment remains the witness
-    /// only when no RTSS process can be seen at all.
+    /// who has no tray icon and no overlay - and the segment outlives the
+    /// process, because RTSS's overlay DLL keeps the mapping open in every game
+    /// it injected (field-proven: zero RTSS processes, segment present). The
+    /// segment is therefore the witness ONLY when the process snapshot itself
+    /// is refused.
     ///
     /// Registry reads are swallowed to false - the detection-service rule the
     /// PawnIO detection follows.
@@ -31,19 +34,24 @@ namespace Uniwill_Control_Utility.Services
         /// <summary>True when RTSS is live IN THIS SESSION (the overlay the user can see).</summary>
         public static bool IsRunning()
         {
-            int[] sessions;
-            try
+            if (!RtssLocation.TryRunningSessions(out int[] sessions))
             {
-                sessions = RtssLocation.RunningSessions();
-            }
-            catch (Exception)
-            {
-                // A snapshot that fails tells nothing; the segment decides.
+                // The snapshot itself was refused (a security product policing
+                // process handles): the segment is the only witness left,
+                // weak as it is.
                 return RtssReader.IsRunning();
             }
 
             if (sessions.Length == 0)
-                return RtssReader.IsRunning();
+            {
+                // No RTSS process - and the segment is NOT evidence of a live
+                // RTSS. It outlives the process, because RTSS's overlay DLL
+                // keeps the mapping open in every game it injected, so a dead
+                // RTSS with a game running answers "Running" through the
+                // segment (field-proven on this box: zero processes, segment
+                // present).
+                return false;
+            }
 
             int mine = SafeSessionId();
 
