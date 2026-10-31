@@ -31,14 +31,14 @@ static class MsiEdit
 
         if (string.IsNullOrEmpty(msi))
         {
-            Console.Error.WriteLine("usage: msi-edit inspect|suppress|export <msi> [uninstallTarget [arpKey]]  (export: 3rd = table, 4th = folder)");
+            Console.Error.WriteLine("usage: msi-edit inspect|suppress|addca|export <msi> [uninstallTarget [arpKey]]  (export: 3rd = table, 4th = folder)");
             Environment.Exit(2);
         }
 
         _installer = (Installer)Activator.CreateInstance(
             Type.GetTypeFromProgID("WindowsInstaller.Installer"));
 
-        bool write = mode == "suppress";
+        bool write = mode == "suppress" || mode == "addca";
         var db = _installer.OpenDatabase(msi, write ? 1 : 0); // 1 = transact, 0 = read-only
         try
         {
@@ -60,6 +60,12 @@ static class MsiEdit
             else if (mode == "suppress")
             {
                 Suppress(db, uninstallTarget, arpKey);
+                db.Commit();
+                Console.WriteLine("COMMITTED");
+            }
+            else if (mode == "addca")
+            {
+                AddServiceCustomActions(db);
                 db.Commit();
                 Console.WriteLine("COMMITTED");
             }
@@ -298,6 +304,119 @@ static class MsiEdit
             catch (Exception e) { Console.WriteLine("  (metadata row present, skipped: " + e.Message + ")"); }
         }
         Console.WriteLine("metadata rows ensured (Publisher/HelpLink/URLInfoAbout/URLUpdateInfo)");
+    }
+
+    /// <summary>
+    /// U-111b: author the deferred exe-CustomActions that register the engine
+    /// service inside the install, so a fresh machine pays ZERO UAC at first
+    /// app launch (the elevation is spent in the MSI, the XMG CC mechanism).
+    ///
+    /// Pure DML on the existing CustomAction + InstallExecuteSequence tables
+    /// (MSI's SQL has no DDL, and no new tables are needed for exe CAs).
+    /// Encoding pinned from the SDK and field-proven on this package 2026-10-31
+    /// (full /i -> /x -> /i -> /x cycle, exit 0 at every pass, plus a forced
+    /// rollback where the 3346 row fired cleanly):
+    ///   3090 = 18 (EXE installed with the package; Source = File-table key)
+    ///        + 1024 (InScript/deferred) + 2048 (NoImpersonate = runs as SYSTEM)
+    ///   3346 = 3090 + 256 (Rollback: runs on the rollback pass)
+    /// The Source is the engine exe's File row under current\Service\ -
+    /// resolved at pack time (File keys are content-derived: every pack
+    /// re-keys them), never hardcoded. Targets are the engine's own verbs:
+    /// --install-engine registers (it is script-safe: no file deletion), and
+    /// --remove-service removes ONLY the SCM object. The sweep verb
+    /// --uninstall-engine must NEVER appear here: it runs nested msiexec /x
+    /// passes and destroys the layout the script is unwinding (1603 cascade,
+    /// field-proven the hard way).
+    ///
+    /// Sequencing follows the SDK rules for type-18 sources: the install-side
+    /// CA runs after InstallFiles (files must exist on disk), the remove-side
+    /// CA before RemoveFiles, and both after/around Velopack's own hooks:
+    /// install rollback 4098 (paired, MSI runs it in reverse order), install
+    /// deferred 4099, remove deferred 3498 (before UninstallHookDeferred 3499,
+    /// so the Velopack hook's sweep verb sees an already-removed service -
+    /// it tolerates 1060). Conditions mirror the package's own convention:
+    /// NOT REMOVE on the install side, REMOVE="ALL" on the remove side.
+    /// </summary>
+    static void AddServiceCustomActions(Database db)
+    {
+        // Resolve the engine exe's File key in current\Service\: File ->
+        // Component_ -> Directory_, then walk the Directory parent chain
+        // (Service under current). Fail closed on any template drift.
+        var dirRows = Query(db, "SELECT `Directory`, `Directory_Parent`, `DefaultDir` FROM `Directory`");
+        var dirs = new Dictionary<string, string[]>();
+        foreach (var r in dirRows) dirs[r[0]] = new[] { r[1], LongName(r[2]) };
+        string serviceDir = null;
+        foreach (var kv in dirs)
+            if (kv.Value[1] == "Service" && dirs.ContainsKey(kv.Value[0]) && dirs[kv.Value[0]][1] == "current")
+                serviceDir = kv.Key;
+        if (serviceDir == null)
+            throw new Exception("no 'Service' directory under 'current' found: template drift, refusing to author CAs");
+
+        // MSI SQL on this OS rejects LIKE with any quoting we probed
+        // (OpenView,Sql), so filter the File rows in C#: the long name
+        // (after the '|') must be the engine exe.
+        var fileRows = new List<List<string>>();
+        foreach (var r in Query(db, "SELECT `File`, `Component_`, `FileName` FROM `File`"))
+            if (string.Equals(LongName(r[2]), "Uniwill Control Utility Engine.exe", StringComparison.OrdinalIgnoreCase))
+                fileRows.Add(new List<string> { r[0], r[1] });
+        var compToDir = new Dictionary<string, string>();
+        foreach (var r in Query(db, "SELECT `Component`, `Directory_` FROM `Component`"))
+            compToDir[r[0]] = r[1];
+        var engineFiles = new List<string>();
+        foreach (var r in fileRows)
+        {
+            string d = compToDir.ContainsKey(r[1]) ? compToDir[r[1]] : null;
+            if (d == serviceDir) engineFiles.Add(r[0]);
+        }
+        if (engineFiles.Count != 1)
+            throw new Exception("expected exactly one 'Uniwill Control Utility Engine.exe' File row in current\\Service\\, found " +
+                                engineFiles.Count + ": template drift, refusing to author CAs");
+        string fk = engineFiles[0];
+
+        // Sequence anchors (absent rows mean the standard MSISequiSheets
+        // defaults the template uses: InstallFiles 4000, RemoveFiles 3500).
+        int installFiles = SeqOf(db, "InstallFiles", 4000);
+        int removeFiles = SeqOf(db, "RemoveFiles", 3500);
+        if (installFiles >= 4098)
+            throw new Exception("InstallFiles is sequenced at " + installFiles + ": the install CA (4099) must run after it");
+        if (removeFiles <= 3498)
+            throw new Exception("RemoveFiles is sequenced at " + removeFiles + ": the remove CA (3498) must run before it");
+
+        foreach (var act in new[] { "UcuEngineInstallDeferred", "UcuEngineInstallRollback", "UcuEngineRemoveDeferred" })
+        {
+            Execute(db, "DELETE FROM `CustomAction` WHERE `Action` = '" + act + "'");
+            Execute(db, "DELETE FROM `InstallExecuteSequence` WHERE `Action` = '" + act + "'");
+        }
+
+        Execute(db, "INSERT INTO `CustomAction` (`Action`, `Type`, `Source`, `Target`) " +
+                    "VALUES ('UcuEngineInstallDeferred', 3090, '" + fk + "', '--install-engine')");
+        Execute(db, "INSERT INTO `CustomAction` (`Action`, `Type`, `Source`, `Target`) " +
+                    "VALUES ('UcuEngineInstallRollback', 3346, '" + fk + "', '--remove-service')");
+        Execute(db, "INSERT INTO `CustomAction` (`Action`, `Type`, `Source`, `Target`) " +
+                    "VALUES ('UcuEngineRemoveDeferred', 3090, '" + fk + "', '--remove-service')");
+
+        Execute(db, "INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) " +
+                    "VALUES ('UcuEngineInstallRollback', 'NOT REMOVE', 4098)");
+        Execute(db, "INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) " +
+                    "VALUES ('UcuEngineInstallDeferred', 'NOT REMOVE', 4099)");
+        Execute(db, "INSERT INTO `InstallExecuteSequence` (`Action`, `Condition`, `Sequence`) " +
+                    "VALUES ('UcuEngineRemoveDeferred', 'REMOVE=\"ALL\"', 3498)");
+
+        Console.WriteLine("engine service CustomActions authored (File key " + fk +
+                          "): 3090 --install-engine @4099, 3346 --remove-service rollback @4098, " +
+                          "3090 --remove-service @3498 (InstallFiles=" + installFiles + ", RemoveFiles=" + removeFiles + ")");
+    }
+
+    static int SeqOf(Database db, string action, int standardDefault)
+    {
+        var rows = Query(db, "SELECT `Sequence` FROM `InstallExecuteSequence` WHERE `Action` = '" + action + "'");
+        return rows.Count == 0 ? standardDefault : int.Parse(rows[0][0]);
+    }
+
+    static string LongName(string shortLongOrLong)
+    {
+        int bar = shortLongOrLong.IndexOf('|');
+        return bar >= 0 ? shortLongOrLong.Substring(bar + 1) : shortLongOrLong;
     }
 
     static void SetProp(Database db, string name, string value)

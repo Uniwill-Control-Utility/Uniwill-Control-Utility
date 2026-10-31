@@ -525,6 +525,45 @@ namespace UCU.Engine
         }
 
         /// <summary>
+        /// Stops and removes ONLY the service - no app kill, no registration
+        /// sweep, no layout deletion. This is the verb the MSI's remove-side
+        /// deferred CustomAction runs (<c>--remove-service</c>): inside an
+        /// uninstall script the sweep verb is a grenade (it runs nested
+        /// <c>msiexec /x</c> passes and destroys the very layout the script
+        /// is unwinding, and the 1603 cascade tears the package). MSI owns
+        /// files, shortcuts, and registrations during the script; this verb
+        /// touches only the SCM object, tolerates an already-absent service
+        /// (1060), and never fails the script for a missing one.
+        /// </summary>
+        public static async Task<int> RemoveServiceAsync()
+        {
+            ConfigureLogging();
+            LogInvocationChain();
+
+            string name = EngineHostFactory.ServiceName;
+
+            int rc = await RunScAsync("stop", name).ConfigureAwait(false);
+            if (rc != 0 && rc != ErrorServiceAlreadyStopped && rc != ErrorServiceDoesNotExist)
+            {
+                Log.Warning("[EngineInstaller] sc stop exited with {Code} (continuing to delete)", rc);
+            }
+
+            rc = await RunScAsync("delete", name).ConfigureAwait(false);
+            if (rc != 0 && rc != ErrorServiceDoesNotExist)
+            {
+                // Same policy-guard recovery as the sweep verb: kill the live
+                // image so a parked delete completes (this process is the same
+                // image: exclude our own pid).
+                KillEngineServiceProcess();
+                await Task.Delay(2000).ConfigureAwait(false);
+                rc = await RunScAsync("delete", name).ConfigureAwait(false);
+            }
+
+            Log.Information("[EngineInstaller] Engine service removed by MSI verb (rc {Code})", rc);
+            return rc;
+        }
+
+        /// <summary>
         /// Force-closes the app (and the retired guardian) so it stops locking
         /// the install layout. This process is the engine exe, a distinct image
         /// name, so no self-exclusion is needed.
