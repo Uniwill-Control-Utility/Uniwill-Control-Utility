@@ -50,4 +50,26 @@ public sealed class RtssLocationTests
     {
         Assert.Equal("RTSS.exe", RtssLocation.ExeName);
     }
+
+    [Fact]
+    public void TheProductIsNamedByItsKeyAndItsDisplayName()
+    {
+        // The probed install shape: the key name the 32-bit installer writes.
+        Assert.True(RtssLocation.IsRtssInstallName("RTSS", null));
+
+        // Any key name, the product display name (case-tolerant).
+        Assert.True(RtssLocation.IsRtssInstallName("{2D67E58B-1234}", "RivaTuner Statistics Server"));
+        Assert.True(RtssLocation.IsRtssInstallName("RivaTuner Statistics Server", "RIVATUNER Statistics Server"));
+    }
+
+    [Fact]
+    public void UnrelatedEntriesAreNotRTSS()
+    {
+        // A bare RTSS substring in a display name (a path value, a plugin)
+        // cannot claim the witness.
+        Assert.False(RtssLocation.IsRtssInstallName("SomeTool", "My Tool RTSS plugin"));
+        Assert.False(RtssLocation.IsRtssInstallName("RivaTunerOverlayHelper", null));
+        Assert.False(RtssLocation.IsRtssInstallName("SomeTool", null));
+        Assert.False(RtssLocation.IsRtssInstallName("SomeTool", "Some Tool"));
+    }
 }
