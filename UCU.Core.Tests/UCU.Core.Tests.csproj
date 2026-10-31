@@ -24,4 +24,11 @@
     <ProjectReference Include="..\UCU.Core\UCU.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The EC registry code generator, linked (not referenced) so the vault tests pin the
+         exact code the build's GenerateEcVault target runs. Program.cs stays out: the test
+         assembly must not acquire an entry point. -->
+    <Compile Include="..\tools\EcRegistryGen\EcRegistryGenerator.cs" Link="EcRegistryGen\EcRegistryGenerator.cs" />
+  </ItemGroup>
+
 </Project>

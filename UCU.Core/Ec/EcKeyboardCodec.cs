@@ -1,3 +1,5 @@
+using UCU.Core.Ec.Generated;
+
 namespace UCU.Core.Ec
 {
     /// <summary>
@@ -21,19 +23,19 @@ namespace UCU.Core.Ec
         public const int MaxBrightness = 7;
 
         /// <summary>Brightness bits of the keyboard status register (bits 5-7).</summary>
-        public const byte BrightnessMask = 0xE0;
+        public const byte BrightnessMask = EcVault.KBD_BRIGHTNESS_MASK;
 
         /// <summary>Shift from a brightness level to its position in the status register.</summary>
         public const int BrightnessShift = 5;
 
         /// <summary>Apply bit (bit 4): tells the EC to commit the status write.</summary>
-        public const byte ApplyBit = 0x10;
+        public const byte ApplyBit = EcVault.KBD_APPLY;
 
         /// <summary>Power-off bit (bit 1).</summary>
-        public const byte PowerOffBit = 0x02;
+        public const byte PowerOffBit = EcVault.KBD_POWER_OFF;
 
         /// <summary>White-only keyboard bit (bit 0) of the status register.</summary>
-        public const byte WhiteOnlyBit = 0x01;
+        public const byte WhiteOnlyBit = EcVault.KBD_WHITE_ONLY;
 
         /// <summary>
         /// Clamps an RGB color to the EC scale and raises an all-zero color to the

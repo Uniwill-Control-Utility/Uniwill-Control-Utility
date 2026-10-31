@@ -1,3 +1,5 @@
+using UCU.Core.Ec.Generated;
+
 namespace UCU.Core.Ec
 {
     /// <summary>
@@ -10,9 +12,9 @@ namespace UCU.Core.Ec
     public static class EcFanRegisters
     {
         /// <summary>CPU fan duty table, 16 bytes, duty on the EC 0-200 scale.</summary>
-        public const ushort CpuFanSpeedTable = 0x0F20;
+        public const ushort CpuFanSpeedTable = EcVault.REG_CPU_FAN_SPEED_TABLE;
 
         /// <summary>GPU fan duty table, 16 bytes, duty on the EC 0-200 scale.</summary>
-        public const ushort GpuFanSpeedTable = 0x0F50;
+        public const ushort GpuFanSpeedTable = EcVault.REG_GPU_FAN_SPEED_TABLE;
     }
 }

@@ -1,3 +1,5 @@
+using UCU.Core.Ec.Generated;
+
 namespace UCU.Core.Ec
 {
     /// <summary>
@@ -33,7 +35,7 @@ namespace UCU.Core.Ec
             designCapacityMah > 0 ? (int)((long)fullChargeCapacityMah * 100 / designCapacityMah) : 0;
 
         /// <summary>True when bit 0 of the power-source register reports AC power.</summary>
-        public static bool IsAcPowered(byte powerSourceRegister) => (powerSourceRegister & 1) != 0;
+        public static bool IsAcPowered(byte powerSourceRegister) => (powerSourceRegister & EcVault.BATTERY_AC_CONNECTED_BIT) != 0;
 
         /// <summary>
         /// Charge rate in milliamps. The EC reports a magnitude in a 16-bit register;

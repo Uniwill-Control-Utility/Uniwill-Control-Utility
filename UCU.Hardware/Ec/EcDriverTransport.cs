@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using UCU.Core.Ec.Generated;
 
 namespace UCU.Hardware.Ec
 {
@@ -19,8 +20,8 @@ namespace UCU.Hardware.Ec
         public const string AcpiDriverDevice = @"\\.\ACPIDriver";
 
         // IOCTL codes from MechControl's EcDevice.cs - proven to work on NB05.
-        private const uint IOCTL_ECREAD = 0x9C40A488;
-        private const uint IOCTL_ECWRITE = 0x9C40A48C;
+        private const uint IOCTL_ECREAD = EcVault.IOCTL_ECREAD;
+        private const uint IOCTL_ECWRITE = EcVault.IOCTL_ECWRITE;
 
         // File access/share flags
         private const uint GENERIC_READ_WRITE = 0xC0000000; // GENERIC_READ | GENERIC_WRITE

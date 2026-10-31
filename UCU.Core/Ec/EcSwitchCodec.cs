@@ -1,3 +1,5 @@
+using UCU.Core.Ec.Generated;
+
 namespace UCU.Core.Ec
 {
     /// <summary>
@@ -32,16 +34,16 @@ namespace UCU.Core.Ec
     public static class EcSwitchCodec
     {
         /// <summary>0x074E bit 4: F-key lock.</summary>
-        public const byte FnLockBit = 0x10;
+        public const byte FnLockBit = EcVault.FN_LOCK_BIT;
 
         /// <summary>0x0726 bit 3: power on when AC is restored.</summary>
-        public const byte AcRecoveryBit = 0x08;
+        public const byte AcRecoveryBit = EcVault.AC_RECOVERY_BIT;
 
         /// <summary>0x0768 bit 0: Win-key lock status.</summary>
-        public const byte WinLockStatusBit = 0x01;
+        public const byte WinLockStatusBit = EcVault.WINLOCK_STATUS_BIT;
 
         /// <summary>0x0767 bit 0: Win-key lock TOGGLE trigger (self-consuming).</summary>
-        public const byte WinLockTriggerBit = 0x01;
+        public const byte WinLockTriggerBit = EcVault.WINLOCK_TRIGGER_BIT;
 
         public static bool IsFnLockLocked(byte registerByte) => (registerByte & FnLockBit) != 0;
 
