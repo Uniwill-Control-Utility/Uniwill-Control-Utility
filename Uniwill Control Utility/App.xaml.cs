@@ -1378,9 +1378,50 @@ namespace Uniwill_Control_Utility
             // the complete route; this hive is the user's own, so no elevation.
             SelfHealControlPanelUninstall();
 
+            // RTSS auto-start for the boot-started app: when UCU is set to
+            // start with Windows (the "UCU Autostart" task is the witness),
+            // the overlay's frame source is expected live at boot - RTSS
+            // installed but not in the user's startup set means the overlay
+            // silently runs without RTSS data. The APP is the starter, not
+            // the engine: RTSS is a user-session overlay (tray icon, game
+            // injection) and a SYSTEM session-0 launch would render it
+            // invisible. The start goes through the elevation-free
+            // highest-privilege task route: RTSS commonly carries the
+            // "Run as administrator" flag (field-reported: double-clicking
+            // it prompts UAC), and a plain Process.Start would pop that
+            // prompt at every logon.
+            SafeFireAndForget(AutoStartRtssForBootStartAsync());
+
             // Show the prerequisite checklist on first startup.
             if (Settings.Default.ShowPrerequisiteDialog)
                 SafeFireAndForget(ShowPrerequisiteDialogAsync());
+        }
+
+        /// <summary>
+        /// Boot-start gate for RTSS: starts it when UCU is the boot-started
+        /// app, RTSS is installed, and it is not running. Silent no-op for
+        /// every other machine (no RTSS, RTSS running, UCU not boot-started).
+        /// </summary>
+        private static async Task AutoStartRtssForBootStartAsync()
+        {
+            try
+            {
+                if (ScheduledTaskService.GetActionPath(AutostartTaskName) is null)
+                    return; // UCU is not set to start with Windows - no opinion about RTSS
+
+                if (!RtssDetectionService.IsInstalled() || RtssDetectionService.IsRunning())
+                    return;
+
+                bool started = await RtssLauncher.StartAsync();
+                if (started)
+                    _logger?.LogInformation("[Startup] RTSS was installed but not running - started for the overlay");
+                else
+                    _logger?.LogWarning("[Startup] RTSS auto-start did not bring RTSS up");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "[Startup] RTSS auto-start failed");
+            }
         }
 
         /// <summary>
