@@ -68,21 +68,44 @@ public sealed class PrerequisiteRtssDetectionTests
     }
 
     [Fact]
-    public void TheExeLocationComesFromTheUninstallEntryAndOnlyVerifiesFiles()
+    public void TheExeLocationRefusesTheUninstallEntryBoobyTrapAndVerifiesFiles()
     {
         string service = ReadAppSource("Services", "RtssDetectionService.cs");
 
         string locate = MethodBody(service, "public static string? LocateExe()");
 
-        // The uninstall entry is the location witness, in both views.
-        Assert.Contains("DisplayIcon", locate, StringComparison.Ordinal);
+        // The uninstall entry is a location witness, read in both views.
         Assert.Contains("InstallLocation", locate, StringComparison.Ordinal);
+        Assert.Contains("DisplayIcon", locate, StringComparison.Ordinal);
         Assert.Contains("RegistryView.Registry64", locate, StringComparison.Ordinal);
         Assert.Contains("RegistryView.Registry32", locate, StringComparison.Ordinal);
+
+        // Field probe of a real 7.3.7 install: DisplayIcon names uninstall.exe
+        // and InstallLocation is empty. An unguarded DisplayIcon would make
+        // the Start button launch RTSS's own uninstaller - the icon is
+        // accepted only when it names RTSS.exe.
+        Assert.Contains("Path.GetFileName(icon), \"RTSS.exe\"", locate, StringComparison.Ordinal);
 
         // A path is returned only when the file exists - launchable by contract.
         Assert.Contains("File.Exists", locate, StringComparison.Ordinal);
         Assert.DoesNotContain("Process.Start", locate, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheRunningRtssProcessIsTheFirstLocationWitness()
+    {
+        string service = ReadAppSource("Services", "RtssDetectionService.cs");
+
+        string locate = MethodBody(service, "public static string? LocateExe()");
+        Assert.Contains("RunningExePath()", locate, StringComparison.Ordinal);
+
+        string witness = MethodBody(service, "private static string? RunningExePath()");
+
+        // The running image path is the truth (field-proven: a 64-bit reader
+        // can name a 32-bit RTSS's image), and a denied module read is not fatal.
+        Assert.Contains("process.MainModule?.FileName", witness, StringComparison.Ordinal);
+        Assert.Contains("File.Exists", witness, StringComparison.Ordinal);
+        Assert.True(witness.Split("catch").Length >= 3, "the module read and the snapshot must both be guarded");
     }
 
     [Fact]

@@ -46,15 +46,24 @@ namespace Uniwill_Control_Utility.Services
         }
 
         /// <summary>
-        /// The RTSS executable, for starting it. The uninstall entry's
-        /// DisplayIcon ("path,0" icon form stripped) and InstallLocation are
-        /// read in both registry views - the RTSS installer is 32-bit, so the
-        /// 64-bit view alone would miss real installs - and the install
-        /// default is the last witness. Only a file that exists is returned:
-        /// a located path is safe to launch.
+        /// The RTSS executable, for starting it. The witnesses, in order of
+        /// trust: a running RTSS process (its own image path - the truth),
+        /// then the uninstall entry's InstallLocation and DisplayIcon read in
+        /// BOTH registry views (the RTSS installer is 32-bit, so the 64-bit
+        /// view alone would miss real installs), then the install default.
+        /// The field probe of a real 7.3.7 install is why the registry
+        /// witnesses are secondary and guarded: InstallLocation is EMPTY and
+        /// DisplayIcon names uninstall.exe, so an unguarded DisplayIcon would
+        /// make the Start button launch RTSS's own uninstaller. Only a path
+        /// that exists as a file is returned - a located path is launchable
+        /// by contract.
         /// </summary>
         public static string? LocateExe()
         {
+            string? running = RunningExePath();
+            if (running != null)
+                return running;
+
             foreach (RegistryView view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
             {
                 try
@@ -66,25 +75,25 @@ namespace Uniwill_Control_Utility.Services
                     if (key == null)
                         continue;
 
-                    string? icon = key.GetValue("DisplayIcon") as string;
-                    if (!string.IsNullOrWhiteSpace(icon))
+                    string? location = CleanPath(key.GetValue("InstallLocation") as string);
+                    if (location != null)
                     {
-                        // "C:\...\RTSS.exe,0" - the icon-index suffix is not path.
-                        int comma = icon.LastIndexOf(',');
-                        string path = comma > 1 ? icon.Substring(0, comma) : icon;
-
-                        if (File.Exists(path.Trim().Trim('"')))
-                            return Path.GetFullPath(path.Trim().Trim('"'));
-                    }
-
-                    string? location = key.GetValue("InstallLocation") as string;
-                    if (!string.IsNullOrWhiteSpace(location))
-                    {
-                        string candidate = Path.Combine(
-                            location.Trim().Trim('"'), "RTSS.exe");
+                        string candidate = Path.Combine(location, "RTSS.exe");
 
                         if (File.Exists(candidate))
                             return Path.GetFullPath(candidate);
+                    }
+
+                    // DisplayIcon is the Add/Remove Programs icon: on real RTSS
+                    // installs it names uninstall.exe. Accept it only when it
+                    // names RTSS.exe - the Start button must never run an
+                    // uninstaller.
+                    string? icon = CleanIconPath(key.GetValue("DisplayIcon") as string);
+                    if (icon != null
+                        && string.Equals(Path.GetFileName(icon), "RTSS.exe", StringComparison.OrdinalIgnoreCase)
+                        && File.Exists(icon))
+                    {
+                        return Path.GetFullPath(icon);
                     }
                 }
                 catch (Exception)
@@ -97,6 +106,57 @@ namespace Uniwill_Control_Utility.Services
                 @"C:\Program Files (x86)\RivaTuner Statistics Server\RTSS.exe";
 
             return File.Exists(Default) ? Default : null;
+        }
+
+        /// <summary>The image path of a running RTSS, or null (field-proven: a 64-bit reader can name a 32-bit RTSS's image).</summary>
+        private static string? RunningExePath()
+        {
+            try
+            {
+                foreach (Process process in Process.GetProcessesByName("RTSS"))
+                {
+                    using (process)
+                    {
+                        try
+                        {
+                            string? path = process.MainModule?.FileName;
+
+                            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                                return Path.GetFullPath(path);
+                        }
+                        catch (Exception)
+                        {
+                            // A module read a security product denies: next process.
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // A process snapshot that fails tells nothing.
+            }
+
+            return null;
+        }
+
+        private static string? CleanPath(string? raw)
+        {
+            string? path = raw == null ? null : raw.Trim().Trim('"');
+            return string.IsNullOrWhiteSpace(path) ? null : path;
+        }
+
+        /// <summary>"C:\...\RTSS.exe,0" - the icon-index suffix is not part of the path.</summary>
+        private static string? CleanIconPath(string? raw)
+        {
+            string? path = CleanPath(raw);
+            if (path == null)
+                return null;
+
+            int comma = path.LastIndexOf(',');
+            if (comma > 1)
+                path = path.Substring(0, comma).Trim();
+
+            return string.IsNullOrWhiteSpace(path) ? null : path;
         }
 
         private static bool ExistsIn(RegistryView view)
