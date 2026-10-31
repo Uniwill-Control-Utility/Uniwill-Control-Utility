@@ -164,11 +164,16 @@ namespace UCU.Engine
         /// (<see cref="ServiceSddl"/>'s AU ace), re-asserting sdset until it does.
         /// The create-commit race needs one or two rounds; the budget is generous so
         /// a descriptor that converges slowly (antivirus on the registry write)
-        /// still lands.
+        /// still lands. Field-proven floor: when the service is created inside an
+        /// MSI script (U-111b's install CustomAction), the SCM's deferred commit of
+        /// the create template lands SIX seconds after sc create returned - past the
+        /// original ten-attempt window - so every in-window sdset was restored and
+        /// the install CA ended with "DACL did not converge". Twenty attempts cover
+        /// the commit plus re-assertion.
         /// </summary>
         internal static async Task<bool> EnsureSddlCommittedAsync(string name)
         {
-            for (int attempt = 0; attempt < 10; attempt++)
+            for (int attempt = 0; attempt < 20; attempt++)
             {
                 string shown = await RunScCaptureAsync("sdshow", name).ConfigureAwait(false);
                 if (SddlCarriesAppContract(shown))
