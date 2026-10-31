@@ -84,8 +84,13 @@ namespace UCU.Hardware.Cpu.Intel
 
                     if (msrPawnIo == null || !msrPawnIo.IsLoaded)
                     {
+                        // U-110: the Intel MSR verbs answer bool (the ported
+                        // stack's shape) and this log is the diagnostic
+                        // surface, so the open code rides the message:
+                        // 1275 names Core Isolation as the blocker.
                         Log.Error(
-                            new InvalidOperationException("IntelMSR.bin failed to load."),
+                            new InvalidOperationException(
+                                "IntelMSR.bin failed to load." + IntelPawnIo.DescribeLastOpenFailure()),
                             "Failed to initialise Intel PawnIO.");
                         return;
                     }

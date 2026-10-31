@@ -430,7 +430,14 @@ namespace UCU.Hardware.Cpu
                 throw new ArgumentOutOfRangeException($"Command '{commandName}' not found");
 
             if (!RyzenAccess.EnsureInitialised())
-                throw new InvalidOperationException("AMD PawnIO failed to initialise.");
+                // U-110: embed the Win32 open code when the device open
+                // failed (1275 names Core Isolation as the blocker; OpenRevo
+                // recognizes the same code from StartService). The engine
+                // dispatcher propagates this message verbatim as the
+                // HardwareFault payload, so the app sees the code, not just
+                // "failed to initialise".
+                throw new InvalidOperationException(
+                    "AMD PawnIO failed to initialise." + AMDpawnIO.DescribeLastOpenFailure());
 
             var originalArguments = (uint[])args.Clone();
             Status lastStatus = Status.FAILED;
@@ -472,7 +479,10 @@ namespace UCU.Hardware.Cpu
 
                 if (!Smu.pawnIo.IsLoaded)
                 {
-                    Log.Information("SMU PawnIO failed to load from: " + modulePath);
+                    // The open code (when recorded) is the engine log's U-110
+                    // diagnostic: 1275 says Core Isolation, 577 says image
+                    // integrity, 2/3 with HVCI on says the same inference.
+                    Log.Information("SMU PawnIO failed to load from: " + modulePath + AMDpawnIO.DescribeLastOpenFailure());
                     return false;
                 }
 

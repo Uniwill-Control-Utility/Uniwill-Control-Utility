@@ -39,8 +39,26 @@ namespace UCU.Hardware.Cpu.Interop
         public static Version? Version => _installedVersion;
         public bool IsLoaded => _device != null && !_device.IsInvalid && !_device.IsClosed;
 
+        /// <summary>
+        /// The Win32 code of the most recent PawnIO device-open failure and
+        /// the path that produced it (U-110 payload, symmetric with the AMD
+        /// interop's record of the same name). Cleared when a load attempt
+        /// begins and when an open succeeds. Intel MSR init is serialized
+        /// behind the stack's initialization lock.
+        /// </summary>
+        public static (int Code, string Path)? LastDeviceOpenFailure { get; private set; }
+
+        /// <summary>" (Win32 {code} opening {path})" when an open failure was
+        /// recorded, empty otherwise — the suffix init-failure messages embed.</summary>
+        public static string DescribeLastOpenFailure() =>
+            LastDeviceOpenFailure is (int code, string path)
+                ? $" (Win32 {code} opening {path})"
+                : string.Empty;
+
         public static IntelPawnIo LoadModuleFromFile(string filePath)
         {
+            LastDeviceOpenFailure = null; // every attempt starts with a clean record
+
             if (string.IsNullOrWhiteSpace(filePath))
                 throw new ArgumentException("File path must not be empty.", nameof(filePath));
 
@@ -52,6 +70,8 @@ namespace UCU.Hardware.Cpu.Interop
 
         public static IntelPawnIo LoadModuleFromResource(Assembly assembly, string resourceName)
         {
+            LastDeviceOpenFailure = null;
+
             using Stream? stream = assembly.GetManifestResourceStream(resourceName);
             if (stream == null)
                 return new IntelPawnIo(null);
@@ -64,6 +84,8 @@ namespace UCU.Hardware.Cpu.Interop
 
         private static IntelPawnIo LoadModule(byte[] moduleBytes)
         {
+            LastDeviceOpenFailure = null;
+
             foreach (string path in DevicePaths)
             {
                 IntPtr raw = CreateFile(
@@ -76,7 +98,14 @@ namespace UCU.Hardware.Cpu.Interop
                     IntPtr.Zero);
 
                 if (raw == IntPtr.Zero || raw.ToInt64() == -1)
+                {
+                    // Record the code for the U-110 payload (see LastDeviceOpenFailure).
+                    LastDeviceOpenFailure = (Marshal.GetLastWin32Error(), path);
                     continue;
+                }
+
+                // An open succeeded: this attempt is not an open failure.
+                LastDeviceOpenFailure = null;
 
                 bool ok = DeviceIoControl(
                     raw,

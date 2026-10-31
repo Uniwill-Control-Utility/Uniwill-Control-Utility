@@ -48,11 +48,40 @@ namespace UCU.Hardware.Cpu.Interop
         /// <summary>True when the device handle exists and is usable.</summary>
         public bool IsLoaded => _device != null && !_device.IsInvalid && !_device.IsClosed;
 
+        /// <summary>
+        /// The Win32 code of the most recent PawnIO device-open failure and
+        /// the path that produced it (U-110 engine payload). A driver that
+        /// Core Isolation (Memory Integrity) blocks never starts, so the
+        /// device is absent and the open fails — and on flows that attempt
+        /// the start, 1275 (ERROR_DRIVER_BLOCKED_BY_CORE_ISOLATION) surfaces
+        /// here; OpenRevo's driver manager names the same code from
+        /// StartService (driver\bld_driver_mgr.rs). Cleared when a load
+        /// attempt begins and when an open succeeds, so the record is never
+        /// stale for the current attempt. SMU init is serialized behind the
+        /// Smu initialization lock, so this is not a racing surface.
+        /// </summary>
+        public static (int Code, string Path)? LastDeviceOpenFailure { get; private set; }
+
+        /// <summary>
+        /// " (Win32 1275 opening \\?\GLOBALROOT\Device\PawnIO)" when a
+        /// device-open failure was recorded, empty when the failure has no
+        /// observed code — the suffix the init-failure messages embed so
+        /// the engine's HardwareFault payload carries the blocking code to
+        /// the app (the dispatcher propagates the InvalidOperationException
+        /// message verbatim).
+        /// </summary>
+        public static string DescribeLastOpenFailure() =>
+            LastDeviceOpenFailure is (int code, string path)
+                ? $" (Win32 {code} opening {path})"
+                : string.Empty;
+
         // --------------------------------------------------------------------
         // Module loading
         // --------------------------------------------------------------------
         public static AMDpawnIO LoadModuleFromFile(string filePath)
         {
+            LastDeviceOpenFailure = null; // every attempt starts with a clean record
+
             if (string.IsNullOrWhiteSpace(filePath))
                 throw new ArgumentException("File path must not be empty.", nameof(filePath));
 
@@ -65,6 +94,8 @@ namespace UCU.Hardware.Cpu.Interop
 
         public static AMDpawnIO LoadModuleFromResource(Assembly assembly, string resourceName)
         {
+            LastDeviceOpenFailure = null;
+
             ArgumentNullException.ThrowIfNull(assembly);
             if (string.IsNullOrWhiteSpace(resourceName))
                 throw new ArgumentException("Resource name must not be empty.", nameof(resourceName));
@@ -79,6 +110,8 @@ namespace UCU.Hardware.Cpu.Interop
 
         private static AMDpawnIO LoadModule(byte[] moduleBytes)
         {
+            LastDeviceOpenFailure = null;
+
             IntPtr raw = CreateFile(
                 DevicePath,
                 FileAccess.GENERIC_READ | FileAccess.GENERIC_WRITE,
@@ -91,6 +124,9 @@ namespace UCU.Hardware.Cpu.Interop
             // Ensure backwards compatibility with pre-2.1.0 versions of PawnIO
             if (raw == IntPtr.Zero || raw.ToInt64() == -1)
             {
+                // Record the code for the U-110 payload (see LastDeviceOpenFailure).
+                LastDeviceOpenFailure = (Marshal.GetLastWin32Error(), DevicePath);
+
                 raw = CreateFile(
                 OldDevicePath,
                 FileAccess.GENERIC_READ | FileAccess.GENERIC_WRITE,
@@ -102,11 +138,17 @@ namespace UCU.Hardware.Cpu.Interop
 
                 if (raw == IntPtr.Zero || raw.ToInt64() == -1)
                 {
+                    LastDeviceOpenFailure = (Marshal.GetLastWin32Error(), OldDevicePath);
                     return new AMDpawnIO(null);
                 }
                     
                 DevicePath = OldDevicePath;
             }
+
+            // An open succeeded: the failure record describes this attempt, and
+            // this attempt is not an open failure (a LoadBinary refusal below
+            // is a different shape; the SMU init messages carry no open code).
+            LastDeviceOpenFailure = null;
 
             try
             {

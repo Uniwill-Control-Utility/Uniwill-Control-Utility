@@ -959,5 +959,8 @@
   "Fn Key Lock": "Fn Key Lock",
   "Locks the Fn layer, like the keyboard\u0027s own Fn lock shortcut; the state lives in the firmware": "Locks the Fn layer, like the keyboard\u0027s own Fn lock shortcut; the state lives in the firmware",
   "AC Power Recovery": "AC Power Recovery",
-  "Turn the laptop on automatically when AC power is restored, e.g. after a power outage": "Turn the laptop on automatically when AC power is restored, e.g. after a power outage"
+  "Turn the laptop on automatically when AC power is restored, e.g. after a power outage": "Turn the laptop on automatically when AC power is restored, e.g. after a power outage",
+  "Memory Integrity is blocking the driver": "Memory Integrity is blocking the driver",
+  "Windows Memory Integrity (Core Isolation) is blocking the PawnIO driver, so it cannot start and the hardware controls it powers are unavailable.\n\nMemory Integrity does NOT need to be turned off for UCU: the latest PawnIO release is signed to load with Memory Integrity enabled, and this installer always downloads the latest official release. Run the installer again to update the driver, then restart UCU.\n\nIf Windows keeps blocking the driver, this machine\u0027s Code Integrity policy blocks it, and the PawnIO-backed controls stay unavailable.\n\nInstaller exit code: {0}": "Windows Memory Integrity (Core Isolation) is blocking the PawnIO driver, so it cannot start and the hardware controls it powers are unavailable.\n\nMemory Integrity does NOT need to be turned off for UCU: the latest PawnIO release is signed to load with Memory Integrity enabled, and this installer always downloads the latest official release. Run the installer again to update the driver, then restart UCU.\n\nIf Windows keeps blocking the driver, this machine\u0027s Code Integrity policy blocks it, and the PawnIO-backed controls stay unavailable.\n\nInstaller exit code: {0}",
+  "Open Windows Security": "Open Windows Security"
 }
