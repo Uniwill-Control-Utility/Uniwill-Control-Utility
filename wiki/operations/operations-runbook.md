@@ -233,6 +233,18 @@ Separate the domains:
 
 Use the log and active command string to locate the failing translator option. For V-F presets, verify the required power-before-curve and power-after-curve sequence.
 
+### Power Tuning Guardian (power-limit drift healing)
+
+The guardian (Automations → Power Tuning Guardian) is opt-in per feature, **off by default**: each enabled half periodically reads the EC's power-contract truth (`power.get_contract_truth` — the GPU cTGP/DB bytes `0x0743`/`0x0744`/`0x0745`/`0x0746`, the custom-profile bit `0x0727!bit6`, and the CPU PL pair `0x0783`/`0x0784`; laptop NVML answers NOT_SUPPORTED for power limits, so the EC registers are the only truth) and re-applies the contract the preset pipeline last applied when a third-party tuner reset it. The app log (`%LOCALAPPDATA%\UCU\logs`) carries the full evidence trail, all prefixed `[PowerGuardian]`:
+
+- `contract loaded/noted/cleared …` — what the guardian believes the contract is; a stock preset apply **clears** it (the firmware's factory table rules, nothing to heal).
+- `drift detected: gpu=… cpu=…` — the moved register bytes (hex) / wattages before the heal, and `contract restored, verified by EC re-read` after it. The user toast fires only on that verified path, throttled to one per 10 minutes.
+- `engine not answering (Busy/Timeout/HardwareUnavailable) - backing off` — normal under engine load; the guardian pauses 60 s, it never queues onto a saturated power domain.
+- `heal refused: InvalidValue …` — the contract bytes are no longer valid for this firmware; fix the preset, the guardian does not retry blindly.
+- `heal NOT verified: …` — the write landed but the EC re-read still shows the tuner's bytes: something is actively re-tuning (check Afterburner / OEM control center startup entries).
+
+Cycles are silently skipped while Adaptive is running (its diff-apply loop owns tuning), while the GPU driver-transition cooldown is armed (GPU half only), and when the persisted contract (`%LOCALAPPDATA%\UCU\power_contract.json`) is empty.
+
 ### Overlay has no FPS value
 
 Confirm RTSS is running and publishing the foreground process. Without RTSS, the ETW fallback must be able to observe present events and resolve the foreground executable. Some protected processes prevent module-path inspection; telemetry may remain unavailable while other overlay metrics continue.

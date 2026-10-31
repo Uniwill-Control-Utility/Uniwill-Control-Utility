@@ -49,6 +49,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             setRefreshRatePluggedIn(Settings.Default.RefreshRatePluggedIn);
             UpdateRefreshRateVisibility();
 
+            // Power Guardian toggles (U-107): persisted rows, defaults OFF.
+            cbPowerGuardGpu.IsChecked = Settings.Default.PowerGuardGpu;
+            cbPowerGuardCpu.IsChecked = Settings.Default.PowerGuardCpu;
+
             setup = true;
         }
 
@@ -508,6 +512,43 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 _ = Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyInternalRefreshRate(hz));
             }
+        }
+
+        #endregion
+
+        #region Power Tuning Guardian
+
+        // Persist-only rows (U-107): the constructor reflects the saved state
+        // before `setup` is armed, so the events that write raises are ignored;
+        // a handler past the guard is user intent, and the row actuates nothing
+        // on reflection — the guardian loop reads these Settings itself.
+
+        private void cbPowerGuardGpu_Checked(object sender, RoutedEventArgs e)
+        {
+            if (!setup) return;
+            Settings.Default.PowerGuardGpu = true;
+            Settings.Default.Save();
+        }
+
+        private void cbPowerGuardGpu_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (!setup) return;
+            Settings.Default.PowerGuardGpu = false;
+            Settings.Default.Save();
+        }
+
+        private void cbPowerGuardCpu_Checked(object sender, RoutedEventArgs e)
+        {
+            if (!setup) return;
+            Settings.Default.PowerGuardCpu = true;
+            Settings.Default.Save();
+        }
+
+        private void cbPowerGuardCpu_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (!setup) return;
+            Settings.Default.PowerGuardCpu = false;
+            Settings.Default.Save();
         }
 
         #endregion

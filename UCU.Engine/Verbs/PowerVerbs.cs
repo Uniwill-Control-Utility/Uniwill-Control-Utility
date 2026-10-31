@@ -1,4 +1,5 @@
 using UCU.Contracts;
+using UCU.Hardware.Ec;
 
 namespace UCU.Engine
 {
@@ -110,6 +111,44 @@ namespace UCU.Engine
 
             add(EngineVerbs.Power.IsCustomProfileActive, (p, ct) =>
                 Task.FromResult<object?>(gate.Acquire().IsCustomProfileActive()));
+
+            add(EngineVerbs.Power.GetContractTruth, (p, ct) =>
+            {
+                // The drift oracle (U-107): the GPU cTGP/DB bytes and the CPU
+                // PL wattage pair in one serialized power-domain pass, so a
+                // heal decision never races a half-updated register set.
+                var ec = gate.Acquire();
+                EcEngine.GpuPowerControlStateBytes gpu = ec.GetGpuPowerControlState();
+
+                return Task.FromResult<object?>(new PowerContractTruthDto
+                {
+                    GpuEnable = gpu.Enable,
+                    GpuCtgp = gpu.Ctgp,
+                    GpuTpp = gpu.Tpp,
+                    GpuDb = gpu.Db,
+                    GpuCustomProfileActive = gpu.CustomProfileActive,
+                    Pl1 = ec.GetPl1(),
+                    Pl2 = ec.GetPl2(),
+                });
+            });
+
+            add(EngineVerbs.Power.HealContract, (p, ct) =>
+            {
+                // The engine replays the preset pipeline's own activation
+                // methods — each half behind its flag. Validation is not the
+                // guardian's plan's shape: ActivateGpuPowerControl /
+                // ApplyCpuPowerLimits validate their ranges exactly as the
+                // preset path does (out-of-range → InvalidValue, EC untouched).
+                HealContractDto dto = EngineSerializer.BindParams<HealContractDto>(p);
+                var ec = gate.Acquire();
+
+                if (dto.ApplyGpu)
+                    ec.ActivateGpuPowerControl(dto.GpuCtgpOffset, dto.GpuDbOffset);
+                if (dto.ApplyCpu)
+                    ec.ApplyCpuPowerLimits(dto.Pl1Watts, dto.Pl2Watts);
+
+                return Task.FromResult<object?>(null);
+            });
         }
     }
 }

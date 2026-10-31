@@ -945,5 +945,13 @@
   "Relaunch the application after a crash": "Ponovno pokreni aplikaciju nakon rušenja",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Automatski ponovno pokreni UCU ako se neočekivano zatvori (registrira zakazani zadatak nadzora)",
   "Updates": "Ažuriranja",
-  "Lets you easily stay up to date with the latest releases": "Lako ostanite u toku s najnovijim izdanjima"
+  "Lets you easily stay up to date with the latest releases": "Lako ostanite u toku s najnovijim izdanjima",
+  "Power Tuning Guardian": "\u010Cuvar prilagodbe snage",
+  "Re-applies your preset\u0027s power limits when another program resets them": "Ponovno primjenjuje ograni\u010Denja snage va\u0161eg unaprijed postavljenog profila kad ih drugi program resetira",
+  "GPU power limit (TGP / Dynamic Boost)": "Ograni\u010Denje snage GPU-a (TGP / Dynamic Boost)",
+  "Restore the preset\u0027s GPU power ceiling when the firmware reports it was changed": "Vra\u0107a gornju granicu snage GPU-a profila kad firmware prijavi promjenu",
+  "CPU power limits (PL1 / PL2)": "Ograni\u010Denja snage CPU-a (PL1 / PL2)",
+  "Restore the preset\u0027s CPU power limits when the firmware reports they were changed": "Vra\u0107a ograni\u010Denja snage CPU-a profila kad firmware prijavi promjenu",
+  "Power limits restored": "Ograni\u010Denja snage su vra\u0107ena",
+  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "Drugi program je promijenio ograni\u010Denja snage GPU-a/CPU-a. UCU je ponovno primijenio va\u0161u prilagodbu."
 }

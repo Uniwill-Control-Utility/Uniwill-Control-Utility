@@ -945,5 +945,13 @@
   "Relaunch the application after a crash": "Mulai ulang aplikasi setelah crash",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Mulai ulang UCU secara otomatis jika keluar tak terduga (mendaftarkan tugas watchdog terjadwal)",
   "Updates": "Pembaruan",
-  "Lets you easily stay up to date with the latest releases": "Selalu mudah mengikuti rilis terbaru"
+  "Lets you easily stay up to date with the latest releases": "Selalu mudah mengikuti rilis terbaru",
+  "Power Tuning Guardian": "Penjaga Penyetelan Daya",
+  "Re-applies your preset\u0027s power limits when another program resets them": "Terapkan ulang batas daya preset Anda saat program lain meresetnya",
+  "GPU power limit (TGP / Dynamic Boost)": "Batas daya GPU (TGP / Dynamic Boost)",
+  "Restore the preset\u0027s GPU power ceiling when the firmware reports it was changed": "Pulihkan batas atas daya GPU preset saat firmware melaporkan itu diubah",
+  "CPU power limits (PL1 / PL2)": "Batas daya CPU (PL1 / PL2)",
+  "Restore the preset\u0027s CPU power limits when the firmware reports they were changed": "Pulihkan batas daya CPU preset saat firmware melaporkan mereka diubah",
+  "Power limits restored": "Batas daya dipulihkan",
+  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "Batas daya GPU/CPU diubah oleh program lain. UCU menerapkan ulang penyetelan Anda."
 }

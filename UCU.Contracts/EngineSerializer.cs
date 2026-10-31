@@ -41,6 +41,7 @@ namespace UCU.Contracts
     [JsonSerializable(typeof(PowerLimitDto))]
     [JsonSerializable(typeof(CpuPowerLimitsDto))]
     [JsonSerializable(typeof(GpuPowerControlDto))]
+    [JsonSerializable(typeof(HealContractDto))]
     [JsonSerializable(typeof(PerformanceModeDto))]
     [JsonSerializable(typeof(StockModeDto))]
     [JsonSerializable(typeof(MuxModeDto))]
@@ -59,6 +60,7 @@ namespace UCU.Contracts
     [JsonSerializable(typeof(FanDutySnapshotDto))]
     [JsonSerializable(typeof(MetricsSnapshotDto))]
     [JsonSerializable(typeof(PowerLimitsDto))]
+    [JsonSerializable(typeof(PowerContractTruthDto))]
     [JsonSerializable(typeof(MuxStateDto))]
     [JsonSerializable(typeof(BatteryTelemetryDto))]
     [JsonSerializable(typeof(PnpDeviceStateDto))]
@@ -107,6 +109,7 @@ namespace UCU.Contracts
             FanDutySnapshotDto v => ToParams(v),
             MetricsSnapshotDto v => ToParams(v),
             PowerLimitsDto v => ToParams(v),
+            PowerContractTruthDto v => ToParams(v),
             MuxModeDto v => ToParams(v),
             MuxStateDto v => ToParams(v),
             BatteryTelemetryDto v => ToParams(v),

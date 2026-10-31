@@ -365,6 +365,60 @@ namespace UCU.Contracts
         public int TccOffset { get; init; }
     }
 
+    /// <summary>
+    /// The EC's answer to "what power contract is enforced right now": the GPU
+    /// cTGP/DB register bytes (0x0743/0x0744/0x0745/0x0746, 0x0727 bit6) and
+    /// the CPU PL1/PL2 wattage. This is the drift oracle for the power-tuning
+    /// guardian: laptop NVML answers NOT_SUPPORTED for power limits (the app
+    /// substitutes the default), so the firmware's own registers are the only
+    /// truth about what the EC enforces.
+    /// </summary>
+    public sealed record PowerContractTruthDto
+    {
+        /// <summary>0x0743 raw: GENERAL(0x01) / DB(0x02) / CTGP(0x04) enable bits.</summary>
+        public int GpuEnable { get; init; }
+
+        /// <summary>0x0744 raw cTGP offset byte.</summary>
+        public int GpuCtgp { get; init; }
+
+        /// <summary>0x0745 raw total-power-pool byte.</summary>
+        public int GpuTpp { get; init; }
+
+        /// <summary>0x0746 raw Dynamic Boost offset byte.</summary>
+        public int GpuDb { get; init; }
+
+        /// <summary>0x0727 bit6: a custom preset owns the EC power/profile values.</summary>
+        public bool GpuCustomProfileActive { get; init; }
+
+        /// <summary>CPU PL1 in watts (EC 0x0783 readback).</summary>
+        public int Pl1 { get; init; }
+
+        /// <summary>CPU PL2 in watts (EC 0x0784 readback).</summary>
+        public int Pl2 { get; init; }
+    }
+
+    /// <summary>
+    /// One serialized re-apply of a drifted half of the power contract: the
+    /// GPU cTGP/DB activation sequence and/or the CPU PL pair, each behind
+    /// its own Apply* flag. The engine is policy-illiterate here — it replays
+    /// the same activation methods the preset pipeline uses; deciding WHAT
+    /// to heal is the app's Core policy's job.
+    /// </summary>
+    public sealed record HealContractDto
+    {
+        public bool ApplyGpu { get; init; }
+
+        public int GpuCtgpOffset { get; init; }
+
+        public int GpuDbOffset { get; init; }
+
+        public bool ApplyCpu { get; init; }
+
+        public int Pl1Watts { get; init; }
+
+        public int Pl2Watts { get; init; }
+    }
+
     public sealed record MuxStateDto
     {
         /// <summary>The semantic mode the EC reports for this platform.</summary>

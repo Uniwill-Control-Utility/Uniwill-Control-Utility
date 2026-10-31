@@ -945,5 +945,13 @@
   "Relaunch the application after a crash": "Toepassing opnieuw starten na een crash",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "UCU automatisch opnieuw starten als het onverwacht wordt afgesloten (regelt een geplande bewakingstaak)",
   "Updates": "Updates",
-  "Lets you easily stay up to date with the latest releases": "Blijf eenvoudig up-to-date met de nieuwste releases"
+  "Lets you easily stay up to date with the latest releases": "Blijf eenvoudig up-to-date met de nieuwste releases",
+  "Power Tuning Guardian": "Bewaker van vermogensafstemming",
+  "Re-applies your preset\u0027s power limits when another program resets them": "Past de vermogenslimieten van uw voorinstelling opnieuw toe wanneer een ander programma ze reset",
+  "GPU power limit (TGP / Dynamic Boost)": "GPU-vermogenslimiet (TGP / Dynamic Boost)",
+  "Restore the preset\u0027s GPU power ceiling when the firmware reports it was changed": "Herstelt het GPU-vermogensplafond van de voorinstelling wanneer de firmware meldt dat het is gewijzigd",
+  "CPU power limits (PL1 / PL2)": "CPU-vermogenslimieten (PL1 / PL2)",
+  "Restore the preset\u0027s CPU power limits when the firmware reports they were changed": "Herstelt de CPU-vermogenslimieten van de voorinstelling wanneer de firmware meldt dat ze zijn gewijzigd",
+  "Power limits restored": "Vermogenslimieten hersteld",
+  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "GPU/CPU-vermogenslimieten zijn door een ander programma gewijzigd. UCU heeft uw afstemming opnieuw toegepast."
 }

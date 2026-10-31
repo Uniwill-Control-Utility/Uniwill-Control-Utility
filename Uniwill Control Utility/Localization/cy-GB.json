@@ -945,5 +945,13 @@
   "Relaunch the application after a crash": "Ailgychwyn yr ap ar ôl chwalu",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Ailddechrau UCU yn awtomatig os yw'n gadael yn annisgwyl (cofrestru tasg wyliadwriaeth wedi'i hamserlennu)",
   "Updates": "Diweddariadau",
-  "Lets you easily stay up to date with the latest releases": "Aros yn gyfredol yn hawdd gyda'r fersiynau diweddaraf"
+  "Lets you easily stay up to date with the latest releases": "Aros yn gyfredol yn hawdd gyda'r fersiynau diweddaraf",
+  "Power Tuning Guardian": "Gwarchodwr Tiwnio P\u0175er",
+  "Re-applies your preset\u0027s power limits when another program resets them": "Ail-gymhwyso terfynau p\u0175er eich rhagosodiad pan fo rhaglen arall yn eu ailosod",
+  "GPU power limit (TGP / Dynamic Boost)": "Terfyn p\u0175er y GPU (TGP / Dynamic Boost)",
+  "Restore the preset\u0027s GPU power ceiling when the firmware reports it was changed": "Adfer lorwennydd p\u0175er GPU y rhagosodiad pan adrodd y firmware ei newid",
+  "CPU power limits (PL1 / PL2)": "Terfynau p\u0175er y CPU (PL1 / PL2)",
+  "Restore the preset\u0027s CPU power limits when the firmware reports they were changed": "Adfer terfynau p\u0175er CPU y rhagosodiad pan adrodd y firmware eu newid",
+  "Power limits restored": "Adferwyd y terfynau p\u0175er",
+  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "Newidiodd rhaglen arall derfynau p\u0175er y GPU/CPU. Ail-gymhwysodd UCU eich tiwnio."
 }

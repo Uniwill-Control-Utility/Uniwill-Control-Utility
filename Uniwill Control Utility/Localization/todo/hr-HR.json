@@ -369,5 +369,13 @@
   "Zone colors": "Zone colors",
   "Zones": "Zones",
   "up to {0} %, restart at {1} %": "up to {0} %, restart at {1} %",
-  "~3-5 mV per 1 point": "~3-5 mV per 1 point"
+  "~3-5 mV per 1 point": "~3-5 mV per 1 point",
+  "Power Tuning Guardian": "Power Tuning Guardian",
+  "Re-applies your preset\u0027s power limits when another program resets them": "Re-applies your preset\u0027s power limits when another program resets them",
+  "GPU power limit (TGP / Dynamic Boost)": "GPU power limit (TGP / Dynamic Boost)",
+  "Restore the preset\u0027s GPU power ceiling when the firmware reports it was changed": "Restore the preset\u0027s GPU power ceiling when the firmware reports it was changed",
+  "CPU power limits (PL1 / PL2)": "CPU power limits (PL1 / PL2)",
+  "Restore the preset\u0027s CPU power limits when the firmware reports they were changed": "Restore the preset\u0027s CPU power limits when the firmware reports they were changed",
+  "Power limits restored": "Power limits restored",
+  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "GPU/CPU power limits were changed by another program. UCU re-applied your tuning."
 }

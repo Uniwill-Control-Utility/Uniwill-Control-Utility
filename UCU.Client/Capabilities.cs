@@ -136,6 +136,12 @@ namespace UCU.Client
         public Task DeactivateGpuPowerControlAsync(CancellationToken cancellationToken = default) =>
             _client.InvokeAsync(EngineVerbs.Power.DeactivateGpuPowerControl, cancellationToken);
 
+        public Task<PowerContractTruthDto> GetContractTruthAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<PowerContractTruthDto>(EngineVerbs.Power.GetContractTruth, cancellationToken);
+
+        public Task HealContractAsync(HealContractDto plan, CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync(EngineVerbs.Power.HealContract, plan, cancellationToken);
+
         public Task<bool> IsCustomProfileActiveAsync(CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<bool>(EngineVerbs.Power.IsCustomProfileActive, cancellationToken);
     }

@@ -945,5 +945,13 @@
   "Relaunch the application after a crash": "Mulakan semula aplikasi selepas ranap",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Mulakan semula UCU secara automatik jika ia keluar secara tidak dijangka (mendaftarkan tugas pengawas berjadual)",
   "Updates": "Kemas kini",
-  "Lets you easily stay up to date with the latest releases": "Sentiasa terkini dengan keluaran terbaharu"
+  "Lets you easily stay up to date with the latest releases": "Sentiasa terkini dengan keluaran terbaharu",
+  "Power Tuning Guardian": "Penjaga Penalaan Kuasa",
+  "Re-applies your preset\u0027s power limits when another program resets them": "Mengenakan semula had kuasa praaset anda apabila program lain menetapkannya semula",
+  "GPU power limit (TGP / Dynamic Boost)": "Had kuasa GPU (TGP / Dynamic Boost)",
+  "Restore the preset\u0027s GPU power ceiling when the firmware reports it was changed": "Pulihkan siling kuasa GPU praaset apabila perisian tegar melaporkan ia diubah",
+  "CPU power limits (PL1 / PL2)": "Had kuasa CPU (PL1 / PL2)",
+  "Restore the preset\u0027s CPU power limits when the firmware reports they were changed": "Pulihkan had kuasa CPU praaset apabila perisian tegar melaporkan ia diubah",
+  "Power limits restored": "Had kuasa dipulihkan",
+  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "Program lain mengubah had kuasa GPU/CPU. UCU telah mengenakan semula penalaan anda."
 }

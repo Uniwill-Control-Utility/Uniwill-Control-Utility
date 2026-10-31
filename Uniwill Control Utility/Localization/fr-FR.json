@@ -945,5 +945,13 @@
   "Relaunch the application after a crash": "Relancer l'application après un plantage",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Redémarrer automatiquement UCU s'il se ferme de manière inattendue (enregistre une tâche de surveillance planifiée)",
   "Updates": "Mises à jour",
-  "Lets you easily stay up to date with the latest releases": "Restez facilement à jour avec les dernières versions"
+  "Lets you easily stay up to date with the latest releases": "Restez facilement à jour avec les dernières versions",
+  "Power Tuning Guardian": "Gardien du r\u00E9glage d\u0027alimentation",
+  "Re-applies your preset\u0027s power limits when another program resets them": "R\u00E9applique les limites de puissance de votre pr\u00E9r\u00E9glage lorsqu\u0027un autre programme les r\u00E9initialise",
+  "GPU power limit (TGP / Dynamic Boost)": "Limite de puissance GPU (TGP / Dynamic Boost)",
+  "Restore the preset\u0027s GPU power ceiling when the firmware reports it was changed": "Restaure le plafond de puissance GPU du pr\u00E9r\u00E9glage lorsque le firmware signale qu\u0027il a \u00E9t\u00E9 modifi\u00E9",
+  "CPU power limits (PL1 / PL2)": "Limites de puissance CPU (PL1 / PL2)",
+  "Restore the preset\u0027s CPU power limits when the firmware reports they were changed": "Restaure les limites de puissance CPU du pr\u00E9r\u00E9glage lorsque le firmware signale qu\u0027elles ont \u00E9t\u00E9 modifi\u00E9es",
+  "Power limits restored": "Limites de puissance restaur\u00E9es",
+  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "Les limites de puissance GPU/CPU ont \u00E9t\u00E9 modifi\u00E9es par un autre programme. UCU a r\u00E9appliqu\u00E9 votre r\u00E9glage."
 }

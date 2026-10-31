@@ -945,5 +945,13 @@
   "Relaunch the application after a crash": "當機後重新啟動應用程式",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "UCU 意外結束時自動重新啟動（註冊排程監視工作）",
   "Updates": "更新",
-  "Lets you easily stay up to date with the latest releases": "輕鬆取得最新版本的更新"
+  "Lets you easily stay up to date with the latest releases": "輕鬆取得最新版本的更新",
+  "Power Tuning Guardian": "\u96FB\u6E90\u8ABF\u6821\u5B88\u8B77",
+  "Re-applies your preset\u0027s power limits when another program resets them": "\u7576\u5176\u4ED6\u7A0B\u5F0F\u91CD\u8A2D\u96FB\u6E90\u9650\u5236\u6642\uFF0C\u91CD\u65B0\u5957\u7528\u9810\u8A2D\u4E2D\u7684\u96FB\u6E90\u9650\u5236",
+  "GPU power limit (TGP / Dynamic Boost)": "GPU \u529F\u7387\u4E0A\u9650 (TGP / Dynamic Boost)",
+  "Restore the preset\u0027s GPU power ceiling when the firmware reports it was changed": "\u7576\u97CC\u9AD4\u5831\u544A GPU \u529F\u7387\u4E0A\u9650\u88AB\u8B8A\u66F4\u6642\uFF0C\u6062\u5FA9\u9810\u8A2D\u4E2D\u7684 GPU \u529F\u7387\u4E0A\u9650",
+  "CPU power limits (PL1 / PL2)": "CPU \u529F\u7387\u4E0A\u9650 (PL1 / PL2)",
+  "Restore the preset\u0027s CPU power limits when the firmware reports they were changed": "\u7576\u97CC\u9AD4\u5831\u544A CPU \u529F\u7387\u4E0A\u9650\u88AB\u8B8A\u66F4\u6642\uFF0C\u6062\u5FA9\u9810\u8A2D\u4E2D\u7684 CPU \u529F\u7387\u4E0A\u9650",
+  "Power limits restored": "\u529F\u7387\u4E0A\u9650\u5DF2\u6062\u5FA9",
+  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "GPU/CPU \u529F\u7387\u4E0A\u9650\u5DF2\u88AB\u5176\u4ED6\u7A0B\u5F0F\u8B8A\u66F4\u3002UCU \u5DF2\u91CD\u65B0\u5957\u7528\u60A8\u7684\u8ABF\u6821\u3002"
 }

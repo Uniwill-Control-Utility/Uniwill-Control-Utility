@@ -945,5 +945,13 @@
   "Relaunch the application after a crash": "إعادة تشغيل التطبيق بعد التعطل",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "إعادة تشغيل UCU تلقائيًا إذا أُغلق بشكل غير متوقع (يسجل مهمة مراقبة مجدولة)",
   "Updates": "التحديثات",
-  "Lets you easily stay up to date with the latest releases": "ابقَ محدثًا بسهولة مع أحدث الإصدارات"
+  "Lets you easily stay up to date with the latest releases": "ابقَ محدثًا بسهولة مع أحدث الإصدارات",
+  "Power Tuning Guardian": "\u062D\u0627\u0631\u0633 \u0636\u0628\u0637 \u0627\u0644\u0637\u0627\u0642\u0629",
+  "Re-applies your preset\u0027s power limits when another program resets them": "\u064A\u0639\u064A\u062F \u062A\u0637\u0628\u064A\u0642 \u062D\u062F\u0648\u062F \u0627\u0644\u0637\u0627\u0642\u0629 \u0641\u064A \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0627\u0644\u0645\u0633\u0628\u0642 \u0639\u0646\u062F\u0645\u0627 \u064A\u0639\u064A\u062F \u0628\u0631\u0646\u0627\u0645\u062C \u0622\u062E\u0631 \u062A\u0639\u064A\u064A\u0646\u0647\u0627",
+  "GPU power limit (TGP / Dynamic Boost)": "\u062D\u062F \u0637\u0627\u0642\u0629 GPU (TGP / Dynamic Boost)",
+  "Restore the preset\u0027s GPU power ceiling when the firmware reports it was changed": "\u064A\u0633\u062A\u0639\u064A\u062F \u0633\u0642\u0641 \u0637\u0627\u0642\u0629 GPU \u0641\u064A \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0627\u0644\u0645\u0633\u0628\u0642 \u0639\u0646\u062F\u0645\u0627 \u064A\u0628\u0644\u063A \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062C \u0627\u0644\u062B\u0627\u0628\u062A \u0639\u0646 \u062A\u063A\u064A\u064A\u0631\u0647",
+  "CPU power limits (PL1 / PL2)": "\u062D\u062F\u0648\u062F \u0637\u0627\u0642\u0629 CPU (PL1 / PL2)",
+  "Restore the preset\u0027s CPU power limits when the firmware reports they were changed": "\u064A\u0633\u062A\u0639\u064A\u062F \u062D\u062F\u0648\u062F \u0637\u0627\u0642\u0629 CPU \u0641\u064A \u0627\u0644\u0625\u0639\u062F\u0627\u062F \u0627\u0644\u0645\u0633\u0628\u0642 \u0639\u0646\u062F\u0645\u0627 \u064A\u0628\u0644\u063A \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062C \u0627\u0644\u062B\u0627\u0628\u062A \u0639\u0646 \u062A\u063A\u064A\u064A\u0631\u0647\u0627",
+  "Power limits restored": "\u062A\u0645\u062A \u0627\u0633\u062A\u0639\u0627\u062F\u0629 \u062D\u062F\u0648\u062F \u0627\u0644\u0637\u0627\u0642\u0629",
+  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "\u063A\u064A\u0651\u0631 \u0628\u0631\u0646\u0627\u0645\u062C \u0622\u062E\u0631 \u062D\u062F\u0648\u062F \u0637\u0627\u0642\u0629 GPU/CPU. \u0623\u0639\u0627\u062F UCU \u062A\u0637\u0628\u064A\u0642 \u0636\u0628\u0637\u0643."
 }

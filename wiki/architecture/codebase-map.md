@@ -76,7 +76,7 @@
 | Platform hardware | `HardwareMonitoringService`, `GpuInventoryService`, `SkuResolver`, `LaptopDetector` | Telemetry leases and identity (app-side). |
 | Peripheral sessions | `KeyboardHidService`, `FlydigiCoolerHidService`, `FlydigiCoolerBleService`, `WaterCoolerService`/`HydroUIService` | Transport lifecycle and commands. |
 | Smart control | `EcSmartFanControl`, `FlydigiSmartControl`, `FlydigiBs1SmartControl` | Temperature-driven periodic control. |
-| Profiles | `PresetArbiter`, `PresetProfileApplier`, `AdaptivePresetManager`, `PresetBackupService`, `DeviceApplier` | Intent arbitration (serialization, boot grace, Adaptive ownership, debounce), profile storage, translation, application, override, import/export. |
+| Profiles | `PresetArbiter`, `PresetProfileApplier`, `AdaptivePresetManager`, `PresetBackupService`, `DeviceApplier`, `PowerContractStore`, `PowerGuardianService` | Intent arbitration (serialization, boot grace, Adaptive ownership, debounce), profile storage, translation, application, override, import/export, and the persisted applied-power contract with its opt-in drift-healing guardian. |
 | Overlay/performance | `OverlayManagerService`, `OverlaySettingsStore`, `Performance/*` | Overlay lifecycle, telemetry and FPS sources. |
 | App support | `LocalizationService`, `VelopackUpdateService`, `PawnIoDetectionService`, `ScheduledTaskService`, `LastAppliedSettingsService`, `Scripts/Misc/ElevatedProcess` | Translation, updates, prerequisites, autostart task, last-applied state, per-operation elevation. |
 
@@ -95,7 +95,7 @@
 | Dashboard | Device identity and hardware snapshots. |
 | Presets | Built-in/custom CPU and GPU profiles, V-F curves, backup/import. |
 | Adaptive | Per-game profiles and selected-domain overrides. |
-| Automations | AC, battery and resume profile selection. |
+| Automations | AC, battery and resume profile selection; Power Tuning Guardian opt-in toggles. |
 | Fan Control | EC curves, turbo, split/unified modes, smart fan mode. |
 | Keyboard / Light Bar | HID per-key editor + EC effects. |
 | Battery | Charge modes (engine verbs) and telemetry. |

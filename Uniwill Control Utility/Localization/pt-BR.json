@@ -945,5 +945,13 @@
   "Relaunch the application after a crash": "Reiniciar o aplicativo após uma falha",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Reiniciar o UCU automaticamente se ele for fechado inesperadamente (registra uma tarefa agendada de monitoramento)",
   "Updates": "Atualizações",
-  "Lets you easily stay up to date with the latest releases": "Mantenha-se facilmente atualizado com as versões mais recentes"
+  "Lets you easily stay up to date with the latest releases": "Mantenha-se facilmente atualizado com as versões mais recentes",
+  "Power Tuning Guardian": "Guardi\u00E3o do ajuste de energia",
+  "Re-applies your preset\u0027s power limits when another program resets them": "Reaplica os limites de energia da predefini\u00E7\u00E3o quando outro programa os redefine",
+  "GPU power limit (TGP / Dynamic Boost)": "Limite de energia da GPU (TGP / Dynamic Boost)",
+  "Restore the preset\u0027s GPU power ceiling when the firmware reports it was changed": "Restaura o teto de energia da GPU da predefini\u00E7\u00E3o quando o firmware informa que foi alterado",
+  "CPU power limits (PL1 / PL2)": "Limites de energia da CPU (PL1 / PL2)",
+  "Restore the preset\u0027s CPU power limits when the firmware reports they were changed": "Restaura os limites de energia da CPU da predefini\u00E7\u00E3o quando o firmware informa que foram alterados",
+  "Power limits restored": "Limites de energia restaurados",
+  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "Os limites de energia da GPU/CPU foram alterados por outro programa. O UCU reaplicou seu ajuste."
 }

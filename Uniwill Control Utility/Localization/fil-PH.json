@@ -945,5 +945,13 @@
   "Relaunch the application after a crash": "I-restart ang aplikasyon pagkatapos mag-crash",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "Awtomatikong i-restart ang UCU kung ito ay biglang magsara (magre-register ng iskedyul na watchdog task)",
   "Updates": "Mga update",
-  "Lets you easily stay up to date with the latest releases": "Madaling manatiling updated sa mga pinakabagong release"
+  "Lets you easily stay up to date with the latest releases": "Madaling manatiling updated sa mga pinakabagong release",
+  "Power Tuning Guardian": "Tagapag-alaga ng Power Tuning",
+  "Re-applies your preset\u0027s power limits when another program resets them": "Muling isinasagawa ang mga limitasyon ng power ng iyong preset kapag ini-reset ng ibang program",
+  "GPU power limit (TGP / Dynamic Boost)": "Limitasyon ng power ng GPU (TGP / Dynamic Boost)",
+  "Restore the preset\u0027s GPU power ceiling when the firmware reports it was changed": "Ibinalik ang power ceiling ng GPU ng preset kapag iniulat ng firmware na ito ay binago",
+  "CPU power limits (PL1 / PL2)": "Mga limitasyon ng power ng CPU (PL1 / PL2)",
+  "Restore the preset\u0027s CPU power limits when the firmware reports they were changed": "Ibinalik ang mga limitasyon ng power ng CPU ng preset kapag iniulat ng firmware na ito ay binago",
+  "Power limits restored": "Naibalik ang mga limitasyon ng power",
+  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "Binago ng ibang program ang mga limitasyon ng power ng GPU/CPU. Muling isinagawa ng UCU ang iyong tuning."
 }

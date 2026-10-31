@@ -3077,6 +3077,11 @@ namespace Uniwill_Control_Utility.Views.Windows
             {
                 var ec = Scripts.RyzenAdj_To_UCU.EcService;
                 ec?.ApplyCpuPowerLimitsAsync((int)p.CpuSustained, (int)p.CpuBoost).GetAwaiter().GetResult();
+
+                // The contract note (U-107): boot/tray custom-slot applies
+                // establish the guardian's contract too.
+                if (ec is not null)
+                    Services.PowerContractStore.NoteCpuApplied((int)p.CpuSustained, (int)p.CpuBoost);
             }
         }
 

@@ -48,6 +48,25 @@ namespace UCU.Contracts
             public const string ActivateGpuPowerControl = "power.activate_gpu_control";
             public const string DeactivateGpuPowerControl = "power.deactivate_gpu_control";
             public const string IsCustomProfileActive = "power.is_custom_profile_active";
+
+            /// <summary>
+            /// The power-contract truth (U-107): the GPU cTGP/DB register bytes
+            /// (0x0743-0x0746, 0x0727 bit6) and the CPU PL1/PL2 wattage in one
+            /// serialized read. Laptop NVML answers NOT_SUPPORTED for power
+            /// limits, so the EC's own registers are the only truth about what
+            /// power ceiling the firmware enforces — the drift oracle for the
+            /// app's tuning guardian.
+            /// </summary>
+            public const string GetContractTruth = "power.get_contract_truth";
+
+            /// <summary>
+            /// One serialized re-apply of a drifted contract half: the GPU
+            /// cTGP/DB activation sequence and/or the CPU PL pair, each behind
+            /// its own Apply* flag (the engine replays the preset pipeline's
+            /// own activation methods; deciding WHAT to heal is app-side Core
+            /// policy).
+            /// </summary>
+            public const string HealContract = "power.heal_contract";
         }
 
         public static class Mux
