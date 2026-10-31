@@ -1,4 +1,5 @@
 using System;
+using UCU.Core.Ec.Generated;
 
 namespace UCU.Core.Ec
 {
@@ -41,15 +42,15 @@ namespace UCU.Core.Ec
         private static readonly (ushort Start, ushort End)[] AllowedRanges =
         {
             // Six 16-byte fan tables: CPU temp-up/temp-down/duty, GPU temp-up/temp-down/duty.
-            (0x0F00, 0x0F5F),
+            (EcVault.REGION_FAN_TABLE_BLOCK_START, EcVault.REGION_FAN_TABLE_BLOCK_END),
             // The writeable PWM register blocks (five bytes per fan).
-            (0x1804, 0x1808),
-            (0x1809, 0x180D),
+            (EcVault.REGION_PWM_WRITE_1_BLOCK_START, EcVault.REGION_PWM_WRITE_1_BLOCK_END),
+            (EcVault.REGION_PWM_WRITE_2_BLOCK_START, EcVault.REGION_PWM_WRITE_2_BLOCK_END),
             // Keyboard: trigger (0x0767) + RGB channels (0x0769-0x076B); brightness status at 0x078C.
-            (0x0767, 0x076B),
-            (0x078C, 0x078C),
+            (EcVault.REGION_KBD_RGB_BLOCK_START, EcVault.REGION_KBD_RGB_BLOCK_END),
+            (EcVault.REGION_KBD_STATUS_BLOCK_START, EcVault.REGION_KBD_STATUS_BLOCK_END),
             // Battery charge mode.
-            (0x07A6, 0x07A6),
+            (EcVault.REGION_BATTERY_MODE_BLOCK_START, EcVault.REGION_BATTERY_MODE_BLOCK_END),
         };
 
         /// <summary>

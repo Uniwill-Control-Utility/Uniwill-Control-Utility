@@ -1,3 +1,5 @@
+using UCU.Core.Ec.Generated;
+
 namespace UCU.Core.Ec
 {
     /// <summary>
@@ -18,7 +20,7 @@ namespace UCU.Core.Ec
     public static class EcTemperatureCodec
     {
         /// <summary>Total slots in one EC fan table (10 active + 1 OFF + 5 reserved).</summary>
-        public const int TableLength = 16;
+        public const int TableLength = EcVault.EC_TABLE_LENGTH;
 
         /// <summary>Slots the encoders fill from user input: zone 0 (OFF) plus zones 1-10.</summary>
         public const int ActiveZoneCount = 11;

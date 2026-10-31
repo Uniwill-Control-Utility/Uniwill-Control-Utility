@@ -1,3 +1,5 @@
+using UCU.Core.Ec.Generated;
+
 namespace UCU.Core.Ec
 {
     /// <summary>
@@ -16,16 +18,16 @@ namespace UCU.Core.Ec
     public static class EcMuxCodec
     {
         /// <summary>AMD/Intel raw byte for MS Hybrid on AMD.</summary>
-        public const byte RawHybridAmd = 0x00;
+        public const byte RawHybridAmd = EcVault.MUX_MODE_HYBRID;
 
         /// <summary>AMD raw byte for dGPU-only.</summary>
-        public const byte RawDgpuOnlyAmd = 0x01;
+        public const byte RawDgpuOnlyAmd = EcVault.MUX_MODE_DGPU_ONLY;
 
         /// <summary>AMD raw byte for iGPU-only.</summary>
-        public const byte RawIgpuOnlyAmd = 0x02;
+        public const byte RawIgpuOnlyAmd = EcVault.MUX_MODE_IGPU_ONLY;
 
         /// <summary>Intel raw byte for MS Hybrid ("Dynamic"); raw 0 never appears on Intel.</summary>
-        public const byte RawHybridIntel = 0x04;
+        public const byte RawHybridIntel = EcVault.MUX_MODE_HYBRID_INTEL;
 
         /// <summary>True when a raw byte is one the firmware on this platform can report.</summary>
         public static bool IsKnownRaw(byte raw, EcPlatform platform)

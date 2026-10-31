@@ -1,3 +1,5 @@
+using UCU.Core.Ec.Generated;
+
 namespace UCU.Core.Ec
 {
     /// <summary>
@@ -8,13 +10,13 @@ namespace UCU.Core.Ec
     public static class EcDutyCodec
     {
         /// <summary>Slots in one duty table (10 active + 1 OFF + 5 padding).</summary>
-        public const int TableLength = 16;
+        public const int TableLength = EcVault.EC_TABLE_LENGTH;
 
         /// <summary>First padding slot; zones from here to 15 repeat the max duty.</summary>
         public const int FirstPaddingZone = 11;
 
         /// <summary>Highest duty value the EC accepts.</summary>
-        public const int MaxEcDuty = 200;
+        public const int MaxEcDuty = EcVault.EC_DUTY_MAX;
 
         /// <summary>Top of the UI duty scale (percent).</summary>
         public const int MaxDutyPercent = 100;
@@ -23,7 +25,7 @@ namespace UCU.Core.Ec
         public const int OemGradientMax = 180;
 
         /// <summary>EC duty units per UI percent point.</summary>
-        public const int EcDutyPerPercent = 2;
+        public const int EcDutyPerPercent = EcVault.EC_DUTY_PER_PERCENT;
 
         /// <summary>Converts a UI duty percentage to the EC 0-200 scale (clamped).</summary>
         public static int PercentToEcDuty(int percent) =>

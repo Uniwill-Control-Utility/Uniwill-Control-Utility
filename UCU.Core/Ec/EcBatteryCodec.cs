@@ -1,3 +1,5 @@
+using UCU.Core.Ec.Generated;
+
 namespace UCU.Core.Ec
 {
     /// <summary>
@@ -12,13 +14,13 @@ namespace UCU.Core.Ec
     public static class EcBatteryCodec
     {
         /// <summary>Field mask (bits 3-5) inside the battery-mode register.</summary>
-        public const byte ModeMask = 0x38;
+        public const byte ModeMask = EcVault.BATTERY_MODE_MASK;
 
         /// <summary>Number of charging modes the firmware defines.</summary>
         public const int ModeCount = 3;
 
         /// <summary>Mode index to raw field value, indexed by mode (from the MechControl IDY_7Y profile).</summary>
-        public static readonly byte[] ModeRawValues = { 0x08, 0x18, 0x28 };
+        public static readonly byte[] ModeRawValues = EcVault.BATTERY_MODE_RAW_VALUES;
 
         /// <summary>User-facing capacity ceiling for each mode index, in percent.</summary>
         public static readonly int[] ModeCapacityCeiling = { 100, 80, 60 };
@@ -126,7 +128,7 @@ namespace UCU.Core.Ec
         // ---------------------------------------------------------------------
 
         /// <summary>Bit inside the gate-status register (0x0742) marking an active charge gate.</summary>
-        public const byte GateActiveBit = 0x10;
+        public const byte GateActiveBit = EcVault.BATTERY_GATE_ACTIVE_BIT;
 
         /// <summary>
         /// Decodes the charge-gate bit (0x0742!bit4): true while the EC gates
@@ -138,10 +140,10 @@ namespace UCU.Core.Ec
         public static bool IsChargeGateActive(byte gateStatusRaw) => (gateStatusRaw & GateActiveBit) != 0;
 
         /// <summary>Value of the platform-override register (0x0770) meaning "no override".</summary>
-        public const byte PlatformOverrideReset = 0xFF;
+        public const byte PlatformOverrideReset = EcVault.BATTERY_PLATFORM_OVERRIDE_RESET;
 
         /// <summary>Value the OEM/performance tools pin the override register to while spoofing the platform.</summary>
-        public const byte PlatformOverridePinned = 5;
+        public const byte PlatformOverridePinned = EcVault.BATTERY_PLATFORM_OVERRIDE_PINNED;
 
         /// <summary>
         /// True when a platform override is in effect. 0xFF is the documented

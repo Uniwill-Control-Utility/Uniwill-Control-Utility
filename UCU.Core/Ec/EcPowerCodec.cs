@@ -1,3 +1,5 @@
+using UCU.Core.Ec.Generated;
+
 namespace UCU.Core.Ec
 {
     /// <summary>
@@ -27,34 +29,34 @@ namespace UCU.Core.Ec
         public const int PerformanceModeCount = 4;
 
         /// <summary>Bit 4 of the mode-index register: arms the OEM performance-button engine.</summary>
-        public const byte PerformanceModeArmBit = 0x10;
+        public const byte PerformanceModeArmBit = EcVault.MODE_INDEX_ARM;
 
         /// <summary>Firmware-owned high bits of the mode-index register (bits 5-7).</summary>
-        public const byte ModeIndexHighBitsMask = 0xE0;
+        public const byte ModeIndexHighBitsMask = EcVault.MODE_INDEX_HIGH_BITS;
 
         /// <summary>Low bit of the mode-index register, preserved across writes.</summary>
-        public const byte ModeIndexLowBit = 0x01;
+        public const byte ModeIndexLowBit = EcVault.MODE_INDEX_LOW_BIT;
 
         /// <summary>Mask of the mode-index register's low nibble (the mode index itself).</summary>
-        public const byte ModeIndexMask = 0x0F;
+        public const byte ModeIndexMask = EcVault.MODE_INDEX_MASK;
 
         /// <summary>Bit 7 of 0x0726: custom power-management gate. Stock presets clear it.</summary>
-        public const byte PowerManagementGateBit = 0x80;
+        public const byte PowerManagementGateBit = EcVault.POWER_MGMT_726_ENABLE;
 
         /// <summary>Bit 6 of 0x0727: custom-profile enable. Stock presets clear it so the firmware's factory table applies.</summary>
-        public const byte CustomProfileEnableBit = 0x40;
+        public const byte CustomProfileEnableBit = EcVault.CUSTOM_PROFILE_ENABLE;
 
         /// <summary>Bit 4 of the trigger register, preserved by the stock-preset write.</summary>
-        public const byte TriggerPreservedBit = 0x10;
+        public const byte TriggerPreservedBit = EcVault.TRIGGER_PRESERVED_BIT;
 
         /// <summary>Bit 5 of the trigger register: apply color.</summary>
-        public const byte TriggerApplyColorBit = 0x20;
+        public const byte TriggerApplyColorBit = EcVault.TRIGGER_RGB_APPLY_COLOR;
 
         /// <summary>Bit 3 of the trigger register, set by the Office stock preset only.</summary>
-        public const byte TriggerOfficeBit = 0x08;
+        public const byte TriggerOfficeBit = EcVault.TRIGGER_OFFICE_BIT;
 
         /// <summary>Bit 4 of the fan-control register: turbo. Forced by the Beast stock preset.</summary>
-        public const byte FanTurboBit = 0x10;
+        public const byte FanTurboBit = EcVault.FAN_MODE_TURBO;
 
         /// <summary>OEM stock mode index for Office (quiet).</summary>
         public const int StockModeOffice = 0;
@@ -72,19 +74,19 @@ namespace UCU.Core.Ec
         /// Literal the OEM writes to the fan-control register for Office
         /// (USER | HIGH). This is what recolors the Q-key LED in a stock preset.
         /// </summary>
-        public const byte FanProfileOffice = 0xA0;
+        public const byte FanProfileOffice = EcVault.FAN_PROFILE_OFFICE;
 
         /// <summary>Literal the OEM writes to the fan-control register for Balance (profile bits cleared).</summary>
-        public const byte FanProfileBalance = 0x00;
+        public const byte FanProfileBalance = EcVault.FAN_PROFILE_BALANCE;
 
         /// <summary>Literal the OEM writes to the fan-control register for Beast (TURBO).</summary>
-        public const byte FanProfileBeast = FanTurboBit;
+        public const byte FanProfileBeast = EcVault.FAN_PROFILE_BEAST;
 
         /// <summary>
         /// Commit value the OEM writes last in every stock-preset body (and never in a
         /// custom profile): 0x83.
         /// </summary>
-        public const byte StockModeCommit = 0x83;
+        public const byte StockModeCommit = EcVault.OEM_MODE_COMMIT;
 
         /// <summary>Encodes a CPU power limit (PL1/PL2/PL4/PL5) in watts to its EC byte.</summary>
         public static byte EncodePowerLimit(int watts) => (byte)Math.Clamp(watts, MinPowerWatts, MaxPowerWatts);

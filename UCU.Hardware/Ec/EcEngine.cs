@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Serilog;
 using UCU.Core.Ec;
+using UCU.Core.Ec.Generated;
 
 namespace UCU.Hardware.Ec
 {
@@ -31,156 +32,195 @@ namespace UCU.Hardware.Ec
         #region EC Register Addresses (from uniwill-laptop-driver)
 
         // --- Temperature & sensors ---
-        public const ushort REG_CPU_TEMP = 0x043E;
-        public const ushort REG_GPU_TEMP = 0x044F;
-        public const ushort REG_SSD_TEMP = 0x07D1;
+        public const ushort REG_CPU_TEMP = EcVault.REG_CPU_TEMP;
+        public const ushort REG_GPU_TEMP = EcVault.REG_GPU_TEMP;
+        public const ushort REG_SSD_TEMP = EcVault.REG_SSD_TEMP;
 
         // --- Fan RPM (big-endian u16) ---
-        public const ushort REG_MAIN_FAN_RPM_LO = 0x0464;
-        public const ushort REG_MAIN_FAN_RPM_HI = 0x0465;
-        public const ushort REG_SECOND_FAN_RPM_LO = 0x046C;
-        public const ushort REG_SECOND_FAN_RPM_HI = 0x046B;
+        public const ushort REG_MAIN_FAN_RPM_LO = EcVault.REG_MAIN_FAN_RPM_LO;
+        public const ushort REG_MAIN_FAN_RPM_HI = EcVault.REG_MAIN_FAN_RPM_HI;
+        public const ushort REG_SECOND_FAN_RPM_LO = EcVault.REG_SECOND_FAN_RPM_LO;
+        public const ushort REG_SECOND_FAN_RPM_HI = EcVault.REG_SECOND_FAN_RPM_HI;
 
         // --- Fan control ---
-        public const ushort REG_MANUAL_FAN_CTRL = 0x0751;
-        public const ushort REG_FAN_SWITCH_SPEED = 0x0787;
-        public const ushort REG_UNIVERSAL_FAN_CTRL = 0x07C5;
-        public const ushort REG_AP_OEM_6 = 0x07C6;
+        public const ushort REG_MANUAL_FAN_CTRL = EcVault.REG_MANUAL_FAN_CTRL;
+        public const ushort REG_FAN_SWITCH_SPEED = EcVault.REG_FAN_SWITCH_SPEED;
+        public const ushort REG_UNIVERSAL_FAN_CTRL = EcVault.REG_UNIVERSAL_FAN_CTRL;
+        public const ushort REG_AP_OEM_6 = EcVault.REG_AP_OEM_6;
 
         // --- Support flags ---
-        public const ushort REG_SUPPORT_1 = 0x0765;
-        public const ushort REG_SUPPORT_2 = 0x0766;
-        public const ushort REG_SUPPORT_5 = 0x0742;
-        public const ushort REG_BIOS_OEM_2 = 0x0782;
+        public const ushort REG_SUPPORT_1 = EcVault.REG_SUPPORT_1;
+        public const ushort REG_SUPPORT_2 = EcVault.REG_SUPPORT_2;
+        public const ushort REG_SUPPORT_5 = EcVault.REG_SUPPORT_5;
+        public const ushort REG_BIOS_OEM_2 = EcVault.REG_BIOS_OEM_2;
 
         // --- Fan curve tables (16 zones each) ---
-        public const ushort REG_CPU_TEMP_END_TABLE = 0x0F00;   // 16 bytes
-        public const ushort REG_CPU_TEMP_START_TABLE = 0x0F10;  // 16 bytes
-        public const ushort REG_CPU_FAN_SPEED_TABLE = 0x0F20;   // 16 bytes (duty 0-200)
-        public const ushort REG_GPU_TEMP_END_TABLE = 0x0F30;   // 16 bytes
-        public const ushort REG_GPU_TEMP_START_TABLE = 0x0F40;  // 16 bytes
-        public const ushort REG_GPU_FAN_SPEED_TABLE = 0x0F50;   // 16 bytes (duty 0-200)
+        public const ushort REG_CPU_TEMP_END_TABLE = EcVault.REG_CPU_TEMP_END_TABLE;   // 16 bytes
+        public const ushort REG_CPU_TEMP_START_TABLE = EcVault.REG_CPU_TEMP_START_TABLE;  // 16 bytes
+        public const ushort REG_CPU_FAN_SPEED_TABLE = EcVault.REG_CPU_FAN_SPEED_TABLE;   // 16 bytes (duty 0-200)
+        public const ushort REG_GPU_TEMP_END_TABLE = EcVault.REG_GPU_TEMP_END_TABLE;   // 16 bytes
+        public const ushort REG_GPU_TEMP_START_TABLE = EcVault.REG_GPU_TEMP_START_TABLE;  // 16 bytes
+        public const ushort REG_GPU_FAN_SPEED_TABLE = EcVault.REG_GPU_FAN_SPEED_TABLE;   // 16 bytes (duty 0-200)
 
         // --- Direct fan PWM ---
-        public const ushort REG_PWM_1_WRITEABLE = 0x1804;
-        public const ushort REG_PWM_2_WRITEABLE = 0x1809;
+        public const ushort REG_PWM_1_WRITEABLE = EcVault.REG_PWM_1_WRITEABLE;
+        public const ushort REG_PWM_2_WRITEABLE = EcVault.REG_PWM_2_WRITEABLE;
 
         // --- Power limits ---
-        public const ushort REG_PL1_SETTING = 0x0783;
-        public const ushort REG_PL2_SETTING = 0x0784;
-        public const ushort REG_PL4_SETTING = 0x0785;
-        public const ushort REG_TCC_OFFSET = 0x0786;
-        public const ushort REG_PL5_SETTING = 0x0788;  // appears to be the authoritative sustained power cap on AM5/FireRange
-        public const ushort REG_MODE_INDEX = 0x07AB;
-        public const byte MODE_INDEX_ARM = 0x10;       // bit 4: forced only for Beast/Custom, cleared for Office/Balance
-        public const ushort REG_POWER_MGMT_726 = 0x0726;
-        public const byte POWER_MGMT_726_ENABLE = 0x80; // bit 7: custom power-management gate
-        public const ushort REG_OEM_MODE_FLAG_45B = 0x045B; // OpenRevo writes 1 for Office, 0 for other stock modes
+        public const ushort REG_PL1_SETTING = EcVault.REG_PL1_SETTING;
+        public const ushort REG_PL2_SETTING = EcVault.REG_PL2_SETTING;
+        public const ushort REG_PL4_SETTING = EcVault.REG_PL4_SETTING;
+        public const ushort REG_TCC_OFFSET = EcVault.REG_TCC_OFFSET;
+        public const ushort REG_PL5_SETTING = EcVault.REG_PL5_SETTING;  // appears to be the authoritative sustained power cap on AM5/FireRange
+        public const ushort REG_MODE_INDEX = EcVault.REG_MODE_INDEX;
+        public const byte MODE_INDEX_ARM = EcVault.MODE_INDEX_ARM;       // bit 4: forced only for Beast/Custom, cleared for Office/Balance
+        public const ushort REG_POWER_MGMT_726 = EcVault.REG_POWER_MGMT_726;
+        public const byte POWER_MGMT_726_ENABLE = EcVault.POWER_MGMT_726_ENABLE; // bit 7: custom power-management gate
+        public const ushort REG_OEM_MODE_FLAG_45B = EcVault.REG_OEM_MODE_FLAG_45B; // OpenRevo writes 1 for Office, 0 for other stock modes
 
         // --- Keyboard backlight ---
-        public const ushort REG_RGB_RED = 0x0769;
-        public const ushort REG_RGB_GREEN = 0x076A;
-        public const ushort REG_RGB_BLUE = 0x076B;
-        public const ushort REG_TRIGGER = 0x0767;
+        public const ushort REG_RGB_RED = EcVault.REG_RGB_RED;
+        public const ushort REG_RGB_GREEN = EcVault.REG_RGB_GREEN;
+        public const ushort REG_RGB_BLUE = EcVault.REG_RGB_BLUE;
+        public const ushort REG_TRIGGER = EcVault.REG_TRIGGER;
 
         /// <summary>Win-key lock STATUS byte (read-only truth; the SET rides
         /// REG_TRIGGER's bit 0 as a toggle). Field-verified U-108.</summary>
-        public const ushort REG_WINLOCK_STATUS = 0x0768;
+        public const ushort REG_WINLOCK_STATUS = EcVault.REG_WINLOCK_STATUS;
 
         /// <summary>Fn-key lock register: bit 4 = locked (0x11/0x01).</summary>
-        public const ushort REG_FN_LOCK = 0x074E;
-        public const ushort REG_KBD_STATUS = 0x078C;
+        public const ushort REG_FN_LOCK = EcVault.REG_FN_LOCK;
+        public const ushort REG_KBD_STATUS = EcVault.REG_KBD_STATUS;
 
         // --- Project ID (hardware revision) ---
-        public const ushort REG_PROJECT_ID = 0x0740;
+        public const ushort REG_PROJECT_ID = EcVault.REG_PROJECT_ID;
 
         // --- AP_OEM flags ---
-        public const ushort REG_AP_OEM = 0x0741;
-        public const byte MANUAL_MODE_ENABLE = 0x01; // bit0: EC honors custom fan tables + cTGP/DB; SETTING it disarms the OEM Performance-button engine on NB02
-        public const byte AP_OEM_FIRMWARE_BOOT_BIT = 0x04; // bit2: the firmware's boot value. The EC drops it when manual control engages; it is NOT the button's freeze switch (bit0 is)
+        public const ushort REG_AP_OEM = EcVault.REG_AP_OEM;
+        public const byte MANUAL_MODE_ENABLE = EcVault.MANUAL_MODE_ENABLE; // bit0: EC honors custom fan tables + cTGP/DB; SETTING it disarms the OEM Performance-button engine on NB02
+        public const byte AP_OEM_FIRMWARE_BOOT_BIT = EcVault.AP_OEM_FIRMWARE_BOOT_BIT; // bit2: the firmware's boot value. The EC drops it when manual control engages; it is NOT the button's freeze switch (bit0 is)
 
         // --- NVIDIA GPU power control (cTGP / Dynamic Boost) ---
-        public const ushort REG_CUSTOM_PROFILE = 0x0727;
-        public const byte CUSTOM_PROFILE_ENABLE = 0x40; // bit 6
-        public const ushort REG_CTGP_DB_ENABLE = 0x0743;       // Enable bits: GENERAL(0x01), DB(0x02), CTGP(0x04)
-        public const ushort REG_CTGP_DB_CTGP_OFFSET = 0x0744;
-        public const ushort REG_CTGP_DB_TPP_OFFSET = 0x0745;
-        public const ushort REG_CTGP_DB_DB_OFFSET = 0x0746;
+        public const ushort REG_CUSTOM_PROFILE = EcVault.REG_CUSTOM_PROFILE;
+        public const byte CUSTOM_PROFILE_ENABLE = EcVault.CUSTOM_PROFILE_ENABLE; // bit 6
+        public const ushort REG_CTGP_DB_ENABLE = EcVault.REG_CTGP_DB_ENABLE;       // Enable bits: GENERAL(0x01), DB(0x02), CTGP(0x04)
+        public const ushort REG_CTGP_DB_CTGP_OFFSET = EcVault.REG_CTGP_DB_CTGP_OFFSET;
+        public const ushort REG_CTGP_DB_TPP_OFFSET = EcVault.REG_CTGP_DB_TPP_OFFSET;
+        public const ushort REG_CTGP_DB_DB_OFFSET = EcVault.REG_CTGP_DB_DB_OFFSET;
 
         // CTGP_DB enable bit masks (from tuxedo-drivers uniwill_interfaces.h)
-        public const byte CTGP_DB_ENABLE_GENERAL = 0x01;
-        public const byte CTGP_DB_ENABLE_DB = 0x02;
-        public const byte CTGP_DB_ENABLE_CTGP = 0x04;
+        public const byte CTGP_DB_ENABLE_GENERAL = EcVault.CTGP_DB_ENABLE_GENERAL;
+        public const byte CTGP_DB_ENABLE_DB = EcVault.CTGP_DB_ENABLE_DB;
+        public const byte CTGP_DB_ENABLE_CTGP = EcVault.CTGP_DB_ENABLE_CTGP;
 
         // --- GPU MUX / Direct Connect (from XMG CC GCUService.exe decompilation) ---
-        public const ushort REG_GPU_STATUS = 0x072A;     // MUX mode control: 0=Hybrid, 1=dGPU-only, 2=iGPU-only
-        public const ushort REG_MODULE_ID_GPU = 0x07D2;  // GPU module ID (read-only, 0x1B for RTX 5090)
-        public const ushort REG_MUX_STATE_LO = 0x0402;   // MUX hardware state low byte (read-only)
-        public const ushort REG_MUX_STATE_HI = 0x0403;   // MUX hardware state high byte (read-only)
-        public const ushort REG_DISPLAY_VARIANT_LO = 0x0408; // Display variant low byte (read-only)
-        public const ushort REG_DISPLAY_VARIANT_HI = 0x0409; // Display variant high byte (read-only)
+        public const ushort REG_GPU_STATUS = EcVault.REG_GPU_STATUS;     // MUX mode control: 0=Hybrid, 1=dGPU-only, 2=iGPU-only
+        public const ushort REG_MODULE_ID_GPU = EcVault.REG_MODULE_ID_GPU;  // GPU module ID (read-only, 0x1B for RTX 5090)
+        public const ushort REG_MUX_STATE_LO = EcVault.REG_MUX_STATE_LO;   // MUX hardware state low byte (read-only)
+        public const ushort REG_MUX_STATE_HI = EcVault.REG_MUX_STATE_HI;   // MUX hardware state high byte (read-only)
+        public const ushort REG_DISPLAY_VARIANT_LO = EcVault.REG_DISPLAY_VARIANT_LO; // Display variant low byte (read-only)
+        public const ushort REG_DISPLAY_VARIANT_HI = EcVault.REG_DISPLAY_VARIANT_HI; // Display variant high byte (read-only)
 
         // MUX mode values (Define.DGgpuDirectConnectionMode from GCUService.exe)
         // On AMD platforms: 0=Hybrid, 1=dGPU-only, 2=iGPU-only
         // On Intel platforms: 4=Hybrid (Dynamic), 1=iGPU-only, 2=dGPU-only (no raw 0)
-        public const byte MUX_MODE_HYBRID = 0x00;       // MS Hybrid (MUX open, both GPUs active)
-        public const byte MUX_MODE_DGPU_ONLY = 0x01;    // dGPU only (MUX closed, discrete GPU)
-        public const byte MUX_MODE_IGPU_ONLY = 0x02;    // iGPU only (MUX open, integrated GPU)
-        public const byte MUX_MODE_HYBRID_INTEL = 0x04; // MS Hybrid on Intel platforms (Dynamic)
+        public const byte MUX_MODE_HYBRID = EcVault.MUX_MODE_HYBRID;       // MS Hybrid (MUX open, both GPUs active)
+        public const byte MUX_MODE_DGPU_ONLY = EcVault.MUX_MODE_DGPU_ONLY;    // dGPU only (MUX closed, discrete GPU)
+        public const byte MUX_MODE_IGPU_ONLY = EcVault.MUX_MODE_IGPU_ONLY;    // iGPU only (MUX open, integrated GPU)
+        public const byte MUX_MODE_HYBRID_INTEL = EcVault.MUX_MODE_HYBRID_INTEL; // MS Hybrid on Intel platforms (Dynamic)
 
         // --- PWM readback ---
-        public const ushort REG_PWM_1 = 0x075B;
-        public const ushort REG_PWM_2 = 0x075C;
+        public const ushort REG_PWM_1 = EcVault.REG_PWM_1;
+        public const ushort REG_PWM_2 = EcVault.REG_PWM_2;
 
         // --- Trigger bits ---
-        public const byte TRIGGER_RGB_APPLY_COLOR = 0x20;  // bit 5
-        public const byte TRIGGER_RGB_LOGO_EFFECT = 0x40;  // bit 6
-        public const byte TRIGGER_RGB_RAINBOW_EFFECT = 0x80; // bit 7
+        public const byte TRIGGER_RGB_APPLY_COLOR = EcVault.TRIGGER_RGB_APPLY_COLOR;  // bit 5
+        public const byte TRIGGER_RGB_LOGO_EFFECT = EcVault.TRIGGER_RGB_LOGO_EFFECT;  // bit 6
+        public const byte TRIGGER_RGB_RAINBOW_EFFECT = EcVault.TRIGGER_RGB_RAINBOW_EFFECT; // bit 7
 
         // --- MANUAL_FAN_CTRL bits ---
-        public const byte FAN_MODE_TURBO = 0x10;   // bit 4
-        public const byte FAN_MODE_HIGH = 0x20;    // bit 5
-        public const byte FAN_MODE_BOOST = 0x40;   // bit 6
-        public const byte FAN_MODE_USER = 0x80;    // bit 7
-        public const byte FAN_LEVEL_MASK = 0x07;   // bits 0-2
+        public const byte FAN_MODE_TURBO = EcVault.FAN_MODE_TURBO;   // bit 4
+        public const byte FAN_MODE_HIGH = EcVault.FAN_MODE_HIGH;    // bit 5
+        public const byte FAN_MODE_BOOST = EcVault.FAN_MODE_BOOST;   // bit 6
+        public const byte FAN_MODE_USER = EcVault.FAN_MODE_USER;    // bit 7
+        public const byte FAN_LEVEL_MASK = EcVault.FAN_LEVEL_MASK;   // bits 0-2
 
         // OpenRevo writes 0x0751 as a literal per stock mode — its (bl<<6)|imm form
         // with the config flag bl resolved to 0. This is the per-mode performance
         // profile that recolors the Q-key LED; 0x07AB carries no mode index.
-        public const byte FAN_PROFILE_OFFICE = 0xA0;   // USER|HIGH
-        public const byte FAN_PROFILE_BALANCE = 0x00;  // profile bits cleared
-        public const byte FAN_PROFILE_BEAST = 0x10;    // TURBO
+        public const byte FAN_PROFILE_OFFICE = EcVault.FAN_PROFILE_OFFICE;   // USER|HIGH
+        public const byte FAN_PROFILE_BALANCE = EcVault.FAN_PROFILE_BALANCE;  // profile bits cleared
+        public const byte FAN_PROFILE_BEAST = EcVault.FAN_PROFILE_BEAST;    // TURBO
 
         // Last write in every OpenRevo stock body, never present in Custom (0x83 = 0x80|3).
-        public const byte OEM_MODE_COMMIT = 0x83;
+        public const byte OEM_MODE_COMMIT = EcVault.OEM_MODE_COMMIT;
 
         // --- UNIVERSAL_FAN_CTRL bits ---
-        public const byte SPLIT_TABLES = 0x80;     // bit 7
+        public const byte SPLIT_TABLES = EcVault.SPLIT_TABLES;     // bit 7
 
         // --- AP_OEM_6 bits ---
-        public const byte ENABLE_UNIVERSAL_FAN_CTRL = 0x04; // bit 2
+        public const byte ENABLE_UNIVERSAL_FAN_CTRL = EcVault.ENABLE_UNIVERSAL_FAN_CTRL; // bit 2
 
         // --- KBD_STATUS bits ---
-        public const byte KBD_WHITE_ONLY = 0x01;   // bit 0
-        public const byte KBD_POWER_OFF = 0x02;    // bit 1
-        public const byte KBD_APPLY = 0x10;         // bit 4
-        public const byte KBD_BRIGHTNESS_MASK = 0xE0; // bits 5-7
+        public const byte KBD_WHITE_ONLY = EcVault.KBD_WHITE_ONLY;   // bit 0
+        public const byte KBD_POWER_OFF = EcVault.KBD_POWER_OFF;    // bit 1
+        public const byte KBD_APPLY = EcVault.KBD_APPLY;         // bit 4
+        public const byte KBD_BRIGHTNESS_MASK = EcVault.KBD_BRIGHTNESS_MASK; // bits 5-7
 
         // --- BIOS_OEM_2 bits ---
-        public const byte FAN_V2_NEW = 0x01;       // bit 0
-        public const byte FAN_V3 = 0x08;           // bit 3
-        public const byte ENABLE_CHINA_MODE = 0x40; // bit 6 (needed for RGB on non-China)
+        public const byte FAN_V2_NEW = EcVault.FAN_V2_NEW;       // bit 0
+        public const byte FAN_V3 = EcVault.FAN_V3;           // bit 3
+        public const byte ENABLE_CHINA_MODE = EcVault.ENABLE_CHINA_MODE; // bit 6 (needed for RGB on non-China)
 
         // --- SUPPORT_2 bits ---
-        public const byte RGB_KEYBOARD = 0x04;     // bit 2
+        public const byte RGB_KEYBOARD = EcVault.RGB_KEYBOARD;     // bit 2
 
         // --- SUPPORT_5 bits ---
-        public const byte FAN_TURBO_SUPPORTED = 0x10; // bit 4
-        public const byte FAN_SUPPORT = 0x20;       // bit 5
+        public const byte FAN_TURBO_SUPPORTED = EcVault.FAN_TURBO_SUPPORTED; // bit 4
+        public const byte FAN_SUPPORT = EcVault.FAN_SUPPORT;       // bit 5
 
         // --- Battery ---
-        public const ushort REG_BATTERY_MODE = 0x07A6;
-        public const ushort REG_BATTERY_SOC = 0x04AB;
+        public const ushort REG_BATTERY_MODE = EcVault.REG_BATTERY_MODE;
+        public const ushort REG_BATTERY_SOC = EcVault.REG_BATTERY_SOC;
+
+        // --- Sequence encodings the init/stock-mode bodies write literally ---------
+        // Every value below is declared once in the EC registry
+        // (UCU.Core\Ec\Registry\EcAddresses.json) and aliased here; the raw-literal
+        // gate test (EcVaultRawLiteralGateTests) is what keeps new EC numbers out of
+        // this file's read/write call sites. The handshake registers carry no
+        // documented semantics beyond their position in the MechControl-decompiled
+        // init sequence, so they are named for that sequence and nothing more.
+
+        // Init step 1 handshake (EcEngine.cs init sequence): write value, then value.
+        private const ushort REG_HANDSHAKE_709 = EcVault.REG_HANDSHAKE_709;
+        private const byte HANDSHAKE_709_VALUE = EcVault.HANDSHAKE_709_VALUE;
+        private const ushort REG_HANDSHAKE_708 = EcVault.REG_HANDSHAKE_708;
+        private const byte HANDSHAKE_708_VALUE = EcVault.HANDSHAKE_708_VALUE;
+
+        // Init step 3 feature enable / step 4 fan-curve arming / step 6 parameter /
+        // step 7 mode / step 8 BIOS_CTRL.
+        private const ushort REG_FEATURE_ENABLE_748 = EcVault.REG_FEATURE_ENABLE_748;
+        private const byte FEATURE_ENABLE_748_VALUE = EcVault.FEATURE_ENABLE_748_VALUE;
+        private const byte UNIVERSAL_FAN_CURVE_ENABLE_BITS = EcVault.UNIVERSAL_FAN_CURVE_ENABLE_BITS;
+        private const ushort REG_FAN_CURVE_PARAM_7C7 = EcVault.REG_FAN_CURVE_PARAM_7C7;
+        private const byte FAN_CURVE_PARAM_7C7_VALUE = EcVault.FAN_CURVE_PARAM_7C7_VALUE;
+        private const byte AP_OEM_6_FAN_CURVE_MODE = EcVault.AP_OEM_6_FAN_CURVE_MODE;
+        private const ushort REG_BIOS_CTRL_706 = EcVault.REG_BIOS_CTRL_706;
+        private const byte BIOS_CTRL_706_VALUE = EcVault.BIOS_CTRL_706_VALUE;
+
+        // Fan-table block layout: each table is 16 bytes and the temp-down/duty
+        // tables sit at fixed offsets from the temp-up base.
+        private const byte FAN_TABLE_TEMP_START_OFFSET = EcVault.FAN_TABLE_TEMP_START_OFFSET;
+        private const byte FAN_TABLE_DUTY_OFFSET = EcVault.FAN_TABLE_DUTY_OFFSET;
+
+        // Mode-index / trigger byte fields preserved across a mode write.
+        private const byte MODE_INDEX_HIGH_BITS = EcVault.MODE_INDEX_HIGH_BITS;
+        private const byte MODE_INDEX_LOW_BIT = EcVault.MODE_INDEX_LOW_BIT;
+        private const byte TRIGGER_PRESERVED_BIT = EcVault.TRIGGER_PRESERVED_BIT;
+        private const byte TRIGGER_OFFICE_BIT = EcVault.TRIGGER_OFFICE_BIT;
+
+        // OVERBOOST write sequence clears the fan-profile bits, then sets bit 4.
+        private const byte FAN_OVERBOOST_CLEAR_MASK = EcVault.FAN_OVERBOOST_CLEAR_MASK;
 
         #endregion
 
@@ -314,9 +354,9 @@ namespace UCU.Hardware.Ec
                 DebugLog("[DIAG] EcEngine: Starting EC activation handshake...");
 
                 // Step 1: Handshake — write to 0x709 then 0x708
-                WriteECRaw(0x0709, 0x05);
+                WriteECRaw(REG_HANDSHAKE_709, HANDSHAKE_709_VALUE);
                 Thread.Sleep(50);
-                WriteECRaw(0x0708, 0x01);
+                WriteECRaw(REG_HANDSHAKE_708, HANDSHAKE_708_VALUE);
                 Thread.Sleep(50);
                 DebugLog("[DIAG] EcEngine: Step 1 — Handshake complete");
 
@@ -326,28 +366,28 @@ namespace UCU.Hardware.Ec
                 // in the 2026-10-11 bisect was a LITERAL write that cleared bit2, not
                 // bit0 itself — OpenRevo keeps bit0 set in every mode and the button
                 // still cycles.
-                byte reg741 = ReadECRaw(0x0741);
+                byte reg741 = ReadECRaw(REG_AP_OEM);
                 DebugLog($"[DIAG] EcEngine: Step 2 — 0x741 left at firmware value (0x{reg741:X2}); bit0 is ORed in only where manual control is needed");
 
                 // Step 3: Feature enable — write 0x81 to 0x748
-                WriteECRaw(0x0748, 0x81);
+                WriteECRaw(REG_FEATURE_ENABLE_748, FEATURE_ENABLE_748_VALUE);
                 Thread.Sleep(50);
                 DebugLog("[DIAG] EcEngine: Step 3 — Feature enable complete");
 
                 // Step 3b: Power management activation — set bit 7 of 0x726 and bit 6 of 0x727.
                 // MechControl performs this step between feature enable and fan curve enable.
                 // Without it, the EC may accept power limit writes but not apply them to hardware.
-                byte reg726 = (byte)(ReadECRaw(0x0726) | 0x80);
-                WriteECRaw(0x0726, reg726);
+                byte reg726 = (byte)(ReadECRaw(REG_POWER_MGMT_726) | POWER_MGMT_726_ENABLE);
+                WriteECRaw(REG_POWER_MGMT_726, reg726);
                 Thread.Sleep(50);
-                byte reg727 = (byte)(ReadECRaw(0x0727) | 0x40);
-                WriteECRaw(0x0727, reg727);
+                byte reg727 = (byte)(ReadECRaw(REG_CUSTOM_PROFILE) | CUSTOM_PROFILE_ENABLE);
+                WriteECRaw(REG_CUSTOM_PROFILE, reg727);
                 Thread.Sleep(50);
                 DebugLog($"[DIAG] EcEngine: Step 3b — Power management activation (0x726=0x{reg726:X2}, 0x727=0x{reg727:X2})");
 
                 // Step 4: Fan curve enable bits — set bits 7,6,5 of 0x7C5 (OR with 0xE0)
-                byte ufCtrl = (byte)(ReadECRaw(0x07C5) | 0xE0);
-                WriteECRaw(0x07C5, ufCtrl);
+                byte ufCtrl = (byte)(ReadECRaw(REG_UNIVERSAL_FAN_CTRL) | UNIVERSAL_FAN_CURVE_ENABLE_BITS);
+                WriteECRaw(REG_UNIVERSAL_FAN_CTRL, ufCtrl);
                 Thread.Sleep(50);
                 DebugLog($"[DIAG] EcEngine: Step 4 — Fan curve enable bits set (0x{ufCtrl:X2})");
 
@@ -365,17 +405,17 @@ namespace UCU.Hardware.Ec
                 DebugLog("[DIAG] EcEngine: Step 5 — Default fan tables written");
 
                 // Step 6: Fan curve parameter — write 0x0C to 0x7C7
-                WriteECRaw(0x07C7, 0x0C);
+                WriteECRaw(REG_FAN_CURVE_PARAM_7C7, FAN_CURVE_PARAM_7C7_VALUE);
                 Thread.Sleep(50);
                 DebugLog("[DIAG] EcEngine: Step 6 — Fan curve parameter set");
 
                 // Step 7: Fan curve mode — write 0x04 to 0x7C6
-                WriteECRaw(0x07C6, 0x04);
+                WriteECRaw(REG_AP_OEM_6, AP_OEM_6_FAN_CURVE_MODE);
                 Thread.Sleep(50);
                 DebugLog("[DIAG] EcEngine: Step 7 — Fan curve mode enabled");
 
                 // Step 8: BIOS_CTRL — write 0x41 to 0x706
-                WriteECRaw(0x0706, 0x41);
+                WriteECRaw(REG_BIOS_CTRL_706, BIOS_CTRL_706_VALUE);
                 Thread.Sleep(50);
                 DebugLog("[DIAG] EcEngine: Step 8 — BIOS_CTRL set");
 
@@ -1194,11 +1234,11 @@ namespace UCU.Hardware.Ec
 
             // Write temp_down table
             byte[] tempDownBytes = Array.ConvertAll(tempDown, b => (byte)b);
-            WriteECRegisters((ushort)(baseAddr + 0x10), tempDownBytes);
+            WriteECRegisters((ushort)(baseAddr + FAN_TABLE_TEMP_START_OFFSET), tempDownBytes);
 
             // Write duty table
             byte[] dutyBytes = Array.ConvertAll(duty, b => (byte)b);
-            WriteECRegisters((ushort)(baseAddr + 0x20), dutyBytes);
+            WriteECRegisters((ushort)(baseAddr + FAN_TABLE_DUTY_OFFSET), dutyBytes);
 
             // Enable universal fan control
             byte ufCtrl = ReadECRegister(REG_UNIVERSAL_FAN_CTRL);
@@ -1316,8 +1356,8 @@ namespace UCU.Hardware.Ec
             };
 
             int[] tempUp = Array.ConvertAll(ReadECRegisters(baseAddr, 16), b => (int)b);
-            int[] tempDown = Array.ConvertAll(ReadECRegisters((ushort)(baseAddr + 0x10), 16), b => (int)b);
-            int[] duty = Array.ConvertAll(ReadECRegisters((ushort)(baseAddr + 0x20), 16), b => (int)b);
+            int[] tempDown = Array.ConvertAll(ReadECRegisters((ushort)(baseAddr + FAN_TABLE_TEMP_START_OFFSET), EcDutyCodec.TableLength), b => (int)b);
+            int[] duty = Array.ConvertAll(ReadECRegisters((ushort)(baseAddr + FAN_TABLE_DUTY_OFFSET), EcDutyCodec.TableLength), b => (int)b);
 
             return (tempUp, tempDown, duty);
         }
@@ -1825,7 +1865,7 @@ namespace UCU.Hardware.Ec
         {
             EcPowerCodec.ValidatePerformanceMode(mode);
             byte prev = ReadECRegister(REG_MODE_INDEX);
-            byte value = (byte)((prev & 0xE0) | mode | MODE_INDEX_ARM);
+            byte value = (byte)((prev & MODE_INDEX_HIGH_BITS) | mode | MODE_INDEX_ARM);
             WriteECRegister(REG_MODE_INDEX, value);
             DebugLog($"EcEngine: Set performance mode to {mode} (0x07AB: 0x{prev:X2} -> 0x{value:X2})");
         }
@@ -1881,7 +1921,7 @@ namespace UCU.Hardware.Ec
                 WriteECInternal(REG_MANUAL_FAN_CTRL, fanProfile);
 
                 byte prevMode = ReadECInternal(REG_MODE_INDEX);
-                byte modeValue = (byte)((prevMode & 0xE0) | (prevMode & 1));
+                byte modeValue = (byte)((prevMode & MODE_INDEX_HIGH_BITS) | (prevMode & MODE_INDEX_LOW_BIT));
                 if (modeCase >= 2)
                 {
                     modeValue |= FAN_MODE_TURBO;
@@ -1889,7 +1929,7 @@ namespace UCU.Hardware.Ec
                 WriteECInternal(REG_MODE_INDEX, modeValue);
 
                 byte prevTrigger = ReadECInternal(REG_TRIGGER);
-                byte triggerValue = (byte)((prevTrigger & 0x10) | TRIGGER_RGB_APPLY_COLOR | (modeCase == 0 ? 0x08 : 0x00));
+                byte triggerValue = (byte)((prevTrigger & TRIGGER_PRESERVED_BIT) | TRIGGER_RGB_APPLY_COLOR | (modeCase == 0 ? TRIGGER_OFFICE_BIT : 0x00));
                 WriteECInternal(REG_TRIGGER, triggerValue);
 
                 byte modeFlag = (byte)(modeCase == 0 ? 1 : 0);
@@ -1989,8 +2029,8 @@ namespace UCU.Hardware.Ec
             try
             {
                 byte current = ReadECRaw(REG_MANUAL_FAN_CTRL);
-                byte next = (byte)(current & ~(0xa0 | 0x10)); // clear bits 1,4,7
-                next |= 0x10; // set bit 4 (OVERBOOST)
+                byte next = (byte)(current & ~FAN_OVERBOOST_CLEAR_MASK); // mask 0xB0 clears bits 4,5,7 (the source comment said 1,4,7; the mask governs)
+                next |= FAN_MODE_TURBO; // bit 4 (OVERBOOST)
                 WriteECRaw(REG_MANUAL_FAN_CTRL, next);
                 Thread.Sleep(50);
                 DebugLog($"[DIAG] EcEngine: Overboost profile set (0x751: 0x{current:X2} -> 0x{next:X2})");
@@ -2067,11 +2107,11 @@ namespace UCU.Hardware.Ec
             try
             {
                 // Step 1: Power management activation (0x0726 bit 7)
-                byte cur726 = ReadECRaw(0x0726);
-                byte want726 = (byte)(cur726 | 0x80);
+                byte cur726 = ReadECRaw(REG_POWER_MGMT_726);
+                byte want726 = (byte)(cur726 | POWER_MGMT_726_ENABLE);
                 if (cur726 != want726)
                 {
-                    WriteECRaw(0x0726, want726);
+                    WriteECRaw(REG_POWER_MGMT_726, want726);
                     Thread.Sleep(50);
                 }
 
@@ -2100,7 +2140,7 @@ namespace UCU.Hardware.Ec
                 // Step 5: Overboost performance profile (0x0751 = 0x10).
                 // From tuxedo_io::uw_set_performance_profile_v1(PROFILE_OVERBOOST):
                 //   clear bits 1,4,7 (0xa0 | 0x10), then set bit 4 (0x10)
-                WriteECRaw(REG_MANUAL_FAN_CTRL, 0x10);
+                WriteECRaw(REG_MANUAL_FAN_CTRL, FAN_MODE_TURBO);
                 Thread.Sleep(50);
                 DebugLog("[DIAG] EcEngine: Overboost profile set (0x751=0x10)");
             }
@@ -2175,11 +2215,11 @@ namespace UCU.Hardware.Ec
         private void EnsurePowerManagementActiveInternal()
         {
             // Step 1: Power management activation (0x0726 bit 7)
-            byte cur726 = ReadECRaw(0x0726);
-            byte want726 = (byte)(cur726 | 0x80);
+            byte cur726 = ReadECRaw(REG_POWER_MGMT_726);
+            byte want726 = (byte)(cur726 | POWER_MGMT_726_ENABLE);
             if (cur726 != want726)
             {
-                WriteECRaw(0x0726, want726);
+                WriteECRaw(REG_POWER_MGMT_726, want726);
                 Thread.Sleep(50);
             }
 
@@ -2298,18 +2338,18 @@ namespace UCU.Hardware.Ec
         }
 
         /// <summary>Charge-gate status register (bit 4 = gate active; multiplexed byte).</summary>
-        public const ushort REG_BATTERY_GATE_STATUS = 0x0742;
+        public const ushort REG_BATTERY_GATE_STATUS = EcVault.REG_BATTERY_GATE_STATUS;
 
         /// <summary>Platform-override register (0xFF = no override; the tools pin 5).</summary>
-        public const ushort REG_BATTERY_PLATFORM_OVERRIDE = 0x0770;
+        public const ushort REG_BATTERY_PLATFORM_OVERRIDE = EcVault.REG_BATTERY_PLATFORM_OVERRIDE;
 
         // The open-revo chassis family carries an explicit threshold pair here;
         // the lab box read 0x07C9=0 / 0x07D0=95 — NOT a percent pair — so on
         // THIS family these bytes are not thresholds and nothing writes them
         // (U-103 field probe 2026-10-30, docs\acpi\BatteryDiagnostic). They are
         // kept as named constants for the next probe, not as a write surface.
-        public const ushort REG_BATTERY_LIMIT_UP = 0x07C9;
-        public const ushort REG_BATTERY_LIMIT_DOWN = 0x07D0;
+        public const ushort REG_BATTERY_LIMIT_UP = EcVault.REG_BATTERY_LIMIT_UP;
+        public const ushort REG_BATTERY_LIMIT_DOWN = EcVault.REG_BATTERY_LIMIT_DOWN;
 
         /// <summary>
         /// Live charge-gate state: true while the EC gates charging (the battery
@@ -2357,15 +2397,15 @@ namespace UCU.Hardware.Ec
 
       // Battery telemetry EC registers (from MechControl decompiled analysis)
         // All multi-byte values are little-endian uint16
-        public const ushort REG_BATTERY_POWER_SOURCE = 0x0490;  // bit 0 = AC connected
-        public const ushort REG_BATTERY_DESIGN_CAP_LO = 0x0402; // Design capacity (mAh, LE u16)
-        public const ushort REG_BATTERY_FULL_CHARGE_CAP_LO = 0x0404; // Full charge capacity (mAh, LE u16)
-        public const ushort REG_BATTERY_DESIGN_VOLTAGE_LO = 0x0408; // Design voltage (mV, LE u16)
-        public const ushort REG_BATTERY_CHARGE_RATE_LO = 0x0434; // Charge rate (mA, LE u16)
-        public const ushort REG_BATTERY_REMAINING_CAP_LO = 0x0436; // Remaining capacity (mAh, LE u16)
-        public const ushort REG_BATTERY_PRESENT_VOLTAGE_LO = 0x0438; // Present voltage (mV, LE u16)
-        public const ushort REG_BATTERY_TEMP_LO = 0x04A2; // Temperature (Kelvin*10, LE u16)
-        public const ushort REG_BATTERY_CYCLE_COUNT_LO = 0x04A6; // Cycle count (LE u16)
+        public const ushort REG_BATTERY_POWER_SOURCE = EcVault.REG_BATTERY_POWER_SOURCE;  // bit 0 = AC connected
+        public const ushort REG_BATTERY_DESIGN_CAP_LO = EcVault.REG_BATTERY_DESIGN_CAP_LO; // Design capacity (mAh, LE u16)
+        public const ushort REG_BATTERY_FULL_CHARGE_CAP_LO = EcVault.REG_BATTERY_FULL_CHARGE_CAP_LO; // Full charge capacity (mAh, LE u16)
+        public const ushort REG_BATTERY_DESIGN_VOLTAGE_LO = EcVault.REG_BATTERY_DESIGN_VOLTAGE_LO; // Design voltage (mV, LE u16)
+        public const ushort REG_BATTERY_CHARGE_RATE_LO = EcVault.REG_BATTERY_CHARGE_RATE_LO; // Charge rate (mA, LE u16)
+        public const ushort REG_BATTERY_REMAINING_CAP_LO = EcVault.REG_BATTERY_REMAINING_CAP_LO; // Remaining capacity (mAh, LE u16)
+        public const ushort REG_BATTERY_PRESENT_VOLTAGE_LO = EcVault.REG_BATTERY_PRESENT_VOLTAGE_LO; // Present voltage (mV, LE u16)
+        public const ushort REG_BATTERY_TEMP_LO = EcVault.REG_BATTERY_TEMP_LO; // Temperature (Kelvin*10, LE u16)
+        public const ushort REG_BATTERY_CYCLE_COUNT_LO = EcVault.REG_BATTERY_CYCLE_COUNT_LO; // Cycle count (LE u16)
 
         /// <summary>
         /// Reads battery telemetry directly from EC registers (matches MechControl approach).
