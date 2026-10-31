@@ -260,6 +260,8 @@ Cycles are silently skipped while Adaptive is running (its diff-apply loop owns 
 
 Confirm RTSS is running and publishing the foreground process. Without RTSS, the ETW fallback must be able to observe present events and resolve the foreground executable. Some protected processes prevent module-path inspection; telemetry may remain unavailable while other overlay metrics continue.
 
+**RTSS "running" with no tray icon: check its session.** `RTSSSharedMemoryV2` is a **global** name, so an RTSS instance living in **session 0** satisfies the app's shared-memory witness (and any "is RTSS running" check that uses it) while the user has no tray icon and no overlay in their games. Field-proven 2026-10-31: a one-shot `Highest`-privileges scheduled task (S4U principal — the pattern that works for launcher-style actions) lands a GUI process in session 0. Diagnose with `Get-Process RTSS | Select-Object Id, SessionId` — the instance must sit in the user's session (console session, usually 1). UCU's prerequisite row and auto-start are session-scoped on purpose and start RTSS **through the engine**, which places it in the active session with the console user's linked (elevated) token — needed because RTSS flagged "Run as administrator" fails a launch against the filtered token (ERROR_ELEVATION_REQUIRED) with no dialog a service could answer. A stale session-0 instance is killed, not adopted: `taskkill /f /pid <id>` (elevated) and let the row's Start bring it back correctly.
+
 ## Suspend/resume verification
 
 After changes to hardware state handling, verify this sequence:
