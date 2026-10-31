@@ -57,11 +57,19 @@ public sealed class PrerequisiteRtssDetectionTests
         string running = MethodBody(service, "public static bool IsRunning()");
 
         // A session-0 RTSS satisfies the global segment and serves no overlay.
-        Assert.Contains("RtssLocation.RunningSessions()", running, StringComparison.Ordinal);
+        Assert.Contains("RtssLocation.TryRunningSessions(out int[] sessions)", running, StringComparison.Ordinal);
         Assert.Contains("SafeSessionId()", running, StringComparison.Ordinal);
 
-        // The segment is the witness only when no RTSS process can be seen.
-        Assert.Contains("sessions.Length == 0", running, StringComparison.Ordinal);
+        // No RTSS process means NOT running: the segment is not evidence of a
+        // live RTSS, because RTSS's overlay DLL keeps the mapping open in every
+        // game it injected (field-proven: zero processes, segment present).
+        int empty = running.IndexOf("sessions.Length == 0", StringComparison.Ordinal);
+        Assert.True(empty > 0, "the empty process list must be answered explicitly");
+        string emptyAnswer = running.Substring(empty, Math.Min(800, running.Length - empty));
+        Assert.Contains("return false;", emptyAnswer, StringComparison.Ordinal);
+        Assert.DoesNotContain("RtssReader.IsRunning()", emptyAnswer, StringComparison.Ordinal);
+
+        // The segment is the witness only when the snapshot itself is refused.
         Assert.Contains("RtssReader.IsRunning()", running, StringComparison.Ordinal);
 
         // Installation and location are the shared Core witnesses (engine too).
