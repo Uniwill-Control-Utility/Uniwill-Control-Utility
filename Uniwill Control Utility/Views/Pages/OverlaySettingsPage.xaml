@@ -254,6 +254,18 @@
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                     <ui:FontIcon x:Name="RtssStatusIcon" FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="16" VerticalAlignment="Center" Margin="4,0,12,0" Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
                     <TextBlock x:Name="RtssStatusText" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <!-- Same Start route as the prerequisite row's button (the
+                         engine session launcher, no UAC; the fallback behaves
+                         like a double-click). Shown only when RTSS is not
+                         running and a start is possible, so an installed RTSS
+                         is reachable from this page - the prerequisite dialog
+                         appears once and never returns. -->
+                    <ui:Button x:Name="RtssStartButton" Margin="10,0,0,0" Padding="8,2" Visibility="Collapsed" Click="RtssStartButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE768;" Margin="0,0,8,0" />
+                            <TextBlock Text="Start" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ui:Button>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <ui:Button Margin="0,0,8,0" Click="PreviewButton_Click">
