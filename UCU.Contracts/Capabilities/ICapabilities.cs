@@ -90,6 +90,15 @@ namespace UCU.Contracts.Capabilities
         Task DeactivateGpuPowerControlAsync(CancellationToken cancellationToken = default);
 
         Task<bool> IsCustomProfileActiveAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>The EC's enforced power contract right now: the GPU
+        /// cTGP/DB register bytes and the CPU PL1/PL2 wattage, read in one
+        /// serialized pass (the guardian's drift oracle).</summary>
+        Task<PowerContractTruthDto> GetContractTruthAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Re-apply a drifted contract half: the GPU cTGP/DB sequence
+        /// and/or the CPU PL pair, each behind its own Apply* flag.</summary>
+        Task HealContractAsync(HealContractDto plan, CancellationToken cancellationToken = default);
     }
 
     /// <summary>

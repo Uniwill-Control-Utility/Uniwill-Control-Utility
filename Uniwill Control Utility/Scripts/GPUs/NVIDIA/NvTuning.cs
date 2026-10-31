@@ -229,6 +229,12 @@ namespace Uniwill_Control_Utility.Scripts.GPUs.NVIDIA
                 //   0x0746 = Dynamic Boost offset
                 ec.ActivateGpuPowerControlAsync(ctgpOffset, dbOffset).GetAwaiter().GetResult();
 
+                // The contract note (U-107): every GPU power-limit apply
+                // funnels through here, so the guardian's contract records the
+                // exact bytes the activation wrote — the drift comparison is
+                // byte-for-byte against the EC's answer, no re-derivation.
+                Services.PowerContractStore.NoteGpuApplied(ctgpOffset, dbOffset);
+
                 return 1;
             }
             catch (Exception ex)

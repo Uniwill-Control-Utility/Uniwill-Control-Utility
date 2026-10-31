@@ -344,6 +344,76 @@
                     </StackPanel>
                 </ui:CardExpander>
 
+                <!-- Power Tuning Guardian (OpenRevo's heal-contract pattern): opt-in
+                     drift-healing of the preset's power limits. Persist-only rows —
+                     reflected constructor writes stay behind the setup guard. -->
+                <ui:CardExpander x:Name="ExpanderPowerGuardian"
+                                 Margin="0,0,0,8"
+                                 IsExpanded="False">
+                    <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE945;" FontSize="20" Margin="4,0,6,0" />
+                    </ui:CardExpander.Icon>
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <ui:TextBlock FontTypography="Body" Text="Power Tuning Guardian" />
+                            <ui:TextBlock Margin="0,2,0,0"
+                                       FontTypography="Caption"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       Text="Re-applies your preset's power limits when another program resets them"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+
+                        <!-- Row: GPU power limit healing -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="GPU power limit (TGP / Dynamic Boost)" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Restore the preset's GPU power ceiling when the firmware reports it was changed"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ui:ToggleSwitch x:Name="cbPowerGuardGpu"
+                                             Grid.Column="1"
+                                             LabelPosition="Left"
+                                             OnContent="On"
+                                             OffContent="Off"
+                                             Checked="cbPowerGuardGpu_Checked"
+                                             Unchecked="cbPowerGuardGpu_Unchecked" />
+                        </Grid>
+
+                        <!-- Row: CPU power limits healing -->
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,18,0" VerticalAlignment="Center">
+                                <ui:TextBlock FontTypography="Body" Text="CPU power limits (PL1 / PL2)" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                           FontTypography="Caption"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                           Text="Restore the preset's CPU power limits when the firmware reports they were changed"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ui:ToggleSwitch x:Name="cbPowerGuardCpu"
+                                             Grid.Column="1"
+                                             LabelPosition="Left"
+                                             OnContent="On"
+                                             OffContent="Off"
+                                             Checked="cbPowerGuardCpu_Checked"
+                                             Unchecked="cbPowerGuardCpu_Unchecked" />
+                        </Grid>
+
+                    </StackPanel>
+                </ui:CardExpander>
+
                 </StackPanel>
             </Grid>
         </ScrollViewer>

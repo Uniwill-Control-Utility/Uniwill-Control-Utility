@@ -945,5 +945,13 @@
   "Relaunch the application after a crash": "クラッシュ後にアプリを再起動する",
   "Automatically restart UCU if it exits unexpectedly (registers a scheduled watchdog task)": "UCU が予期せず終了した場合は自動的に再起動します(監視タスクをスケジュール登録します)",
   "Updates": "更新",
-  "Lets you easily stay up to date with the latest releases": "最新のリリースを簡単にキャッチアップ"
+  "Lets you easily stay up to date with the latest releases": "最新のリリースを簡単にキャッチアップ",
+  "Power Tuning Guardian": "\u96FB\u6E90\u30C1\u30E5\u30FC\u30CB\u30F3\u30B0\u306E\u5B88\u8B77\u8005",
+  "Re-applies your preset\u0027s power limits when another program resets them": "\u4ED6\u306E\u30D7\u30ED\u30B0\u30E9\u30E0\u304C\u30EA\u30BB\u30C3\u30C8\u3057\u305F\u5834\u5408\u3001\u30D7\u30EA\u30BB\u30C3\u30C8\u306E\u96FB\u529B\u5236\u9650\u3092\u518D\u9069\u7528\u3057\u307E\u3059",
+  "GPU power limit (TGP / Dynamic Boost)": "GPU \u96FB\u529B\u5236\u9650 (TGP / \u30C0\u30A4\u30CA\u30DF\u30C3\u30AF\u30D6\u30FC\u30B9\u30C8)",
+  "Restore the preset\u0027s GPU power ceiling when the firmware reports it was changed": "\u30D5\u30A1\u30FC\u30E0\u30A6\u30A7\u30A2\u304C\u5909\u66F4\u3092\u5831\u544A\u3057\u305F\u5834\u5408\u3001\u30D7\u30EA\u30BB\u30C3\u30C8\u306E GPU \u96FB\u529B\u4E0A\u9650\u3092\u5FA9\u5143\u3057\u307E\u3059",
+  "CPU power limits (PL1 / PL2)": "CPU \u96FB\u529B\u5236\u9650 (PL1 / PL2)",
+  "Restore the preset\u0027s CPU power limits when the firmware reports they were changed": "\u30D5\u30A1\u30FC\u30E0\u30A6\u30A7\u30A2\u304C\u5909\u66F4\u3092\u5831\u544A\u3057\u305F\u5834\u5408\u3001\u30D7\u30EA\u30BB\u30C3\u30C8\u306E CPU \u96FB\u529B\u5236\u9650\u3092\u5FA9\u5143\u3057\u307E\u3059",
+  "Power limits restored": "\u96FB\u529B\u5236\u9650\u3092\u5FA9\u5143\u3057\u307E\u3057\u305F",
+  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "\u4ED6\u306E\u30D7\u30ED\u30B0\u30E9\u30E0\u304C GPU/CPU \u306E\u96FB\u529B\u5236\u9650\u3092\u5909\u66F4\u3057\u307E\u3057\u305F\u3002UCU \u306F\u30C1\u30E5\u30FC\u30CB\u30F3\u30B0\u3092\u518D\u9069\u7528\u3057\u307E\u3057\u305F\u3002"
 }

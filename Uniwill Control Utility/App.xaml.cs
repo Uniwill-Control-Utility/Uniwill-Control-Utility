@@ -499,6 +499,15 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<BetterRgbStreamService>();
                         services.AddHostedService(provider => provider.GetRequiredService<BetterRgbStreamService>());
 
+                        // The power-tuning guardian (OpenRevo's heal-contract
+                        // pattern): asks the EC what power contract it enforces
+                        // and re-applies the preset's contract when a third-party
+                        // tuner reset it. Per-feature opt-in, off by default; the
+                        // hosted loop is gated, throttled, and never queues onto
+                        // a saturated engine domain.
+                        services.AddSingleton<PowerGuardianService>();
+                        services.AddHostedService(provider => provider.GetRequiredService<PowerGuardianService>());
+
                         // Centralized device applier (singleton)
                         services.AddSingleton<DeviceApplier>();
                         services.AddSingleton<TrayQuickControlService>();
@@ -571,6 +580,14 @@ namespace Uniwill_Control_Utility
                 {
                     Scripts.RyzenAdj_To_UCU.EcService = powerCapability;
                 }
+
+                // Load the persisted power contract (U-107) before the
+                // startup apply: the EC keeps the last applied power values
+                // across app restarts, so when boot apply cannot reach the
+                // engine the guardian's contract is the one the PREVIOUS
+                // session established, not an empty one. A boot apply that
+                // does run notes over it with its own exact bytes.
+                Services.PowerContractStore.Load();
 
                 var fanCapability = _host.Services.GetService<IFanCapability>();
                 if (fanCapability != null)

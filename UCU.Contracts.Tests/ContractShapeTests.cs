@@ -259,7 +259,7 @@ public sealed class ContractShapeTests
             7, true, "s", new byte[] { 1, 2 },
             new FanStatusDto(), new FanCurveTablesDto(), new FanDutySnapshotDto(),
             new MetricsSnapshotDto(),
-            new PowerLimitsDto(), new MuxModeDto(), new MuxStateDto(),
+            new PowerLimitsDto(), new PowerContractTruthDto(), new MuxModeDto(), new MuxStateDto(),
             new BatteryTelemetryDto(), new PnpDeviceStateDto(),
             new RegisterValueDto(), new RegisterBytesDto(),
             new EngineInfoDto(),

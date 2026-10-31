@@ -242,6 +242,11 @@ namespace Uniwill_Control_Utility.Services
                 if (ecGate is not null)
                 {
                     await ecGate.ApplyOemStockModeAsync(OemModeIndexFor(profileName)).ConfigureAwait(false);
+
+                    // The contract yields with the values (U-107): a stock
+                    // preset deliberately leaves power bytes to the firmware,
+                    // so the guardian must not "heal" custom values back.
+                    Services.PowerContractStore.ClearAll();
                 }
             }
 
@@ -299,6 +304,11 @@ namespace Uniwill_Control_Utility.Services
                         }
                     }
                     await ec.ApplyCpuPowerLimitsAsync(pl1, pl2).ConfigureAwait(false);
+
+                    // The contract note (U-107): the watts pair this preset
+                    // established is what the guardian re-applies if the EC
+                    // reports it changed.
+                    Services.PowerContractStore.NoteCpuApplied(pl1, pl2);
                 }
             }
 

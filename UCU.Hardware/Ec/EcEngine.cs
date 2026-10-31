@@ -664,6 +664,35 @@ namespace UCU.Hardware.Ec
         }
 
         /// <summary>
+        /// The raw EC truth of the GPU power-control contract (U-107): the
+        /// cTGP/DB enable byte (0x0743), the cTGP offset (0x0744), the total
+        /// power pool (0x0745), the Dynamic Boost offset (0x0746), and whether
+        /// a custom profile owns them (0x0727 bit6). Laptop NVML answers
+        /// NOT_SUPPORTED for power limits, so these registers are the only
+        /// truth about the power ceiling the firmware enforces — the drift
+        /// oracle for the app's tuning guardian. Raw bytes out, no decoding:
+        /// the expected-value rules are the app's Core policy's, mirroring
+        /// ActivateGpuPowerControl's writes.
+        /// </summary>
+        public GpuPowerControlStateBytes GetGpuPowerControlState()
+        {
+            EnsureInitialized();
+            lock (_lock)
+            {
+                return new GpuPowerControlStateBytes(
+                    ReadECInternal(REG_CTGP_DB_ENABLE),
+                    ReadECInternal(REG_CTGP_DB_CTGP_OFFSET),
+                    ReadECInternal(REG_CTGP_DB_TPP_OFFSET),
+                    ReadECInternal(REG_CTGP_DB_DB_OFFSET),
+                    (ReadECInternal(REG_CUSTOM_PROFILE) & CUSTOM_PROFILE_ENABLE) != 0);
+            }
+        }
+
+        /// <summary>The GPU power-control registers as the EC reports them.
+        /// See <see cref="GetGpuPowerControlState"/>.</summary>
+        public sealed record GpuPowerControlStateBytes(byte Enable, byte Ctgp, byte Tpp, byte Db, bool CustomProfileActive);
+
+        /// <summary>
         /// Gets the current TCC (Thermal Comfort Control) offset from the EC.
         /// Returns the value of register 0x0786 (CPU TCC offset).
         /// </summary>
