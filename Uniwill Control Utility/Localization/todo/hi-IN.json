@@ -474,5 +474,11 @@
   "CPU power limits (PL1 / PL2)": "CPU power limits (PL1 / PL2)",
   "Restore the preset\u0027s CPU power limits when the firmware reports they were changed": "Restore the preset\u0027s CPU power limits when the firmware reports they were changed",
   "Power limits restored": "Power limits restored",
-  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "GPU/CPU power limits were changed by another program. UCU re-applied your tuning."
+  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.",
+  "Windows Key Lock": "Windows Key Lock",
+  "Blocks the Windows key; the lock lives in the firmware, so it stays active after UCU closes": "Blocks the Windows key; the lock lives in the firmware, so it stays active after UCU closes",
+  "Fn Key Lock": "Fn Key Lock",
+  "Locks the Fn layer, like the keyboard\u0027s own Fn lock shortcut; the state lives in the firmware": "Locks the Fn layer, like the keyboard\u0027s own Fn lock shortcut; the state lives in the firmware",
+  "AC Power Recovery": "AC Power Recovery",
+  "Turn the laptop on automatically when AC power is restored, e.g. after a power outage": "Turn the laptop on automatically when AC power is restored, e.g. after a power outage"
 }

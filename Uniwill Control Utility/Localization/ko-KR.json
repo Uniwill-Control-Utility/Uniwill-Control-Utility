@@ -953,5 +953,11 @@
   "CPU power limits (PL1 / PL2)": "CPU \uC804\uB825 \uC81C\uD55C (PL1 / PL2)",
   "Restore the preset\u0027s CPU power limits when the firmware reports they were changed": "\uD38C\uC6E8\uC5B4\uAC00 \uBCC0\uACBD\uC744 \uBCF4\uACE0\uD558\uBA74 \uD504\uB9AC\uC14B\uC758 CPU \uC804\uB825 \uC81C\uD55C\uC744 \uBCF5\uC6D0\uD569\uB2C8\uB2E4",
   "Power limits restored": "\uC804\uB825 \uC81C\uD55C\uC774 \uBCF5\uC6D0\uB418\uC5C8\uC2B5\uB2C8\uB2E4",
-  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "\uB2E4\uB978 \uD504\uB85C\uADF8\uB7A8\uC774 GPU/CPU \uC804\uB825 \uC81C\uD55C\uC744 \uBCC0\uACBD\uD588\uC2B5\uB2C8\uB2E4. UCU\uAC00 \uD29C\uB2DD\uC744 \uB2E4\uC2DC \uC801\uC6A9\uD588\uC2B5\uB2C8\uB2E4."
+  "GPU/CPU power limits were changed by another program. UCU re-applied your tuning.": "\uB2E4\uB978 \uD504\uB85C\uADF8\uB7A8\uC774 GPU/CPU \uC804\uB825 \uC81C\uD55C\uC744 \uBCC0\uACBD\uD588\uC2B5\uB2C8\uB2E4. UCU\uAC00 \uD29C\uB2DD\uC744 \uB2E4\uC2DC \uC801\uC6A9\uD588\uC2B5\uB2C8\uB2E4.",
+  "Windows Key Lock": "Windows \uD0A4 \uC7A0\uAE08",
+  "Blocks the Windows key; the lock lives in the firmware, so it stays active after UCU closes": "Windows \uD0A4\uB97C \uCC28\uB2E8\uD569\uB2C8\uB2E4. \uC7A0\uAE08 \uC0C1\uD0DC\uB294 \uD38C\uC6E8\uC5B4\uC5D0 \uC800\uC7A5\uB418\uC5B4 UCU\uB97C \uC885\uB8CC\uD55C \uB4A4\uC5D0\uB3C4 \uC720\uC9C0\uB429\uB2C8\uB2E4",
+  "Fn Key Lock": "Fn \uD0A4 \uC7A0\uAE08",
+  "Locks the Fn layer, like the keyboard\u0027s own Fn lock shortcut; the state lives in the firmware": "\uD0A4\uBCF4\uB4DC \uC790\uCCB4\uC758 Fn \uC7A0\uAE08 \uB2E8\uCD95\uD0A4\uC640 \uB9C8\uCC2C\uAC00\uC9C0\uB85C Fn \uB808\uC774\uC5B4\uB97C \uC7A0\uAE09\uB2C8\uB2E4. \uC0C1\uD0DC\uB294 \uD38C\uC6E8\uC5B4\uC5D0 \uC800\uC7A5\uB429\uB2C8\uB2E4",
+  "AC Power Recovery": "AC \uC804\uC6D0 \uBCF5\uAD6C",
+  "Turn the laptop on automatically when AC power is restored, e.g. after a power outage": "\uC815\uC804 \uD6C4 AC \uC804\uC6D0\uC774 \uBCF5\uAD6C\uB418\uBA74 \uB178\uD2B8\uBD81\uC744 \uC790\uB3D9\uC73C\uB85C \uCF2D\uB2C8\uB2E4"
 }

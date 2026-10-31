@@ -62,7 +62,13 @@ public sealed class FakeEcTransport : IEcTransport
 
         _registers[address] = value;
         _writes.Add((address, value));
+        OnWrite?.Invoke(address, value);
     }
+
+    /// <summary>Optional firmware-behavior simulator: invoked after a write
+    /// is recorded, so a write to a TRIGGER register can mutate the STATUS
+    /// register the way the real EC does (the U-108 win-lock toggle test).</summary>
+    public Action<ushort, byte>? OnWrite { get; set; }
 
     public void ClearLog() => _writes.Clear();
 

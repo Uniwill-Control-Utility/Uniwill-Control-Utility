@@ -99,6 +99,15 @@ namespace UCU.Contracts.Capabilities
         /// <summary>Re-apply a drifted contract half: the GPU cTGP/DB sequence
         /// and/or the CPU PL pair, each behind its own Apply* flag.</summary>
         Task HealContractAsync(HealContractDto plan, CancellationToken cancellationToken = default);
+
+        /// <summary>AC power recovery truth: "turn on when AC is restored"
+        /// (EC 0x0726 bit 3, shared with the power-management gate bit 7).</summary>
+        Task<bool> GetAcRecoveryAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Command AC power recovery (bit-scoped RMW that preserves
+        /// every other bit of the shared register). The result is the state
+        /// the EC reads back.</summary>
+        Task<bool> SetAcRecoveryAsync(bool enabled, CancellationToken cancellationToken = default);
     }
 
     /// <summary>
@@ -135,6 +144,21 @@ namespace UCU.Contracts.Capabilities
         Task<bool> IsRgbAsync(CancellationToken cancellationToken = default);
 
         Task<bool> IsWhiteOnlyAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Win-key lock truth: the EC status byte bit (0x0768!bit0).</summary>
+        Task<bool> GetWinLockAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Command the Win-key lock. The engine fires the EC toggle
+        /// trigger only on truth mismatch and verifies the flip; the result is
+        /// the lock state the EC reports after the act.</summary>
+        Task<bool> SetWinLockAsync(bool locked, CancellationToken cancellationToken = default);
+
+        /// <summary>Fn-key lock truth: EC 0x074E bit 4.</summary>
+        Task<bool> GetFnLockAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Command the Fn-key lock (bit-scoped RMW). The result is
+        /// the state the EC reads back.</summary>
+        Task<bool> SetFnLockAsync(bool locked, CancellationToken cancellationToken = default);
     }
 
     /// <summary>Battery telemetry and the charging-mode register.</summary>

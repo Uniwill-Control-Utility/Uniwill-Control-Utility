@@ -149,6 +149,19 @@ namespace UCU.Engine
 
                 return Task.FromResult<object?>(null);
             });
+
+            // AC power recovery (U-108): 0x0726 bit 3. Rides the POWER
+            // domain so its bit-scoped RMW is ordered against every other
+            // 0x0726 writer (the activation handshake's bit-7 gates, the
+            // stock-mode clear) — one queue, no interleaved RMW race.
+            add(EngineVerbs.Power.GetAcRecovery, (p, ct) =>
+                Task.FromResult<object?>(gate.Acquire().GetAcRecoveryEnabled()));
+
+            add(EngineVerbs.Power.SetAcRecovery, (p, ct) =>
+            {
+                DeviceToggleDto dto = EngineSerializer.BindParams<DeviceToggleDto>(p);
+                return Task.FromResult<object?>(gate.Acquire().SetAcRecoveryEnabled(dto.Enabled));
+            });
         }
     }
 }
