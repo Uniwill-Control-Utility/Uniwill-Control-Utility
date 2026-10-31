@@ -1705,9 +1705,11 @@ namespace UCU.Hardware.Ec
 
         /// <summary>
         /// Commands the Fn-key lock by a bit-scoped RMW (the codec returns
-        /// every other bit of 0x074E unchanged). The result is what the EC
-        /// READS BACK, not what was asked: the caller reflects firmware
-        /// truth, not intent.
+        /// every other bit of 0x074E unchanged). The result is the LOCK STATE
+        /// the EC reads back - not whether the request took: the UI reflects
+        /// the observed truth, and a success-shaped answer to an unlock
+        /// command would render it as locked (the field defect this wording
+        /// pins: success==state only when the command is ON).
         /// </summary>
         public bool SetFnLockLocked(bool locked)
         {
@@ -1729,7 +1731,7 @@ namespace UCU.Hardware.Ec
                 }
             }
 
-            bool observed = EcSwitchCodec.IsFnLockLocked(after) == locked;
+            bool observed = EcSwitchCodec.IsFnLockLocked(after);
             DebugLog($"[KBD] EcEngine: Fn lock -> {locked}: 0x{before:X2} -> 0x{after:X2}, observed={observed}");
             return observed;
         }
@@ -1771,8 +1773,9 @@ namespace UCU.Hardware.Ec
             if (before == locked)
             {
                 // Truth already agrees: no fire. Re-firing would toggle away
-                // from the desired state — the trigger is a TOGGLE.
-                return true;
+                // from the desired state - the trigger is a TOGGLE. The
+                // answer is the OBSERVED state (which equals the request).
+                return before;
             }
 
             lock (_lock)
@@ -1802,12 +1805,12 @@ namespace UCU.Hardware.Ec
                 if (now == locked)
                 {
                     DebugLog($"[KBD] EcEngine: Win lock -> {locked}: fired trigger 0x{REG_TRIGGER:X4}, status verified");
-                    return true;
+                    return now;   // the OBSERVED state (equals the request here)
                 }
             }
 
             DebugLog($"[KBD] EcEngine: Win lock -> {locked}: fired trigger 0x{REG_TRIGGER:X4}, status 0x{REG_WINLOCK_STATUS:X4} NOT verified");
-            return GetWinLockLocked() == locked;
+            return GetWinLockLocked();   // the answer is the state, not success
         }
 
         /// <summary>
@@ -2084,7 +2087,7 @@ namespace UCU.Hardware.Ec
                 }
             }
 
-            bool observed = EcSwitchCodec.IsAcRecoveryEnabled(after) == enabled;
+            bool observed = EcSwitchCodec.IsAcRecoveryEnabled(after);
             DebugLog($"EcEngine: AC recovery -> {enabled}: 0x{REG_POWER_MGMT_726:X4} 0x{before:X2} -> 0x{after:X2}, observed={observed}");
             return observed;
         }

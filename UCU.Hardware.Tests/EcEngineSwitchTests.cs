@@ -49,7 +49,11 @@ public sealed class EcEngineSwitchTests
         var (engine, transport) = NewEngine();
         transport.Preset(EcEngine.REG_FN_LOCK, 0x31); // bit4 set, bits 5 and 0 also set
 
-        Assert.True(engine.SetFnLockLocked(false));
+        // The verb answers the OBSERVED STATE, not success: a successful
+        // unlock answers false (unlocked). Success==state is only equal for
+        // ON commands - the field defect that made every row snap back to
+        // On after a working OFF write.
+        Assert.False(engine.SetFnLockLocked(false));
 
         Assert.Equal(new byte[] { 0x21 }, transport.WritesAt(EcEngine.REG_FN_LOCK));
     }
@@ -127,7 +131,9 @@ public sealed class EcEngineSwitchTests
         var (engine, transport) = NewEngine();
         transport.Preset(EcEngine.REG_POWER_MGMT_726, 0x99);
 
-        Assert.True(engine.SetAcRecoveryEnabled(false));
+        // State, not success: a successful disable answers false (see the
+        // Fn-unlock pin).
+        Assert.False(engine.SetAcRecoveryEnabled(false));
 
         Assert.Equal(new byte[] { 0x91 }, transport.WritesAt(EcEngine.REG_POWER_MGMT_726));
     }
@@ -237,7 +243,9 @@ public sealed class EcEngineSwitchTests
         transport.Preset(EcEngine.REG_WINLOCK_STATUS, 0x01);
         SimulateWinLockFirmware(transport);
 
-        Assert.True(engine.SetWinLockLocked(false));
+        // State, not success: a successful unlock answers false (see the
+        // Fn-unlock pin).
+        Assert.False(engine.SetWinLockLocked(false));
 
         Assert.Single(transport.WritesAt(EcEngine.REG_TRIGGER));
         Assert.Equal(0x00, transport.Read(EcEngine.REG_WINLOCK_STATUS));
