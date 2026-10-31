@@ -86,55 +86,127 @@ namespace Uniwill_Control_Utility.Services.Performance
         // Win32 file mapping access flags
         private const uint FileMapRead = 0x0004;
 
-        // Cached shared memory mapping to avoid OpenFileMapping/MapViewOfFile on every read.
-        // These are kernel transitions; caching them eliminates 4 P/Invoke calls per sample.
-        // We validate the signature on each read to detect RTSS restart/crash.
+        // Cached shared memory mapping to avoid OpenFileMapping/MapViewOfFile on every
+        // read. These are kernel transitions; caching them eliminates 4 P/Invoke calls
+        // per sample. We validate the signature on each read to detect RTSS restart/crash.
+        //
+        // _mapLock guards the cache AND every shared-memory read. Unmapping a view
+        // while another thread reads it is a use-after-free, and reading offsets that
+        // run past the mapping faults it: both raise AccessViolationException, which
+        // modern .NET does NOT let anyone catch - the process dies (field-proven
+        // 2026-10-31: RTSS force-killed mid-write left a section with a valid 'RTSS'
+        // signature and array bounds beyond the mapping; the FPS sampler starting
+        // during splash preload crashed the app at the 92% mark on every launch,
+        // event stacks in Marshal.ReadInt32 <- TryRead and PtrToStructure <-
+        // AcquireMapping). So: one lock across acquire-to-copy, and zero trust -
+        // every header-derived offset is bounds-checked against the real view size
+        // before any read.
+        private static readonly object _mapLock = new();
         private static IntPtr _cachedMappingHandle;
         private static IntPtr _cachedViewPtr;
+        private static ulong _cachedViewSize;
 
-        private static bool AcquireMapping(out IntPtr viewPtr)
+        // App-entry bytes this reader touches: fields through dwFrameTime (offset 280) + 4.
+        internal const int EntryLayoutBytes = 284;
+
+        // Sanity caps for header-derived array geometry (a real RTSS array is 64 entries
+        // of a few hundred bytes; anything past these caps is garbage and fails closed).
+        internal const uint MaxAppArrayEntries = 4096;
+        internal const uint MaxAppEntrySize = 0x10000;
+
+        /// <summary>
+        /// Bounds contract of a section's app array against the mapped view size:
+        /// the array must lie wholly inside the view, entries must be large enough
+        /// to carry every field this reader touches, and the view must be addressable
+        /// by the int offsets the scan uses. Pure so it is testable without a section.
+        /// </summary>
+        internal static bool LayoutFits(RtssHeader header, ulong viewSize)
         {
+            ulong headerSize = (ulong)System.Runtime.InteropServices.Marshal.SizeOf<RtssHeader>();
+
+            return viewSize > 0
+                && viewSize <= int.MaxValue
+                && header.AppArrOffset >= headerSize
+                && header.AppArrOffset < viewSize
+                && header.AppEntrySize >= EntryLayoutBytes
+                && header.AppEntrySize <= MaxAppEntrySize
+                && header.AppArrSize > 0
+                && header.AppArrSize <= MaxAppArrayEntries
+                && (ulong)header.AppArrSize * header.AppEntrySize <= viewSize - header.AppArrOffset;
+        }
+
+        /// <summary>The size of the mapped view (whole-section map), 0 when unknown.</summary>
+        private static ulong ViewRegionSize(IntPtr view)
+        {
+            MEMORY_BASIC_INFORMATION info = default;
+            UIntPtr ok = VirtualQuery(view, out info, (UIntPtr)System.Runtime.InteropServices.Marshal.SizeOf<MEMORY_BASIC_INFORMATION>());
+            return ok == UIntPtr.Zero ? 0 : (ulong)info.RegionSize;
+        }
+
+        /// <summary>
+        /// Acquire a shared-memory view, validated for this reader: size covers the
+        /// header, the signature is live, and the app array lies wholly inside the
+        /// view. A torn/garbage section fails closed (nothing cached). Caller must
+        /// hold <see cref="_mapLock"/> for the whole read (the cached view is only
+        /// ever unmapped under the same lock).
+        /// </summary>
+        private static bool AcquireMappingLocked(out IntPtr viewPtr, out ulong viewSize)
+        {
+            viewPtr = IntPtr.Zero;
+            viewSize = 0;
+
             // Try cached handle first.
             if (_cachedViewPtr != IntPtr.Zero)
             {
                 // Validate the signature is still correct (RTSS may have restarted).
-                try
+                // Safe: the view was size-checked at map time, and the lock keeps
+                // it from being unmapped under us.
+                if (Marshal.ReadInt32(_cachedViewPtr) == (int)ValidSignature)
                 {
-                    RtssHeader header = Marshal.PtrToStructure<RtssHeader>(_cachedViewPtr);
-                    if (header.Signature == ValidSignature)
-                    {
-                        viewPtr = _cachedViewPtr;
-                        return true;
-                    }
-                }
-                catch
-                {
-                    // Cache corrupted, fall through to recreate.
+                    viewPtr = _cachedViewPtr;
+                    viewSize = _cachedViewSize;
+                    return true;
                 }
 
-                // Dispose cached handles.
                 ReleaseCachedMapping();
             }
 
             // Open fresh mapping.
             IntPtr mappingHandle = OpenFileMapping(FileMapRead, false, SharedMemoryName);
             if (mappingHandle == IntPtr.Zero)
+                return false;
+
+            IntPtr view = MapViewOfFile(mappingHandle, FileMapRead, 0, 0, 0);
+            if (view == IntPtr.Zero)
             {
-                viewPtr = IntPtr.Zero;
+                CloseHandle(mappingHandle);
                 return false;
             }
 
-            viewPtr = MapViewOfFile(mappingHandle, FileMapRead, 0, 0, 0);
-            if (viewPtr == IntPtr.Zero)
+            ulong size = ViewRegionSize(view);
+            if (size < (ulong)Marshal.SizeOf<RtssHeader>())
             {
+                UnmapViewOfFile(view);
                 CloseHandle(mappingHandle);
-                viewPtr = IntPtr.Zero;
+                return false;
+            }
+
+            RtssHeader header = Marshal.PtrToStructure<RtssHeader>(view);
+            if (header.Signature != ValidSignature || !LayoutFits(header, size))
+            {
+                // Signature lives, layout garbage: the section is torn (RTSS died
+                // mid-write). Treat it as absent and cache nothing.
+                UnmapViewOfFile(view);
+                CloseHandle(mappingHandle);
                 return false;
             }
 
             // Cache for next call.
             _cachedMappingHandle = mappingHandle;
-            _cachedViewPtr = viewPtr;
+            _cachedViewPtr = view;
+            _cachedViewSize = size;
+            viewPtr = view;
+            viewSize = size;
             return true;
         }
 
@@ -150,6 +222,7 @@ namespace Uniwill_Control_Utility.Services.Performance
                 CloseHandle(_cachedMappingHandle);
                 _cachedMappingHandle = IntPtr.Zero;
             }
+            _cachedViewSize = 0;
         }
 
         // Per-process ring buffers for frame-time percentile calculation.
@@ -193,6 +266,28 @@ namespace Uniwill_Control_Utility.Services.Performance
         [LibraryImport("kernel32.dll")]
         private static partial int CloseHandle(IntPtr hObject);
 
+        /// <summary>
+        /// MEMORY_BASIC_INFORMATION (x64 layout, current through the Windows 11
+        /// 24H2 PartitionId extension: RegionSize sits at offset 24 in both).
+        /// RegionSize of a mapped view is the mapped region - the whole-section
+        /// map's size, the bound every shared-memory read is checked against.
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MEMORY_BASIC_INFORMATION
+        {
+            public IntPtr BaseAddress;
+            public IntPtr AllocationBase;
+            public uint AllocationProtect;
+            public ushort PartitionId;
+            public UIntPtr RegionSize;
+            public uint State;
+            public uint Protect;
+            public uint Type;
+        }
+
+        [LibraryImport("kernel32.dll", EntryPoint = "VirtualQuery")]
+        private static partial UIntPtr VirtualQuery(IntPtr lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, UIntPtr dwLength);
+
         /// <summary>Quick check whether RTSS is installed and running.</summary>
         /// <remarks>
         /// Checks both the shared memory signature AND the process list. Shared memory
@@ -222,14 +317,14 @@ namespace Uniwill_Control_Utility.Services.Performance
                 CloseHandle(mappingHandle);
                 return false;
             }
+
+            // Size-then-read: a signature read is safe only inside the mapped
+            // region (a torn section can be smaller than the header, and the
+            // fault it produces is uncatchable).
             try
             {
-                RtssHeader header = Marshal.PtrToStructure<RtssHeader>(viewPtr);
-                return header.Signature == ValidSignature;
-            }
-            catch
-            {
-                return false;
+                return ViewRegionSize(viewPtr) >= (ulong)Marshal.SizeOf<RtssHeader>()
+                    && Marshal.ReadInt32(viewPtr) == (int)ValidSignature;
             }
             finally
             {
@@ -282,67 +377,69 @@ namespace Uniwill_Control_Utility.Services.Performance
         {
             data = default;
 
-            if (!AcquireMapping(out IntPtr viewPtr))
+            // The lock spans the whole shared-memory access: the cached view is
+            // only ever unmapped under it, and the header/app-array bounds were
+            // validated against the view size at acquire - every ReadInt32 below
+            // is in-bounds by construction (an out-of-bounds read here is an
+            // uncatchable AV, see the _mapLock comment).
+            lock (_mapLock)
             {
-                LogOnce("Could not acquire RTSS mapping — RTSS not running or mapping inaccessible");
-                return false;
-            }
-
-            // Read header (signature already validated by AcquireMapping, but read fields).
-            RtssHeader header = Marshal.PtrToStructure<RtssHeader>(viewPtr);
-
-            if (header.AppArrOffset == 0 || header.AppEntrySize == 0 || header.AppArrSize == 0)
-            {
-                LogOnce($"Invalid header offsets: offset={header.AppArrOffset}, entrySize={header.AppEntrySize}, arrSize={header.AppArrSize}");
-                return false;
-            }
-
-            // Scan app array — collect all apps, look for exact PID match and best fallback.
-            RtssFpsData? bestFallback = null;
-            List<(int Pid, string Name, int FrameTime, int ApiFlag)> allApps = new();
-
-            for (uint i = 0; i < header.AppArrSize; i++)
-            {
-                IntPtr entryPtr = IntPtr.Add(viewPtr, (int)(header.AppArrOffset + i * header.AppEntrySize));
-                int pid = Marshal.ReadInt32(entryPtr);
-                if (pid == 0)
-                    continue; // Empty slot
-
-                string name = ReadAnsiString(entryPtr, 4, MaxPath);
-                int flags = Marshal.ReadInt32(entryPtr, 4 + MaxPath);
-                int dwFrameTime = Marshal.ReadInt32(entryPtr, 268 + 12); // offset 280
-
-                allApps.Add((pid, name, dwFrameTime, flags & RtssFlags.ApiUsageMask));
-
-                if (pid == processId)
+                if (!AcquireMappingLocked(out IntPtr viewPtr, out ulong viewSize))
                 {
-                    data = ParseAppEntry(entryPtr, (int)header.AppEntrySize, processId);
-                    if (data.Fps > 0)
-                        return true;
+                    LogOnce("Could not acquire RTSS mapping — RTSS not running or mapping inaccessible");
+                    return false;
                 }
 
-                // Collect fallback: best game-like app with FPS > 0.
-                if (IsGameProcess(name) && dwFrameTime > 0)
+                // Read header (signature and array layout already validated).
+                RtssHeader header = Marshal.PtrToStructure<RtssHeader>(viewPtr);
+
+                // Scan app array — collect all apps, look for exact PID match and best fallback.
+                RtssFpsData? bestFallback = null;
+                List<(int Pid, string Name, int FrameTime, int ApiFlag)> allApps = new();
+
+                for (uint i = 0; i < header.AppArrSize; i++)
                 {
-                    RtssFpsData candidate = ParseAppEntry(entryPtr, (int)header.AppEntrySize, pid);
-                    if (candidate.Fps > 0 && (bestFallback == null || candidate.Fps > bestFallback.Value.Fps))
-                        bestFallback = candidate;
+                    IntPtr entryPtr = IntPtr.Add(viewPtr, (int)(header.AppArrOffset + i * header.AppEntrySize));
+                    int pid = Marshal.ReadInt32(entryPtr);
+                    if (pid == 0)
+                        continue; // Empty slot
+
+                    string name = ReadAnsiString(entryPtr, 4, MaxPath);
+                    int flags = Marshal.ReadInt32(entryPtr, 4 + MaxPath);
+                    int dwFrameTime = Marshal.ReadInt32(entryPtr, 268 + 12); // offset 280
+
+                    allApps.Add((pid, name, dwFrameTime, flags & RtssFlags.ApiUsageMask));
+
+                    if (pid == processId)
+                    {
+                        data = ParseAppEntry(entryPtr, (int)header.AppEntrySize, processId);
+                        if (data.Fps > 0)
+                            return true;
+                    }
+
+                    // Collect fallback: best game-like app with FPS > 0.
+                    if (IsGameProcess(name) && dwFrameTime > 0)
+                    {
+                        RtssFpsData candidate = ParseAppEntry(entryPtr, (int)header.AppEntrySize, pid);
+                        if (candidate.Fps > 0 && (bestFallback == null || candidate.Fps > bestFallback.Value.Fps))
+                            bestFallback = candidate;
+                    }
                 }
+
+                // If exact PID wasn't found but we have a game entry with FPS, use it.
+                if (bestFallback != null && bestFallback.Value.Fps > 0)
+                {
+                    data = bestFallback.Value;
+                    LogOnce($"PID {processId} not in RTSS, using fallback [{data.ProcessId}] {System.IO.Path.GetFileName(data.ProcessName)} FPS={data.Fps:F0}");
+                    return true;
+                }
+
+                // Log all apps once for diagnostics (debounced by LogOnce).
+                string appList = string.Join(", ", allApps.Take(5).Select(a => $"[{a.Pid}] {System.IO.Path.GetFileName(a.Name)} ft={a.FrameTime} api=0x{a.ApiFlag:X}"));
+                LogOnce($"RTSS apps ({allApps.Count}): {appList}{(allApps.Count > 5 ? " ..." : "")}");
+
+                return false;
             }
-
-            // If exact PID wasn't found but we have a game entry with FPS, use it.
-            if (bestFallback != null && bestFallback.Value.Fps > 0)
-            {
-                data = bestFallback.Value;
-                LogOnce($"PID {processId} not in RTSS, using fallback [{data.ProcessId}] {System.IO.Path.GetFileName(data.ProcessName)} FPS={data.Fps:F0}");
-                return true;
-            }
-
-            // Log all apps once for diagnostics (debounced by LogOnce).
-            string appList = string.Join(", ", allApps.Take(5).Select(a => $"[{a.Pid}] {System.IO.Path.GetFileName(a.Name)} ft={a.FrameTime} api=0x{a.ApiFlag:X}"));
-            LogOnce($"RTSS apps ({allApps.Count}): {appList}{(allApps.Count > 5 ? " ..." : "")}");
-
-            return false;
         }
 
         private static bool IsGameProcess(string processName)
