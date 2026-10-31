@@ -248,6 +248,32 @@ if ($arpEcho -notmatch [regex]::Escape("Uninstall\MSI:$arpCode")) {
 }
 Write-Host "Rebound $($packedMsi.Name): the single Control Panel entry now runs Uninstall.exe" -ForegroundColor Cyan
 
+# --- 5a. U-111 (MSI registers the engine service) is a proven dead end ----
+# The goal was real: a fresh install paid one UAC because the app's
+# unelevated chain registered UCUEngine. The mechanism Windows Installer
+# prescribes — ServiceInstall/ServiceControl/MsiLockPermissionsEx rows +
+# InstallServices/StartServices/StopServices/DeleteServices — cannot be
+# authored into THIS package on current Windows, field-probed 2026-10-31
+# (every probe against a copy of the packed MSI):
+#   - CREATE TABLE parses nowhere: COM OpenView, the C API
+#     (MsiDatabaseOpenViewW), transacted, direct, read-write: 1615
+#     ERROR_BAD_QUERY on every syntax, including the SDK's documented
+#     examples. msi.dll's SQL on this OS has no DDL.
+#   - MsiDatabaseImport of an .idt: 1627 (imports rows into existing
+#     tables only). MsiDatabaseMerge: hr=0 no-op — the source database
+#     cannot create the tables either.
+#   - The compound-file route (writing table streams as light.exe does):
+#     the OS's own APIs refuse it — StgCreateStorageEx INVALIDFUNCTION,
+#     StgOpenStorageEx ABNORMALAPIWRITE on every format, transacted
+#     CreateStream/OpenStream INVALIDFUNCTION, on a freshly packed MSI,
+#     and the control docfile created moments earlier by the same API.
+#     This is the OS guard against non-MSI writers; routing around it is
+#     not on the table.
+# The engine therefore stays registered by the app: the documented,
+# shipped, field-proven elevated `--install-engine` pass (one UAC on a
+# fresh machine). msi-edit's `export` mode keeps MSI's ISTG format
+# inspectable if a future Windows gives msi.dll its DDL back.
+
 # --- 5b. Stamp the Setup.exe bootstrapper requireAdministrator ---
 # vpk's bootstrapper template is asInvoker and vpk exposes no manifest flag,
 # so a double-click on a per-machine pack fails mid-install with
