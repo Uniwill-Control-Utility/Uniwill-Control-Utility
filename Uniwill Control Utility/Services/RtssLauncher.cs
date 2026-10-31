@@ -23,12 +23,14 @@ namespace Uniwill_Control_Utility.Services
     /// </summary>
     public static class RtssLauncher
     {
-        /// <summary>True when the start route is available: RTSS installed, not
-        /// running in this session, image located.</summary>
+        /// <summary>True when the start route is available: RTSS not running
+        /// in this session, and an image located. One locate pass (the scan
+        /// costs ~30 ms on a full-ARP machine, and the Overlay page's 2 s
+        /// status poll calls this): IsInstalled IS a located image, so a
+        /// separate IsInstalled() call would just double the scan.</summary>
         public static bool CanStart()
         {
-            return RtssDetectionService.IsInstalled()
-                && !RtssDetectionService.IsRunning()
+            return !RtssDetectionService.IsRunning()
                 && RtssLocation.Locate() != null;
         }
 
