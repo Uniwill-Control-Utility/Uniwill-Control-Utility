@@ -135,14 +135,24 @@ public sealed class PrerequisiteRtssDetectionTests
     }
 
     [Fact]
-    public void TheAppStartsRtssOnlyForTheBootStartedApp()
+    public void TheAppStartsRtssForTheBootStartAndTheOverlayStartupPair()
     {
         string app = ReadAppSource("App.xaml.cs");
 
-        string startUp = MethodBody(app, "private static async Task AutoStartRtssForBootStartAsync()");
+        string startUp = MethodBody(app, "private static async Task AutoStartRtssForOverlayAsync()");
 
-        // "UCU is set to start with Windows" is witnessed by the autostart task.
-        Assert.Contains("ScheduledTaskService.GetActionPath(AutostartTaskName) is null", startUp, StringComparison.Ordinal);
+        // (a) "UCU is set to start with Windows" is witnessed by the autostart task.
+        Assert.Contains("ScheduledTaskService.GetActionPath(AutostartTaskName) is not null", startUp, StringComparison.Ordinal);
+
+        // (b) The Overlay page's "Enable overlay" + "Show on startup" pair demands
+        // RTSS at every startup: the OSD needs RTSS live BEFORE games launch (RTSS
+        // hooks at game start), and the boot-start task is not the only route the
+        // app is started by. Read from the store (the toggles' source of truth).
+        Assert.Contains("GetService<OverlaySettingsStore>()?.Current", startUp, StringComparison.Ordinal);
+        Assert.Contains("overlay.Enabled && overlay.ShowOnStartup", startUp, StringComparison.Ordinal);
+
+        // Neither contract -> no opinion about RTSS.
+        Assert.Contains("if (!bootStarted && !overlayDemandsRtss)", startUp, StringComparison.Ordinal);
 
         // Installed-and-idle only, through the launcher (never a raw Process.Start).
         Assert.Contains("!RtssDetectionService.IsInstalled() || RtssDetectionService.IsRunning()", startUp, StringComparison.Ordinal);
@@ -150,7 +160,7 @@ public sealed class PrerequisiteRtssDetectionTests
         Assert.DoesNotContain("Process.Start", startUp, StringComparison.Ordinal);
 
         // The hook is in the startup chain, fired once and unhandled-fault-free.
-        Assert.Contains("SafeFireAndForget(AutoStartRtssForBootStartAsync())", app, StringComparison.Ordinal);
+        Assert.Contains("SafeFireAndForget(AutoStartRtssForOverlayAsync())", app, StringComparison.Ordinal);
     }
 
     private static string ReadAppSource(params string[] parts) =>
