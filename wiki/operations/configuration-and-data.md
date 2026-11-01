@@ -58,9 +58,19 @@ Most of these stores return defaults when files are absent or unreadable. Writes
 | `vf_presets.json` | `VfCurvePresetStore` | V-F curve preset slots. |
 | `vf_stock.json` | `VfStockCurveStore` | Captured stock V-F points. |
 | `overlay.json` | `OverlaySettingsStore` | Overlay visibility, metrics, refresh, scale, opacity, placement and hotkeys. |
+| `shortcuts.json` | `ShortcutStore` | User shortcut map (U-204): chord -> vetted action. The record is the file; the store sanitises on load (unparseable chord, duplicate chord first-wins, missing payload, 32-row cap) and quarantines a corrupt file to `.bak`. |
+| `oem-takeover-journal.json` | `Services/OemTakeoverService` | User-scope takeover journal (U-203): HKCU Run renames, UWP AppModel `State`, StartupApproved flag bytes - "mutations not yet undone". Merged with the engine journal for the UI. |
+| `icc/` | `Scripts/Misc/Display` | Imported ICC profiles (U-205), validated before they land here and offered next to Windows' own set. Per-user because the spool folder needs administrator rights. |
 | `logs/ucu_log<yyyyMMdd>.txt` | `App` (Serilog file sink) | Structured diagnostic log; daily rolling, 8 MiB per file. Written per user because a per-machine install cannot write its own directory; an unwritable folder degrades logging to the console rather than failing startup. |
 
 `CustomPresetStore.MigrateLegacyFile` copies the earlier `custom_presets.json` representation into the Normal-mode store when needed.
+
+## `%ProgramData%/UCU` (engine service)
+
+| File | Owner | Content |
+| --- | --- | --- |
+| `engine/engine<yyyyMMdd>.log` | Engine (Serilog) | Service-side log: EC init/handshake, dispatcher faults, `[Oem]` pause/resume action lines, RTSS/session routes. Written as LocalSystem because a support case may exist on a machine where the user never started the app. |
+| `engine/oem-takeover-journal.json` | `UCU.Hardware/Takeover/OemTakeoverService` | Machine-scope takeover journal (U-203): HKLM Run renames, service start-type parkings (with the `|running` flag), task disables - the reversible record the restore consumes. |
 
 ## Application directory
 

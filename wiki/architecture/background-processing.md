@@ -41,6 +41,10 @@ flowchart TB
 | Flydigi HID / BLE, Watercooler | Input loops, heartbeats, reconnect, smart mode | Connection | Suspend/disconnect/disposal |
 | `EngineLifecycle` | One-shot engine install/start at startup | Deferred at launch | Completes; the service outlives the app |
 
+`ShortcutService` (U-204) is not its own loop: chord matching runs inside `OverlayManagerService`'s global hook thread (one hook, one set of field lessons), and the matched action is queued on the UI dispatcher. The hook is installed when the overlay is enabled **or** at least one shortcut exists - a shortcut set does not die with the overlay toggle.
+
+`OemTakeoverService` (U-203) has no loop either: status is probed on demand (Settings card expansion, the title-bar chip's 60 s tick) and pause/restore run against the engine verbs. `DiagnosticsExportService` (U-208) runs only when the user exports.
+
 ## View-lifetime work
 
 | Surface | Work and cadence |
@@ -49,6 +53,8 @@ flowchart TB
 | Fan Control | Temperature/RPM each second; debounce for curve writes. |
 | Keyboard | 150 ms apply debounce; 1 s idle check; 500 ms wake check. |
 | Light Bar | 150 ms apply debounce. |
+| Display | Brightness slider debounced 400 ms before the WMI write (a drag is not one write per pixel); panel/refresh/ICC state read on navigation. |
+| Automations | Shortcut rows rebuild from `shortcuts.json` on navigation and on culture change; summaries are localized fragments. |
 | Overlay Settings | RTSS status every 2 s. |
 | Overlay view model | Configured refresh, clamped 100–5000 ms (store) / ≥16 ms (view model). |
 | V-F curve editor | Live clocks every 2 s; 300 ms resize debounce. |

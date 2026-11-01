@@ -85,7 +85,7 @@
 - `Scripts/AMD Backend/` — PawnIO modules + Ryzen SMU mailbox.
 - `Scripts/Intel Backend/` — PawnIO modules, MSR/MCHBAR tuning.
 - `Scripts/GPUs/NVIDIA/` — MUX detection, NVAPI/NVML, power/clock and V-F curve logic.
-- `Scripts/Misc/` — logging, cached system data, WMI discovery, display operations, `HardwareManagement` (elevated PnP flows), `NvramAccess` (NVRAM routes: engine-first, local fallback with the 50-series door handshake), notifications.
+- `Scripts/Misc/` — logging, cached system data, WMI discovery, display operations (mode/refresh, ICC association + imported profiles, WDDM brightness), `HardwareManagement` (elevated PnP flows), `NvramAccess` (NVRAM routes: engine-first, local fallback with the 50-series door handshake), notifications.
 - `RyzenAdj_To_UCU.cs` — shared command interpreter for AMD/Intel/NVIDIA/display/Windows-power options.
 
 ## Presentation surfaces
@@ -95,7 +95,9 @@
 | Dashboard | Device identity and hardware snapshots. |
 | Presets | Built-in/custom CPU and GPU profiles, V-F curves, backup/import. |
 | Adaptive | Per-game profiles and selected-domain overrides. |
-| Automations | AC, battery and resume profile selection; Power Tuning Guardian opt-in toggles. |
+| Automations | AC, battery and resume profile selection; Power Tuning Guardian opt-in toggles; keyboard shortcuts (chord -> vetted action, dispatched from the overlay's hook). |
+| Display | GPU mode/MUX, iGPU power saving, MiniLED, panel refresh, ICC profile association + import/export, display brightness. |
+| About | Update controls, third-party libraries, and the one-click diagnostics bundle. |
 | Fan Control | EC curves, turbo, split/unified modes, smart fan mode. |
 | Keyboard / Light Bar | HID per-key editor + EC effects. |
 | Battery | Charge modes (engine verbs) and telemetry. |

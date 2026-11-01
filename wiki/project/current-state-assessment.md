@@ -14,19 +14,19 @@ This verdict is narrower than “the application does not work.” The code cont
 
 | Area | Observed evidence | Assessment |
 | --- | --- | --- |
-| Product implementation | 53,706 C# + 11,920 XAML lines; complete pages/services for profiles, Adaptive Mode, EC, HID, BLE, monitoring, overlay and persistence | Broad implementation exists. |
+| Product implementation | About 60,800 C# + 14,500 XAML lines in the app projects plus 5,700 in the engine-era libraries; complete pages/services for profiles, Adaptive Mode, EC, HID, BLE, monitoring, overlay, OEM takeover, shortcut map, diagnostics and display extras | Broad implementation exists. |
 | Runtime architecture | Generic Host, DI, structured logs, single-instance handling, device reconnect, resume reapplication, cleanup paths | Operational concerns are explicitly handled. |
 | Build definition | One valid SDK-style WPF project targeting .NET 10/Windows 22621; native/content payload declared | Build intent is clear. |
-| Build proof | No SDK on the analysis machine; no CI workflow or stored build result | This revision is not independently build-verified here. |
-| Automated tests | No test project, test framework, or test files found | Regressions are not machine-gated. |
+| Build proof | Clean Release build at the known-warning baseline (130 warnings, 0 errors) with the .NET 10 SDK; `build\pack.ps1` produces the MSI, nupkgs and portable zip | Build is reproducible locally and gated per change. |
+| Automated tests | Five xUnit projects (Contracts, Core, Engine, Hardware, app) with 1,020 tests green at this revision; every commit gate requires all five suites | Regressions in the tested surface are machine-gated. |
 | Hardware qualification | Detector/SKU/protocol lists exist; no versioned execution matrix or captured results | Enumeration is not proof of operation. |
 | Release engineering | Self-contained publish properties exist; no installer source, release workflow, tags, or checksums | Release cannot be reproduced from the repository alone. |
 | Update path | GitHub release client and MSI launch path exist | Contract is brittle and still points at the earlier repository owner. |
 | Change rate | 196 commits in 2026-09; several startup/resume/device fixes in the last days | The code is under rapid stabilization, not a frozen release baseline. |
 | Maintainability | 36 files over 500 lines; 18 over 1,000; large code-behind and service classes | Review and regression scope is concentrated. |
-| Error observability | Serilog file/console logging and diagnostic levels exist | Core observability exists, but many hardware fallbacks suppress or only debug-log exceptions. |
-| Data evolution | Multiple explicit migrations and versioned backup format | Compatibility work exists; stores remain fragmented. |
-| Localization data | 21 catalogues parse; `zh-CN.json` has an orphan key at line 389 and fails JSON parsing | Selecting Simplified Chinese can fail catalogue loading during startup/culture change. |
+| Error observability | Serilog file/console logging, engine `[Oem]` pause/resume action lines, and a one-click diagnostics bundle (report + logs + both journals) | Core observability exists; some hardware fallbacks still log only at debug level. |
+| Data evolution | Multiple explicit migrations, versioned backup format, and the newer stores (`shortcuts.json`, both takeover journals, imported ICC profiles) each with their own sanitise/quarantine rule | Compatibility work exists; stores remain fragmented. |
+| Localization data | 26 shipped catalogues + 21 todo queue files, 1,105 keys each, parse-verified with System.Text.Json on every sync; the earlier `zh-CN` orphan-key defect is fixed | Catalogue loading is consistent across cultures. |
 
 ## Implemented capability versus verified capability
 
@@ -47,10 +47,12 @@ quadrantChart
     Keyboard HID: [0.86, 0.20]
     Monitoring and overlay: [0.78, 0.22]
     Persistence and migration: [0.78, 0.30]
-    Build and release: [0.42, 0.12]
+    OEM takeover and coexistence: [0.78, 0.45]
+    Shortcuts, diagnostics, display extras: [0.70, 0.50]
+    Build and release: [0.62, 0.45]
 ```
 
-Coordinates express repository evidence, not measured defect rates. The dominant pattern is substantial implementation with little automated qualification.
+Coordinates express repository evidence, not measured defect rates. The dominant pattern is substantial implementation; automated qualification now covers the decision cores and the app/service surfaces, while hardware behaviour still depends on the field laptop gates in `../operations/operations-runbook.md`.
 
 ## Strong implementation signals
 

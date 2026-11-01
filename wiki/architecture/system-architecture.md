@@ -64,6 +64,7 @@ flowchart TB
 - Feature pages own UI state and domain orchestration, but EC-touching features (Fan Control, Keyboard, Light Bar, Battery, dashboard telemetry) call the capability interfaces, never hardware types.
 - `EcTelemetryService` polls temperatures, fan RPM and fan duty through `IEcTelemetryCapability` and feeds the tray, overlay and dashboard.
 - SMU/Intel/NVIDIA/HID/BLE/WMI code stays as-is; `Scripts/Misc/ElevatedProcess` performs the few operations that need admin (webcam and dGPU PnP toggles, touchpad admin flow) with a per-operation `runas` launch.
+- The app also owns the features that are user-session work by construction: the shortcut map (`ShortcutService` - chords matched on the overlay's hook, actions executed on the UI dispatcher through the same vetted action set as the watcher hub), the OEM takeover's user-scope half plus the merged status/journal view (`Services/OemTakeoverService`, with the machine scope behind the `oem.*` verbs), the one-click diagnostics bundle (`DiagnosticsExportService`), and the display extras the user session owns (ICC association/import, WDDM brightness).
 
 ### Engine process
 
