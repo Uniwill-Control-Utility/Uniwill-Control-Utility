@@ -207,6 +207,32 @@ public sealed class TakeoverPolicyTests
         Assert.False(OemTakeoverTargets.IsUnderWindowsSystemDirectory(string.Empty));
     }
 
+    [Fact]
+    public void ServiceJournalBefore_RoundTripsTheRunningFlag_AndToleratesLegacyValues()
+    {
+        // A stop with no config change (hand-started service already at
+        // demand-start) is the field case: the flag is what makes the restore
+        // start it again.
+        string running = TakeoverServiceJournal.FormatBefore(3, wasRunning: true);
+        Assert.Equal("3|running", running);
+        Assert.True(TakeoverServiceJournal.TryParseBefore(running, out uint start, out bool wasRunning));
+        Assert.Equal(3u, start);
+        Assert.True(wasRunning);
+
+        // A config-only change (service was not running) carries no flag.
+        Assert.Equal("2", TakeoverServiceJournal.FormatBefore(2, wasRunning: false));
+        Assert.True(TakeoverServiceJournal.TryParseBefore("2", out start, out wasRunning));
+        Assert.Equal(2u, start);
+        Assert.False(wasRunning);
+
+        // Legacy/corrupt entries: unreadable text restores nothing and is consumed.
+        Assert.False(TakeoverServiceJournal.TryParseBefore("", out _, out _));
+        Assert.False(TakeoverServiceJournal.TryParseBefore("parked|running", out _, out _));
+        Assert.True(TakeoverServiceJournal.TryParseBefore("4|RUNNING", out start, out wasRunning));
+        Assert.Equal(4u, start);
+        Assert.True(wasRunning);
+    }
+
     // ---- The restore planner ---------------------------------------------
 
     private static TakeoverJournalEntry Entry(

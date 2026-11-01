@@ -232,11 +232,11 @@ namespace UCU.Hardware.Takeover
                         break;
 
                     case TakeoverMutationKind.ServiceStart:
-                        if (RestoreServiceConfig(entry, actions))
-                        {
+                        (bool entryConsumed, bool needsStart) = RestoreServiceConfig(entry, actions);
+                        if (entryConsumed)
                             consumed.Add((entry.Kind, entry.Target.ToUpperInvariant()));
+                        if (needsStart)
                             serviceRestarts.Add(entry.Target);
-                        }
                         break;
 
                     case TakeoverMutationKind.UwpState:
@@ -253,6 +253,7 @@ namespace UCU.Hardware.Takeover
             }
 
             StartCascade(serviceRestarts, actions);
+            VerifyStarted(serviceRestarts, actions);
 
             if (consumed.Count > 0)
             {
@@ -589,6 +590,7 @@ namespace UCU.Hardware.Takeover
 
                     // Stop first (bounded), then park at demand: the reference's
                     // "sc stop + sc config demand" pair, in one gated pass.
+                    bool stopped = false;
                     var status = new TakeoverNative.SERVICE_STATUS();
                     if (TakeoverNative.QueryServiceStatus(service, ref status) &&
                         status.dwCurrentState is TakeoverNative.SERVICE_RUNNING
@@ -597,29 +599,41 @@ namespace UCU.Hardware.Takeover
                     {
                         TakeoverNative.ControlService(service, TakeoverNative.SERVICE_CONTROL_STOP, ref status);
                         WaitForState(service, TakeoverNative.SERVICE_STOPPED, TimeSpan.FromSeconds(5));
+                        stopped = true;
                         actions.Add($"stopped service {name}");
                     }
 
+                    bool parked = false;
                     if (start != TakeoverNative.SERVICE_DEMAND_START)
                     {
                         if (TakeoverNative.ChangeServiceConfig(
                                 service, TakeoverNative.SERVICE_NO_CHANGE, TakeoverNative.SERVICE_DEMAND_START,
                                 TakeoverNative.SERVICE_NO_CHANGE, null, null, IntPtr.Zero, null, null, null, null))
                         {
-                            journal.Add(new TakeoverJournalEntry
-                            {
-                                Kind = TakeoverMutationKind.ServiceStart,
-                                Target = name,
-                                Before = start.ToString(),
-                                After = TakeoverNative.SERVICE_DEMAND_START.ToString(),
-                                Utc = DateTime.UtcNow,
-                            });
+                            parked = true;
                             actions.Add($"parked service {name} at demand-start (was {start})");
                         }
                         else
                         {
                             actions.Add($"service {name}: start-type change refused");
                         }
+                    }
+
+                    // Journal whenever the pause changed something. The stop
+                    // alone is a mutation: a service already parked at
+                    // demand-start (a hand-started OEM service - the tester
+                    // laptop's GCUBridge) gets no config write, and without
+                    // this entry the restore had nothing to start.
+                    if (stopped || parked)
+                    {
+                        journal.Add(new TakeoverJournalEntry
+                        {
+                            Kind = TakeoverMutationKind.ServiceStart,
+                            Target = name,
+                            Before = TakeoverServiceJournal.FormatBefore(start, stopped),
+                            After = TakeoverNative.SERVICE_DEMAND_START.ToString(),
+                            Utc = DateTime.UtcNow,
+                        });
                     }
                 }
                 finally
@@ -629,24 +643,31 @@ namespace UCU.Hardware.Takeover
             }
         }
 
-        private static bool RestoreServiceConfig(TakeoverJournalEntry entry, List<string> actions)
+        /// <summary>Re-arms one journaled service. <c>Consumed</c> = the entry
+        /// is done with (restored, target gone, or unreadable); <c>NeedsStart</c>
+        /// = the service was RUNNING at pause time, so the resume cascade must
+        /// start it. A stop with no config change (a hand-started service
+        /// already at demand-start) carries the running flag and re-arms to
+        /// the same value - the re-arm is a no-op, the start is the point.</summary>
+        private static (bool Consumed, bool NeedsStart) RestoreServiceConfig(
+            TakeoverJournalEntry entry, List<string> actions)
         {
-            if (!uint.TryParse(entry.Before, out uint startType) ||
+            if (!TakeoverServiceJournal.TryParseBefore(entry.Before, out uint startType, out bool wasRunning) ||
                 (startType != TakeoverNative.SERVICE_AUTO_START && startType != TakeoverNative.SERVICE_DEMAND_START))
             {
                 actions.Add($"service {entry.Target}: journal entry has an unreadable Start value '{entry.Before}'");
-                return true; // consume the broken entry: it restores nothing, forever, otherwise
+                return (true, false); // consume the broken entry: it restores nothing, forever, otherwise
             }
 
             using var scm = new ScmScope();
             if (scm.Manager == IntPtr.Zero)
-                return false;
+                return (false, false);
 
             IntPtr service = TakeoverNative.OpenService(scm.Manager, entry.Target, TakeoverNative.SERVICE_TAKEOVER_ACCESS);
             if (service == IntPtr.Zero)
             {
                 actions.Add($"service {entry.Target}: gone (uninstalled while paused)");
-                return true; // consume: the target no longer exists
+                return (true, false); // consume: the target no longer exists
             }
 
             try
@@ -656,11 +677,11 @@ namespace UCU.Hardware.Takeover
                         TakeoverNative.SERVICE_NO_CHANGE, null, null, IntPtr.Zero, null, null, null, null))
                 {
                     actions.Add($"re-armed service {entry.Target} (Start={startType})");
-                    return true;
+                    return (true, wasRunning);
                 }
 
                 actions.Add($"service {entry.Target}: re-arm refused");
-                return false;
+                return (false, false);
             }
             finally
             {
@@ -686,6 +707,12 @@ namespace UCU.Hardware.Takeover
 
             foreach (string name in serviceNames)
             {
+                // GCUService is the bridge's own spawn: starting it directly
+                // while the bridge is coming up races the bridge. It gets the
+                // watched start below instead.
+                if (string.Equals(name, "GCUService", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 IntPtr service = TakeoverNative.OpenService(scm.Manager, name, TakeoverNative.SERVICE_TAKEOVER_ACCESS);
                 if (service == IntPtr.Zero)
                     continue;
@@ -729,6 +756,42 @@ namespace UCU.Hardware.Takeover
                     continue;
 
                 StartServiceIfNotRunningAfter(scm.Manager, name, TimeSpan.FromMilliseconds(300), actions);
+            }
+        }
+
+        /// <summary>Post-cascade audit: every service the pause stopped must be
+        /// running after the restore. A survivor is reported with the SCM's
+        /// own state, so the action list says exactly where the restore
+        /// stopped - the field defect's signature was silence (the service
+        /// stayed down and nothing said so).</summary>
+        private static void VerifyStarted(List<string> serviceNames, List<string> actions)
+        {
+            if (serviceNames.Count == 0)
+                return;
+
+            using var scm = new ScmScope();
+            if (scm.Manager == IntPtr.Zero)
+                return;
+
+            foreach (string name in serviceNames)
+            {
+                IntPtr service = TakeoverNative.OpenService(scm.Manager, name, TakeoverNative.SERVICE_TAKEOVER_ACCESS);
+                if (service == IntPtr.Zero)
+                    continue;
+
+                try
+                {
+                    var status = new TakeoverNative.SERVICE_STATUS();
+                    if (TakeoverNative.QueryServiceStatus(service, ref status) &&
+                        status.dwCurrentState != TakeoverNative.SERVICE_RUNNING)
+                    {
+                        actions.Add($"service {name}: still not running after restore (state {status.dwCurrentState})");
+                    }
+                }
+                finally
+                {
+                    TakeoverNative.CloseServiceHandle(service);
+                }
             }
         }
 
