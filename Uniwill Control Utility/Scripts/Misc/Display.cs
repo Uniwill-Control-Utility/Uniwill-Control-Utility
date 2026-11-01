@@ -939,19 +939,6 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             return false;
         }
 
-        /// <summary>Turns the display off; any input wakes it. Per session, no
-        /// privilege, nothing persisted (U-205).</summary>
-        public static void TurnOffDisplay()
-        {
-            const uint WmSysCommand = 0x0112;
-            const int ScMonitorPower = 0xF170;
-            IntPtr HwndBroadcast = new(0xFFFF);
-
-            SendMessage(HwndBroadcast, WmSysCommand, (IntPtr)ScMonitorPower, (IntPtr)2);
-        }
-
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        private static extern IntPtr SendMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
         /// <summary>Copies the display's associated profile to
         /// <paramref name="targetPath"/> (U-205).</summary>

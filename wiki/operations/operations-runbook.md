@@ -219,11 +219,11 @@ Never robocopy-patch the layout to stage a new payload: MSI-written files carry 
 - **Step 3 by app chain**: skipping the manual `--install-engine` verb is fine - the app's post-startup chain registers the service (one UAC prompt on first launch, fresh registration carries the current DACL).
 - **Step 3 IS part of the agent cycle (user-directed 2026-10-31)**: run `"...current\Service\Uniwill Control Utility Engine.exe" --install-engine` from the elevated staging shell after `/i`, then verify `sc query` = RUNNING - the user's first app launch is then clean (no UAC). Expect `sc sdshow` to read `A;;KR;;;AU` (not the `A;;CCSWRPRC;;;AU` template) on this box: the service-protection enforcer (observed: Emsisoft) reverts the AU grant every install/re-assert pass (log: 10 re-assert attempts, "DACL did not converge", SACL fingerprint `S:(AU;FA;...;;;WD)`) - with the service RUNNING that costs the user nothing; when the service is NOT running, the unelevated app cannot start it and the elevated repair path pops a UAC **every launch** (the documented classic symptom). The permanent fixes are the AV application allowlist for both images and Authenticode signing (section "The engine service is running yet..."), not the staging cycle.
 
-### Display brightness is missing, or Screen off does nothing
+### Display brightness is missing
 
 Display → **Display brightness** (U-205) writes through the panel's WDDM brightness control (`root\WMI` → `WmiMonitorBrightnessMethods.WmiSetBrightness`), then re-reads `WmiMonitorBrightness.CurrentBrightness` as the evidence — the row is hidden entirely when the panel exposes no such class, so a missing slider means "this display has no WDDM brightness control", not a bug (external monitors are handled by their own DDC/CI controls, not by this row). The warning `[Display] brightness write to N% did not verify` means the panel accepted the call but reports a different value (driver clamp); the label then shows the readback, never the request.
 
-**Screen off** broadcasts `WM_SYSCOMMAND`/`SC_MONITORPOWER` — session-scoped, nothing persisted, any input wakes the display. It is not a lock: the session stays signed in.
+**Screen off was removed** (2026-11-01). The implemented form - broadcasting `WM_SYSCOMMAND`/`SC_MONITORPOWER` to every top-level window - put the test machine into a sleep loop that only a forced power-off cleared: on modern-standby systems the broadcast is not a display-only request. Do not reintroduce it in that shape; anything display-power related must be scoped to the app's own window (or left to Windows' own power settings).
 
 ### An imported ICC profile is refused (or does not show up)
 
