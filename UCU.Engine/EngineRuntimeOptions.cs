@@ -126,6 +126,15 @@ namespace UCU.Engine
         /// </summary>
         public Func<string, bool>? RtssLaunchOverride { get; init; }
 
+        /// <summary>
+        /// OEM takeover service override, same test seam (story U-203): the
+        /// production service stops and re-arms REAL OEM services, disables
+        /// REAL scheduled tasks, rewrites REAL HKLM run keys and kills REAL
+        /// processes, which has no place in a test process. Tests inject a
+        /// scripted machine.
+        /// </summary>
+        public UCU.Hardware.Takeover.IOemTakeoverService? OemTakeoverOverride { get; init; }
+
         /// <summary>Engine build identity reported in <c>engine.get_info</c>.</summary>
         public string EngineVersion { get; init; } = ReadEngineVersion();
 

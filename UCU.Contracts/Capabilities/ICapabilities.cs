@@ -350,4 +350,35 @@ namespace UCU.Contracts.Capabilities
         /// reports the process started.</summary>
         Task<bool> StartAsync(CancellationToken cancellationToken = default);
     }
+
+    /// <summary>
+    /// OEM Control Center takeover, machine-scope half (story U-203). The
+    /// mutations are LocalSystem work - HKLM run-key renames, service
+    /// start-type changes, machine task disable, cross-session process
+    /// kills - and every one passes the path+signature+publisher gate
+    /// (UCU.Core.Takeover) before it lands; gate refusals come back as the
+    /// squat-suspect audit list, never as actions. The user-scope half (HKCU
+    /// run keys, UWP AppModel state, StartupApproved flags) is composed
+    /// app-side, where the signed-in user's own registry is the write scope.
+    ///
+    /// The verbs take no parameters by construction: the target vocabulary
+    /// is the compiled catalog, so the pipe is never a run-anything surface.
+    /// </summary>
+    public interface IOemCapability
+    {
+        /// <summary>The machine-scope inventory and pause state. Cheap and
+        /// side-effect free; safe to call on page load.</summary>
+        Task<OemStatusDto> GetStatusAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Pauses the stack (gated kills, service stop + demand-
+        /// start, task disable, HKLM run-key neutralization), journaled for
+        /// restore. Zero mutations is a valid answer on machines without the
+        /// stack (the reference's auto-bypass).</summary>
+        Task<OemActionDto> PauseAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>Replays the journal in restore order (autostart first,
+        /// service re-arm and starts last, the watchdog cascade the
+        /// reference sequences). Idempotent: repeated calls converge.</summary>
+        Task<OemActionDto> ResumeAsync(CancellationToken cancellationToken = default);
+    }
 }

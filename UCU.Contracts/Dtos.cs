@@ -495,4 +495,70 @@ namespace UCU.Contracts
 
         public int ProcessId { get; init; }
     }
+
+    /// <summary>
+    /// The machine-scope OEM takeover inventory (story U-203; see
+    /// <see cref="EngineVerbs.Oem"/>). The counts are what the caller shows;
+    /// <see cref="State"/> is the engine's own machine-scope reading of them
+    /// (the name of a Core TakeoverPolicy.State). The user-scope half of the
+    /// picture (HKCU run keys, UWP AppModel state, StartupApproved flags) is
+    /// app-side user-registry work the engine must not write blind, so the
+    /// app composition merges these counts with its own before deciding the
+    /// state the UI renders.
+    /// </summary>
+    public sealed record OemStatusDto
+    {
+        /// <summary>A Core TakeoverPolicy.State name: NotInstalled, Active,
+        /// Paused, PartiallyPaused, Stale.</summary>
+        public string State { get; init; } = "NotInstalled";
+
+        /// <summary>How many catalog services exist on the machine.</summary>
+        public int ServicesInstalled { get; init; }
+
+        /// <summary>How many catalog services are currently running.</summary>
+        public int ServicesRunning { get; init; }
+
+        /// <summary>Verified OEM processes currently alive.</summary>
+        public int OemProcessesRunning { get; init; }
+
+        /// <summary>Engine journal depth (machine-scope mutations recorded).</summary>
+        public int JournalCount { get; init; }
+
+        /// <summary>Machine-scope autostart entries currently neutralized
+        /// (run keys in backup form, catalog tasks disabled).</summary>
+        public int AutostartNeutralized { get; init; }
+
+        /// <summary>Targets that carry a catalog name / OEM keyword but
+        /// failed the path+signature+publisher gate. Audit text ("what an
+        /// attacker named like the OEM stack"); never touched, and the list
+        /// is the reason a pause reports fewer mutations than the catalog.</summary>
+        public List<string> SquatSuspects { get; init; } = new();
+
+        /// <summary>Currently neutralized machine-scope targets (backup run
+        /// keys, disabled tasks, services held at demand-start).</summary>
+        public List<string> NeutralizedTargets { get; init; } = new();
+    }
+
+    /// <summary>
+    /// The result of oem.pause / oem.resume: the state the machine is in
+    /// after the action, how much landed, and an audit line per mutation
+    /// (what the journal view shows). A machine without the stack answers
+    /// zero mutations - the reference's auto-bypass, not an error.
+    /// </summary>
+    public sealed record OemActionDto
+    {
+        /// <summary>The post-action machine-scope state (same names as
+        /// <see cref="OemStatusDto.State"/>).</summary>
+        public string State { get; init; } = "NotInstalled";
+
+        /// <summary>Journal mutations applied (a kill counts as recorded
+        /// audit, not a reversible mutation).</summary>
+        public int MutationsApplied { get; init; }
+
+        /// <summary>Gate refusals during the action (squat-suspects).</summary>
+        public int SquatSuspects { get; init; }
+
+        /// <summary>One human-readable line per mutation, journal order.</summary>
+        public List<string> Actions { get; init; } = new();
+    }
 }

@@ -878,6 +878,104 @@
                         </StackPanel>
                     </ui:CardExpander>
 
+                    <!-- OEM Control Center takeover (story U-203): pause the OEM
+                         stack (engine machine scope + user scope), restore it from
+                         the journal. Status + actions only; the hardening gate's
+                         refusals surface as the suspect list, never as actions. -->
+                    <ui:CardExpander x:Name="OemTakeoverCard"
+                                     Margin="0,0,0,8"
+                                     IsExpanded="False"
+                                     Expanded="OemTakeoverCard_Expanded">
+                        <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8AF;" FontSize="20" Margin="6,0,6,0" />
+                        </ui:CardExpander.Icon>
+                        <ui:CardExpander.Header>
+                            <StackPanel>
+                                <ui:TextBlock FontTypography="Body" Text="OEM Control Center" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                               FontTypography="Caption"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Text="Pause the OEM Control Center stack so this app owns the fan and power path, and restore it untouched afterwards"
+                                               TextWrapping="Wrap" />
+                            </StackPanel>
+                        </ui:CardExpander.Header>
+
+                        <StackPanel>
+                            <!-- Row: status + actions -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <ui:TextBlock x:Name="tbOemStatus" FontTypography="Body" Text="Status: checking…" />
+                                    <ui:TextBlock x:Name="tbOemStatusDetail" Margin="0,2,0,2"
+                                                  FontTypography="Caption"
+                                                  Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                  Text=""
+                                                  TextWrapping="Wrap" />
+                                    <ui:TextBlock x:Name="tbOemSuspects" Margin="0,4,0,2"
+                                                  FontTypography="Caption"
+                                                  Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                                  Text=""
+                                                  TextWrapping="Wrap"
+                                                  Visibility="Collapsed" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <ui:Button x:Name="btnOemPause"
+                                               Margin="0,0,8,0"
+                                               Click="btnOemPause_Click">
+                                        <ui:Button.Content>
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE769;" FontSize="14" />
+                                                <TextBlock Margin="8,0,0,0" Text="Pause stack" />
+                                            </StackPanel>
+                                        </ui:Button.Content>
+                                    </ui:Button>
+                                    <ui:Button x:Name="btnOemRestore" Click="btnOemRestore_Click">
+                                        <ui:Button.Content>
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE777;" FontSize="14" />
+                                                <TextBlock Margin="8,0,0,0" Text="Restore stack" />
+                                            </StackPanel>
+                                        </ui:Button.Content>
+                                    </ui:Button>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Divider -->
+                            <Border Height="1" Margin="-58,12,-46,12"
+                                    Background="{DynamicResource CardStrokeColorDefaultSolidBrush}" />
+
+                            <!-- Journal (merged engine + user audit rows, newest first) -->
+                            <StackPanel x:Name="OemJournalSection" Visibility="Collapsed">
+                                <ui:TextBlock FontTypography="Body" Text="Takeover journal" />
+                                <ItemsControl x:Name="icOemJournal" Margin="0,8,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,2,0,2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Kind}"
+                                                           FontSize="11" FontWeight="SemiBold"
+                                                           VerticalAlignment="Center" MinWidth="110" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Target}"
+                                                           FontSize="11" Margin="8,0,8,0"
+                                                           VerticalAlignment="Center" TextWrapping="Wrap" />
+                                                <TextBlock Grid.Column="2" Text="{Binding TimeText}"
+                                                           FontSize="11" VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </ui:CardExpander>
+
                     <!-- Preset backup -->
                     <ui:CardExpander Margin="0,0,0,8"
                                      IsExpanded="False">
