@@ -153,6 +153,60 @@ public sealed class TakeoverPolicyTests
         Assert.Equal(TakeoverPolicy.Eligibility.UcuSelf, TakeoverPolicy.Evaluate(ucuFlag, keywordMatchedName: true));
     }
 
+    [Fact]
+    public void Evaluate_MsixPackagePayload_IsPackageIdentified_AndSignatureExempt()
+    {
+        // Field-proven on the tester laptop (pack #23 round): the UWP Control
+        // Center's Win32 payload carries the AppX package signature, NOT
+        // per-file Authenticode - WinVerifyTrust answers unsigned for every
+        // file inside the package, and the gate refused the stack's own tray
+        // helper. Package identity is squat-immune by construction: the
+        // packages subsystem is the only writer of the WindowsApps tree.
+        var payload = Obs(
+            "SystrayComponent",
+            path: @"C:\Program Files\WindowsApps\ControlCenter3_5.55.51.47_x64__wrbgcf7aesyd8\Win32\SystrayComponent.exe",
+            signatureValid: false,
+            publisher: null);
+        Assert.Equal(TakeoverPolicy.Eligibility.Eligible, TakeoverPolicy.Evaluate(payload, keywordMatchedName: true));
+
+        // A package path that no longer exists is not a target either.
+        var gone = Obs(
+            "SystrayComponent",
+            path: @"C:\Program Files\WindowsApps\Gone_1.0_x64__x\Win32\SystrayComponent.exe",
+            pathExists: false,
+            signatureValid: false,
+            publisher: null);
+        Assert.Equal(TakeoverPolicy.Eligibility.SquatSuspect, TakeoverPolicy.Evaluate(gone, keywordMatchedName: true));
+    }
+
+    [Fact]
+    public void PackageRoot_IsDetectedCaseInsensitively_AndNeverConfusedWithNormalProgramFiles()
+    {
+        Assert.True(OemTakeoverTargets.IsUnderPackageRoot(
+            @"C:\Program Files\WindowsApps\ControlCenter3_5.55.51.47_x64__wrbgcf7aesyd8\Win32\SystrayComponent.exe"));
+        Assert.True(OemTakeoverTargets.IsUnderPackageRoot(@"c:\program files\windowsapps\x\y.exe"));
+        Assert.False(OemTakeoverTargets.IsUnderPackageRoot(@"C:\Program Files\OEM\Control Center\CCU\CCU.exe"));
+        Assert.False(OemTakeoverTargets.IsUnderPackageRoot(string.Empty));
+
+        // The ODM identity the Recoil 3 (TongFang) family ships under.
+        Assert.True(OemTakeoverTargets.MatchesPublisher("CN=TongFang Computer Systems, O=TongFang, C=CN"));
+    }
+
+    [Fact]
+    public void System32_IdentityExemption_IsDetectedCaseInsensitively()
+    {
+        // The OEM Control Center's "ControlCenter" task runs powershell.exe
+        // (script-action task, field-proven): the executable is Windows' and
+        // catalog-signed (no embedded signature to read), the task name is
+        // OEM. System32 identity cannot be squatted without administrator.
+        Assert.True(OemTakeoverTargets.IsUnderWindowsSystemDirectory(
+            @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"));
+        Assert.True(OemTakeoverTargets.IsUnderWindowsSystemDirectory(@"c:\windows\system32\cmd.exe"));
+        Assert.False(OemTakeoverTargets.IsUnderWindowsSystemDirectory(
+            @"C:\Program Files\OEM\Control Center\powershell.exe"));
+        Assert.False(OemTakeoverTargets.IsUnderWindowsSystemDirectory(string.Empty));
+    }
+
     // ---- The restore planner ---------------------------------------------
 
     private static TakeoverJournalEntry Entry(

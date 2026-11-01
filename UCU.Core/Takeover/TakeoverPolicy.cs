@@ -130,6 +130,14 @@ namespace UCU.Core.Takeover
             if (obs.SignatureValid is null && obs.Path is null)
                 return Eligibility.Eligible;
 
+            // Package-identified scope: MSIX payloads under the WindowsApps root
+            // are covered by the AppX package signature (never per-file
+            // Authenticode) and the root is writable only through package
+            // identity - squat-immune by construction. The path must still exist:
+            // a vanished payload is not a target.
+            if (obs.Path is not null && OemTakeoverTargets.IsUnderPackageRoot(obs.Path))
+                return obs.PathExists ? Eligibility.Eligible : Eligibility.SquatSuspect;
+
             // The file-identity scope: path must exist, be signed, chain-valid,
             // and publisher-matched. Any failure = squat suspect.
             if (obs.Path is null || obs.Path.Length == 0 || !obs.PathExists)

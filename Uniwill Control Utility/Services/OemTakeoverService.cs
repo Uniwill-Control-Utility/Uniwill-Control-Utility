@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Win32;
@@ -685,16 +685,14 @@ namespace Uniwill_Control_Utility.Services
             if (!File.Exists(path))
                 return (TakeoverPolicy.Eligibility.SquatSuspect, $"image '{path}' not found");
 
-            bool valid = IsSignatureValid(path);
-            string? subject = null;
-            try
-            {
-                subject = X509CertificateLoader.LoadCertificateFromFile(path).Subject;
-            }
-            catch
-            {
-                // Unsigned: no publisher identity; the gate refuses.
-            }
+            // Package-identified scope: MSIX payloads are covered by the AppX
+            // package signature, never per-file Authenticode (the same
+            // exemption the policy documents; the tree is writable only
+            // through package identity).
+            if (OemTakeoverTargets.IsUnderPackageRoot(path))
+                return (TakeoverPolicy.Eligibility.Eligible, null);
+
+            bool valid = VerifySignedFile(path, out string? subject);
 
             if (!valid)
                 return (TakeoverPolicy.Eligibility.SquatSuspect, $"image '{path}' is unsigned or its chain is invalid");
@@ -777,6 +775,18 @@ namespace Uniwill_Control_Utility.Services
         }
 
         // ---- Authenticode (user-scope P/Invoke; same clauses as the engine) -----------
+        // WinVerifyTrust answers "trusted?" but not "by whom?"; the signer
+        // subject is the publisher evidence the allowlist compares, read from
+        // the VERIFY state's provider chain (the documented WTHelper walk).
+        // A certificate-file loader answers nothing for a PE with an embedded
+        // signature - field-proven on the tester laptop, pack #23 round:
+        // every signed OEM binary read with an empty subject.
+
+        private const uint WtdStateActionVerify = 1;
+        private const uint WtdStateActionClose = 2;
+        private const uint X509AsnEncoding = 0x00000001;
+        private const uint Pkcs7AsnEncoding = 0x00010000;
+        private const uint CertSimpleNameStr = 1;
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         private struct WintrustFileInfo
@@ -805,14 +815,88 @@ namespace Uniwill_Control_Utility.Services
             public IntPtr pSignatureSettings;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct CryptIntegerBlob
+        {
+            public uint cbData;
+            public IntPtr pbData;
+        }
+
+        /// <summary>wincrypt's FILETIME: two DWORDs, 4-byte aligned (a CLR
+        /// long would shift every following field's offset).</summary>
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeFileTime
+        {
+            public uint dwLowDateTime;
+            public uint dwHighDateTime;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct CryptAlgorithmIdentifier
+        {
+            public IntPtr pszObjId;
+            public CryptIntegerBlob Parameters;
+        }
+
+        /// <summary>The CERT_INFO prefix the subject walk needs.</summary>
+        [StructLayout(LayoutKind.Sequential)]
+        private struct CertInfoPrefix
+        {
+            public uint dwVersion;
+            public CryptIntegerBlob SerialNumber;
+            public CryptAlgorithmIdentifier SignatureAlgorithm;
+            public CryptIntegerBlob Issuer;
+            public NativeFileTime NotBefore;
+            public NativeFileTime NotAfter;
+            public CryptIntegerBlob Subject;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct CertContextPrefix
+        {
+            public uint dwCertEncodingType;
+            public IntPtr pbCertEncoded;
+            public uint cbCertEncoded;
+            public IntPtr pCertInfo;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct CryptProviderCertPrefix
+        {
+            public uint cbStruct;
+            public IntPtr pCert;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct CryptProviderSgnrPrefix
+        {
+            public uint cbStruct;
+            public NativeFileTime sftVerifyAsOf;
+            public uint csCertChain;
+            public IntPtr pasCertChain;
+        }
+
         [DllImport("wintrust.dll", SetLastError = true)]
         private static extern uint WinVerifyTrust(IntPtr hWnd, in Guid pgActionID, ref WintrustData pWVTData);
+
+        [DllImport("wintrust.dll", SetLastError = true)]
+        private static extern IntPtr WTHelperProvDataFromStateData(IntPtr hStateData);
+
+        [DllImport("wintrust.dll", SetLastError = true)]
+        private static extern IntPtr WTHelperGetProvSignerFromChain(
+            IntPtr pProvData, uint dwIndex, [MarshalAs(UnmanagedType.Bool)] bool fCounterSigner, uint dwIndexCounterSigner);
+
+        [DllImport("crypt32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern int CertNameToStrW(
+            uint dwCertEncodingType, ref CryptIntegerBlob pName, uint dwStrType, StringBuilder? psz, int csz);
 
         private static readonly Guid WinTrustActionGenericVerifyV2 =
             new(0x00AAC56B, 0xCD44, 0x11D0, 0x8C, 0xC2, 0x00, 0xC0, 0x4F, 0xC2, 0x95, 0xEE);
 
-        private static bool IsSignatureValid(string filePath)
+        private static bool VerifySignedFile(string filePath, out string? subject)
         {
+            subject = null;
+
             var fileInfo = new WintrustFileInfo
             {
                 cbStruct = (uint)Marshal.SizeOf<WintrustFileInfo>(),
@@ -820,26 +904,83 @@ namespace Uniwill_Control_Utility.Services
             };
 
             IntPtr fileInfoPtr = Marshal.AllocHGlobal(Marshal.SizeOf<WintrustFileInfo>());
+            var data = new WintrustData
+            {
+                cbStruct = (uint)Marshal.SizeOf<WintrustData>(),
+                dwUIChoice = 2,          // WTD_UI_NONE
+                fdwRevocationChecks = 0, // WTD_REVOKE_NONE (offline chain)
+                dwUnionChoice = 1,       // WTD_CHOICE_FILE
+                dwStateAction = WtdStateActionVerify,
+            };
+
+            uint status;
             try
             {
                 Marshal.StructureToPtr(fileInfo, fileInfoPtr, false);
+                data.pFileData = fileInfoPtr;
 
-                var data = new WintrustData
-                {
-                    cbStruct = (uint)Marshal.SizeOf<WintrustData>(),
-                    dwUIChoice = 2,        // WTD_UI_NONE
-                    fdwRevocationChecks = 0, // WTD_REVOKE_NONE (offline chain)
-                    dwUnionChoice = 1,     // WTD_CHOICE_FILE
-                    pFileData = fileInfoPtr,
-                    dwStateAction = 0,     // WTD_STATEACTION_IGNORE
-                };
+                status = WinVerifyTrust(IntPtr.Zero, in WinTrustActionGenericVerifyV2, ref data);
 
-                return WinVerifyTrust(IntPtr.Zero, in WinTrustActionGenericVerifyV2, ref data) == 0;
+                if (status == 0 && data.hWVTStateData != IntPtr.Zero)
+                    subject = ReadSignerSubject(data.hWVTStateData);
             }
             finally
             {
+                if (data.hWVTStateData != IntPtr.Zero)
+                {
+                    WintrustData close = data;
+                    close.dwStateAction = WtdStateActionClose;
+                    WinVerifyTrust(IntPtr.Zero, in WinTrustActionGenericVerifyV2, ref close);
+                }
+
                 Marshal.DestroyStructure<WintrustFileInfo>(fileInfoPtr);
                 Marshal.FreeHGlobal(fileInfoPtr);
+            }
+
+            return status == 0;
+        }
+
+        private static string? ReadSignerSubject(IntPtr hStateData)
+        {
+            try
+            {
+                IntPtr providerData = WTHelperProvDataFromStateData(hStateData);
+                if (providerData == IntPtr.Zero)
+                    return null;
+
+                IntPtr signer = WTHelperGetProvSignerFromChain(providerData, 0, false, 0);
+                if (signer == IntPtr.Zero)
+                    return null;
+
+                CryptProviderSgnrPrefix sgnr = Marshal.PtrToStructure<CryptProviderSgnrPrefix>(signer);
+                if (sgnr.csCertChain == 0 || sgnr.pasCertChain == IntPtr.Zero)
+                    return null;
+
+                IntPtr certificate = Marshal.PtrToStructure<CryptProviderCertPrefix>(sgnr.pasCertChain).pCert;
+                if (certificate == IntPtr.Zero)
+                    return null;
+
+                CertContextPrefix context = Marshal.PtrToStructure<CertContextPrefix>(certificate);
+                if (context.pCertInfo == IntPtr.Zero)
+                    return null;
+
+                CertInfoPrefix info = Marshal.PtrToStructure<CertInfoPrefix>(context.pCertInfo);
+                if (info.Subject.pbData == IntPtr.Zero || info.Subject.cbData == 0)
+                    return null;
+
+                int length = CertNameToStrW(
+                    X509AsnEncoding | Pkcs7AsnEncoding, ref info.Subject, CertSimpleNameStr, null, 0);
+                if (length <= 1)
+                    return null;
+
+                var text = new StringBuilder(length);
+                length = CertNameToStrW(
+                    X509AsnEncoding | Pkcs7AsnEncoding, ref info.Subject, CertSimpleNameStr, text, text.Capacity);
+                return length > 1 ? text.ToString() : null;
+            }
+            catch
+            {
+                return null;
             }
         }
     }
