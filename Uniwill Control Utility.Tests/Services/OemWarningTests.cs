@@ -64,4 +64,38 @@ public sealed class OemWarningTests
     {
         Assert.False(OemTakeoverService.ShouldWarn(null!));
     }
+
+    [Fact]
+    public void Failures_PicksRefusalsAndFailures_InOrder_Capped()
+    {
+        var report = new OemMergeReport
+        {
+            Actions = new[]
+            {
+                "re-armed service GCUBridge (Start=3)",
+                "started service GCUBridge",
+                "service GCUService: start failed (Win32 1068)",
+                "task ControlCenter: disable refused",
+                "service GCUBridge: still not running after restore (state 1)",
+            },
+        };
+
+        IReadOnlyList<string> failures = OemTakeoverService.Failures(report);
+
+        Assert.Equal(2, failures.Count);
+        Assert.Equal("service GCUService: start failed (Win32 1068)", failures[0]);
+        Assert.Equal("task ControlCenter: disable refused", failures[1]);
+    }
+
+    [Fact]
+    public void Failures_EmptyWhenEveryActionLanded()
+    {
+        var report = new OemMergeReport
+        {
+            Actions = new[] { "re-armed service GCUBridge (Start=2)", "started service GCUBridge" },
+        };
+
+        Assert.Empty(OemTakeoverService.Failures(report));
+        Assert.Empty(OemTakeoverService.Failures(null!));
+    }
 }

@@ -1438,7 +1438,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                             ? LocalizationService.Get("Nothing to pause: the OEM Control Center stack is not installed on this machine.")
                             : LocalizationService.Format("Paused the OEM Control Center stack ({0} mutations applied).", report.MutationsApplied);
 
-                ToastNotification.ShowToastNotification(title, body);
+                ToastNotification.ShowToastNotification(title, AppendOemFailures(body, report));
             }
             catch (Exception ex)
             {
@@ -1475,7 +1475,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 if (!report.EngineReachable && report.State != "Busy")
                     body += "\n" + LocalizationService.Get("The engine service is not running; the machine scope was not restored.");
 
-                ToastNotification.ShowToastNotification(title, body);
+                ToastNotification.ShowToastNotification(title, AppendOemFailures(body, report));
             }
             catch (Exception ex)
             {
@@ -1489,6 +1489,16 @@ namespace Uniwill_Control_Utility.Views.Pages
                 await RefreshOemOverviewAsync();
                 _ = Dispatcher.InvokeAsync(() => SetOemBusy(false));
             }
+        }
+
+        /// <summary>Appends the failing action lines to an outcome toast: the
+        /// card's journal shows mutations, not results, and a silent failure
+        /// (the field's restore that left GCUBridge down) is exactly what the
+        /// user cannot act on.</summary>
+        private static string AppendOemFailures(string body, Services.OemMergeReport report)
+        {
+            IReadOnlyList<string> failures = Services.OemTakeoverService.Failures(report);
+            return failures.Count == 0 ? body : body + "\n" + string.Join("\n", failures);
         }
 
         private void SetOemBusy(bool isBusy)

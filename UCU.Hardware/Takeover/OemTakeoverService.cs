@@ -7,6 +7,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Win32;
+using Serilog;
 using UCU.Core.Takeover;
 
 namespace UCU.Hardware.Takeover
@@ -197,6 +198,10 @@ namespace UCU.Hardware.Takeover
 
             SaveJournal(journal);
 
+            Log.Information("[Oem] pause: {Count} journal entries, {Actions} actions", journal.Count - baseline, actions.Count);
+            foreach (string line in actions)
+                Log.Information("[Oem] pause: {Action}", line);
+
             return new OemActionResult
             {
                 StatusAfter = GetStatus(),
@@ -216,6 +221,8 @@ namespace UCU.Hardware.Takeover
             IReadOnlyList<TakeoverJournalEntry> plan = TakeoverPolicy.PlanRestore(journal);
             var consumed = new HashSet<(TakeoverMutationKind, string)>();
             var serviceRestarts = new List<string>(); // catalog order preserved by the plan tail
+
+            Log.Information("[Oem] resume: {Journal} journal entries -> {Plan} planned restores", journal.Count, plan.Count);
 
             foreach (TakeoverJournalEntry entry in plan)
             {
@@ -254,6 +261,11 @@ namespace UCU.Hardware.Takeover
 
             StartCascade(serviceRestarts, actions);
             VerifyStarted(serviceRestarts, actions);
+
+            Log.Information("[Oem] resume: services to start = [{Services}], {Actions} action lines",
+                string.Join(", ", serviceRestarts), actions.Count);
+            foreach (string line in actions)
+                Log.Information("[Oem] resume: {Action}", line);
 
             if (consumed.Count > 0)
             {
