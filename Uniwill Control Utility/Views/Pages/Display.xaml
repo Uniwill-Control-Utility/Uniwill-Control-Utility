@@ -630,7 +630,7 @@
                                     <ui:TextBlock Margin="0,2,0,0"
                                                   FontTypography="Caption"
                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                  Text="Associate a Windows ICC color profile with the display in use via the ICM profile-association registry"/>
+                                                  Text="Associate an ICC color profile with the built-in display"/>
                                 </StackPanel>
                             </ui:CardControl.Header>
                             <StackPanel Orientation="Horizontal"
@@ -648,8 +648,17 @@
                                         Click="btnImportColorProfile_Click"/>
                                 <Button Content="Export"
                                         Padding="10,4"
+                                        Margin="0,0,8,0"
                                         VerticalAlignment="Center"
                                         Click="btnExportColorProfile_Click"/>
+                                <!-- Imported profiles only: Windows' own profiles are
+                                     not the user's to delete. -->
+                                <Button x:Name="btnDeleteColorProfile"
+                                        Content="Delete"
+                                        Padding="10,4"
+                                        VerticalAlignment="Center"
+                                        Visibility="Collapsed"
+                                        Click="btnDeleteColorProfile_Click"/>
                             </StackPanel>
                         </ui:CardControl>
 

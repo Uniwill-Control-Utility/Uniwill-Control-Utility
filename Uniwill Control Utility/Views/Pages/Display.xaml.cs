@@ -763,6 +763,56 @@ namespace Uniwill_Control_Utility.Views.Pages
                     cbColorCalibration.SelectionChanged += cbColorCalibration_SelectionChanged;
                 }
             }
+
+            UpdateColorDeleteVisibility();
+        }
+
+        /// <summary>Delete is offered for imported profiles only: Windows'
+        /// shipped profiles are not the user's to remove.</summary>
+        private void UpdateColorDeleteVisibility()
+        {
+            bool imported = cbColorCalibration.SelectedItem is ComboBoxItem item
+                            && item.Tag is string file
+                            && Uniwill_Control_Utility.Scripts.Misc.Display.IsImportedColorProfile(file);
+
+            btnDeleteColorProfile.Visibility = imported ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>Deletes the selected imported profile (U-205). If it is the
+        /// associated one, the association is dropped first - leaving the
+        /// registry pointing at a missing file would have Windows fail every
+        /// colour lookup for the display.</summary>
+        private async void btnDeleteColorProfile_Click(object sender, RoutedEventArgs e)
+        {
+            if (cbColorCalibration.SelectedItem is not ComboBoxItem item || item.Tag is not string file)
+                return;
+
+            _colorCalBusy = true;
+            try
+            {
+                if (string.Equals(file, GetColorProfileSafe(), StringComparison.OrdinalIgnoreCase))
+                {
+                    await Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyColorProfile(
+                        Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName(), string.Empty));
+                }
+
+                if (!Uniwill_Control_Utility.Scripts.Misc.Display.DeleteImportedColorProfile(file, out string? error))
+                {
+                    ToastNotification.ShowToastNotification(
+                        LocalizationService.Get("Color Calibration"),
+                        LocalizationService.Format("The ICC profile could not be deleted: {0}", error ?? string.Empty));
+                    return;
+                }
+
+                UpdateColorCalibrationCombo(GetColorProfileSafe());
+                ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("Color Calibration"),
+                    LocalizationService.Get("The ICC profile was deleted."));
+            }
+            finally
+            {
+                _colorCalBusy = false;
+            }
         }
 
         /// <summary>Imports a user ICC profile (U-205): the Core validator
@@ -828,6 +878,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void cbColorCalibration_SelectionChanged(object sender, RoutedEventArgs e)
         {
+            UpdateColorDeleteVisibility();
+
             if (!_isLoaded || _colorCalBusy)
                 return;
 

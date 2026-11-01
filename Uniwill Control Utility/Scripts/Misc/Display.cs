@@ -839,6 +839,40 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             return true;
         }
 
+        /// <summary>True for a profile the user imported - the only kind the
+        /// app may delete. Windows' shipped set lives in its spool folder and
+        /// is not ours to remove, so the delete control stays hidden for it.</summary>
+        public static bool IsImportedColorProfile(string? fileName) =>
+            !string.IsNullOrEmpty(fileName)
+            && !ColorProfileFiles.Contains(fileName, StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Deletes an imported profile from the per-user store
+        /// (U-205). Refuses the shipped set.</summary>
+        public static bool DeleteImportedColorProfile(string fileName, out string? error)
+        {
+            error = null;
+
+            if (!IsImportedColorProfile(fileName))
+            {
+                error = "the shipped Windows profiles cannot be deleted";
+                return false;
+            }
+
+            try
+            {
+                string path = System.IO.Path.Combine(IccUserFolder, fileName);
+                if (System.IO.File.Exists(path))
+                    System.IO.File.Delete(path);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
+
         /// <summary>Copies the display's associated profile to
         /// <paramref name="targetPath"/> (U-205).</summary>
         public static bool ExportColorProfile(string? deviceName, string targetPath, out string? error)
