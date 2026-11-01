@@ -355,6 +355,12 @@ namespace Uniwill_Control_Utility.Views.Windows
                 OemWarnPopup.IsOpen = true;
         }
 
+        private static string AppendOemFailures(string body, Services.OemMergeReport report)
+        {
+            IReadOnlyList<string> failures = Services.OemTakeoverService.Failures(report);
+            return failures.Count == 0 ? body : body + "\n" + string.Join("\n", failures);
+        }
+
         private void OemWarnNotNow_Click(object sender, System.Windows.RoutedEventArgs e)
         {
             // Session-only dismissal: the next launch re-checks, so a machine
@@ -370,8 +376,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             _navigationService.Navigate(typeof(Views.Pages.SettingsPage));
         }
 
-        private async void OemWarnPause_Click(object sender, System.Windows.RoutedEventArgs e)
-        {
+        private async void OemWarnPause_Click(object sender, System.Windows.RoutedEventArgs e)        {
             Services.OemTakeoverService? service = _oemTakeover;
             if (service is null)
                 return;
@@ -391,7 +396,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                             : LocalizationService.Format("Paused the OEM Control Center stack ({0} mutations applied).", report.MutationsApplied);
 
                 Uniwill_Control_Utility.Scripts.Misc.ToastNotification.ShowToastNotification(
-                    LocalizationService.Get("OEM Control Center"), body);
+                    LocalizationService.Get("OEM Control Center"), AppendOemFailures(body, report));
             }
             catch (Exception ex)
             {

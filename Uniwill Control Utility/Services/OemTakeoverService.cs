@@ -181,6 +181,38 @@ namespace Uniwill_Control_Utility.Services
             && overview.ServicesInstalled > 0
             && (overview.State == "Active" || overview.State == "PartiallyPaused");
 
+        /// <summary>
+        /// The action lines worth showing without opening the full card:
+        /// anything that names a refusal or a failure ("refused", "failed",
+        /// "still not running", "unreachable"). The journal list shows
+        /// mutations, not outcomes, and a silent failure was the field
+        /// defect's signature - a restore that left GCUBridge down said
+        /// nothing at all.
+        /// </summary>
+        public static IReadOnlyList<string> Failures(OemMergeReport report, int max = 2)
+        {
+            var failures = new List<string>();
+            if (report?.Actions is null || max <= 0)
+                return failures;
+
+            foreach (string line in report.Actions)
+            {
+                if (!line.Contains("refused", StringComparison.OrdinalIgnoreCase)
+                    && !line.Contains("failed", StringComparison.OrdinalIgnoreCase)
+                    && !line.Contains("still not running", StringComparison.OrdinalIgnoreCase)
+                    && !line.Contains("unreachable", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                failures.Add(line);
+                if (failures.Count >= max)
+                    break;
+            }
+
+            return failures;
+        }
+
         // ---- Pause / restore ---------------------------------------------------
 
         public Task<OemMergeReport> PauseAsync() => RunExclusive(async () =>
