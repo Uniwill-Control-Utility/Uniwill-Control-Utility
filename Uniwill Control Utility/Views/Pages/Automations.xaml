@@ -4,6 +4,7 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:local="clr-namespace:Uniwill_Control_Utility.Views.Pages"
+      xmlns:helpers="clr-namespace:Uniwill_Control_Utility.Helpers"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       d:DataContext="{d:DesignInstance local:Automations, IsDesignTimeCreatable=False}"
       d:Background="{DynamicResource ApplicationBackgroundBrush}"
@@ -13,6 +14,7 @@
       d:DesignWidth="800"
       Title="Automations"
       Loaded="Page_Loaded"
+      helpers:MouseWheelScrollBehavior.IsEnabled="True"
       SnapsToDevicePixels="True"
       UseLayoutRounding="True">
 
@@ -35,7 +37,8 @@
     <Grid>
 
         <!-- Full-width, full-height ScrollViewer -->
-        <ScrollViewer VerticalScrollBarVisibility="Auto"
+        <ScrollViewer x:Name="mainScroll"
+                      VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       CanContentScroll="False"
                       PanningMode="VerticalOnly"
