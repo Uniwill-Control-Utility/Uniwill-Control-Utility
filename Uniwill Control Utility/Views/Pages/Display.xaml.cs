@@ -268,8 +268,77 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Sync the color-calibration combo from the live ICM association
             UpdateColorCalibrationCombo(GetColorProfileSafe());
 
+            InitBrightnessRow();
+
             RefreshAll();
             _isLoaded = true;
+        }
+
+        // ---- Brightness + screen off (U-205) --------------------------------
+
+        private bool _brightnessLoading;
+        private DispatcherTimer? _brightnessTimer;
+
+        /// <summary>Shows the brightness row only where the panel exposes the
+        /// WDDM brightness control, and seeds it from the live value.</summary>
+        private void InitBrightnessRow()
+        {
+            if (!Uniwill_Control_Utility.Scripts.Misc.Display.TryGetBrightness(out int percent))
+            {
+                CardBrightness.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            CardBrightness.Visibility = Visibility.Visible;
+
+            _brightnessLoading = true;
+            try
+            {
+                slBrightness.Value = percent;
+                tbBrightness.Text = percent + "%";
+            }
+            finally
+            {
+                _brightnessLoading = false;
+            }
+        }
+
+        /// <summary>Debounced apply: a slider drag must not issue one WMI write
+        /// per pixel of travel.</summary>
+        private void slBrightness_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            tbBrightness.Text = (int)Math.Round(e.NewValue) + "%";
+
+            if (_brightnessLoading || !_isLoaded)
+                return;
+
+            _brightnessTimer ??= new DispatcherTimer(
+                TimeSpan.FromMilliseconds(400),
+                DispatcherPriority.Normal,
+                (_, _) =>
+                {
+                    _brightnessTimer!.Stop();
+                    ApplyBrightness();
+                },
+                Dispatcher);
+
+            _brightnessTimer.Stop();
+            _brightnessTimer.Start();
+        }
+
+        private void ApplyBrightness()
+        {
+            int wanted = (int)Math.Round(slBrightness.Value);
+
+            if (!Uniwill_Control_Utility.Scripts.Misc.Display.TrySetBrightness(wanted, out int applied))
+                Log.Warning("[Display] brightness write to {Wanted}% did not verify (readback {Applied})", wanted, applied);
+            else
+                tbBrightness.Text = applied + "%";
+        }
+
+        private void btnScreenOff_Click(object sender, RoutedEventArgs e)
+        {
+            Uniwill_Control_Utility.Scripts.Misc.Display.TurnOffDisplay();
         }
 
         /// <summary>
