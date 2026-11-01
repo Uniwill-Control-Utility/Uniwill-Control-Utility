@@ -37,6 +37,24 @@ public sealed class PrerequisiteRtssDetectionTests
     }
 
     [Fact]
+    public void TheOverlayPageStatusRowUsesTheSessionScopedProcessWitness()
+    {
+        // FIELD DEFECT 2026-11-01 (tester laptop): after an MSI install, the
+        // Overlay page said "RTSS running" with ZERO RTSS processes (and the
+        // Start button was hidden, removing the self-heal). The status row
+        // asked the shared-memory segment, which outlives RTSS: injected
+        // clients keep the mapping open, and a force-killed RTSS leaves a
+        // VALID header (the DEAD marker is graceful-exit-only). The row must
+        // read the process witness the prerequisite row uses.
+        string page = ReadAppSource("Views", "Pages", "OverlaySettingsPage.xaml.cs");
+
+        string status = MethodBody(page, "private void UpdateRtssStatus()");
+
+        Assert.Contains("RtssDetectionService.IsRunning()", status, StringComparison.Ordinal);
+        Assert.DoesNotContain("RtssReader.IsRunning()", status, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TheDialogButtonStartsInstalledRtssAndOnlyDownloadsAbsentRtss()
     {
         string dialog = ReadAppSource("Views", "Windows", "PrerequisiteDialog.xaml.cs");
