@@ -402,7 +402,8 @@ namespace Uniwill_Control_Utility
                                 provider.GetRequiredService<IFpsMonitoringService>(),
                                 provider.GetService<EcTelemetryService>(),
                                 provider.GetService<HydroUIService>(),
-                                provider.GetService<FlydigiCoolerHidService>()));
+                                provider.GetService<FlydigiCoolerHidService>(),
+                                provider.GetService<Services.ShortcutService>()));
                         services.AddHostedService(provider => provider.GetRequiredService<OverlayManagerService>());
 
                         // Main window with navigation
@@ -520,6 +521,11 @@ namespace Uniwill_Control_Utility
                         // engine and takeover state plus logs and journals.
                         // App-side only; best-effort per file.
                         services.AddSingleton<Services.DiagnosticsExportService>();
+
+                        // User shortcut map (U-204): chord -> vetted action,
+                        // dispatched from the overlay's existing global hook.
+                        services.AddSingleton<Services.ShortcutStore>();
+                        services.AddSingleton<Services.ShortcutService>();
 
                         // Hardware Performance / Q-key button intercept: polls the EC
                         // TCC offset register for button presses and cycles UCU presets.

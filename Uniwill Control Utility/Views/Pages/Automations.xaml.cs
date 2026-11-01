@@ -62,6 +62,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Watcher Rules card (U-201): rows from watchers.json; edits save
             // through the store, which reloads the hosted hub.
             InitWatcherRules();
+            InitShortcuts();
 
             setup = true;
         }
@@ -632,8 +633,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             SaveWatcherRules(_watcherRows.Select(r => r.ToRule()).ToList());
         }
 
-        private void SaveWatcherRules(List<WatcherRule> rules)
-        {
+        private void SaveWatcherRules(List<WatcherRule> rules)        {
             if (_watcherStore is null)
                 return;
 
@@ -738,6 +738,155 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         /// <summary>One card row: the rule plus the live Enabled toggle and
         /// the localized one-line summary.</summary>
+        #region Keyboard shortcuts (U-204)
+
+        private readonly ObservableCollection<ShortcutRow> _shortcutRows = new();
+        private ShortcutService? _shortcutService;
+
+        private sealed class ShortcutRow
+        {
+            public string Chord { get; init; } = string.Empty;
+
+            public string Summary { get; init; } = string.Empty;
+
+            public ShortcutBinding Binding { get; init; } = new();
+        }
+
+        /// <summary>Binds the shortcut map (U-204). The dispatcher lives in the
+        /// overlay's global hook; this page only edits and saves the file.</summary>
+        private void InitShortcuts()
+        {
+            _shortcutService = App.GetService<ShortcutService>();
+
+            icShortcuts.ItemsSource = _shortcutRows;
+            RefreshShortcutRows();
+
+            // Summaries are localized fragments: rebuild on culture change.
+            LocalizationService.CultureChanged += (_, _) =>
+                Dispatcher.BeginInvoke(new Action(RefreshShortcutRows));
+        }
+
+        private void RefreshShortcutRows()
+        {
+            _shortcutRows.Clear();
+
+            if (_shortcutService is not null)
+            {
+                foreach (ShortcutBinding binding in _shortcutService.Bindings)
+                {
+                    _shortcutRows.Add(new ShortcutRow
+                    {
+                        Chord = binding.Chord,
+                        Summary = ShortcutSummary(binding),
+                        Binding = binding,
+                    });
+                }
+            }
+
+            txtShortcutsEmpty.Visibility = _shortcutRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private static string ShortcutSummary(ShortcutBinding binding) => binding.Action switch
+        {
+            ShortcutAction.ApplyPreset =>
+                LocalizationService.Get("Apply preset") + ": " + PresetProfileApplier.DisplayName(binding.PresetName ?? string.Empty),
+            ShortcutAction.SetPerformanceMode =>
+                LocalizationService.Get("Set performance mode") + ": " + binding.PerformanceMode,
+            ShortcutAction.SetFanTurbo => LocalizationService.Get("Enable fan turbo"),
+            ShortcutAction.PauseOemTakeover => LocalizationService.Get("Pause OEM Control Center"),
+            ShortcutAction.ResumeOemTakeover => LocalizationService.Get("Restore OEM Control Center"),
+            _ => binding.Action.ToString(),
+        };
+
+        private IReadOnlyList<string> ShortcutPresetChoices() =>
+            PresetProfileApplier.GetProfileNames()
+                .Select(PresetProfileApplier.DisplayName)
+                .ToList();
+
+        private void SaveShortcuts(List<ShortcutBinding> bindings)
+        {
+            if (_shortcutService is null)
+                return;
+
+            ShortcutStore? store = App.GetService<ShortcutStore>();
+            if (store is null)
+                return;
+
+            try
+            {
+                store.Save(bindings);
+                _shortcutService.Reload();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message,
+                    LocalizationService.Get("Keyboard shortcuts"),
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+
+            RefreshShortcutRows();
+        }
+
+        private void btnAddShortcut_Click(object sender, RoutedEventArgs e)
+        {
+            if (_shortcutService is null || _shortcutService.Bindings.Count >= ShortcutStore.MaxBindings)
+                return;
+
+            var dialog = new ShortcutDialog(ShortcutPresetChoices())
+            {
+                Owner = Window.GetWindow(this),
+            };
+
+            if (dialog.ShowDialog() != true || dialog.Result is null)
+                return;
+
+            List<ShortcutBinding> updated = _shortcutService.Bindings.ToList();
+            updated.Add(dialog.Result);
+            SaveShortcuts(updated);
+        }
+
+        private void btnEditShortcut_Click(object sender, RoutedEventArgs e)
+        {
+            if (_shortcutService is null ||
+                (sender as FrameworkElement)?.DataContext is not ShortcutRow row)
+            {
+                return;
+            }
+
+            var dialog = new ShortcutDialog(ShortcutPresetChoices(), row.Binding)
+            {
+                Owner = Window.GetWindow(this),
+            };
+
+            if (dialog.ShowDialog() != true || dialog.Result is null)
+                return;
+
+            List<ShortcutBinding> updated = _shortcutService.Bindings.ToList();
+            int index = updated.FindIndex(b => string.Equals(b.Chord, row.Binding.Chord, StringComparison.OrdinalIgnoreCase));
+            if (index < 0)
+                return;
+
+            updated[index] = dialog.Result;
+            SaveShortcuts(updated);
+        }
+
+        private void btnDeleteShortcut_Click(object sender, RoutedEventArgs e)
+        {
+            if (_shortcutService is null ||
+                (sender as FrameworkElement)?.DataContext is not ShortcutRow row)
+            {
+                return;
+            }
+
+            List<ShortcutBinding> updated = _shortcutService.Bindings
+                .Where(b => !string.Equals(b.Chord, row.Binding.Chord, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            SaveShortcuts(updated);
+        }
+
+        #endregion
+
         public sealed class WatcherRuleRow : INotifyPropertyChanged
         {
             private readonly WatcherRule _rule;
