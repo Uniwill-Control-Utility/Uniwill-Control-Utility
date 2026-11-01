@@ -27,12 +27,29 @@ namespace Uniwill_Control_Utility.Helpers
             if (sender is not FrameworkElement page) return;
 
             var scrollViewer = page.FindName("mainScroll") as ScrollViewer;
+
+            // A viewer that cannot scroll is not the target: fall through to the
+            // ancestor/descendant search instead of dead-ending (the page's own
+            // ScrollViewer can be viewport-sized on a page the shell measures
+            // tall, in which case the shell's scroller is the one to move).
+            if (scrollViewer is not null && scrollViewer.ScrollableHeight <= 0)
+                scrollViewer = null;
+
             if (scrollViewer is null && page.FindName("lbGames") is DependencyObject gamesList)
                 scrollViewer = FindScrollableDescendant(gamesList);
 
             scrollViewer ??= FindScrollableAncestor(e.OriginalSource as DependencyObject);
             scrollViewer ??= FindScrollableDescendant(page);
-            if (scrollViewer is null || scrollViewer.ScrollableHeight <= 0) return;
+
+            if (scrollViewer is null || scrollViewer.ScrollableHeight <= 0)
+            {
+                Serilog.Log.Debug("[Wheel] no scrollable target (source {Source})", e.OriginalSource?.GetType().Name);
+                return;
+            }
+
+            Serilog.Log.Debug("[Wheel] scrolling {Name} by {Delta} (extent {Extent}, viewport {Viewport})",
+                string.IsNullOrEmpty(scrollViewer.Name) ? scrollViewer.GetType().Name : scrollViewer.Name,
+                e.Delta, scrollViewer.ExtentHeight, scrollViewer.ViewportHeight);
 
             scrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset - e.Delta);
             e.Handled = true;
