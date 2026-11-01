@@ -86,6 +86,13 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (updateService is not null)
                 updateService.StateChanged += OnUpdateStateChanged;
 
+            // Title-bar OEM warning chip (U-203): lights up while the OEM
+            // Control Center stack is live, i.e. while it can override this
+            // app's fan and power writes. The Settings card stays the full
+            // view; this chip is the discoverable path to it.
+            _oemTakeover = App.GetService<Services.OemTakeoverService>();
+            _ = RefreshOemWarningAsync();
+
             SystemEvents.PowerModeChanged += HandlePowerModeChange;
 
             // Subscribe to window messages for display change detection.
@@ -294,6 +301,110 @@ namespace Uniwill_Control_Utility.Views.Windows
             UpdateCard.Visibility = _updateCardVisible && !isDashboard
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+        }
+
+        // ---- OEM takeover warning chip (U-203) --------------------------------
+
+        private Services.OemTakeoverService? _oemTakeover;
+        private DateTime _oemLastProbeUtc = DateTime.MinValue;
+        private bool _oemProbeBusy;
+        private bool _oemWarnDismissed;
+
+        /// <summary>
+        /// Probes the merged takeover state and lights the warning chip while
+        /// the OEM stack is live. Throttled (Misc tick, 60 s) because the probe
+        /// walks services, processes, tasks and both registry scopes; the chip
+        /// is a status indicator, not a live meter.
+        /// </summary>
+        private async System.Threading.Tasks.Task RefreshOemWarningAsync()
+        {
+            Services.OemTakeoverService? service = _oemTakeover;
+            if (service is null || _oemProbeBusy)
+                return;
+
+            _oemProbeBusy = true;
+            try
+            {
+                Services.OemOverview overview = await service.GetOverviewAsync();
+                _oemLastProbeUtc = DateTime.UtcNow;
+
+                bool warn = Services.OemTakeoverService.ShouldWarn(overview) && !_oemWarnDismissed;
+
+                OemWarningCard.Visibility = warn ? Visibility.Visible : Visibility.Collapsed;
+                if (!warn)
+                    OemWarnPopup.IsOpen = false;
+
+                OemWarnDetail.Text = LocalizationService.Format(
+                    "Services running: {0} of {1} · OEM processes: {2} · journal: {3} · autostart neutralized: {4}",
+                    overview.ServicesRunning, overview.ServicesInstalled,
+                    overview.OemProcessesRunning, overview.JournalCount, overview.AutostartNeutralized);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "OEM takeover warning probe failed");
+            }
+            finally
+            {
+                _oemProbeBusy = false;
+            }
+        }
+
+        private void OemWarningCard_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (OemWarningCard.Visibility == Visibility.Visible)
+                OemWarnPopup.IsOpen = true;
+        }
+
+        private void OemWarnNotNow_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+            // Session-only dismissal: the next launch re-checks, so a machine
+            // whose stack came back after a reboot is warned again.
+            _oemWarnDismissed = true;
+            OemWarnPopup.IsOpen = false;
+            OemWarningCard.Visibility = Visibility.Collapsed;
+        }
+
+        private void OemWarnSettings_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+            OemWarnPopup.IsOpen = false;
+            _navigationService.Navigate(typeof(Views.Pages.SettingsPage));
+        }
+
+        private async void OemWarnPause_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+            Services.OemTakeoverService? service = _oemTakeover;
+            if (service is null)
+                return;
+
+            OemWarnPauseButton.IsEnabled = false;
+            try
+            {
+                Services.OemMergeReport report = await service.PauseAsync();
+                OemWarnPopup.IsOpen = false;
+
+                string body = report.State == "Busy"
+                    ? LocalizationService.Get("A takeover action is already running.")
+                    : !report.EngineReachable
+                        ? LocalizationService.Get("The engine service is not running; the machine scope (services, tasks, machine run keys) was not paused.")
+                        : report.MutationsApplied == 0
+                            ? LocalizationService.Get("Nothing to pause: the OEM Control Center stack is not installed on this machine.")
+                            : LocalizationService.Format("Paused the OEM Control Center stack ({0} mutations applied).", report.MutationsApplied);
+
+                Uniwill_Control_Utility.Scripts.Misc.ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("OEM Control Center"), body);
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogError(ex, "OEM takeover pause from the title bar failed");
+                Uniwill_Control_Utility.Scripts.Misc.ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("OEM Control Center"),
+                    LocalizationService.Get("The pause action failed; see the log."));
+            }
+            finally
+            {
+                OemWarnPauseButton.IsEnabled = true;
+                await RefreshOemWarningAsync();
+            }
         }
 
         private void UpdateRestartButton_Click(object sender, System.Windows.RoutedEventArgs e)
@@ -1086,6 +1197,9 @@ namespace Uniwill_Control_Utility.Views.Windows
         {
             try
             {
+                // Throttled status probe for the title-bar OEM warning chip.
+                if ((DateTime.UtcNow - _oemLastProbeUtc).TotalSeconds >= 60)
+                    await RefreshOemWarningAsync();
             }
             catch (Exception ex)
             {

@@ -165,6 +165,22 @@ namespace Uniwill_Control_Utility.Services
             };
         }
 
+        /// <summary>
+        /// Whether the title bar should warn that the OEM stack is live. The
+        /// warning exists because the takeover is otherwise discoverable only
+        /// inside Settings, and a running OEM Control Center silently fights
+        /// UCU's fan and power writes (the story's whole premise): a user who
+        /// never opens that card would never learn why fan settings "don't
+        /// stick". Active and PartiallyPaused are the two states where the
+        /// conflict is happening right now; Paused/Stale are the states this
+        /// feature created on purpose.
+        /// </summary>
+        public static bool ShouldWarn(OemOverview overview) =>
+            overview is not null
+            && overview.EngineReachable
+            && overview.ServicesInstalled > 0
+            && (overview.State == "Active" || overview.State == "PartiallyPaused");
+
         // ---- Pause / restore ---------------------------------------------------
 
         public Task<OemMergeReport> PauseAsync() => RunExclusive(async () =>
