@@ -139,7 +139,25 @@ namespace Uniwill_Control_Utility.Services
             _hydroUi = hydroUi;
             _flydigi = flydigi;
             _shortcuts = shortcuts;
+
+            if (_shortcuts is not null)
+            {
+                // Adding/removing the last shortcut must add/remove the hook
+                // itself: the map lives on the overlay's hook, not beside it.
+                _shortcuts.Changed += () => PostToHookThread(() =>
+                {
+                    if (NeedsHook(_settingsStore.Current))
+                        EnsureHook();
+                    else
+                        RemoveHook();
+                });
+            }
         }
+
+        /// <summary>The hook serves the overlay toggles AND the user shortcut
+        /// map, so it is needed when either consumer exists.</summary>
+        private bool NeedsHook(OverlayOptions options) =>
+            options.Enabled || (_shortcuts?.Bindings.Count ?? 0) > 0;
 
         public Task StartAsync(
             CancellationToken cancellationToken)
@@ -150,7 +168,7 @@ namespace Uniwill_Control_Utility.Services
 
             OverlayOptions options = _settingsStore.Current;
 
-            if (options.Enabled)
+            if (NeedsHook(options))
             {
                 /*
                  * The global hook goes to its dedicated pumped thread (field-
@@ -162,9 +180,17 @@ namespace Uniwill_Control_Utility.Services
                  * desktop, and every thread of an interactive-session process is
                  * on WinSta0\Default, so the dedicated thread keeps the events
                  * flowing without owning the UI.
+                 *
+                 * The hook also carries the user shortcut map (U-204), so it is
+                 * installed when the overlay is off but shortcuts exist - a
+                 * shortcut silently dying with the overlay toggle was the
+                 * first-draft bug.
                  */
                 PostToHookThread(EnsureHook);
+            }
 
+            if (options.Enabled)
+            {
                 // Start RTSS OSD timer.
                 StartRtssOsd(options);
             }
@@ -208,7 +234,7 @@ namespace Uniwill_Control_Utility.Services
             // the dispatcher it has always run on.
             PostToHookThread(() =>
             {
-                if (normalisedOptions.Enabled)
+                if (NeedsHook(normalisedOptions))
                     EnsureHook();
                 else
                     RemoveHook();

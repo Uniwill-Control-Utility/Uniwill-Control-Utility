@@ -224,7 +224,7 @@ Never robocopy-patch the layout to stage a new payload: MSI-written files carry 
 Shortcuts are user-editable under **Automations → Keyboard shortcuts** and persist in `%LOCALAPPDATA%\UCU\shortcuts.json` (the record is the file; an unreadable file is moved to `.bak` and the map starts empty). Three facts make most "my shortcut does nothing" reports self-diagnosing:
 
 - **At least one of Ctrl, Alt or Shift is required**, and only one primary key. A modifier-only chord is rejected on save; a hand-edited row that fails the grammar is dropped on load (the hook never fires a bad row).
-- **The chord is matched by the same global hook as the overlay toggles**, installed only while the overlay is enabled (`Game Overlay → Enable overlay`). With the overlay off there is no hook, so no shortcut fires - the overlay toggles share that switch.
+- **The chord is matched by the same global hook as the overlay toggles**, and that hook is installed while the overlay is enabled **or** at least one shortcut exists - a shortcut set does not die with the overlay toggle. The hook still runs on its dedicated pumped thread regardless of which consumer asked for it.
 - **One action per press**, the whitelist being the watcher hub's class: apply preset (through the preset arbiter, same priority as a tray click), set performance mode, enable fan turbo (set semantics - it does not toggle off), pause/restore the OEM Control Center. Presets apply with the usual toast; takeover actions carry the same outcome lines as the Settings card.
 
 A shortcut that fires the wrong thing is a duplicate chord: the first row wins on load, and the editor's saved file keeps one binding per chord.

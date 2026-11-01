@@ -195,8 +195,16 @@ namespace Uniwill_Control_Utility.Services
 
         public IReadOnlyList<ShortcutBinding> Bindings => _bindings;
 
+        /// <summary>Raised after the map was re-read (the editor saved): the
+        /// overlay service installs or removes the shared hook from this.</summary>
+        public event Action? Changed;
+
         /// <summary>Re-reads the file (the editor saves through the store).</summary>
-        public void Reload() => _bindings = _store.Load();
+        public void Reload()
+        {
+            _bindings = _store.Load();
+            Changed?.Invoke();
+        }
 
         /// <summary>Called per hook keydown. True when a binding matched; the
         /// action is queued on the UI dispatcher and never runs inline on the
