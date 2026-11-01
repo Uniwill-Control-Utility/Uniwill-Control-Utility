@@ -651,7 +651,7 @@ namespace Uniwill_Control_Utility.Services
                 CpuTemperature = Round(ReadFirstValue(cpu, SensorType.Temperature, "Core Average", "CPU Package", "Core")),
                 CpuUsage = Round(ReadFirstValue(cpu, SensorType.Load, "CPU Total", "Total")),
                 CpuPowerWatts = Round(ReadFirstValue(cpu, SensorType.Power, "CPU Package", "Package")),
-                CpuClockMhz = Round(ReadAverage(cpu, SensorType.Clock, "Core")),
+                CpuClockMhz = CoreClockMhzFrom(cpu),
                 GpuTemperature = Round(ReadFirstValue(gpu, SensorType.Temperature, "GPU Core", "Core")),
                 GpuUsage = Round(ReadFirstValue(gpu, SensorType.Load, "GPU Core", "D3D 3D", "Core")),
                 GpuPowerWatts = Round(ReadFirstValue(gpu, SensorType.Power, "GPU Package", "GPU Power", "Core")),
@@ -1279,17 +1279,50 @@ namespace Uniwill_Control_Utility.Services
             return sensor?.Value ?? 0;
         }
 
-        private static double ReadAverage(IHardware? hardware, SensorType type, string name)
-        {
-            if (hardware is null)
-                return 0;
+        /// <summary>
+        /// Average CPU core clock, MHz, 0 = unavailable. The engine probe's
+        /// field-pinned rules (LhmSensorProbe.Extract), applied to the app's
+        /// own tree: AMD's "Cores (Average)" aggregate first, else the mean of
+        /// the per-core family - "Core #N" (AMD), "P-Core #N"/"E-Core #N"
+        /// (Intel hybrid, field 2026-11-01 Ultra 9 275HX). The old
+        /// ReadAverage(cpu, Clock, "Core") Contains-matched the "(Effective)"
+        /// utilisation-weighted pseudo-clocks AND the iGPU sub-hardware's
+        /// "GPU Core" clock: the dev box displayed 2929 MHz while the true
+        /// aggregate was 5300 (and Intel's idle iGPU clock diluted every
+        /// reading there too). Direct node sensors only, and the
+        /// engine's fill-zeros overlay is untouched: when this answers 0
+        /// (no Ring0), the engine's value wins as before.
+        /// </summary>
+        internal static int CoreClockMhzFrom(IHardware? cpu) =>
+            cpu is null
+                ? 0
+                : CoreClockMhzFrom(cpu.Sensors.Select(s => (s.SensorType, s.Name, s.Value)).ToList());
 
-            float[] values = EnumerateSensors(hardware)
-                .Where(sensor => sensor.SensorType == type && sensor.Name.Contains(name, StringComparison.OrdinalIgnoreCase) && sensor.Value.HasValue)
-                .Select(sensor => sensor.Value!.Value)
+        internal static int CoreClockMhzFrom(IReadOnlyList<(SensorType Type, string Name, float? Value)> sensors)
+        {
+            double aggregate = sensors
+                .Where(s => s.Type == SensorType.Clock && s.Value.HasValue
+                    && s.Name.Equals("Cores (Average)", StringComparison.OrdinalIgnoreCase))
+                .Select(s => (double)s.Value!.Value)
+                .FirstOrDefault(v => v > 0);
+
+            if (aggregate > 0)
+                return Round(aggregate);
+
+            float[] cores = sensors
+                .Where(s => s.Type == SensorType.Clock && s.Value.HasValue && s.Value.Value > 0
+                    && IsCoreClockName(s.Name)
+                    && !s.Name.Contains("(Effective)", StringComparison.OrdinalIgnoreCase))
+                .Select(s => s.Value!.Value)
                 .ToArray();
-            return values.Length == 0 ? 0 : values.Average();
+
+            return cores.Length == 0 ? 0 : Round(cores.Average());
         }
+
+        private static bool IsCoreClockName(string name) =>
+            name.StartsWith("Core #", StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith("P-Core #", StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith("E-Core #", StringComparison.OrdinalIgnoreCase);
 
         private static IEnumerable<ISensor> EnumerateSensors(IHardware hardware)
         {

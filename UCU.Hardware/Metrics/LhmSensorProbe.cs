@@ -141,9 +141,7 @@ namespace UCU.Hardware.Metrics
             // clock (2161 vs 5150), so averaging them in would halve the reading.
             int clock = (int)Math.Round(
                 AverageCoreClock(data) ?? 0,
-                MidpointRounding.AwayFromZero);
-
-            // SPD data rate: the fastest supported cycle time across all modules.
+                MidpointRounding.AwayFromZero);            // SPD data rate: the fastest supported cycle time across all modules.
             float? tckNs = data
                 .Where(d => d.Hardware == HardwareType.Memory
                     && d.Sensor == SensorType.Timing
@@ -158,17 +156,32 @@ namespace UCU.Hardware.Metrics
                 ? (int)Math.Round(2000d / tckNs.Value, MidpointRounding.AwayFromZero)
                 : 0;
 
+            // DIMM temperatures: the "DIMM #N" family assigned to the card's two
+            // slots by discovery order. The exact "#0"/"#1" pair assumed 2-slot
+            // numbering; the field Intel board (2026-11-01, Ultra 9 275HX)
+            // populates "DIMM #0" + "DIMM #2" (4-slot channel layout), so the
+            // second DIMM's temperature was silently dropped. The app's own
+            // reader already pairs by order (its comment cites this machine);
+            // the engine overlay fills the app's zeros, so it must pair the
+            // same way - same rule, two readers, one contract.
+            List<float> dimmTemps = data
+                .Where(d => d.Hardware == HardwareType.Memory
+                    && d.Sensor == SensorType.Temperature
+                    && d.Name.StartsWith("DIMM #", StringComparison.OrdinalIgnoreCase)
+                    && d.Value > 0)
+                .Select(d => d.Value)
+                .Take(2)
+                .ToList();
+
             return new SensorProbeReading
             {
                 CpuPowerWatts = (int)Math.Round(power ?? 0, MidpointRounding.AwayFromZero),
                 CpuClockMhz = clock,
                 MemorySpeedMts = speedMts,
                 MemoryTemperature0 = (int)Math.Round(
-                    FirstValue(data, HardwareType.Memory, SensorType.Temperature, "DIMM #0") ?? 0,
-                    MidpointRounding.AwayFromZero),
+                    dimmTemps.Count > 0 ? dimmTemps[0] : 0, MidpointRounding.AwayFromZero),
                 MemoryTemperature1 = (int)Math.Round(
-                    FirstValue(data, HardwareType.Memory, SensorType.Temperature, "DIMM #1") ?? 0,
-                    MidpointRounding.AwayFromZero),
+                    dimmTemps.Count > 1 ? dimmTemps[1] : 0, MidpointRounding.AwayFromZero),
                 ProbeOpen = true,
             };
         }
@@ -204,7 +217,7 @@ namespace UCU.Hardware.Metrics
 
             var cores = data
                 .Where(d => d.Hardware == HardwareType.Cpu && d.Sensor == SensorType.Clock
-                    && d.Name.StartsWith("Core #", StringComparison.OrdinalIgnoreCase)
+                    && IsCoreClockName(d.Name)
                     && !d.Name.Contains("(Effective)", StringComparison.OrdinalIgnoreCase)
                     && d.Value > 0)
                 .Select(d => d.Value)
@@ -212,5 +225,21 @@ namespace UCU.Hardware.Metrics
 
             return cores.Count > 0 ? cores.Average() : null;
         }
+
+        /// <summary>
+        /// Per-core clock names. AMD: "Core #N" (field 2026-10-29, Ryzen 9
+        /// 9955HX3D). Intel hybrid: "P-Core #N" and "E-Core #N" - the field
+        /// Intel tree (2026-11-01, Core Ultra 9 275HX) exposes NO "Core #N"
+        /// and no "Cores (Average)" aggregate, so the AMD-only matcher found
+        /// no clock sensor at all and the card/OSD rendered the blank ("--")
+        /// while power answered fine on "CPU Package". The names are prefixes
+        /// of exactly the per-core family: "Bus Speed" (99.10) stays out, and
+        /// the iGPU's "GPU Core"/"GPU Memory" clocks hang off a Gpu-typed
+        /// sub-hardware node, excluded by the caller's Cpu filter.
+        /// </summary>
+        private static bool IsCoreClockName(string name) =>
+            name.StartsWith("Core #", StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith("P-Core #", StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith("E-Core #", StringComparison.OrdinalIgnoreCase);
     }
 }
