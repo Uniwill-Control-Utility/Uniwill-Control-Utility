@@ -641,6 +641,7 @@
                                         Minimum="0"
                                         Maximum="100"
                                         TickFrequency="5"
+                                        TickPlacement="BottomRight"
                                         IsSnapToTickEnabled="True"
                                         VerticalAlignment="Center"
                                         ValueChanged="slBrightness_ValueChanged"/>
@@ -650,27 +651,6 @@
                                            VerticalAlignment="Center"
                                            Text="--"/>
                             </StackPanel>
-                        </ui:CardControl>
-
-                        <!-- Screen off (U-205): per-session, any input wakes it. -->
-                        <ui:CardControl x:Name="CardScreenOff" Margin="0,0,0,8">
-                            <ui:CardControl.Icon>
-                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7E8;" FontSize="20" Margin="4,0,6,0"/>
-                            </ui:CardControl.Icon>
-                            <ui:CardControl.Header>
-                                <StackPanel>
-                                    <ui:TextBlock FontTypography="Body" Text="Screen off"/>
-                                    <ui:TextBlock Margin="0,2,0,0"
-                                                   FontTypography="Caption"
-                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                                   Text="Turn off the display; any input wakes it"/>
-                                </StackPanel>
-                            </ui:CardControl.Header>
-                            <Button Content="Turn off screen"
-                                    Padding="10,4"
-                                    HorizontalAlignment="Right"
-                                    VerticalAlignment="Center"
-                                    Click="btnScreenOff_Click"/>
                         </ui:CardControl>
 
                         <ui:CardControl x:Name="CardColorCalibration" Margin="0,0,0,8" Visibility="Collapsed">

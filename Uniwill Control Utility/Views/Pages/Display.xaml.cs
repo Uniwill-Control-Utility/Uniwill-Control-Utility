@@ -336,10 +336,6 @@ namespace Uniwill_Control_Utility.Views.Pages
                 tbBrightness.Text = applied + "%";
         }
 
-        private void btnScreenOff_Click(object sender, RoutedEventArgs e)
-        {
-            Uniwill_Control_Utility.Scripts.Misc.Display.TurnOffDisplay();
-        }
 
         /// <summary>
         /// Updates the visual state of the three GPU mode buttons to reflect the current mode.
