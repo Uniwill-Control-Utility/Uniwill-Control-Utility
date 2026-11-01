@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using Microsoft.Win32.TaskScheduler;
+using Task = Microsoft.Win32.TaskScheduler.Task;
 
 namespace UCU.Hardware.Takeover
 {
@@ -19,114 +22,84 @@ namespace UCU.Hardware.Takeover
     /// The Task Scheduler scope for the takeover (story U-203): root-folder
     /// enumeration, Exec-action paths, and the Enabled toggle - the
     /// reference's twelve-task set (sandbox.rs) driven through the
-    /// Schedule.Service COM object.
+    /// Microsoft.Win32.TaskScheduler wrapper (the app's existing TaskScheduler
+    /// package; the dependency rides the LocalSystem side of the boundary
+    /// for the same reason System.Management rides it for the MiniLED row:
+    /// an unelevated app cannot toggle machine tasks' enable state, which
+    /// is exactly why this scope is engine-side).
     ///
-    /// Late-bound (dynamic) on purpose: the Task Scheduler 2.0 API is a COM
-    /// dual/dispatch surface, so no interop declarations and no extra
-    /// package are needed - the same binding PowerShell's Get-ScheduledTask
-    /// stack rides. The service runs as LocalSystem, which owns machine
-    /// tasks' enable state; an unelevated app cannot toggle them, which is
-    /// exactly why this scope is engine-side.
+    /// The wrapper, not raw dynamic COM: the raw binding is a field-proven
+    /// dead end - casting the Schedule.Service collection to
+    /// IEnumerable&lt;dynamic&gt; answers E_NOINTERFACE (0x80004002) because
+    /// the collection's enumeration lives on IDispatch _NewEnum, which only
+    /// the PowerShell adapter speaks; the first GetStatus on the staged
+    /// engine faulted exactly there (pack #22, dev-box probe).
     /// </summary>
-    public sealed class OemScheduledTasks
+    public sealed class OemScheduledTasks : IDisposable
     {
-        private readonly dynamic _root;
+        private readonly TaskService _service = new();
 
-        public OemScheduledTasks()
-        {
-            Type? schedulerType = Type.GetTypeFromProgID("Schedule.Service");
-            if (schedulerType is null)
-                throw new InvalidOperationException("the Task Scheduler COM server (Schedule.Service) is not registered");
-
-            dynamic scheduler = Activator.CreateInstance(schedulerType)
-                ?? throw new InvalidOperationException("the Task Scheduler COM server could not be created");
-
-            scheduler.Connect();
-            _root = scheduler.GetFolder("\\");
-        }
+        public void Dispose() => _service.Dispose();
 
         /// <summary>Every root-folder task (the vocabulary's tasks are all
-        /// registered in the root; the reference's scope too). Unreadable
-        /// fields degrade to "no paths / disabled-unknown", which the gate
+        /// registered in the root; the reference's scope too). A task whose
+        /// definition cannot be read degrades to "no paths", which the gate
         /// reads as a refusal - a task whose actions cannot be inspected is
         /// never touched.</summary>
         public IEnumerable<OemTaskObservation> EnumerateRootTasks()
         {
-            foreach (dynamic task in (IEnumerable<dynamic>)_root.GetTasks(0))
+            foreach (Task task in _service.RootFolder.Tasks)
             {
                 string name;
                 bool enabled;
+                IReadOnlyList<string> paths;
                 try
                 {
-                    name = (string)task.Name;
-                    enabled = (bool)task.Enabled;
+                    name = task.Name;
+                    enabled = task.Enabled;
+                    paths = task.Definition.Actions
+                        .OfType<ExecAction>()
+                        .Select(action => action.Path)
+                        .Where(path => !string.IsNullOrWhiteSpace(path))
+                        .ToList();
                 }
                 catch (Exception)
                 {
-                    continue; // a task we cannot even name is not ours to touch
+                    // A task we cannot even name is not ours to touch; a
+                    // definition read failure leaves it (the gate refuses
+                    // tasks with no Exec paths).
+                    if (string.IsNullOrEmpty(task.Name))
+                        continue;
+
+                    name = task.Name;
+                    enabled = false;
+                    paths = Array.Empty<string>();
                 }
 
                 yield return new OemTaskObservation
                 {
                     Name = name,
                     Enabled = enabled,
-                    ActionPaths = ReadActionPaths(task),
+                    ActionPaths = paths,
                 };
             }
         }
 
-        /// <summary>Sets the task's Enabled flag (the COM put_enabled, which
-        /// the service persists) and answers the readback, so the journal
-        /// records the observed state, never an assumption. Null = the task
-        /// is gone or the write was refused.</summary>
+        /// <summary>Sets the task's Enabled flag and answers the readback,
+        /// so the journal records the observed state, never an assumption.
+        /// Null = the task is gone or the write was refused.</summary>
         public bool? SetEnabled(string taskName, bool enabled)
         {
             try
             {
-                dynamic task = _root.GetTask(taskName);
+                Task task = _service.RootFolder.Tasks[taskName];
                 task.Enabled = enabled;
-                return (bool)task.Enabled;
+                return task.Enabled;
             }
             catch (Exception)
             {
                 return null;
             }
-        }
-
-        private static IReadOnlyList<string> ReadActionPaths(dynamic task)
-        {
-            var paths = new List<string>();
-            try
-            {
-                dynamic definition = task.Definition;
-                dynamic actions = definition.Actions;
-                long count = actions.Count;
-                for (long i = 1; i <= count; i++) // the COM collection is 1-based
-                {
-                    try
-                    {
-                        dynamic action = actions.Item(i);
-                        // Only Exec actions carry a Path; COM throws
-                        // disp-E UnknownName for the other action types.
-                        string path = (string)action.Path;
-                        if (!string.IsNullOrWhiteSpace(path))
-                            paths.Add(path);
-                    }
-                    catch (Exception)
-                    {
-                        // Not an Exec action (Script/Email/...) - no executable
-                        // identity to gate; the task stays untouched (the
-                        // gate refuses tasks without a verified Exec path).
-                    }
-                }
-            }
-            catch (Exception)
-            {
-                // Definition unreadable: the caller sees zero paths and the
-                // gate refuses the task.
-            }
-
-            return paths;
         }
     }
 }
