@@ -77,6 +77,25 @@ namespace Uniwill_Control_Utility.Services.Performance
                 void* basePtr = (void*)viewPtr.ToPointer();
                 byte* entryPtr = ((byte*)basePtr) + header.OsdArrOffset + (ulong)(slot * header.OsdEntrySize);
 
+                int* osdFrame = (int*)basePtr + 8; // dwOSDFrame, offset 32
+                int* dwBusy = (int*)basePtr + 9;   // dwBusy, v2.14+ LONG (32-bit), offset 36
+
+                // FIELD-PROVEN 2026-11-01 (OSD freezes 7-10 s then bulk-refreshes):
+                // this code used to force dwBusy to 0 via an 8-byte long at
+                // offset 32. Two defects: (1) the 8-byte store at 32 clobbered
+                // dwOSDFrame (offset 32-35), erasing the new-text signal the
+                // render side polls - section dumps caught the counter pinned
+                // at 0/1 instead of climbing ~1/s; (2) dwBusy is a LOCK with a
+                // balanced protocol (RTSSSharedMemory.h): acquire before
+                // writing, release after the frame bump. Force-zeroing it
+                // stomped locks RTSS itself held, driving the counter negative
+                // and stalling every injected renderer for seconds (the
+                // visible freeze; RTSS recovers the stuck lock on its own).
+                // So: balanced Interlocked bracket, 32-bit access, correct
+                // offsets.
+                if (version >= LockingVersion)
+                    System.Threading.Interlocked.Increment(ref *dwBusy);
+
                 // Write to extended or regular buffer. When the text is empty,
                 // zero the entire buffer so RTSS clears any previously rendered
                 // OSD text (including live replacement tags like <FR>).
@@ -93,16 +112,12 @@ namespace Uniwill_Control_Utility.Services.Performance
                         szOsd[i] = textBytes.Length > i ? textBytes[i] : (byte)0;
                 }
 
-                // Increment the global OSD frame counter to signal RTSS.
-                RtssHeader* hdr = (RtssHeader*)basePtr;
-                hdr->OsdFrame++;
+                // Signal the new frame (32-bit counter; atomic - RTSS polls it).
+                System.Threading.Interlocked.Increment(ref *osdFrame);
 
-                // Reset dwBusy lock (v2.14+).
+                // Release the lock (v2.14+) so the render side may read.
                 if (version >= LockingVersion)
-                {
-                    long* dwBusy = (long*)((byte*)basePtr + 32); // offset of dwBusy
-                    *dwBusy = 0;
-                }
+                    System.Threading.Interlocked.Decrement(ref *dwBusy);
 
                 // Flush so RTSS sees the new frame immediately.
                 FlushViewOfFile((IntPtr)basePtr, IntPtr.Zero);
@@ -133,6 +148,14 @@ namespace Uniwill_Control_Utility.Services.Performance
             {
                 void* basePtr = (void*)viewPtr.ToPointer();
 
+                int* osdFrame = (int*)basePtr + 8; // dwOSDFrame, offset 32
+                int* dwBusy = (int*)basePtr + 9;   // dwBusy, v2.14+ LONG (32-bit), offset 36
+
+                // Balanced lock bracket - see Update's field-proof comment:
+                // acquire, mutate, bump the frame, release.
+                if (version >= LockingVersion)
+                    System.Threading.Interlocked.Increment(ref *dwBusy);
+
                 // Scan all slots to find every UCU-owned entry and zero it.
                 // Do NOT re-claim — let the slot go fully empty so RTSS sees
                 // an unowned slot and clears any cached rendered text.
@@ -161,14 +184,11 @@ namespace Uniwill_Control_Utility.Services.Performance
                 }
 
                 // Increment frame counter to signal RTSS that the slot changed.
-                RtssHeader* hdr = (RtssHeader*)basePtr;
-                hdr->OsdFrame++;
+                System.Threading.Interlocked.Increment(ref *osdFrame);
 
+                // Release the lock (v2.14+) so the render side may read.
                 if (version >= LockingVersion)
-                {
-                    long* dwBusy = (long*)((byte*)basePtr + 32);
-                    *dwBusy = 0;
-                }
+                    System.Threading.Interlocked.Decrement(ref *dwBusy);
 
                 // Flush so RTSS sees the zeroed slot immediately.
                 FlushViewOfFile((IntPtr)basePtr, IntPtr.Zero);
@@ -338,7 +358,9 @@ namespace Uniwill_Control_Utility.Services.Performance
             public uint OsdArrOffset;
             public uint OsdArrSize;
             public uint OsdFrame;
-            // v2.14+: long dwBusy (offset 32)
+            // v2.14+ adds dwBusy: a 32-bit LONG at offset 36 (dwOSDFrame is
+            // the field at 32 - the lock is NOT at 32, and it is not 8 bytes;
+            // see Update() for the field-proven protocol).
         }
 
         #endregion
