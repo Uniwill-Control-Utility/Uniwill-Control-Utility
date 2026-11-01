@@ -153,7 +153,7 @@ public sealed class ContractShapeTests
         {
             string[] parts = verb.Split('.');
             Assert.Equal(2, parts.Length);
-            Assert.Contains(parts[0], new[] { "fan", "power", "mux", "keyboard", "battery", "device", "cpu", "telemetry", "engine", "rtss" });
+            Assert.Contains(parts[0], new[] { "fan", "power", "mux", "keyboard", "battery", "device", "cpu", "telemetry", "engine", "rtss", "oem" });
             Assert.Equal(verb, verb.ToLowerInvariant());
             Assert.Matches("^[a-z_]+$", parts[1]);
         }
@@ -177,7 +177,8 @@ public sealed class ContractShapeTests
             + typeof(IIntelMsrCapability).GetMethods().Length
             + typeof(IEcTelemetryCapability).GetMethods().Length
             + typeof(IEngineCapability).GetMethods().Length
-            + typeof(IRtssCapability).GetMethods().Length;
+            + typeof(IRtssCapability).GetMethods().Length
+            + typeof(IOemCapability).GetMethods().Length;
 
         // Not one-to-one (GetStateAsync covers three mux verbs), so the assertion is a
         // band: capabilities must stay close to the verb count, not drift 3x past it.
@@ -218,6 +219,7 @@ public sealed class ContractShapeTests
             typeof(IKeyboardCapability), typeof(IBatteryCapability), typeof(IDeviceCapability),
             typeof(IAmdSmuCapability), typeof(IIntelMsrCapability),
             typeof(IEcTelemetryCapability), typeof(IEngineCapability),
+            typeof(IOemCapability),
         };
 
         foreach (Type iface in interfaces)
@@ -264,6 +266,7 @@ public sealed class ContractShapeTests
             new BatteryTelemetryDto(), new PnpDeviceStateDto(),
             new RegisterValueDto(), new RegisterBytesDto(),
             new EngineInfoDto(),
+            new OemStatusDto(), new OemActionDto(),
         };
 
         foreach (object result in results)

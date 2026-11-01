@@ -67,6 +67,9 @@ namespace UCU.Contracts
     [JsonSerializable(typeof(RegisterValueDto))]
     [JsonSerializable(typeof(RegisterBytesDto))]
     [JsonSerializable(typeof(EngineInfoDto))]
+    [JsonSerializable(typeof(OemStatusDto))]
+    [JsonSerializable(typeof(OemActionDto))]
+    [JsonSerializable(typeof(List<UCU.Core.Takeover.TakeoverJournalEntry>))]
     public partial class EngineJsonContext : JsonSerializerContext
     {
     }
@@ -119,6 +122,8 @@ namespace UCU.Contracts
             RegisterValueDto v => ToParams(v),
             RegisterBytesDto v => ToParams(v),
             EngineInfoDto v => ToParams(v),
+            OemStatusDto v => ToParams(v),
+            OemActionDto v => ToParams(v),
             _ => throw new ProtocolViolationException($"result type {value.GetType().Name} is not registered in {nameof(EngineJsonContext)}"),
         };
 

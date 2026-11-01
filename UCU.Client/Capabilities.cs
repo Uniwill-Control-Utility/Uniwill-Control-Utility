@@ -426,4 +426,26 @@ namespace UCU.Client
         public Task<bool> StartAsync(CancellationToken cancellationToken = default) =>
             _client.InvokeAsync<bool>(EngineVerbs.Rtss.Start, cancellationToken);
     }
+
+    /// <summary>
+    /// OEM takeover proxies (story U-203). No parameters on any call: the
+    /// target vocabulary is the engine's compiled, gate-checked catalog, so
+    /// the client sends intent only - never a name, path, or service handle
+    /// the pipe could be talked into touching.
+    /// </summary>
+    public sealed class OemCapability : IOemCapability
+    {
+        private readonly EngineClient _client;
+
+        public OemCapability(EngineClient client) => _client = client;
+
+        public Task<OemStatusDto> GetStatusAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<OemStatusDto>(EngineVerbs.Oem.GetStatus, cancellationToken);
+
+        public Task<OemActionDto> PauseAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<OemActionDto>(EngineVerbs.Oem.Pause, cancellationToken);
+
+        public Task<OemActionDto> ResumeAsync(CancellationToken cancellationToken = default) =>
+            _client.InvokeAsync<OemActionDto>(EngineVerbs.Oem.Resume, cancellationToken);
+    }
 }

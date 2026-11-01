@@ -17,12 +17,13 @@ public sealed class EngineHostFixture : IAsyncDisposable
 {
     private readonly IHost _host;
 
-    private EngineHostFixture(IHost host, EngineRuntimeOptions options, IEcTransport transport, List<string> rtssLaunches)
+    private EngineHostFixture(IHost host, EngineRuntimeOptions options, IEcTransport transport, List<string> rtssLaunches, FakeOemTakeoverService oem)
     {
         _host = host;
         Options = options;
         Transport = transport;
         RtssLaunches = rtssLaunches;
+        FakeOem = oem;
         Client = new EngineClient(options.PipeName);
         Fan = new FanCapability(Client);
         Power = new PowerCapability(Client);
@@ -35,6 +36,7 @@ public sealed class EngineHostFixture : IAsyncDisposable
         Smu = new AmdSmuCapability(Client);
         IntelMsr = new IntelMsrCapability(Client);
         Rtss = new RtssCapability(Client);
+        Oem = new OemCapability(Client);
     }
 
     public EngineRuntimeOptions Options { get; }
@@ -52,6 +54,10 @@ public sealed class EngineHostFixture : IAsyncDisposable
     public EcTelemetryCapability Telemetry { get; }
     public EngineCapability Engine { get; }
     public RtssCapability Rtss { get; }
+    public OemCapability Oem { get; }
+
+    /// <summary>The scripted OEM machine the takeover verbs run against.</summary>
+    public FakeOemTakeoverService FakeOem { get; }
 
     /// <summary>Images the rtss.start verb asked the (overridden) session launcher to start.</summary>
     public IReadOnlyList<string> RtssLaunches { get; }
@@ -64,6 +70,7 @@ public sealed class EngineHostFixture : IAsyncDisposable
         string pipeName = $"UCUEngineTest.{Guid.NewGuid():N}";
 
         var rtssLaunches = new List<string>();
+        var oem = new FakeOemTakeoverService();
 
         var overrides = new EngineRuntimeOptions
         {
@@ -99,6 +106,10 @@ public sealed class EngineHostFixture : IAsyncDisposable
 
                 return true;
             },
+            // Hermetic default: the production takeover stops REAL services,
+            // disables REAL tasks, rewrites REAL HKLM run keys and kills REAL
+            // processes. Tests script the machine through configure.
+            OemTakeoverOverride = oem,
             LogDirectory = Path.Combine(Path.GetTempPath(), "ucu-engine-tests", pipeName),
         };
 
@@ -107,7 +118,7 @@ public sealed class EngineHostFixture : IAsyncDisposable
         IHost host = EngineHostFactory.CreateHost(Array.Empty<string>(), isService: false, overrides);
         await host.StartAsync().ConfigureAwait(false);
 
-        return new EngineHostFixture(host, overrides, overrides.TransportOverride!, rtssLaunches);
+        return new EngineHostFixture(host, overrides, overrides.TransportOverride!, rtssLaunches, oem);
     }
 
     public FakeEcTransport Fake => (FakeEcTransport)Transport;

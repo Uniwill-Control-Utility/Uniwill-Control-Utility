@@ -82,6 +82,17 @@ namespace UCU.Engine
                 services.AddSingleton<UCU.Hardware.Devices.IMiniLedService>(
                     options.MiniLedOverride ?? new UCU.Hardware.Devices.MiniLedWmiService());
 
+                // The OEM takeover row (U-203): pausing the OEM stack is a
+                // LocalSystem act (service start types, machine tasks, HKLM
+                // run keys, cross-session kills) the unelevated app cannot
+                // do; every mutation passes the Core publisher gate. The
+                // journal rides the engine's data directory (ProgramData for
+                // the service), where the app's merged journal view reads it
+                // back. Tests script the whole machine.
+                services.AddSingleton<UCU.Hardware.Takeover.IOemTakeoverService>(
+                    options.OemTakeoverOverride ?? new UCU.Hardware.Takeover.OemTakeoverService(
+                        Path.Combine(EnginePaths.ResolveLogDirectory(options, isService), "oem-takeover-journal.json")));
+
                 services.AddHostedService<EnginePipeServer>();
                 services.AddHostedService<EngineWatchdog>();
                 services.AddHostedService<AppSupervision>();

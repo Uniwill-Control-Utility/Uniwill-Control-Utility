@@ -1327,5 +1327,177 @@ namespace Uniwill_Control_Utility.Views.Pages
             PresetBackupStatus.IsOpen = true;
         }
 
+        #region OEM takeover (story U-203)
+
+        private Services.OemTakeoverService? _oemTakeover;
+        private bool _oemOverviewLoaded;
+
+        /// <summary>Lazy first read: the status probe walks services, tasks
+        /// and the user registry scopes, so it runs when the card opens, not
+        /// at page construction (the Settings page stays a snappy first
+        /// frame; HardwareManagement's gated rows set the precedent).</summary>
+        private void OemTakeoverCard_Expanded(object sender, RoutedEventArgs e)
+        {
+            if (_oemOverviewLoaded)
+                return;
+
+            _oemOverviewLoaded = true;
+            _oemTakeover ??= App.GetService<Services.OemTakeoverService>();
+            _ = RefreshOemOverviewAsync();
+        }
+
+        private async System.Threading.Tasks.Task RefreshOemOverviewAsync()
+        {
+            if (_oemTakeover is null)
+                return;
+
+            Services.OemOverview overview;
+            try
+            {
+                overview = await _oemTakeover.GetOverviewAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "[Settings] OEM takeover status read failed");
+                return;
+            }
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                tbOemStatus.Text = LocalizationService.Format("Status: {0}", OemStateLabel(overview));
+
+                tbOemStatusDetail.Text = LocalizationService.Format(
+                    "Services running: {0} of {1} · OEM processes: {2} · journal: {3} · autostart neutralized: {4}",
+                    overview.ServicesRunning, overview.ServicesInstalled,
+                    overview.OemProcessesRunning, overview.JournalCount, overview.AutostartNeutralized);
+
+                if (overview.SquatSuspects.Count > 0)
+                {
+                    var lines = new List<string>();
+                    int shown = Math.Min(overview.SquatSuspects.Count, 6);
+                    lines.AddRange(overview.SquatSuspects.Take(shown));
+                    if (overview.SquatSuspects.Count > shown)
+                        lines.Add(LocalizationService.Format("… and {0} more", overview.SquatSuspects.Count - shown));
+
+                    tbOemSuspects.Text = LocalizationService.Format(
+                        "Name-squat suspects the hardening gate refused ({0}) — never touched:", overview.SquatSuspects.Count)
+                        + "\n" + string.Join("\n", lines);
+                    tbOemSuspects.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    tbOemSuspects.Visibility = Visibility.Collapsed;
+                }
+
+                if (overview.Journal.Count > 0)
+                {
+                    icOemJournal.ItemsSource = overview.Journal;
+                    OemJournalSection.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    icOemJournal.ItemsSource = null;
+                    OemJournalSection.Visibility = Visibility.Collapsed;
+                }
+            });
+        }
+
+        private static string OemStateLabel(Services.OemOverview overview)
+        {
+            if (!overview.EngineReachable)
+                return LocalizationService.Get("Engine offline");
+
+            return overview.State switch
+            {
+                "NotInstalled" => LocalizationService.Get("Not installed"),
+                "Paused" => LocalizationService.Get("Paused"),
+                "PartiallyPaused" => LocalizationService.Get("Partially paused"),
+                "Stale" => LocalizationService.Get("Stale"),
+                "Busy" => LocalizationService.Get("Working…"),
+                _ => LocalizationService.Get("Active"),
+            };
+        }
+
+        private async void btnOemPause_Click(object sender, RoutedEventArgs e)
+        {
+            _oemTakeover ??= App.GetService<Services.OemTakeoverService>();
+            if (_oemTakeover is null)
+                return;
+
+            SetOemBusy(true);
+            try
+            {
+                Services.OemMergeReport report = await _oemTakeover.PauseAsync();
+
+                string title = LocalizationService.Get("OEM Control Center");
+                string body = report.State == "Busy"
+                    ? LocalizationService.Get("A takeover action is already running.")
+                    : !report.EngineReachable
+                        ? LocalizationService.Get("The engine service is not running; the machine scope (services, tasks, machine run keys) was not paused.")
+                        : report.MutationsApplied == 0
+                            ? LocalizationService.Get("Nothing to pause: the OEM Control Center stack is not installed on this machine.")
+                            : LocalizationService.Format("Paused the OEM Control Center stack ({0} mutations applied).", report.MutationsApplied);
+
+                ToastNotification.ShowToastNotification(title, body);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[Settings] OEM takeover pause failed");
+                ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("OEM Control Center"),
+                    LocalizationService.Get("The pause action failed; see the log."));
+            }
+            finally
+            {
+                await RefreshOemOverviewAsync();
+                _ = Dispatcher.InvokeAsync(() => SetOemBusy(false));
+            }
+        }
+
+        private async void btnOemRestore_Click(object sender, RoutedEventArgs e)
+        {
+            _oemTakeover ??= App.GetService<Services.OemTakeoverService>();
+            if (_oemTakeover is null)
+                return;
+
+            SetOemBusy(true);
+            try
+            {
+                Services.OemMergeReport report = await _oemTakeover.ResumeAsync();
+
+                string title = LocalizationService.Get("OEM Control Center");
+                string body = report.State == "Busy"
+                    ? LocalizationService.Get("A takeover action is already running.")
+                    : report.MutationsApplied == 0
+                        ? LocalizationService.Get("Nothing to restore: no paused OEM takeover mutations on this machine.")
+                        : LocalizationService.Format("Restored the OEM Control Center stack ({0} journal entries reversed).", report.MutationsApplied);
+
+                if (!report.EngineReachable && report.State != "Busy")
+                    body += "\n" + LocalizationService.Get("The engine service is not running; the machine scope was not restored.");
+
+                ToastNotification.ShowToastNotification(title, body);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[Settings] OEM takeover restore failed");
+                ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("OEM Control Center"),
+                    LocalizationService.Get("The restore action failed; see the log."));
+            }
+            finally
+            {
+                await RefreshOemOverviewAsync();
+                _ = Dispatcher.InvokeAsync(() => SetOemBusy(false));
+            }
+        }
+
+        private void SetOemBusy(bool isBusy)
+        {
+            btnOemPause.IsEnabled = !isBusy;
+            btnOemRestore.IsEnabled = !isBusy;
+        }
+
+        #endregion
+
      }
 }

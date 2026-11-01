@@ -314,5 +314,47 @@ namespace UCU.Contracts
             /// assumption.</summary>
             public const string Start = "rtss.start";
         }
+
+        /// <summary>
+        /// OEM Control Center takeover (story U-203, open-revo takeover/
+        /// lifecycle.rs port). The machine-scope half of the pause: HKLM run
+        /// keys, the companion services, the scheduled tasks and the
+        /// verified OEM processes. These are LocalSystem mutations by
+        /// construction - the HKLM Run roots are admin-write, the services'
+        /// Start type needs CHANGE_CONFIG, the tasks are machine objects, and
+        /// killing another session's process needs rights an unelevated app
+        /// never gets - so they live engine-side like every other privileged
+        /// row. The user-scope half (HKCU run keys, UWP AppModel state, the
+        /// StartupApproved flags) stays app-side: those are the signed-in
+        /// user's keys and the engine, running as LocalSystem, must not write
+        /// them blind.
+        ///
+        /// Hardening (the plan's audit note D.7): the reference mutates by
+        /// bare name, which any user can squat. Every engine-side target
+        /// passes the path+signature+publisher gate (UCU.Core.Takeover)
+        /// before a mutation, gate failures are listed as squat-suspects and
+        /// never touched, and UCU's own install roots are untouchable.
+        /// </summary>
+        public static class Oem
+        {
+            /// <summary>The machine-scope inventory: catalog service/process
+            /// counts, journal size, neutralized-autostart count, the
+            /// squat-suspect audit list, and the pause state the counts
+            /// decide (TakeoverPolicy.DecideState).</summary>
+            public const string GetStatus = "oem.get_status";
+
+            /// <summary>Pauses the OEM stack: gated process kills, service
+            /// stop + Start=demand, task disable, HKLM run-key neutralization,
+            /// every mutation journaled for restore. Auto-bypasses (zero
+            /// mutations) on machines without the stack - the reference's
+            /// Thin &amp; Light path, field-proven by the dev-box probe.</summary>
+            public const string Pause = "oem.pause";
+
+            /// <summary>Replays the journal: run keys back, tasks enabled,
+            /// services re-armed and started in the watchdog order (bridge
+            /// first, the service the bridge spawns watched, the rest
+            /// started). Idempotent: kills drop out, one replay per target.</summary>
+            public const string Resume = "oem.resume";
+        }
     }
 }

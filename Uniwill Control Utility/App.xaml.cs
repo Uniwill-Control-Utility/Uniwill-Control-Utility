@@ -462,6 +462,7 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<IIntelMsrCapability, IntelMsrCapability>();
                         services.AddSingleton<IEngineCapability, EngineCapability>();
                         services.AddSingleton<IRtssCapability, RtssCapability>();
+                        services.AddSingleton<IOemCapability, OemCapability>();
                         services.AddSingleton<EcTelemetryService>();
                         services.AddSingleton<IEcCpuTemperatureSource>(provider =>
                             provider.GetRequiredService<EcTelemetryService>());
@@ -506,6 +507,14 @@ namespace Uniwill_Control_Utility
                         services.AddSingleton<WatcherStore>();
                         services.AddSingleton<WatcherHubService>();
                         services.AddHostedService(provider => provider.GetRequiredService<WatcherHubService>());
+
+                        // The OEM takeover composition (U-203, open-revo takeover/
+                        // lifecycle.rs port): the user scope (HKCU Run keys, UWP
+                        // AppModel startup tasks, StartupApproved flags, the user
+                        // journal) composed app-side; the machine scope (services,
+                        // tasks, HKLM, gated kills) called through the oem.* verbs.
+                        // The Settings card is the only consumer; the merge is pure.
+                        services.AddSingleton<Services.OemTakeoverService>();
 
                         // Hardware Performance / Q-key button intercept: polls the EC
                         // TCC offset register for button presses and cycles UCU presets.

@@ -4,6 +4,7 @@ using UCU.Hardware.Cpu;
 using UCU.Hardware.Cpu.Intel;
 using UCU.Hardware.Devices;
 using UCU.Hardware.Firmware;
+using UCU.Hardware.Takeover;
 
 namespace UCU.Engine
 {
@@ -29,12 +30,13 @@ namespace UCU.Engine
             EcEngineGate gate, EngineDomainQueues queues, AppExitSignal appExit,
             EngineMetricsSnapshotSource metrics, IPnpDeviceService devices, IFwNvramService nvram,
             IAmdSmuService smu, IIntelMsrService msr, IMiniLedService miniLed,
+            IOemTakeoverService oemTakeover,
             EcRawWriteGuard rawWriteGuard, EngineRuntimeOptions options)
         {
             _gate = gate;
             _queues = queues;
             _appExit = appExit;
-            _handlers = BuildHandlers(gate, appExit, metrics, devices, nvram, smu, msr, miniLed, rawWriteGuard, options.RtssLaunchOverride);
+            _handlers = BuildHandlers(gate, appExit, metrics, devices, nvram, smu, msr, miniLed, oemTakeover, rawWriteGuard, options.RtssLaunchOverride);
         }
 
         public IReadOnlyCollection<string> Verbs => _handlers.Keys;
@@ -104,7 +106,7 @@ namespace UCU.Engine
         private static Dictionary<string, VerbHandler> BuildHandlers(
             EcEngineGate gate, AppExitSignal appExit, EngineMetricsSnapshotSource metrics,
             IPnpDeviceService devices, IFwNvramService nvram, IAmdSmuService smu, IIntelMsrService msr,
-            IMiniLedService miniLed, EcRawWriteGuard rawWriteGuard, Func<string, bool>? rtssLaunch)
+            IMiniLedService miniLed, IOemTakeoverService oem, EcRawWriteGuard rawWriteGuard, Func<string, bool>? rtssLaunch)
         {
             var handlers = new Dictionary<string, VerbHandler>(StringComparer.Ordinal);
 
@@ -125,6 +127,10 @@ namespace UCU.Engine
             // (a user-session process launch has nothing to order against on
             // the EC queues).
             RtssVerbs.Register(Add, rtssLaunch);
+
+            // oem.* falls to the default (telemetry) queue: pause/restore
+            // sequence against each other, away from the EC verbs' queues.
+            OemVerbs.Register(Add, oem);
 
             return handlers;
         }
