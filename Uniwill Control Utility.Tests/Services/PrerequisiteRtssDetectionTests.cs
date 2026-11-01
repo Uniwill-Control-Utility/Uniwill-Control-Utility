@@ -185,6 +185,35 @@ public sealed class PrerequisiteRtssDetectionTests
         Assert.DoesNotContain("CREATE_UNICODE_ENVIRONMENT |", launcher, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void TheOsdWriterFollowsTheRtssLockAndFrameSignalProtocol()
+    {
+        // FIELD DEFECT 2026-11-01 (OSD text freezes 7-10 s then bulk-refreshes):
+        // RtssOsdWriter force-zeroed dwBusy via an 8-byte long at offset 32.
+        // dwBusy is a 32-bit LONG at offset 36 (dwOSDFrame is at 32), and it
+        // is a LOCK: acquire before writing, release after the frame bump.
+        // The 8-byte store erased the dwOSDFrame signal every write (section
+        // dump: counter pinned at 0/1 instead of climbing ~1/s), and the
+        // unbalanced zero stomped locks RTSS itself held (negative lock =>
+        // every injected renderer stalls for seconds). Pinned contract:
+        // balanced Interlocked bracket, 32-bit access, offsets 32/36.
+        string writer = ReadAppSource("Services", "Performance", "RtssOsdWriter.cs");
+
+        // dwBusy: 32-bit, at offset 36 (base + 9 ints).
+        Assert.Contains("int* dwBusy = (int*)basePtr + 9;", writer, StringComparison.Ordinal);
+        Assert.DoesNotContain("(long*)((byte*)basePtr + 32)", writer, StringComparison.Ordinal);
+
+        // No force-zeroing the lock: the bracket must be balanced.
+        Assert.DoesNotContain("*dwBusy = 0", writer, StringComparison.Ordinal);
+
+        // Frame signal: atomic bump on the 32-bit counter at offset 32,
+        // between acquire and release.
+        Assert.Contains("int* osdFrame = (int*)basePtr + 8;", writer, StringComparison.Ordinal);
+        Assert.Contains("Interlocked.Increment(ref *osdFrame)", writer, StringComparison.Ordinal);
+        Assert.Contains("Interlocked.Increment(ref *dwBusy)", writer, StringComparison.Ordinal);
+        Assert.Contains("Interlocked.Decrement(ref *dwBusy)", writer, StringComparison.Ordinal);
+    }
+
     private static string ReadAppSource(params string[] parts) =>
         File.ReadAllText(Path.Combine(new[] { RepositoryRoot(), "Uniwill Control Utility" }.Concat(parts).ToArray()));
 
