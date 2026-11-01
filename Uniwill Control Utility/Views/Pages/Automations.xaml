@@ -14,6 +14,7 @@
       d:DesignWidth="800"
       Title="Automations"
       Loaded="Page_Loaded"
+      ScrollViewer.CanContentScroll="False"
       helpers:MouseWheelScrollBehavior.IsEnabled="True"
       SnapsToDevicePixels="True"
       UseLayoutRounding="True">
@@ -36,7 +37,7 @@
     <!-- Root Grid spans full window space -->
     <Grid>
 
-        <!-- Full-width, full-height ScrollViewer -->
+        <!-- Scrollable content -->
         <ScrollViewer x:Name="mainScroll"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
@@ -496,7 +497,9 @@
                                                 x:Name="btnEditWatcherRule"
                                                 Content="&#xE70F;"
                                                 FontFamily="Segoe MDL2 Assets"
-                                                Width="32"
+                                                Width="36"
+                                                Padding="0"
+                                                HorizontalContentAlignment="Center"
                                                 Margin="4,0,0,0"
                                                 VerticalAlignment="Center"
                                                 ToolTipService.ToolTip="Edit"
@@ -506,7 +509,9 @@
                                                 Content="&#xE74D;"
                                                 FontFamily="Segoe MDL2 Assets"
                                                 Foreground="{DynamicResource SystemFillColorCriticalBrush}"
-                                                Width="32"
+                                                Width="36"
+                                                Padding="0"
+                                                HorizontalContentAlignment="Center"
                                                 Margin="4,0,0,0"
                                                 VerticalAlignment="Center"
                                                 ToolTipService.ToolTip="Delete"
@@ -592,7 +597,9 @@
                                         <Button Grid.Column="2"
                                                 Content="&#xE70F;"
                                                 FontFamily="Segoe MDL2 Assets"
-                                                Width="32"
+                                                Width="36"
+                                                Padding="0"
+                                                HorizontalContentAlignment="Center"
                                                 Margin="4,0,0,0"
                                                 VerticalAlignment="Center"
                                                 ToolTipService.ToolTip="Edit"
@@ -601,7 +608,9 @@
                                                 Content="&#xE74D;"
                                                 FontFamily="Segoe MDL2 Assets"
                                                 Foreground="{DynamicResource SystemFillColorCriticalBrush}"
-                                                Width="32"
+                                                Width="36"
+                                                Padding="0"
+                                                HorizontalContentAlignment="Center"
                                                 Margin="4,0,0,0"
                                                 VerticalAlignment="Center"
                                                 ToolTipService.ToolTip="Delete"
