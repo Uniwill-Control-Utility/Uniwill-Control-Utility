@@ -8,7 +8,6 @@ using System.Windows.Threading;
 using Uniwill_Control_Utility.Models;
 using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Services;
-using Uniwill_Control_Utility.Services.Performance;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
@@ -79,7 +78,19 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         private void UpdateRtssStatus()
         {
-            if (RtssReader.IsRunning())
+            // Session-scoped PROCESS witness, not the shared-memory segment:
+            // the segment name is global, RTSS's overlay DLL keeps the mapping
+            // open in every process it injected (so it outlives RTSS), and an
+            // MSI upgrade that force-kills RTSS leaves a VALID header behind
+            // (the DEAD marker is only written on graceful exit). Field report
+            // 2026-11-01: the page said "RTSS running" with zero RTSS
+            // processes and no OSD - and hid the Start button, removing the
+            // self-heal (launching RTSS rewrites the header). The service's
+            // process snapshot answers false with zero processes (and falls
+            // back to the segment only when a security product refuses the
+            // snapshot), so the label, the Start button (CanStart) and the
+            // startup gate now read from one witness.
+            if (RtssDetectionService.IsRunning())
             {
                 RtssStatusIcon.Glyph = "\uE930"; // Positive
                 RtssStatusIcon.Foreground = Application.Current.FindResource("SystemFillColorSuccessBrush") as System.Windows.Media.Brush;
