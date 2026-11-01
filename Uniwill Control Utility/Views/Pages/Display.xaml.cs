@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Threading;
@@ -53,6 +54,11 @@ namespace Uniwill_Control_Utility.Views.Pages
         private bool _localDimmingToggling;
         private bool _refreshRateBusy;
         private bool _colorCalBusy;
+
+        /// <summary>The last non-imported profile the user selected: the
+        /// fallback when the active imported profile is deleted (U-205).</summary>
+        private string _lastShippedColorProfile =
+            Uniwill_Control_Utility.Scripts.Misc.Display.DefaultColorProfileFile;
 
         // Delayed refresh timer created after each user change.
 
@@ -781,7 +787,9 @@ namespace Uniwill_Control_Utility.Views.Pages
         /// <summary>Deletes the selected imported profile (U-205). If it is the
         /// associated one, the association is dropped first - leaving the
         /// registry pointing at a missing file would have Windows fail every
-        /// colour lookup for the display.</summary>
+        /// colour lookup for the display. The selection then falls back to the
+        /// last shipped profile the user had chosen (Default if none), so the
+        /// combo never ends up blank.</summary>
         private async void btnDeleteColorProfile_Click(object sender, RoutedEventArgs e)
         {
             if (cbColorCalibration.SelectedItem is not ComboBoxItem item || item.Tag is not string file)
@@ -790,7 +798,9 @@ namespace Uniwill_Control_Utility.Views.Pages
             _colorCalBusy = true;
             try
             {
-                if (string.Equals(file, GetColorProfileSafe(), StringComparison.OrdinalIgnoreCase))
+                bool wasAssociated = string.Equals(file, GetColorProfileSafe(), StringComparison.OrdinalIgnoreCase);
+
+                if (wasAssociated)
                 {
                     await Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyColorProfile(
                         Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName(), string.Empty));
@@ -804,7 +814,22 @@ namespace Uniwill_Control_Utility.Views.Pages
                     return;
                 }
 
-                UpdateColorCalibrationCombo(GetColorProfileSafe());
+                // Re-associate the shipped profile the display had before the
+                // imported one (Default when there is none), so deleting the
+                // active profile leaves a calibrated, selected display instead
+                // of an empty combo and a blank association.
+                List<string> offered = OfferedColorProfileFiles();
+                string? fallback = offered.Contains(_lastShippedColorProfile)
+                    ? _lastShippedColorProfile
+                    : offered.FirstOrDefault();
+
+                if (wasAssociated && !string.IsNullOrEmpty(fallback))
+                {
+                    await Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyColorProfile(
+                        Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName(), fallback!));
+                }
+
+                UpdateColorCalibrationCombo(GetColorProfileSafe() ?? fallback);
                 ToastNotification.ShowToastNotification(
                     LocalizationService.Get("Color Calibration"),
                     LocalizationService.Get("The ICC profile was deleted."));
@@ -879,6 +904,15 @@ namespace Uniwill_Control_Utility.Views.Pages
         private void cbColorCalibration_SelectionChanged(object sender, RoutedEventArgs e)
         {
             UpdateColorDeleteVisibility();
+
+            // Remember the shipped choice before an imported one can take over:
+            // deleting the imported profile returns the display to it.
+            if (cbColorCalibration.SelectedItem is ComboBoxItem chosen
+                && chosen.Tag is string chosenFile
+                && !Uniwill_Control_Utility.Scripts.Misc.Display.IsImportedColorProfile(chosenFile))
+            {
+                _lastShippedColorProfile = chosenFile;
+            }
 
             if (!_isLoaded || _colorCalBusy)
                 return;
