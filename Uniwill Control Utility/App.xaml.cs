@@ -498,6 +498,15 @@ namespace Uniwill_Control_Utility
                         // Q-key service that consumes it.
                         services.AddSingleton<PresetArbiter>();
 
+                        // The watcher/trigger hub (U-201, open-revo watcher_hub.rs
+                        // port): user automation rules (watchers.json) evaluated on
+                        // a 1 s tick — telemetry thresholds, foreground edges, OS
+                        // power/session edges, named-value diffs — acting only
+                        // through the whitelisted verbs and the arbiter above.
+                        services.AddSingleton<WatcherStore>();
+                        services.AddSingleton<WatcherHubService>();
+                        services.AddHostedService(provider => provider.GetRequiredService<WatcherHubService>());
+
                         // Hardware Performance / Q-key button intercept: polls the EC
                         // TCC offset register for button presses and cycles UCU presets.
                         services.AddSingleton<QKeyButtonService>();

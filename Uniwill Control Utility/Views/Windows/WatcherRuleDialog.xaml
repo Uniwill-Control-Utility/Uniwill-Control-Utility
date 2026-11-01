@@ -1,0 +1,198 @@
+<ui:FluentWindow x:Class="Uniwill_Control_Utility.Views.Windows.WatcherRuleDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    Title="Watcher Rule"
+    Width="500"
+    SizeToContent="Height"
+    MaxHeight="820"
+    WindowStartupLocation="CenterOwner"
+    ResizeMode="NoResize"
+    WindowBackdropType="Mica"
+    WindowCornerPreference="Round"
+    ExtendsContentIntoTitleBar="True"
+    SnapsToDevicePixels="True"
+    UseLayoutRounding="True">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0"
+                     x:Name="TitleBar"
+                     Icon="pack://application:,,,/Assets/applicationIcon-256.png"
+                     CanMaximize="False"
+                     ShowMaximize="False"
+                     ShowMinimize="False"
+                     ShowClose="False" />
+
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      PanningMode="VerticalOnly">
+            <StackPanel Margin="18,8,18,8">
+
+                <!-- Name -->
+                <ui:TextBlock x:Name="lblName" FontTypography="BodyStrong" Margin="0,0,0,4" />
+                <TextBox x:Name="txtName" Height="32" MaxLength="60" />
+
+                <!-- Cooldown -->
+                <ui:TextBlock x:Name="lblCooldown" FontTypography="BodyStrong" Margin="0,12,0,4" />
+                <ui:NumberBox x:Name="nbCooldown"
+                              Minimum="1" Maximum="86400"
+                              MaxDecimalPlaces="0" SmallChange="1"
+                              Value="5" />
+                <ui:TextBlock x:Name="lblCooldownHint"
+                              FontTypography="Caption"
+                              Margin="0,4,0,0"
+                              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                              TextWrapping="Wrap" />
+
+                <!-- Condition -->
+                <ui:TextBlock x:Name="lblCondition" FontTypography="BodyStrong" Margin="0,14,0,4" />
+                <ComboBox x:Name="cbxCondition" Height="32" SelectionChanged="cbxCondition_SelectionChanged" />
+
+                <!-- Telemetry panel -->
+                <StackPanel x:Name="panelTelemetry" Margin="0,10,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <ui:TextBlock x:Name="lblCpuTempAbove" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" FontTypography="Body" Margin="0,4" />
+                        <ui:NumberBox x:Name="nbCpuTempAbove" Grid.Row="0" Grid.Column="1" Minimum="0" Maximum="120" MaxDecimalPlaces="0" SmallChange="1" Margin="0,4" />
+
+                        <ui:TextBlock x:Name="lblCpuTempBelow" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" FontTypography="Body" Margin="0,4" />
+                        <ui:NumberBox x:Name="nbCpuTempBelow" Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="120" MaxDecimalPlaces="0" SmallChange="1" Margin="0,4" />
+
+                        <ui:TextBlock x:Name="lblGpuTempAbove" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" FontTypography="Body" Margin="0,4" />
+                        <ui:NumberBox x:Name="nbGpuTempAbove" Grid.Row="2" Grid.Column="1" Minimum="0" Maximum="120" MaxDecimalPlaces="0" SmallChange="1" Margin="0,4" />
+
+                        <ui:TextBlock x:Name="lblGpuTempBelow" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" FontTypography="Body" Margin="0,4" />
+                        <ui:NumberBox x:Name="nbGpuTempBelow" Grid.Row="3" Grid.Column="1" Minimum="0" Maximum="120" MaxDecimalPlaces="0" SmallChange="1" Margin="0,4" />
+
+                        <ui:TextBlock x:Name="lblCpuUsageAbove" Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" FontTypography="Body" Margin="0,4" />
+                        <ui:NumberBox x:Name="nbCpuUsageAbove" Grid.Row="4" Grid.Column="1" Minimum="0" Maximum="100" MaxDecimalPlaces="0" SmallChange="1" Margin="0,4" />
+
+                        <ui:TextBlock x:Name="lblGpuUsageAbove" Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" FontTypography="Body" Margin="0,4" />
+                        <ui:NumberBox x:Name="nbGpuUsageAbove" Grid.Row="5" Grid.Column="1" Minimum="0" Maximum="100" MaxDecimalPlaces="0" SmallChange="1" Margin="0,4" />
+
+                        <ui:TextBlock x:Name="lblFpsAbove" Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" FontTypography="Body" Margin="0,4" />
+                        <ui:NumberBox x:Name="nbFpsAbove" Grid.Row="6" Grid.Column="1" Minimum="0" Maximum="1000" MaxDecimalPlaces="0" SmallChange="1" Margin="0,4" />
+
+                        <ui:TextBlock x:Name="lblPowerState" Grid.Row="7" Grid.Column="0" VerticalAlignment="Center" FontTypography="Body" Margin="0,4" />
+                        <ComboBox x:Name="cbxPowerState" Grid.Row="7" Grid.Column="1" Height="32" Margin="0,4" />
+
+                        <ui:TextBlock x:Name="lblForegroundContains" Grid.Row="8" Grid.Column="0" VerticalAlignment="Center" FontTypography="Body" Margin="0,4" />
+                        <TextBox x:Name="txtForegroundContains" Grid.Row="8" Grid.Column="1" Height="32" MaxLength="60" Margin="0,4" />
+                    </Grid>
+                    <ui:TextBlock x:Name="lblTelemetryHint"
+                                  FontTypography="Caption"
+                                  Margin="0,6,0,0"
+                                  Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                  TextWrapping="Wrap" />
+                </StackPanel>
+
+                <!-- Foreground panel -->
+                <StackPanel x:Name="panelForeground" Margin="0,10,0,0" Visibility="Collapsed">
+                    <ui:TextBlock x:Name="lblTargetApps" FontTypography="Body" Margin="0,4" />
+                    <TextBox x:Name="txtTargetApps" Height="32" MaxLength="200" />
+                    <ui:TextBlock x:Name="lblTargetAppsHint"
+                                  FontTypography="Caption"
+                                  Margin="0,4,0,0"
+                                  Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                  TextWrapping="Wrap" />
+                    <ui:TextBlock x:Name="lblEdge" FontTypography="Body" Margin="0,10,0,4" />
+                    <ComboBox x:Name="cbxEdge" Height="32" />
+                </StackPanel>
+
+                <!-- Power panel -->
+                <StackPanel x:Name="panelPower" Margin="0,10,0,0" Visibility="Collapsed">
+                    <ui:TextBlock x:Name="lblPowerEvent" FontTypography="Body" Margin="0,4" />
+                    <ComboBox x:Name="cbxPowerEvent" Height="32" />
+                </StackPanel>
+
+                <!-- Value-change panel -->
+                <StackPanel x:Name="panelValue" Margin="0,10,0,0" Visibility="Collapsed">
+                    <ui:TextBlock x:Name="lblWatchedValue" FontTypography="Body" Margin="0,4" />
+                    <ComboBox x:Name="cbxWatchedValue" Height="32" />
+                    <ui:TextBlock x:Name="lblWatchedValueHint"
+                                  FontTypography="Caption"
+                                  Margin="0,4,0,0"
+                                  Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                  TextWrapping="Wrap" />
+                </StackPanel>
+
+                <!-- Action -->
+                <ui:TextBlock x:Name="lblAction" FontTypography="BodyStrong" Margin="0,14,0,4" />
+                <ComboBox x:Name="cbxAction" Height="32" SelectionChanged="cbxAction_SelectionChanged" />
+
+                <!-- Apply-preset panel -->
+                <StackPanel x:Name="panelPreset" Margin="0,10,0,0" Visibility="Collapsed">
+                    <ui:TextBlock x:Name="lblPreset" FontTypography="Body" Margin="0,4" />
+                    <ComboBox x:Name="cbxPreset" Height="32" />
+                </StackPanel>
+
+                <!-- Set-performance-mode panel -->
+                <StackPanel x:Name="panelMode" Margin="0,10,0,0" Visibility="Collapsed">
+                    <ui:TextBlock x:Name="lblModeNumber" FontTypography="Body" Margin="0,4" />
+                    <ui:NumberBox x:Name="nbMode" Minimum="0" Maximum="3" MaxDecimalPlaces="0" SmallChange="1" Value="0" />
+                </StackPanel>
+
+                <!-- Set-fan-turbo panel -->
+                <StackPanel x:Name="panelTurbo" Margin="0,10,0,0" Visibility="Collapsed">
+                    <ui:TextBlock x:Name="lblTurboState" FontTypography="Body" Margin="0,4" />
+                    <ComboBox x:Name="cbxTurboState" Height="32" />
+                </StackPanel>
+
+                <!-- Notify panel -->
+                <StackPanel x:Name="panelNotify" Margin="0,10,0,0" Visibility="Collapsed">
+                    <ui:TextBlock x:Name="lblNotifyTitle" FontTypography="Body" Margin="0,4" />
+                    <TextBox x:Name="txtNotifyTitle" Height="32" MaxLength="80" />
+                    <ui:TextBlock x:Name="lblNotifyMessage" FontTypography="Body" Margin="0,10,0,4" />
+                    <TextBox x:Name="txtNotifyMessage" Height="32" MaxLength="200" />
+                </StackPanel>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Buttons row with card background -->
+        <Grid Grid.Row="2" Background="{DynamicResource SmokeFillColorDefaultBrush}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <ui:Button x:Name="btnCancel"
+                       Grid.Column="1"
+                       Width="130"
+                       Height="34"
+                       Margin="0,16,8,16"
+                       Click="btnCancel_Click" />
+
+            <ui:Button x:Name="btnSave"
+                       Grid.Column="2"
+                       Width="130"
+                       Height="34"
+                       Appearance="Primary"
+                       Margin="0,16,0,16"
+                       Click="btnSave_Click" />
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

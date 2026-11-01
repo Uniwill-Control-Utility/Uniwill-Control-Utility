@@ -18,6 +18,10 @@ namespace UCU.Core.Supervision
         AutomationAc,
         /// <summary>The "apply preset on battery" automation (power-status edge, adapter removed).</summary>
         AutomationBattery,
+        /// <summary>A watcher-hub rule (U-201) whose action is ApplyPreset. Same automatic
+        /// class as the AC/battery edges: boot-grace-suppressed, yields to Adaptive,
+        /// and a successful apply updates the persisted selection.</summary>
+        AutomationRule,
         /// <summary>Startup application of the saved preset.</summary>
         BootRestore,
         /// <summary>Re-application of the active preset after sleep/hibernate resume.</summary>
@@ -82,7 +86,8 @@ namespace UCU.Core.Supervision
         public static bool IsAutomaticSource(PresetIntentSource source)
         {
             return source == PresetIntentSource.AutomationAc
-                || source == PresetIntentSource.AutomationBattery;
+                || source == PresetIntentSource.AutomationBattery
+                || source == PresetIntentSource.AutomationRule;
         }
 
         /// <summary>True when the intent's target equals the last applied profile
@@ -108,6 +113,7 @@ namespace UCU.Core.Supervision
             // restores do not fight ownership they do not challenge.
             return source == PresetIntentSource.AutomationAc
                 || source == PresetIntentSource.AutomationBattery
+                || source == PresetIntentSource.AutomationRule
                 || source == PresetIntentSource.HardwarePhysicalButton;
         }
 
@@ -127,7 +133,8 @@ namespace UCU.Core.Supervision
             return source == PresetIntentSource.UserInterface
                 || source == PresetIntentSource.HardwarePhysicalButton
                 || source == PresetIntentSource.AutomationAc
-                || source == PresetIntentSource.AutomationBattery;
+                || source == PresetIntentSource.AutomationBattery
+                || source == PresetIntentSource.AutomationRule;
         }
 
         /// <summary>

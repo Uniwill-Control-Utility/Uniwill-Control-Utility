@@ -414,6 +414,108 @@
                     </StackPanel>
                 </ui:CardExpander>
 
+                <!-- Watcher Rules (U-201, open-revo watcher_hub.rs port): user
+                     automation rules evaluated by the hosted hub on a 1 s tick.
+                     Rows edit through the WatcherRuleDialog; the store persists
+                     watchers.json and the hub reloads on save. -->
+                <ui:CardExpander x:Name="ExpanderWatcherRules"
+                                 Margin="0,0,0,8"
+                                 IsExpanded="False">
+                    <ui:CardExpander.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE781;" FontSize="20" Margin="4,0,6,0" />
+                    </ui:CardExpander.Icon>
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <ui:TextBlock FontTypography="Body" Text="Watcher Rules" />
+                            <ui:TextBlock Margin="0,2,0,0"
+                                       FontTypography="Caption"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       Text="Fire an action when telemetry thresholds, foreground apps, power events, or EC values change"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+
+                        <!-- Toolbar row: note + Add -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,18,0"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="Rules run while the app is open, each at most once per its cooldown." />
+                            <Button Grid.Column="1"
+                                    x:Name="btnAddWatcherRule"
+                                    Content="Add Rule"
+                                    Width="100"
+                                    VerticalAlignment="Center"
+                                    Click="btnAddWatcherRule_Click" />
+                        </Grid>
+
+                        <!-- Empty state -->
+                        <TextBlock x:Name="txtWatcherRulesEmpty"
+                                   Margin="0,10,0,0"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Text="No watcher rules yet. Add one to automate the fan, presets, performance modes, or notifications." />
+
+                        <!-- Rule rows -->
+                        <ItemsControl x:Name="icWatcherRules" Margin="0,8,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,4,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:ToggleSwitch Grid.Column="0"
+                                                         x:Name="tsRuleEnabled"
+                                                         LabelPosition="Right"
+                                                         VerticalAlignment="Center"
+                                                         OnContent="On"
+                                                         OffContent="Off"
+                                                         IsChecked="{Binding Enabled, Mode=TwoWay}" />
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Summary}"
+                                                       FontSize="11"
+                                                       Margin="0,2,0,0"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2"
+                                                x:Name="btnEditWatcherRule"
+                                                Content="&#xE70F;"
+                                                FontFamily="Segoe MDL2 Assets"
+                                                Width="32"
+                                                Margin="4,0,0,0"
+                                                VerticalAlignment="Center"
+                                                ToolTipService.ToolTip="Edit"
+                                                Click="btnEditWatcherRule_Click" />
+                                        <Button Grid.Column="3"
+                                                x:Name="btnDeleteWatcherRule"
+                                                Content="&#xE74D;"
+                                                FontFamily="Segoe MDL2 Assets"
+                                                Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                                Width="32"
+                                                Margin="4,0,0,0"
+                                                VerticalAlignment="Center"
+                                                ToolTipService.ToolTip="Delete"
+                                                Click="btnDeleteWatcherRule_Click" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                    </StackPanel>
+                </ui:CardExpander>
+
                 </StackPanel>
             </Grid>
         </ScrollViewer>
