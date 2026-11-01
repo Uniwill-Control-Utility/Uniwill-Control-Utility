@@ -138,6 +138,14 @@ namespace UCU.Hardware.Takeover
             List<TakeoverJournalEntry> journal = LoadJournal();
             int baseline = journal.Count;
 
+            // Snapshot the catalog services' live states BEFORE the kill pass:
+            // killing the bridge's process stops its service, and a post-kill
+            // query then reads "stopped" - the pause journaled "was not
+            // running", the restore never started it, and GCUBridge stayed
+            // down after every Restore (reproduced live 2026-11-01: the pause
+            // logged "killed GCUBridge" and no "stopped service" line).
+            Dictionary<string, uint> preStates = SnapshotServiceStates();
+
             void Journal(TakeoverJournalEntry entry, string auditLine)
             {
                 journal.Add(entry);
@@ -188,7 +196,7 @@ namespace UCU.Hardware.Takeover
             }
 
             // 2. Stop the catalog services and park them at demand-start.
-            PauseServices(probe, journal, actions);
+            PauseServices(probe, journal, actions, preStates);
 
             // 3. Disable the catalog tasks.
             PauseTasks(probe, journal, actions);
@@ -279,10 +287,18 @@ namespace UCU.Hardware.Takeover
             foreach (string line in actions)
                 Log.Information("[Oem] resume: {Action}", line);
 
-            if (consumed.Count > 0)
+            // Kills are audit-only and not undoable, so a restore consumes them:
+            // keeping them poisoned the state decider (any journal entry reads
+            // as pause evidence, so a fully restored stack reported
+            // PartiallyPaused forever - live-proven 2026-11-01).
+            int droppedKills = journal.RemoveAll(e => e.Kind == TakeoverMutationKind.ProcessKilled);
+
+            if (consumed.Count > 0 || droppedKills > 0)
             {
                 journal.RemoveAll(e => consumed.Contains((e.Kind, e.Target.ToUpperInvariant())));
                 SaveJournal(journal);
+                Log.Information("[Oem] resume: journal drained ({Consumed} entries reversed, {Kills} kill records dropped), {Remaining} left",
+                    consumed.Count, droppedKills, journal.Count);
             }
 
             return new OemActionResult
@@ -586,7 +602,42 @@ namespace UCU.Hardware.Takeover
             return (installed, running, neutralized, suspects);
         }
 
-        private static void PauseServices(PublisherProbe probe, List<TakeoverJournalEntry> journal, List<string> actions)
+        /// <summary>Live state of every catalog service, taken before the kill
+        /// pass. The kill pass stops a service through its process, so this
+        /// snapshot is the only point where "was it running?" is still
+        /// answerable (the field's third restore round).</summary>
+        private static Dictionary<string, uint> SnapshotServiceStates()
+        {
+            var states = new Dictionary<string, uint>(StringComparer.OrdinalIgnoreCase);
+
+            using var scm = new ScmScope();
+            if (scm.Manager == IntPtr.Zero)
+                return states;
+
+            foreach (string name in OemTakeoverTargets.ServiceNames)
+            {
+                IntPtr service = TakeoverNative.OpenService(scm.Manager, name, TakeoverNative.SERVICE_TAKEOVER_ACCESS);
+                if (service == IntPtr.Zero)
+                    continue;
+
+                try
+                {
+                    var status = new TakeoverNative.SERVICE_STATUS();
+                    if (TakeoverNative.QueryServiceStatus(service, ref status))
+                        states[name] = status.dwCurrentState;
+                }
+                finally
+                {
+                    TakeoverNative.CloseServiceHandle(service);
+                }
+            }
+
+            return states;
+        }
+
+        private static void PauseServices(
+            PublisherProbe probe, List<TakeoverJournalEntry> journal, List<string> actions,
+            IReadOnlyDictionary<string, uint> preStates)
         {
             using var scm = new ScmScope();
             if (scm.Manager == IntPtr.Zero)
@@ -612,6 +663,16 @@ namespace UCU.Hardware.Takeover
 
                     uint start = config!.Value.dwStartType;
 
+                    // The pre-kill snapshot is the authority on "was running":
+                    // by now the kill pass may already have stopped this
+                    // service through its process, and a live query would
+                    // read STOPPED. The live query below still drives the
+                    // stop action itself.
+                    bool wasRunning = preStates.TryGetValue(name, out uint preState)
+                        && preState is TakeoverNative.SERVICE_RUNNING
+                            or TakeoverNative.SERVICE_START_PENDING
+                            or TakeoverNative.SERVICE_STOP_PENDING;
+
                     // Stop first (bounded), then park at demand: the reference's
                     // "sc stop + sc config demand" pair, in one gated pass.
                     bool stopped = false;
@@ -625,6 +686,10 @@ namespace UCU.Hardware.Takeover
                         WaitForState(service, TakeoverNative.SERVICE_STOPPED, TimeSpan.FromSeconds(5));
                         stopped = true;
                         actions.Add($"stopped service {name}");
+                    }
+                    else if (wasRunning)
+                    {
+                        actions.Add($"service {name} was running before the kill pass (the kill stopped it)");
                     }
 
                     bool parked = false;
@@ -647,14 +712,16 @@ namespace UCU.Hardware.Takeover
                     // alone is a mutation: a service already parked at
                     // demand-start (a hand-started OEM service - the tester
                     // laptop's GCUBridge) gets no config write, and without
-                    // this entry the restore had nothing to start.
-                    if (stopped || parked)
+                    // this entry the restore had nothing to start. The running
+                    // flag comes from the PRE-KILL snapshot, because the kill
+                    // pass is what stopped the service.
+                    if (stopped || parked || wasRunning)
                     {
                         journal.Add(new TakeoverJournalEntry
                         {
                             Kind = TakeoverMutationKind.ServiceStart,
                             Target = name,
-                            Before = TakeoverServiceJournal.FormatBefore(start, stopped),
+                            Before = TakeoverServiceJournal.FormatBefore(start, wasRunning),
                             After = TakeoverNative.SERVICE_DEMAND_START.ToString(),
                             Utc = DateTime.UtcNow,
                         });
