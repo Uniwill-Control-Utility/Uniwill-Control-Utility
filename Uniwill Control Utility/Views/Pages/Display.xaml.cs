@@ -841,8 +841,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         }
 
         /// <summary>Imports a user ICC profile (U-205): the Core validator
-        /// decides, Core refuses garbage before anything is associated.</summary>
-        private void btnImportColorProfile_Click(object sender, RoutedEventArgs e)
+        /// decides, Core refuses garbage before anything is associated. A
+        /// successful import is switched to immediately - choosing a file in
+        /// the import dialog is the user's intent to use it.</summary>
+        private async void btnImportColorProfile_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new Microsoft.Win32.OpenFileDialog
             {
@@ -864,7 +866,30 @@ namespace Uniwill_Control_Utility.Views.Pages
                 return;
             }
 
-            UpdateColorCalibrationCombo(GetColorProfileSafe());
+            _colorCalBusy = true;
+            try
+            {
+                string? panel = Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName();
+                if (string.IsNullOrEmpty(panel))
+                {
+                    // Panel detached (external-only): defer, exactly like a
+                    // combo selection made in that state.
+                    Settings.Default.DisplayColorProfileDeferred = file;
+                    Settings.Default.DisplayColorProfileLastKnown = file;
+                    Settings.Default.Save();
+                }
+                else
+                {
+                    await Task.Run(() => Uniwill_Control_Utility.Scripts.Misc.Display.ApplyColorProfile(panel, file));
+                }
+
+                UpdateColorCalibrationCombo(GetColorProfileSafe() ?? file);
+            }
+            finally
+            {
+                _colorCalBusy = false;
+            }
+
             ToastNotification.ShowToastNotification(
                 LocalizationService.Get("Color Calibration"),
                 LocalizationService.Get("The ICC profile was imported."));
