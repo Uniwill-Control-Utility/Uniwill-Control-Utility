@@ -633,11 +633,24 @@
                                                   Text="Associate a Windows ICC color profile with the display in use via the ICM profile-association registry"/>
                                 </StackPanel>
                             </ui:CardControl.Header>
-                            <ComboBox x:Name="cbColorCalibration"
-                                      Width="180"
-                                      HorizontalAlignment="Right"
-                                      VerticalAlignment="Center"
-                                      SelectionChanged="cbColorCalibration_SelectionChanged"/>
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center">
+                                <ComboBox x:Name="cbColorCalibration"
+                                          Width="180"
+                                          Margin="0,0,8,0"
+                                          VerticalAlignment="Center"
+                                          SelectionChanged="cbColorCalibration_SelectionChanged"/>
+                                <Button Content="Import"
+                                        Padding="10,4"
+                                        Margin="0,0,8,0"
+                                        VerticalAlignment="Center"
+                                        Click="btnImportColorProfile_Click"/>
+                                <Button Content="Export"
+                                        Padding="10,4"
+                                        VerticalAlignment="Center"
+                                        Click="btnExportColorProfile_Click"/>
+                            </StackPanel>
                         </ui:CardControl>
 
                     </StackPanel>
