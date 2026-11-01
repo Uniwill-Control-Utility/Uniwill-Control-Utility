@@ -167,6 +167,44 @@ namespace Uniwill_Control_Utility.Views.Pages
             e.Handled = true;
         }
 
+        private async void ExportDiagnostics_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                AddExtension = true,
+                DefaultExt = ".zip",
+                FileName = $"UCU-Diagnostics-{DateTime.Now:yyyy-MM-dd-HHmm}.zip",
+                Filter = LocalizationService.Get("Diagnostics bundle (*.zip)|*.zip"),
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            btnExportDiagnostics.IsEnabled = false;
+            try
+            {
+                DiagnosticsExportService? service = App.GetService<DiagnosticsExportService>();
+                if (service is null)
+                    return;
+
+                await service.ExportAsync(dialog.FileName);
+                Scripts.Misc.ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("Diagnostics"),
+                    LocalizationService.Get("Diagnostics bundle exported."));
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "[About] diagnostics export failed");
+                Scripts.Misc.ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("Diagnostics"),
+                    LocalizationService.Get("The diagnostics bundle could not be written."));
+            }
+            finally
+            {
+                btnExportDiagnostics.IsEnabled = true;
+            }
+        }
+
         private void OpenLogFolder_Click(object sender, RoutedEventArgs e)
         {
             // The log folder is per-user (App.LOGS_FOLDER): in a per-machine install

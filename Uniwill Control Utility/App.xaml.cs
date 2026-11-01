@@ -516,6 +516,11 @@ namespace Uniwill_Control_Utility
                         // The Settings card is the only consumer; the merge is pure.
                         services.AddSingleton<Services.OemTakeoverService>();
 
+                        // Diagnostics bundle (U-208): versions, hardware,
+                        // engine and takeover state plus logs and journals.
+                        // App-side only; best-effort per file.
+                        services.AddSingleton<Services.DiagnosticsExportService>();
+
                         // Hardware Performance / Q-key button intercept: polls the EC
                         // TCC offset register for button presses and cycles UCU presets.
                         services.AddSingleton<QKeyButtonService>();
