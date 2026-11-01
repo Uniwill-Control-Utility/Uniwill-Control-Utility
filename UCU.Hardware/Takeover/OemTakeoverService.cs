@@ -221,6 +221,7 @@ namespace UCU.Hardware.Takeover
             IReadOnlyList<TakeoverJournalEntry> plan = TakeoverPolicy.PlanRestore(journal);
             var consumed = new HashSet<(TakeoverMutationKind, string)>();
             var serviceRestarts = new List<string>(); // catalog order preserved by the plan tail
+            var deferredServiceEntries = new List<TakeoverJournalEntry>();
 
             Log.Information("[Oem] resume: {Journal} journal entries -> {Plan} planned restores", journal.Count, plan.Count);
 
@@ -241,7 +242,17 @@ namespace UCU.Hardware.Takeover
                     case TakeoverMutationKind.ServiceStart:
                         (bool entryConsumed, bool needsStart) = RestoreServiceConfig(entry, actions);
                         if (entryConsumed)
-                            consumed.Add((entry.Kind, entry.Target.ToUpperInvariant()));
+                        {
+                            // A service entry is consumed only once the service is
+                            // actually back: the re-arm succeeding says nothing
+                            // about the start, and the first failing restore must
+                            // not drain the journal (that is what made every
+                            // retry silently do nothing in the field).
+                            if (needsStart)
+                                deferredServiceEntries.Add(entry);
+                            else
+                                consumed.Add((entry.Kind, entry.Target.ToUpperInvariant()));
+                        }
                         if (needsStart)
                             serviceRestarts.Add(entry.Target);
                         break;
@@ -261,6 +272,7 @@ namespace UCU.Hardware.Takeover
 
             StartCascade(serviceRestarts, actions);
             VerifyStarted(serviceRestarts, actions);
+            ConsumeStartedServices(deferredServiceEntries, consumed, actions);
 
             Log.Information("[Oem] resume: services to start = [{Services}], {Actions} action lines",
                 string.Join(", ", serviceRestarts), actions.Count);
@@ -798,6 +810,58 @@ namespace UCU.Hardware.Takeover
                         status.dwCurrentState != TakeoverNative.SERVICE_RUNNING)
                     {
                         actions.Add($"service {name}: still not running after restore (state {status.dwCurrentState})");
+                    }
+                }
+                finally
+                {
+                    TakeoverNative.CloseServiceHandle(service);
+                }
+            }
+        }
+
+        /// <summary>Drains the service entries whose work actually finished: a
+        /// re-armed service is consumed only when the SCM now reports it
+        /// RUNNING (or it is gone). Anything still stopped keeps its journal
+        /// entry, so the next Restore retries instead of reporting "nothing to
+        /// restore" - the field's silent dead end.</summary>
+        private static void ConsumeStartedServices(
+            List<TakeoverJournalEntry> deferred,
+            HashSet<(TakeoverMutationKind, string)> consumed,
+            List<string> actions)
+        {
+            if (deferred.Count == 0)
+                return;
+
+            using var scm = new ScmScope();
+            if (scm.Manager == IntPtr.Zero)
+            {
+                actions.Add("service control manager unreachable: paused service entries kept for retry");
+                return;
+            }
+
+            foreach (TakeoverJournalEntry entry in deferred)
+            {
+                IntPtr service = TakeoverNative.OpenService(scm.Manager, entry.Target, TakeoverNative.SERVICE_TAKEOVER_ACCESS);
+                if (service == IntPtr.Zero)
+                {
+                    // Gone while paused: nothing left to start, consume.
+                    consumed.Add((entry.Kind, entry.Target.ToUpperInvariant()));
+                    continue;
+                }
+
+                try
+                {
+                    var status = new TakeoverNative.SERVICE_STATUS();
+                    bool running = TakeoverNative.QueryServiceStatus(service, ref status)
+                                   && status.dwCurrentState == TakeoverNative.SERVICE_RUNNING;
+
+                    if (running)
+                    {
+                        consumed.Add((entry.Kind, entry.Target.ToUpperInvariant()));
+                    }
+                    else
+                    {
+                        actions.Add($"service {entry.Target}: journal entry kept for retry (not running)");
                     }
                 }
                 finally
