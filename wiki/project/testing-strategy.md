@@ -51,6 +51,13 @@ The application project remains large; new deterministic logic keeps moving into
 - Watercooler command frames, Nordic UART UUIDs, flow/status parsing, and enum-to-byte mappings.
 - Keyboard global report bytes, speed/direction transforms, per-key row announcement and BGR planar output.
 - EC temperature/duty conversion and fan-curve table shape.
+- ICC profile header gate (declared size, `acsp`, major version, tag-table bounds) before an imported profile can be associated.
+
+### Takeover, shortcuts and diagnostics
+
+- OEM takeover eligibility gate: catalog name/keyword, existing path, signature, publisher allowlist, UCU-root self-guard, package/system identity exemptions; restore planner (kills drop, dedup newest, service starts last); state decider; journal text round-trip with the `|running` flag.
+- Shortcut chord grammar, `shortcuts.json` sanitiser (invalid chord, duplicate first-wins, missing payload, cap) and corrupt-file quarantine.
+- Diagnostics report composition (sections, `unknown` fallbacks, attachment listing) plus a real zip round-trip against fake capabilities.
 
 ### Profiles and SKU resolution
 
