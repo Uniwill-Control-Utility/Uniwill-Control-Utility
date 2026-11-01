@@ -24,6 +24,10 @@ namespace Uniwill_Control_Utility.Services
         private readonly FlydigiCoolerHidService? _flydigi;
 
         private readonly object _settingsSaveLock = new();
+        // The user shortcut map (U-204): same hook, same debounce, one
+        // dispatcher for both consumers.
+        private readonly ShortcutService? _shortcuts;
+
         private readonly object _hookLock = new();
         private readonly object _hookThreadLock = new();
 
@@ -113,7 +117,8 @@ namespace Uniwill_Control_Utility.Services
             Performance.IFpsMonitoringService fps,
             EcTelemetryService? ecTelemetry = null,
             HydroUIService? hydroUi = null,
-            FlydigiCoolerHidService? flydigi = null)
+            FlydigiCoolerHidService? flydigi = null,
+            ShortcutService? shortcuts = null)
         {
             _settingsStore =
                 settingsStore ??
@@ -133,6 +138,7 @@ namespace Uniwill_Control_Utility.Services
             _ecTelemetry = ecTelemetry;
             _hydroUi = hydroUi;
             _flydigi = flydigi;
+            _shortcuts = shortcuts;
         }
 
         public Task StartAsync(
@@ -376,7 +382,13 @@ namespace Uniwill_Control_Utility.Services
             {
                 _lastHotkeyUtc = now;
                 ToggleContents();
+                return;
             }
+
+            // User shortcut map (U-204). Matching happens here (hook thread);
+            // the action is queued on the UI dispatcher by the service.
+            if (_shortcuts?.TryHandle(e) == true)
+                _lastHotkeyUtc = now;
         }
 
         private OverlayOptions NormaliseForStorage(
@@ -745,110 +757,6 @@ namespace Uniwill_Control_Utility.Services
         private static partial uint GetWindowThreadProcessId(IntPtr window, out uint processId);
 
         #endregion
-
-        private readonly record struct Hotkey(
-            bool Control,
-            bool Alt,
-            bool Shift,
-            Keys Key)
-        {
-            public bool Matches(KeyEventArgs e)
-            {
-                return e.Control == Control &&
-                       e.Alt == Alt &&
-                       e.Shift == Shift &&
-                       e.KeyCode == Key;
-            }
-
-            public static bool TryParse(
-                string? text,
-                out Hotkey hotkey)
-            {
-                hotkey = default;
-
-                if (string.IsNullOrWhiteSpace(text))
-                    return false;
-
-                bool control = false;
-                bool alt = false;
-                bool shift = false;
-                bool hasPrimaryKey = false;
-
-                Keys key = Keys.None;
-
-                string[] tokens = text.Split(
-                    '+',
-                    StringSplitOptions.TrimEntries |
-                    StringSplitOptions.RemoveEmptyEntries);
-
-                foreach (string token in tokens)
-                {
-                    if (token.Equals(
-                            "Ctrl",
-                            StringComparison.OrdinalIgnoreCase) ||
-                        token.Equals(
-                            "Control",
-                            StringComparison.OrdinalIgnoreCase))
-                    {
-                        control = true;
-                        continue;
-                    }
-
-                    if (token.Equals(
-                            "Alt",
-                            StringComparison.OrdinalIgnoreCase))
-                    {
-                        alt = true;
-                        continue;
-                    }
-
-                    if (token.Equals(
-                            "Shift",
-                            StringComparison.OrdinalIgnoreCase))
-                    {
-                        shift = true;
-                        continue;
-                    }
-
-                    if (hasPrimaryKey)
-                        return false;
-
-                    if (!Enum.TryParse(
-                            token,
-                            true,
-                            out key))
-                    {
-                        return false;
-                    }
-
-                    hasPrimaryKey = true;
-                }
-
-                if (!hasPrimaryKey ||
-                    key == Keys.None ||
-                    key is
-                        Keys.ControlKey or
-                        Keys.LControlKey or
-                        Keys.RControlKey or
-                        Keys.Menu or
-                        Keys.LMenu or
-                        Keys.RMenu or
-                        Keys.ShiftKey or
-                        Keys.LShiftKey or
-                        Keys.RShiftKey)
-                {
-                    return false;
-                }
-
-                hotkey = new Hotkey(
-                    control,
-                    alt,
-                    shift,
-                    key);
-
-                return true;
-            }
-        }
 
         /// <summary>Snapshot of Hydro UI pump and fan state for the RTSS OSD formatter.</summary>
         internal readonly record struct HydroUiSnapshot(

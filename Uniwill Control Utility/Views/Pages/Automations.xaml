@@ -516,6 +516,101 @@
                     </StackPanel>
                 </ui:CardExpander>
 
+                <!-- Keyboard shortcuts (U-204): the user's chord -> action map,
+                     dispatched from the overlay's existing global hook. The
+                     action set is the watcher hub's class (preset through the
+                     arbiter, performance mode, fan turbo, OEM takeover). -->
+                <ui:CardExpander x:Name="ExpanderShortcuts"
+                                 Margin="0,0,0,8"
+                                 IsExpanded="False">
+                    <ui:CardExpander.Icon>
+                        <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE765;" FontSize="20" Margin="4,0,6,0" />
+                    </ui:CardExpander.Icon>
+                    <ui:CardExpander.Header>
+                        <StackPanel>
+                            <ui:TextBlock FontTypography="Body" Text="Keyboard shortcuts" />
+                            <ui:TextBlock Margin="0,2,0,0"
+                                       FontTypography="Caption"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                       Text="Run any UCU action from a global shortcut while the app is open"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ui:CardExpander.Header>
+                    <StackPanel>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,18,0"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="A shortcut fires once per press; chords need at least one of Ctrl, Alt or Shift." />
+                            <Button Grid.Column="1"
+                                    x:Name="btnAddShortcut"
+                                    Content="Add shortcut"
+                                    Width="120"
+                                    VerticalAlignment="Center"
+                                    Click="btnAddShortcut_Click" />
+                        </Grid>
+
+                        <TextBlock x:Name="txtShortcutsEmpty"
+                                   Margin="0,10,0,0"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Text="No shortcuts yet. Add one to trigger presets, performance modes, fan turbo, or the OEM takeover from the keyboard." />
+
+                        <ItemsControl x:Name="icShortcuts" Margin="0,8,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,4,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0"
+                                                Padding="8,3"
+                                                CornerRadius="4"
+                                                VerticalAlignment="Center"
+                                                Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                                            <TextBlock Text="{Binding Chord}" FontFamily="Consolas" FontSize="12" />
+                                        </Border>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding Summary}"
+                                                   Margin="10,0,8,0"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                   TextWrapping="Wrap" />
+                                        <Button Grid.Column="2"
+                                                Content="&#xE70F;"
+                                                FontFamily="Segoe MDL2 Assets"
+                                                Width="32"
+                                                Margin="4,0,0,0"
+                                                VerticalAlignment="Center"
+                                                ToolTipService.ToolTip="Edit"
+                                                Click="btnEditShortcut_Click" />
+                                        <Button Grid.Column="3"
+                                                Content="&#xE74D;"
+                                                FontFamily="Segoe MDL2 Assets"
+                                                Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                                Width="32"
+                                                Margin="4,0,0,0"
+                                                VerticalAlignment="Center"
+                                                ToolTipService.ToolTip="Delete"
+                                                Click="btnDeleteShortcut_Click" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                    </StackPanel>
+                </ui:CardExpander>
+
                 </StackPanel>
             </Grid>
         </ScrollViewer>

@@ -219,6 +219,16 @@ Never robocopy-patch the layout to stage a new payload: MSI-written files carry 
 - **Step 3 by app chain**: skipping the manual `--install-engine` verb is fine - the app's post-startup chain registers the service (one UAC prompt on first launch, fresh registration carries the current DACL).
 - **Step 3 IS part of the agent cycle (user-directed 2026-10-31)**: run `"...current\Service\Uniwill Control Utility Engine.exe" --install-engine` from the elevated staging shell after `/i`, then verify `sc query` = RUNNING - the user's first app launch is then clean (no UAC). Expect `sc sdshow` to read `A;;KR;;;AU` (not the `A;;CCSWRPRC;;;AU` template) on this box: the service-protection enforcer (observed: Emsisoft) reverts the AU grant every install/re-assert pass (log: 10 re-assert attempts, "DACL did not converge", SACL fingerprint `S:(AU;FA;...;;;WD)`) - with the service RUNNING that costs the user nothing; when the service is NOT running, the unelevated app cannot start it and the elevated repair path pops a UAC **every launch** (the documented classic symptom). The permanent fixes are the AV application allowlist for both images and Authenticode signing (section "The engine service is running yet..."), not the staging cycle.
 
+### Keyboard shortcuts do not fire
+
+Shortcuts are user-editable under **Automations → Keyboard shortcuts** and persist in `%LOCALAPPDATA%\UCU\shortcuts.json` (the record is the file; an unreadable file is moved to `.bak` and the map starts empty). Three facts make most "my shortcut does nothing" reports self-diagnosing:
+
+- **At least one of Ctrl, Alt or Shift is required**, and only one primary key. A modifier-only chord is rejected on save; a hand-edited row that fails the grammar is dropped on load (the hook never fires a bad row).
+- **The chord is matched by the same global hook as the overlay toggles**, installed only while the overlay is enabled (`Game Overlay → Enable overlay`). With the overlay off there is no hook, so no shortcut fires - the overlay toggles share that switch.
+- **One action per press**, the whitelist being the watcher hub's class: apply preset (through the preset arbiter, same priority as a tray click), set performance mode, enable fan turbo (set semantics - it does not toggle off), pause/restore the OEM Control Center. Presets apply with the usual toast; takeover actions carry the same outcome lines as the Settings card.
+
+A shortcut that fires the wrong thing is a duplicate chord: the first row wins on load, and the editor's saved file keeps one binding per chord.
+
 ### OEM Control Center takeover (pause/restore)
 
 Field context for story U-203 (Settings → "OEM Control Center" card). The OEM stack (`GCUBridge`/`GCUService`, the ControlCenter tray/services, its scheduled tasks and Run keys) re-arms the OEM fan curves, so it fights UCU's fan/power writes; the takeover pauses it (journal-first, fully reversible) and restores it untouched.
