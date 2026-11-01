@@ -163,8 +163,33 @@ public sealed class PrerequisiteRtssDetectionTests
         Assert.Contains("SafeFireAndForget(AutoStartRtssForOverlayAsync())", app, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void TheSessionLauncherPassesNoDebugProcessFlagToCreateProcessAsUser()
+    {
+        // FIELD DEFECT 2026-11-01: AppSessionLauncher passed LOGON_WITH_PROFILE
+        // (0x1) into the CreateProcessAsUser flag word. LOGON_WITH_PROFILE
+        // belongs to CreateProcessWithTokenW/WithLogonW; in the CreateProcess*
+        // space 0x1 is DEBUG_PROCESS - every launched process attached to a
+        // nonexistent debugger and froze at the ntdll image-load debug event.
+        // The field shape: the RTSS "Start" button showed an RTSS.exe in Task
+        // Manager that spawned no Hooks Loader (no injection, no OSD), and a
+        // supervised app relaunch never painted a window - all frozen 1-thread
+        // ~3 MB husks. The engine test suite has no source-reading helper, so
+        // this contract is pinned here, beside the other RTSS start-route pins.
+        string launcher = ReadEngineSource("AppSessionLauncher.cs");
+
+        Assert.DoesNotContain("LOGON_WITH_PROFILE", launcher, StringComparison.Ordinal);
+
+        // The call site passes exactly the one valid flag.
+        Assert.Contains("CREATE_UNICODE_ENVIRONMENT,", launcher, StringComparison.Ordinal);
+        Assert.DoesNotContain("CREATE_UNICODE_ENVIRONMENT |", launcher, StringComparison.Ordinal);
+    }
+
     private static string ReadAppSource(params string[] parts) =>
         File.ReadAllText(Path.Combine(new[] { RepositoryRoot(), "Uniwill Control Utility" }.Concat(parts).ToArray()));
+
+    private static string ReadEngineSource(params string[] parts) =>
+        File.ReadAllText(Path.Combine(new[] { RepositoryRoot(), "UCU.Engine" }.Concat(parts).ToArray()));
 
     private static string ReadCoreSource(params string[] parts) =>
         File.ReadAllText(Path.Combine(new[] { RepositoryRoot(), "UCU.Core" }.Concat(parts).ToArray()));

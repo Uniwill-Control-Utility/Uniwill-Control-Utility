@@ -22,7 +22,6 @@ namespace UCU.Engine
         private const int TokenPrimary = 1;
         private const int TokenLinkedToken = 19;
         private const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
-        private const uint LOGON_WITH_PROFILE = 0x00000001;
         private const uint WTSConsoleSession = 0xFFFFFFFF;
 
         /// <summary>
@@ -106,7 +105,20 @@ namespace UCU.Engine
 
                 bool started = CreateProcessAsUser(primary, null, commandLine,
                     IntPtr.Zero, IntPtr.Zero, false,
-                    CREATE_UNICODE_ENVIRONMENT | LOGON_WITH_PROFILE,
+                    // FIELD-PROVEN 2026-11-01: pass ONLY CreateProcess-valid
+                    // flags. The profile flag of CreateProcessWithTokenW/
+                    // WithLogonW (value 0x1) is not a CreateProcessAsUser
+                    // flag: in the CreateProcess* flag space 0x1 is
+                    // DEBUG_PROCESS, so including it created every process
+                    // attached to a nonexistent debugger: the process object
+                    // appeared (1 thread, ~3 MB, frozen at the ntdll
+                    // image-load debug event) and NEVER ran - the RTSS
+                    // "Start" button produced a helper-less RTSS.exe (no Hooks
+                    // Loader => no injection => no OSD), auto-start "succeeded"
+                    // against a husk, and a supervised app relaunch never
+                    // painted a window. CreateProcessAsUser loads the token
+                    // user's profile on its own; no flag is needed for it.
+                    CREATE_UNICODE_ENVIRONMENT,
                     environment, workingDirectory, ref startupInfo, out PROCESS_INFORMATION pi);
 
                 if (!started)
