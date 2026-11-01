@@ -54,6 +54,8 @@ For a useful incident report, capture:
 - Reproduction steps including sleep/resume or navigation state.
 - The relevant log file and screenshots.
 
+**The diagnostics bundle does all of this in one click** (About → Diagnostics → *Export diagnostics*, U-208). It writes a zip containing `report.txt` (UCU version, OS, CPU, the engine's `get_info` answer, and the OEM takeover state incl. gate refusals) plus the app log, the engine log, and both takeover journals. The journals are the field-critical part: they are what distinguishes "nothing was paused" from "the restore failed", and three U-203 field rounds had to collect them by hand. Files are read with `FileShare.ReadWrite`, so the currently-open log tails are included; anything unreadable is skipped rather than failing the export.
+
 ## Common symptoms
 
 ### Application exits immediately after launch
