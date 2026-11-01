@@ -1,4 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -10,8 +14,10 @@ using Uniwill_Control_Utility.Properties;
 using Uniwill_Control_Utility.Scripts;
 using Uniwill_Control_Utility.Scripts.GPUs.NVIDIA;
 using Uniwill_Control_Utility.Services;
+using Uniwill_Control_Utility.Views.Windows;
 using UCU.Contracts.Capabilities;
 using UCU.Core.Ec;
+using UCU.Core.Supervision;
 
 namespace Uniwill_Control_Utility.Views.Pages
 {
@@ -52,6 +58,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Power Guardian toggles (U-107): persisted rows, defaults OFF.
             cbPowerGuardGpu.IsChecked = Settings.Default.PowerGuardGpu;
             cbPowerGuardCpu.IsChecked = Settings.Default.PowerGuardCpu;
+
+            // Watcher Rules card (U-201): rows from watchers.json; edits save
+            // through the store, which reloads the hosted hub.
+            InitWatcherRules();
 
             setup = true;
         }
@@ -190,9 +200,10 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         /// <summary>
         /// Maps a display name ("Office", "Custom 3") back to the profile key ("Office", "Custom 3").
-        /// Returns empty string for "None" or unrecognized values.
+        /// Returns empty string for "None" or unrecognized values. Internal: the watcher rule
+        /// dialog resolves its preset selection through the same mapping.
         /// </summary>
-        private static string ResolveProfileName(string? displayName)
+        internal static string ResolveProfileName(string? displayName)
         {
             if (string.IsNullOrEmpty(displayName) || displayName == "None")
                 return string.Empty;
@@ -549,6 +560,214 @@ namespace Uniwill_Control_Utility.Views.Pages
             if (!setup) return;
             Settings.Default.PowerGuardCpu = false;
             Settings.Default.Save();
+        }
+
+        #endregion
+
+        #region Watcher Rules (U-201)
+
+        // The card edits watchers.json through the WatcherStore: every change
+        // goes Save -> the store raises Changed -> the hosted hub reloads its
+        // live rule set. The rows carry the rule records; Enabled lives on the
+        // row and is folded back into the record at save time.
+
+        private readonly WatcherStore? _watcherStore = App.GetService<WatcherStore>();
+        private readonly ObservableCollection<WatcherRuleRow> _watcherRows = new();
+        private bool _watcherLoading;
+
+        /// <summary>Loads the store, binds the rows, and arms culture-aware
+        /// summary refresh. Called from the constructor.</summary>
+        private void InitWatcherRules()
+        {
+            try
+            {
+                _watcherStore?.Load();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("[Automations] watchers.json load failed: {Message}", ex.Message);
+            }
+
+            icWatcherRules.ItemsSource = _watcherRows;
+            RefreshWatcherRows();
+
+            LocalizationService.CultureChanged += OnWatcherCultureChanged;
+        }
+
+        private void OnWatcherCultureChanged(object? sender, EventArgs e)
+        {
+            // Summaries are localized fragments; rebuild the rows so they
+            // re-render in the new culture.
+            Dispatcher.BeginInvoke(new Action(RefreshWatcherRows));
+        }
+
+        private void RefreshWatcherRows()
+        {
+            _watcherLoading = true;
+
+            foreach (WatcherRuleRow row in _watcherRows)
+                row.PropertyChanged -= WatcherRowChanged;
+            _watcherRows.Clear();
+
+            if (_watcherStore is not null)
+            {
+                foreach (WatcherRule rule in _watcherStore.Rules)
+                {
+                    WatcherRuleRow row = new(rule);
+                    row.PropertyChanged += WatcherRowChanged;
+                    _watcherRows.Add(row);
+                }
+            }
+
+            _watcherLoading = false;
+
+            txtWatcherRulesEmpty.Visibility = _watcherRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void WatcherRowChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (_watcherLoading || e.PropertyName != nameof(WatcherRuleRow.Enabled))
+                return;
+
+            SaveWatcherRules(_watcherRows.Select(r => r.ToRule()).ToList());
+        }
+
+        private void SaveWatcherRules(List<WatcherRule> rules)
+        {
+            if (_watcherStore is null)
+                return;
+
+            try
+            {
+                // The store validates every rule and raises Changed (the hub
+                // reloads): the page never touches the hub directly.
+                _watcherStore.Save(rules);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message,
+                    LocalizationService.Get("Watcher Rules"),
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+
+            RefreshWatcherRows();
+        }
+
+        /// <summary>The preset display names for the dialog's combo — the
+        /// same pool the AC/DC/resume rows offer (built-ins + the changed
+        /// custom slots of the active mode), minus "None": a watcher rule's
+        /// apply-preset action requires a profile.</summary>
+        private static List<string> WatcherPresetDisplayNames()
+        {
+            List<string> names = new();
+            foreach (string name in PresetProfileApplier.BuiltInProfileNames)
+                names.Add(PresetProfileApplier.DisplayName(name));
+
+            PresetMode mode = ActivePresetMode;
+            var presets = CustomPresetStore.Load(mode);
+            for (int i = 0; i < presets.Length; i++)
+            {
+                if (presets[i].HasChanges)
+                    names.Add(PresetProfileApplier.CustomProfileKey(i, mode));
+            }
+
+            return names;
+        }
+
+        private void btnAddWatcherRule_Click(object sender, RoutedEventArgs e)
+        {
+            if (_watcherStore is null)
+                return;
+
+            if (_watcherRows.Count >= WatcherPolicy.MaxRules)
+            {
+                MessageBox.Show(
+                    LocalizationService.Format("At most {0} watcher rules.", WatcherPolicy.MaxRules),
+                    LocalizationService.Get("Watcher Rules"),
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            WatcherRuleDialog dialog = new(null, WatcherPresetDisplayNames())
+            {
+                Owner = Window.GetWindow(this),
+            };
+
+            if (dialog.ShowDialog() == true && dialog.Rule is WatcherRule rule)
+            {
+                List<WatcherRule> updated = _watcherRows.Select(r => r.ToRule()).ToList();
+                updated.Add(rule);
+                SaveWatcherRules(updated);
+            }
+        }
+
+        private void btnEditWatcherRule_Click(object sender, RoutedEventArgs e)
+        {
+            if (_watcherStore is null || sender is not FrameworkElement { DataContext: WatcherRuleRow row })
+                return;
+
+            int index = _watcherRows.IndexOf(row);
+            if (index < 0)
+                return;
+
+            WatcherRuleDialog dialog = new(row.ToRule(), WatcherPresetDisplayNames())
+            {
+                Owner = Window.GetWindow(this),
+            };
+
+            if (dialog.ShowDialog() == true && dialog.Rule is WatcherRule edited)
+            {
+                List<WatcherRule> updated = _watcherRows.Select(r => r.ToRule()).ToList();
+                updated[index] = edited;
+                SaveWatcherRules(updated);
+            }
+        }
+
+        private void btnDeleteWatcherRule_Click(object sender, RoutedEventArgs e)
+        {
+            if (_watcherStore is null || sender is not FrameworkElement { DataContext: WatcherRuleRow row })
+                return;
+
+            List<WatcherRule> updated = _watcherRows
+                .Where(r => !ReferenceEquals(r, row))
+                .Select(r => r.ToRule())
+                .ToList();
+
+            SaveWatcherRules(updated);
+        }
+
+        /// <summary>One card row: the rule plus the live Enabled toggle and
+        /// the localized one-line summary.</summary>
+        public sealed class WatcherRuleRow : INotifyPropertyChanged
+        {
+            private readonly WatcherRule _rule;
+            private bool _enabled;
+
+            public WatcherRuleRow(WatcherRule rule)
+            {
+                _rule = rule;
+                _enabled = rule.Enabled;
+            }
+
+            public string Name => _rule.Name;
+
+            public string Summary => WatcherVocabulary.Describe(_rule);
+
+            public bool Enabled
+            {
+                get => _enabled;
+                set
+                {
+                    if (_enabled == value)
+                        return;
+                    _enabled = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Enabled)));
+                }
+            }
+
+            public WatcherRule ToRule() => _rule with { Enabled = _enabled };
+
+            public event PropertyChangedEventHandler? PropertyChanged;
         }
 
         #endregion
