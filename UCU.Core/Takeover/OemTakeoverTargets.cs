@@ -25,6 +25,11 @@ namespace UCU.Core.Takeover
     ///    "uniwill" keyword would be self-decapitation (field-proven by the
     ///    dev-box probe: UCU's own processes are the ONLY "uniwill" match).
     ///
+    /// Two scopes are signature-exempt because their identity is not the file:
+    /// registry state bytes (UWP AppModel / StartupApproved - package/task
+    /// identity) and MSIX package payloads under the WindowsApps root (the
+    /// AppX package signature covers them; per-file Authenticode does not).
+    ///
     /// Targets that match the name catalog but fail 2-4 are never touched;
     /// they surface as squat-suspects in the status (audit trail, not action).
     /// </summary>
@@ -122,6 +127,7 @@ namespace UCU.Core.Takeover
             "control center",
             "gcu",
             "pcspecialist",
+            "tongfang",
         };
 
         /// <summary>Install roots owned by UCU: nothing under these is ever a
@@ -169,6 +175,33 @@ namespace UCU.Core.Takeover
         public static bool IsUnderUcuRoot(string path) =>
             !string.IsNullOrEmpty(path)
             && path.IndexOf(UcuOwnRootHint, StringComparison.OrdinalIgnoreCase) >= 0;
+
+        /// <summary>True for paths under the MSIX/Store package install root
+        /// (the UWP Control Center's own payload, e.g.
+        /// <c>...\Program Files\WindowsApps\ControlCenter3_*_x64_...\Win32\</c>).
+        /// The packages subsystem is the only writer of that tree (package
+        /// identity, ACL-protected), so a user cannot name-squat inside it -
+        /// the same squat-immunity the registry-byte scopes carry. Package
+        /// payloads are covered by the AppX package signature, NOT per-file
+        /// Authenticode, so the file-identity clauses cannot apply there
+        /// (field-proven on the tester laptop: SystrayComponent inside the
+        /// package reads as unsigned).</summary>
+        public static bool IsUnderPackageRoot(string path) =>
+            !string.IsNullOrEmpty(path)
+            && path.IndexOf(@"\WindowsApps\", StringComparison.OrdinalIgnoreCase) >= 0;
+
+        /// <summary>True for paths under the Windows system directory
+        /// (System32). Executable identity there belongs to the OS: a user
+        /// cannot write to it without administrator rights, so a task whose
+        /// actions are all system binaries is name-squat-immune in the same
+        /// way a package payload is (field-proven: the OEM Control Center's
+        /// "ControlCenter" task runs "powershell.exe" with its script as the
+        /// argument - the task is OEM, the executable is Windows', and the
+        /// executable has no embedded signature to read because inbox
+        /// binaries are catalog-signed).</summary>
+        public static bool IsUnderWindowsSystemDirectory(string path) =>
+            !string.IsNullOrEmpty(path)
+            && path.IndexOf(@"\System32\", StringComparison.OrdinalIgnoreCase) >= 0;
 
         private static bool ContainsExact(IReadOnlyList<string> list, string name)
         {

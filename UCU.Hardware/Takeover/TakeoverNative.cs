@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 namespace UCU.Hardware.Takeover
@@ -171,13 +172,17 @@ namespace UCU.Hardware.Takeover
         [DllImport("wintrust.dll", SetLastError = true)]
         static extern uint WinVerifyTrust(IntPtr hWnd, in Guid pgActionID, ref WINTRUST_DATA pWVTData);
 
-        /// <summary>True when the file carries a signature whose chain the
-        /// platform trusts (offline chain check - the field laptops run
-        /// disconnected as a norm, and the reference's own restore scripts
-        /// do not do revocation either). Unsigned, tampered, chain-broken:
-        /// false, and the takeover gate refuses the target.</summary>
-        public static bool IsSignatureValid(string filePath)
+        /// <summary>Verifies the file's signature chain AND reads the signer
+        /// subject in one WinTrust pass. <see cref="IsSignatureValid"/> is the
+        /// same verdict without the publisher read. The chain check is
+        /// offline (the field laptops run disconnected as a norm, and the
+        /// reference's own restore scripts do not do revocation either);
+        /// unsigned, tampered, chain-broken: false, and the takeover gate
+        /// refuses the target.</summary>
+        public static bool VerifySignedFile(string filePath, out string? subject)
         {
+            subject = null;
+
             var fileInfo = new WINTRUST_FILE_INFO
             {
                 cbStruct = (uint)Marshal.SizeOf<WINTRUST_FILE_INFO>(),
@@ -187,34 +192,185 @@ namespace UCU.Hardware.Takeover
             };
 
             IntPtr fileInfoPtr = Marshal.AllocHGlobal(Marshal.SizeOf<WINTRUST_FILE_INFO>());
+            var data = new WINTRUST_DATA
+            {
+                cbStruct = (uint)Marshal.SizeOf<WINTRUST_DATA>(),
+                dwUIChoice = 2,          // WTD_UI_NONE (a service must never pop UI)
+                fdwRevocationChecks = 0, // WTD_REVOKE_NONE (offline chain: field machines)
+                dwUnionChoice = 1,       // WTD_CHOICE_FILE
+                dwStateAction = WTD_STATEACTION_VERIFY,
+            };
+
+            uint status;
             try
             {
                 Marshal.StructureToPtr(fileInfo, fileInfoPtr, false);
+                data.pFileData = fileInfoPtr;
 
-                var data = new WINTRUST_DATA
-                {
-                    cbStruct = (uint)Marshal.SizeOf<WINTRUST_DATA>(),
-                    pPolicyCallbackData = IntPtr.Zero,
-                    pSIPClientData = IntPtr.Zero,
-                    dwUIChoice = 2,
-                    fdwRevocationChecks = 0,
-                    dwUnionChoice = 1,
-                    pFileData = fileInfoPtr,
-                    dwStateAction = 0,
-                    hWVTStateData = IntPtr.Zero,
-                    pwszURLReference = IntPtr.Zero,
-                    dwProvFlags = 0,
-                    dwUIContext = 0,
-                    pSignatureSettings = IntPtr.Zero,
-                };
+                status = WinVerifyTrust(IntPtr.Zero, in WinTrustActionGenericVerifyV2, ref data);
 
-                uint status = WinVerifyTrust(IntPtr.Zero, in WinTrustActionGenericVerifyV2, ref data);
-                return status == 0; // TRUST_S_SUCCESS
+                if (status == 0 && data.hWVTStateData != IntPtr.Zero)
+                    subject = ReadSignerSubject(data.hWVTStateData);
             }
             finally
             {
+                // VERIFY owns provider state; CLOSE releases it (skipping this
+                // leaks the chain in a long-running service).
+                if (data.hWVTStateData != IntPtr.Zero)
+                {
+                    WINTRUST_DATA close = data;
+                    close.dwStateAction = WTD_STATEACTION_CLOSE;
+                    WinVerifyTrust(IntPtr.Zero, in WinTrustActionGenericVerifyV2, ref close);
+                }
+
                 Marshal.DestroyStructure<WINTRUST_FILE_INFO>(fileInfoPtr);
                 Marshal.FreeHGlobal(fileInfoPtr);
+            }
+
+            return status == 0; // TRUST_S_SUCCESS
+        }
+
+        /// <summary>True when the file carries a signature whose chain the
+        /// platform trusts. Unsigned, tampered, chain-broken: false.</summary>
+        public static bool IsSignatureValid(string filePath) => VerifySignedFile(filePath, out _);
+
+        // ---- Authenticode signer (the publisher evidence) -------------------
+
+        const uint WTD_STATEACTION_VERIFY = 1;
+        const uint WTD_STATEACTION_CLOSE = 2;
+        const uint X509_ASN_ENCODING = 0x00000001;
+        const uint PKCS_7_ASN_ENCODING = 0x00010000;
+        const uint CERT_SIMPLE_NAME_STR = 1;
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct CRYPT_INTEGER_BLOB
+        {
+            public uint cbData;
+            public IntPtr pbData;
+        }
+
+        /// <summary>wincrypt's FILETIME: two DWORDs, 4-byte aligned - NOT a
+        /// CLR long (whose 8-byte alignment would shift every following
+        /// field; the first probe read past the wrong offsets and lost the
+        /// chain pointer).</summary>
+        [StructLayout(LayoutKind.Sequential)]
+        struct FILETIME
+        {
+            public uint dwLowDateTime;
+            public uint dwHighDateTime;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct CRYPT_ALGORITHM_IDENTIFIER
+        {
+            public IntPtr pszObjId;
+            public CRYPT_INTEGER_BLOB Parameters;
+        }
+
+        /// <summary>The CERT_INFO prefix the subject walk needs (dwVersion ..
+        /// Subject; the layout matches wincrypt's CERT_INFO through Subject).</summary>
+        [StructLayout(LayoutKind.Sequential)]
+        struct CERT_INFO_PREFIX
+        {
+            public uint dwVersion;
+            public CRYPT_INTEGER_BLOB SerialNumber;
+            public CRYPT_ALGORITHM_IDENTIFIER SignatureAlgorithm;
+            public CRYPT_INTEGER_BLOB Issuer;
+            public FILETIME NotBefore;
+            public FILETIME NotAfter;
+            public CRYPT_INTEGER_BLOB Subject;
+        }
+
+        /// <summary>CERT_CONTEXT prefix (encoding type, encoded bytes, info).</summary>
+        [StructLayout(LayoutKind.Sequential)]
+        struct CERT_CONTEXT_PREFIX
+        {
+            public uint dwCertEncodingType;
+            public IntPtr pbCertEncoded;
+            public uint cbCertEncoded;
+            public IntPtr pCertInfo;
+        }
+
+        /// <summary>CRYPT_PROVIDER_CERT prefix: the chain element's certificate.</summary>
+        [StructLayout(LayoutKind.Sequential)]
+        struct CRYPT_PROVIDER_CERT_PREFIX
+        {
+            public uint cbStruct;
+            public IntPtr pCert;
+        }
+
+        /// <summary>CRYPT_PROVIDER_SGNR prefix: the signer's certificate chain.</summary>
+        [StructLayout(LayoutKind.Sequential)]
+        struct CRYPT_PROVIDER_SGNR_PREFIX
+        {
+            public uint cbStruct;
+            public FILETIME sftVerifyAsOf;
+            public uint csCertChain;
+            public IntPtr pasCertChain;
+        }
+
+        [DllImport("wintrust.dll", SetLastError = true)]
+        static extern IntPtr WTHelperProvDataFromStateData(IntPtr hStateData);
+
+        [DllImport("wintrust.dll", SetLastError = true)]
+        static extern IntPtr WTHelperGetProvSignerFromChain(
+            IntPtr pProvData, uint dwIndex, [MarshalAs(UnmanagedType.Bool)] bool fCounterSigner, uint dwIndexCounterSigner);
+
+        [DllImport("crypt32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        static extern int CertNameToStrW(
+            uint dwCertEncodingType, ref CRYPT_INTEGER_BLOB pName, uint dwStrType, StringBuilder? psz, int csz);
+
+        /// <summary>The Authenticode signer's subject DN ("CN=..., O=...,
+        /// C=...") read from a VERIFY state handle. The publisher evidence
+        /// the allowlist compares; nothing managed reads it (a
+        /// certificate-FILE loader answers nothing for a PE with an embedded
+        /// signature - field-proven on the tester laptop, pack #23 round:
+        /// every signed OEM binary read with an empty subject and the whole
+        /// stack was refused as the wrong publisher - and
+        /// X509Certificate.CreateFromSignedFile is SYSLIB0057-obsolete).
+        /// Null = no readable signer.</summary>
+        static string? ReadSignerSubject(IntPtr hStateData)
+        {
+            try
+            {
+                IntPtr providerData = WTHelperProvDataFromStateData(hStateData);
+                if (providerData == IntPtr.Zero)
+                    return null;
+
+                IntPtr signer = WTHelperGetProvSignerFromChain(providerData, 0, false, 0);
+                if (signer == IntPtr.Zero)
+                    return null;
+
+                CRYPT_PROVIDER_SGNR_PREFIX sgnr = Marshal.PtrToStructure<CRYPT_PROVIDER_SGNR_PREFIX>(signer);
+                if (sgnr.csCertChain == 0 || sgnr.pasCertChain == IntPtr.Zero)
+                    return null;
+
+                // Chain element 0 is the signer leaf.
+                IntPtr certificate = Marshal.PtrToStructure<CRYPT_PROVIDER_CERT_PREFIX>(sgnr.pasCertChain).pCert;
+                if (certificate == IntPtr.Zero)
+                    return null;
+
+                CERT_CONTEXT_PREFIX context = Marshal.PtrToStructure<CERT_CONTEXT_PREFIX>(certificate);
+                if (context.pCertInfo == IntPtr.Zero)
+                    return null;
+
+                CERT_INFO_PREFIX info = Marshal.PtrToStructure<CERT_INFO_PREFIX>(context.pCertInfo);
+                if (info.Subject.pbData == IntPtr.Zero || info.Subject.cbData == 0)
+                    return null;
+
+                int length = CertNameToStrW(
+                    X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, ref info.Subject, CERT_SIMPLE_NAME_STR, null, 0);
+                if (length <= 1)
+                    return null;
+
+                var text = new StringBuilder(length);
+                length = CertNameToStrW(
+                    X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, ref info.Subject, CERT_SIMPLE_NAME_STR, text, text.Capacity);
+                return length > 1 ? text.ToString() : null;
+            }
+            catch
+            {
+                return null;
             }
         }
 

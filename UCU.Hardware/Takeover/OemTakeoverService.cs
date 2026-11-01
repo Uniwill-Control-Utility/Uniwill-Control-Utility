@@ -929,15 +929,44 @@ namespace UCU.Hardware.Takeover
         }
 
         /// <summary>A task's identity is its Exec actions: every path must
-        /// pass the file-identity gate. No Exec paths at all (Script/Email
-        /// actions, unreadable definition) = no identity = refuse.</summary>
+        /// pass the file-identity gate, with two identity exemptions - a
+        /// package payload (AppX-signed) and a system binary (the OS owns
+        /// System32; a script-action task legitimately runs powershell.exe).
+        /// No Exec paths at all (Script/Email actions, unreadable definition)
+        /// = no identity = refuse.</summary>
         private static (TakeoverPolicy.Eligibility verdict, string? reason) GateTask(
             PublisherProbe probe, OemTaskObservation task)
         {
             if (task.ActionPaths.Count == 0)
                 return (TakeoverPolicy.Eligibility.SquatSuspect, "no Exec action path to verify");
 
-            foreach (string path in task.ActionPaths)
+            var normalized = new List<string>(task.ActionPaths.Count);
+            foreach (string rawPath in task.ActionPaths)
+            {
+                // Task actions routinely carry bare names or System32-relative
+                // paths ("powershell.exe" - field-proven on the tester
+                // laptop's ControlCenter task); normalize through the same
+                // extractor the run-key scope uses before the gate sees it.
+                normalized.Add(ExePathFromCommand(rawPath) ?? rawPath);
+            }
+
+            bool allSystemBinaries = true;
+            foreach (string path in normalized)
+            {
+                if (!OemTakeoverTargets.IsUnderWindowsSystemDirectory(path))
+                {
+                    allSystemBinaries = false;
+                    break;
+                }
+            }
+
+            // System-identity exemption: every action is an OS binary, so the
+            // executable identity is Windows' and the catalog name is the
+            // task's whole identity (a user cannot plant a System32 image).
+            if (allSystemBinaries)
+                return (TakeoverPolicy.Eligibility.Eligible, null);
+
+            foreach (string path in normalized)
             {
                 var (verdict, reason) = GateFileIdentity(probe, path);
                 if (verdict != TakeoverPolicy.Eligibility.Eligible)
@@ -962,7 +991,15 @@ namespace UCU.Hardware.Takeover
                 return (TakeoverPolicy.Eligibility.UcuSelf, null);
 
             bool exists = File.Exists(path);
-            (bool valid, string? subject) = exists
+
+            // Package-identified scope (MSIX payloads under WindowsApps): the
+            // AppX package signature covers the file, per-file Authenticode
+            // does not exist there, and the tree is writable only through
+            // package identity - the policy's documented exemption. Probing
+            // the file would answer "unsigned" for every package payload
+            // (field-proven: SystrayComponent on the tester laptop).
+            bool packageRoot = exists && OemTakeoverTargets.IsUnderPackageRoot(path);
+            (bool valid, string? subject) = exists && !packageRoot
                 ? probe.Probe(path)
                 : (false, null);
 
@@ -971,7 +1008,7 @@ namespace UCU.Hardware.Takeover
                 Name = path,
                 Path = path,
                 PathExists = exists,
-                SignatureValid = valid,
+                SignatureValid = packageRoot ? null : valid,
                 PublisherSubject = subject,
             };
 
@@ -979,11 +1016,13 @@ namespace UCU.Hardware.Takeover
 
             string? reason = !exists
                 ? $"image '{path}' not found"
-                : !valid
-                    ? $"image '{path}' is unsigned or its chain is invalid"
-                    : !OemTakeoverTargets.MatchesPublisher(subject ?? string.Empty)
-                        ? $"publisher '{subject}' is not on the OEM allowlist"
-                        : null;
+                : packageRoot
+                    ? null
+                    : !valid
+                        ? $"image '{path}' is unsigned or its chain is invalid"
+                        : !OemTakeoverTargets.MatchesPublisher(subject ?? string.Empty)
+                            ? $"publisher '{subject}' is not on the OEM allowlist"
+                            : null;
 
             return (verdict, reason);
         }
@@ -1048,17 +1087,7 @@ namespace UCU.Hardware.Takeover
                 if (_cache.TryGetValue(path, out (bool, string?) hit))
                     return hit;
 
-                bool valid = TakeoverNative.IsSignatureValid(path);
-                string? subject = null;
-                try
-                {
-                    subject = X509CertificateLoader.LoadCertificateFromFile(path).Subject;
-                }
-                catch
-                {
-                    // Unsigned / unparseable embedded signature: no publisher
-                    // identity. The gate refuses; nothing here is a fault.
-                }
+                bool valid = TakeoverNative.VerifySignedFile(path, out string? subject);
 
                 var result = (valid, subject);
                 _cache[path] = result;
