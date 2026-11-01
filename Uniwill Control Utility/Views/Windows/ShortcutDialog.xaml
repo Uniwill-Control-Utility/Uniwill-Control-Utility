@@ -45,12 +45,12 @@
 
             <!-- Action -->
             <ui:TextBlock x:Name="lblAction" FontTypography="BodyStrong" Margin="0,14,0,4" />
-            <ComboBox x:Name="cbxAction" Height="32" SelectionChanged="Action_SelectionChanged" />
+            <ComboBox x:Name="cbxAction" MinHeight="32" SelectionChanged="Action_SelectionChanged" />
 
             <!-- Preset payload -->
             <StackPanel x:Name="panelPreset" Margin="0,10,0,0" Visibility="Collapsed">
                 <ui:TextBlock x:Name="lblPreset" FontTypography="Body" Margin="0,0,0,4" />
-                <ComboBox x:Name="cbxPreset" Height="32" />
+                <ComboBox x:Name="cbxPreset" MinHeight="32" />
             </StackPanel>
 
             <!-- Performance-mode payload -->

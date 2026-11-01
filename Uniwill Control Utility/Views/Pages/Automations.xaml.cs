@@ -798,10 +798,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             _ => binding.Action.ToString(),
         };
 
-        private IReadOnlyList<string> ShortcutPresetChoices() =>
-            PresetProfileApplier.GetProfileNames()
-                .Select(PresetProfileApplier.DisplayName)
-                .ToList();
+        private IReadOnlyList<string> ShortcutPresetChoices() => WatcherPresetDisplayNames();
 
         private void SaveShortcuts(List<ShortcutBinding> bindings)
         {
