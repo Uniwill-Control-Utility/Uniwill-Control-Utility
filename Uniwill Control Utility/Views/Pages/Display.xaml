@@ -620,6 +620,59 @@
                         </ui:CardControl>
 
                         <!-- Display Color Calibration (hidden when only Default is available) -->
+                        <!-- Display brightness (U-205): hidden when the panel
+                             exposes no WDDM brightness control. -->
+                        <ui:CardControl x:Name="CardBrightness" Margin="0,0,0,8" Visibility="Collapsed">
+                            <ui:CardControl.Icon>
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE706;" FontSize="20" Margin="4,0,6,0"/>
+                            </ui:CardControl.Icon>
+                            <ui:CardControl.Header>
+                                <StackPanel>
+                                    <ui:TextBlock FontTypography="Body" Text="Display brightness"/>
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Adjust the brightness of the built-in display"/>
+                                </StackPanel>
+                            </ui:CardControl.Header>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Slider x:Name="slBrightness"
+                                        Width="180"
+                                        Minimum="0"
+                                        Maximum="100"
+                                        TickFrequency="5"
+                                        IsSnapToTickEnabled="True"
+                                        VerticalAlignment="Center"
+                                        ValueChanged="slBrightness_ValueChanged"/>
+                                <TextBlock x:Name="tbBrightness"
+                                           Width="44"
+                                           TextAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           Text="--"/>
+                            </StackPanel>
+                        </ui:CardControl>
+
+                        <!-- Screen off (U-205): per-session, any input wakes it. -->
+                        <ui:CardControl x:Name="CardScreenOff" Margin="0,0,0,8">
+                            <ui:CardControl.Icon>
+                                <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7E8;" FontSize="20" Margin="4,0,6,0"/>
+                            </ui:CardControl.Icon>
+                            <ui:CardControl.Header>
+                                <StackPanel>
+                                    <ui:TextBlock FontTypography="Body" Text="Screen off"/>
+                                    <ui:TextBlock Margin="0,2,0,0"
+                                                   FontTypography="Caption"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   Text="Turn off the display; any input wakes it"/>
+                                </StackPanel>
+                            </ui:CardControl.Header>
+                            <Button Content="Turn off screen"
+                                    Padding="10,4"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Click="btnScreenOff_Click"/>
+                        </ui:CardControl>
+
                         <ui:CardControl x:Name="CardColorCalibration" Margin="0,0,0,8" Visibility="Collapsed">
                             <ui:CardControl.Icon>
                                 <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE790;" FontSize="20" Margin="4,0,6,0"/>

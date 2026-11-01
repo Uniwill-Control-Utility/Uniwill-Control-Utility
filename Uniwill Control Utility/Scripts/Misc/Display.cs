@@ -873,6 +873,86 @@ namespace Uniwill_Control_Utility.Scripts.Misc
             }
         }
 
+        // ---- Brightness + screen off (U-205) --------------------------------
+
+        /// <summary>Current panel brightness (0..100) via WMI, or false when the
+        /// display does not expose WmiMonitorBrightness (external monitors,
+        /// some panels).</summary>
+        public static bool TryGetBrightness(out int percent)
+        {
+            percent = 0;
+
+            try
+            {
+                using var searcher = new System.Management.ManagementObjectSearcher(
+                    @"root\WMI", "SELECT CurrentBrightness FROM WmiMonitorBrightness");
+
+                foreach (System.Management.ManagementObject item in searcher.Get())
+                {
+                    using (item)
+                    {
+                        percent = Convert.ToInt32(item["CurrentBrightness"]);
+                        return true;
+                    }
+                }
+            }
+            catch
+            {
+                // The WMI class is absent on displays without WDDM brightness
+                // control: unsupported, not a fault.
+            }
+
+            return false;
+        }
+
+        /// <summary>Sets panel brightness and answers the readback (U-205).
+        /// WmiSetBrightness takes (timeoutSeconds, percent); the readback is
+        /// the evidence, exactly like every other panel write.</summary>
+        public static bool TrySetBrightness(int percent, out int applied)
+        {
+            applied = 0;
+            percent = Math.Clamp(percent, 0, 100);
+
+            try
+            {
+                using var searcher = new System.Management.ManagementObjectSearcher(
+                    @"root\WMI", "SELECT * FROM WmiMonitorBrightnessMethods");
+
+                foreach (System.Management.ManagementObject item in searcher.Get())
+                {
+                    using (item)
+                    {
+                        item.InvokeMethod("WmiSetBrightness", new object[] { 0u, (byte)percent });
+
+                        if (TryGetBrightness(out applied))
+                            return Math.Abs(applied - percent) <= 1;
+
+                        return false;
+                    }
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            return false;
+        }
+
+        /// <summary>Turns the display off; any input wakes it. Per session, no
+        /// privilege, nothing persisted (U-205).</summary>
+        public static void TurnOffDisplay()
+        {
+            const uint WmSysCommand = 0x0112;
+            const int ScMonitorPower = 0xF170;
+            IntPtr HwndBroadcast = new(0xFFFF);
+
+            SendMessage(HwndBroadcast, WmSysCommand, (IntPtr)ScMonitorPower, (IntPtr)2);
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
         /// <summary>Copies the display's associated profile to
         /// <paramref name="targetPath"/> (U-205).</summary>
         public static bool ExportColorProfile(string? deviceName, string targetPath, out string? error)
