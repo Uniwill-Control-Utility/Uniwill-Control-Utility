@@ -833,6 +833,7 @@ namespace UCU.Hardware.Takeover
                 return (0, suspects);
             }
 
+            using (tasks)
             foreach (OemTaskObservation task in tasks.EnumerateRootTasks())
             {
                 if (!OemTakeoverTargets.IsTaskName(task.Name))
@@ -870,6 +871,7 @@ namespace UCU.Hardware.Takeover
                 return;
             }
 
+            using (tasks)
             foreach (OemTaskObservation task in tasks.EnumerateRootTasks())
             {
                 if (!OemTakeoverTargets.IsTaskName(task.Name) || !task.Enabled)
@@ -913,7 +915,9 @@ namespace UCU.Hardware.Takeover
             }
 
             bool enable = entry.Before == "1";
-            bool? readback = tasks.SetEnabled(entry.Target, enable);
+            bool? readback;
+            using (tasks)
+                readback = tasks.SetEnabled(entry.Target, enable);
             if (readback == enable)
             {
                 actions.Add($"task {entry.Target}: Enabled={readback}");

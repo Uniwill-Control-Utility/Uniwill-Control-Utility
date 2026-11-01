@@ -23,6 +23,14 @@
          root\WMI method is a privileged act the unelevated app cannot do, so
          the WMI dependency rides the LocalSystem side of the boundary. -->
     <PackageReference Include="System.Management" Version="10.0.13" />
+    <!-- The OEM takeover task scope (U-203): pausing the OEM stack disables
+         machine scheduled tasks, an enable-state write only LocalSystem
+         owns, so the Task Scheduler dependency rides the LocalSystem side
+         of the boundary (the same wrapper the app already ships for its
+         own task rows). Raw dynamic COM binding is a field-proven dead
+         end: the Schedule.Service collection answers E_NOINTERFACE to the
+         IEnumerable cast (pack #22 dev-box fault). -->
+    <PackageReference Include="TaskScheduler" Version="2.12.2" />
     <!-- The engine-side sensor probe (Metrics/). The app keeps its own LHM copy for
          the GPU (NVAPI decision) and never loads this assembly, so the
          sensor-driver dependency stays on the LocalSystem side of the boundary. -->
