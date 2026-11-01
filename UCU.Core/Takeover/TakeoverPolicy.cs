@@ -45,15 +45,63 @@ namespace UCU.Core.Takeover
         public string Target { get; init; } = "";
 
         /// <summary>The pre-mutation state, textual (the registry value's
-        /// "name=value", the service Start dword, the task Enabled, the
-        /// State/flag byte as hex). Empty for facts with no prior value
-        /// (a kill, a task that was already disabled).</summary>
+        /// "name=value", the service Start dword plus the optional
+        /// <c>|running</c> flag, the task Enabled, the State/flag byte as
+        /// hex). Empty for facts with no prior value (a kill, a task that was
+        /// already disabled).</summary>
         public string Before { get; init; } = "";
 
         /// <summary>The post-mutation state, same textual shape.</summary>
         public string After { get; init; } = "";
 
         public DateTime Utc { get; init; }
+    }
+
+    /// <summary>
+    /// The ServiceStart journal entry's text shape, shared by the executor
+    /// (writes it on pause) and the restore (reads it) so the two can never
+    /// drift. <c>Before</c> is the pre-pause start type plus, when the
+    /// service was actually running at pause time, a <c>|running</c> flag.
+    ///
+    /// The flag exists because the start type alone is not the whole
+    /// pre-state: a service already at demand-start is stopped without any
+    /// config change, and without the flag that stop is unrecorded - the
+    /// field defect (tester laptop: GCUBridge started by hand, paused, and
+    /// the restore had nothing to start). Legacy entries carry the bare
+    /// dword and restore as a re-arm only.
+    /// </summary>
+    public static class TakeoverServiceJournal
+    {
+        public const string RunningFlag = "running";
+
+        public static string FormatBefore(uint startType, bool wasRunning) =>
+            wasRunning ? $"{startType}|{RunningFlag}" : startType.ToString();
+
+        /// <summary>Reads a <c>Before</c> value. False for an unreadable
+        /// entry (a corrupt journal line restores nothing, forever, and is
+        /// consumed by the caller).</summary>
+        public static bool TryParseBefore(string? before, out uint startType, out bool wasRunning)
+        {
+            startType = 0;
+            wasRunning = false;
+
+            if (string.IsNullOrWhiteSpace(before))
+                return false;
+
+            string text = before!.Trim();
+            int separator = text.IndexOf('|');
+            string number = separator < 0 ? text : text[..separator];
+            if (!uint.TryParse(number, out startType))
+                return false;
+
+            if (separator >= 0)
+            {
+                string flag = text[(separator + 1)..];
+                wasRunning = string.Equals(flag, RunningFlag, StringComparison.OrdinalIgnoreCase);
+            }
+
+            return true;
+        }
     }
 
     /// <summary>
