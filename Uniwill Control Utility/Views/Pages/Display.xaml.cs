@@ -765,6 +765,67 @@ namespace Uniwill_Control_Utility.Views.Pages
             }
         }
 
+        /// <summary>Imports a user ICC profile (U-205): the Core validator
+        /// decides, Core refuses garbage before anything is associated.</summary>
+        private void btnImportColorProfile_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                AddExtension = true,
+                DefaultExt = ".icc",
+                Filter = LocalizationService.Get("ICC profile (*.icc;*.icm)|*.icc;*.icm"),
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            if (!Uniwill_Control_Utility.Scripts.Misc.Display.ImportColorProfile(
+                    dialog.FileName, out string? file, out string? error) ||
+                file is null)
+            {
+                ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("Color Calibration"),
+                    LocalizationService.Format("The ICC profile could not be imported: {0}", error ?? string.Empty));
+                return;
+            }
+
+            UpdateColorCalibrationCombo(GetColorProfileSafe());
+            ToastNotification.ShowToastNotification(
+                LocalizationService.Get("Color Calibration"),
+                LocalizationService.Get("The ICC profile was imported."));
+        }
+
+        /// <summary>Copies the display's associated profile out (U-205).</summary>
+        private void btnExportColorProfile_Click(object sender, RoutedEventArgs e)
+        {
+            string? current = GetColorProfileSafe();
+
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                AddExtension = true,
+                DefaultExt = ".icc",
+                FileName = string.IsNullOrEmpty(current) ? "UCU-color-profile.icc" : current!,
+                Filter = LocalizationService.Get("ICC profile (*.icc;*.icm)|*.icc;*.icm"),
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            if (!Uniwill_Control_Utility.Scripts.Misc.Display.ExportColorProfile(
+                    Uniwill_Control_Utility.Scripts.Misc.Display.InternalPanelName(),
+                    dialog.FileName, out string? error))
+            {
+                ToastNotification.ShowToastNotification(
+                    LocalizationService.Get("Color Calibration"),
+                    LocalizationService.Format("The ICC profile could not be exported: {0}", error ?? string.Empty));
+                return;
+            }
+
+            ToastNotification.ShowToastNotification(
+                LocalizationService.Get("Color Calibration"),
+                LocalizationService.Get("The ICC profile was exported."));
+        }
+
         private void cbColorCalibration_SelectionChanged(object sender, RoutedEventArgs e)
         {
             if (!_isLoaded || _colorCalBusy)

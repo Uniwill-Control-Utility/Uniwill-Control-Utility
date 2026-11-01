@@ -601,7 +601,7 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 return GetCurrentColorProfile(deviceName) is null;
             }
 
-            string fullPath = IcmProfilesFolder + @"\" + profileFileName;
+            string fullPath = ResolveProfilePath(profileFileName);
             if (!System.IO.File.Exists(fullPath))
                 return false;
 
@@ -637,6 +637,26 @@ namespace Uniwill_Control_Utility.Scripts.Misc
                 if (file == DefaultColorProfileFile || System.IO.File.Exists(IcmProfilesFolder + @"\" + file))
                     offered.Add(file);
             }
+
+            // Imported profiles (U-205) join the Windows set: they are the
+            // user's own calibration files, validated on import.
+            try
+            {
+                if (System.IO.Directory.Exists(IccUserFolder))
+                {
+                    foreach (string path in System.IO.Directory.GetFiles(IccUserFolder))
+                    {
+                        string name = System.IO.Path.GetFileName(path);
+                        if (!offered.Contains(name, StringComparer.OrdinalIgnoreCase))
+                            offered.Add(name);
+                    }
+                }
+            }
+            catch
+            {
+                // An unreadable user folder simply offers the Windows set.
+            }
+
             return offered;
         }
 
@@ -755,6 +775,101 @@ namespace Uniwill_Control_Utility.Scripts.Misc
         internal const string IcmProfileValueName = "ICMProfile";
         internal const string IcmAssociationRoot = @"HKCU\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ICM\ProfileAssociations\Display\{4d36e96e-e325-11ce-bfc1-08002be10318}";
         internal const string IcmProfilesFolder = @"C:\Windows\System32\spool\drivers\color";
+
+        /// <summary>Imported ICC profiles (U-205): the user's own .icc/.icm
+        /// files, validated before they land here. Per-user because the app is
+        /// unelevated and the spool folder needs administrator rights.</summary>
+        internal static string IccUserFolder => System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UCU", "icc");
+
+        /// <summary>Full path of a profile filename: an imported profile lives
+        /// in the per-user folder, everything else in Windows' spool.</summary>
+        internal static string ResolveProfilePath(string fileName)
+        {
+            if (System.IO.Path.IsPathRooted(fileName))
+                return fileName;
+
+            string imported = System.IO.Path.Combine(IccUserFolder, fileName);
+            return System.IO.File.Exists(imported)
+                ? imported
+                : System.IO.Path.Combine(IcmProfilesFolder, fileName);
+        }
+
+        /// <summary>Validates an ICC file and stores it for association
+        /// (U-205). The validator is the Core gate: a file that is not a
+        /// profile never becomes selectable, because Windows would accept the
+        /// association and render the panel through a broken transform.</summary>
+        public static bool ImportColorProfile(string sourcePath, out string? fileName, out string? error)
+        {
+            fileName = null;
+            error = null;
+
+            byte[] bytes;
+            try
+            {
+                bytes = System.IO.File.ReadAllBytes(sourcePath);
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+
+            UCU.Core.Display.IccProfileValidator.Result verdict =
+                UCU.Core.Display.IccProfileValidator.Validate(bytes);
+            if (!verdict.Valid)
+            {
+                error = verdict.Reason;
+                return false;
+            }
+
+            string name = System.IO.Path.GetFileName(sourcePath);
+            try
+            {
+                System.IO.Directory.CreateDirectory(IccUserFolder);
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(IccUserFolder, name), bytes);
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+
+            fileName = name;
+            return true;
+        }
+
+        /// <summary>Copies the display's associated profile to
+        /// <paramref name="targetPath"/> (U-205).</summary>
+        public static bool ExportColorProfile(string? deviceName, string targetPath, out string? error)
+        {
+            error = null;
+
+            string? current = GetCurrentColorProfile(deviceName);
+            if (string.IsNullOrEmpty(current))
+            {
+                error = "no profile is associated with this display";
+                return false;
+            }
+
+            string source = ResolveProfilePath(current);
+            if (!System.IO.File.Exists(source))
+            {
+                error = $"profile file '{current}' not found";
+                return false;
+            }
+
+            try
+            {
+                System.IO.File.Copy(source, targetPath, overwrite: true);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
 
         const int DispChangeSuccessful = 0;
         const int DgpuOnlyRefreshRate = 300;
