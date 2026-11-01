@@ -66,6 +66,46 @@ namespace Uniwill_Control_Utility.Services
             return false;
         }
 
+        /// <summary>
+        /// True when RTSS's hooks loader - the injector that makes game OSD
+        /// possible - is live IN THIS SESSION. RTSS spawns it during its own
+        /// init, so its presence is the READY witness, not a second opinion on
+        /// liveness: a game launched while RTSS exists but the loader has not
+        /// registered is hooked only by RTSS's next process scan, seconds
+        /// later (field report 2026-11-01: game started 2 s after the Start
+        /// button, OSD took ~12 s to appear; dev-box chain probe: a game
+        /// created in that window stayed out of the app array for a minute).
+        /// Same snapshot rule as IsRunning: a refused snapshot answers false
+        /// (the caller treats hooks-less as "not ready yet", never as a
+        /// false positive).
+        /// </summary>
+        public static bool AreHooksActive()
+        {
+            int mine = SafeSessionId();
+
+            foreach (string name in new[] { "RTSSHooksLoader", "RTSSHooksLoader64" })
+            {
+                foreach (System.Diagnostics.Process p in System.Diagnostics.Process.GetProcessesByName(name))
+                {
+                    try
+                    {
+                        if (p.SessionId == mine)
+                            return true;
+                    }
+                    catch (Exception)
+                    {
+                        // Session of a vanishing process: not evidence.
+                    }
+                    finally
+                    {
+                        p.Dispose();
+                    }
+                }
+            }
+
+            return false;
+        }
+
         private static int SafeSessionId()
         {
             try

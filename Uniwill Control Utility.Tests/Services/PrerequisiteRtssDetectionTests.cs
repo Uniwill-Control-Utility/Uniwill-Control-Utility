@@ -140,6 +140,30 @@ public sealed class PrerequisiteRtssDetectionTests
     }
 
     [Fact]
+    public void TheStartWaitsForHooksReadinessNotMereProcessExistence()
+    {
+        // FIELD REPORT 2026-11-01 (tester laptop): Start, game 2 s later,
+        // OSD took ~12 s. RTSS exists seconds before its hooks loader
+        // registers, and a game created in that window is hooked only by
+        // RTSS's next process scan (dev-box chain probe: out of the app
+        // array for a full minute). So the Start route's poll window ends
+        // on liveness AND hooks readiness, and the hooks witness is
+        // session-scoped like liveness.
+        string launcher = ReadAppSource("Services", "RtssLauncher.cs");
+        string detection = ReadAppSource("Services", "RtssDetectionService.cs");
+
+        Assert.Contains("RtssDetectionService.IsRunning() && RtssDetectionService.AreHooksActive()", launcher, StringComparison.Ordinal);
+
+        // The loader processes are the injector; readiness checks them in
+        // this session (both bitnesses: RTSS spawns 32-bit and 64-bit
+        // loaders), never the segment.
+        Assert.Contains("public static bool AreHooksActive()", detection, StringComparison.Ordinal);
+        Assert.Contains("\"RTSSHooksLoader\", \"RTSSHooksLoader64\"", detection, StringComparison.Ordinal);
+        Assert.Contains("p.SessionId == mine", detection, StringComparison.Ordinal);
+        Assert.DoesNotContain("RtssReader.IsRunning", detection.Substring(detection.IndexOf("AreHooksActive", StringComparison.Ordinal)), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TheEngineCapabilityIsRegisteredAndReachableFromTheNonDiPaths()
     {
         string app = ReadAppSource("App.xaml.cs");
