@@ -354,6 +354,8 @@ namespace Uniwill_Control_Utility.Services
                 return;
 
             IsManualControlLocked = true;
+            DiagnosticLogger.LogInfo(
+                $"[Fan] manual control lock engaged (preset '{Properties.Settings.Default.presetProfile}')");
             ManualControlLockChanged?.Invoke(this, true);
         }
 
@@ -367,6 +369,8 @@ namespace Uniwill_Control_Utility.Services
                 return;
 
             IsManualControlLocked = false;
+            DiagnosticLogger.LogInfo(
+                $"[Fan] manual control lock released (preset '{Properties.Settings.Default.presetProfile}')");
             ManualControlLockChanged?.Invoke(this, false);
         }
 
@@ -375,23 +379,23 @@ namespace Uniwill_Control_Utility.Services
         /// firmware disagrees with our cached view. Called from the preset-apply flow
         /// (page navigation) rather than on a timer — only a preset apply or the OEM
         /// button ever flips the gate.
+        ///
+        /// The truth is the app's own ownership decision, not the EC's
+        /// custom-profile bit (0x0727 bit6). That bit is a GPU-power-control
+        /// prerequisite: a custom fan table applies with it clear (measured
+        /// 2026-11-02 on the dev box - 0x0727 = 0x00, Full Speed tables ->
+        /// duty 200/200). Reading it as "a stock preset is active" locked the
+        /// fan page under a Custom preset that simply never activated GPU
+        /// power control (on battery, or a preset without GPU changes), and
+        /// the overlay then contradicted itself: "Custom preset applied - fan
+        /// control customization is only possible with a Custom preset."
         /// </summary>
         public void SyncManualControlLock()
         {
-            if (_power is null)
-                return;
-
-            try
-            {
-                if (_power.IsCustomProfileActiveAsync().GetAwaiter().GetResult())
-                    DisableManualControlLock();
-                else
-                    EnableManualControlLock();
-            }
-            catch (Exception ex)
-            {
-                DiagnosticLogger.LogError(ex, "DeviceApplier: Failed to read EC manual-mode lock state");
-            }
+            if (PresetProfileApplier.IsBuiltInProfile(Properties.Settings.Default.presetProfile))
+                EnableManualControlLock();
+            else
+                DisableManualControlLock();
         }
 
         /// <summary>
