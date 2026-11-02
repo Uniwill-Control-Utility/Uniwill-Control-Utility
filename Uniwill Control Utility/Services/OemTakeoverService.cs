@@ -174,11 +174,19 @@ namespace Uniwill_Control_Utility.Services
         /// stick". Active and PartiallyPaused are the two states where the
         /// conflict is happening right now; Paused/Stale are the states this
         /// feature created on purpose.
+        ///
+        /// Live evidence is required, not just presence: <c>Active</c> is the
+        /// policy's fallback for "installed, nothing running, no pause
+        /// evidence", so an installed but idle stack used to raise a warning
+        /// the pause action then answered with "Nothing to pause" (field,
+        /// 2026-11-02: GCUBridge installed and stopped, Control Center not
+        /// running). "Running" in the chip's own text has to mean running.
         /// </summary>
         public static bool ShouldWarn(OemOverview overview) =>
             overview is not null
             && overview.EngineReachable
             && overview.ServicesInstalled > 0
+            && (overview.ServicesRunning > 0 || overview.OemProcessesRunning > 0)
             && (overview.State == "Active" || overview.State == "PartiallyPaused");
 
         /// <summary>

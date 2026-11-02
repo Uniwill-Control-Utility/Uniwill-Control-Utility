@@ -15,12 +15,14 @@ namespace Uniwill_Control_Utility.Tests.Services;
 public sealed class OemWarningTests
 {
     private static OemOverview Overview(
-        string state, bool engineReachable = true, int servicesInstalled = 1) => new()
+        string state, bool engineReachable = true, int servicesInstalled = 1,
+        int? servicesRunning = null, int oemProcesses = 0) => new()
         {
             State = state,
             EngineReachable = engineReachable,
             ServicesInstalled = servicesInstalled,
-            ServicesRunning = servicesInstalled,
+            ServicesRunning = servicesRunning ?? servicesInstalled,
+            OemProcessesRunning = oemProcesses,
         };
 
     [Theory]
@@ -29,6 +31,26 @@ public sealed class OemWarningTests
     public void Warns_WhileTheStackIsLive(string state)
     {
         Assert.True(OemTakeoverService.ShouldWarn(Overview(state)));
+    }
+
+    [Fact]
+    public void Silent_WhenTheStackIsInstalledButNothingIsRunning()
+    {
+        // Field, 2026-11-02: GCUBridge installed but stopped, Control Center not
+        // running. The chip warned anyway ("Active" is the policy's fallback for
+        // "installed, no evidence") and its Pause button answered "Nothing to
+        // pause". A warning the user cannot act on is worse than no warning.
+        Assert.False(OemTakeoverService.ShouldWarn(
+            Overview("Active", servicesInstalled: 1, servicesRunning: 0, oemProcesses: 0)));
+    }
+
+    [Fact]
+    public void Warns_WhenOnlyAnOemProcessIsLive()
+    {
+        // The service may be stopped while the Control Center app itself runs -
+        // that process is exactly what fights UCU's writes.
+        Assert.True(OemTakeoverService.ShouldWarn(
+            Overview("Active", servicesInstalled: 1, servicesRunning: 0, oemProcesses: 2)));
     }
 
     [Theory]
