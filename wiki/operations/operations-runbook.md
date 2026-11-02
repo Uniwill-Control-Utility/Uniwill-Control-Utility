@@ -243,6 +243,14 @@ The preset used to raise the curve duties to 100 % and stop there, but the EC pi
 
 This also explains the older "one fan moved first" confusion: it was never a dropped write - the tables land (they are read back byte-for-byte), the *zone* just decides whether they matter.
 
+### Every preset is re-applied at startup ("Apply on startup" is gone)
+
+The Presets page carried an "Apply on startup" checkbox that only affected Custom presets (stock presets always applied). Leaving it off meant a relaunch could show the saved preset as active while the EC still held the previous session's values - the state that made the fan page lock itself under a Custom preset on 2026-11-02, and that makes any post-relaunch fan/power report ambiguous.
+
+`MainWindow.ApplyOnStart` now applies whatever preset is saved - stock or Custom - on every launch, and `Settings.ApplyOnStart` is deleted (property and stored value; a user.config that still carries the key is simply ignored). The checkbox and its "Apply on startup" catalog entry are gone (26 catalogs, byte-faithful line removal, 0 insertions). Pin: `FanStartupOwnershipTests.StartupPresetApplyIsUnconditional`.
+
+Consequence worth knowing: a Custom preset's power limits, fan curve and GPU settings are written on every launch, so a machine whose EC firmware clamps something (see the battery section) will look exactly the same after a relaunch as it did before it - which is the point.
+
 ### The fan page locked itself under a Custom preset (fixed)
 
 Field 2026-11-02: Custom preset 1 applied, unplug, close, relaunch - the preset was still applied, but the Fan Control page showed the "Stock Preset Active" lockdown captioned **"Custom preset applied - fan control customization is only possible with a Custom preset."**

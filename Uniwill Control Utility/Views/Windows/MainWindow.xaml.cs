@@ -58,7 +58,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         private static INavigationService _navigationService;
         private bool _isTrayPresetApplying;
         private readonly TrayWidgetController _trayWidget;
-        // Debounce for the tray-icon left click — the shell can send the LBUTTONDOWN
+        // Debounce for the tray-icon left click â€” the shell can send the LBUTTONDOWN
         // message twice per click (press + release).
         private DateTime _lastTrayIconClick;
         public static bool IsPageSelected(Type pageType) =>
@@ -124,7 +124,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             // the first left-click until a right-click forced the focus change.
             if (this.WindowState != WindowState.Minimized && this.IsVisible)
             {
-                // Open but not in focus (another window owns the desktop) — the click
+                // Open but not in focus (another window owns the desktop) â€” the click
                 // brings the main window back to the front instead of doing nothing.
                 if (!this.IsActive)
                 {
@@ -152,7 +152,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 return;
 
             // Minimize first so the tray-icon left-click guard sees a minimized window,
-            // then show the mini-tray near the tray icon — the cursor sits on the title
+            // then show the mini-tray near the tray icon â€” the cursor sits on the title
             // bar here, so anchoring on it would drop the tray at the button's axis.
             this.WindowState = WindowState.Minimized;
             _ = _trayWidget.ToggleAsync();
@@ -161,7 +161,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         private void TrayMenu_Opened(object sender, RoutedEventArgs e)
         {
             // The tray ContextMenu lives outside the window's visual tree, so the
-            // Loaded/SetCulture localization passes never reach it — refresh it on
+            // Loaded/SetCulture localization passes never reach it â€” refresh it on
             // every open (the deferred dispatch also covers items added below).
             LocalizationService.RefreshElement(cmTrayMenu);
 
@@ -335,7 +335,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                     OemWarnPopup.IsOpen = false;
 
                 OemWarnDetail.Text = LocalizationService.Format(
-                    "Services running: {0} of {1} · OEM processes: {2} · journal: {3} · autostart neutralized: {4}",
+                    "Services running: {0} of {1} Â· OEM processes: {2} Â· journal: {3} Â· autostart neutralized: {4}",
                     overview.ServicesRunning, overview.ServicesInstalled,
                     overview.OemProcessesRunning, overview.JournalCount, overview.AutostartNeutralized);
             }
@@ -473,106 +473,106 @@ namespace Uniwill_Control_Utility.Views.Windows
                     return;
                 }
 
-                if (Settings.Default.ApplyOnStart)
+                // Every preset re-applies at startup now (the "Apply on startup"
+                // option is gone): a relaunch must never leave the EC running the
+                // previous session's values while the UI claims the saved preset.
+                // If the last selected profile was Custom, apply from CustomPresetStore.
+                if (Settings.Default.presetProfile == "Custom")
                 {
-                    // If the last selected profile was Custom, apply from CustomPresetStore.
-                    if (Settings.Default.presetProfile == "Custom")
+                    await Task.Run(() => GetBatteryStatus());
+
+                    // Determine active preset mode based on current Power boost mode setting
+                    Models.PresetMode mode = Settings.Default.EnablePowerBoostMode
+                        ? Models.PresetMode.Boost
+                        : Models.PresetMode.Normal;
+                    var presets = Models.CustomPresetStore.Load(mode);
+                    // Use the saved slot for the active mode, fall back to first slot with data.
+                    int slot = mode == Models.PresetMode.Boost
+                        ? Settings.Default.customPresetSlotBoost
+                        : Settings.Default.customPresetSlot;
+                    if (slot < 0 || slot >= presets.Length || !presets[slot].HasChanges)
                     {
-                        await Task.Run(() => GetBatteryStatus());
-
-                        // Determine active preset mode based on current Power boost mode setting
-                        Models.PresetMode mode = Settings.Default.EnablePowerBoostMode
-                            ? Models.PresetMode.Boost
-                            : Models.PresetMode.Normal;
-                        var presets = Models.CustomPresetStore.Load(mode);
-                        // Use the saved slot for the active mode, fall back to first slot with data.
-                        int slot = mode == Models.PresetMode.Boost
-                            ? Settings.Default.customPresetSlotBoost
-                            : Settings.Default.customPresetSlot;
-                        if (slot < 0 || slot >= presets.Length || !presets[slot].HasChanges)
+                        // Fallback: find first slot with saved data.
+                        slot = 0;
+                        for (int i = 0; i < presets.Length; i++)
                         {
-                            // Fallback: find first slot with saved data.
-                            slot = 0;
-                            for (int i = 0; i < presets.Length; i++)
+                            if (presets[i].HasChanges)
                             {
-                                if (presets[i].HasChanges)
-                                {
-                                    slot = i;
-                                    break;
-                                }
+                                slot = i;
+                                break;
                             }
                         }
-
-                        var p = presets[slot];
-                        if (p.HasChanges)
-                        {
-                            // Build command string from the preset values
-                            string command = BuildCustomCommandString(p);
-                            if (!string.IsNullOrWhiteSpace(command))
-                            {
-                                await ApplyCustomOnStart(command, p);
-                                // Direct apply outside the pipeline: keep the arbiter's
-                                // debounce state honest so a startup automation edge for
-                                // the same selection is recognized as a duplicate.
-                                App.GetService<PresetArbiter>()?.RecordApply(
-                                    PresetIntentSource.BootRestore,
-                                    PresetProfileApplier.CustomProfileKey(slot, mode));
-                                string customTemplate = mode == Models.PresetMode.Boost
-                                    ? "Custom {0} (Boost) Applied"
-                                    : "Custom {0} Applied";
-                                ToastNotification.ShowToastNotification(LocalizationService.Format(customTemplate, slot + 1),
-                                    accent: ToastNotification.AccentFor(customTemplate, (slot + 1).ToString()));
-                            }
-                        }
-                        return;
                     }
 
-                    // Legacy path: CommandString from Automations / tray menu
-                    if (Settings.Default.CommandString != null && Settings.Default.CommandString != "")
+                    var p = presets[slot];
+                    if (p.HasChanges)
                     {
-                        await Task.Run(() => GetBatteryStatus());
-
-                        if (statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
-                            || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery)
+                        // Build command string from the preset values
+                        string command = BuildCustomCommandString(p);
+                        if (!string.IsNullOrWhiteSpace(command))
                         {
-                            if (Settings.Default.EnableAutoNavigation &&
-                                Settings.Default.acPreset != "None" && !string.IsNullOrEmpty(Settings.Default.acPreset))
-                            {
-                                Settings.Default.acCommandString = PresetProfileApplier.BuildCommandString(
-                                    ResolveAutomationProfile(Settings.Default.acPreset));
-                                Settings.Default.CommandString = Settings.Default.acCommandString;
-                                Settings.Default.Save();
-                                // Startup restore of the AC selection: BootRestore, not an
-                                // automation edge — the boot grace must not swallow it.
-                                await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset,
-                                    PresetIntentSource.BootRestore);
-                                ToastNotification.ShowToastNotification("Charge Applied");
-                            }
-                            else
-                            {
-                                await RyzenAdj_To_UCU.TranslateAsync(Settings.Default.CommandString);
-                                ToastNotification.ShowToastNotification("Settings Reapplied");
-                            }
+                            await ApplyCustomOnStart(command, p);
+                            // Direct apply outside the pipeline: keep the arbiter's
+                            // debounce state honest so a startup automation edge for
+                            // the same selection is recognized as a duplicate.
+                            App.GetService<PresetArbiter>()?.RecordApply(
+                                PresetIntentSource.BootRestore,
+                                PresetProfileApplier.CustomProfileKey(slot, mode));
+                            string customTemplate = mode == Models.PresetMode.Boost
+                                ? "Custom {0} (Boost) Applied"
+                                : "Custom {0} Applied";
+                            ToastNotification.ShowToastNotification(LocalizationService.Format(customTemplate, slot + 1),
+                                accent: ToastNotification.AccentFor(customTemplate, (slot + 1).ToString()));
+                        }
+                    }
+                    return;
+                }
+
+                // Legacy path: CommandString from Automations / tray menu
+                if (Settings.Default.CommandString != null && Settings.Default.CommandString != "")
+                {
+                    await Task.Run(() => GetBatteryStatus());
+
+                    if (statuscode == BatteryStatusAc || statuscode == BatteryStatusCritical
+                        || statuscode == BatteryStatusCharging || statuscode == BatteryStatusNoSystemBattery)
+                    {
+                        if (Settings.Default.EnableAutoNavigation &&
+                            Settings.Default.acPreset != "None" && !string.IsNullOrEmpty(Settings.Default.acPreset))
+                        {
+                            Settings.Default.acCommandString = PresetProfileApplier.BuildCommandString(
+                                ResolveAutomationProfile(Settings.Default.acPreset));
+                            Settings.Default.CommandString = Settings.Default.acCommandString;
+                            Settings.Default.Save();
+                            // Startup restore of the AC selection: BootRestore, not an
+                            // automation edge â€” the boot grace must not swallow it.
+                            await TranslatePresetAsync(Settings.Default.acCommandString, Settings.Default.acPreset,
+                                PresetIntentSource.BootRestore);
+                            ToastNotification.ShowToastNotification("Charge Applied");
                         }
                         else
                         {
-                            if (Settings.Default.EnableAutoNavigation &&
-                                Settings.Default.dcPreset != "None" && !string.IsNullOrEmpty(Settings.Default.dcPreset))
-                            {
-                                Settings.Default.dcCommandString = PresetProfileApplier.BuildCommandString(
-                                    ResolveAutomationProfile(Settings.Default.dcPreset));
-                                Settings.Default.CommandString = Settings.Default.dcCommandString;
-                                Settings.Default.Save();
-                                // Startup restore of the DC selection — BootRestore (see AC branch).
-                                await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset,
-                                    PresetIntentSource.BootRestore);
-                                ToastNotification.ShowToastNotification("Discharge Applied");
-                            }
-                            else
-                            {
-                                await RyzenAdj_To_UCU.TranslateAsync(Settings.Default.CommandString);
-                                ToastNotification.ShowToastNotification("Settings Reapplied");
-                            }
+                            await RyzenAdj_To_UCU.TranslateAsync(Settings.Default.CommandString);
+                            ToastNotification.ShowToastNotification("Settings Reapplied");
+                        }
+                    }
+                    else
+                    {
+                        if (Settings.Default.EnableAutoNavigation &&
+                            Settings.Default.dcPreset != "None" && !string.IsNullOrEmpty(Settings.Default.dcPreset))
+                        {
+                            Settings.Default.dcCommandString = PresetProfileApplier.BuildCommandString(
+                                ResolveAutomationProfile(Settings.Default.dcPreset));
+                            Settings.Default.CommandString = Settings.Default.dcCommandString;
+                            Settings.Default.Save();
+                            // Startup restore of the DC selection â€” BootRestore (see AC branch).
+                            await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset,
+                                PresetIntentSource.BootRestore);
+                            ToastNotification.ShowToastNotification("Discharge Applied");
+                        }
+                        else
+                        {
+                            await RyzenAdj_To_UCU.TranslateAsync(Settings.Default.CommandString);
+                            ToastNotification.ShowToastNotification("Settings Reapplied");
                         }
                     }
                 }
@@ -638,7 +638,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             {
                 var settings = KeyboardSettingsService.Load();
 
-                // BetterRGB: the streamer owns the keyboard handle — resume it instead
+                // BetterRGB: the streamer owns the keyboard handle â€” resume it instead
                 // of opening a fresh one and re-sending firmware reports.
                 if (settings.Engine == KeyboardEngine.BetterRGB)
                 {
@@ -781,7 +781,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// <summary>
         /// Auto-power lighting policy for the Keyboard and Light Bar pages: when a page's
         /// "auto off when unplugged" option is enabled, the lights follow the AC plug
-        /// state — unplugged turns them off, plugged in restores the user's saved lighting
+        /// state â€” unplugged turns them off, plugged in restores the user's saved lighting
         /// intent. The BetterRGB streamer (which owns the keyboard-zone handle) is
         /// stopped/started instead of sending firmware reports.
         /// </summary>
@@ -860,7 +860,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         internal static async Task AsyncApplyKeyboardOnStart()
         {
             // Wait for the system to settle after boot. The HID controller needs
-            // time to become discoverable — especially on cold startup.
+            // time to become discoverable â€” especially on cold startup.
             await Task.Delay(1000);
 
             KeyboardHidService? hidService = null;
@@ -890,7 +890,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                 var settings = KeyboardSettingsService.Load();
                 if (settings.Engine == KeyboardEngine.BetterRGB)
                 {
-                    // BetterRGB: the streamer owns the keyboard-zone handle — skip the
+                    // BetterRGB: the streamer owns the keyboard-zone handle â€” skip the
                     // firmware keyboard apply. The light bar rides the usage-2 device
                     // and is unaffected by the engine choice.
                     var streamer = App.GetService<BetterRgbStreamService>();
@@ -918,7 +918,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
 
             // Auto-power lighting at startup: if the laptop is on battery and the
-            // option is enabled, the startup apply above turned the lights on —
+            // option is enabled, the startup apply above turned the lights on â€”
             // suppress them to honor the unplug-off policy.
             try
             {
@@ -1314,7 +1314,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                             var dcResult = await TranslatePresetAsync(Settings.Default.dcCommandString, Settings.Default.dcPreset,
                                 PresetIntentSource.AutomationBattery);
 
-                            // Silence on suppression — see the AC branch.
+                            // Silence on suppression â€” see the AC branch.
                             if (dcResult.Applied && lastAppliedState != "dc") ToastNotification.ShowToastNotification("Discharge Applied");
                             lastAppliedState = "dc";
                         }
@@ -1385,7 +1385,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                     }
 
                     // BetterRGB streamer AC policy (OpenRevo's auto-policy):
-                    // plugged in → restore the 60FPS streamer; battery → hardware
+                    // plugged in â†’ restore the 60FPS streamer; battery â†’ hardware
                     // firmware effects at the same params (0% CPU).
                     try
                     {
@@ -1432,7 +1432,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 Debug.WriteLine($"[Resume] LHM reset failed: {ex.Message}");
                             }
 
-                            // Also reset the NvTuning NVML state — it uses a separate NVML
+                            // Also reset the NvTuning NVML state â€” it uses a separate NVML
                             // context from LHM and has its own stale handles after resume.
                             try
                             {
@@ -1514,7 +1514,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                             }
 
                             // Auto-power lighting: the resume re-applies above turned the
-                            // lights back on per saved settings — if the auto-power option
+                            // lights back on per saved settings â€” if the auto-power option
                             // is enabled and the laptop is on battery, suppress them again.
                             try
                             {
@@ -1594,7 +1594,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                                 var fan = App.GetService<IFanCapability>();
                                 if (fan != null && !IsFanCustomizationAllowed())
                                 {
-                                    Debug.WriteLine("[Resume] Stock preset active — EC fan duties not re-applied");
+                                    Debug.WriteLine("[Resume] Stock preset active â€” EC fan duties not re-applied");
                                 }
                                 else if (fan != null)
                                 {
@@ -1677,7 +1677,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                                     try
                                     {
                                         // If the service still thinks it's connected, the HID link
-                                        // may be stale after hibernate — reconnect.
+                                        // may be stale after hibernate â€” reconnect.
                                         if (flydigiService.IsConnected)
                                         {
                                             Debug.WriteLine("[Flydigi] Resuming from sleep - disconnecting stale HID link");
@@ -1756,7 +1756,7 @@ namespace Uniwill_Control_Utility.Views.Windows
         /// </summary>
         private const int WM_DISPLAYCHANGE = 0x007E;
 
-        // SM_CMONITORS for GetSystemMetrics — tracks how many displays are active
+        // SM_CMONITORS for GetSystemMetrics â€” tracks how many displays are active
         // so we only reset GPU driver state on real topology changes, not fullscreen alt-tabs.
         private const int SM_CMONITORS = 80;
         private int _lastMonitorCount = -1;
@@ -1772,10 +1772,10 @@ namespace Uniwill_Control_Utility.Views.Windows
                 bool topologyChanged = _lastMonitorCount < 0 || currentMonitorCount != _lastMonitorCount;
                 _lastMonitorCount = currentMonitorCount;
 
-                // Don't mark as handled — other WPF code may need this message.
+                // Don't mark as handled â€” other WPF code may need this message.
                 // Only reset GPU driver state when the monitor count actually changes.
                 // Fullscreen alt-tabs fire WM_DISPLAYCHANGE but don't change the
-                // monitor count — resetting on those causes a 15-second NVML
+                // monitor count â€” resetting on those causes a 15-second NVML
                 // blackout (GpuInteropGuard cooldown) and metrics show zeros.
                 if (topologyChanged)
                 {
@@ -1790,7 +1790,7 @@ namespace Uniwill_Control_Utility.Views.Windows
                         Debug.WriteLine($"[Display] LHM reset failed: {ex.Message}");
                     }
 
-                    // Also reset NvTuning's NVML context — separate from LHM.
+                    // Also reset NvTuning's NVML context â€” separate from LHM.
                     try
                     {
                         Scripts.GPUs.NVIDIA.Nvml.Reset();
@@ -2067,7 +2067,7 @@ namespace Uniwill_Control_Utility.Views.Windows
 
         private async void TrayCustomPreset_Click(object? sender, RoutedEventArgs e)
         {
-            // Legacy handler – delegates to extended handler with Normal mode.
+            // Legacy handler â€“ delegates to extended handler with Normal mode.
             if (sender is not MenuItem menuItem || menuItem.Tag is not int slot)
                 return;
             await TrayCustomPresetApplyAsync(slot, Models.PresetMode.Normal);
@@ -2228,8 +2228,8 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             // Keep the window inside the monitor's work area so the title bar
             // never spills above the top screen edge. On the 2560x1600 internal
-            // panel at 150% scale, 1080 DIP = 1620 physical px — taller than the
-            // screen — so CenterScreen splits the overflow off the top.
+            // panel at 150% scale, 1080 DIP = 1620 physical px â€” taller than the
+            // screen â€” so CenterScreen splits the overflow off the top.
             // Skipped while the startup gate parks the window off-screen:
             // Screen.FromHandle resolves a parked window to the NEAREST monitor,
             // and the fit's re-center would drag it back on-screen - where the
@@ -2263,17 +2263,17 @@ namespace Uniwill_Control_Utility.Views.Windows
 
             Task.Run(Garbage.Garbage_Collect);
 
-            // Watch for the laptop panel being turned back on (external-only → attached)
+            // Watch for the laptop panel being turned back on (external-only â†’ attached)
             // and auto-apply the UCU-declared refresh rate + color profile after a settle
             // delay when the live panel differs.
             StartPanelWatcher();
         }
 
-        // Auto-reconcile the internal panel's display settings on the detached→attached
+        // Auto-reconcile the internal panel's display settings on the detachedâ†’attached
         // transition: the watcher polls the panel's attach state; on re-enable it waits a
         // settle delay (Windows is still finalizing the display mode) and then applies the
         // declared values if the live panel differs. While the panel stays attached, no
-        // auto-apply happens — Windows-side changes are adopted by the normal syncs.
+        // auto-apply happens â€” Windows-side changes are adopted by the normal syncs.
         private const int PanelSettleDelayMs = 3000;
         private bool _panelWasAttached = true;
         private bool _panelReconcilePending;
@@ -2301,7 +2301,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             if (attached != _panelWasAttached)
             {
                 // The ITE RGB MCU resets itself during a display (mux) switch; streaming
-                // frames into a resetting MCU repaints the keyboard key-by-key — the
+                // frames into a resetting MCU repaints the keyboard key-by-key â€” the
                 // visible blink storm. Pause the stream and let the MCU settle first.
                 App.GetService<BetterRgbStreamService>()?.RestartAfterDisplaySwitch();
             }
@@ -3174,7 +3174,7 @@ namespace Uniwill_Control_Utility.Views.Windows
             }
             else if (Family.TYPE == Family.ProcessorType.Intel)
             {
-                // No voltage control on Intel — undervolt removed
+                // No voltage control on Intel â€” undervolt removed
                 parts.Add($"--intel-pl={p.IntelPl1:F0},{p.IntelPl2:F0}");
             }
 

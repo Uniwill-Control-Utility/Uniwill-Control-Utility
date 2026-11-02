@@ -72,7 +72,6 @@
   "Apply a preset after the system resumes from sleep or hibernation": "Sistem uyku veya hazırda bekletme modundan uyandıktan sonra bir önayar uygulayın",
   "Apply a preset whenever the battery begins charging": "Pil şarj olmaya başladığında bir önayar uygulayın",
   "Apply a preset whenever the system begins running from battery power": "Sistem pil gücüyle çalışmaya başladığında bir önayar uygulayın",
-  "Apply on startup": "Başlangıçta uygula",
   "Apply preset": "Hazır ayarı uygula",
   "Apply presets automatically when power or system state changes.": "Güç veya sistem durumu değiştiğinde önayarları otomatik olarak uygulayın.",
   "Apply your own custom power settings using the sliders below.": "Aşağıdaki kaydırıcıları kullanarak kendi özel güç ayarlarınızı uygulayın.",

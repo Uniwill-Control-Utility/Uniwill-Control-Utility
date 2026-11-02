@@ -72,7 +72,6 @@
   "Apply a preset after the system resumes from sleep or hibernation": "Застосовувати пресет після виходу системи з режиму сну або гібернації",
   "Apply a preset whenever the battery begins charging": "Застосовувати пресет щоразу, коли починається заряджання акумулятора",
   "Apply a preset whenever the system begins running from battery power": "Застосовувати пресет щоразу, коли система переходить на живлення від акумулятора",
-  "Apply on startup": "Застосовувати під час запуску",
   "Apply preset": "Застосувати профіль",
   "Apply presets automatically when power or system state changes.": "Автоматично застосовувати пресети у разі зміни живлення або стану системи.",
   "Apply your own custom power settings using the sliders below.": "Застосуйте власні параметри живлення за допомогою повзунків нижче.",

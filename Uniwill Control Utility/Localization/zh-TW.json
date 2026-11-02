@@ -72,7 +72,6 @@
   "Apply a preset after the system resumes from sleep or hibernation": "在系統從睡眠或休眠狀態復原後套用預設",
   "Apply a preset whenever the battery begins charging": "每當電池開始充電時套用預設",
   "Apply a preset whenever the system begins running from battery power": "每當系統開始使用電池供電運行時套用預設",
-  "Apply on startup": "啟動時套用",
   "Apply preset": "套用預設",
   "Apply presets automatically when power or system state changes.": "當電源或系統狀態改變時自動套用預設。",
   "Apply your own custom power settings using the sliders below.": "使用下方的滑塊套用您自己的自定義功耗設定。",
