@@ -1341,6 +1341,30 @@ namespace UCU.Hardware.Ec
             Thread.Sleep(150);
 
             DebugLog($"[DIAG] EcEngine: Applied fan curves - CPU '{cpuCurve.Name}': [{string.Join(", ", cpuDuty)}] | GPU '{gpuCurve.Name}': [{string.Join(", ", gpuDuty)}]");
+
+            // End-of-apply readback. The EC can accept a table write and still
+            // serve the old table (its internal buffer is shared and rapid
+            // writes are dropped), which is how a half-applied curve leaves one
+            // fan following the previous preset until the next apply. Verify
+            // both duty tables and re-write once; a persistent mismatch is a
+            // warning, never a silent success.
+            VerifyFanDutyTable(REG_CPU_FAN_SPEED_TABLE, cpuDuty, "CPU");
+            VerifyFanDutyTable(REG_GPU_FAN_SPEED_TABLE, gpuDuty, "GPU");
+        }
+
+        private void VerifyFanDutyTable(ushort register, byte[] expected, string label)
+        {
+            byte[] actual = ReadECRegisters(register, expected.Length);
+            if (actual.Length == expected.Length && System.Linq.Enumerable.SequenceEqual(actual, expected))
+                return;
+
+            DebugLog($"[WRN] EcEngine: {label} fan table did not land (readback differs); re-writing once");
+            WriteECRegisters(register, expected);
+            Thread.Sleep(100);
+
+            byte[] retry = ReadECRegisters(register, expected.Length);
+            if (retry.Length != expected.Length || !System.Linq.Enumerable.SequenceEqual(retry, expected))
+                DebugLog($"[WRN] EcEngine: {label} fan table still differs after the retry - the EC refused it");
         }
 
         /// <summary>

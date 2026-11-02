@@ -112,7 +112,7 @@ public sealed class PowerContractCaptureSiteTests
     public void ApplierAndPages_NoteTheCpuPair_AndClearOnStock()
     {
         string applier = ReadAppSource("Services", "PresetProfileApplier.cs");
-        Assert.Contains("PowerContractStore.NoteCpuApplied(pl1, pl2)", applier, StringComparison.Ordinal);
+        Assert.Contains("PowerContractStore.NoteCpuApplied(verdict.Pl1, verdict.Pl2)", applier, StringComparison.Ordinal);
         Assert.Contains("PowerContractStore.ClearAll()", applier, StringComparison.Ordinal);
 
         string presets = ReadAppSource("Views", "Pages", "Presets.xaml.cs");
