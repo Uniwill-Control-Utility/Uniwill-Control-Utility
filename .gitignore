@@ -383,5 +383,16 @@ build/msi-edit/obj/
 # User-story / planning documents are local working notes and are NEVER
 # committed (user rule, 2026-11-02). Stories live in the agent plan directory
 # outside the repo; anything that looks like one stays out of history.
-**/*user-stories*.md
-**/*user-stories*.json
+# Names that mark a working document rather than a reference one. Keep this
+# list narrow enough that a real doc (`operations-runbook`, protocol pages,
+# `Localization/todo/*.json`) never matches.
+**/*stories*
+**/*backlog*
+**/*draft*
+**/*-wip*
+**/*wip-*
+**/plan.md
+**/plan-*.md
+**/*-plan.md
+**/*plan-*.md
+**/*-plan.json
