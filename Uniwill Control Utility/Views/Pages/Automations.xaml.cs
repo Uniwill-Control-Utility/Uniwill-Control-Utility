@@ -33,8 +33,8 @@ namespace Uniwill_Control_Utility.Views.Pages
 
             _mux = App.GetService<IGpuMuxCapability>();
 
-            PopulateComboBox(cbxCharge, ActivePresetMode);
-            PopulateComboBox(cbxDischarge, ActivePresetMode);
+            PopulateComboBox(cbxCharge, ActivePresetMode, KeepCurrentLabel);
+            PopulateComboBox(cbxDischarge, ActivePresetMode, KeepCurrentLabel);
             PopulateComboBox(cbxResume, ActivePresetMode);
 
             // Restore saved selections — resets to None if the saved preset is from the wrong mode pool.
@@ -77,14 +77,24 @@ namespace Uniwill_Control_Utility.Views.Pages
 
         #region ComboBox Population
 
+        /// <summary>Persisted value of the leading item on the power-edge rows.
+        /// It stays "None" because the power-edge re-apply (WatcherHubService) and
+        /// MainWindow's automation gate compare against that exact string.</summary>
+        private const string NoPresetValue = "None";
+
+        /// <summary>Shown instead of "None": the app re-applies the current preset
+        /// on the edge so the battery clamp lands, so "None" would read as "do nothing".</summary>
+        internal const string KeepCurrentLabel = "Keep current preset";
+
         /// <summary>
-        /// Populates a ComboBox with "None" plus all available preset display names
-        /// filtered to only include custom presets from the currently active preset mode.
-        /// Built-in profiles (Office, Gaming, Turbo) are always included.
+        /// Populates a ComboBox with the "keep current" item plus all available preset
+        /// display names, filtered to only include custom presets from the currently
+        /// active preset mode. Built-in profiles (Office, Gaming, Turbo) are always
+        /// included.
         /// </summary>
-        private static void PopulateComboBox(ComboBox comboBox, PresetMode mode)
+        private static void PopulateComboBox(ComboBox comboBox, PresetMode mode, string noneLabel = "None")
         {
-            comboBox.Items.Add("None");
+            comboBox.Items.Add(new ComboBoxItem { Content = noneLabel, Tag = NoPresetValue });
 
             // Always show built-in profiles
             foreach (string name in PresetProfileApplier.BuiltInProfileNames)
@@ -112,7 +122,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             setup = false;
             string oldPreset = Settings.Default.acPreset;
             cbxCharge.Items.Clear();
-            PopulateComboBox(cbxCharge, ActivePresetMode);
+            PopulateComboBox(cbxCharge, ActivePresetMode, KeepCurrentLabel);
             getAcPreset(oldPreset);
             setup = true;
         }
@@ -122,7 +132,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             setup = false;
             string oldPreset = Settings.Default.dcPreset;
             cbxDischarge.Items.Clear();
-            PopulateComboBox(cbxDischarge, ActivePresetMode);
+            PopulateComboBox(cbxDischarge, ActivePresetMode, KeepCurrentLabel);
             getDcPreset(oldPreset);
             setup = true;
         }
@@ -157,10 +167,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 if (!setup) return;
 
-                string? selectedText = (sender as ComboBox)?.SelectedItem?.ToString();
+                string? selectedText = SelectedPresetValue(sender as ComboBox);
                 string profileName = ResolveProfileName(selectedText);
 
-                Settings.Default.acPreset = selectedText ?? "None";
+                Settings.Default.acPreset = selectedText ?? NoPresetValue;
                 Settings.Default.acCommandString = PresetProfileApplier.BuildCommandString(profileName);
                 Settings.Default.Save();
             }
@@ -171,10 +181,10 @@ namespace Uniwill_Control_Utility.Views.Pages
         {
             if (!setup) return;
 
-            string? selectedText = (sender as ComboBox)?.SelectedItem?.ToString();
+            string? selectedText = SelectedPresetValue(sender as ComboBox);
             string profileName = ResolveProfileName(selectedText);
 
-            Settings.Default.dcPreset = selectedText ?? "None";
+            Settings.Default.dcPreset = selectedText ?? NoPresetValue;
             Settings.Default.dcCommandString = PresetProfileApplier.BuildCommandString(profileName);
             Settings.Default.Save();
         }
@@ -185,10 +195,10 @@ namespace Uniwill_Control_Utility.Views.Pages
             {
                 if (!setup) return;
 
-                string? selectedText = (sender as ComboBox)?.SelectedItem?.ToString();
+                string? selectedText = SelectedPresetValue(sender as ComboBox);
                 string profileName = ResolveProfileName(selectedText);
 
-                Settings.Default.resumePreset = selectedText ?? "None";
+                Settings.Default.resumePreset = selectedText ?? NoPresetValue;
                 Settings.Default.resumeCommandString = PresetProfileApplier.BuildCommandString(profileName);
                 Settings.Default.Save();
             }
@@ -224,6 +234,16 @@ namespace Uniwill_Control_Utility.Views.Pages
             };
         }
 
+        /// <summary>
+        /// The persisted name carried by a combobox item: the Tag when the item has one
+        /// (the leading "keep current" row), otherwise the item's text.
+        /// </summary>
+        private static string? PresetItemValue(object? item) =>
+            item is ComboBoxItem { Tag: string tag } ? tag : item?.ToString();
+
+        private static string? SelectedPresetValue(ComboBox? comboBox) =>
+            PresetItemValue(comboBox?.SelectedItem);
+
         private void getAcPreset(string searchName)
         {
             setPresetFromSaved(cbxCharge, searchName, (val) => Settings.Default.acPreset = val);
@@ -255,7 +275,7 @@ namespace Uniwill_Control_Utility.Views.Pages
             // Exact match first
             foreach (var item in comboBox.Items)
             {
-                if (item.ToString() == searchName)
+                if (PresetItemValue(item) == searchName)
                 {
                     comboBox.SelectedItem = item;
                     return;
@@ -269,7 +289,7 @@ namespace Uniwill_Control_Utility.Views.Pages
                 string newDisplayName = PresetProfileApplier.DisplayName(profileKey);
                 foreach (var item in comboBox.Items)
                 {
-                    if (item.ToString() == newDisplayName)
+                    if (PresetItemValue(item) == newDisplayName)
                     {
                         comboBox.SelectedItem = item;
                         saveCallback(newDisplayName);

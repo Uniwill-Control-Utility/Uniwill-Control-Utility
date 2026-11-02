@@ -92,6 +92,30 @@
                             </ui:InfoBar.Resources>
                         </ui:InfoBar>
 
+                    <!-- Stock-preset lock: the firmware drives the fans, so the saved
+                         curve below is not what the hardware runs -->
+                    <ui:CardControl x:Name="StockPresetNotice" Margin="0,0,0,8" Visibility="Collapsed">
+                        <ui:CardControl.Icon>
+                            <ui:FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BA;" FontSize="20" Margin="4,0,6,0" />
+                        </ui:CardControl.Icon>
+                        <ui:CardControl.Header>
+                            <StackPanel>
+                                <ui:TextBlock x:Name="txtStockPresetTitle"
+                                              FontTypography="Body"
+                                              TextWrapping="Wrap" />
+                                <ui:TextBlock Margin="0,2,0,0"
+                                              FontTypography="Caption"
+                                              Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                              Text="Your saved fan curve is not in use while a built-in preset is active. It comes back when you apply a Custom preset."
+                                              TextWrapping="Wrap" />
+                            </StackPanel>
+                        </ui:CardControl.Header>
+                    </ui:CardControl>
+
+                    <!-- Curve area — collapsed as a whole while a stock preset owns the
+                         fans, so no child can re-show a stale curve -->
+                    <StackPanel x:Name="CurveArea">
+
                     <!-- Unified curve toggle with expander -->
                     <ui:CardExpander x:Name="UnifiedCard"
                                      Margin="0,0,0,8"
@@ -476,6 +500,8 @@
                             </StackPanel>
                         </ui:CardExpander>
                     </Grid>
+                    </StackPanel>
+
                     </StackPanel>
 
                     <!-- Fan Turbo toggle -->

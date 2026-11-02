@@ -106,11 +106,11 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,18,0" VerticalAlignment="Center">
-                                <ui:TextBlock FontTypography="Body" Text="Preset" />
+                                <ui:TextBlock FontTypography="Body" Text="Preset on battery" />
                                 <ui:TextBlock Margin="0,2,0,0"
                                            FontTypography="Caption"
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                           Text="Apply a preset whenever the system begins running from battery power"
+                                           Text="Applied when the system switches to battery power"
                                            TextWrapping="Wrap" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -130,6 +130,13 @@
                                 </ui:Button>
                             </StackPanel>
                         </Grid>
+
+                        <!-- What a power-edge preset now controls (power limits are capped by the firmware on battery) -->
+                        <ui:TextBlock Margin="0,8,0,0"
+                                      FontTypography="Caption"
+                                      Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                      Text="Power limits stay capped on battery whichever preset is selected — a preset changes fan noise, undervolt and who controls the fans."
+                                      TextWrapping="Wrap" />
 
                         <!-- Divider (hidden while the GPU row below is hidden) -->
                         <Border x:Name="SeparatorGpuBattery" Height="1" Margin="-58,12,-46,12"
@@ -213,11 +220,11 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,18,0" VerticalAlignment="Center">
-                                <ui:TextBlock FontTypography="Body" Text="Preset" />
+                                <ui:TextBlock FontTypography="Body" Text="Preset when plugged in" />
                                 <ui:TextBlock Margin="0,2,0,0"
                                            FontTypography="Caption"
                                            Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                                           Text="Apply a preset whenever the battery begins charging"
+                                           Text="Applied when the charger is connected"
                                            TextWrapping="Wrap" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -237,6 +244,13 @@
                                 </ui:Button>
                             </StackPanel>
                         </Grid>
+
+                        <!-- Same note for the plugged-in edge: charging does not lift the battery cap -->
+                        <ui:TextBlock Margin="0,8,0,0"
+                                      FontTypography="Caption"
+                                      Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                      Text="Power limits stay capped on battery whichever preset is selected — a preset changes fan noise, undervolt and who controls the fans."
+                                      TextWrapping="Wrap" />
 
                         <!-- Divider (hidden while the GPU row below is hidden) -->
                         <Border x:Name="SeparatorGpuPluggedIn" Height="1" Margin="-58,12,-46,12"
